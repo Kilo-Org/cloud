@@ -6,6 +6,7 @@ import { organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { eq, sql } from 'drizzle-orm';
 import { toMicrodollars } from '@/lib/utils';
+import { userCanManageCredits } from '@/lib/admin/credit-management';
 
 export async function POST(
   request: NextRequest,
@@ -16,8 +17,11 @@ export async function POST(
   }
 
   const id = (await params).id;
-  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+  const { user: operator, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) return authFailedResponse;
+  if (!operator || !userCanManageCredits(operator)) {
+    return NextResponse.json({ error: 'Credit management access required' }, { status: 403 });
+  }
 
   const org = await getOrganizationById(id);
   if (!org) {

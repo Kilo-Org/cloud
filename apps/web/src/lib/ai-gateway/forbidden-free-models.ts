@@ -25,6 +25,7 @@ const forbiddenFreeModelIds: ReadonlySet<string> = new Set([
   'meta-llama/llama-3.2-3b-instruct:free',
   'meta-llama/llama-3.3-70b-instruct:free',
   'mistralai/mistral-small-3.1-24b-instruct:free',
+  'morph-warp-grep-v2',
   'minimax/minimax-m2.1:free',
   'minimax/minimax-m2.5:free',
   'moonshotai/kimi-k2.5:free',

@@ -33,10 +33,12 @@
     "dev:setup-env": "tsx dev/local/setup-env.ts",
     "dev:seed": "tsx dev/seed/index.ts",
     "dev:discord-gateway-cron": "tsx dev/discord-gateway-cron.ts",
-    "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts"
+    "dev:kiloclaw-fly-instances": "tsx services/kiloclaw/scripts/dev-fly-instances.ts",
+    "web:env": "tsx scripts/web-env/index.ts"
   },
   "packageManager": "pnpm@11.1.2",
   "devDependencies": {
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "husky": "9.1.7",
     "ink": "6.8.0",

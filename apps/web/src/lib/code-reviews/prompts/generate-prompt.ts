@@ -24,7 +24,7 @@ import { getPromptTemplateFeatureFlag, getPlatformConfig } from './platform-help
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { sanitizeUserInput } from './prompt-utils';
 import { formatRepositoryReviewInstructions } from './repository-review-instructions';
-import { stripReviewSummaryFooter } from '../summary/usage-footer';
+import { getCurrentReviewSummaryForContext } from '../summary/history';
 
 /**
  * Inline comment info for duplicate detection
@@ -60,6 +60,7 @@ const PromptTemplateSchema = z.object({
   workflow: z.string(),
   whatToReview: z.string(),
   commentFormat: z.string(),
+  inlineCommentFooter: z.string().optional(),
   summaryFormatIssuesFound: z.string(),
   summaryFormatNoIssues: z.string(),
   summaryMarkerNote: z.string(),
@@ -130,6 +131,7 @@ export function resolveTemplate(
   return {
     template: {
       ...remoteTemplate,
+      inlineCommentFooter: remoteTemplate.inlineCommentFooter ?? localTemplate.inlineCommentFooter,
       incrementalReviewWorkflow:
         remoteTemplate.incrementalReviewWorkflow ?? localTemplate.incrementalReviewWorkflow,
       styleGuidance: mergeStyleOverrides(localTemplate.styleGuidance, remoteTemplate.styleGuidance),
@@ -277,7 +279,9 @@ export async function generateReviewPrompt(
     existingReviewState?.summaryComment
   ) {
     const activeCount = existingReviewState.inlineComments?.filter(c => !c.isOutdated).length ?? 0;
-    const previousSummary = stripReviewSummaryFooter(existingReviewState.summaryComment.body);
+    const previousSummary = getCurrentReviewSummaryForContext(
+      existingReviewState.summaryComment.body
+    );
     const incrementalWorkflow = template.incrementalReviewWorkflow
       .replace(/{PREVIOUS_SHA}/g, previousHeadSha)
       .replace(/{PREVIOUS_SUMMARY}/g, previousSummary)
@@ -316,6 +320,10 @@ export async function generateReviewPrompt(
   // 8. Comment format (use style override if available, otherwise default)
   const commentFormat = template.commentFormatOverrides?.[reviewStyle] ?? template.commentFormat;
   prompt += commentFormat + '\n\n';
+
+  if (platform === 'github' && template.inlineCommentFooter) {
+    prompt += template.inlineCommentFooter + '\n\n';
+  }
 
   // 9. Dynamic context section (separator)
   prompt += '---\n\n# CONTEXT FOR THIS ' + platformConfig.prTerm + '\n\n';

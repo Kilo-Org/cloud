@@ -71,7 +71,11 @@ const mockCaptureException = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockCaptureMessage = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockAppendPreviousReviewSummaryHistory = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockAppendReviewSummaryFooter = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockBuildReviewSummaryFooter = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockRetryReviewFresh = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -140,8 +144,14 @@ jest.mock('@sentry/nextjs', () => ({
   captureMessage: mockCaptureMessage,
 }));
 
+jest.mock('@/lib/code-reviews/summary/history', () => ({
+  appendPreviousReviewSummaryHistory: (...args: unknown[]) =>
+    mockAppendPreviousReviewSummaryHistory(...args),
+}));
+
 jest.mock('@/lib/code-reviews/summary/usage-footer', () => ({
   appendReviewSummaryFooter: (...args: unknown[]) => mockAppendReviewSummaryFooter(...args),
+  buildReviewSummaryFooter: (...args: unknown[]) => mockBuildReviewSummaryFooter(...args),
 }));
 
 jest.mock('@/lib/code-reviews/action-required', () => {
@@ -225,6 +235,8 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     repository_review_instructions_used: false,
     repository_review_instructions_ref: null,
     repository_review_instructions_truncated: false,
+    previous_summary_body: null,
+    previous_summary_head_sha: null,
     model: null,
     total_tokens_in: null,
     total_tokens_out: null,
@@ -379,7 +391,15 @@ beforeEach(async () => {
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
   mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
-  mockAppendReviewSummaryFooter.mockReturnValue('body with footer');
+  mockAppendPreviousReviewSummaryHistory.mockImplementation((body: string) => body);
+  mockBuildReviewSummaryFooter.mockImplementation(
+    (footer: { usage?: unknown; reviewGuidance?: { used: boolean } }) =>
+      footer.usage || footer.reviewGuidance?.used ? '\n\nfooter' : ''
+  );
+  mockAppendReviewSummaryFooter.mockImplementation(
+    (body: string, footer: { usage?: unknown; reviewGuidance?: { used: boolean } }) =>
+      footer.usage || footer.reviewGuidance?.used ? 'body with footer' : body
+  );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
   ({ POST } = await import('./route'));
 });
@@ -773,6 +793,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     it.each([
       'No allowed providers are specified.',
       'No allowed providers are available for the selected model.',
+      'Not Found: {"error":"No eligible provider can serve the selected model.","error_type":"provider_not_allowed","message":"No eligible provider can serve the selected model. Select another model or update the provider routing settings."}',
       'No endpoints found matching your data policy (Free model training). Configure: https://openrouter.ai/settings/privacy',
     ])(
       'infers provider-policy callbacks as selected-model action-required failures',
@@ -876,14 +897,25 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
-    it('reclassifies failed model-not-found callbacks as cancelled while preserving the error message', async () => {
+    it('reclassifies failed model-not-found callbacks as cancelled while preserving dashboard diagnostics', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
       mockFindKiloReviewComment.mockResolvedValue(null);
+      const diagnostics = {
+        requestedModel: 'kilo/retired-model',
+        availableModelCount: 3,
+        availableModels: ['vendor/alpha', 'vendor/beta', 'vendor/gamma'],
+        suggestedModels: ['vendor/alpha', 'vendor/beta'],
+        suggestionSource: 'fuzzy',
+      };
+      const detailedErrorMessage =
+        'Model not found: kilo/retired-model. Available runtime models: 3. Closest matches: vendor/alpha, vendor/beta.';
 
       const response = await POST(
         makeRequest({
           status: 'failed',
-          errorMessage: 'Model not found: kilo/retired-model',
+          cloudAgentSessionId: 'agent_runtime_model_diagnostics',
+          errorMessage: detailedErrorMessage,
+          modelNotFoundRuntimeDiagnostics: diagnostics,
         }),
         makeParams(REVIEW_ID)
       );
@@ -892,7 +924,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'cancelled',
-          errorMessage: 'Model not found: kilo/retired-model',
+          errorMessage: detailedErrorMessage,
           terminalReason: 'model_not_found',
         })
       );
@@ -900,10 +932,38 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         REVIEW_ID,
         'cancelled',
         expect.objectContaining({
-          errorMessage: 'Model not found: kilo/retired-model',
+          errorMessage: detailedErrorMessage,
           terminalReason: 'model_not_found',
         })
       );
+      expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+      expect(mockCaptureMessage).toHaveBeenCalledWith(
+        'Code review runtime model not found',
+        expect.objectContaining({
+          level: 'warning',
+          tags: expect.objectContaining({
+            source: 'code-review-runtime-model-not-found',
+            review_id: REVIEW_ID,
+            cloud_agent_session_id: 'agent_runtime_model_diagnostics',
+          }),
+          extra: expect.objectContaining({
+            requestedModel: 'kilo/retired-model',
+            availableModelCount: 3,
+            availableModels: ['vendor/alpha', 'vendor/beta', 'vendor/gamma'],
+            suggestedModels: ['vendor/alpha', 'vendor/beta'],
+            suggestionSource: 'fuzzy',
+          }),
+        })
+      );
+      const publicOutputs = JSON.stringify({
+        githubCheck: mockUpdateCheckRun.mock.calls,
+        githubSummary: mockCreatePRComment.mock.calls,
+        gitlabStatus: mockSetCommitStatus.mock.calls,
+        gitlabSummary: mockCreateMRNote.mock.calls,
+      });
+      expect(publicOutputs).not.toContain('vendor/alpha');
+      expect(publicOutputs).not.toContain('Available runtime models');
+      expect(publicOutputs).not.toContain('retired-model');
       expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
       expect(mockRetryReviewFresh).not.toHaveBeenCalled();
     });
@@ -1257,6 +1317,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 100_001,
           totalTokensOut: 0,
+          tokensIn: 100_001,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 200_000,
         },
       },
@@ -1266,6 +1329,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 60_000,
           totalTokensOut: 40_000,
+          tokensIn: 60_000,
+          tokensOut: 40_000,
+          cachedTokens: 0,
           totalCostMusd: 200_000,
         },
       },
@@ -1275,6 +1341,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 100_001,
           totalTokensOut: 0,
+          tokensIn: 100_001,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 199_999,
         },
       },
@@ -1284,6 +1353,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 99_999,
           totalTokensOut: 0,
+          tokensIn: 99_999,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 200_000,
         },
       },
@@ -1324,6 +1396,232 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    it('allows one fresh retry for a pre-dispatch sandbox connection failure when usage is unavailable', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-sandbox-connect-failed',
+        cliSessionId: 'ses_sandbox_connect_failed',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Could not connect to the sandbox',
+          terminalReason: 'sandbox_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'sandbox_connect_failed',
+            attempts: 2,
+            message: 'Sandbox connection failed after 2 attempts',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_sandbox_connect_failed',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: 'Could not connect to the sandbox',
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('does not infer the unavailable-usage exception from sandbox connection error text', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-sandbox-connect-text-only',
+        cliSessionId: 'ses_sandbox_connect_text_only',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Could not connect to the sandbox',
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_sandbox_connect_text_only',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'sandbox_error' })
+      );
+    });
+
+    it.each([
+      {
+        name: 'sandbox connection failure after dispatch',
+        failure: { stage: 'agent_activity', code: 'sandbox_connect_failed' },
+      },
+      {
+        name: 'different pre-dispatch failure code',
+        failure: { stage: 'pre_dispatch', code: 'workspace_setup_failed' },
+      },
+      {
+        name: 'incomplete failure data',
+        failure: { stage: 'pre_dispatch' },
+      },
+      {
+        name: 'future-shaped failure data',
+        failure: {
+          stage: 'pre_dispatch',
+          code: 'sandbox_connect_failed',
+          diagnostic: 'future field',
+        },
+      },
+    ])('keeps unavailable usage fail-closed for $name', async ({ failure }) => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-sandbox-connect-near-miss',
+        cliSessionId: 'ses_sandbox_connect_near_miss',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Could not connect to the sandbox',
+          terminalReason: 'sandbox_error',
+          failure,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_sandbox_connect_near_miss',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'sandbox_error' })
+      );
+    });
+
+    it('ignores structured failure fields on legacy orchestrator payloads', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-legacy-sandbox-connect',
+        cliSessionId: 'ses_legacy_sandbox_connect',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          sessionId: retryFlow.sessionId,
+          cliSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Could not connect to the sandbox',
+          terminalReason: 'sandbox_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'sandbox_connect_failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_legacy_sandbox_connect',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'sandbox_error' })
+      );
+    });
+
+    it('applies measured usage thresholds to pre-dispatch sandbox connection failures', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-expensive-sandbox-connect',
+        cliSessionId: 'ses_expensive_sandbox_connect',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue({
+        model: 'anthropic/claude-sonnet-4.6',
+        totalTokensIn: 99_999,
+        totalTokensOut: 0,
+        tokensIn: 99_999,
+        tokensOut: 0,
+        cachedTokens: 0,
+        totalCostMusd: 200_000,
+      });
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Could not connect to the sandbox',
+          terminalReason: 'sandbox_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'sandbox_connect_failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_expensive_sandbox_connect',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'sandbox_error' })
+      );
+    });
+
     it.each([
       {
         name: 'cost and tokens are below thresholds',
@@ -1331,6 +1629,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 99_999,
           totalTokensOut: 0,
+          tokensIn: 99_999,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 199_999,
         },
       },
@@ -1689,7 +1990,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
     });
 
-    it('terminalizes the parent when the infra retry attempt fails', async () => {
+    it('terminalizes a retry attempt with the targeted pre-dispatch sandbox failure', async () => {
       mockGetCodeReviewById.mockResolvedValue(
         makeReview({ status: 'running', session_id: 'agent-second-failure' })
       );
@@ -1698,6 +1999,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           id: '00000000-0000-0000-0000-000000000403',
           status: 'failed',
           session_id: 'agent-second-failure',
+          cli_session_id: 'ses_second_failure',
           retry_reason: 'infra_failure',
           retry_of_attempt_id: '00000000-0000-0000-0000-000000000402',
         })
@@ -1707,6 +2009,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           id: '00000000-0000-0000-0000-000000000403',
           status: 'failed',
           session_id: 'agent-second-failure',
+          cli_session_id: 'ses_second_failure',
           retry_reason: 'infra_failure',
           retry_of_attempt_id: '00000000-0000-0000-0000-000000000402',
         })
@@ -1716,8 +2019,13 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeRequest({
           status: 'failed',
           cloudAgentSessionId: 'agent-second-failure',
+          kiloSessionId: 'ses_second_failure',
           errorMessage: 'Unexpected backend failure after prior infra retry',
           terminalReason: 'upstream_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'sandbox_connect_failed',
+          },
         }),
         makeParams(REVIEW_ID)
       );
@@ -2148,9 +2456,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
     it('updates GitHub check runs with actionable cancelled copy', async () => {
       mockGetCodeReviewById.mockResolvedValue(makeReview());
       mockFindKiloReviewComment.mockResolvedValue(null);
+      const detailedErrorMessage =
+        'Model not found: kilo/retired-model. Available runtime models: 3. Closest matches: vendor/alpha, vendor/beta.';
 
       await POST(
-        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeRequest({ status: 'failed', errorMessage: detailedErrorMessage }),
         makeParams(REVIEW_ID)
       );
 
@@ -2169,6 +2479,13 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         }),
         'standard'
       );
+      const publicOutputs = JSON.stringify({
+        githubCheck: mockUpdateCheckRun.mock.calls,
+        githubSummary: mockCreatePRComment.mock.calls,
+      });
+      expect(publicOutputs).not.toContain('retired-model');
+      expect(publicOutputs).not.toContain('vendor/alpha');
+      expect(publicOutputs).not.toContain('Available runtime models');
     });
 
     it('updates GitLab commit status with actionable cancelled copy', async () => {
@@ -2176,9 +2493,11 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
       );
       mockFindKiloReviewNote.mockResolvedValue(null);
+      const detailedErrorMessage =
+        'Model not found: kilo/retired-model. Available runtime models: 3. Closest matches: vendor/alpha, vendor/beta.';
 
       await POST(
-        makeRequest({ status: 'failed', errorMessage: 'Model not found: kilo/retired-model' }),
+        makeRequest({ status: 'failed', errorMessage: detailedErrorMessage }),
         makeParams(REVIEW_ID)
       );
 
@@ -2192,6 +2511,13 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         }),
         'https://gitlab.com'
       );
+      const publicOutputs = JSON.stringify({
+        gitlabStatus: mockSetCommitStatus.mock.calls,
+        gitlabSummary: mockCreateMRNote.mock.calls,
+      });
+      expect(publicOutputs).not.toContain('retired-model');
+      expect(publicOutputs).not.toContain('vendor/alpha');
+      expect(publicOutputs).not.toContain('Available runtime models');
     });
 
     it('creates the canonical GitHub summary when absent', async () => {
@@ -2395,16 +2721,81 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
   });
 
   describe('summary footer guidance', () => {
-    it('updates completed GitHub summary with REVIEW.md guidance metadata when used', async () => {
+    it('appends captured history to a completed GitHub summary', async () => {
       const review = makeReview({
-        repository_review_instructions_used: true,
-        repository_review_instructions_ref: 'main',
-        repository_review_instructions_truncated: false,
+        previous_summary_body: '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings',
+        previous_summary_head_sha: 'previous-head-sha',
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+      mockAppendPreviousReviewSummaryHistory.mockReturnValue('body with history');
+
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(mockAppendPreviousReviewSummaryHistory).toHaveBeenCalledWith(
+        'existing body',
+        review.previous_summary_body,
+        'previous-head-sha',
+        { maxBodyCharacters: 65_536, reservedCharacters: 0 }
+      );
+      expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('body with history', {
+        usage: undefined,
+        reviewGuidance: { used: false, ref: null, truncated: false },
+      });
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        99,
+        'body with history',
+        'standard'
+      );
+    });
+
+    it('omits an oversized GitHub footer instead of exceeding the comment limit', async () => {
+      const review = makeReview({
+        previous_summary_body: '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings',
+        previous_summary_head_sha: 'previous-head-sha',
         model: 'anthropic/claude-sonnet-4.6',
         total_tokens_in: 1000,
         total_tokens_out: 200,
       });
       mockGetCodeReviewById.mockResolvedValue(review);
+      mockAppendPreviousReviewSummaryHistory.mockReturnValue('body with bounded history');
+      mockAppendReviewSummaryFooter.mockReturnValue('x'.repeat(65_537));
+
+      await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
+
+      expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        99,
+        'body with bounded history',
+        'standard'
+      );
+    });
+
+    it('updates completed GitHub summary with REVIEW.md guidance metadata when used', async () => {
+      const review = makeReview({
+        repository_review_instructions_used: true,
+        repository_review_instructions_ref: 'main',
+        repository_review_instructions_truncated: false,
+        cli_session_id: 'ses_review_with_cache',
+        model: 'anthropic/claude-sonnet-4.6',
+        total_tokens_in: 1000,
+        total_tokens_out: 200,
+        completed_at: '2025-01-01T00:10:00Z',
+      });
+      mockGetCodeReviewById.mockResolvedValue(review);
+      mockGetSessionUsageFromBilling.mockResolvedValue({
+        model: 'openai/gpt-4o',
+        totalTokensIn: 1000,
+        totalTokensOut: 200,
+        tokensIn: 200,
+        tokensOut: 200,
+        cachedTokens: 800,
+        totalCostMusd: 100,
+      });
 
       await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
@@ -2415,8 +2806,29 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         1,
         'standard'
       );
+      expect(mockAppendPreviousReviewSummaryHistory).toHaveBeenCalledWith(
+        'existing body',
+        null,
+        null,
+        { maxBodyCharacters: 65_536, reservedCharacters: 8 }
+      );
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_review_with_cache',
+        '2025-01-01T00:00:00Z',
+        '2025-01-01T00:10:00Z'
+      );
+      expect(mockUpdateCodeReviewUsage).toHaveBeenCalledWith(REVIEW_ID, {
+        totalTokensIn: 1000,
+        totalTokensOut: 200,
+        totalCostMusd: 100,
+      });
       expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing body', {
-        usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 1000, tokensOut: 200 },
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          tokensIn: 200,
+          tokensOut: 200,
+          cachedTokens: 800,
+        },
         reviewGuidance: { used: true, ref: 'main', truncated: false },
       });
       expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
@@ -2452,7 +2864,12 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'https://gitlab.com'
       );
       expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing note body', {
-        usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 1000, tokensOut: 200 },
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          tokensIn: 1000,
+          tokensOut: 200,
+          cachedTokens: 0,
+        },
         reviewGuidance: { used: true, ref: 'main', truncated: true },
       });
       expect(mockUpdateKiloReviewNote).toHaveBeenCalledWith(
@@ -2498,7 +2915,10 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
 
       await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
-      expect(mockAppendReviewSummaryFooter).not.toHaveBeenCalled();
+      expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing body', {
+        usage: undefined,
+        reviewGuidance: { used: false, ref: null, truncated: false },
+      });
       expect(mockUpdateKiloReviewComment).not.toHaveBeenCalled();
     });
   });

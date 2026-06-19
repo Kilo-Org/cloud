@@ -11,6 +11,32 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-06-18',
+    description: 'OpenClaw 2026.6.8 is available now as an Early Access upgrade.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-06-16',
+    description:
+      "Fixed image recognition for KiloClaw agents. Images sent to an agent could not be processed and failed with 'model does not support images', because the models that support images were not being offered to the image pipeline. KiloClaw now refreshes the model list so image understanding works again. Redeploy your instance to pick up the fix.",
+    category: 'bugfix',
+    deployHint: 'redeploy_required',
+  },
+  {
+    date: '2026-06-15',
+    description: 'OpenClaw 2026.6.5 is now generally available to everyone.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
+    date: '2026-06-10',
+    description:
+      'OpenClaw 2026.6.5 is available now as an Early Access upgrade. This release includes a new OpenClaw feature that migrates some credentials stored in JSON files into a SQLite database. The migration runs automatically the first time you upgrade — and once your instance has migrated, there is no automatic way to revert to the previous format.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
     date: '2026-06-03',
     description:
       "Google Calendar now connects through KiloCode's official Google approved OAuth client. Connect it from Settings → Productivity → Google Calendar for read-only calendar access. We encourage everyone to use this instead of the legacy Google (Gog) connection. If you already have the legacy connection set up, it keeps working and nothing is removed. New legacy setups are no longer offered, so switch over when convenient.",

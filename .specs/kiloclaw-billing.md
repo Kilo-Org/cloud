@@ -1058,8 +1058,11 @@ rows renew.
    operations so that a retry can re-attempt the deduction without
    the idempotency key blocking it.
 4. If the deduction insert returns zero affected rows (duplicate key
-   from a prior committed transaction), the subscription update
-   within the same transaction is a no-op (same values). The system
+   from a prior committed transaction), the system MUST reconcile the
+   subscription advancement when the same renewal boundary remains
+   current. Reconciliation MUST apply the same active-renewal destruction-
+   deadline invalidation and suspended-recovery side effects as a newly
+   inserted deduction. If the boundary has already advanced, the system
    MUST skip further processing for that row.
 5. If the subscription has cancel-at-period-end set, the sweep MUST
    skip the deduction, set the subscription status to canceled, and
@@ -1070,10 +1073,12 @@ rows renew.
 6. When the effective balance (as defined in Credit Enrollment rule 4)
    is sufficient for the subscription's price-version renewal amount
    and the deduction succeeds (one affected row), the system MUST
-   atomically record the deduction as credit spend (see Definitions)
-   and advance the subscription's billing period
-   (current-period-start, current-period-end, credit-renewal-timestamp)
-   within the same transaction. After the transaction commits, the
+   atomically record the deduction as credit spend (see Definitions),
+   advance the subscription's billing period
+   (current-period-start, current-period-end, credit-renewal-timestamp),
+   and clear any prior destruction deadline within the same transaction.
+   Clearing the destruction deadline MUST NOT clear the suspension
+   timestamp or auto-resume retry state. After the transaction commits, the
    system MUST trigger a bonus credit evaluation as described in Credit
    Enrollment rule 6. The user's credit balance MAY be temporarily
    negative between the deduction and the bonus award. If the bonus
@@ -1096,9 +1101,11 @@ rows renew.
    the user so that future failures can re-trigger the notification.
 10. When the deduction succeeds, the subscription was past-due, and
     the suspension timestamp is non-null (suspended recovery), the
-    system MUST call the auto-resume procedure to restart the instance,
-    clear the suspension-cycle email log entries (including the
-    credit-renewal-failed entry), and clear the suspension columns.
+    system MUST call the auto-resume procedure to restart the instance.
+    The renewal transaction has already invalidated the prior destruction
+    deadline; suspension-cycle email log entries (including the credit-
+    renewal-failed entry), the suspension timestamp, and auto-resume retry
+    state MUST remain until readiness completion.
 11. When the effective balance (as defined in Credit Enrollment
     rule 4) is insufficient, the system MUST first check whether
     the user has auto top-up enabled and whether a top-up has
@@ -1257,6 +1264,11 @@ rows renew.
    hard-expiry enforcement, the system MUST re-evaluate parent
    organization entitlement. If entitlement has returned, the system MUST
    run Organization Entitlement Recovery instead of sending the warning.
+3. Immediately before sending a personal destruction warning, the system
+   MUST re-read the current subscription and instance state and skip the
+   warning if the row is no longer current and destruction-eligible, the
+   deadline no longer falls within the warning window, or the instance is
+   no longer the same live personal instance.
 
 ### Instance Destruction
 
@@ -1283,6 +1295,12 @@ rows renew.
    MUST emit telemetry identifying pending provider resources and the
    latest provider error, if any. A provider 404 for a resource counts as
    confirmed deletion of that resource.
+9. Immediately before requesting destruction of a personal instance, the
+   system MUST re-read the current subscription and instance state. It MUST
+   skip destruction unless the same current subscription still has a
+   destruction-eligible status, remains suspended, has an elapsed deadline,
+   still references the same live personal instance, and that instance is
+   not already destroyed.
 
 ### Past-Due Payment Enforcement
 
@@ -1346,16 +1364,21 @@ rows renew.
    status-change events MUST NOT trigger auto-resume for hybrid rows
    (see Hybrid Subscription Ownership rule 2).
 2. If the instance start attempt fails, the system MUST log the failure
-   and MUST NOT clear the suspension timestamp or destruction deadline.
+   and MUST NOT clear the suspension timestamp or auto-resume retry state.
    Leaving these fields intact allows the background job (Billing
-   Lifecycle Background Job rule 5) to detect the incomplete
-   auto-resume and retry on the next sweep.
-3. The system MUST clear the suspension timestamp and destruction
-   deadline only after a successful instance start (or when no instance
-   exists to restart).
-4. The system MUST clear email log entries for suspension, destruction,
+   Lifecycle Background Job rule 5) to detect the incomplete auto-resume
+   and retry on the next sweep. A successful credit renewal MUST already
+   have invalidated the prior destruction deadline before the start attempt,
+   and start failure MUST NOT restore it.
+3. The system MUST clear the suspension timestamp and auto-resume retry
+   state only after a successful instance start (or when no instance
+   exists to restart). Credit-renewal destruction-deadline invalidation
+   MUST NOT wait for instance readiness or auto-resume completion.
+4. After successful instance start (or when no instance exists to restart),
+   the system MUST clear email log entries for suspension, destruction,
    and credit-renewal-failed notifications so they can fire again in a
-   future suspension cycle.
+   future suspension cycle. Deadline invalidation alone MUST NOT reset
+   those entries while the suspension timestamp remains non-null.
 5. The system MUST NOT clear email log entries for trial or earlybird
    warning notifications, as those are one-time events.
 

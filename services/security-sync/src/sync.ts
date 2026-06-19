@@ -18,6 +18,7 @@ import {
   agent_configs,
   platform_integrations,
   security_findings,
+  security_finding_notifications,
   security_analysis_queue,
   security_analysis_owner_state,
   security_audit_log,
@@ -27,6 +28,12 @@ import {
   decideAutoAnalysisEligibility,
   type AutoAnalysisMinSeverity,
 } from '@kilocode/worker-utils/security-auto-analysis-policy';
+import {
+  SecurityNotificationPolicySchema,
+  isOpenFindingEligibleForNewFindingNotification,
+  type SecurityNotificationPolicy,
+} from '@kilocode/worker-utils/security-notification-policy';
+import { resolveNotificationRecipientUserIds } from './notifications/recipients';
 
 const SecurityFindingSource = { DEPENDABOT: 'dependabot' } as const;
 
@@ -221,6 +228,25 @@ function analysisOwnerStateFilter(owner: SecurityReviewOwner) {
   return eq(security_analysis_owner_state.owned_by_user_id, owner.userId);
 }
 
+function findingOwnerPredicate(owner: SecurityReviewOwner) {
+  if (isOrgOwner(owner)) {
+    return eq(security_findings.owned_by_organization_id, owner.organizationId);
+  }
+  return eq(security_findings.owned_by_user_id, owner.userId);
+}
+
+function findingOwnerConflictTarget(owner: SecurityReviewOwner) {
+  return isOrgOwner(owner)
+    ? sql`(${sql.identifier(security_findings.owned_by_organization_id.name)}, ${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) WHERE ${sql.identifier(security_findings.owned_by_organization_id.name)} IS NOT NULL`
+    : sql`(${sql.identifier(security_findings.owned_by_user_id.name)}, ${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) WHERE ${sql.identifier(security_findings.owned_by_user_id.name)} IS NOT NULL`;
+}
+
+function findingOwnerPartitionColumn(owner: SecurityReviewOwner) {
+  return isOrgOwner(owner)
+    ? security_findings.owned_by_organization_id
+    : security_findings.owned_by_user_id;
+}
+
 type EnabledOwnerConfig = {
   owner: SecurityReviewOwner;
   platformIntegrationId: string;
@@ -228,6 +254,7 @@ type EnabledOwnerConfig = {
   repositories: string[];
   repoNameToId: Map<string, number>;
   slaConfig: SecurityAgentConfig;
+  notificationPolicy: SecurityNotificationPolicy | null;
   autoAnalysisEnabledAt: string | null;
   authInvalidAt: string | null;
   /** Number of selected_repository_ids that are no longer accessible via the installation.
@@ -329,6 +356,19 @@ export async function getOwnerConfig(
     });
   }
 
+  const parsedNotificationPolicy = SecurityNotificationPolicySchema.safeParse(
+    agentConfig.config ?? {}
+  );
+  const notificationPolicy = parsedNotificationPolicy.success
+    ? parsedNotificationPolicy.data
+    : null;
+  if (!parsedNotificationPolicy.success) {
+    console.warn('Invalid security notification policy, skipping owner notification admission', {
+      ownerType: isOrgOwner(owner) ? 'org' : 'user',
+      error: parsedNotificationPolicy.error.message,
+    });
+  }
+
   const ownerStates = await db
     .select({ autoAnalysisEnabledAt: security_analysis_owner_state.auto_analysis_enabled_at })
     .from(security_analysis_owner_state)
@@ -342,6 +382,7 @@ export async function getOwnerConfig(
     repositories: selectedRepos,
     repoNameToId,
     slaConfig: { ...DEFAULT_SLA_CONFIG, ...securityConfig },
+    notificationPolicy,
     autoAnalysisEnabledAt: ownerStates[0]?.autoAnalysisEnabledAt ?? null,
     authInvalidAt: integration.authInvalidAt,
     missingSelectedRepoCount,
@@ -559,6 +600,7 @@ const securityFindingStatusSchema = z.enum([
 
 const upsertSecurityFindingResultSchema = z.object({
   findingId: z.string().uuid(),
+  wasInserted: z.boolean(),
   previousStatus: securityFindingStatusSchema.nullable(),
   effectiveStatus: securityFindingStatusSchema,
   findingCreatedAt: z
@@ -571,7 +613,7 @@ const upsertSecurityFindingResultSchema = z.object({
 type UpsertSecurityFindingResult = z.infer<typeof upsertSecurityFindingResultSchema>;
 
 async function upsertSecurityFinding(
-  db: WorkerDb,
+  db: Pick<WorkerDb, 'execute'>,
   params: {
     finding: ParsedSecurityFinding;
     owner: SecurityReviewOwner;
@@ -592,6 +634,7 @@ async function upsertSecurityFinding(
       WHERE ${security_findings.repo_full_name} = ${repoFullName}
         AND ${security_findings.source} = ${finding.source}
         AND ${security_findings.source_id} = ${finding.source_id}
+        AND ${findingOwnerPredicate(owner)}
       FOR UPDATE
     ),
     upserted AS (
@@ -654,7 +697,7 @@ async function upsertSecurityFinding(
         ${finding.dependency_scope}
       FROM (SELECT 1) AS input
       LEFT JOIN existing_match ON true
-      ON CONFLICT (${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) DO UPDATE
+      ON CONFLICT ${findingOwnerConflictTarget(owner)} DO UPDATE
       SET
         ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
         ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
@@ -693,6 +736,7 @@ async function upsertSecurityFinding(
     )
     SELECT
       upserted.id AS "findingId",
+      upserted.was_inserted AS "wasInserted",
       CASE
         WHEN upserted.was_inserted THEN NULL::text
         ELSE COALESCE(existing_match.previous_status, upserted.effective_status)
@@ -710,6 +754,7 @@ async function upsertSecurityFinding(
   const fallback = await db.execute<Record<string, unknown>>(sql`
     SELECT
       ${security_findings.id} AS "findingId",
+      false AS "wasInserted",
       ${security_findings.status} AS "previousStatus",
       ${security_findings.status} AS "effectiveStatus",
       ${security_findings.created_at} AS "findingCreatedAt"
@@ -717,11 +762,74 @@ async function upsertSecurityFinding(
     WHERE ${security_findings.repo_full_name} = ${repoFullName}
       AND ${security_findings.source} = ${finding.source}
       AND ${security_findings.source_id} = ${finding.source_id}
+      AND ${findingOwnerPredicate(owner)}
     LIMIT 1
   `);
   const recovered = fallback.rows[0];
   if (!recovered) throw new Error('Failed to upsert security finding');
   return upsertSecurityFindingResultSchema.parse(recovered);
+}
+
+async function insertStagedNewFindingNotifications(
+  db: Pick<WorkerDb, 'insert'>,
+  params: {
+    findingId: string;
+    recipientUserIds: string[];
+  }
+): Promise<number> {
+  if (params.recipientUserIds.length === 0) return 0;
+
+  const inserted = await db
+    .insert(security_finding_notifications)
+    .values(
+      params.recipientUserIds.map(recipientUserId => ({
+        finding_id: params.findingId,
+        recipient_user_id: recipientUserId,
+        kind: 'new_finding' as const,
+        status: 'staged' as const,
+      }))
+    )
+    .onConflictDoNothing()
+    .returning({ id: security_finding_notifications.id });
+
+  return inserted.length;
+}
+
+async function finalizeStagedNewFindingNotifications(
+  db: Pick<WorkerDb, 'execute'>,
+  params: { owner: SecurityReviewOwner; repoFullName: string }
+): Promise<{ pending: number; cancelled: number }> {
+  const result = await db.execute<{ status: 'pending' | 'cancelled'; count: number }>(sql`
+    WITH finalized AS (
+      UPDATE ${security_finding_notifications}
+      SET
+        status = CASE
+          WHEN ${security_findings.status} = 'open'
+            AND COALESCE(${security_findings.ignored_reason}, '') NOT LIKE 'superseded:%'
+          THEN 'pending'
+          ELSE 'cancelled'
+        END,
+        updated_at = now()
+      FROM ${security_findings}
+      WHERE ${security_finding_notifications.finding_id} = ${security_findings.id}
+        AND ${security_finding_notifications.kind} = 'new_finding'
+        AND ${security_finding_notifications.status} = 'staged'
+        AND ${security_findings.repo_full_name} = ${params.repoFullName}
+        AND ${findingOwnerPredicate(params.owner)}
+      RETURNING ${security_finding_notifications.status}
+    )
+    SELECT status, count(*)::int AS count
+    FROM finalized
+    GROUP BY status
+  `);
+
+  let pending = 0;
+  let cancelled = 0;
+  for (const row of result.rows) {
+    if (row.status === 'pending') pending = row.count;
+    if (row.status === 'cancelled') cancelled = row.count;
+  }
+  return { pending, cancelled };
 }
 
 type AutoAnalysisQueueSyncResult = {
@@ -897,24 +1005,26 @@ export async function syncAutoAnalysisQueueForFinding(
 type SupersedeResult = { count: number; supersededFindingIds: string[] };
 
 async function supersedeDuplicateFindings(
-  db: WorkerDb,
-  repoFullName: string
+  db: Pick<WorkerDb, 'execute'>,
+  repoFullName: string,
+  owner: SecurityReviewOwner
 ): Promise<SupersedeResult> {
-  try {
-    const result = await db.execute<{ id: string }>(sql`
+  const ownerPartitionColumn = findingOwnerPartitionColumn(owner);
+  const result = await db.execute<{ id: string }>(sql`
       WITH ranked AS (
         SELECT
           id,
           ROW_NUMBER() OVER (
-            PARTITION BY repo_full_name, source, ghsa_id, package_name, manifest_path
+            PARTITION BY ${ownerPartitionColumn}, repo_full_name, source, ghsa_id, package_name, manifest_path
             ORDER BY CASE WHEN source_id ~ '^[0-9]+$' THEN source_id::int ELSE 0 END DESC
           ) AS rn,
           FIRST_VALUE(id) OVER (
-            PARTITION BY repo_full_name, source, ghsa_id, package_name, manifest_path
+            PARTITION BY ${ownerPartitionColumn}, repo_full_name, source, ghsa_id, package_name, manifest_path
             ORDER BY CASE WHEN source_id ~ '^[0-9]+$' THEN source_id::int ELSE 0 END DESC
           ) AS canonical_id
         FROM security_findings
         WHERE repo_full_name = ${repoFullName}
+          AND ${findingOwnerPredicate(owner)}
           AND source = 'dependabot'
           AND ghsa_id IS NOT NULL
           AND status = 'open'
@@ -933,15 +1043,8 @@ async function supersedeDuplicateFindings(
       )
       SELECT id FROM superseded
     `);
-    const supersededFindingIds = result.rows.map(r => r.id);
-    return { count: supersededFindingIds.length, supersededFindingIds };
-  } catch (error) {
-    // Best-effort: don't let dedup failures break the sync.
-    console.error(`Error superseding duplicate findings for ${repoFullName}`, {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return { count: 0, supersededFindingIds: [] };
-  }
+  const supersededFindingIds = result.rows.map(r => r.id);
+  return { count: supersededFindingIds.length, supersededFindingIds };
 }
 
 /**
@@ -1155,6 +1258,7 @@ export async function syncOwner(params: {
   trigger?: 'scheduled' | 'manual';
   actor?: { id: string; email?: string | null; name?: string | null };
   repoFullName?: string;
+  notificationMaterializationEnabled?: boolean;
 }): Promise<SyncResult> {
   const { db: database, gitTokenService, owner, runId, actor, repoFullName } = params;
   const trigger = params.trigger ?? 'scheduled';
@@ -1194,6 +1298,12 @@ export async function syncOwner(params: {
   const totalResult = createEmptySyncResult();
   let firstError: Error | null = null;
   let successfulRepos = 0;
+  const notificationPolicy = params.notificationMaterializationEnabled
+    ? config.notificationPolicy
+    : null;
+  const notificationRecipientUserIds = notificationPolicy
+    ? await resolveNotificationRecipientUserIds(database, owner)
+    : [];
 
   for (const repoFullName of repositories) {
     try {
@@ -1205,6 +1315,8 @@ export async function syncOwner(params: {
         platformIntegrationId: config.platformIntegrationId,
         repoFullName,
         slaConfig: config.slaConfig,
+        notificationPolicy,
+        notificationRecipientUserIds,
         autoAnalysisEnabledAt: config.autoAnalysisEnabledAt,
       });
       totalResult.synced += repoResult.synced;
@@ -1366,6 +1478,8 @@ async function syncRepo(params: {
   platformIntegrationId: string;
   repoFullName: string;
   slaConfig: SecurityAgentConfig;
+  notificationPolicy: SecurityNotificationPolicy | null;
+  notificationRecipientUserIds: string[];
   autoAnalysisEnabledAt: string | null;
 }): Promise<SyncResult> {
   const {
@@ -1376,6 +1490,8 @@ async function syncRepo(params: {
     platformIntegrationId,
     repoFullName,
     slaConfig,
+    notificationPolicy,
+    notificationRecipientUserIds,
   } = params;
   const commandOwner = toSecurityAgentCommandOwner(owner);
   await recordSecurityAgentRepositorySyncAttempt(database, { owner: commandOwner, repoFullName });
@@ -1449,13 +1565,35 @@ async function syncRepo(params: {
       const slaDays = getSlaForSeverity(slaConfig, finding.severity);
       const slaDueAt = calculateSlaDueAt(finding.first_detected_at, slaDays);
 
-      const upserted = await upsertSecurityFinding(database, {
-        finding,
-        owner,
-        platformIntegrationId,
-        repoFullName,
-        slaDueAt,
+      let upserted: UpsertSecurityFindingResult | undefined;
+      await database.transaction(async tx => {
+        upserted = await upsertSecurityFinding(tx, {
+          finding,
+          owner,
+          platformIntegrationId,
+          repoFullName,
+          slaDueAt,
+        });
+
+        if (
+          notificationPolicy &&
+          isOpenFindingEligibleForNewFindingNotification({
+            wasInserted: upserted.wasInserted,
+            effectiveStatus: upserted.effectiveStatus,
+            isAgentEnabled: true,
+            newFindingNotificationsEnabled: notificationPolicy.new_finding_notifications_enabled,
+            severity: finding.severity,
+            minimumSeverity: notificationPolicy.new_finding_notification_min_severity,
+          })
+        ) {
+          await insertStagedNewFindingNotifications(tx, {
+            findingId: upserted.findingId,
+            recipientUserIds: notificationRecipientUserIds,
+          });
+        }
       });
+      if (!upserted) throw new Error('Failed to upsert security finding');
+
       await syncAutoAnalysisQueueForFinding(database, {
         owner,
         findingId: upserted.findingId,
@@ -1479,16 +1617,32 @@ async function syncRepo(params: {
     }
   }
 
-  const { count: supersededCount, supersededFindingIds } = await supersedeDuplicateFindings(
-    database,
-    repoFullName
-  );
+  let supersedeResult: SupersedeResult = { count: 0, supersededFindingIds: [] };
+  let finalizedNewFindingNotifications = { pending: 0, cancelled: 0 };
+  await database.transaction(async tx => {
+    supersedeResult = await supersedeDuplicateFindings(tx, repoFullName, owner);
+    finalizedNewFindingNotifications = await finalizeStagedNewFindingNotifications(tx, {
+      owner,
+      repoFullName,
+    });
+  });
+  const { count: supersededCount, supersededFindingIds } = supersedeResult;
   if (supersededCount > 0) {
     console.info(`Superseded ${supersededCount} duplicate finding(s) for ${repoFullName}`);
     const dequeued = await dequeueSupersededFindings(database, supersededFindingIds);
     if (dequeued > 0) {
       console.info(`Dequeued ${dequeued} superseded finding(s) from auto-analysis queue`);
     }
+  }
+  if (
+    finalizedNewFindingNotifications.pending > 0 ||
+    finalizedNewFindingNotifications.cancelled > 0
+  ) {
+    console.info('Finalized staged Security Agent Notifications', {
+      repoFullName,
+      pending: finalizedNewFindingNotifications.pending,
+      cancelled: finalizedNewFindingNotifications.cancelled,
+    });
   }
 
   if (result.errors > 0) {

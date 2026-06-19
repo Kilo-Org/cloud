@@ -1,4 +1,3 @@
-import { generateText } from 'ai';
 import * as z from 'zod';
 
 import type { CodeReviewMemoryProposal } from '@kilocode/db/schema';
@@ -6,7 +5,7 @@ import type { ReviewMemoryPlatform } from '@kilocode/db/schema-types';
 import type { ReviewMemoryOwner } from './db';
 import {
   createReviewMemoryGatewayProvider,
-  extractReviewMemoryJsonObject,
+  generateReviewMemoryStructuredOutput,
   resolveReviewMemoryActor,
   resolveReviewMemoryModel,
 } from './llm';
@@ -53,18 +52,19 @@ export async function generateIntegratedReviewGuidanceWithGateway(input: {
     userAgent: 'Kilo Review Memory Integrator',
   });
 
-  const result = await generateText({
+  const result = await generateReviewMemoryStructuredOutput({
     model: provider.chatModel(modelSlug),
     prompt: buildReviewMdIntegrationPrompt(input),
     maxOutputTokens: 8_000,
+    schemaName: 'review_md_integration',
+    schema: ReviewMdIntegrationOutputSchema,
+    validate: validateReviewMdIntegrationOutput,
   });
-  const parsed = ReviewMdIntegrationOutputSchema.parse(extractReviewMemoryJsonObject(result.text));
-  const validated = validateReviewMdIntegrationOutput(parsed);
 
   return {
-    ...validated,
-    tokensIn: result.usage.inputTokens ?? null,
-    tokensOut: result.usage.outputTokens ?? null,
+    ...result.output,
+    tokensIn: result.tokensIn,
+    tokensOut: result.tokensOut,
   };
 }
 
@@ -102,9 +102,6 @@ function buildReviewMdIntegrationPrompt(input: {
   const proposal = input.proposal;
 
   return `You are a repository maintainer editing REVIEW.md, the repository-maintained instructions for automated code review.
-
-Return strict JSON with this shape:
-{"status":"updated|already_present","updatedReviewMd":"complete updated REVIEW.md or null","integrationSummary":"short summary"}
 
 Rules:
 - Preserve existing guidance, ordering, and voice as much as possible.

@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { orgnaization_modes, ORGANIZATION_MODES_ORG_SLUG_CONSTRAINT } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { OrganizationModeConfig } from '@/lib/organizations/organization-types';
 
 export type OrganizationMode = typeof orgnaization_modes.$inferSelect;
@@ -63,6 +63,7 @@ export async function getOrganizationModeById(
 }
 
 export async function updateOrganizationMode(
+  organizationId: string,
   modeId: string,
   updates: {
     name?: string;
@@ -79,14 +80,26 @@ export async function updateOrganizationMode(
     updateData.slug = updates.slug;
   }
   if (updates.config !== undefined) {
-    updateData.config = mergeToSatisfy(updates.config);
+    const configPatch = Object.fromEntries(
+      Object.entries(updates.config).map(([key, value]) => [
+        key,
+        value === undefined ? null : value,
+      ])
+    );
+
+    updateData.config = sql`jsonb_strip_nulls(((${JSON.stringify(defaultConfig)}::jsonb || COALESCE(${orgnaization_modes.config}, '{}'::jsonb)) || ${JSON.stringify(configPatch)}::jsonb))`;
   }
 
   try {
     const [mode] = await db
       .update(orgnaization_modes)
       .set(updateData)
-      .where(eq(orgnaization_modes.id, modeId))
+      .where(
+        and(
+          eq(orgnaization_modes.id, modeId),
+          eq(orgnaization_modes.organization_id, organizationId)
+        )
+      )
       .returning();
 
     return mode ? { ...mode, config: mergeToSatisfy(mode.config) } : null;

@@ -2,24 +2,20 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from '@jest/globals';
 import type { AutoRoutingClassifierAnalyticsResponse } from '@kilocode/auto-routing-contracts';
-import { AutoRoutingBreakdownTables } from './AutoRoutingAdminContent';
+import { AutoRoutingBreakdownTables, summaryRates } from './AutoRoutingAdminContent';
 
 const analytics: AutoRoutingClassifierAnalyticsResponse = {
   period: '24h',
   summary: {
     totalRequests: 10,
     classifiedRequests: 8,
+    cachedRequests: 6,
+    fallbackRequests: 2,
     classifierErrors: 1,
     invalidRequests: 1,
     totalCostCredits: 0.0000123,
     avgDurationMs: 123.4,
     p95DurationMs: 456.7,
-    avgConfidence: 0.82,
-    withSessionId: 9,
-    uniqueSessions: 7,
-    requiresTools: 5,
-    mirroredHasTools: 6,
-    avgBodyBytes: 2048,
   },
   statusBreakdown: [{ status: 'classified', requests: 8 }],
   taskTypeBreakdown: [{ taskType: 'implementation', requests: 5, avgConfidence: 0.9 }],
@@ -33,6 +29,24 @@ const analytics: AutoRoutingClassifierAnalyticsResponse = {
   ],
   classifierModelBreakdown: [{ classifierModel: 'google/gemini-2.5-flash-lite', requests: 10 }],
 };
+
+describe('summaryRates', () => {
+  it('computes hit and fallback rates against classified requests, not total requests', () => {
+    expect(summaryRates(analytics.summary)).toEqual({
+      classifiedRate: 0.8,
+      cacheHitRate: 0.75,
+      fallbackRate: 0.25,
+    });
+  });
+
+  it('returns zero rates for an empty summary', () => {
+    expect(summaryRates(undefined)).toEqual({
+      classifiedRate: 0,
+      cacheHitRate: 0,
+      fallbackRate: 0,
+    });
+  });
+});
 
 describe('AutoRoutingBreakdownTables', () => {
   it('renders task type tables in a separate row after status and model tables', () => {

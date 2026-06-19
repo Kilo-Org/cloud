@@ -31,10 +31,14 @@ Before editing or reviewing, read:
    when the release is part of the change.
 4. Build the candidate image. If a Dockerfile patch guard fails, inspect the new
    OpenClaw package artifact or source rather than loosening the guard blindly.
-5. Run `bash services/kiloclaw/scripts/controller-openclaw-upgrade-smoke-test.sh`
-   from a clean committed bump branch. It compares refreshed `origin/main` by
-   default, or an intentionally justified `BASE_REF`, to committed `HEAD` and retains
-   `/root` between image phases.
+5. Run `bash services/kiloclaw/scripts/tests/openclaw-upgrade-validate.sh` from a
+   clean committed bump branch. This is the entry point: it runs Phase 1 (keyless
+   image checks, config-shape validation, and the grype CVE scan) and Phase 2 (the
+   credentialed live smoke). Phase 2 compares refreshed `origin/main` by default, or
+   an intentionally justified `BASE_REF`, to committed `HEAD` and retains `/root`
+   between image phases. Set `KILOCODE_API_KEY` for Phase 2. (Run
+   `openclaw-upgrade-smoke.sh` directly only when you specifically need the live
+   smoke alone, without Phase 1.)
 6. Run required final KiloClaw submission gates and review output, diagnostics, and
    PR documentation before making the PR ready.
 

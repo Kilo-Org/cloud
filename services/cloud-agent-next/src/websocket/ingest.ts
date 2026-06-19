@@ -24,12 +24,18 @@ import {
   handleCommandsAvailable,
   extractEntityId,
 } from '../session/ingest-handlers/index.js';
-import type { CompleteEventData, KilocodeEventData, CloudStatusData } from '../shared/protocol.js';
+import {
+  WrapperTerminalFailureCodes,
+  type CompleteEventData,
+  type KilocodeEventData,
+  type CloudStatusData,
+} from '../shared/protocol.js';
 import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
 import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper-supervisor.js';
 import type { TerminalizeParams } from '../session/session-message-state.js';
 import { classifyAssistantFailureMessage } from '../session/safe-failure-projection.js';
+import { parseModelNotFoundRuntimeDiagnostics } from '../shared/runtime-model-diagnostics.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -63,7 +69,11 @@ const errorEventSchema = z.object({
   error: z.string().optional(),
   message: z.string().optional(),
   errorSource: z.literal('assistant').optional(),
+  modelNotFoundRuntimeDiagnostics: z.unknown().optional(),
+  failureCode: z.enum(WrapperTerminalFailureCodes).optional(),
 });
+
+const MODEL_NOT_FOUND_SAFE_ERROR_MESSAGE = 'Assistant request failed: model not found';
 
 const cloudMessageCompletedEventSchema = z.object({
   messageId: z.string(),
@@ -824,6 +834,38 @@ export function createIngestHandler(
               errorData.errorSource === 'assistant'
                 ? classifyAssistantFailureMessage(fatalMessage)
                 : 'Agent wrapper failed';
+            const shouldForwardModelNotFoundDiagnostics =
+              errorData.errorSource === 'assistant' &&
+              safeFatalMessage === MODEL_NOT_FOUND_SAFE_ERROR_MESSAGE;
+            const parsedDiagnostics =
+              shouldForwardModelNotFoundDiagnostics &&
+              errorData.modelNotFoundRuntimeDiagnostics !== undefined
+                ? parseModelNotFoundRuntimeDiagnostics(errorData.modelNotFoundRuntimeDiagnostics)
+                : undefined;
+            if (
+              !shouldForwardModelNotFoundDiagnostics &&
+              errorData.modelNotFoundRuntimeDiagnostics !== undefined
+            ) {
+              logger
+                .withFields({
+                  sessionId,
+                  wrapperRunId,
+                  wrapperGeneration,
+                  wrapperConnectionId,
+                })
+                .warn('Ignoring runtime model diagnostics for non-model-not-found fatal error');
+            } else if (parsedDiagnostics && !parsedDiagnostics.success) {
+              logger
+                .withFields({
+                  sessionId,
+                  wrapperRunId,
+                  wrapperGeneration,
+                  wrapperConnectionId,
+                  reason: parsedDiagnostics.reason,
+                  serializedByteLength: parsedDiagnostics.serializedByteLength,
+                })
+                .warn('Ignoring invalid runtime model diagnostics');
+            }
             broadcastFn({
               id: 0 as EventId,
               execution_id: eventSourceId,
@@ -839,6 +881,10 @@ export function createIngestHandler(
               status: 'failed',
               error: fatalMessage,
               errorSource: errorData.errorSource,
+              ...(parsedDiagnostics?.success
+                ? { modelNotFoundRuntimeDiagnostics: parsedDiagnostics.data }
+                : {}),
+              failureCode: errorData.failureCode,
             });
             logger
               .withFields({

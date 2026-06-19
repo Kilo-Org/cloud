@@ -51,6 +51,8 @@ pnpm dev:env
 
 For the full list of environment variables, see [ENVIRONMENT.md](./ENVIRONMENT.md).
 
+Kilo employees adding or rotating shared web env vars should use `pnpm web:env set <VARIABLE>` instead of editing Vercel projects or tracked dotenv defaults independently. The helper coordinates tracked dotenv files, Vercel deployments, and 1Password where needed.
+
 ### 3. Start the database
 
 ```bash
@@ -138,6 +140,7 @@ The repo includes a seed runner for creating local fixtures via `pnpm dev:seed`.
 | `pnpm dev:status` | Live status of running services |
 | `pnpm dev:restart` | Restart a running service |
 | `pnpm dev:env` | Sync `.dev.vars` files from `.env.local` |
+| `pnpm web:env set <VARIABLE>` | Add or rotate shared web env vars across dotenv defaults, Vercel, and 1Password |
 | `pnpm test` | Run the Jest test suite |
 | `pnpm test:e2e` | Run Playwright end-to-end tests |
 | `pnpm typecheck` | Run TypeScript type checking |

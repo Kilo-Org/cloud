@@ -605,6 +605,33 @@ describe('WrapperSupervisor', () => {
     });
   });
 
+  it('does not persist model diagnostics for non-model-not-found assistant failures', async () => {
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'failed',
+      error: 'Rate limit exceeded for provider request',
+      errorSource: 'assistant',
+      modelNotFoundRuntimeDiagnostics: {
+        requestedModel: 'kilo/retired-model',
+        availableModelCount: 2,
+        availableModels: ['vendor/alpha-model', 'vendor/beta-model'],
+        suggestedModels: ['vendor/alpha-model'],
+        suggestionSource: 'fuzzy',
+      },
+    });
+
+    const message = await getSessionMessageState(harness.storage, MESSAGE_ID);
+    expect(message).toMatchObject({
+      status: 'failed',
+      failureReason: 'assistant_error',
+      safeFailureMessage: 'Assistant request was rate limited',
+    });
+    expect(message?.modelNotFoundRuntimeDiagnostics).toBeUndefined();
+  });
+
   it.each([
     {
       label: 'before activity',
@@ -735,6 +762,30 @@ describe('WrapperSupervisor', () => {
       });
     }
   );
+
+  it.each([
+    { failureCode: 'payment_required' as const, error: 'Insufficient credits' },
+    { failureCode: 'model_missing' as const, error: 'Model not found' },
+  ])('preserves $failureCode after agent activity', async failure => {
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE]);
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      agentActivityObservedAt: 9_000,
+    });
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'failed',
+      errorSource: 'assistant',
+      ...failure,
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureStage: 'agent_activity',
+      failureCode: failure.failureCode,
+    });
+  });
 
   it('persists physical stop obligation before reading messages for a failed terminal event', async () => {
     const storageRef: { current?: MemoryStorage } = {};

@@ -5,6 +5,7 @@
 import type { FeatureValue } from '@/lib/feature-detection';
 import {
   KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
 } from '@/lib/ai-gateway/auto-model';
@@ -25,16 +26,11 @@ import { seed_20_code_free_model } from '@/lib/ai-gateway/providers/seed';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
-import { morph_warp_grep_free_model } from '@/lib/ai-gateway/providers/morph';
 import {
   GEMINI_PRO_CURRENT_MODEL_ID,
   gemma_4_26b_a4b_it_free_model,
 } from '@/lib/ai-gateway/providers/google';
-import {
-  alibabaDirectModels,
-  qwen36_plus_stealth_model,
-  qwen37_plus_model,
-} from '@/lib/ai-gateway/providers/qwen';
+import { QWEN37_PLUS_MODEL_ID, qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
@@ -54,6 +50,7 @@ export const autoFreeModels = [
 export const preferredModels = [
   KILO_AUTO_FRONTIER_MODEL.id,
   KILO_AUTO_BALANCED_MODEL.id,
+  KILO_AUTO_EFFICIENT_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
   ...autoFreeModels,
   CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -66,7 +63,7 @@ export const preferredModels = [
   GPT_CURRENT_MODEL_ID,
   GEMINI_PRO_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
-  qwen37_plus_model.public_id,
+  QWEN37_PLUS_MODEL_ID,
   qwen36_plus_stealth_model.public_id,
   GLM_CURRENT_MODEL_ID,
 ];
@@ -87,9 +84,7 @@ export function isKiloExclusiveModel(model: string): boolean {
 
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
-  morph_warp_grep_free_model,
   seed_20_code_free_model,
-  ...alibabaDirectModels,
   ...deepseekDiscountedModels,
   qwen36_plus_stealth_model,
   claude_sonnet_clawsetup_model,
@@ -99,15 +94,6 @@ export const kiloExclusiveModels = [
   claude_opus_4_6_stealth_model,
   stepfun_37_flash_free_model,
 ] as KiloExclusiveModel[];
-
-export function isKiloExclusiveModelRequiringDataCollection(model: string): boolean {
-  return kiloExclusiveModels.some(
-    m =>
-      m.public_id === model &&
-      m.status !== 'disabled' &&
-      (!m.pricing || m.flags.includes('requires-data-collection'))
-  );
-}
 
 export function isKiloStealthModel(model: string): boolean {
   return kiloExclusiveModels.some(m => m.public_id === model && m.flags.includes('stealth'));

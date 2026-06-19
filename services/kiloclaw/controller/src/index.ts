@@ -52,6 +52,7 @@ import { writeGogCredentials } from './gog-credentials';
 import { installGogShim } from './gog-shim';
 import { migrateLegacyGoogleCredentialsToBroker } from './legacy-google-migration';
 import { startWatchRenewal, stopWatchRenewal } from './gmail-watch-renewal';
+import { startModelCatalogRefresh, stopModelCatalogRefresh } from './model-catalog-refresh';
 import { bootstrapCritical, bootstrapNonCritical, cleanNpmCache } from './bootstrap';
 import type { ControllerStateRef, ControllerState } from './bootstrap';
 import { getOpenclawVersion } from './openclaw-version';
@@ -300,6 +301,7 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
     pairingCache?.cleanup();
     stopCheckin?.();
     stopWatchRenewal();
+    stopModelCatalogRefresh();
     const shutdowns: Promise<void>[] = [];
     if (supervisor) shutdowns.push(supervisor.shutdown(signal));
     if (gmailWatchSupervisor) shutdowns.push(gmailWatchSupervisor.shutdown(signal));
@@ -587,6 +589,9 @@ export async function startController(env: NodeJS.ProcessEnv = process.env): Pro
   try {
     await supervisor.start();
     pc.start();
+    // Seed the kilocode model catalog into openclaw.json so OpenClaw's image
+    // capability gate sees vision modalities (TEMPORARY — see model-catalog-refresh.ts).
+    startModelCatalogRefresh(env);
     if (gmailWatchSupervisor && googleAccountEmail) {
       await gmailWatchSupervisor.start();
       startWatchRenewal(googleAccountEmail);

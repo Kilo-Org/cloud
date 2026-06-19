@@ -14,6 +14,8 @@ global.fetch = mockFetch;
 
 const classifierModelResponse = {
   model: 'google/gemini-2.5-flash-lite',
+  override: null,
+  benchmarkWinner: null,
   defaultModel: 'google/gemini-2.5-flash-lite',
 };
 
@@ -22,17 +24,13 @@ const classifierAnalyticsResponse = {
   summary: {
     totalRequests: 0,
     classifiedRequests: 0,
+    cachedRequests: 0,
+    fallbackRequests: 0,
     classifierErrors: 0,
     invalidRequests: 0,
     totalCostCredits: 0,
     avgDurationMs: 0,
     p95DurationMs: 0,
-    avgConfidence: 0,
-    withSessionId: 0,
-    uniqueSessions: 0,
-    requiresTools: 0,
-    mirroredHasTools: 0,
-    avgBodyBytes: 0,
   },
   statusBreakdown: [],
   taskTypeBreakdown: [],
@@ -86,6 +84,28 @@ describe('auto routing admin client', () => {
           'content-type': 'application/json',
         },
         body: JSON.stringify({ model: 'google/gemini-2.5-flash-lite' }),
+      }
+    );
+  });
+
+  it('clears the classifier model override by sending null', async () => {
+    mockFetch.mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(classifierModelResponse),
+    });
+
+    await updateAutoRoutingClassifierModel(null);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://auto-routing.example.com/admin/classifier-model',
+      {
+        method: 'PUT',
+        headers: {
+          authorization: 'Bearer test-internal-secret',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ model: null }),
       }
     );
   });

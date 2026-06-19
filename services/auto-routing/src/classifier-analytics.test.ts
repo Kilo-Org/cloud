@@ -1,21 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { writeClassifierMetricsDataPoint } from './classifier-analytics';
-import type { NormalizedClassifierInput } from './classifier-input';
-import type { ClassifierOutput } from './classifier-output';
-
-const input = {
-  apiKind: 'chat_completions',
-  requestedModel: 'anthropic/claude-sonnet-4',
-  systemPromptPrefix: '',
-  userPromptPrefix: 'Fix the failing test.',
-  messageCount: 2,
-  hasTools: true,
-  stream: false,
-  providerHints: {
-    provider: null,
-    providerOptions: null,
-  },
-} satisfies NormalizedClassifierInput;
+import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifier';
 
 const classification = {
   taskType: 'debugging',
@@ -34,17 +19,15 @@ describe('classifier analytics', () => {
 
     writeClassifierMetricsDataPoint(
       {
-        AUTO_ROUTING_CLASSIFIER_METRICS: { writeDataPoint },
+        AUTO_ROUTING_CLASSIFIER_METRICS_V2: { writeDataPoint },
       },
       {
         status: 'classified',
         classifierModel: 'google/gemini-2.5-flash-lite',
-        input,
+        requestedModel: 'anthropic/claude-sonnet-4',
         classification,
-        sessionId: 'task-123',
         classifierDurationMs: 123.45,
         classifierCostCredits: 0.00000123,
-        bodyBytes: 456,
       }
     );
 
@@ -53,7 +36,6 @@ describe('classifier analytics', () => {
       blobs: [
         'google/gemini-2.5-flash-lite',
         'anthropic/claude-sonnet-4',
-        'chat_completions',
         'classified',
         'debugging',
         'test_repair',
@@ -61,10 +43,8 @@ describe('classifier analytics', () => {
         'medium',
         'code_change',
         '1',
-        '0.6-0.8',
-        'task-123',
       ],
-      doubles: [123.45, 0.00000123, 0.74, 2, 1, 456],
+      doubles: [123.45, 0.00000123, 0.74, 0],
     });
   });
 });

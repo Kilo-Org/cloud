@@ -43,6 +43,7 @@ export function SecurityConfigPage() {
       medium: configData?.slaMediumDays ?? 45,
       low: configData?.slaLowDays ?? 90,
     },
+    slaEnabled: configData?.slaEnabled ?? true,
     repositorySelectionMode: configData?.repositorySelectionMode ?? 'selected',
     selectedRepositoryIds: configData?.selectedRepositoryIds ?? [],
     triageModelSlug:
@@ -65,6 +66,11 @@ export function SecurityConfigPage() {
       configData?.analysisModelSlug ??
       configData?.modelSlug ??
       DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
+    slaNotificationsEnabled: configData?.slaNotificationsEnabled ?? false,
+    slaNotificationMinSeverity: configData?.slaNotificationMinSeverity ?? 'high',
+    slaNotificationWarningDays: configData?.slaNotificationWarningDays ?? 3,
+    newFindingNotificationsEnabled: configData?.newFindingNotificationsEnabled ?? false,
+    newFindingNotificationMinSeverity: configData?.newFindingNotificationMinSeverity ?? 'high',
   } satisfies SecurityConfigFormState;
 
   return (

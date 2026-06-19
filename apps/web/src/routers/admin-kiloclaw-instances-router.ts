@@ -3922,6 +3922,7 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       latest_sandbox_destroyed_at: string | null;
       user_email: string | null;
       subscription_status: string | null;
+      subscription_ended_at: string | null;
     };
 
     // 1. The latest destroyed row per (user, sandbox) inside the requested
@@ -3963,7 +3964,8 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
         to_char(ranked.destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as destroyed_at,
         to_char(ranked.latest_sandbox_destroyed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as latest_sandbox_destroyed_at,
         ranked.user_email,
-        ranked.subscription_status
+        ranked.subscription_status,
+        to_char(ranked.subscription_ended_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as subscription_ended_at
       from (
         select distinct on (i.user_id, i.sandbox_id)
           i.id,
@@ -3979,7 +3981,16 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
               and latest.destroyed_at is not null
           ) as latest_sandbox_destroyed_at,
           u.google_user_email as user_email,
-          s.status as subscription_status
+          s.status as subscription_status,
+          -- Billing/trial period boundary for the subscription tied to this
+          -- destroyed instance — shown in the admin volume table as a proxy for
+          -- when the user's access ended (there is no canonical canceled_at
+          -- column). Prefer the paid period end, fall back to the trial end so
+          -- never-converted trials aren't blank. This is NOT an authoritative
+          -- end event: transfers and immediate cancellations can leave a
+          -- boundary that differs from the lineage's true end, so the UI labels
+          -- this column "Period End" rather than "Ended".
+          coalesce(s.current_period_end, s.trial_ends_at) as subscription_ended_at
         from kiloclaw_instances i
         left join kilocode_users u on i.user_id = u.id
         left join kiloclaw_subscriptions s on i.id = s.instance_id
@@ -4013,7 +4024,15 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       sandbox_id: string;
       organization_id: string | null;
       destroyed_at: string;
+      // Lineage truth: the most recent destruction across ALL provisions of
+      // this (user, sandbox), not just the row that matched the scan window.
+      // This is the date the 7-day orphan grace clock actually runs from. For a
+      // reprovisioned sandbox it can be far more recent than `destroyed_at`
+      // (the windowed row), so surfacing it stops the table from appearing to
+      // contradict the user's subscription timeline.
+      latest_sandbox_destroyed_at: string | null;
       subscription_status: string | null;
+      subscription_ended_at: string | null;
       fly_app: string;
       volume_id: string;
       volume_name: string;
@@ -4153,7 +4172,9 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
             sandbox_id: instance.sandbox_id,
             organization_id: instance.organization_id,
             destroyed_at: destroyedAt,
+            latest_sandbox_destroyed_at: instance.latest_sandbox_destroyed_at,
             subscription_status: instance.subscription_status,
+            subscription_ended_at: instance.subscription_ended_at,
             fly_app: scan.flyApp,
             volume_id: v.id,
             volume_name: v.name,

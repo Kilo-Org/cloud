@@ -1228,6 +1228,32 @@ describe('createIngestHandler', () => {
       expect(doContext.wrapperSupervisor.observeFinalizing).toHaveBeenCalledWith(WRAPPER_RUN_ID);
     });
 
+    it.each([
+      { failureCode: 'payment_required' as const, error: 'Insufficient credits' },
+      { failureCode: 'model_missing' as const, error: 'Model not found' },
+    ])('forwards $failureCode wrapper failures to the session coordinator', async failure => {
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', { fatal: true, ...failure })
+      );
+
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        ...failure,
+      });
+    });
+
     it('does NOT terminalize on wrapper complete event (new path)', async () => {
       const state = createFakeState();
       const doContext = createNewPathDOContext();
@@ -1328,6 +1354,112 @@ describe('createIngestHandler', () => {
         error: rawError,
         errorSource: 'assistant',
       });
+    });
+
+    it('keeps model diagnostics private while forwarding them to the supervisor', async () => {
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+      const diagnostics = {
+        requestedModel: 'kilo/retired-model',
+        availableModelCount: 2,
+        availableModels: ['vendor/alpha-model', 'vendor/beta-model'],
+        suggestedModels: ['vendor/alpha-model'],
+        suggestionSource: 'fuzzy' as const,
+      };
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', {
+          fatal: true,
+          error: 'Model not found: kilo/retired-model',
+          errorSource: 'assistant',
+          modelNotFoundRuntimeDiagnostics: diagnostics,
+        })
+      );
+
+      const safeMessage = 'Assistant request failed: model not found';
+      const safePayload = JSON.stringify({
+        fatal: true,
+        errorSource: 'assistant',
+        error: safeMessage,
+        message: safeMessage,
+      });
+      expect(eventQueries.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: safePayload })
+      );
+      expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ payload: safePayload }));
+      expect(broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stream_event_type: 'cloud.status',
+          payload: JSON.stringify({ cloudStatus: { type: 'error', message: safeMessage } }),
+        })
+      );
+      const publicCalls = JSON.stringify({
+        persisted: vi.mocked(eventQueries.insert).mock.calls,
+        broadcast: vi.mocked(broadcast).mock.calls,
+      });
+      expect(publicCalls).not.toContain('retired-model');
+      expect(publicCalls).not.toContain('vendor/alpha-model');
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        error: 'Model not found: kilo/retired-model',
+        errorSource: 'assistant',
+        modelNotFoundRuntimeDiagnostics: diagnostics,
+      });
+    });
+
+    it('drops model diagnostics attached to non-model-not-found fatal events', async () => {
+      const doContext = createNewPathDOContext();
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+      const diagnostics = {
+        requestedModel: 'kilo/retired-model',
+        availableModelCount: 2,
+        availableModels: ['vendor/alpha-model', 'vendor/beta-model'],
+        suggestedModels: ['vendor/alpha-model'],
+        suggestionSource: 'fuzzy' as const,
+      };
+
+      await handler.handleIngestMessage(
+        ws,
+        makeStreamMessage('error', {
+          fatal: true,
+          error: 'Rate limit exceeded for provider request',
+          errorSource: 'assistant',
+          modelNotFoundRuntimeDiagnostics: diagnostics,
+        })
+      );
+
+      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+        wrapperRunId: WRAPPER_RUN_ID,
+        status: 'failed',
+        error: 'Rate limit exceeded for provider request',
+        errorSource: 'assistant',
+      });
+      const publicCalls = JSON.stringify({
+        persisted: vi.mocked(eventQueries.insert).mock.calls,
+        broadcast: vi.mocked(broadcast).mock.calls,
+      });
+      expect(publicCalls).not.toContain('retired-model');
+      expect(publicCalls).not.toContain('vendor/alpha-model');
     });
 
     it('keeps unclassified fatal events as wrapper failures', async () => {

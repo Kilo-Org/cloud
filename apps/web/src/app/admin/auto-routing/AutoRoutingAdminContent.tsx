@@ -11,7 +11,6 @@ import React, { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { BarChart3, Clock3, DollarSign, HelpCircle, RefreshCw, Route, Save } from 'lucide-react';
-import * as z from 'zod';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,7 +30,8 @@ import {
   type OpenRouterModelsResponse,
 } from '@/lib/organizations/organization-types';
 import { cn } from '@/lib/utils';
-import { formatBodySizeKilobytes } from './auto-routing-format';
+import { BenchmarksSection } from './BenchmarksSection';
+import { parseAdminResponse } from './admin-fetch';
 
 const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
   { value: '1h', label: '1h' },
@@ -39,24 +39,6 @@ const periods: Array<{ value: AutoRoutingAnalyticsPeriod; label: string }> = [
   { value: '7d', label: '7d' },
   { value: '30d', label: '30d' },
 ];
-
-const AdminApiErrorSchema = z.object({ error: z.string().optional() });
-
-async function parseAdminResponse<T extends object>(
-  response: Response,
-  schema: z.ZodType<T>
-): Promise<T> {
-  const body: unknown = await response.json();
-  if (!response.ok) {
-    const parsedError = AdminApiErrorSchema.safeParse(body);
-    throw new Error(
-      parsedError.success && parsedError.data.error
-        ? parsedError.data.error
-        : `Request failed: ${response.status}`
-    );
-  }
-  return schema.parse(body);
-}
 
 async function fetchClassifierModel() {
   const response = await fetch('/admin/api/auto-routing/classifier-model');
@@ -66,7 +48,7 @@ async function fetchClassifierModel() {
   );
 }
 
-async function saveClassifierModel(model: string) {
+async function saveClassifierModel(model: string | null) {
   const response = await fetch('/admin/api/auto-routing/classifier-model', {
     method: 'PUT',
     headers: { 'content-type': 'application/json' },
@@ -116,6 +98,22 @@ function formatCredits(value: number) {
     minimumFractionDigits: value > 0 && value < 1 ? 4 : 2,
     maximumFractionDigits: value > 0 && value < 1 ? 4 : 2,
   }).format(value);
+}
+
+// Cache hits and fallbacks are both subsets of requests that produced a
+// classification, so their rates use classifiedRequests (not totalRequests)
+// as the denominator.
+export function summaryRates(
+  summary: AutoRoutingClassifierAnalyticsResponse['summary'] | undefined
+) {
+  const totalRequests = summary?.totalRequests ?? 0;
+  const classifiedRequests = summary?.classifiedRequests ?? 0;
+  return {
+    classifiedRate: totalRequests > 0 ? classifiedRequests / totalRequests : 0,
+    cacheHitRate: classifiedRequests > 0 ? (summary?.cachedRequests ?? 0) / classifiedRequests : 0,
+    fallbackRate:
+      classifiedRequests > 0 ? (summary?.fallbackRequests ?? 0) / classifiedRequests : 0,
+  };
 }
 
 function MetricHelp({ label, description }: { label: string; description: string }) {
@@ -221,7 +219,7 @@ export function AutoRoutingBreakdownTables({
       <div className="grid gap-4 xl:grid-cols-2">
         <BreakdownCard
           title="Status"
-          help="Breakdown by raw classifier status, including classifier_error:<subtype> rows for classifier failures."
+          help="Breakdown by raw classifier status: fallback:<reason> rows for heuristic fallback classifications and classifier_error:<subtype> rows for classifier failures."
           loading={loading}
         >
           <Table>
@@ -382,10 +380,12 @@ export function AutoRoutingAdminContent() {
   });
 
   useEffect(() => {
-    if (classifierModelQuery.data?.model) {
-      setSelectedModel(classifierModelQuery.data.model);
+    const override = classifierModelQuery.data?.override;
+    const model = classifierModelQuery.data?.model;
+    if (model !== undefined) {
+      setSelectedModel(override ?? model);
     }
-  }, [classifierModelQuery.data?.model]);
+  }, [classifierModelQuery.data?.override, classifierModelQuery.data?.model]);
 
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (
@@ -399,10 +399,14 @@ export function AutoRoutingAdminContent() {
 
   const saveMutation = useMutation({
     mutationFn: saveClassifierModel,
-    onSuccess: data => {
+    onSuccess: (data, model) => {
       queryClient.setQueryData(['auto-routing', 'classifier-model'], data);
-      setSelectedModel(data.model);
-      toast.success('Classifier model updated');
+      setSelectedModel(data.override ?? data.model);
+      if (model === null) {
+        toast.success('Override cleared — benchmark winner in effect');
+      } else {
+        toast.success('Classifier model override saved');
+      }
     },
     onError: error => {
       toast.error(error instanceof Error ? error.message : 'Failed to update classifier model');
@@ -417,14 +421,15 @@ export function AutoRoutingAdminContent() {
     classifierModelQuery.error instanceof Error ? classifierModelQuery.error.message : undefined;
   const openRouterModelsError =
     openRouterModelsQuery.error instanceof Error ? openRouterModelsQuery.error.message : undefined;
-  const currentModel = classifierModelQuery.data?.model ?? '';
-  const hasClassifierModelLoaded = classifierModelQuery.isSuccess && currentModel.length > 0;
+  const currentOverride = classifierModelQuery.data?.override ?? null;
+  const hasClassifierModelLoaded = classifierModelQuery.isSuccess;
   const hasModelChange =
-    hasClassifierModelLoaded && selectedModel.trim().length > 0 && selectedModel !== currentModel;
+    hasClassifierModelLoaded &&
+    selectedModel.trim().length > 0 &&
+    selectedModel !== (currentOverride ?? '');
   const summary = analyticsQuery.data?.summary;
   const totalRequests = summary?.totalRequests ?? 0;
-  const classifiedRate = totalRequests > 0 ? (summary?.classifiedRequests ?? 0) / totalRequests : 0;
-  const sessionRate = totalRequests > 0 ? (summary?.withSessionId ?? 0) / totalRequests : 0;
+  const { classifiedRate, cacheHitRate, fallbackRate } = summaryRates(summary);
   const analyticsErrorMessage =
     analyticsQuery.error instanceof Error
       ? analyticsQuery.error.message
@@ -458,32 +463,67 @@ export function AutoRoutingAdminContent() {
 
       <Card className="rounded-lg">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 pb-2">
-          <CardTitle className="text-base">Classifier Model</CardTitle>
+          <CardTitle className="text-base">Classifier model override</CardTitle>
           <MetricHelp
-            label="Classifier Model"
-            description="The OpenRouter model used by the auto-routing classifier. Saving changes updates KV config, so the classifier can change without a redeploy."
+            label="Classifier model override"
+            description="When unset, the latest classifier benchmark winner is used. Setting an override bypasses the benchmark winner. Saving updates KV config without a redeploy."
           />
         </CardHeader>
-        <CardContent className="grid gap-4 p-4 pt-0 lg:grid-cols-[1fr_auto] lg:items-end">
-          <ModelCombobox
-            label="Model"
-            models={modelOptions}
-            value={selectedModel}
-            onValueChange={setSelectedModel}
-            isLoading={openRouterModelsQuery.isLoading || classifierModelQuery.isLoading}
-            error={classifierModelError ?? openRouterModelsError}
-            placeholder={classifierModelQuery.data?.defaultModel ?? 'Select classifier model'}
-            className="w-full"
-          />
-          <Button
-            type="button"
-            onClick={() => saveMutation.mutate(selectedModel)}
-            disabled={!hasModelChange || saveMutation.isPending}
-            className="w-full lg:w-auto"
-          >
-            <Save className="size-4" />
-            Save model
-          </Button>
+        <CardContent className="flex flex-col gap-4 p-4 pt-0">
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-muted-foreground">Effective model</dt>
+            <dd className="font-mono text-xs truncate">
+              {classifierModelQuery.data?.model ?? <Skeleton className="h-4 w-48" />}
+            </dd>
+            <dt className="text-muted-foreground">Override</dt>
+            <dd className="font-mono text-xs truncate">
+              {classifierModelQuery.isLoading ? (
+                <Skeleton className="h-4 w-48" />
+              ) : (
+                (classifierModelQuery.data?.override ?? 'none')
+              )}
+            </dd>
+            <dt className="text-muted-foreground">Benchmark winner</dt>
+            <dd className="font-mono text-xs truncate">
+              {classifierModelQuery.isLoading ? (
+                <Skeleton className="h-4 w-48" />
+              ) : (
+                (classifierModelQuery.data?.benchmarkWinner ?? 'not yet published')
+              )}
+            </dd>
+          </dl>
+          <div className="grid gap-4 lg:grid-cols-[1fr_auto_auto] lg:items-end">
+            <ModelCombobox
+              label="Set override"
+              models={modelOptions}
+              value={selectedModel}
+              onValueChange={setSelectedModel}
+              isLoading={openRouterModelsQuery.isLoading || classifierModelQuery.isLoading}
+              error={classifierModelError ?? openRouterModelsError}
+              placeholder={classifierModelQuery.data?.defaultModel ?? 'Select classifier model'}
+              className="w-full"
+            />
+            <Button
+              type="button"
+              onClick={() => saveMutation.mutate(selectedModel)}
+              disabled={!hasModelChange || saveMutation.isPending}
+              className="w-full lg:w-auto"
+            >
+              <Save className="size-4" />
+              Save override
+            </Button>
+            {currentOverride !== null ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => saveMutation.mutate(null)}
+                disabled={saveMutation.isPending}
+                className="w-full lg:w-auto text-destructive hover:text-destructive"
+              >
+                Clear override
+              </Button>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 
@@ -529,7 +569,7 @@ export function AutoRoutingAdminContent() {
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <MetricCard
               title="Requests"
               value={formatNumber(totalRequests)}
@@ -539,12 +579,20 @@ export function AutoRoutingAdminContent() {
               help="Total auto-routing analytics rows in the selected period. Includes classified requests, classifier errors, and invalid input statuses."
             />
             <MetricCard
+              title="Cache Hit Rate"
+              value={formatPercent(cacheHitRate)}
+              detail={`${formatNumber(summary?.cachedRequests ?? 0)} served from cache`}
+              icon={BarChart3}
+              loading={analyticsQuery.isLoading}
+              help="Percent of classified requests served from the per-conversation decision cache instead of a classifier model call. Cached decisions cost no credits."
+            />
+            <MetricCard
               title="Classifier Latency"
               value={`${formatDecimal(summary?.avgDurationMs ?? 0)} ms`}
               detail={`p95 ${formatDecimal(summary?.p95DurationMs ?? 0)} ms`}
               icon={Clock3}
               loading={analyticsQuery.isLoading}
-              help="Average classifier runtime for requests that reached classifier execution. The detail shows p95 latency."
+              help="Average classifier model call runtime for requests that reached classifier execution. Decisions served from the cache are excluded. The detail shows p95 latency."
             />
             <MetricCard
               title="Classifier Cost"
@@ -555,39 +603,20 @@ export function AutoRoutingAdminContent() {
               help="Summed OpenRouter classifier cost in OpenRouter credits, not USD."
             />
             <MetricCard
-              title="Session Coverage"
-              value={formatPercent(sessionRate)}
-              detail={`${formatNumber(summary?.uniqueSessions ?? 0)} unique sessions`}
-              icon={BarChart3}
+              title="Fallback Rate"
+              value={formatPercent(fallbackRate)}
+              detail={`${formatNumber(summary?.fallbackRequests ?? 0)} heuristic fallbacks`}
+              icon={Route}
               loading={analyticsQuery.isLoading}
-              help="Percent of analytics rows with a session id. The detail shows distinct non-empty sessions."
+              help="Percent of classified requests that used the heuristic fallback classification because the classifier model call failed or returned invalid output. The Status table breaks fallbacks down by reason."
             />
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
             <MetricCard
               title="Classifier Errors"
               value={formatNumber(summary?.classifierErrors ?? 0)}
               detail={`${formatNumber(summary?.invalidRequests ?? 0)} invalid inputs`}
               icon={BarChart3}
               loading={analyticsQuery.isLoading}
-              help="Requests where the mirrored input was parseable, but classifier execution or classifier output failed. The detail counts malformed JSON, envelope, or body inputs."
-            />
-            <MetricCard
-              title="Requires Tools"
-              value={formatNumber(summary?.requiresTools ?? 0)}
-              detail={`${formatNumber(summary?.mirroredHasTools ?? 0)} mirrored with tools`}
-              icon={Route}
-              loading={analyticsQuery.isLoading}
-              help="Classified requests where the classifier output says the task requires tools. The detail counts original mirrored requests that included tools."
-            />
-            <MetricCard
-              title="Body Size"
-              value={formatBodySizeKilobytes(summary?.avgBodyBytes ?? 0)}
-              detail={`${formatPercent(summary?.avgConfidence ?? 0)} avg confidence`}
-              icon={BarChart3}
-              loading={analyticsQuery.isLoading}
-              help="Average mirrored body size in KB. The detail shows average classifier confidence for successful classifications."
+              help="Requests where classifier execution or classifier output failed. The detail counts mirror payloads the worker rejected (malformed JSON or schema mismatch), which usually indicates gateway/worker version skew during a deploy."
             />
           </div>
 
@@ -597,6 +626,8 @@ export function AutoRoutingAdminContent() {
           />
         </>
       )}
+
+      <BenchmarksSection />
     </div>
   );
 }

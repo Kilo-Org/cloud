@@ -870,7 +870,7 @@ export const GetMessageResultOutput = z
     acceptedAt: z.number().optional(),
     terminalAt: z.number().optional(),
     completionSource: SessionMessageCompletionSourceSchema.optional(),
-    failure: SafeFailureProjectionSchema.optional(),
+    failure: SafeFailureProjectionSchema.extend({ retryable: z.boolean() }).optional(),
     gateResult: z.enum(['pass', 'fail']).optional(),
     assistant: z
       .object({

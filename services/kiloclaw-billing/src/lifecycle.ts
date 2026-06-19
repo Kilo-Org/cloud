@@ -235,13 +235,33 @@ type OrganizationRecoveryRow = OrganizationEntitlementLifecycleFields & {
   instance_id: string | null;
 };
 
-type OrganizationDestructionRow = OrganizationRecoveryRow & {
+type InstanceDestructionRow = {
+  id: string;
+  user_id: string;
+  instance_id: string | null;
   sandbox_id: string | null;
   instance_name: string | null;
   instance_destroyed_at: string | null;
+  organization_id: string | null;
+  organization_name: string | null;
   plan: KiloClawPlan;
   status: KiloClawSubscriptionStatus;
   email: string;
+  credit_renewal_at: string | null;
+};
+
+type OrganizationDestructionRow = OrganizationEntitlementLifecycleFields & InstanceDestructionRow;
+
+type PersonalDestructionWarningRow = {
+  id: string;
+  user_id: string;
+  email: string;
+  destruction_deadline: string | null;
+  instance_id: string;
+  instance_name: string | null;
+  instance_destroyed_at: string | null;
+  organization_id: string | null;
+  plan: KiloClawPlan;
   credit_renewal_at: string | null;
 };
 
@@ -1637,6 +1657,35 @@ async function autoResumeIfSuspended(
   return true;
 }
 
+async function handleCreditRenewalRecoveryAfterAdvance(
+  env: BillingWorkerEnv,
+  database: WorkerDb,
+  context: SweepExecutionContext,
+  row: CreditRenewalRow,
+  wasPastDue: boolean
+): Promise<void> {
+  if (!wasPastDue) return;
+
+  if (!row.suspended_at) {
+    await database.delete(kiloclaw_email_log).where(
+      emailLogRowCondition({
+        userId: row.user_id,
+        instanceId: row.instance_id,
+        emailType: 'claw_credit_renewal_failed',
+      })
+    );
+    return;
+  }
+
+  await autoResumeIfSuspended(env, database, context, {
+    id: row.id,
+    user_id: row.user_id,
+    instance_id: row.instance_id,
+    organization_id: row.organization_id,
+    auto_resume_attempt_count: row.auto_resume_attempt_count,
+  });
+}
+
 type CreditRenewalTransactionOutcome =
   | { kind: 'skipped' }
   | { kind: 'ambiguous_commit'; subscriptionId: string; userId: string; instanceId: string }
@@ -1649,6 +1698,7 @@ type CreditRenewalTransactionOutcome =
       effectivePlan: 'commit' | 'standard';
       priceVersion: string;
       costMicrodollars: number;
+      wasPastDue: boolean;
       row: CreditRenewalRow;
       newPeriodEnd: string;
     }
@@ -1771,6 +1821,7 @@ function buildCreditRenewalAdvanceUpdateSet(params: {
     current_period_start: params.newPeriodStart,
     current_period_end: params.newPeriodEnd,
     credit_renewal_at: params.newPeriodEnd,
+    destruction_deadline: null,
     auto_top_up_triggered_for_period: null,
   };
 
@@ -2011,26 +2062,28 @@ async function processCreditRenewalRow(
           )
           .returning();
 
-        if (updatedSubscription) {
-          await insertKiloClawSubscriptionChangeLog(tx, {
-            subscriptionId: current.id,
-            actor: LIFECYCLE_ACTOR,
-            action: changeAction,
-            reason: 'credit_renewal_duplicate_idempotency_reconciled',
-            before: beforeSubscription,
-            after: updatedSubscription,
-          });
-
-          await supersedeTerminalRenewalFailuresForBoundary(tx, {
-            subscriptionId: current.id,
-            currentBoundary: newPeriodEnd,
-            actor: {
-              type: LIFECYCLE_ACTOR.actorType,
-              id: LIFECYCLE_ACTOR.actorId,
-            },
-            supersededAt: new Date().toISOString(),
-          });
+        if (!updatedSubscription) {
+          return { kind: 'skipped' } satisfies CreditRenewalTransactionOutcome;
         }
+
+        await insertKiloClawSubscriptionChangeLog(tx, {
+          subscriptionId: current.id,
+          actor: LIFECYCLE_ACTOR,
+          action: changeAction,
+          reason: 'credit_renewal_duplicate_idempotency_reconciled',
+          before: beforeSubscription,
+          after: updatedSubscription,
+        });
+
+        await supersedeTerminalRenewalFailuresForBoundary(tx, {
+          subscriptionId: current.id,
+          currentBoundary: newPeriodEnd,
+          actor: {
+            type: LIFECYCLE_ACTOR.actorType,
+            id: LIFECYCLE_ACTOR.actorId,
+          },
+          supersededAt: new Date().toISOString(),
+        });
 
         return {
           kind: 'duplicate',
@@ -2040,6 +2093,7 @@ async function processCreditRenewalRow(
           effectivePlan,
           priceVersion: current.kiloclaw_price_version,
           costMicrodollars,
+          wasPastDue,
           row: current,
           newPeriodEnd,
         } satisfies CreditRenewalTransactionOutcome;
@@ -2139,6 +2193,14 @@ async function processCreditRenewalRow(
   }
 
   if (outcome.kind === 'duplicate') {
+    await handleCreditRenewalRecoveryAfterAdvance(
+      env,
+      database,
+      context,
+      outcome.row,
+      outcome.wasPastDue
+    );
+
     await processPaidConversionBestEffort(env, context, {
       userId: outcome.userId,
       dedupeKey: `affiliate:impact:sale:${outcome.deductionCategory}`,
@@ -2184,25 +2246,13 @@ async function processCreditRenewalRow(
       });
     }
 
-    if (outcome.wasPastDue && !outcome.row.suspended_at) {
-      await database.delete(kiloclaw_email_log).where(
-        emailLogRowCondition({
-          userId: outcome.userId,
-          instanceId: outcome.row.instance_id,
-          emailType: 'claw_credit_renewal_failed',
-        })
-      );
-    }
-
-    if (outcome.wasPastDue && outcome.row.suspended_at) {
-      await autoResumeIfSuspended(env, database, context, {
-        id: outcome.row.id,
-        user_id: outcome.userId,
-        instance_id: outcome.row.instance_id,
-        organization_id: outcome.row.organization_id,
-        auto_resume_attempt_count: outcome.row.auto_resume_attempt_count,
-      });
-    }
+    await handleCreditRenewalRecoveryAfterAdvance(
+      env,
+      database,
+      context,
+      outcome.row,
+      outcome.wasPastDue
+    );
 
     await processPaidConversionBestEffort(env, context, {
       userId: outcome.userId,
@@ -3358,6 +3408,102 @@ async function loadCurrentOrganizationTrialExpiryRow(
   return row ?? null;
 }
 
+async function loadCurrentPersonalDestructionRow(
+  database: Pick<WorkerDb, 'select'>,
+  params: {
+    subscriptionId: string;
+    userId: string;
+    instanceId: string;
+    sandboxId: string;
+    now: string;
+  }
+): Promise<InstanceDestructionRow | null> {
+  const [row] = await database
+    .select({
+      id: kiloclaw_subscriptions.id,
+      user_id: kiloclaw_subscriptions.user_id,
+      instance_id: kiloclaw_subscriptions.instance_id,
+      sandbox_id: kiloclaw_instances.sandbox_id,
+      instance_name: kiloclaw_instances.name,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      organization_id: kiloclaw_instances.organization_id,
+      organization_name: sql<string | null>`null`.as('organization_name'),
+      plan: kiloclaw_subscriptions.plan,
+      status: kiloclaw_subscriptions.status,
+      email: kilocode_users.google_user_email,
+      credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.id, params.subscriptionId),
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId),
+        eq(kiloclaw_instances.id, params.instanceId),
+        eq(kiloclaw_instances.user_id, params.userId),
+        eq(kiloclaw_instances.sandbox_id, params.sandboxId),
+        lt(kiloclaw_subscriptions.destruction_deadline, params.now),
+        currentSubscriptionRowFilter(),
+        isNotNull(kiloclaw_subscriptions.suspended_at),
+        inArray(kiloclaw_subscriptions.status, ['canceled', 'past_due', 'unpaid']),
+        isNull(kiloclaw_instances.destroyed_at),
+        isNull(kiloclaw_instances.organization_id)
+      )
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
+async function loadCurrentPersonalDestructionWarningRow(
+  database: Pick<WorkerDb, 'select'>,
+  params: {
+    subscriptionId: string;
+    userId: string;
+    instanceId: string;
+    advisoryNow: string;
+    warningCutoff: string;
+  }
+): Promise<PersonalDestructionWarningRow | null> {
+  const [row] = await database
+    .select({
+      id: kiloclaw_subscriptions.id,
+      user_id: kiloclaw_subscriptions.user_id,
+      email: kilocode_users.google_user_email,
+      destruction_deadline: kiloclaw_subscriptions.destruction_deadline,
+      instance_id: kiloclaw_instances.id,
+      instance_name: kiloclaw_instances.name,
+      instance_destroyed_at: kiloclaw_instances.destroyed_at,
+      organization_id: kiloclaw_instances.organization_id,
+      plan: kiloclaw_subscriptions.plan,
+      credit_renewal_at: kiloclaw_subscriptions.credit_renewal_at,
+    })
+    .from(kiloclaw_subscriptions)
+    .innerJoin(kilocode_users, eq(kiloclaw_subscriptions.user_id, kilocode_users.id))
+    .innerJoin(kiloclaw_instances, eq(kiloclaw_subscriptions.instance_id, kiloclaw_instances.id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.id, params.subscriptionId),
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        eq(kiloclaw_subscriptions.instance_id, params.instanceId),
+        eq(kiloclaw_instances.id, params.instanceId),
+        eq(kiloclaw_instances.user_id, params.userId),
+        gte(kiloclaw_subscriptions.destruction_deadline, params.advisoryNow),
+        lte(kiloclaw_subscriptions.destruction_deadline, params.warningCutoff),
+        currentSubscriptionRowFilter(),
+        isNotNull(kiloclaw_subscriptions.suspended_at),
+        inArray(kiloclaw_subscriptions.status, ['canceled', 'past_due', 'unpaid']),
+        isNull(kiloclaw_instances.destroyed_at),
+        isNull(kiloclaw_instances.organization_id)
+      )
+    )
+    .limit(1);
+
+  return row ?? null;
+}
+
 async function loadCurrentOrganizationDestructionRow(
   database: Pick<WorkerDb, 'select'>,
   subscriptionId: string,
@@ -4152,7 +4298,7 @@ async function runInstanceDestructionSweep(
         continue;
       }
 
-      let destructionRow = row;
+      let destructionRow: InstanceDestructionRow = row;
       if (row.organization_id) {
         const currentRow = await loadCurrentOrganizationDestructionRow(database, row.id, now);
         if (!currentRow) {
@@ -4204,6 +4350,25 @@ async function runInstanceDestructionSweep(
           );
           continue;
         }
+      } else {
+        const currentRow = await loadCurrentPersonalDestructionRow(database, {
+          subscriptionId: row.id,
+          userId: row.user_id,
+          instanceId: row.instance_id,
+          sandboxId: row.sandbox_id,
+          now,
+        });
+        if (!currentRow) {
+          logSkippedSubscriptionRow(
+            'Skipping personal instance destruction because candidate is no longer eligible',
+            row,
+            {
+              reason: 'candidate_no_longer_eligible',
+            }
+          );
+          continue;
+        }
+        destructionRow = currentRow;
       }
 
       const destructionInstanceId = destructionRow.instance_id;
@@ -4667,31 +4832,50 @@ async function runDestructionWarningSweep(
         );
         continue;
       }
-      if (await hasUnresolvedTerminalRenewalFailureForBoundary(database, row)) {
+
+      const currentRow = await loadCurrentPersonalDestructionWarningRow(database, {
+        subscriptionId: row.id,
+        userId: row.user_id,
+        instanceId: row.instance_id,
+        advisoryNow,
+        warningCutoff: twoDaysFromNow,
+      });
+      if (!currentRow?.destruction_deadline) {
+        logSkippedSubscriptionRow(
+          'Skipping personal destruction warning because candidate is no longer eligible',
+          row,
+          {
+            reason: 'candidate_no_longer_eligible',
+          }
+        );
         continue;
       }
-      const instanceIdShort = shortInstanceId(row.instance_id);
+
+      if (await hasUnresolvedTerminalRenewalFailureForBoundary(database, currentRow)) {
+        continue;
+      }
+      const instanceIdShort = shortInstanceId(currentRow.instance_id);
       const sent = await trySendEmail(
         database,
         env,
         context,
-        row.user_id,
-        row.email,
+        currentRow.user_id,
+        currentRow.email,
         'claw_destruction_warning',
         'clawDestructionWarning',
         {
-          destruction_date: formatDateForEmail(new Date(row.destruction_deadline)),
+          destruction_date: formatDateForEmail(new Date(currentRow.destruction_deadline)),
           claw_url: clawUrl,
           instance_label: formatInstanceLabel({
-            instanceName: row.instance_name,
-            instanceId: row.instance_id,
-            plan: row.plan,
+            instanceName: currentRow.instance_name,
+            instanceId: currentRow.instance_id,
+            plan: currentRow.plan,
           }),
           instance_id_short: instanceIdShort,
         },
         summary,
         undefined,
-        { instanceId: row.instance_id }
+        { instanceId: currentRow.instance_id }
       );
       if (sent) summary.destruction_warnings++;
     } catch (error) {

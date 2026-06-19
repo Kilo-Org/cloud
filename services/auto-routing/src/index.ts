@@ -6,6 +6,8 @@ import { getClassifierModelHandler, putClassifierModelHandler } from './admin-cl
 import { decideHandler } from './decide';
 import type { HonoEnv } from './hono-env';
 
+export { AutoRoutingDecisionCacheDO } from './decision-cache';
+
 export const app = new Hono<HonoEnv>();
 
 app.use('*', authMiddleware);

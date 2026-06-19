@@ -37,6 +37,16 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
   {
+    id: 'star-giveaway-june-2026',
+    title: 'GitHub Star Giveaway',
+    message:
+      "We're giving away $500 of AI Credits when we reach 25,000 stars on GitHub. Support us:",
+    action: {
+      actionText: 'github.com/Kilo-Org/kilocode',
+      actionURL: 'https://github.com/Kilo-Org/kilocode/',
+    },
+  },
+  {
     id: 'stealth-opus-discount-may-25',
     title: 'Claude Opus 4.7 at 20% Off — Only in Kilo Code!',
     message:
@@ -63,6 +73,17 @@ const normalUnconditionalNotifications: KiloNotification[] = [
       actionURL: 'https://app.kilo.ai/cloud',
     },
     showIn: ['extension', 'cli'],
+  },
+  {
+    id: 'kilo-console-beta',
+    title: 'Try Kilo Console (Beta)',
+    message: 'Manage git worktrees, sessions, and all CLI settings from a browser-based UI.',
+    action: {
+      actionText: 'How to install',
+      actionURL:
+        'https://blog.kilo.ai/p/kilo-console-beta-is-live?utm_source=kilo-cli&utm_medium=notifications&utm_campaign=cli-tips',
+    },
+    showIn: ['cli'],
   },
   {
     id: 'app-builder-promo-mar-6',

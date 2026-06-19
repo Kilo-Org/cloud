@@ -65,4 +65,52 @@ describe('legacy execution callback enqueue', () => {
       status: 'completed',
     });
   });
+
+  it('adds retryable fallback client errors without parsing legacy error text', async () => {
+    const userId = 'user_legacy_callback_error';
+    const sessionId = 'agent_legacy_callback_error';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const jobs = await runInDurableObject(stub, async instance => {
+      const sentCallbackJobs: CallbackJob[] = [];
+      installCallbackQueue(instance, async job => {
+        sentCallbackJobs.push(job);
+      });
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kiloSessionId: '55555555-5555-4555-8555-555555555555',
+        kilocodeToken: 'token-callback-error',
+        callbackTarget: { url: 'https://example.com/callback' },
+      });
+      await instance.addExecution({
+        executionId: 'exc_legacy_callback_error',
+        mode: 'code',
+        streamingMode: 'websocket',
+        ingestToken: 'exc_legacy_callback_error',
+      });
+      await instance.updateExecutionStatus({
+        executionId: 'exc_legacy_callback_error',
+        status: 'failed',
+        error: 'assistant_error must not control classification',
+      });
+      return sentCallbackJobs;
+    });
+
+    expect(jobs[0].payload).toMatchObject({
+      executionId: 'exc_legacy_callback_error',
+      status: 'failed',
+      errorMessage: 'assistant_error must not control classification',
+      clientError: {
+        code: 'EXECUTION_FAILED',
+        message: 'assistant_error must not control classification',
+        retryable: true,
+      },
+    });
+  });
 });

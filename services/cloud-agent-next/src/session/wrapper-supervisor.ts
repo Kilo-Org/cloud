@@ -18,7 +18,14 @@ import {
   type SessionMessageState,
   type SessionMessageStorage,
 } from './session-message-state.js';
+import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
 import type { LatestAssistantMessage } from './types.js';
+import {
+  MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_LOG_CHUNK_SIZE,
+  MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_MAX_SERIALIZED_BYTES,
+  isModelNotFoundRuntimeDiagnosticsWithinQueueBudget,
+  type ModelNotFoundRuntimeDiagnostics,
+} from '../shared/runtime-model-diagnostics.js';
 import {
   clearCurrentWrapperRuntimeFailureState,
   clearCurrentWrapperRuntimeLivenessState,
@@ -47,6 +54,7 @@ const WRAPPER_PING_TIMEOUT_MS = 30_000;
 const WRAPPER_STOP_ATTEMPT_TIMEOUT_MS = 45_000;
 const WRAPPER_STOP_RETRY_DELAYS_MS = [5_000, 30_000, 120_000, 300_000];
 const DISCONNECT_GRACE_KEY = 'disconnect_grace';
+const MODEL_NOT_FOUND_SAFE_ERROR_MESSAGE = 'Assistant request failed: model not found';
 
 const disconnectGraceStateSchema = z.object({
   wrapperRunId: z.string(),
@@ -89,7 +97,9 @@ export type WrapperTerminalEvent = {
   status: 'completed' | 'failed' | 'interrupted';
   error?: string;
   errorSource?: 'assistant';
+  modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
   interruptionSource?: 'container_shutdown';
+  failureCode?: WrapperTerminalFailureCode;
   gateResult?: 'pass' | 'fail';
   messageIds?: string[];
 };
@@ -214,6 +224,112 @@ function getWrapperInterruptionFailureCode(
   return error === 'Container shutdown: SIGTERM' || error === 'Container shutdown: SIGINT'
     ? 'container_shutdown'
     : 'system_interrupt';
+}
+
+function parseCodeReviewCallbackTarget(
+  metadata: SessionMetadata | null
+): { reviewId: string; attemptId?: string } | undefined {
+  const callbackUrl = metadata?.callback?.target?.url;
+  if (!callbackUrl) return undefined;
+
+  try {
+    const url = new URL(callbackUrl);
+    const segments = url.pathname.split('/').filter(Boolean);
+    const markerIndex = segments.findIndex(
+      (segment, index) =>
+        segment === 'code-review-status' &&
+        segments[index - 2] === 'api' &&
+        segments[index - 1] === 'internal'
+    );
+    const reviewId = markerIndex === -1 ? undefined : segments[markerIndex + 1];
+    if (!reviewId) return undefined;
+    const attemptId = url.searchParams.get('attemptId') ?? undefined;
+    return { reviewId, ...(attemptId ? { attemptId } : {}) };
+  } catch {
+    return undefined;
+  }
+}
+
+function serializedDiagnosticsByteLength(
+  diagnostics: ModelNotFoundRuntimeDiagnostics
+): number | undefined {
+  try {
+    return new TextEncoder().encode(JSON.stringify(diagnostics)).byteLength;
+  } catch {
+    return undefined;
+  }
+}
+
+function logCodeReviewRuntimeModelDiagnostics(params: {
+  diagnostics: ModelNotFoundRuntimeDiagnostics;
+  metadata: SessionMetadata;
+  reviewId?: string;
+  attemptId?: string;
+  wrapperRunId: string;
+  wrapperGeneration: number;
+  wrapperConnectionId: string;
+}): void {
+  const {
+    diagnostics,
+    metadata,
+    reviewId,
+    attemptId,
+    wrapperRunId,
+    wrapperGeneration,
+    wrapperConnectionId,
+  } = params;
+  const serializedByteLength = serializedDiagnosticsByteLength(diagnostics);
+  const fitsQueueBudget = isModelNotFoundRuntimeDiagnosticsWithinQueueBudget(diagnostics);
+  const baseFields = {
+    logTag: 'code-review-runtime-model-not-found',
+    reviewId,
+    attemptId,
+    sessionId: metadata.identity.sessionId,
+    wrapperRunId,
+    wrapperGeneration,
+    wrapperConnectionId,
+    requestedModel: diagnostics.requestedModel,
+    availableModelCount: diagnostics.availableModelCount,
+    suggestedModels: diagnostics.suggestedModels,
+    suggestionSource: diagnostics.suggestionSource,
+    serializedByteLength,
+  };
+
+  if (fitsQueueBudget) {
+    logger
+      .withFields({
+        ...baseFields,
+        availableModels: diagnostics.availableModels,
+      })
+      .warn('Code review runtime model not found');
+    return;
+  }
+
+  const chunkCount = Math.ceil(
+    diagnostics.availableModels.length / MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_LOG_CHUNK_SIZE
+  );
+  logger
+    .withFields({
+      ...baseFields,
+      maxSerializedByteLength: MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_MAX_SERIALIZED_BYTES,
+      chunkCount,
+    })
+    .warn('Code review runtime model diagnostics exceeded callback budget');
+
+  for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex += 1) {
+    const start = chunkIndex * MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_LOG_CHUNK_SIZE;
+    logger
+      .withFields({
+        ...baseFields,
+        chunkIndex,
+        chunkCount,
+        availableModels: diagnostics.availableModels.slice(
+          start,
+          start + MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_LOG_CHUNK_SIZE
+        ),
+      })
+      .warn('Code review runtime model not found model-list chunk');
+  }
 }
 
 export function createWrapperSupervisor(
@@ -926,8 +1042,17 @@ export function createWrapperSupervisor(
   }
 
   async function onTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
-    const { wrapperRunId, status, error, errorSource, interruptionSource, gateResult, messageIds } =
-      params;
+    const {
+      wrapperRunId,
+      status,
+      error,
+      errorSource,
+      modelNotFoundRuntimeDiagnostics,
+      interruptionSource,
+      failureCode: terminalFailureCode,
+      gateResult,
+      messageIds,
+    } = params;
     const sessionId = getSessionIdForLogs();
     const state = await getWrapperRuntimeState(storage);
     if (
@@ -954,6 +1079,30 @@ export function createWrapperSupervisor(
       })
       .info('Wrapper terminal event received by supervisor');
 
+    let persistedModelNotFoundDiagnostics: ModelNotFoundRuntimeDiagnostics | undefined;
+    const canPersistModelNotFoundDiagnostics =
+      status === 'failed' &&
+      errorSource === 'assistant' &&
+      classifyAssistantFailureMessage(error) === MODEL_NOT_FOUND_SAFE_ERROR_MESSAGE;
+    if (modelNotFoundRuntimeDiagnostics && canPersistModelNotFoundDiagnostics) {
+      const metadata = await getMetadata();
+      if (metadata?.identity.createdOnPlatform === 'code-review') {
+        const reviewTarget = parseCodeReviewCallbackTarget(metadata);
+        logCodeReviewRuntimeModelDiagnostics({
+          diagnostics: modelNotFoundRuntimeDiagnostics,
+          metadata,
+          reviewId: reviewTarget?.reviewId,
+          attemptId: reviewTarget?.attemptId,
+          wrapperRunId,
+          wrapperGeneration: state.wrapperGeneration,
+          wrapperConnectionId: state.wrapperConnectionId,
+        });
+        if (isModelNotFoundRuntimeDiagnosticsWithinQueueBudget(modelNotFoundRuntimeDiagnostics)) {
+          persistedModelNotFoundDiagnostics = modelNotFoundRuntimeDiagnostics;
+        }
+      }
+    }
+
     if (status === 'failed' || status === 'interrupted') {
       await requestPhysicalWrapperStop(
         status === 'failed' ? 'terminal-failed' : 'terminal-interrupted'
@@ -971,8 +1120,11 @@ export function createWrapperSupervisor(
               error: error ?? 'Assistant request failed',
               completionSource: 'wrapper_failure',
               failureStage: 'agent_activity',
-              failureCode: 'assistant_error',
+              failureCode: terminalFailureCode ?? 'assistant_error',
               safeFailureMessage: classifyAssistantFailureMessage(error),
+              ...(persistedModelNotFoundDiagnostics
+                ? { modelNotFoundRuntimeDiagnostics: persistedModelNotFoundDiagnostics }
+                : {}),
             });
             continue;
           }
@@ -984,9 +1136,9 @@ export function createWrapperSupervisor(
             error: error ?? 'Wrapper error',
             completionSource: 'wrapper_failure',
             failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-            failureCode: activityObserved
-              ? 'wrapper_error_after_activity'
-              : 'wrapper_error_before_activity',
+            failureCode:
+              terminalFailureCode ??
+              (activityObserved ? 'wrapper_error_after_activity' : 'wrapper_error_before_activity'),
           });
           continue;
         }

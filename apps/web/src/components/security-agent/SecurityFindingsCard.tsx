@@ -95,6 +95,7 @@ type SecurityFindingsCardProps = {
   cancellingRemediationAttemptIds?: Set<string>;
   runningCount?: number;
   concurrencyLimit?: number;
+  showSla?: boolean;
   sortBy: 'severity_desc' | 'severity_asc' | 'sla_due_at_asc';
   onSortByChange: (sortBy: 'severity_desc' | 'severity_asc' | 'sla_due_at_asc') => void;
 };
@@ -134,6 +135,7 @@ export function SecurityFindingsCard({
   cancellingRemediationAttemptIds,
   runningCount = 0,
   concurrencyLimit = 3,
+  showSla = true,
   sortBy,
   onSortByChange,
 }: SecurityFindingsCardProps) {
@@ -327,7 +329,7 @@ export function SecurityFindingsCard({
                 Severity <ArrowUp className="size-3" aria-hidden="true" />
               </span>
             </SelectItem>
-            <SelectItem value="sla_due_at_asc">SLA due date</SelectItem>
+            {showSla && <SelectItem value="sla_due_at_asc">SLA due date</SelectItem>}
           </SelectContent>
         </Select>
       </div>
@@ -371,6 +373,7 @@ export function SecurityFindingsCard({
                   !!finding.remediationSummary?.latestAttemptId &&
                   cancellingRemediationAttemptIds?.has(finding.remediationSummary.latestAttemptId)
                 }
+                slaDisplay={showSla ? 'visible' : 'hidden'}
               />
             ))}
           </div>

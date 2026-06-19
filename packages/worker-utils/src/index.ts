@@ -99,6 +99,9 @@ export type { RepoCoordinates } from './git-url.js';
 
 export { KILO_MODEL_PREFIX, unprefixKiloGatewayModelId } from './kilo-model-id.js';
 
+export { ttlCached } from './ttl-cache.js';
+export type { TtlCache } from './ttl-cache.js';
+
 export {
   CloudAgentQueueReportSchema,
   CloudAgentRunStatuses,

@@ -20,6 +20,8 @@ Updated 2026-05-22 -- renamed to `.specs/impact-referrals.md` and expanded to Ki
 Updated 2026-05-28 -- classify enforced Stripe EFW refunds as adverse payments.
 Updated 2026-05-29 -- name the Impact-facing Kilo Pass reward unit `Kilo Pass Bonus Credits`.
 Updated 2026-06-05 -- final Commit term reward-extension behavior.
+Updated 2026-06-12 -- clarify subscription-independent Kilo Pass referral sharing and automatic pending reward
+application.
 
 ## Conventions
 
@@ -192,6 +194,14 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 10. Logged-in users MUST access referral sharing through the product's Impact Verified Access widget.
 
 11. Kilo Pass referral sharing MUST be available from `/subscriptions/kilo-pass/refer` when configured.
+
+11a. Any logged-in Kilo user MUST be able to access and share the Kilo Pass referral link regardless of current or
+     historical Kilo Pass subscription state. Active, paused, canceling, canceled, annual, former, and never-subscribed
+     Kilo users remain eligible to share.
+
+11b. Relevant Kilo Pass surfaces MUST expose a `Refer & earn` path to `/subscriptions/kilo-pass/refer` for active,
+     paused, canceling, canceled, annual, former, and never-subscribed users. Non-subscriber surfaces MUST show only the
+     referral call to action; reward details belong on the dedicated referral page.
 
 12. The Kilo Pass referral page MUST use Kilo Pass-specific widget configuration, token issuance, reward summary, and
     copy. It MUST NOT show KiloClaw referral wording, widgets, links, or rewards as Kilo Pass referral state.
@@ -479,7 +489,8 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 
 107.  If a Kilo Pass beneficiary has no active eligible monthly Kilo Pass subscription when a reward would apply, the
       reward MUST remain pending until the beneficiary starts or reactivates an eligible monthly Kilo Pass subscription,
-      is canceled by adverse-payment handling, is manually resolved, or expires.
+      is canceled by adverse-payment handling, is manually resolved, or expires. Paused, canceling, canceled, annual,
+      and unsubscribed states MUST NOT qualify merely because a subscription record exists.
 
 108.  A pending Kilo Pass referral reward MUST expire and be canceled 12 months after it is earned if it has not been
       consumed.
@@ -521,6 +532,9 @@ application, and Kilo Pass redeems after local referral bonus allocation.
 
 122.  When multiple pending unexpired Kilo Pass referral rewards are eligible for the same issuance, the oldest earned
       reward MUST be consumed first.
+
+122a. Kilo Pass referral reward application MUST be automatic. The system MUST NOT require or expose a user-triggered
+      manual claim action for pending Kilo Pass referral rewards.
 
 123.  A Kilo Pass referral reward MUST apply only to an eligible monthly base issuance after the reward is earned. It MUST
       NOT apply retroactively to the source conversion's base issuance or to any already-created issuance.

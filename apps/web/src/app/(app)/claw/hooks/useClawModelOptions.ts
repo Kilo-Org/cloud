@@ -23,7 +23,7 @@ const EMPTY_STATUS = {
  * Configuration picker, context-aware (personal vs org). Reuses
  * useModelSelectorList + getSettingsModelOptions so the two surfaces stay in sync.
  */
-export function useClawModelOptions(): {
+export function useClawModelOptions(enabled = true): {
   modelOptions: ModelOption[];
   isLoading: boolean;
   error: string | undefined;
@@ -33,11 +33,16 @@ export function useClawModelOptions(): {
   const orgStatus = useOrgKiloClawStatus(organizationId);
   const status = (organizationId ? orgStatus.data : personalStatus.data) ?? EMPTY_STATUS;
 
+  // Gate the OpenRouter model-catalog fetch — the genuinely new round-trip this
+  // hook adds. Callers that only render the picker conditionally (the inline
+  // row model control, the create/defaults dialogs) pass `enabled` so it never
+  // fires on a stopped machine or for read-only users. (Status / controller
+  // version are deduped with the page's own queries.)
   const {
     data: modelsData,
     isLoading: isLoadingModels,
     error: modelsError,
-  } = useModelSelectorList(organizationId);
+  } = useModelSelectorList(organizationId, enabled);
   const isModelsError = modelsError != null;
   const isRunning = status.status === 'running';
   const { trackedVersion, runningVersion, isLoadingControllerVersion, isControllerVersionError } =

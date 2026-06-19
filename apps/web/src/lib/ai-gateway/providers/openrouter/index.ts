@@ -18,7 +18,7 @@ import {
   type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isForbiddenFreeModel } from '@/lib/ai-gateway/forbidden-free-models';
-import { getOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
+import { getGatewayOpenCodeSettings } from '@/lib/ai-gateway/providers/model-settings';
 import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getOpenRouterModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
@@ -26,6 +26,9 @@ import { getPreferredProviderOrder } from '@/lib/ai-gateway/providers/apply-prov
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
+import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
+import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { addMonths } from 'date-fns';
 
 // Re-export from shared module for backwards compatibility
 export { normalizeModelId } from '@/lib/ai-gateway/model-utils';
@@ -86,12 +89,15 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
   const isNew = preferredIndex >= 0 && ageDays >= 0 && ageDays < 7;
   if (isNew) return model.name + ' (new)';
   if (model.expiration_date) {
-    const suffix = new Date(model.expiration_date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    });
-    return model.name + ' (retires ' + suffix + ')';
+    const expirationDate = new Date(model.expiration_date);
+    if (expirationDate <= addMonths(new Date(), 1)) {
+      const suffix = expirationDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      });
+      return model.name + ' (retires ' + suffix + ')';
+    }
   }
   return model.name;
 }
@@ -127,7 +133,9 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         (model: OpenRouterModel) =>
           !kiloExclusiveModels.some(
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
-          ) && !isForbiddenFreeModel(model.id)
+          ) &&
+          !isForbiddenFreeModel(model.id) &&
+          !isFableModel(model.id)
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);
@@ -154,6 +162,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           .map(model => convertFromKiloExclusiveModel(model))
       )
       .concat(autoModels)
+      .map(applyCustomPricingToModel)
       .map(async (model: OpenRouterModel) => {
         const preferredIndex = preferredModels.indexOf(model.id);
         const addPdf =
@@ -169,7 +178,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
           preferredIndex: preferredIndex >= 0 ? preferredIndex : undefined,
           isFree: model.isFree ?? isFree,
           mayTrainOnYourPrompts: model.mayTrainOnYourPrompts ?? isFree,
-          opencode: model.opencode ?? getOpenCodeSettings(model.id),
+          opencode: model.opencode ?? getGatewayOpenCodeSettings(model.id),
           architecture: addPdf
             ? {
                 ...model.architecture,

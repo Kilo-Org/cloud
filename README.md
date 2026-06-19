@@ -19,6 +19,8 @@ scripts/          CI and one-off scripts
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for the full local setup guide — prerequisites, database, environment variables, and common commands.
 
+For shared web env var additions or rotations, use `pnpm web:env set <VARIABLE>` rather than editing Vercel projects, tracked dotenv defaults, or 1Password separately.
+
 Quick start (assuming prerequisites are installed):
 
 ```bash

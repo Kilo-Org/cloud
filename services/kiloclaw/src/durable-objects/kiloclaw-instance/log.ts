@@ -8,6 +8,7 @@ import {
   ALARM_INTERVAL_DESTROYING_MS,
   ALARM_INTERVAL_IDLE_MS,
   ALARM_JITTER_MS,
+  DESTROY_VOLUME_RETRY_DELAYS_MS,
 } from '../../config';
 import { writeEvent, eventContextFromState } from '../../utils/analytics';
 
@@ -233,9 +234,18 @@ export function alarmIntervalForStatus(status: InstanceStatus): number {
   }
 }
 
+export function destroyRetryDelay(attempt: number, random = Math.random()): number {
+  const index = Math.min(Math.max(attempt, 1) - 1, DESTROY_VOLUME_RETRY_DELAYS_MS.length - 1);
+  const baseDelay = DESTROY_VOLUME_RETRY_DELAYS_MS[index];
+  return baseDelay * (0.5 + random);
+}
+
 /**
  * Next alarm time with jitter.
  */
-export function nextAlarmTime(status: InstanceStatus): number {
+export function nextAlarmTime(status: InstanceStatus, destroyVolumeAttempts = 0): number {
+  if (status === 'destroying' && destroyVolumeAttempts > 0) {
+    return Date.now() + destroyRetryDelay(destroyVolumeAttempts);
+  }
   return Date.now() + alarmIntervalForStatus(status) + Math.random() * ALARM_JITTER_MS;
 }

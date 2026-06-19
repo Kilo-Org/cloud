@@ -9,6 +9,7 @@ import type * as DbModule from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import worker, { collectScheduledSyncOwners, type SecuritySyncQueueMessage } from './index.js';
 import { processSecurityFindingDismissal } from './dismiss.js';
+import { runSecurityNotificationSweep } from './notifications/sweep.js';
 import { syncOwner } from './sync.js';
 
 vi.mock('@kilocode/db', async importOriginal => {
@@ -27,6 +28,7 @@ vi.mock('@kilocode/db', async importOriginal => {
 });
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
 vi.mock('./dismiss.js', () => ({ processSecurityFindingDismissal: vi.fn() }));
+vi.mock('./notifications/sweep.js', () => ({ runSecurityNotificationSweep: vi.fn() }));
 vi.mock('./sync.js', () => ({ syncOwner: vi.fn() }));
 
 beforeEach(() => {
@@ -43,6 +45,7 @@ beforeEach(() => {
     transitioned: true,
     command: {},
   } as never);
+  vi.mocked(runSecurityNotificationSweep).mockResolvedValue({} as never);
 });
 
 describe('collectScheduledSyncOwners', () => {
@@ -104,7 +107,7 @@ describe('scheduled sync dispatch', () => {
     vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
 
     await worker.scheduled(
-      {} as ScheduledController,
+      { cron: '0 */6 * * *' } as ScheduledController,
       {
         HYPERDRIVE: { connectionString: 'postgres://worker' },
         SYNC_QUEUE: {
@@ -141,6 +144,22 @@ describe('scheduled sync dispatch', () => {
     );
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('runs notification sweep on hourly notification cron without sync dispatch', async () => {
+    const waitUntil = vi.fn();
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://worker' },
+      SYNC_QUEUE: { sendBatch: vi.fn() },
+    } as unknown as CloudflareEnv;
+
+    await worker.scheduled({ cron: '15 * * * *' } as ScheduledController, env, {
+      waitUntil,
+    } as unknown as ExecutionContext);
+
+    expect(runSecurityNotificationSweep).toHaveBeenCalledWith(env);
+    expect(getWorkerDb).not.toHaveBeenCalled();
+    expect(waitUntil).not.toHaveBeenCalled();
   });
 });
 
@@ -240,6 +259,7 @@ describe('manual sync dispatch', () => {
         trigger: 'manual',
         actor: { id: 'user-123', email: 'owner@example.com', name: 'Owner Example' },
         repoFullName: 'kilo/repo',
+        notificationMaterializationEnabled: false,
       })
     );
     expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
@@ -255,6 +275,45 @@ describe('manual sync dispatch', () => {
     expect(
       vi.mocked(transitionSecurityAgentCommandWithCurrentState).mock.invocationCallOrder[1]
     ).toBeLessThan(ack.mock.invocationCallOrder[0] ?? Infinity);
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('enables sync-time notification staging only for exact true rollout flag', async () => {
+    vi.mocked(syncOwner).mockResolvedValue({ synced: 1, errors: 0, staleRepos: 0 } as never);
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await worker.queue(
+      {
+        messages: [
+          {
+            body: {
+              schemaVersion: 1,
+              runId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+              messageId: 'scheduled-sync-message',
+              trigger: 'scheduled',
+              owner: { userId: 'user-123' },
+              ownerKey: 'user:user-123',
+              chunkIndex: 0,
+              chunkCount: 1,
+              dispatchedAt: '2026-06-11T10:00:00.000Z',
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+        GIT_TOKEN_SERVICE: {},
+        SECURITY_NOTIFICATION_MATERIALIZATION_ENABLED: 'true',
+      } as CloudflareEnv
+    );
+
+    expect(syncOwner).toHaveBeenCalledWith(
+      expect.objectContaining({ notificationMaterializationEnabled: true })
+    );
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });

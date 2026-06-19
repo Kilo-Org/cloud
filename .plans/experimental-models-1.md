@@ -26,7 +26,7 @@ Schema lives in `packages/db/src/schema.ts`. The implementation adds these table
 - `model_experiment_variant_version`
 - `model_experiment_request`
 
-Upstream JSON validation lives in `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts`.
+Experiment upstream JSON uses the shared `CustomLlmApiConfig` type and is validated with `CustomLlmApiConfigSchema` from `packages/db/src/schema-types.ts`.
 
 Deferred schema/reporting work:
 
@@ -95,12 +95,12 @@ Implementation target:
 - Reuse or generalize existing free-model response rewriters in `apps/web/src/lib/ai-gateway/providers/openrouter/responses.ts` and sibling response helpers.
 - Apply rewriting for experiment traffic even though the provider id is `custom`.
 - Cover non-streaming JSON responses.
-- Cover streaming SSE/event-stream responses for chat-completions, Anthropic messages, and Responses API shapes.
+- Cover streaming SSE/event-stream responses for the currently supported experiment API shape, chat completions.
 
 Test target:
 
 - End-to-end experimented chat-completions request: response `model` is the requested public id and never the variant internal id.
-- End-to-end experimented messages request: streamed and final model values are rewritten to the requested public id.
+- If experiment providers later support Messages API requests, cover streamed and final model-value rewriting before enabling that API kind.
 
 ### Live Reporting
 
@@ -119,7 +119,7 @@ Implementation target:
 - Decide whether model properties belong on the experiment, the public model id, or a separate model-metadata record referenced by the experiment.
 - Ensure clients can discover the experimented model's effective context window and capabilities before sending requests.
 - Keep variant upstream configuration separate from client-facing model properties unless a field is intentionally variant-specific.
-- Validate that configured properties match the request kinds and provider APIs supported by all active variants.
+- Validate that configured model capabilities match the experiment provider's explicitly supported chat APIs and every active variant endpoint.
 
 ### Prompt Retention Operations
 
@@ -150,7 +150,7 @@ Core gateway and persistence:
 - `apps/web/src/lib/ai-gateway/experiments/membership.ts`
 - `apps/web/src/lib/ai-gateway/experiments/persist.ts`
 - `apps/web/src/lib/ai-gateway/experiments/pick-variant.ts`
-- `apps/web/src/lib/ai-gateway/experiments/upstream-schema.ts`
+- `packages/db/src/schema-types.ts`
 - `apps/web/src/lib/ai-gateway/llm-proxy-helpers.ts`
 - `apps/web/src/lib/ai-gateway/processUsage.ts`
 - `apps/web/src/lib/ai-gateway/processUsage.types.ts`

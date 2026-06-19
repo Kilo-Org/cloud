@@ -292,9 +292,11 @@ describe('upsertSecurityFinding', () => {
     expect(row.severity).toBe('critical');
   });
 
-  it('uses repo_full_name + source + source_id as the unique key', async () => {
+  it('uses owner + repo_full_name + source + source_id as the unique key', async () => {
     const user = await insertTestUser();
     const owner: SecurityReviewOwner = { userId: user.id };
+    const otherUser = await insertTestUser();
+    const otherOwner: SecurityReviewOwner = { userId: otherUser.id };
     const repo = 'test-org/unique-key-repo';
 
     const a = await upsertSecurityFinding({
@@ -307,10 +309,17 @@ describe('upsertSecurityFinding', () => {
       owner,
       repoFullName: repo,
     });
+    const c = await upsertSecurityFinding({
+      ...makeFinding({ source_id: '20', severity: 'critical' }),
+      owner: otherOwner,
+      repoFullName: repo,
+    });
 
     expect(a.findingId).not.toBe(b.findingId);
+    expect(a.findingId).not.toBe(c.findingId);
     expect(a.wasInserted).toBe(true);
     expect(b.wasInserted).toBe(true);
+    expect(c.wasInserted).toBe(true);
 
     const rows = await db
       .select()
@@ -323,6 +332,17 @@ describe('upsertSecurityFinding', () => {
       );
 
     expect(rows).toHaveLength(2);
+
+    const otherRows = await db
+      .select()
+      .from(security_findings)
+      .where(
+        and(
+          eq(security_findings.repo_full_name, repo),
+          eq(security_findings.owned_by_user_id, otherUser.id)
+        )
+      );
+    expect(otherRows).toHaveLength(1);
   });
 
   it('handles null cwe_ids without serialization error', async () => {
@@ -364,7 +384,7 @@ describe('supersedeDuplicateFindings', () => {
       repoFullName: repo,
     });
 
-    const result = await supersedeDuplicateFindings(repo);
+    const result = await supersedeDuplicateFindings(repo, owner);
     expect(result.count).toBe(1);
     expect(result.supersededFindingIds).toEqual([older.findingId]);
 
@@ -409,7 +429,7 @@ describe('supersedeDuplicateFindings', () => {
       repoFullName: repo,
     });
 
-    const result = await supersedeDuplicateFindings(repo);
+    const result = await supersedeDuplicateFindings(repo, owner);
     expect(result.count).toBe(0);
     expect(result.supersededFindingIds).toEqual([]);
 
@@ -437,7 +457,7 @@ describe('supersedeDuplicateFindings', () => {
       repoFullName: repo,
     });
 
-    const result = await supersedeDuplicateFindings(repo);
+    const result = await supersedeDuplicateFindings(repo, owner);
     expect(result.count).toBe(0);
     expect(result.supersededFindingIds).toEqual([]);
   });
@@ -458,7 +478,7 @@ describe('supersedeDuplicateFindings', () => {
       repoFullName: repo,
     });
 
-    const result = await supersedeDuplicateFindings(repo);
+    const result = await supersedeDuplicateFindings(repo, owner);
     expect(result.count).toBe(0);
     expect(result.supersededFindingIds).toEqual([]);
 
@@ -488,10 +508,10 @@ describe('supersedeDuplicateFindings', () => {
       repoFullName: repo,
     });
 
-    const firstResult = await supersedeDuplicateFindings(repo);
+    const firstResult = await supersedeDuplicateFindings(repo, owner);
     expect(firstResult.count).toBe(1);
 
-    const secondResult = await supersedeDuplicateFindings(repo);
+    const secondResult = await supersedeDuplicateFindings(repo, owner);
     expect(secondResult.count).toBe(0);
     expect(secondResult.supersededFindingIds).toEqual([]);
   });
@@ -525,7 +545,7 @@ describe('supersedeDuplicateFindings', () => {
       repoFullName: repo,
     });
 
-    const result = await supersedeDuplicateFindings(repo);
+    const result = await supersedeDuplicateFindings(repo, owner);
     expect(result.count).toBe(2);
     expect(result.supersededFindingIds).toEqual(
       expect.arrayContaining([group1Older.findingId, group2Older.findingId])

@@ -7,6 +7,7 @@ describe('OpenRouter Models Config', () => {
       'google/gemini-3.1-pro-preview',
       'anthropic/claude-sonnet-4.6',
       'openai/gpt-5.5',
+      'z-ai/glm-5.2',
     ];
 
     expectedModels.forEach(model => {

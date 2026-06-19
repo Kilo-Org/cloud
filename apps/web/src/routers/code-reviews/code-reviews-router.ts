@@ -350,7 +350,11 @@ export const codeReviewRouter = createTRPCRouter({
             output: billingUsage.tokensOut,
             cached: billingUsage.cachedTokens,
           }
-        : { input: 0, output: 0, cached: 0 };
+        : {
+            input: review.total_tokens_in ?? 0,
+            output: review.total_tokens_out ?? 0,
+            cached: 0,
+          };
 
       return successResult({ review, attempts, tokenUsage });
     } catch (error) {

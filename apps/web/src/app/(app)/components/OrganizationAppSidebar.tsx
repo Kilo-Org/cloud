@@ -61,16 +61,24 @@ export default function OrganizationAppSidebar({
       organizationId,
     }),
     enabled: organizationData?.plan === 'enterprise',
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 5 * 60 * 1000,
   });
   const pendingFeatureAdoptionCount = featureAdoptionQuery.data?.pendingCount ?? 0;
   const previousPathname = useRef(pathname);
   useEffect(() => {
+    const adoptionConfigurationRoutes = [
+      `/organizations/${organizationId}/integrations`,
+      `/organizations/${organizationId}/code-reviews`,
+      `/organizations/${organizationId}/security-agent`,
+    ];
+    const previousRouteWasAdoptionConfiguration = adoptionConfigurationRoutes.some(
+      route =>
+        previousPathname.current === route || previousPathname.current.startsWith(`${route}/`)
+    );
     if (
       organizationData?.plan === 'enterprise' &&
       previousPathname.current !== pathname &&
-      previousPathname.current !== `/organizations/${organizationId}/usage-details`
+      previousRouteWasAdoptionConfiguration
     ) {
       void featureAdoptionQuery.refetch();
     }

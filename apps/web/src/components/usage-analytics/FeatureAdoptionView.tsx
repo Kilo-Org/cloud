@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, ArrowRight, Bot, Cable, Check, Circle, Shield, Webhook } from 'lucide-react';
+import { AlertCircle, ArrowRight, Bot, Cable, Check, Circle, Shield } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ const featureIcons: Record<FeatureAdoptionKey, typeof Bot> = {
   'source-control-integration': Cable,
   'code-reviewer': Bot,
   'security-agent': Shield,
-  'cloud-agent-webhook': Webhook,
   'team-integration': Cable,
 };
 

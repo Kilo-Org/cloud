@@ -7,7 +7,6 @@ export const FEATURE_ADOPTION_KEYS = [
   'source-control-integration',
   'code-reviewer',
   'security-agent',
-  'cloud-agent-webhook',
   'team-integration',
 ] as const;
 
@@ -26,7 +25,6 @@ type FeatureAdoptionState = {
   sourceControlConnected: boolean;
   codeReviewerEnabled: boolean;
   securityAgentEnabled: boolean;
-  hasActiveCloudAgentWebhook: boolean;
   teamIntegrationConnected: boolean;
 };
 
@@ -34,7 +32,6 @@ type FeatureAdoptionStateRow = {
   source_control_connected: boolean;
   code_reviewer_enabled: boolean;
   security_agent_enabled: boolean;
-  has_active_cloud_agent_webhook: boolean;
   team_integration_connected: boolean;
 };
 
@@ -67,14 +64,6 @@ export function buildFeatureAdoptionChecks(
       adopted: state.securityAgentEnabled,
       actionLabel: state.securityAgentEnabled ? 'Review settings' : 'Enable Security Agent',
       actionUrl: `/organizations/${organizationId}/security-agent/config`,
-    },
-    {
-      key: 'cloud-agent-webhook',
-      title: 'Cloud Agent automation configured',
-      description: 'Start Cloud Agent work from an active external webhook trigger.',
-      adopted: state.hasActiveCloudAgentWebhook,
-      actionLabel: state.hasActiveCloudAgentWebhook ? 'Manage triggers' : 'Create webhook trigger',
-      actionUrl: `/organizations/${organizationId}/cloud/triggers${state.hasActiveCloudAgentWebhook ? '' : '/new'}`,
     },
     {
       key: 'team-integration',
@@ -115,19 +104,15 @@ async function getFeatureAdoptionState(organizationId: string): Promise<FeatureA
           AND is_enabled = true
       ) AS security_agent_enabled,
       EXISTS (
-        SELECT 1 FROM cloud_agent_webhook_triggers
-        WHERE organization_id = ${organizationId}
-          AND target_type = 'cloud_agent'
-          AND activation_mode = 'webhook'
-          AND is_active = true
-      ) AS has_active_cloud_agent_webhook,
-      EXISTS (
         SELECT 1 FROM platform_integrations
         WHERE owned_by_organization_id = ${organizationId}
-          AND platform IN ('slack', 'discord', 'linear')
           AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
           AND suspended_at IS NULL
           AND auth_invalid_at IS NULL
+          AND (
+            platform IN ('slack', 'discord') OR
+            (platform = 'linear' AND metadata -> 'bot_enabled' = 'true'::jsonb)
+          )
       ) AS team_integration_connected
   `);
   const row = result.rows[0] as FeatureAdoptionStateRow | undefined;
@@ -135,7 +120,6 @@ async function getFeatureAdoptionState(organizationId: string): Promise<FeatureA
     sourceControlConnected: row?.source_control_connected ?? false,
     codeReviewerEnabled: row?.code_reviewer_enabled ?? false,
     securityAgentEnabled: row?.security_agent_enabled ?? false,
-    hasActiveCloudAgentWebhook: row?.has_active_cloud_agent_webhook ?? false,
     teamIntegrationConnected: row?.team_integration_connected ?? false,
   };
 }

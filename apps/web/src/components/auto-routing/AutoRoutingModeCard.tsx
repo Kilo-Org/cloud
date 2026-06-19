@@ -32,12 +32,13 @@ const modeOptions: Array<{ value: AutoRoutingMode; label: string; description: s
     value: 'cost_per_accuracy',
     label: 'Best accuracy per dollar',
     description:
-      'Default. Chooses the model that passes the accuracy threshold and delivers the best accuracy per dollar among efficient workers.',
+      'Default. Chooses the model that passes the accuracy threshold and delivers the best accuracy per dollar within the efficient model pool.',
   },
   {
     value: 'best_accuracy',
     label: 'Best accuracy',
-    description: 'Chooses the highest-accuracy efficient worker, regardless of cost.',
+    description:
+      'Chooses the highest-accuracy model in the efficient model pool, regardless of cost.',
   },
 ];
 
@@ -133,7 +134,7 @@ export function AutoRoutingModeCard({ organizationId, readonly = false }: Props)
           Auto routing
         </CardTitle>
         <CardDescription>
-          Choose how Kilo ranks efficient-worker candidates for kilo-auto/efficient.
+          Choose how Kilo ranks models in the efficient model pool for kilo-auto/efficient.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

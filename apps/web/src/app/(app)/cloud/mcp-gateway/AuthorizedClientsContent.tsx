@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 function permissionLabel(scope: string) {
   if (scope === 'mcp:access') return 'Read, write, and act through this MCP connection';
@@ -112,21 +113,31 @@ export function AuthorizedClientsContent({ organizationId }: AuthorizedClientsCo
       {listQuery.data?.map(grant => (
         <Card key={grant.grantId}>
           <CardHeader className="gap-4 pb-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 space-y-2">
+            <div className="min-w-0 space-y-1.5">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="size-4 text-muted-foreground" aria-hidden="true" />
-                <CardTitle className="min-w-0 break-words text-base">
-                  Unverified MCP client
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Unverified client"
+                      className="text-muted-foreground inline-flex shrink-0 cursor-help items-center"
+                    >
+                      <ShieldCheck className="size-4" aria-hidden="true" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Unverified — this name was provided by the client and has not been confirmed.
+                  </TooltipContent>
+                </Tooltip>
+                <CardTitle className="min-w-0 truncate text-base">
+                  {grant.clientName ? `“${grant.clientName}”` : 'Unverified MCP client'}
                 </CardTitle>
               </div>
-              <div className="text-muted-foreground font-mono text-xs break-all">
-                {grant.clientId}
+              <div className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+                {grant.clientName && <span>Reported name</span>}
+                {grant.clientName && <span aria-hidden="true">•</span>}
+                <span className="font-mono break-all">{grant.clientId}</span>
               </div>
-              {grant.clientName && (
-                <div className="text-muted-foreground min-w-0 text-xs break-words">
-                  Self-reported name: {grant.clientName}
-                </div>
-              )}
             </div>
             <Button
               variant="outline"

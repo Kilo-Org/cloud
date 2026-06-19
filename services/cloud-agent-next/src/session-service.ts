@@ -132,7 +132,6 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'git pull',
   'gh pr diff',
   'gh pr view',
-  'gh api graphql',
   'gh api repos/*/pulls/*/reviews',
   'gh api repos/*/pulls/*/comments',
   'gh api repos/*/issues/*/comments',
@@ -154,6 +153,11 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'cd',
   'mkdir',
   'touch',
+];
+
+const CODE_REVIEW_EXACT_ALLOWED_COMMANDS = [
+  "gh api graphql -F owner=* -F name=* -F number=* -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid reviewThreads(first:100){nodes{id isResolved isOutdated viewerCanResolve path comments(first:1){totalCount nodes{body viewerDidAuthor}}}}}}}'",
+  "gh api graphql -F threadId=* -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}'",
 ];
 
 const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
@@ -373,6 +377,7 @@ const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
 export type CommandGuardPolicy = {
   policyName: string;
   allowed: string[];
+  allowedExact?: string[];
   denied: string[];
 };
 
@@ -389,6 +394,7 @@ export function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardP
     return {
       policyName: 'code-review-read-only',
       allowed: CODE_REVIEW_ALLOWED_COMMANDS,
+      allowedExact: CODE_REVIEW_EXACT_ALLOWED_COMMANDS,
       denied: [...DEFAULT_DENIED_COMMAND_PATTERNS, ...CODE_REVIEW_DENIED_COMMAND_PATTERNS],
     };
   }
@@ -405,6 +411,9 @@ export function buildCommandGuardBashPermissions(
   for (const cmd of commandGuardPolicy.allowed) {
     bashPermissions[cmd] = 'allow';
     bashPermissions[`${cmd} *`] = 'allow';
+  }
+  for (const cmd of commandGuardPolicy.allowedExact ?? []) {
+    bashPermissions[cmd] = 'allow';
   }
   for (const cmd of commandGuardPolicy.denied) {
     bashPermissions[cmd] = 'deny';

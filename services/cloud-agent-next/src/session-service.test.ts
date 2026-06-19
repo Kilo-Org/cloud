@@ -111,8 +111,8 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['glab api --method POST *merge_requests/*/discussions*']).toBe('allow');
 
     expect(bashPermissions['gh pr diff']).toBe('allow');
-    expect(bashPermissions['gh api graphql']).toBe('allow');
-    expect(bashPermissions['gh api graphql *']).toBe('allow');
+    expect(bashPermissions['gh api graphql']).toBeUndefined();
+    expect(bashPermissions['gh api graphql *']).toBeUndefined();
     expect(bashPermissions['gh api repos/*/pulls/*/reviews']).toBe('allow');
     expect(bashPermissions['gh api repos/*/pulls/*/reviews *']).toBe('allow');
     expect(bashPermissions['gh api repos/*/pulls/*/comments']).toBe('allow');
@@ -136,6 +136,14 @@ describe('code-review command guard policy', () => {
     }
     expect(bashPermissions['gh api repos/*/pulls/*/comments --input*']).toBe('deny');
     expect(bashPermissions['gh api repos/*/pulls/*/comments --input* *']).toBe('deny');
+
+    for (const exactGraphqlCommand of [
+      "gh api graphql -F owner=* -F name=* -F number=* -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){state headRefOid reviewThreads(first:100){nodes{id isResolved isOutdated viewerCanResolve path comments(first:1){totalCount nodes{body viewerDidAuthor}}}}}}}'",
+      "gh api graphql -F threadId=* -f query='mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}'",
+    ]) {
+      expect(bashPermissions[exactGraphqlCommand]).toBe('allow');
+      expect(bashPermissions[`${exactGraphqlCommand} *`]).toBeUndefined();
+    }
 
     for (const riskyAwkCommand of ['awk * -i*', 'awk * --in-place*', 'awk *system(*']) {
       expect(bashPermissions[riskyAwkCommand]).toBe('deny');

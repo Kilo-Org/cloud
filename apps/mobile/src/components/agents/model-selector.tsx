@@ -4,7 +4,9 @@ import { BookOpenCheck, Brain, ChevronDown } from 'lucide-react-native';
 
 import { Text } from '@/components/ui/text';
 import {
+  BYOK_MODEL_LABEL,
   getFreeModelDataAccessibilityLabel,
+  hasUserByokAvailable,
   mayTrainOnYourPrompts,
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
@@ -43,13 +45,15 @@ export function ModelSelector({
 
   const selectedModel = options.find(m => m.id === value);
   const label = selectedModel?.name ?? (value || 'Model');
+  const byok = hasUserByokAvailable(selectedModel);
   const collectsData = mayTrainOnYourPrompts(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';
   const compactVariantLabel = variant ? compactThinkingEffortLabel(variant) : '';
   const dataLabel = collectsData ? getFreeModelDataAccessibilityLabel(label) : label;
+  const modelLabel = byok ? `${dataLabel}, ${BYOK_MODEL_LABEL}` : dataLabel;
   const accessibilityLabel =
-    hasVariants && variantLabel ? `${dataLabel}, ${variantLabel} thinking effort` : dataLabel;
+    hasVariants && variantLabel ? `${modelLabel}, ${variantLabel} thinking effort` : modelLabel;
 
   function handlePress() {
     if (effectivelyDisabled) {
@@ -82,6 +86,13 @@ export function ModelSelector({
         >
           {label}
         </Text>
+        {byok ? (
+          <View className="rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-700">
+            <Text className="text-[10px] font-medium text-foreground" numberOfLines={1}>
+              {BYOK_MODEL_LABEL}
+            </Text>
+          </View>
+        ) : null}
         {collectsData ? <BookOpenCheck size={12} color={colors.warn} /> : null}
         {hasVariants && compactVariantLabel ? (
           <View className="flex-row items-center gap-1 rounded-full bg-neutral-200 px-1.5 py-0.5 dark:bg-neutral-800">

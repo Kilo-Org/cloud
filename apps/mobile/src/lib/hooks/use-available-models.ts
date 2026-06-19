@@ -14,6 +14,7 @@ export type ModelOption = {
   isPreferred: boolean;
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
+  hasUserByokAvailable?: boolean;
 };
 
 type ModelResponse = {
@@ -22,6 +23,7 @@ type ModelResponse = {
     name: string;
     isFree?: boolean;
     mayTrainOnYourPrompts?: boolean;
+    hasUserByokAvailable?: boolean;
     preferredIndex?: number;
     opencode?: {
       variants?: Record<string, unknown>;
@@ -104,6 +106,7 @@ export function useAvailableModels(organizationId: string | undefined) {
       name: formatShortModelName(model.name),
       isFree: model.isFree,
       mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+      hasUserByokAvailable: model.hasUserByokAvailable,
       variants: Object.keys(model.opencode?.variants ?? {}),
       preferredIndex: model.preferredIndex,
     }));
@@ -131,6 +134,7 @@ export function useAvailableModels(organizationId: string | undefined) {
       isPreferred: item.preferredIndex !== undefined,
       isFree: item.isFree,
       mayTrainOnYourPrompts: item.mayTrainOnYourPrompts,
+      hasUserByokAvailable: item.hasUserByokAvailable,
     }));
   }, [data]);
 

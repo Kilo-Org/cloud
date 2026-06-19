@@ -30,6 +30,24 @@ const populatedArgs = {
       { value: 'dependency', count: 2, lowConfidenceCount: 0 },
     ],
   },
+  modelBreakdown: [
+    {
+      model: 'anthropic/claude-sonnet-4.6',
+      trackedReviews: 14,
+      totalFindings: 18,
+      criticalFindings: 4,
+      warningFindings: 10,
+      suggestionFindings: 4,
+    },
+    {
+      model: 'openai/gpt-5.1',
+      trackedReviews: 10,
+      totalFindings: 13,
+      criticalFindings: 1,
+      warningFindings: 7,
+      suggestionFindings: 5,
+    },
+  ],
   findingBreakdown: [
     { value: 'correctness', total: 10, critical: 1, warning: 6, suggestion: 3 },
     { value: 'security', total: 6, critical: 2, warning: 3, suggestion: 1 },
@@ -70,6 +88,7 @@ const emptyOptionalDataArgs = {
     complexity: [],
     changeTypes: [],
   },
+  modelBreakdown: [],
   findingBreakdown: [],
   securityBreakdown: [],
 } satisfies AnalyticsBreakdownBarsArgs;

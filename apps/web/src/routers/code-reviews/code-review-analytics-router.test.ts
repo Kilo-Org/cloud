@@ -75,6 +75,7 @@ describe('Code Reviewer analytics router', () => {
     repository: string;
     prNumber: number;
     headSha: string;
+    model?: string;
     analyticsManifest: CodeReviewAnalyticsManifest;
     owner?:
       | { type: 'org'; id: string; userId: string }
@@ -98,7 +99,11 @@ describe('Code Reviewer analytics router', () => {
       status: 'running',
       analyticsEnabledAtDispatch: true,
     });
-    await updateCodeReviewStatus(reviewId, 'running');
+    await updateCodeReviewStatus(
+      reviewId,
+      'running',
+      input.model === undefined ? {} : { model: input.model }
+    );
     await finalizeCompletedCodeReviewWithAnalytics({
       codeReviewId: reviewId,
       sourceAttemptId: attempt.id,
@@ -134,10 +139,13 @@ describe('Code Reviewer analytics router', () => {
 
   it('returns owner-scoped, deduplicated metrics and GitHub contributors to members', async () => {
     const repository = `analytics/router-${crypto.randomUUID()}`;
+    const claudeModel = 'anthropic/claude-sonnet-4.6';
+    const gptModel = 'openai/gpt-5.1';
     await captureReview({
       repository,
       prNumber: 1,
       headSha: crypto.randomUUID(),
+      model: claudeModel,
       analyticsManifest: manifest({
         type: 'feature',
         impact: 'high',
@@ -151,6 +159,7 @@ describe('Code Reviewer analytics router', () => {
       repository,
       prNumber: 1,
       headSha: crypto.randomUUID(),
+      model: claudeModel,
       analyticsManifest: manifest({
         type: 'bug_fix',
         impact: 'medium',
@@ -161,6 +170,7 @@ describe('Code Reviewer analytics router', () => {
       repository,
       prNumber: 2,
       headSha: crypto.randomUUID(),
+      model: gptModel,
       analyticsManifest: manifest({
         type: 'feature',
         impact: 'high',
@@ -171,18 +181,21 @@ describe('Code Reviewer analytics router', () => {
       repository,
       prNumber: 3,
       headSha: crypto.randomUUID(),
+      model: gptModel,
       analyticsManifest: manifest({ type: 'bug_fix', impact: 'low' }),
     });
     await captureReview({
       repository,
       prNumber: 4,
       headSha: crypto.randomUUID(),
+      model: gptModel,
       analyticsManifest: manifest({ type: 'maintenance', impact: 'high', confidence: 'low' }),
     });
     await captureReview({
       repository,
       prNumber: 5,
       headSha: crypto.randomUUID(),
+      model: gptModel,
       analyticsManifest: manifest({
         type: 'bug_fix',
         impact: 'high',
@@ -226,6 +239,24 @@ describe('Code Reviewer analytics router', () => {
       high: 2,
       unclassified: 1,
     });
+    expect(dashboard.modelBreakdown).toEqual([
+      {
+        model: claudeModel,
+        trackedReviews: 2,
+        totalFindings: 3,
+        criticalFindings: 1,
+        warningFindings: 1,
+        suggestionFindings: 1,
+      },
+      {
+        model: gptModel,
+        trackedReviews: 4,
+        totalFindings: 2,
+        criticalFindings: 0,
+        warningFindings: 1,
+        suggestionFindings: 1,
+      },
+    ]);
     expect(dashboard.repositories).toEqual([
       expect.objectContaining({
         repository,
@@ -278,6 +309,7 @@ describe('Code Reviewer analytics router', () => {
       estimatedImpactPoints: 0,
     });
     expect(dashboard.repositoryOptions).toContain(repository);
+    expect(dashboard.modelBreakdown).toEqual([]);
   });
 
   it('requires organization scope for reads and settings changes', async () => {

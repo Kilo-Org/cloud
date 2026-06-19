@@ -252,6 +252,15 @@ export type CodeReviewAnalyticsSeverityBreakdownRow<T extends string> = {
   suggestion: number;
 };
 
+export type CodeReviewAnalyticsModelBreakdownRow = {
+  model: string | null;
+  trackedReviews: number;
+  totalFindings: number;
+  criticalFindings: number;
+  warningFindings: number;
+  suggestionFindings: number;
+};
+
 export type CodeReviewAnalyticsRepositoryRow = {
   repository: string;
   trackedPrsOrMrs: number;
@@ -290,6 +299,7 @@ export type CodeReviewAnalyticsDashboard = {
     complexity: CodeReviewAnalyticsDistributionRow<CodeReviewAnalyticsComplexityLevel>[];
     changeTypes: CodeReviewAnalyticsDistributionRow<CodeReviewAnalyticsChangeType>[];
   };
+  modelBreakdown: CodeReviewAnalyticsModelBreakdownRow[];
   findingBreakdown: CodeReviewAnalyticsSeverityBreakdownRow<CodeReviewFindingCategory>[];
   securityBreakdown: CodeReviewAnalyticsSeverityBreakdownRow<CodeReviewFindingSecurityClass>[];
   repositories: CodeReviewAnalyticsRepositoryRow[];
@@ -316,6 +326,7 @@ type DashboardAggregateRow = {
   summary: CodeReviewAnalyticsSummary;
   repository_options: string[];
   impact_breakdown: CodeReviewAnalyticsDashboard['impactBreakdown'];
+  model_breakdown: CodeReviewAnalyticsDashboard['modelBreakdown'];
   finding_breakdown: CodeReviewAnalyticsDashboard['findingBreakdown'];
   security_breakdown: CodeReviewAnalyticsDashboard['securityBreakdown'];
   repositories: CodeReviewAnalyticsDashboard['repositories'];
@@ -337,6 +348,7 @@ function analyticsDashboardQuery(input: DashboardInput) {
         ${cloud_agent_code_reviews.platform_project_id} AS platform_project_id,
         ${cloud_agent_code_reviews.pr_author} AS pr_author,
         ${cloud_agent_code_reviews.pr_author_github_id} AS pr_author_github_id,
+        NULLIF(BTRIM(${cloud_agent_code_reviews.model}), '') AS review_model,
         latest_attempt.id AS source_attempt_id,
         ${code_review_analytics_results.id} AS analytics_result_id,
         COALESCE(${code_review_analytics_results.capture_status}, 'missing') AS capture_status,
@@ -430,6 +442,22 @@ function analyticsDashboardQuery(input: DashboardInput) {
         COALESCE(SUM(critical_findings), 0)::int AS critical_findings,
         COALESCE(SUM(warning_findings), 0)::int AS warning_findings
       FROM captured_results
+    ), model_breakdown_rows AS (
+      SELECT
+        review_model,
+        COUNT(*)::int AS tracked_reviews,
+        COALESCE(SUM(total_findings), 0)::int AS total_findings,
+        COALESCE(SUM(critical_findings), 0)::int AS critical_findings,
+        COALESCE(SUM(warning_findings), 0)::int AS warning_findings,
+        COALESCE(SUM(suggestion_findings), 0)::int AS suggestion_findings
+      FROM captured_results
+      GROUP BY review_model
+      ORDER BY
+        total_findings DESC,
+        critical_findings DESC,
+        warning_findings DESC,
+        suggestion_findings DESC,
+        review_model ASC NULLS LAST
     ), logical_summary AS (
       SELECT
         COUNT(*)::int AS tracked_prs,
@@ -644,6 +672,22 @@ function analyticsDashboardQuery(input: DashboardInput) {
       ) AS impact_breakdown,
       COALESCE((
         SELECT jsonb_agg(jsonb_build_object(
+          'model', review_model,
+          'trackedReviews', tracked_reviews,
+          'totalFindings', total_findings,
+          'criticalFindings', critical_findings,
+          'warningFindings', warning_findings,
+          'suggestionFindings', suggestion_findings
+        ) ORDER BY
+          total_findings DESC,
+          critical_findings DESC,
+          warning_findings DESC,
+          suggestion_findings DESC,
+          review_model ASC NULLS LAST)
+        FROM model_breakdown_rows
+      ), '[]'::jsonb) AS model_breakdown,
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
           'value', value,
           'total', total,
           'critical', critical,
@@ -743,6 +787,7 @@ export async function getCodeReviewAnalyticsDashboard(
     summary: dashboard.summary,
     repositoryOptions: dashboard.repository_options,
     impactBreakdown: dashboard.impact_breakdown,
+    modelBreakdown: dashboard.model_breakdown,
     findingBreakdown: dashboard.finding_breakdown,
     securityBreakdown: dashboard.security_breakdown,
     repositories: dashboard.repositories,

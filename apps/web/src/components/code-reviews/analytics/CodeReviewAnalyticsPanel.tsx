@@ -601,6 +601,7 @@ export function CodeReviewAnalyticsPanel({
 
           <AnalyticsBreakdownBars
             impactBreakdown={dashboard.impactBreakdown}
+            modelBreakdown={dashboard.modelBreakdown}
             findingBreakdown={dashboard.findingBreakdown}
             securityBreakdown={dashboard.securityBreakdown}
           />

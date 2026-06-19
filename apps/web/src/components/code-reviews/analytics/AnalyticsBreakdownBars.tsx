@@ -59,6 +59,20 @@ type SeverityBreakdownRow<T extends string> = {
   suggestion: number;
 };
 
+type ModelBreakdownRow = {
+  model: string | null;
+  trackedReviews: number;
+  totalFindings: number;
+  criticalFindings: number;
+  warningFindings: number;
+  suggestionFindings: number;
+};
+
+type ModelSeverityRow = SeverityBreakdownRow<string> & {
+  model: string | null;
+  trackedReviews: number;
+};
+
 type ImpactBreakdown = {
   impact: Record<'low' | 'medium' | 'high' | 'unclassified', number>;
   complexity: DistributionRow<ComplexityLevel>[];
@@ -67,6 +81,7 @@ type ImpactBreakdown = {
 
 type AnalyticsBreakdownBarsProps = {
   impactBreakdown: ImpactBreakdown;
+  modelBreakdown: ModelBreakdownRow[];
   findingBreakdown: SeverityBreakdownRow<FindingCategory>[];
   securityBreakdown: SeverityBreakdownRow<SecurityClass>[];
 };
@@ -154,6 +169,24 @@ function lowConfidenceDetail(count: number): string | undefined {
   return `${count.toLocaleString()} low confidence`;
 }
 
+function formatReviewModelName(model: string | null): string {
+  const trimmed = model?.trim();
+  if (!trimmed) return 'Model metadata unavailable';
+
+  const [, ...withoutProvider] = trimmed.split('/');
+  const display = withoutProvider.join('/');
+  return display.length > 0 ? display : trimmed;
+}
+
+function rawReviewModelTitle(model: string | null): string | undefined {
+  const trimmed = model?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function reviewCountDetail(count: number): string {
+  return `${count.toLocaleString()} ${count === 1 ? 'review' : 'reviews'}`;
+}
+
 function DistributionBarList({ items, label }: { items: BarItem[]; label: string }) {
   const maxCount = Math.max(...items.map(item => item.count), 1);
 
@@ -182,20 +215,25 @@ function DistributionBarList({ items, label }: { items: BarItem[]; label: string
   );
 }
 
-function SeverityBarList<T extends string>({
+function SeverityBarList<Row extends SeverityBreakdownRow<string>>({
   rows,
-  labels,
   label,
+  labelForRow,
+  detailForRow,
+  titleForRow,
 }: {
-  rows: SeverityBreakdownRow<T>[];
-  labels: Record<T, string>;
+  rows: Row[];
   label: string;
+  labelForRow: (row: Row) => string;
+  detailForRow?: (row: Row) => string | undefined;
+  titleForRow?: (row: Row) => string | undefined;
 }) {
   const maxTotal = Math.max(...rows.map(row => row.total), 1);
 
   return (
     <div className="space-y-3" role="list" aria-label={label}>
       {rows.map(row => {
+        const rowDetail = detailForRow?.(row);
         const severityCounts = [
           { label: 'Critical', count: row.critical },
           { label: 'Warning', count: row.warning },
@@ -212,7 +250,16 @@ function SeverityBarList<T extends string>({
         return (
           <div key={row.value} className="space-y-1.5" role="listitem">
             <div className="flex items-start justify-between gap-3 text-sm">
-              <span>{labels[row.value]}</span>
+              <div className="min-w-0">
+                <span className="block truncate" title={titleForRow?.(row)}>
+                  {labelForRow(row)}
+                </span>
+                {rowDetail && (
+                  <span className="text-muted-foreground mt-0.5 block text-xs tabular-nums">
+                    {rowDetail}
+                  </span>
+                )}
+              </div>
               <span className="shrink-0 tabular-nums">{row.total.toLocaleString()}</span>
             </div>
             <div className="bg-muted flex h-2 overflow-hidden rounded-full" aria-hidden="true">
@@ -240,6 +287,25 @@ function SeverityBarList<T extends string>({
   );
 }
 
+function SeverityLegend() {
+  return (
+    <div
+      className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-2 text-xs sm:justify-end"
+      aria-hidden="true"
+    >
+      <span className="flex items-center gap-1.5">
+        <span className="bg-chart-5 size-2 rounded-full" /> Critical
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="bg-chart-3 size-2 rounded-full" /> Warning
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="bg-chart-2 size-2 rounded-full" /> Suggestion
+      </span>
+    </div>
+  );
+}
+
 function BreakdownCard({
   headingId,
   title,
@@ -258,6 +324,66 @@ function BreakdownCard({
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
+  );
+}
+
+function ReviewModelSection({
+  modelBreakdown,
+  headingId,
+}: Pick<AnalyticsBreakdownBarsProps, 'modelBreakdown'> & {
+  headingId: string;
+}) {
+  if (modelBreakdown.length === 0) return null;
+
+  if (modelBreakdown.length === 1) {
+    const row = modelBreakdown[0];
+    if (!row) return null;
+
+    return (
+      <p className="text-muted-foreground text-sm">
+        Code Reviewer model:{' '}
+        <span className="text-foreground" title={rawReviewModelTitle(row.model)}>
+          {formatReviewModelName(row.model)}
+        </span>
+      </p>
+    );
+  }
+
+  const modelRows: ModelSeverityRow[] = modelBreakdown.map((row, index) => ({
+    value: `${row.model ?? 'model-metadata-unavailable'}-${index}`,
+    model: row.model,
+    trackedReviews: row.trackedReviews,
+    total: row.totalFindings,
+    critical: row.criticalFindings,
+    warning: row.warningFindings,
+    suggestion: row.suggestionFindings,
+  }));
+  const modelsHeadingId = `${headingId}-models`;
+
+  return (
+    <section className="space-y-4" aria-labelledby={headingId}>
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1.5">
+          <h2 id={headingId} className="text-lg font-semibold tracking-tight">
+            Findings by model
+          </h2>
+          <CardDescription>
+            Critical, warning, and suggestion Code Review Findings raised by each Code Reviewer
+            model in this selection.
+          </CardDescription>
+        </div>
+        <SeverityLegend />
+      </header>
+      <BreakdownCard headingId={modelsHeadingId} title="Code Reviewer models">
+        <SeverityBarList
+          rows={modelRows}
+          label="Code Reviewer model and severity distribution"
+          labelForRow={row => formatReviewModelName(row.model)}
+          detailForRow={row => reviewCountDetail(row.trackedReviews)}
+          titleForRow={row => rawReviewModelTitle(row.model)}
+        />
+      </BreakdownCard>
+    </section>
   );
 }
 
@@ -354,28 +480,15 @@ function FindingTaxonomySection({
             Newly raised Code Review Findings grouped by controlled category and severity.
           </CardDescription>
         </div>
-        <div
-          className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-2 text-xs sm:justify-end"
-          aria-hidden="true"
-        >
-          <span className="flex items-center gap-1.5">
-            <span className="bg-chart-5 size-2 rounded-full" /> Critical
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="bg-chart-3 size-2 rounded-full" /> Warning
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="bg-chart-2 size-2 rounded-full" /> Suggestion
-          </span>
-        </div>
+        <SeverityLegend />
       </header>
       <div className={cn('grid gap-6', hasSecurityBreakdown && 'lg:grid-cols-2 lg:items-start')}>
         <BreakdownCard headingId={categoriesHeadingId} title="Categories">
           {findingBreakdown.length > 0 ? (
             <SeverityBarList
               rows={findingBreakdown}
-              labels={findingCategoryLabels}
               label="Finding category and severity distribution"
+              labelForRow={row => findingCategoryLabels[row.value]}
             />
           ) : (
             <p className="text-muted-foreground text-sm">
@@ -387,8 +500,8 @@ function FindingTaxonomySection({
           <BreakdownCard headingId={securityHeadingId} title="Security concern classes">
             <SeverityBarList
               rows={securityBreakdown}
-              labels={securityClassLabels}
               label="Security concern class and severity distribution"
+              labelForRow={row => securityClassLabels[row.value]}
             />
           </BreakdownCard>
         )}
@@ -399,6 +512,7 @@ function FindingTaxonomySection({
 
 export function AnalyticsBreakdownBars({
   impactBreakdown,
+  modelBreakdown,
   findingBreakdown,
   securityBreakdown,
 }: AnalyticsBreakdownBarsProps) {
@@ -407,6 +521,7 @@ export function AnalyticsBreakdownBars({
   return (
     <div className="space-y-8">
       <ChangeProfileSection impactBreakdown={impactBreakdown} headingId={`${id}-change-profile`} />
+      <ReviewModelSection modelBreakdown={modelBreakdown} headingId={`${id}-review-model`} />
       <FindingTaxonomySection
         findingBreakdown={findingBreakdown}
         securityBreakdown={securityBreakdown}

@@ -26,6 +26,7 @@ import {
   resolveActiveOAuthGrant,
   resolveActiveRoute,
   resolveRuntimeState,
+  touchOAuthGrantUsage,
 } from '../db/runtime-repository';
 import { resolveProviderAuthorization } from '../lib/provider-refresh';
 import { loadStaticHeaders } from '../lib/credentials';
@@ -227,6 +228,16 @@ async function handleConnect(
       });
       if (!oauthGrant) {
         return forbiddenResponse(c);
+      }
+      const touchPromise = touchOAuthGrantUsage({
+        env: c.env,
+        grantId: oauthGrant.oauth_grant_id,
+      }).catch(() => {});
+      try {
+        c.executionCtx.waitUntil(touchPromise);
+      } catch {
+        // c.executionCtx is unavailable in unit tests; the promise is already attached
+        // a no-op rejection handler so leaving it floating is safe.
       }
     }
     phase = 'load_runtime_state';

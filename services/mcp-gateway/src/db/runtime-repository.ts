@@ -24,7 +24,7 @@ import {
   mcp_gateway_provider_grants,
 } from '@kilocode/db/schema';
 import { MCPGatewayOAuthGrantStatus } from '@kilocode/db/schema-types';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import type { MCPGatewayEnv } from '../types';
 
 export function getRuntimeDb(env: MCPGatewayEnv['Bindings']) {
@@ -239,6 +239,29 @@ export async function resolveRuntimeState(params: {
     grant,
     staticSecret: staticSecretRows[0] ?? null,
   };
+}
+
+const OAUTH_GRANT_TOUCH_DEBOUNCE_SECONDS = 30;
+
+export async function touchOAuthGrantUsage(params: {
+  env: MCPGatewayEnv['Bindings'];
+  grantId: string;
+}) {
+  const db = getRuntimeDb(params.env);
+  await db
+    .update(mcp_gateway_oauth_grants)
+    .set({ last_used_at: sql`NOW()` })
+    .where(
+      and(
+        eq(mcp_gateway_oauth_grants.oauth_grant_id, params.grantId),
+        eq(mcp_gateway_oauth_grants.grant_status, MCPGatewayOAuthGrantStatus.Active),
+        isNull(mcp_gateway_oauth_grants.revoked_at),
+        or(
+          isNull(mcp_gateway_oauth_grants.last_used_at),
+          sql`${mcp_gateway_oauth_grants.last_used_at} < NOW() - (${OAUTH_GRANT_TOUCH_DEBOUNCE_SECONDS} || ' seconds')::interval`
+        )
+      )
+    );
 }
 
 export async function recordRuntimeAudit(params: {

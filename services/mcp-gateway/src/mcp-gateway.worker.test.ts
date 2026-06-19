@@ -18,6 +18,7 @@ vi.mock('./db/runtime-repository', () => ({
   resolveActiveRoute: mockResolveActiveRoute,
   resolveRuntimeState: mockResolveRuntimeState,
   recordRuntimeAudit: async () => undefined,
+  touchOAuthGrantUsage: async () => undefined,
 }));
 
 vi.mock('./lib/jwt', () => ({

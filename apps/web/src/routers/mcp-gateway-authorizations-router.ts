@@ -81,6 +81,7 @@ export const mcpGatewayAuthorizationsRouter = createTRPCRouter({
         clientName: row.client.client_name,
         redirectUri: row.grant.redirect_uri,
         connectionName: row.config.name,
+        configId: row.grant.config_id,
         context:
           row.grant.owner_scope === 'organization'
             ? {

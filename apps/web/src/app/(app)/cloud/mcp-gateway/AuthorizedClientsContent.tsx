@@ -1,14 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
-import { ShieldCheck, ShieldX } from 'lucide-react';
+import { ShieldCheck, ShieldX, ChevronDown } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   AlertDialog,
@@ -21,11 +22,16 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { getMcpGatewayRoutes } from '@/lib/mcp-gateway/routes';
 
 function permissionLabel(scope: string) {
   if (scope === 'mcp:access') return 'Read, write, and act through this MCP connection';
   if (scope === 'profile') return 'View your Kilo profile';
   return scope;
+}
+
+function isBroadAccessScope(scope: string) {
+  return scope === 'mcp:access';
 }
 
 type AuthorizedClientsContentProps = {
@@ -110,90 +116,122 @@ export function AuthorizedClientsContent({ organizationId }: AuthorizedClientsCo
           </div>
         </div>
       )}
-      {listQuery.data?.map(grant => (
-        <Card key={grant.grantId}>
-          <CardHeader className="gap-4 pb-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label="Unverified client"
-                      className="text-muted-foreground inline-flex shrink-0 cursor-help items-center"
-                    >
-                      <ShieldCheck className="size-4" aria-hidden="true" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Unverified — this name was provided by the client and has not been confirmed.
-                  </TooltipContent>
-                </Tooltip>
-                <CardTitle className="min-w-0 truncate text-base">
-                  {grant.clientName ? `“${grant.clientName}”` : 'Unverified MCP client'}
-                </CardTitle>
-              </div>
-              <div className="text-muted-foreground flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
-                {grant.clientName && <span>Reported name</span>}
-                {grant.clientName && <span aria-hidden="true">•</span>}
-                <span className="font-mono break-all">{grant.clientId}</span>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              className="h-10 w-full sm:h-9 sm:w-auto"
-              disabled={revokeMutation.isPending}
-              onClick={() => setRevokeGrantId(grant.grantId)}
-            >
-              <ShieldX className="size-4" />
-              Revoke access
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-0">
-            <div className="grid gap-4 border-t pt-4 text-sm sm:grid-cols-2 lg:grid-cols-5">
-              <div className="min-w-0 space-y-1">
-                <p className="text-muted-foreground text-xs uppercase">Connection</p>
-                <p className="break-words font-medium">{grant.connectionName}</p>
-              </div>
-              <div className="min-w-0 space-y-1">
-                <p className="text-muted-foreground text-xs uppercase">Callback URI</p>
-                <p className="font-mono text-xs break-all">{grant.redirectUri}</p>
-              </div>
-              <div className="min-w-0 space-y-1">
-                <p className="text-muted-foreground text-xs uppercase">Context</p>
-                <Badge variant="outline" className="w-fit">
-                  {grant.context.type === 'organization'
-                    ? grant.context.organizationName
-                    : 'Personal'}
-                </Badge>
-              </div>
-              <div className="min-w-0 space-y-1">
-                <p className="text-muted-foreground text-xs uppercase">Authorized</p>
-                <p title={new Date(grant.approvedAt).toLocaleString()}>
-                  {formatDistanceToNow(new Date(grant.approvedAt), { addSuffix: true })}
+      {listQuery.data?.map(grant => {
+        const connectionHref = getMcpGatewayRoutes(
+          grant.context.type === 'organization' ? grant.context.organizationId : undefined
+        ).detail(grant.configId);
+        const onBehalfOf =
+          grant.context.type === 'organization' ? grant.context.organizationName : 'yourself';
+        const hasBroadAccess = grant.scopes.some(isBroadAccessScope);
+        const otherScopes = grant.scopes.filter(scope => !isBroadAccessScope(scope));
+        return (
+          <Card key={grant.grantId}>
+            <CardHeader className="gap-3 pb-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Unverified client"
+                        className="text-muted-foreground focus-visible:ring-ring inline-flex shrink-0 cursor-help items-center rounded-sm focus-visible:ring-1 focus-visible:outline-none"
+                      >
+                        <ShieldCheck className="size-4" aria-hidden="true" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Unverified — this name was provided by the client and has not been confirmed.
+                    </TooltipContent>
+                  </Tooltip>
+                  <h2 className="min-w-0 truncate text-base font-semibold tracking-tight">
+                    {grant.clientName ? `“${grant.clientName}”` : 'Unverified MCP client'}
+                  </h2>
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  Authorized to use{' '}
+                  <Link
+                    href={connectionHref}
+                    className="text-foreground font-medium underline-offset-2 hover:underline"
+                  >
+                    {grant.connectionName}
+                  </Link>{' '}
+                  on behalf of <span className="text-foreground">{onBehalfOf}</span>
                 </p>
               </div>
-              <div className="min-w-0 space-y-1">
-                <p className="text-muted-foreground text-xs uppercase">Last used</p>
-                <p
+              <Button
+                variant="outline"
+                className="h-10 w-full sm:h-9 sm:w-auto"
+                disabled={revokeMutation.isPending}
+                onClick={() => setRevokeGrantId(grant.grantId)}
+              >
+                <ShieldX className="size-4" />
+                Revoke access
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-0">
+              {hasBroadAccess && (
+                <div className="bg-muted/40 space-y-1 rounded-md border p-3">
+                  <p className="text-muted-foreground text-xs font-medium uppercase">
+                    What this grants
+                  </p>
+                  <p className="text-sm">
+                    Read, write, and act through{' '}
+                    <span className="font-medium">{grant.connectionName}</span> on your behalf,
+                    using whatever tools that connection exposes.
+                  </p>
+                  {otherScopes.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {otherScopes.map(scope => (
+                        <Badge key={scope} variant="secondary">
+                          {permissionLabel(scope)}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums">
+                <span title={new Date(grant.approvedAt).toLocaleString()}>
+                  Authorized {formatDistanceToNow(new Date(grant.approvedAt), { addSuffix: true })}
+                </span>
+                <span aria-hidden="true" className="opacity-60">
+                  ·
+                </span>
+                <span
                   title={grant.lastUsedAt ? new Date(grant.lastUsedAt).toLocaleString() : undefined}
                 >
                   {grant.lastUsedAt
-                    ? formatDistanceToNow(new Date(grant.lastUsedAt), { addSuffix: true })
+                    ? `Last used ${formatDistanceToNow(new Date(grant.lastUsedAt), { addSuffix: true })}`
                     : 'Not used yet'}
-                </p>
+                </span>
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {grant.scopes.map(scope => (
-                <Badge key={scope} variant="secondary">
-                  {permissionLabel(scope)}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+              <details className="group border-t pt-3">
+                <summary className="text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex cursor-pointer items-center gap-1 rounded-sm text-xs font-medium select-none focus-visible:ring-1 focus-visible:outline-none">
+                  <ChevronDown
+                    className="size-3.5 transition-transform group-open:rotate-180"
+                    aria-hidden="true"
+                  />
+                  Show technical details
+                </summary>
+                <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                  <div className="min-w-0 space-y-1">
+                    <dt className="text-muted-foreground text-xs uppercase">Client ID</dt>
+                    <dd className="bg-muted/40 rounded-sm px-2 py-1 font-mono text-xs break-all">
+                      {grant.clientId}
+                    </dd>
+                  </div>
+                  <div className="min-w-0 space-y-1">
+                    <dt className="text-muted-foreground text-xs uppercase">Callback URI</dt>
+                    <dd className="bg-muted/40 rounded-sm px-2 py-1 font-mono text-xs break-all">
+                      {grant.redirectUri}
+                    </dd>
+                  </div>
+                </dl>
+              </details>
+            </CardContent>
+          </Card>
+        );
+      })}
       <AlertDialog
         open={revokeGrantId !== null}
         onOpenChange={open => {

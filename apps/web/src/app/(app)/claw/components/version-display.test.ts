@@ -2,6 +2,15 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { VersionImageMetadata } from './VersionPinCard';
 
+// The same-version explanation is surfaced as the info trigger's accessible
+// name (aria-label), which renders into static markup. We deliberately assert
+// against the aria-label rather than the Radix TooltipContent: that content
+// lives in a portal and only mounts when the tooltip is open, so it never
+// appears in renderToStaticMarkup output.
+const SAME_VERSION_EXPLANATION =
+  'Both images run the same OpenClaw version, but the latest image includes additional fixes, improvements, and features.';
+const SAME_VERSION_ARIA_LABEL = `aria-label="${SAME_VERSION_EXPLANATION}"`;
+
 describe('KiloClaw version display', () => {
   it('pairs current and latest OpenClaw versions with their image tags', () => {
     const html = renderToStaticMarkup(
@@ -27,8 +36,8 @@ describe('KiloClaw version display', () => {
     expect(html).toContain('Latest');
     expect(html).toContain('OpenClaw 2026.6.8');
     expect(html).toContain('img-048842db6829');
-    // Different OpenClaw versions: no "same version" explanation.
-    expect(html).not.toContain('the same OpenClaw version');
+    // Different OpenClaw versions: no "same version" explanation trigger.
+    expect(html).not.toContain(SAME_VERSION_ARIA_LABEL);
   });
 
   it('explains when active and latest share an OpenClaw version but differ by image', () => {
@@ -49,9 +58,7 @@ describe('KiloClaw version display', () => {
       )
     );
 
-    expect(html).toContain(
-      'Both images run the same OpenClaw version, but the latest image includes additional fixes, improvements, and features.'
-    );
+    expect(html).toContain(SAME_VERSION_ARIA_LABEL);
   });
 
   it('omits the explanation when active and latest are the same image', () => {
@@ -72,6 +79,6 @@ describe('KiloClaw version display', () => {
       )
     );
 
-    expect(html).not.toContain('the same OpenClaw version');
+    expect(html).not.toContain(SAME_VERSION_ARIA_LABEL);
   });
 });

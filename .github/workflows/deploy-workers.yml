@@ -17,6 +17,11 @@ on:
           - staging
   workflow_call:
     inputs:
+      worker:
+        description: 'Worker folder to deploy for single-worker calls'
+        required: false
+        default: ''
+        type: string
       base_sha:
         description: 'Base SHA to diff against when detecting changed workers'
         required: false
@@ -37,7 +42,7 @@ concurrency:
 
 jobs:
   deploy-manual:
-    if: github.event_name == 'workflow_dispatch'
+    if: inputs.worker != ''
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     name: Deploy ${{ inputs.worker }}
@@ -71,7 +76,7 @@ jobs:
           command: ${{ inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment) }}
 
   detect-changes:
-    if: inputs.base_sha != '' || inputs.target_environment != 'production'
+    if: inputs.worker == '' && (inputs.base_sha != '' || inputs.target_environment != 'production')
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:

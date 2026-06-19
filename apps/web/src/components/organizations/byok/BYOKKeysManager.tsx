@@ -756,6 +756,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             you may need to wait a few minutes and restart your client for this
                             entry to appear.
                           </p>
+                          {organizationId ? (
+                            <p className="mt-2">
+                              This provider is considered trusted in the context of organization
+                              restrictions.
+                            </p>
+                          ) : null}
                         </AlertDescription>
                       </Alert>
                     );
@@ -764,9 +770,17 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <Alert>
                       <Info className="size-4" />
                       <AlertDescription>
-                        Once saved, your key will automatically be used whenever your client
-                        requests one of the supported models above. If multiple keys apply to the
-                        same model, they are tried in unspecified order until one succeeds.
+                        <p>
+                          Once saved, your key will automatically be used whenever your client
+                          requests one of the supported models above. If multiple keys apply to the
+                          same model, they are tried in unspecified order until one succeeds.
+                        </p>
+                        {organizationId ? (
+                          <p className="mt-2">
+                            Models of this provider are subject to organization-configured model
+                            restrictions, but the provider itself is considered trusted.
+                          </p>
+                        ) : null}
                       </AlertDescription>
                     </Alert>
                   );

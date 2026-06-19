@@ -108,6 +108,7 @@ export async function replaceConfig(
   config: {
     min_accuracy: number;
     switch_cost_factor: number;
+    best_accuracy_switch_threshold: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
@@ -180,6 +181,7 @@ export async function insertRun(
     startedAt: string;
     min_accuracy: number;
     switch_cost_factor: number;
+    best_accuracy_switch_threshold: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
@@ -198,6 +200,7 @@ export async function insertRun(
     started_at: run.startedAt,
     min_accuracy: run.min_accuracy,
     switch_cost_factor: run.switch_cost_factor,
+    best_accuracy_switch_threshold: run.best_accuracy_switch_threshold,
     max_concurrency: run.max_concurrency,
     benchmark_user_id: run.benchmark_user_id,
     benchmark_org_id: run.benchmark_org_id,
@@ -552,6 +555,7 @@ export function routingTableToRows(
     generated_at: table.generatedAt,
     min_accuracy: table.minAccuracy,
     switch_cost_factor: table.switchCostFactor,
+    best_accuracy_switch_threshold: table.bestAccuracySwitchThreshold,
     source: table.source,
   };
 
@@ -598,6 +602,7 @@ export function rowsToRoutingTable(
     generatedAt: tableRow.generated_at,
     minAccuracy: tableRow.min_accuracy,
     switchCostFactor: tableRow.switch_cost_factor,
+    bestAccuracySwitchThreshold: tableRow.best_accuracy_switch_threshold,
     source: tableRow.source as RoutingTable['source'],
     routes: routeMap,
   };
@@ -623,6 +628,7 @@ export async function saveRoutingTable(
           generated_at: tableRow.generated_at,
           min_accuracy: tableRow.min_accuracy,
           switch_cost_factor: tableRow.switch_cost_factor,
+          best_accuracy_switch_threshold: tableRow.best_accuracy_switch_threshold,
           source: tableRow.source,
         },
       }),

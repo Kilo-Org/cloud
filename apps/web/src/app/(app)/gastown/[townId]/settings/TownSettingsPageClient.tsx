@@ -147,6 +147,7 @@ export function TownSettingsPageClient({ townId, readOnly = false, organizationI
         name: model.name,
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+        hasUserByokAvailable: model.hasUserByokAvailable,
       })) ?? [],
     [modelsData]
   );

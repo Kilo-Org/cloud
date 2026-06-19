@@ -9,6 +9,7 @@ export const benchmarkConfig = sqliteTable('benchmark_config', {
   id: integer('id').primaryKey(),
   min_accuracy: real('min_accuracy').notNull(),
   switch_cost_factor: real('switch_cost_factor').notNull(),
+  best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
   max_concurrency: integer('max_concurrency').notNull(),
   benchmark_user_id: text('benchmark_user_id'),
   benchmark_org_id: text('benchmark_org_id'),
@@ -53,6 +54,7 @@ export const benchmarkRuns = sqliteTable(
     // Config snapshot taken at startRun time so mid-run edits can't skew results.
     min_accuracy: real('min_accuracy').notNull(),
     switch_cost_factor: real('switch_cost_factor').notNull(),
+    best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
     max_concurrency: integer('max_concurrency').notNull(),
     benchmark_user_id: text('benchmark_user_id'),
     benchmark_org_id: text('benchmark_org_id'),
@@ -142,6 +144,7 @@ export const routingTables = sqliteTable('routing_tables', {
   generated_at: text('generated_at').notNull(),
   min_accuracy: real('min_accuracy').notNull(),
   switch_cost_factor: real('switch_cost_factor').notNull(),
+  best_accuracy_switch_threshold: real('best_accuracy_switch_threshold').notNull().default(0.05),
   source: text('source').notNull(),
 });
 

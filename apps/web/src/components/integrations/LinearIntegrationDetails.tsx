@@ -55,6 +55,7 @@ export function LinearIntegrationDetails({
         name: model.name,
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+        hasUserByokAvailable: model.hasUserByokAvailable,
       })) ?? []
     );
   }, [openRouterModels]);

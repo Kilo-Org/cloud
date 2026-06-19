@@ -23,6 +23,9 @@ export const RoutingTableSchema = z.object({
   // Keep a session's incumbent model unless the fresh pick is cheaper by
   // more than this factor (see BenchmarkConfigSchema.switchCostFactor).
   switchCostFactor: z.number().min(1),
+  // In best-accuracy mode, keep a threshold-meeting incumbent unless the
+  // fresh pick improves accuracy by more than this absolute delta.
+  bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),
   source: z.enum(['benchmark']),
   routes: z.record(z.string(), z.array(RankedCandidateSchema).min(1)).superRefine((routes, ctx) => {
     for (const key of Object.keys(routes)) {

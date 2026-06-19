@@ -39,12 +39,20 @@
         "name": "AUTO_ROUTING_DECISION_CACHE",
         "class_name": "AutoRoutingDecisionCacheDO",
       },
+      {
+        "name": "AUTO_ROUTING_MODE_CONFIG",
+        "class_name": "AutoRoutingModeConfigDO",
+      },
     ],
   },
   "migrations": [
     {
       "tag": "v1",
       "new_sqlite_classes": ["AutoRoutingDecisionCacheDO"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["AutoRoutingModeConfigDO"],
     },
   ],
   "analytics_engine_datasets": [

@@ -80,6 +80,7 @@ describe('insertRun', () => {
         startedAt: '2026-06-17T00:00:00.000Z',
         min_accuracy: 0.7,
         switch_cost_factor: 3,
+        best_accuracy_switch_threshold: 0.05,
         max_concurrency: 100,
         benchmark_user_id: 'user-123',
         benchmark_org_id: null,

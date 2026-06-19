@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { captureException } from '@sentry/nextjs';
-import { and, eq, type SQL } from 'drizzle-orm';
-import { agent_configs } from '@kilocode/db/schema';
+import { and, count, eq, gte, lt, type SQL } from 'drizzle-orm';
+import { agent_configs, cloud_agent_code_reviews } from '@kilocode/db/schema';
 import { db, sql, type DrizzleTransaction } from '@/lib/drizzle';
 import { NEXTAUTH_URL } from '@/lib/config.server';
 import { sendCodeReviewDisabledEmail } from '@/lib/email';
@@ -44,6 +44,11 @@ const BYOK_INVALID_KEY_MESSAGE =
   '[byok] your api key is invalid or has been revoked. please check your api key configuration.';
 const BYOK_PERMISSION_DENIED_MESSAGE =
   '[byok] your api key does not have permission to access this resource. please check your api key permissions.';
+const REPEATED_REPOSITORY_CLONE_TIMEOUT_REASON =
+  'repeated_repository_clone_timeout' satisfies CodeReviewActionRequiredReason;
+const REPOSITORY_CLONE_TIMEOUT_MESSAGE_FRAGMENT = 'repository clone timed out';
+const REPEATED_REPOSITORY_CLONE_TIMEOUT_THRESHOLD = 3;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 type AgentConfigWithRuntimeState = {
   runtime_state?: Record<string, unknown> | null;
@@ -57,6 +62,13 @@ type DisableCodeReviewForActionRequiredFailureArgs = {
   errorMessage: string;
 };
 
+type DisableCodeReviewForRepeatedCloneTimeoutsTodayArgs = {
+  owner: Owner;
+  platform: CodeReviewPlatform;
+  reviewId: string;
+  errorMessage?: string | null;
+};
+
 type ClearCodeReviewActionRequiredStateArgs = {
   owner: Owner;
   platform: CodeReviewPlatform;
@@ -68,6 +80,15 @@ type MarkActionRequiredEmailSentArgs = {
   reason: CodeReviewActionRequiredReason;
   sentAt: string;
 };
+
+type PersistActionRequiredDisableArgs = {
+  owner: Owner;
+  platform: CodeReviewPlatform;
+  reviewId?: string;
+  reason: CodeReviewActionRequiredReason;
+};
+
+type PersistActionRequiredBeforeUpdate = (tx: DrizzleTransaction) => Promise<boolean>;
 
 function stripKnownErrorPrefixes(errorMessage: string): string {
   let message = errorMessage.trim();
@@ -158,6 +179,54 @@ function ownerConditions(owner: Pick<Owner, 'type' | 'id'>, platform: CodeReview
       ? eq(agent_configs.owned_by_organization_id, owner.id)
       : eq(agent_configs.owned_by_user_id, owner.id),
   ];
+}
+
+function reviewOwnerConditions(
+  owner: Pick<Owner, 'type' | 'id'>,
+  platform: CodeReviewPlatform
+): SQL[] {
+  return [
+    eq(cloud_agent_code_reviews.platform, platform),
+    owner.type === 'org'
+      ? eq(cloud_agent_code_reviews.owned_by_organization_id, owner.id)
+      : eq(cloud_agent_code_reviews.owned_by_user_id, owner.id),
+  ];
+}
+
+function getUtcDayBounds(now = new Date()): { start: string; end: string } {
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return {
+    start: start.toISOString(),
+    end: new Date(start.getTime() + DAY_MS).toISOString(),
+  };
+}
+
+function isRepositoryCloneTimeoutMessage(errorMessage?: string | null): boolean {
+  return errorMessage
+    ? errorMessage.toLowerCase().includes(REPOSITORY_CLONE_TIMEOUT_MESSAGE_FRAGMENT)
+    : false;
+}
+
+async function countRepositoryCloneTimeoutFailuresToday(
+  tx: DrizzleTransaction,
+  owner: Owner,
+  platform: CodeReviewPlatform
+): Promise<number> {
+  const dayBounds = getUtcDayBounds();
+  const [row] = await tx
+    .select({ timeoutCount: count() })
+    .from(cloud_agent_code_reviews)
+    .where(
+      and(
+        ...reviewOwnerConditions(owner, platform),
+        eq(cloud_agent_code_reviews.status, 'failed'),
+        gte(cloud_agent_code_reviews.completed_at, dayBounds.start),
+        lt(cloud_agent_code_reviews.completed_at, dayBounds.end),
+        sql`LOWER(${cloud_agent_code_reviews.error_message}) LIKE ${`%${REPOSITORY_CLONE_TIMEOUT_MESSAGE_FRAGMENT}%`}`
+      )
+    );
+
+  return row?.timeoutCount ?? 0;
 }
 
 async function updateActionRequiredRuntimeState(
@@ -287,12 +356,13 @@ async function markActionRequiredEmailSent(args: MarkActionRequiredEmailSentArgs
   });
 }
 
-export async function disableCodeReviewForActionRequiredFailure(
-  args: DisableCodeReviewForActionRequiredFailureArgs
-): Promise<void> {
+async function persistActionRequiredDisable(
+  args: PersistActionRequiredDisableArgs,
+  beforeUpdate?: PersistActionRequiredBeforeUpdate
+): Promise<boolean | null> {
   const copy = getCodeReviewActionRequiredCopy(args.reason);
 
-  const shouldSendEmail = await db.transaction(async tx => {
+  return await db.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`code-review-action-required:${args.owner.type}:${args.owner.id}:${args.platform}`}))`
     );
@@ -318,6 +388,11 @@ export async function disableCodeReviewForActionRequiredFailure(
       );
     }
 
+    if (beforeUpdate) {
+      const shouldPersist = await beforeUpdate(tx);
+      if (!shouldPersist) return null;
+    }
+
     const now = new Date().toISOString();
     const existingState = getCodeReviewActionRequiredState(config);
     const shouldSendEmail =
@@ -341,7 +416,12 @@ export async function disableCodeReviewForActionRequiredFailure(
 
     return shouldSendEmail;
   });
+}
 
+async function sendAndMarkActionRequiredEmailNotifications(
+  args: PersistActionRequiredDisableArgs,
+  shouldSendEmail: boolean
+): Promise<void> {
   if (!shouldSendEmail) return;
 
   try {
@@ -373,6 +453,59 @@ export async function disableCodeReviewForActionRequiredFailure(
       },
     });
   }
+}
+
+export async function disableCodeReviewForActionRequiredFailure(
+  args: DisableCodeReviewForActionRequiredFailureArgs
+): Promise<void> {
+  const shouldSendEmail = await persistActionRequiredDisable(args);
+  if (shouldSendEmail === null) return;
+  await sendAndMarkActionRequiredEmailNotifications(args, shouldSendEmail);
+}
+
+export async function disableCodeReviewForRepeatedCloneTimeoutsToday(
+  args: DisableCodeReviewForRepeatedCloneTimeoutsTodayArgs
+): Promise<CodeReviewActionRequiredReason | null> {
+  if (!isRepositoryCloneTimeoutMessage(args.errorMessage)) return null;
+
+  const shouldSendEmail = await persistActionRequiredDisable(
+    {
+      owner: args.owner,
+      platform: args.platform,
+      reviewId: args.reviewId,
+      reason: REPEATED_REPOSITORY_CLONE_TIMEOUT_REASON,
+    },
+    async tx => {
+      const timeoutCount = await countRepositoryCloneTimeoutFailuresToday(
+        tx,
+        args.owner,
+        args.platform
+      );
+      if (timeoutCount < REPEATED_REPOSITORY_CLONE_TIMEOUT_THRESHOLD) return false;
+
+      await tx
+        .update(cloud_agent_code_reviews)
+        .set({
+          terminal_reason: REPEATED_REPOSITORY_CLONE_TIMEOUT_REASON,
+          updated_at: new Date().toISOString(),
+        })
+        .where(eq(cloud_agent_code_reviews.id, args.reviewId));
+
+      return true;
+    }
+  );
+
+  if (shouldSendEmail === null) return null;
+  await sendAndMarkActionRequiredEmailNotifications(
+    {
+      owner: args.owner,
+      platform: args.platform,
+      reviewId: args.reviewId,
+      reason: REPEATED_REPOSITORY_CLONE_TIMEOUT_REASON,
+    },
+    shouldSendEmail
+  );
+  return REPEATED_REPOSITORY_CLONE_TIMEOUT_REASON;
 }
 
 export async function clearCodeReviewActionRequiredState(

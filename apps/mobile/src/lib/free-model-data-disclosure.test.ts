@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BYOK_MODEL_LABEL,
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataAccessibilityLabel,
+  hasUserByokAvailable,
   isFreeModelOption,
   mayTrainOnYourPrompts,
 } from './free-model-data-disclosure';
 
 describe('free model data disclosure', () => {
   it('uses the disclosure label expected in model pickers', () => {
+    expect(BYOK_MODEL_LABEL).toBe('BYOK');
     expect(FREE_MODEL_DATA_LABEL).toBe('Data collected');
     expect(FREE_MODEL_FREE_LABEL).toBe('Free');
   });
@@ -37,6 +40,22 @@ describe('free model data disclosure', () => {
       })
     ).toBe(false);
     expect(mayTrainOnYourPrompts({ id: 'free-model', isFree: true })).toBe(false);
+  });
+
+  it('detects only explicit user BYOK availability', () => {
+    expect(
+      hasUserByokAvailable({
+        id: 'anthropic/claude',
+        hasUserByokAvailable: true,
+      })
+    ).toBe(true);
+    expect(
+      hasUserByokAvailable({
+        id: 'anthropic/claude',
+        hasUserByokAvailable: false,
+      })
+    ).toBe(false);
+    expect(hasUserByokAvailable({ id: 'anthropic/claude' })).toBe(false);
   });
 
   it('adds a data collection phrase to accessibility labels', () => {

@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Rocket, ExternalLink, Settings2, ListChecks, Brain } from 'lucide-react';
+import { Brain, ExternalLink, ListChecks, Rocket, Settings2 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';

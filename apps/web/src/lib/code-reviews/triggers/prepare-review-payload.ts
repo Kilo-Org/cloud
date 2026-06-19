@@ -492,7 +492,7 @@ export async function prepareReviewPayload(
     const authToken = generateApiToken(user, { botId: 'reviewer' });
 
     // 6. Generate dynamic review prompt
-    const { prompt, version, source } = await generateReviewPrompt(
+    const { prompt, version } = await generateReviewPrompt(
       config,
       review.repo_full_name,
       review.pr_number,
@@ -510,7 +510,6 @@ export async function prepareReviewPayload(
       reviewId,
       platform,
       version,
-      source,
       promptLength: prompt.length,
       hasRepositoryReviewInstructions: repositoryReviewInstructionsLookup.used,
     });

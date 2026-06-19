@@ -1,5 +1,7 @@
 const mockCancelReview = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
+const mockSyncWebhooksForRepositories = jest.fn();
+const mockGetValidGitLabToken = jest.fn();
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
@@ -9,6 +11,14 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
 
 jest.mock('@/lib/code-reviews/dispatch/dispatch-pending-reviews', () => ({
   tryDispatchPendingReviews: (...args: unknown[]) => mockTryDispatchPendingReviews(...args),
+}));
+
+jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
+  syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
+}));
+
+jest.mock('@/lib/integrations/gitlab-service', () => ({
+  getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -267,13 +277,20 @@ describe('review agent config REVIEW.md setting', () => {
     organization = await createTestOrganization('Review Config Org', testUser.id, 0, {}, false);
   });
 
+  beforeEach(() => {
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    mockSyncWebhooksForRepositories.mockResolvedValue({
+      result: { created: [], updated: [], deleted: [], errors: [] },
+      updatedWebhooks: {},
+    });
+  });
+
   afterEach(async () => {
     await db
       .delete(agent_configs)
       .where(
         and(
           eq(agent_configs.agent_type, 'code_review'),
-          eq(agent_configs.platform, 'github'),
           eq(agent_configs.owned_by_user_id, testUser.id)
         )
       );
@@ -282,13 +299,20 @@ describe('review agent config REVIEW.md setting', () => {
       .where(
         and(
           eq(agent_configs.agent_type, 'code_review'),
-          eq(agent_configs.platform, 'github'),
           eq(agent_configs.owned_by_organization_id, organization.id)
         )
       );
     await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organization.id));
+    await db
       .delete(organization_audit_logs)
       .where(eq(organization_audit_logs.organization_id, organization.id));
+    mockGetValidGitLabToken.mockReset();
+    mockSyncWebhooksForRepositories.mockReset();
   });
 
   afterAll(async () => {
@@ -373,6 +397,128 @@ describe('review agent config REVIEW.md setting', () => {
     expect(config?.is_enabled).toBe(false);
   });
 
+  it('preserves personal review feature settings during a full config save', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+      focusAreas: ['correctness'],
+      modelSlug: 'test-model',
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      })
+    );
+  });
+
+  it('keeps previous GitLab repository ids for webhook synchronization', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        selected_repository_ids: [101, 202],
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'selected',
+      selectedRepositoryIds: [202, 303],
+    });
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202, 303],
+      [101, 202],
+      {},
+      'https://gitlab.example.com'
+    );
+  });
+
+  it('preserves organization review feature settings during a full config save', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'lenient',
+      focusAreas: ['maintainability'],
+      modelSlug: 'test-model',
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_organization_id, organization.id)
+      ),
+    });
+
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'lenient',
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      })
+    );
+  });
+
   it('clears actionRequired state when toggling personal Code Reviewer', async () => {
     const caller = await createCallerForUser(testUser.id);
     await db.insert(agent_configs).values({
@@ -426,7 +572,13 @@ describe('review agent config REVIEW.md setting', () => {
       ),
     });
 
-    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        disable_review_md: true,
+        review_memory_enabled: false,
+        review_analytics_enabled: false,
+      })
+    );
     expect(config?.config).not.toHaveProperty('max_review_time_minutes');
 
     const refetched = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
@@ -454,7 +606,13 @@ describe('review agent config REVIEW.md setting', () => {
       ),
     });
 
-    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        disable_review_md: true,
+        review_memory_enabled: false,
+        review_analytics_enabled: false,
+      })
+    );
     expect(config?.config).not.toHaveProperty('max_review_time_minutes');
 
     const refetched = await caller.organizations.reviewAgent.getReviewConfig({

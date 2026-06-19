@@ -180,7 +180,6 @@ describe('prepareReviewPayload', () => {
     mockGenerateReviewPrompt.mockResolvedValue({
       prompt: 'generated prompt',
       version: 'test-version',
-      source: 'local',
     });
   });
 

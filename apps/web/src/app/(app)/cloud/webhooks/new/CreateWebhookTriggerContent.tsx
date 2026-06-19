@@ -78,6 +78,7 @@ export function CreateWebhookTriggerContent({ organizationId }: CreateWebhookTri
         name: model.name,
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+        hasUserByokAvailable: model.hasUserByokAvailable,
       })),
     [modelsData?.data]
   );

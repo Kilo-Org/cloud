@@ -6,14 +6,22 @@ jest.mock('@/lib/email', () => ({
 
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { agent_configs, kilocode_users, type User } from '@kilocode/db/schema';
+import {
+  agent_configs,
+  cloud_agent_code_reviews,
+  kilocode_users,
+  type User,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
+  disableCodeReviewForRepeatedCloneTimeoutsToday,
+  getCodeReviewActionRequiredCopy,
   getCodeReviewActionRequiredRecoveryHref,
   getCodeReviewActionRequiredState,
 } from './action-required';
+import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from './action-required-shared';
 
 describe('classifyCodeReviewActionRequiredFailure', () => {
   it('classifies GitHub installation, GitHub IP allow-list, BYOK, GitLab, and selected model failures', () => {
@@ -129,6 +137,11 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
         '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.'
       )
     ).toBeNull();
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Repository clone timed out: termination hard_timeout, elapsed 300041ms'
+      )
+    ).toBeNull();
   });
 
   it('routes GitLab project access recovery to GitLab integrations', () => {
@@ -148,16 +161,38 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
       '/organizations/org-1/code-reviews'
     );
   });
+
+  it('routes repeated repository clone timeout recovery to support email', () => {
+    expect(getCodeReviewActionRequiredRecoveryHref('repeated_repository_clone_timeout')).toBe(
+      'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
+    );
+  });
+
+  it.each(CODE_REVIEW_ACTION_REQUIRED_REASONS)(
+    'uses disabled-state copy for %s',
+    actionRequiredReason => {
+      const copy = getCodeReviewActionRequiredCopy(actionRequiredReason);
+
+      expect(copy.emailReason).toMatch(/Code Reviewer was disabled/);
+      expect(copy.checkSummary).toMatch(/Code Reviewer was disabled/);
+      expect(copy.recoveryLabel.trim()).not.toBe('');
+      expect(copy.checkTitle.trim()).not.toBe('');
+      expect(copy.gitlabDescription.trim()).not.toBe('');
+      expect(copy.gitlabDescription.length).toBeLessThanOrEqual(255);
+    }
+  );
 });
 
 describe('disableCodeReviewForActionRequiredFailure', () => {
   let testUser: User;
+  let extraUserIds: string[] = [];
 
   beforeAll(async () => {
     testUser = await insertTestUser();
   });
 
   beforeEach(async () => {
+    extraUserIds = [];
     mockSendCodeReviewDisabledEmail.mockResolvedValue({ sent: true });
     await db.insert(agent_configs).values({
       owned_by_user_id: testUser.id,
@@ -170,6 +205,11 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
   });
 
   afterEach(async () => {
+    for (const userId of [testUser.id, ...extraUserIds]) {
+      await db
+        .delete(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+    }
     await db
       .delete(agent_configs)
       .where(
@@ -178,6 +218,9 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
           eq(agent_configs.agent_type, 'code_review')
         )
       );
+    for (const userId of extraUserIds) {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
     mockSendCodeReviewDisabledEmail.mockReset();
   });
 
@@ -198,6 +241,33 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
       )
       .limit(1);
     return config;
+  }
+
+  async function seedFailedReview(params: {
+    ownerId?: string;
+    platform?: 'github' | 'gitlab';
+    errorMessage: string;
+    completedAt?: Date;
+  }): Promise<string> {
+    const id = crypto.randomUUID();
+    await db.insert(cloud_agent_code_reviews).values({
+      id,
+      owned_by_user_id: params.ownerId ?? testUser.id,
+      repo_full_name: `clone-timeout-test/repo-${id}`,
+      pr_number: 1,
+      pr_url: `https://example.com/clone-timeout-test/repo-${id}/pull/1`,
+      pr_title: 'Test PR',
+      pr_author: 'author',
+      base_ref: 'main',
+      head_ref: `feature-${id}`,
+      head_sha: id,
+      platform: params.platform ?? 'github',
+      status: 'failed',
+      error_message: params.errorMessage,
+      terminal_reason: 'sandbox_error',
+      completed_at: (params.completedAt ?? new Date()).toISOString(),
+    });
+    return id;
   }
 
   it('throws when the agent config is missing', async () => {
@@ -308,5 +378,101 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
 
     expect(state?.reason).toBe('github_ip_allow_list');
     expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not disable when fewer than three repository clone timeouts completed today', async () => {
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+    const errorMessage = 'Repository clone timed out';
+    await seedFailedReview({ errorMessage });
+    const triggeringReviewId = await seedFailedReview({ errorMessage });
+
+    const result = await disableCodeReviewForRepeatedCloneTimeoutsToday({
+      owner,
+      platform: 'github',
+      reviewId: triggeringReviewId,
+      errorMessage,
+    });
+
+    const config = await getStoredConfig();
+    const [triggeringReview] = await db
+      .select({ terminalReason: cloud_agent_code_reviews.terminal_reason })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, triggeringReviewId))
+      .limit(1);
+
+    expect(result).toBeNull();
+    expect(config?.is_enabled).toBe(true);
+    expect(getCodeReviewActionRequiredState(config)).toBeNull();
+    expect(triggeringReview?.terminalReason).toBe('sandbox_error');
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
+  });
+
+  it('disables and emails on the third repository clone timeout today', async () => {
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+    await seedFailedReview({ errorMessage: 'repository clone timed out' });
+    await seedFailedReview({ errorMessage: 'Repository clone timed out' });
+    const errorMessage = 'Repository Clone Timed Out: termination hard_timeout, elapsed 300041ms';
+    const triggeringReviewId = await seedFailedReview({ errorMessage });
+
+    const result = await disableCodeReviewForRepeatedCloneTimeoutsToday({
+      owner,
+      platform: 'github',
+      reviewId: triggeringReviewId,
+      errorMessage,
+    });
+
+    const config = await getStoredConfig();
+    const state = getCodeReviewActionRequiredState(config);
+    const [triggeringReview] = await db
+      .select({ terminalReason: cloud_agent_code_reviews.terminal_reason })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, triggeringReviewId))
+      .limit(1);
+
+    expect(result).toBe('repeated_repository_clone_timeout');
+    expect(config?.is_enabled).toBe(false);
+    expect(state?.reason).toBe('repeated_repository_clone_timeout');
+    expect(state?.triggeringReviewId).toBe(triggeringReviewId);
+    expect(state?.lastErrorMessage).toBe(
+      'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.'
+    );
+    expect(state?.emailSentAt).toBeTruthy();
+    expect(triggeringReview?.terminalReason).toBe('repeated_repository_clone_timeout');
+    expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledWith(
+      testUser.google_user_email,
+      expect.objectContaining({
+        reason:
+          'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
+        recoveryLabel: 'Contact support',
+        recoveryUrl:
+          'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer',
+      })
+    );
+  });
+
+  it('does not count other owners, other platforms, or yesterday for clone timeout threshold', async () => {
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+    const otherUser = await insertTestUser();
+    extraUserIds.push(otherUser.id);
+    const errorMessage = 'Repository clone timed out';
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const triggeringReviewId = await seedFailedReview({ errorMessage });
+    await seedFailedReview({ ownerId: otherUser.id, errorMessage });
+    await seedFailedReview({ platform: 'gitlab', errorMessage });
+    await seedFailedReview({ errorMessage, completedAt: yesterday });
+
+    const result = await disableCodeReviewForRepeatedCloneTimeoutsToday({
+      owner,
+      platform: 'github',
+      reviewId: triggeringReviewId,
+      errorMessage,
+    });
+
+    const config = await getStoredConfig();
+    expect(result).toBeNull();
+    expect(config?.is_enabled).toBe(true);
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
   });
 });

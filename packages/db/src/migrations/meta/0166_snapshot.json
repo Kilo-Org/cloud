@@ -1,5 +1,5 @@
 {
-  "id": "5c74dbb6-1b99-4da6-985b-6b5e0f11045a",
+  "id": "f9732794-dd86-47a7-9414-d025ec7a50a0",
   "prevId": "1b09f3ca-b736-46b2-b352-3e9ffe7c04a2",
   "version": "7",
   "dialect": "postgresql",
@@ -4359,6 +4359,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "analytics_enabled_at_dispatch": {
+          "name": "analytics_enabled_at_dispatch",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -6236,6 +6242,294 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.code_review_analytics_findings": {
+      "name": "code_review_analytics_findings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "analytics_result_id": {
+          "name": "analytics_result_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ordinal": {
+          "name": "ordinal",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "severity": {
+          "name": "severity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "security_class": {
+          "name": "security_class",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "code_review_analytics_findings_analytics_result_id_code_review_analytics_results_id_fk": {
+          "name": "code_review_analytics_findings_analytics_result_id_code_review_analytics_results_id_fk",
+          "tableFrom": "code_review_analytics_findings",
+          "tableTo": "code_review_analytics_results",
+          "columnsFrom": [
+            "analytics_result_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_code_review_analytics_findings_result_ordinal": {
+          "name": "UQ_code_review_analytics_findings_result_ordinal",
+          "nullsNotDistinct": false,
+          "columns": [
+            "analytics_result_id",
+            "ordinal"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "code_review_analytics_findings_severity_check": {
+          "name": "code_review_analytics_findings_severity_check",
+          "value": "\"code_review_analytics_findings\".\"severity\" IN ('critical', 'warning', 'suggestion')"
+        },
+        "code_review_analytics_findings_category_check": {
+          "name": "code_review_analytics_findings_category_check",
+          "value": "\"code_review_analytics_findings\".\"category\" IN ('security', 'correctness', 'reliability', 'data_integrity', 'performance', 'compatibility', 'maintainability', 'test_quality', 'documentation', 'accessibility', 'other')"
+        },
+        "code_review_analytics_findings_security_class_check": {
+          "name": "code_review_analytics_findings_security_class_check",
+          "value": "\"code_review_analytics_findings\".\"security_class\" IN ('auth_access', 'injection', 'data_protection', 'request_resource_boundary', 'deserialization_object_integrity', 'dependency_supply_chain', 'memory_safety', 'availability', 'concurrency', 'security_configuration', 'other')"
+        },
+        "code_review_analytics_findings_ordinal_check": {
+          "name": "code_review_analytics_findings_ordinal_check",
+          "value": "\"code_review_analytics_findings\".\"ordinal\" >= 0"
+        },
+        "code_review_analytics_findings_security_class_presence_check": {
+          "name": "code_review_analytics_findings_security_class_presence_check",
+          "value": "(\n        (\"code_review_analytics_findings\".\"category\" = 'security' AND \"code_review_analytics_findings\".\"security_class\" IS NOT NULL) OR\n        (\"code_review_analytics_findings\".\"category\" <> 'security' AND \"code_review_analytics_findings\".\"security_class\" IS NULL)\n      )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.code_review_analytics_results": {
+      "name": "code_review_analytics_results",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "code_review_id": {
+          "name": "code_review_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_attempt_id": {
+          "name": "source_attempt_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "capture_status": {
+          "name": "capture_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "taxonomy_version": {
+          "name": "taxonomy_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "change_type": {
+          "name": "change_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "impact_level": {
+          "name": "impact_level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "complexity_level": {
+          "name": "complexity_level",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "classification_confidence": {
+          "name": "classification_confidence",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "finalized_at": {
+          "name": "finalized_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_code_review_analytics_results_source_attempt_id": {
+          "name": "idx_code_review_analytics_results_source_attempt_id",
+          "columns": [
+            {
+              "expression": "source_attempt_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_code_review_analytics_results_finalized_at": {
+          "name": "idx_code_review_analytics_results_finalized_at",
+          "columns": [
+            {
+              "expression": "finalized_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "code_review_analytics_results_code_review_id_cloud_agent_code_reviews_id_fk": {
+          "name": "code_review_analytics_results_code_review_id_cloud_agent_code_reviews_id_fk",
+          "tableFrom": "code_review_analytics_results",
+          "tableTo": "cloud_agent_code_reviews",
+          "columnsFrom": [
+            "code_review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "code_review_analytics_results_source_attempt_id_cloud_agent_code_review_attempts_id_fk": {
+          "name": "code_review_analytics_results_source_attempt_id_cloud_agent_code_review_attempts_id_fk",
+          "tableFrom": "code_review_analytics_results",
+          "tableTo": "cloud_agent_code_review_attempts",
+          "columnsFrom": [
+            "source_attempt_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_code_review_analytics_results_code_review_id": {
+          "name": "UQ_code_review_analytics_results_code_review_id",
+          "nullsNotDistinct": false,
+          "columns": [
+            "code_review_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "code_review_analytics_results_capture_status_check": {
+          "name": "code_review_analytics_results_capture_status_check",
+          "value": "\"code_review_analytics_results\".\"capture_status\" IN ('captured', 'missing', 'invalid', 'omitted')"
+        },
+        "code_review_analytics_results_change_type_check": {
+          "name": "code_review_analytics_results_change_type_check",
+          "value": "\"code_review_analytics_results\".\"change_type\" IN ('bug_fix', 'feature', 'refactor', 'maintenance', 'dependency', 'test', 'documentation', 'mixed', 'other')"
+        },
+        "code_review_analytics_results_impact_level_check": {
+          "name": "code_review_analytics_results_impact_level_check",
+          "value": "\"code_review_analytics_results\".\"impact_level\" IN ('low', 'medium', 'high')"
+        },
+        "code_review_analytics_results_complexity_level_check": {
+          "name": "code_review_analytics_results_complexity_level_check",
+          "value": "\"code_review_analytics_results\".\"complexity_level\" IN ('low', 'medium', 'high')"
+        },
+        "code_review_analytics_results_classification_confidence_check": {
+          "name": "code_review_analytics_results_classification_confidence_check",
+          "value": "\"code_review_analytics_results\".\"classification_confidence\" IN ('low', 'medium', 'high')"
+        },
+        "code_review_analytics_results_classification_presence_check": {
+          "name": "code_review_analytics_results_classification_presence_check",
+          "value": "(\n        (\n          \"code_review_analytics_results\".\"capture_status\" = 'captured'\n          AND \"code_review_analytics_results\".\"change_type\" IS NOT NULL\n          AND \"code_review_analytics_results\".\"impact_level\" IS NOT NULL\n          AND \"code_review_analytics_results\".\"complexity_level\" IS NOT NULL\n          AND \"code_review_analytics_results\".\"classification_confidence\" IS NOT NULL\n        ) OR (\n          \"code_review_analytics_results\".\"capture_status\" <> 'captured'\n          AND \"code_review_analytics_results\".\"change_type\" IS NULL\n          AND \"code_review_analytics_results\".\"impact_level\" IS NULL\n          AND \"code_review_analytics_results\".\"complexity_level\" IS NULL\n          AND \"code_review_analytics_results\".\"classification_confidence\" IS NULL\n        )\n      )"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.code_review_feedback_events": {
@@ -17569,12 +17863,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "oauth_grant_id": {
-          "name": "oauth_grant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "event_type": {
           "name": "event_type",
           "type": "text",
@@ -17608,21 +17896,6 @@
           "columns": [
             {
               "expression": "config_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_gateway_audit_events_grant": {
-          "name": "IDX_mcp_gateway_audit_events_grant",
-          "columns": [
-            {
-              "expression": "oauth_grant_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -17722,19 +17995,6 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
-        },
-        "mcp_gateway_audit_events_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk": {
-          "name": "mcp_gateway_audit_events_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk",
-          "tableFrom": "mcp_gateway_audit_events",
-          "tableTo": "mcp_gateway_oauth_grants",
-          "columnsFrom": [
-            "oauth_grant_id"
-          ],
-          "columnsTo": [
-            "oauth_grant_id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -17780,12 +18040,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
-        },
-        "oauth_grant_id": {
-          "name": "oauth_grant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         },
         "client_id": {
           "name": "client_id",
@@ -17931,21 +18185,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "IDX_mcp_gateway_authorization_codes_grant": {
-          "name": "IDX_mcp_gateway_authorization_codes_grant",
-          "columns": [
-            {
-              "expression": "oauth_grant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -17971,19 +18210,6 @@
           ],
           "columnsTo": [
             "oauth_client_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_gateway_authorization_codes_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk": {
-          "name": "mcp_gateway_authorization_codes_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk",
-          "tableFrom": "mcp_gateway_authorization_codes",
-          "tableTo": "mcp_gateway_oauth_grants",
-          "columnsFrom": [
-            "oauth_grant_id"
-          ],
-          "columnsTo": [
-            "oauth_grant_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -18061,12 +18287,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
-        },
-        "oauth_grant_id": {
-          "name": "oauth_grant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         },
         "client_id": {
           "name": "client_id",
@@ -18224,21 +18444,6 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_mcp_gateway_authorization_requests_grant": {
-          "name": "IDX_mcp_gateway_authorization_requests_grant",
-          "columns": [
-            {
-              "expression": "oauth_grant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "IDX_mcp_gateway_authorization_requests_user": {
           "name": "IDX_mcp_gateway_authorization_requests_user",
           "columns": [
@@ -18280,19 +18485,6 @@
           ],
           "columnsTo": [
             "oauth_client_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_gateway_authorization_requests_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk": {
-          "name": "mcp_gateway_authorization_requests_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk",
-          "tableFrom": "mcp_gateway_authorization_requests",
-          "tableTo": "mcp_gateway_oauth_grants",
-          "columnsFrom": [
-            "oauth_grant_id"
-          ],
-          "columnsTo": [
-            "oauth_grant_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -19248,363 +19440,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.mcp_gateway_oauth_grants": {
-      "name": "mcp_gateway_oauth_grants",
-      "schema": "",
-      "columns": {
-        "oauth_grant_id": {
-          "name": "oauth_grant_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "oauth_client_id": {
-          "name": "oauth_client_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "owner_scope": {
-          "name": "owner_scope",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "owner_id": {
-          "name": "owner_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "config_id": {
-          "name": "config_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "connect_resource_id": {
-          "name": "connect_resource_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "instance_id": {
-          "name": "instance_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "redirect_uri": {
-          "name": "redirect_uri",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "granted_scopes": {
-          "name": "granted_scopes",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "execution_context": {
-          "name": "execution_context",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "config_version": {
-          "name": "config_version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "grant_status": {
-          "name": "grant_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'active'"
-        },
-        "approved_at": {
-          "name": "approved_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "last_used_at": {
-          "name": "last_used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "revoked_at": {
-          "name": "revoked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "revocation_reason": {
-          "name": "revocation_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_mcp_gateway_oauth_grants_active_binding": {
-          "name": "UQ_mcp_gateway_oauth_grants_active_binding",
-          "columns": [
-            {
-              "expression": "oauth_client_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "connect_resource_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "redirect_uri",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"mcp_gateway_oauth_grants\".\"revoked_at\" is null and \"mcp_gateway_oauth_grants\".\"grant_status\" in ('pending', 'active')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_gateway_oauth_grants_client": {
-          "name": "IDX_mcp_gateway_oauth_grants_client",
-          "columns": [
-            {
-              "expression": "oauth_client_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_gateway_oauth_grants_user": {
-          "name": "IDX_mcp_gateway_oauth_grants_user",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_gateway_oauth_grants_config": {
-          "name": "IDX_mcp_gateway_oauth_grants_config",
-          "columns": [
-            {
-              "expression": "config_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_gateway_oauth_grants_owner": {
-          "name": "IDX_mcp_gateway_oauth_grants_owner",
-          "columns": [
-            {
-              "expression": "owner_scope",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "owner_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_gateway_oauth_grants_resource": {
-          "name": "IDX_mcp_gateway_oauth_grants_resource",
-          "columns": [
-            {
-              "expression": "connect_resource_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_gateway_oauth_grants_instance": {
-          "name": "IDX_mcp_gateway_oauth_grants_instance",
-          "columns": [
-            {
-              "expression": "instance_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_gateway_oauth_grants_revoked_at": {
-          "name": "IDX_mcp_gateway_oauth_grants_revoked_at",
-          "columns": [
-            {
-              "expression": "revoked_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "mcp_gateway_oauth_grants_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk": {
-          "name": "mcp_gateway_oauth_grants_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk",
-          "tableFrom": "mcp_gateway_oauth_grants",
-          "tableTo": "mcp_gateway_oauth_clients",
-          "columnsFrom": [
-            "oauth_client_id"
-          ],
-          "columnsTo": [
-            "oauth_client_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_gateway_oauth_grants_kilo_user_id_kilocode_users_id_fk": {
-          "name": "mcp_gateway_oauth_grants_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "mcp_gateway_oauth_grants",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_gateway_oauth_grants_config_id_mcp_gateway_configs_config_id_fk": {
-          "name": "mcp_gateway_oauth_grants_config_id_mcp_gateway_configs_config_id_fk",
-          "tableFrom": "mcp_gateway_oauth_grants",
-          "tableTo": "mcp_gateway_configs",
-          "columnsFrom": [
-            "config_id"
-          ],
-          "columnsTo": [
-            "config_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_gateway_oauth_grants_connect_resource_id_mcp_gateway_connect_resources_connect_resource_id_fk": {
-          "name": "mcp_gateway_oauth_grants_connect_resource_id_mcp_gateway_connect_resources_connect_resource_id_fk",
-          "tableFrom": "mcp_gateway_oauth_grants",
-          "tableTo": "mcp_gateway_connect_resources",
-          "columnsFrom": [
-            "connect_resource_id"
-          ],
-          "columnsTo": [
-            "connect_resource_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_gateway_oauth_grants_instance_id_mcp_gateway_connection_instances_instance_id_fk": {
-          "name": "mcp_gateway_oauth_grants_instance_id_mcp_gateway_connection_instances_instance_id_fk",
-          "tableFrom": "mcp_gateway_oauth_grants",
-          "tableTo": "mcp_gateway_connection_instances",
-          "columnsFrom": [
-            "instance_id"
-          ],
-          "columnsTo": [
-            "instance_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "mcp_gateway_oauth_grants_config_version_positive": {
-          "name": "mcp_gateway_oauth_grants_config_version_positive",
-          "value": "\"mcp_gateway_oauth_grants\".\"config_version\" > 0"
-        },
-        "mcp_gateway_oauth_grants_owner_scope": {
-          "name": "mcp_gateway_oauth_grants_owner_scope",
-          "value": "\"mcp_gateway_oauth_grants\".\"owner_scope\" IN ('personal', 'organization')"
-        },
-        "mcp_gateway_oauth_grants_status": {
-          "name": "mcp_gateway_oauth_grants_status",
-          "value": "\"mcp_gateway_oauth_grants\".\"grant_status\" IN ('pending', 'active', 'revoked')"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.mcp_gateway_pending_provider_authorizations": {
       "name": "mcp_gateway_pending_provider_authorizations",
       "schema": "",
@@ -19624,12 +19459,6 @@
         },
         "authorization_request_id": {
           "name": "authorization_request_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "oauth_grant_id": {
-          "name": "oauth_grant_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -19783,21 +19612,6 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_mcp_gateway_pending_provider_authorizations_grant": {
-          "name": "IDX_mcp_gateway_pending_provider_authorizations_grant",
-          "columns": [
-            {
-              "expression": "oauth_grant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "IDX_mcp_gateway_pending_provider_authorizations_expires_at": {
           "name": "IDX_mcp_gateway_pending_provider_authorizations_expires_at",
           "columns": [
@@ -19824,19 +19638,6 @@
           ],
           "columnsTo": [
             "authorization_request_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_gateway_pending_provider_authorizations_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk": {
-          "name": "mcp_gateway_pending_provider_authorizations_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk",
-          "tableFrom": "mcp_gateway_pending_provider_authorizations",
-          "tableTo": "mcp_gateway_oauth_grants",
-          "columnsFrom": [
-            "oauth_grant_id"
-          ],
-          "columnsTo": [
-            "oauth_grant_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -20173,12 +19974,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "oauth_grant_id": {
-          "name": "oauth_grant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "client_id": {
           "name": "client_id",
           "type": "text",
@@ -20290,21 +20085,6 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_mcp_gateway_refresh_tokens_grant": {
-          "name": "IDX_mcp_gateway_refresh_tokens_grant",
-          "columns": [
-            {
-              "expression": "oauth_grant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "IDX_mcp_gateway_refresh_tokens_config": {
           "name": "IDX_mcp_gateway_refresh_tokens_config",
           "columns": [
@@ -20346,19 +20126,6 @@
           ],
           "columnsTo": [
             "oauth_client_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_gateway_refresh_tokens_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk": {
-          "name": "mcp_gateway_refresh_tokens_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk",
-          "tableFrom": "mcp_gateway_refresh_tokens",
-          "tableTo": "mcp_gateway_oauth_grants",
-          "columnsFrom": [
-            "oauth_grant_id"
-          ],
-          "columnsTo": [
-            "oauth_grant_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"

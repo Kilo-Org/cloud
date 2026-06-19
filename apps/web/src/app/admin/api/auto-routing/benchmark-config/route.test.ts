@@ -72,6 +72,7 @@ const validConfig = {
   deciderModels: [{ id: 'openai/gpt-5-mini', reasoningEffort: null }],
   minAccuracy: 0.7,
   switchCostFactor: 3,
+  bestAccuracySwitchThreshold: 0.05,
   maxConcurrency: 4,
   benchmarkUserId: null,
   benchmarkOrgId: null,

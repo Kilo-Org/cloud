@@ -34,6 +34,8 @@ import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
 import type { CodeReviewPlatform } from '../core/schemas';
+import { appendCodeReviewAnalyticsPromptAppendix } from '../analytics/contracts';
+import { getReviewAnalyticsEnabledFromConfig } from '../analytics/settings';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { APP_URL } from '@/lib/constants';
@@ -482,6 +484,14 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     agentConfig,
     platform,
   });
+  const analyticsPrompt =
+    owner.type === 'org'
+      ? appendCodeReviewAnalyticsPromptAppendix(payload.sessionInput.prompt)
+      : null;
+  const shouldEnrollAnalytics =
+    owner.type === 'org' &&
+    getReviewAnalyticsEnabledFromConfig(agentConfig.config) &&
+    analyticsPrompt !== null;
 
   if (!(await reviewIsStillReserved(review.id, dispatchReservationId))) {
     logExceptInTest('[dispatchReview] Review reservation changed after preparation', {
@@ -491,7 +501,25 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
   }
 
   const agentVersion = 'v2';
-  const attempt = await ensureCurrentCodeReviewAttemptFromReview(review);
+  const attempt = await ensureCurrentCodeReviewAttemptFromReview(review, shouldEnrollAnalytics);
+  const analyticsEnabledAtDispatch =
+    owner.type === 'org' && attempt.analytics_enabled_at_dispatch === true;
+
+  let dispatchPayload = payload;
+  if (analyticsEnabledAtDispatch) {
+    if (analyticsPrompt === null) {
+      throw new Error(
+        `Analytics-enabled attempt ${attempt.id} cannot be dispatched without the analytics protocol`
+      );
+    }
+    dispatchPayload = {
+      ...payload,
+      sessionInput: {
+        ...payload.sessionInput,
+        prompt: analyticsPrompt,
+      },
+    };
+  }
 
   if (!(await reviewIsStillReserved(review.id, dispatchReservationId))) {
     if (!(await reviewIsStillQueued(review.id))) {
@@ -520,7 +548,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
 
   try {
     await codeReviewWorkerClient.dispatchReview({
-      ...payload,
+      ...dispatchPayload,
       attemptId: attempt.id,
       skipBalanceCheck: true,
       agentVersion,

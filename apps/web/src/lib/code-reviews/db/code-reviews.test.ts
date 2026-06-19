@@ -15,6 +15,7 @@ import {
   createCodeReview,
   createCodeReviewAttempt,
   createInfraRetryAttemptIfMissing,
+  ensureCurrentCodeReviewAttemptFromReview,
   getCodeReviewAttemptForReview,
   getSessionUsageFromBilling,
   listCodeReviewAttempts,
@@ -619,6 +620,40 @@ describe('findPreviousCompletedReview', () => {
         errorMessage: 'bad callback',
       })
     ).rejects.toThrow('not found');
+  });
+
+  it('snapshots analytics enrollment once for a dispatched attempt', async () => {
+    const reviewId = await createReview('sha-analytics-snapshot');
+    const [review] = await db
+      .select()
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    const enabledAttempt = await ensureCurrentCodeReviewAttemptFromReview(review, true);
+    const unchangedAttempt = await ensureCurrentCodeReviewAttemptFromReview(review, false);
+
+    expect(enabledAttempt.analytics_enabled_at_dispatch).toBe(true);
+    expect(unchangedAttempt.id).toBe(enabledAttempt.id);
+    expect(unchangedAttempt.analytics_enabled_at_dispatch).toBe(true);
+  });
+
+  it('copies analytics enrollment to an infrastructure retry attempt', async () => {
+    const reviewId = await createReview('sha-analytics-retry-snapshot');
+    await updateCodeReviewStatus(reviewId, 'running');
+    const failedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'failed',
+      analyticsEnabledAtDispatch: true,
+    });
+
+    const result = await createInfraRetryAttemptIfMissing({
+      codeReviewId: reviewId,
+      retryOfAttemptId: failedAttempt.id,
+    });
+
+    expect(result.outcome).toBe('created');
+    if (result.outcome !== 'created') throw new Error('Expected infrastructure retry attempt');
+    expect(result.attempt.analytics_enabled_at_dispatch).toBe(true);
   });
 });
 

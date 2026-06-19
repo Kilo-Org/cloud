@@ -153,18 +153,28 @@ describe('kiloPassDuplicateCardCanceled template', () => {
 });
 
 describe('codeReviewDisabled template', () => {
-  test('renders reason and recovery link', () => {
+  test('renders neutral wording, reason, and recovery link', () => {
+    const reason =
+      'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.';
     const html = renderTemplate('codeReviewDisabled', {
-      reason: 'The selected BYOK API key is invalid or has been revoked.',
-      recovery_url: 'https://app.kilocode.ai/byok',
-      recovery_label: 'Update BYOK settings',
+      reason,
+      recovery_url:
+        'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer',
+      recovery_label: 'Contact support',
       year: '2026',
     });
 
     expect(html).toContain('Code Reviewer Disabled');
-    expect(html).toContain('The selected BYOK API key is invalid or has been revoked.');
-    expect(html).toContain('https://app.kilocode.ai/byok');
-    expect(html).toContain('Update BYOK settings');
+    expect(html).toContain('Code Reviewer was disabled for this reason');
+    expect(html).toContain(reason);
+    expect(html).toMatch(/Resolve the issue, then enable Code\s+Reviewer again/);
+    expect(html).toContain(
+      'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
+    );
+    expect(html).toContain('Contact support');
+    expect(html).not.toContain('Code Reviewer was disabled because it needs attention.');
+    expect(html).not.toContain('configuration attention');
+    expect(html).not.toContain('Fix the configuration issue');
   });
 });
 

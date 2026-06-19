@@ -335,6 +335,7 @@ export function OnboardingStepModel() {
         name: model.name,
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+        hasUserByokAvailable: model.hasUserByokAvailable,
       })) ?? [],
     [modelsData]
   );

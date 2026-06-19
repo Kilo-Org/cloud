@@ -75,6 +75,7 @@ function mockRunSnapshot(): void {
       max_concurrency: 4,
       min_accuracy: 0.7,
       switch_cost_factor: 3,
+      best_accuracy_switch_threshold: 0.05,
       benchmark_user_id: 'benchmark-user',
       benchmark_org_id: 'benchmark-org',
       repetitions: 1,

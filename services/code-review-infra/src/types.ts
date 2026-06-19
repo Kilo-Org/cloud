@@ -107,6 +107,7 @@ const InternalStatusTerminalReasonSchema = z
     'gitlab_project_access_required',
     'byok_invalid_key',
     'selected_model_unavailable',
+    'repeated_repository_clone_timeout',
     'user_cancelled',
     'superseded',
     'interrupted',

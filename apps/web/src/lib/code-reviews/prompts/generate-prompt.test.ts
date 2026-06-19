@@ -1,142 +1,23 @@
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import { resolveTemplate, generateReviewPrompt } from './generate-prompt';
-import type { PromptTemplate, ExistingReviewState } from './generate-prompt';
+import DEFAULT_PROMPT_TEMPLATE_GITHUB from './default-prompt-template.json';
+import DEFAULT_PROMPT_TEMPLATE_GITLAB from './default-prompt-template-gitlab.json';
+import { generateReviewPrompt, PromptTemplateSchema } from './generate-prompt';
+import type { ExistingReviewState } from './generate-prompt';
 import {
   REVIEW_INSTRUCTIONS_FILE,
   normalizeRepositoryReviewInstructions,
 } from './repository-review-instructions';
 import { REVIEW_SUMMARY_HISTORY_START } from '../summary/history';
 
-// --- Fixtures ---
-
-const localTemplate = {
-  version: 'local-v1',
-  systemRole: 'local system role',
-  hardConstraints: 'local constraints',
-  workflow: 'local workflow',
-  whatToReview: 'local what',
-  commentFormat: 'local comment format',
-  inlineCommentFooter: 'local inline footer',
-  summaryFormatIssuesFound: 'local issues',
-  summaryFormatNoIssues: 'local no issues',
-  summaryMarkerNote: 'local marker',
-  summaryCommandCreate: 'local create',
-  summaryCommandUpdate: 'local update',
-  inlineCommentsApi: 'local api',
-  fixLinkTemplate: 'local fix',
-  styleGuidance: { roast: 'ROAST MODE ACTIVATED', balanced: 'local balanced guidance' },
-  commentFormatOverrides: { roast: 'roast comment format' },
-  summaryFormatOverrides: { roast: { issuesFound: 'roast issues', noIssues: 'roast no issues' } },
-} satisfies PromptTemplate;
-
-const remoteTemplateWithoutStyleOverrides = {
-  version: 'remote-v1',
-  systemRole: 'remote system role',
-  hardConstraints: 'remote constraints',
-  workflow: 'remote workflow',
-  whatToReview: 'remote what',
-  commentFormat: 'remote comment format',
-  summaryFormatIssuesFound: 'remote issues',
-  summaryFormatNoIssues: 'remote no issues',
-  summaryMarkerNote: 'remote marker',
-  summaryCommandCreate: 'remote create',
-  summaryCommandUpdate: 'remote update',
-  inlineCommentsApi: 'remote api',
-  fixLinkTemplate: 'remote fix',
-} satisfies PromptTemplate;
-
-const remoteTemplateWithNewStyleKey = {
-  ...remoteTemplateWithoutStyleOverrides,
-  styleGuidance: { strict: 'REMOTE STRICT GUIDANCE' },
-  commentFormatOverrides: { strict: 'remote strict comment format' },
-  summaryFormatOverrides: {
-    strict: { issuesFound: 'remote strict issues', noIssues: 'remote strict no issues' },
-  },
-} satisfies PromptTemplate;
-
-const remoteTemplateOverridingRoast = {
-  ...remoteTemplateWithoutStyleOverrides,
-  styleGuidance: { roast: 'REMOTE ROAST GUIDANCE' },
-} satisfies PromptTemplate;
-
-const remoteTemplateOverridingBalanced = {
-  ...remoteTemplateWithoutStyleOverrides,
-  styleGuidance: { balanced: 'REMOTE BALANCED GUIDANCE' },
-} satisfies PromptTemplate;
-
-// --- resolveTemplate ---
-
-describe('resolveTemplate', () => {
-  it('returns local template with source "local" when remote is undefined', () => {
-    const result = resolveTemplate(undefined, localTemplate);
-
-    expect(result.template).toBe(localTemplate);
-    expect(result.source).toBe('local');
+describe('checked-in prompt templates', () => {
+  it('validates the GitHub template', () => {
+    expect(PromptTemplateSchema.safeParse(DEFAULT_PROMPT_TEMPLATE_GITHUB).success).toBe(true);
   });
 
-  it('falls back to local style overrides when remote omits them', () => {
-    const result = resolveTemplate(remoteTemplateWithoutStyleOverrides, localTemplate);
-
-    expect(result.template.version).toBe('remote-v1');
-    expect(result.template.systemRole).toBe('remote system role');
-    expect(result.template.styleGuidance).toEqual({
-      roast: 'ROAST MODE ACTIVATED',
-      balanced: 'local balanced guidance',
-    });
-    expect(result.template.commentFormatOverrides).toEqual({ roast: 'roast comment format' });
-    expect(result.template.summaryFormatOverrides).toEqual({
-      roast: { issuesFound: 'roast issues', noIssues: 'roast no issues' },
-    });
-  });
-
-  it('falls back to local inline comment footer when remote omits it', () => {
-    const result = resolveTemplate(remoteTemplateWithoutStyleOverrides, localTemplate);
-
-    expect(result.template.inlineCommentFooter).toBe('local inline footer');
-  });
-
-  it('remote wins for keys that both local and remote define', () => {
-    const result = resolveTemplate(remoteTemplateOverridingRoast, localTemplate);
-
-    expect(result.template.styleGuidance?.['roast']).toBe('REMOTE ROAST GUIDANCE');
-    // local-only keys still present
-    expect(result.template.styleGuidance?.['balanced']).toBe('local balanced guidance');
-  });
-
-  it('remote wins for balanced key that local also defines', () => {
-    const result = resolveTemplate(remoteTemplateOverridingBalanced, localTemplate);
-
-    expect(result.template.styleGuidance?.['balanced']).toBe('REMOTE BALANCED GUIDANCE');
-    // local-only keys still present
-    expect(result.template.styleGuidance?.['roast']).toBe('ROAST MODE ACTIVATED');
-  });
-
-  it('merges remote style keys that local does not define', () => {
-    const result = resolveTemplate(remoteTemplateWithNewStyleKey, localTemplate);
-
-    expect(result.template.styleGuidance).toEqual({
-      roast: 'ROAST MODE ACTIVATED',
-      balanced: 'local balanced guidance',
-      strict: 'REMOTE STRICT GUIDANCE',
-    });
-    expect(result.template.commentFormatOverrides).toEqual({
-      roast: 'roast comment format',
-      strict: 'remote strict comment format',
-    });
-    expect(result.template.summaryFormatOverrides).toEqual({
-      roast: { issuesFound: 'roast issues', noIssues: 'roast no issues' },
-      strict: { issuesFound: 'remote strict issues', noIssues: 'remote strict no issues' },
-    });
-  });
-
-  it('returns source "posthog" when remote template is provided', () => {
-    const result = resolveTemplate(remoteTemplateWithoutStyleOverrides, localTemplate);
-
-    expect(result.source).toBe('posthog');
+  it('validates the GitLab template', () => {
+    expect(PromptTemplateSchema.safeParse(DEFAULT_PROMPT_TEMPLATE_GITLAB).success).toBe(true);
   });
 });
-
-// --- generateReviewPrompt (integration) ---
 
 const baseConfig = {
   review_style: 'balanced' as const,
@@ -146,12 +27,78 @@ const baseConfig = {
 } satisfies CodeReviewAgentConfig;
 
 describe('generateReviewPrompt', () => {
+  it('always uses the checked-in GitHub template version and commands', async () => {
+    const result = await generateReviewPrompt(baseConfig, 'owner/repo', 42);
+
+    expect(result.version).toBe(DEFAULT_PROMPT_TEMPLATE_GITHUB.version);
+    expect(result.prompt).toContain('gh pr diff 42');
+    expect(result.prompt).toContain('gh api repos/owner/repo/pulls/42/reviews');
+    expect(result.prompt).not.toContain('glab api');
+  });
+
+  it('always uses the checked-in GitLab template version and commands', async () => {
+    const result = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+    });
+
+    expect(result.version).toBe(DEFAULT_PROMPT_TEMPLATE_GITLAB.version);
+    expect(result.prompt).toContain('glab mr diff 10');
+    expect(result.prompt).toContain(
+      'glab api --method POST "projects/group%2Fproject/merge_requests/10/discussions"'
+    );
+    expect(result.prompt).not.toContain('gh api');
+  });
+
   it('keeps built-in review guidance when repository instructions are absent', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
 
     expect(prompt).toContain('# WHAT TO REVIEW');
     expect(prompt).toContain('Security vulnerabilities (injection, XSS, auth bypass)');
     expect(prompt).not.toContain(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`);
+  });
+
+  it('includes GitHub diff line-number safeguards', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain('# GITHUB DIFF LINE RULES');
+    expect(prompt).toContain('gh pr diff 1');
+    expect(prompt).toContain('Use the NEW file line number from the RIGHT side of the diff');
+    expect(prompt).toContain('Line could not be resolved');
+  });
+
+  it('does not include GitHub diff line-number safeguards for GitLab', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+    });
+
+    expect(prompt).not.toContain('# GITHUB DIFF LINE RULES');
+  });
+
+  it('includes tiered sub-agent usage guidance for GitHub', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain('# SUB-AGENT USAGE');
+    expect(prompt).toContain('Tiny: up to 2 files and under 100 changed lines: use 0 sub-agents');
+    expect(prompt).toContain('Small: 3-5 files or 100-300 changed lines: use at most 1 sub-agent');
+    expect(prompt).toContain(
+      'Medium and larger: 6+ files or more than 300 changed lines: use the full 6 sub-agents'
+    );
+  });
+
+  it('includes tiered sub-agent usage guidance for GitLab', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+    });
+
+    expect(prompt).toContain('# SUB-AGENT USAGE');
+    expect(prompt).toContain('Tiny: up to 2 files and under 100 changed lines: use 0 sub-agents');
+    expect(prompt).toContain('Small: 3-5 files or 100-300 changed lines: use at most 1 sub-agent');
+    expect(prompt).toContain(
+      'Medium and larger: 6+ files or more than 300 changed lines: use the full 6 sub-agents'
+    );
   });
 
   it('replaces built-in review guidance with REVIEW.md instructions at the same prompt point', async () => {
@@ -177,20 +124,58 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`);
     expect(prompt).toContain('Only flag regressions with direct evidence.');
     expect(prompt).toContain('```ts\nconst markdown = true;\n```');
+    expect(prompt).toContain('# SUB-AGENT USAGE');
+    expect(prompt).toContain("replace Kilo's default review guidance for sub-agent usage");
+    expect(prompt).toContain('formatting/output requirements');
     expect(prompt).not.toContain('# WHAT TO REVIEW');
     expect(prompt).not.toContain('Security vulnerabilities (injection, XSS, auth bypass)');
+
+    expect(prompt).toContain('operating in READ-ONLY, NON-INTERACTIVE mode');
     expect(prompt).toContain('# HARD CONSTRAINTS (READ FIRST)');
     expect(prompt).toContain('# WORKFLOW');
+    expect(prompt).toContain('gh pr diff 1');
     expect(prompt).toContain('# FOCUS AREAS');
+    expect(prompt).toContain('Pay special attention to: security');
     expect(prompt).toContain('# COMMENT FORMAT');
-    expect(prompt).toContain('## Inline Comments API Call');
+    expect(prompt).toContain('<!-- kilo-review -->');
+    expect(prompt).toContain('gh api repos/owner/repo/issues/1/comments');
+    expect(prompt).toContain('gh api repos/owner/repo/pulls/1/reviews');
 
-    expect(prompt.indexOf('# CUSTOM INSTRUCTIONS')).toBeLessThan(
-      prompt.indexOf(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`)
+    const repositoryPolicyIndex = prompt.indexOf(
+      `# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`
     );
-    expect(prompt.indexOf(`# ${REVIEW_INSTRUCTIONS_FILE} code review instructions`)).toBeLessThan(
-      prompt.indexOf('# FOCUS AREAS')
+    expect(prompt.indexOf('# SUB-AGENT USAGE')).toBeLessThan(repositoryPolicyIndex);
+    expect(prompt.indexOf('# CUSTOM INSTRUCTIONS')).toBeLessThan(repositoryPolicyIndex);
+    expect(prompt.indexOf('# HARD CONSTRAINTS (READ FIRST)')).toBeLessThan(repositoryPolicyIndex);
+    expect(prompt.indexOf('# WORKFLOW')).toBeLessThan(repositoryPolicyIndex);
+    expect(repositoryPolicyIndex).toBeLessThan(prompt.indexOf('# FOCUS AREAS'));
+    expect(repositoryPolicyIndex).toBeLessThan(prompt.indexOf('# COMMENT FORMAT'));
+    expect(repositoryPolicyIndex).toBeLessThan(prompt.indexOf('## Inline Comments API Call'));
+  });
+
+  it('keeps GitLab safety, workflow, commands, and output with REVIEW.md policy', async () => {
+    const { prompt, version } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
+      platform: 'gitlab',
+      gitlabContext: { baseSha: 'base123', startSha: 'start123', headSha: 'head123' },
+      repositoryReviewInstructions: '# Project policy\n\nOnly flag regressions with evidence.',
+    });
+
+    expect(version).toBe(DEFAULT_PROMPT_TEMPLATE_GITLAB.version);
+    expect(prompt).toContain('Only flag regressions with evidence.');
+    expect(prompt).toContain('# SUB-AGENT USAGE');
+    expect(prompt).toContain("replace Kilo's default review guidance for sub-agent usage");
+    expect(prompt).toContain('formatting/output requirements');
+    expect(prompt).not.toContain('Security vulnerabilities (injection, XSS, auth bypass)');
+    expect(prompt).toContain('operating in READ-ONLY, NON-INTERACTIVE mode');
+    expect(prompt).toContain('# HARD CONSTRAINTS (READ FIRST)');
+    expect(prompt).toContain('glab mr diff 10');
+    expect(prompt).toContain(
+      'glab api --method POST "projects/group%2Fproject/merge_requests/10/notes"'
     );
+    expect(prompt).toContain(
+      'glab api --method POST "projects/group%2Fproject/merge_requests/10/discussions"'
+    );
+    expect(prompt).toContain('<!-- kilo-review -->');
   });
 
   it('includes GitHub inline comment footer guidance after the comment format', async () => {

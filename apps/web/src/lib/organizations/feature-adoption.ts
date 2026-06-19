@@ -1,10 +1,5 @@
-import {
-  agent_configs,
-  cloud_agent_webhook_triggers,
-  organizations,
-  platform_integrations,
-} from '@kilocode/db/schema';
-import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { organizations } from '@kilocode/db/schema';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { readDb } from '@/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 
@@ -44,6 +39,12 @@ type FeatureAdoptionState = {
   agentConfigs: AdoptionAgentConfig[];
   integrations: AdoptionIntegration[];
   hasActiveCloudAgentWebhook: boolean;
+};
+
+type FeatureAdoptionStateRow = {
+  agent_configs: AdoptionAgentConfig[];
+  integrations: AdoptionIntegration[];
+  has_active_cloud_agent_webhook: boolean;
 };
 
 const SOURCE_CONTROL_PLATFORMS = ['github', 'gitlab'];
@@ -95,7 +96,7 @@ export function buildFeatureAdoptionChecks(
     {
       key: 'code-reviewer',
       title: 'Code Reviewer enabled',
-      description: 'Run AI-assisted reviews on pull requests or merge requests.',
+      description: 'Run AI assisted reviews on pull requests or merge requests.',
       adopted: codeReviewerEnabled,
       actionLabel: codeReviewerEnabled ? 'Review settings' : 'Enable Code Reviewer',
       actionUrl: `/organizations/${organizationId}/code-reviews`,
@@ -127,67 +128,53 @@ export function buildFeatureAdoptionChecks(
   ];
 }
 
-export async function getOrganizationPendingFeatureAdoptionCount(
-  organizationId: string
-): Promise<{ plan: 'teams' | 'enterprise'; pendingCount: number }> {
-  const organizationRows = await readDb
-    .select({ plan: organizations.plan })
-    .from(organizations)
-    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
-    .limit(1);
-  const organization = organizationRows[0];
-  if (!organization) {
-    throw new Error('Organization not found');
-  }
-  if (organization.plan !== 'enterprise') {
-    return { plan: organization.plan, pendingCount: 0 };
-  }
-
-  const rows = await readDb.execute(sql`
+async function getFeatureAdoptionState(organizationId: string): Promise<FeatureAdoptionState> {
+  const result = await readDb.execute(sql`
     SELECT
-      (CASE WHEN EXISTS (
-        SELECT 1 FROM platform_integrations
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'agentType', agent_type,
+          'platform', platform,
+          'isEnabled', is_enabled
+        ))
+        FROM agent_configs
         WHERE owned_by_organization_id = ${organizationId}
-          AND platform IN ('github', 'gitlab')
-          AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
-          AND suspended_at IS NULL
-          AND auth_invalid_at IS NULL
-      ) THEN 0 ELSE 1 END) +
-      (CASE WHEN EXISTS (
-        SELECT 1 FROM agent_configs
+          AND agent_type IN ('code_review', 'security_scan')
+      ), '[]'::jsonb) AS agent_configs,
+      COALESCE((
+        SELECT jsonb_agg(jsonb_build_object(
+          'platform', platform,
+          'status', integration_status,
+          'suspendedAt', suspended_at,
+          'authInvalidAt', auth_invalid_at
+        ))
+        FROM platform_integrations
         WHERE owned_by_organization_id = ${organizationId}
-          AND agent_type = 'code_review'
-          AND platform IN ('github', 'gitlab')
-          AND is_enabled = true
-      ) THEN 0 ELSE 1 END) +
-      (CASE WHEN EXISTS (
-        SELECT 1 FROM agent_configs
-        WHERE owned_by_organization_id = ${organizationId}
-          AND agent_type = 'security_scan'
-          AND platform = 'github'
-          AND is_enabled = true
-      ) THEN 0 ELSE 1 END) +
-      (CASE WHEN EXISTS (
-        SELECT 1 FROM cloud_agent_webhook_triggers
+      ), '[]'::jsonb) AS integrations,
+      EXISTS (
+        SELECT 1
+        FROM cloud_agent_webhook_triggers
         WHERE organization_id = ${organizationId}
           AND target_type = 'cloud_agent'
           AND activation_mode = 'webhook'
           AND is_active = true
-      ) THEN 0 ELSE 1 END) +
-      (CASE WHEN EXISTS (
-        SELECT 1 FROM platform_integrations
-        WHERE owned_by_organization_id = ${organizationId}
-          AND platform IN ('slack', 'discord', 'linear')
-          AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
-          AND suspended_at IS NULL
-          AND auth_invalid_at IS NULL
-      ) THEN 0 ELSE 1 END) AS pending_count
+      ) AS has_active_cloud_agent_webhook
   `);
-
-  const pendingCount = Number(rows.rows[0]?.pending_count);
+  const row = result.rows[0] as FeatureAdoptionStateRow | undefined;
   return {
-    plan: organization.plan,
-    pendingCount: Number.isFinite(pendingCount) ? pendingCount : FEATURE_ADOPTION_KEYS.length,
+    agentConfigs: row?.agent_configs ?? [],
+    integrations: row?.integrations ?? [],
+    hasActiveCloudAgentWebhook: row?.has_active_cloud_agent_webhook ?? false,
+  };
+}
+
+export async function getOrganizationPendingFeatureAdoptionCount(
+  organizationId: string
+): Promise<{ plan: 'teams' | 'enterprise'; pendingCount: number }> {
+  const adoption = await getOrganizationFeatureAdoption(organizationId);
+  return {
+    plan: adoption.plan,
+    pendingCount: adoption.checks.filter(check => !check.adopted).length,
   };
 }
 
@@ -208,49 +195,10 @@ export async function getOrganizationFeatureAdoption(organizationId: string): Pr
     return { plan: organization.plan, checks: [] };
   }
 
-  const [agentConfigRows, integrationRows, webhookRows] = await Promise.all([
-    readDb
-      .select({
-        agentType: agent_configs.agent_type,
-        platform: agent_configs.platform,
-        isEnabled: agent_configs.is_enabled,
-      })
-      .from(agent_configs)
-      .where(
-        and(
-          eq(agent_configs.owned_by_organization_id, organizationId),
-          inArray(agent_configs.agent_type, ['code_review', 'security_scan'])
-        )
-      ),
-    readDb
-      .select({
-        platform: platform_integrations.platform,
-        status: platform_integrations.integration_status,
-        suspendedAt: platform_integrations.suspended_at,
-        authInvalidAt: platform_integrations.auth_invalid_at,
-      })
-      .from(platform_integrations)
-      .where(eq(platform_integrations.owned_by_organization_id, organizationId)),
-    readDb
-      .select({ id: cloud_agent_webhook_triggers.id })
-      .from(cloud_agent_webhook_triggers)
-      .where(
-        and(
-          eq(cloud_agent_webhook_triggers.organization_id, organizationId),
-          eq(cloud_agent_webhook_triggers.target_type, 'cloud_agent'),
-          eq(cloud_agent_webhook_triggers.activation_mode, 'webhook'),
-          eq(cloud_agent_webhook_triggers.is_active, true)
-        )
-      )
-      .limit(1),
-  ]);
+  const state = await getFeatureAdoptionState(organizationId);
 
   return {
     plan: organization.plan,
-    checks: buildFeatureAdoptionChecks(organizationId, {
-      agentConfigs: agentConfigRows,
-      integrations: integrationRows,
-      hasActiveCloudAgentWebhook: webhookRows.length > 0,
-    }),
+    checks: buildFeatureAdoptionChecks(organizationId, state),
   };
 }

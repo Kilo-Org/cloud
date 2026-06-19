@@ -90,6 +90,7 @@ import {
   MCPGatewayRouteStatus,
   MCPGatewayInstanceStatus,
   MCPGatewayProviderGrantStatus,
+  MCPGatewayOAuthGrantStatus,
   MCPGatewaySecretKind,
   MCPGatewayOAuthClientAuthMethod,
   MCPGatewayAuthorizationRequestStatus,
@@ -8217,6 +8218,68 @@ export const mcp_gateway_oauth_clients = pgTable(
 export type MCPGatewayOAuthClient = typeof mcp_gateway_oauth_clients.$inferSelect;
 export type NewMCPGatewayOAuthClient = typeof mcp_gateway_oauth_clients.$inferInsert;
 
+export const mcp_gateway_oauth_grants = pgTable(
+  'mcp_gateway_oauth_grants',
+  {
+    oauth_grant_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    oauth_client_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
+    owner_id: text().notNull(),
+    config_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
+    connect_resource_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_connect_resources.connect_resource_id, { onDelete: 'cascade' }),
+    instance_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_connection_instances.instance_id, { onDelete: 'cascade' }),
+    redirect_uri: text().notNull(),
+    granted_scopes: text().array().notNull(),
+    execution_context: jsonb().$type<Record<string, unknown>>().notNull(),
+    config_version: integer().notNull(),
+    grant_status: text()
+      .$type<MCPGatewayOAuthGrantStatus>()
+      .notNull()
+      .default(MCPGatewayOAuthGrantStatus.Active),
+    approved_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_reason: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_gateway_oauth_grants_active_binding')
+      .on(table.oauth_client_id, table.kilo_user_id, table.connect_resource_id, table.redirect_uri)
+      .where(sql`${table.revoked_at} is null and ${table.grant_status} in ('pending', 'active')`),
+    index('IDX_mcp_gateway_oauth_grants_client').on(table.oauth_client_id),
+    index('IDX_mcp_gateway_oauth_grants_user').on(table.kilo_user_id),
+    index('IDX_mcp_gateway_oauth_grants_config').on(table.config_id),
+    index('IDX_mcp_gateway_oauth_grants_owner').on(table.owner_scope, table.owner_id),
+    index('IDX_mcp_gateway_oauth_grants_resource').on(table.connect_resource_id),
+    index('IDX_mcp_gateway_oauth_grants_instance').on(table.instance_id),
+    index('IDX_mcp_gateway_oauth_grants_revoked_at').on(table.revoked_at),
+    check('mcp_gateway_oauth_grants_config_version_positive', sql`${table.config_version} > 0`),
+    enumCheck('mcp_gateway_oauth_grants_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
+    enumCheck('mcp_gateway_oauth_grants_status', table.grant_status, MCPGatewayOAuthGrantStatus),
+  ]
+);
+
+export type MCPGatewayOAuthGrant = typeof mcp_gateway_oauth_grants.$inferSelect;
+export type NewMCPGatewayOAuthGrant = typeof mcp_gateway_oauth_grants.$inferInsert;
+
 export const mcp_gateway_authorization_requests = pgTable(
   'mcp_gateway_authorization_requests',
   {
@@ -8228,6 +8291,9 @@ export const mcp_gateway_authorization_requests = pgTable(
     oauth_client_id: uuid()
       .notNull()
       .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    oauth_grant_id: uuid().references(() => mcp_gateway_oauth_grants.oauth_grant_id, {
+      onDelete: 'cascade',
+    }),
     client_id: text().notNull(),
     owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
     owner_id: text().notNull(),
@@ -8264,6 +8330,7 @@ export const mcp_gateway_authorization_requests = pgTable(
   table => [
     uniqueIndex('UQ_mcp_gateway_authorization_requests_state_hash').on(table.request_state_hash),
     index('IDX_mcp_gateway_authorization_requests_config').on(table.config_id),
+    index('IDX_mcp_gateway_authorization_requests_grant').on(table.oauth_grant_id),
     index('IDX_mcp_gateway_authorization_requests_user').on(table.kilo_user_id),
     index('IDX_mcp_gateway_authorization_requests_expires_at').on(table.expires_at),
     enumCheck(
@@ -8299,6 +8366,9 @@ export const mcp_gateway_authorization_codes = pgTable(
     oauth_client_id: uuid()
       .notNull()
       .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    oauth_grant_id: uuid().references(() => mcp_gateway_oauth_grants.oauth_grant_id, {
+      onDelete: 'cascade',
+    }),
     client_id: text().notNull(),
     owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
     owner_id: text().notNull(),
@@ -8326,6 +8396,7 @@ export const mcp_gateway_authorization_codes = pgTable(
     uniqueIndex('UQ_mcp_gateway_authorization_codes_code_hash').on(table.code_hash),
     index('IDX_mcp_gateway_authorization_codes_expires_at').on(table.expires_at),
     index('IDX_mcp_gateway_authorization_codes_client').on(table.oauth_client_id),
+    index('IDX_mcp_gateway_authorization_codes_grant').on(table.oauth_grant_id),
     enumCheck(
       'mcp_gateway_authorization_codes_owner_scope',
       table.owner_scope,
@@ -8349,6 +8420,9 @@ export const mcp_gateway_refresh_tokens = pgTable(
     oauth_client_id: uuid()
       .notNull()
       .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    oauth_grant_id: uuid().references(() => mcp_gateway_oauth_grants.oauth_grant_id, {
+      onDelete: 'cascade',
+    }),
     client_id: text().notNull(),
     owner_scope: text().$type<MCPGatewayOwnerScope>().notNull(),
     owner_id: text().notNull(),
@@ -8372,6 +8446,7 @@ export const mcp_gateway_refresh_tokens = pgTable(
   table => [
     uniqueIndex('UQ_mcp_gateway_refresh_tokens_token_hash').on(table.token_hash),
     index('IDX_mcp_gateway_refresh_tokens_user').on(table.kilo_user_id),
+    index('IDX_mcp_gateway_refresh_tokens_grant').on(table.oauth_grant_id),
     index('IDX_mcp_gateway_refresh_tokens_config').on(table.config_id),
     index('IDX_mcp_gateway_refresh_tokens_consumed_at').on(table.consumed_at),
     enumCheck('mcp_gateway_refresh_tokens_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
@@ -8393,6 +8468,9 @@ export const mcp_gateway_pending_provider_authorizations = pgTable(
       () => mcp_gateway_authorization_requests.authorization_request_id,
       { onDelete: 'cascade' }
     ),
+    oauth_grant_id: uuid().references(() => mcp_gateway_oauth_grants.oauth_grant_id, {
+      onDelete: 'cascade',
+    }),
     config_id: uuid()
       .notNull()
       .references(() => mcp_gateway_configs.config_id, { onDelete: 'cascade' }),
@@ -8428,6 +8506,7 @@ export const mcp_gateway_pending_provider_authorizations = pgTable(
   table => [
     uniqueIndex('UQ_mcp_gateway_pending_provider_authorizations_state_hash').on(table.state_hash),
     index('IDX_mcp_gateway_pending_provider_authorizations_config').on(table.config_id),
+    index('IDX_mcp_gateway_pending_provider_authorizations_grant').on(table.oauth_grant_id),
     index('IDX_mcp_gateway_pending_provider_authorizations_expires_at').on(table.expires_at),
     check(
       'mcp_gateway_pending_provider_authorizations_config_version_positive',
@@ -8508,6 +8587,9 @@ export const mcp_gateway_audit_events = pgTable(
     instance_id: uuid().references(() => mcp_gateway_connection_instances.instance_id, {
       onDelete: 'set null',
     }),
+    oauth_grant_id: uuid().references(() => mcp_gateway_oauth_grants.oauth_grant_id, {
+      onDelete: 'set null',
+    }),
     event_type: text().notNull(),
     outcome: text().$type<MCPGatewayAuditOutcome>().notNull(),
     correlation_metadata: jsonb().$type<Record<string, unknown>>().notNull().default({}),
@@ -8515,6 +8597,7 @@ export const mcp_gateway_audit_events = pgTable(
   },
   table => [
     index('IDX_mcp_gateway_audit_events_config').on(table.config_id),
+    index('IDX_mcp_gateway_audit_events_grant').on(table.oauth_grant_id),
     index('IDX_mcp_gateway_audit_events_owner').on(table.owner_scope, table.owner_id),
     index('IDX_mcp_gateway_audit_events_created_at').on(table.created_at),
     enumCheck('mcp_gateway_audit_events_owner_scope', table.owner_scope, MCPGatewayOwnerScope),

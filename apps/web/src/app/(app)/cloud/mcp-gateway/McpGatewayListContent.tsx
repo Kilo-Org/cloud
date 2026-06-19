@@ -103,12 +103,17 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
             Create and manage remote MCP server connections for Kilo Code.
           </p>
         </div>
-        <Button asChild>
-          <Link href={routes.create}>
-            <Plus />
-            Create connection
-          </Link>
-        </Button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button asChild variant="outline">
+            <Link href={routes.authorizedClients}>Authorized clients</Link>
+          </Button>
+          <Button asChild>
+            <Link href={routes.create}>
+              <Plus />
+              Create connection
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>

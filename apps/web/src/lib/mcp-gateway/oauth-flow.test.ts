@@ -13,6 +13,7 @@ import {
   organization_memberships,
   mcp_gateway_connection_instances,
   mcp_gateway_oauth_clients,
+  mcp_gateway_oauth_grants,
   mcp_gateway_pending_provider_authorizations,
   mcp_gateway_provider_grants,
   mcp_gateway_rate_limit_windows,
@@ -119,6 +120,7 @@ async function cleanupGatewayTables() {
   await db.delete(mcp_gateway_authorization_codes);
   await db.delete(mcp_gateway_authorization_requests);
   await db.delete(mcp_gateway_refresh_tokens);
+  await db.delete(mcp_gateway_oauth_grants);
   await db.delete(mcp_gateway_provider_grants);
   await db.delete(mcp_gateway_connection_instances);
   await db.delete(mcp_gateway_assignments);
@@ -343,7 +345,19 @@ describe('MCP gateway app OAuth flow', () => {
     expect(claims.sub).toBe(user.id);
     expect(claims.aud).toBe(created.route.canonical_url);
     expect(claims.scope).toBe('mcp:access profile');
+    expect(claims.token_source).toBe('oauth_client');
+    if (claims.token_source !== 'oauth_client') throw new Error('Expected OAuth client token');
+    expect(claims.oauth_grant_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    );
     expect(tokenResponse.scope).toBe('mcp:access profile');
+    const [persistedGrant] = await db
+      .select()
+      .from(mcp_gateway_oauth_grants)
+      .where(eq(mcp_gateway_oauth_grants.oauth_grant_id, claims.oauth_grant_id));
+    expect(persistedGrant?.kilo_user_id).toBe(user.id);
+    expect(persistedGrant?.oauth_client_id).toBeDefined();
+    expect(persistedGrant?.connect_resource_id).toBe(created.route.connect_resource_id);
     await expect(services.tokenService.userInfo(tokenResponse.access_token)).resolves.toEqual({
       sub: user.id,
       name: user.google_user_name,
@@ -359,6 +373,7 @@ describe('MCP gateway app OAuth flow', () => {
     });
     const derivedClaims = await services.tokenService.verifyUserInfoToken(derivedToken.token);
     expect(derivedClaims.scope).toBe('mcp:access');
+    expect(derivedClaims.token_source).toBe('derived_connect');
     await expect(services.tokenService.userInfo(derivedToken.token)).rejects.toMatchObject({
       code: 'invalid_scope',
     });
@@ -372,6 +387,9 @@ describe('MCP gateway app OAuth flow', () => {
       headers: new Headers(),
     });
     expect(refreshed.refresh_token).not.toBe(tokenResponse.refresh_token);
+    const refreshedClaims = await services.tokenService.verifyUserInfoToken(refreshed.access_token);
+    expect(refreshedClaims.token_source).toBe('oauth_client');
+    expect(refreshedClaims.oauth_grant_id).toBe(claims.oauth_grant_id);
     await expect(
       services.tokenService.exchangeToken({
         request: {
@@ -959,6 +977,14 @@ describe('MCP gateway app OAuth flow', () => {
     });
     expect(pending?.pending_status).toBe('error');
     expect(pending?.consumed_at).toBeTruthy();
+    expect(pending?.oauth_grant_id).toBeTruthy();
+    if (!pending?.oauth_grant_id) return;
+    const [revokedGrant] = await db
+      .select()
+      .from(mcp_gateway_oauth_grants)
+      .where(eq(mcp_gateway_oauth_grants.oauth_grant_id, pending.oauth_grant_id));
+    expect(revokedGrant?.grant_status).toBe('revoked');
+    expect(revokedGrant?.revoked_at).toBeTruthy();
     await expect(
       services.providerOAuthService.handleProviderCallback({
         state,
@@ -1135,14 +1161,10 @@ describe('MCP gateway app OAuth flow', () => {
       code: 'provider-code',
       userId: user.id,
     });
-    expect(callback.grant.grant_status).toBe('active');
+    expect(callback.grant).not.toBeNull();
     expect(new URLSearchParams(tokenRequestBody).get('resource')).toBe('https://example.com/mcp');
-    expect(
-      services.grantService.decryptGrant(
-        callback.grant.encrypted_grant,
-        callback.instance.instance_id
-      ).scope
-    ).toBe('email openid');
+    if (!callback.grant) throw new Error('Expected provider grant');
+    expect(callback.grant.grant_status).toBe('active');
     const grants = await db
       .select()
       .from(mcp_gateway_provider_grants)
@@ -1153,6 +1175,12 @@ describe('MCP gateway app OAuth flow', () => {
       authorizationRequest: callback.authorizationRequest,
     });
     expect(new URL(finalized.redirectUrl).searchParams.get('code')).toBeTruthy();
+    expect(
+      services.grantService.decryptGrant(
+        callback.grant.encrypted_grant,
+        callback.instance.instance_id
+      ).scope
+    ).toBe('email openid');
   });
 
   it('keeps grant versions strictly advancing across replacement', async () => {

@@ -4,6 +4,7 @@ export function getMcpGatewayRoutes(organizationId?: string) {
     : '/cloud/mcp-gateway';
   return {
     list: base,
+    authorizedClients: '/cloud/mcp-gateway/authorized-clients',
     create: `${base}/new`,
     detail: (configId: string) => `${base}/${configId}`,
   };

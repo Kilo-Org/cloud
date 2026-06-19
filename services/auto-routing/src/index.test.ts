@@ -106,6 +106,7 @@ const benchmarkRoutingTable = {
   generatedAt: '2026-06-12T00:00:00.000Z',
   minAccuracy: 0.7,
   switchCostFactor: 3,
+  bestAccuracySwitchThreshold: 0.05,
   source: 'benchmark',
   routes: {
     'implementation/feature_development': [

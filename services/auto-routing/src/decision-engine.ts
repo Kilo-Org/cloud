@@ -40,6 +40,7 @@ export function computeDecision(
   const candidates = table.routes[routeKey]?.filter(c => !deniedModelIds.has(c.model));
   if (!candidates?.length) return null;
   const freshPick = pickFreshCandidate(candidates, mode);
+  const bestAccuracySwitchThreshold = table.bestAccuracySwitchThreshold ?? 0.05;
 
   // Keep the session on its incumbent model when it is still good enough for
   // the current taxonomy route. A model switch discards the provider's prompt cache,
@@ -49,13 +50,16 @@ export function computeDecision(
   // that one-time penalty, i.e. it is cheaper by more than switchCostFactor.
   const incumbent =
     incumbentModel === null ? undefined : candidates.find(c => c.model === incumbentModel);
-  if (
-    mode === 'cost_per_accuracy' &&
+  const stickyIncumbent =
     incumbent &&
     incumbent.meetsThreshold &&
     incumbent.model !== freshPick.model &&
-    !(freshPick.avgCostUsd * table.switchCostFactor < incumbent.avgCostUsd)
-  ) {
+    ((mode === 'cost_per_accuracy' &&
+      !(freshPick.avgCostUsd * table.switchCostFactor < incumbent.avgCostUsd)) ||
+      (mode === 'best_accuracy' &&
+        !(freshPick.accuracy - incumbent.accuracy > bestAccuracySwitchThreshold)));
+
+  if (stickyIncumbent) {
     return {
       model: incumbent.model,
       taskType: classification.taskType,

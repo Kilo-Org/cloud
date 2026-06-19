@@ -133,6 +133,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
   excludedAutoDeciderModels: string;
   minAccuracy: number;
   switchCostFactor: number;
+  bestAccuracySwitchThreshold: number;
   maxConcurrency: number;
   benchmarkUserId: string;
   benchmarkOrgId: string;
@@ -152,6 +153,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
       excludedAutoDeciderModels: '',
       minAccuracy: 0.7,
       switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
       maxConcurrency: 100,
       benchmarkUserId: '',
       benchmarkOrgId: '',
@@ -172,6 +174,7 @@ export function configToFormState(config: BenchmarkConfig | null): {
     excludedAutoDeciderModels: (config.excludedAutoDeciderModels ?? []).join('\n'),
     minAccuracy: config.minAccuracy,
     switchCostFactor: config.switchCostFactor,
+    bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
     maxConcurrency: config.maxConcurrency,
     benchmarkUserId: config.benchmarkUserId ?? '',
     benchmarkOrgId: config.benchmarkOrgId ?? '',
@@ -246,6 +249,7 @@ export function formStateToConfig(
     excludedAutoDeciderModels,
     minAccuracy: state.minAccuracy,
     switchCostFactor: state.switchCostFactor,
+    bestAccuracySwitchThreshold: state.bestAccuracySwitchThreshold,
     maxConcurrency: state.maxConcurrency,
     benchmarkUserId: benchmarkUserId.length > 0 ? benchmarkUserId : null,
     benchmarkOrgId: benchmarkOrgId.length > 0 ? benchmarkOrgId : null,
@@ -549,6 +553,29 @@ function BenchmarkConfigEditor({
               value={form.switchCostFactor}
               onChange={e =>
                 updateForm(prev => ({ ...prev, switchCostFactor: parseFloat(e.target.value) || 1 }))
+              }
+              className="h-8 w-40 tabular-nums"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label
+              htmlFor="benchmark-best-accuracy-switch-threshold"
+              className="text-sm font-medium"
+            >
+              Best accuracy switch threshold (0–1)
+            </Label>
+            <Input
+              id="benchmark-best-accuracy-switch-threshold"
+              type="number"
+              min={0}
+              max={1}
+              step={0.01}
+              value={form.bestAccuracySwitchThreshold}
+              onChange={e =>
+                updateForm(prev => ({
+                  ...prev,
+                  bestAccuracySwitchThreshold: parseFloat(e.target.value) || 0,
+                }))
               }
               className="h-8 w-40 tabular-nums"
             />

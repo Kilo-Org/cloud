@@ -34,6 +34,7 @@ const TEST_CONFIG: BenchmarkConfig = {
   ],
   minAccuracy: 0.7,
   switchCostFactor: 3,
+  bestAccuracySwitchThreshold: 0.05,
   maxConcurrency: 100,
   benchmarkUserId: null,
   benchmarkOrgId: null,
@@ -52,6 +53,7 @@ const TEST_CONFIG_ROWS = {
     id: 1 as const,
     min_accuracy: TEST_CONFIG.minAccuracy,
     switch_cost_factor: TEST_CONFIG.switchCostFactor,
+    best_accuracy_switch_threshold: TEST_CONFIG.bestAccuracySwitchThreshold,
     max_concurrency: TEST_CONFIG.maxConcurrency,
     benchmark_user_id: TEST_CONFIG.benchmarkUserId,
     benchmark_org_id: TEST_CONFIG.benchmarkOrgId,
@@ -218,6 +220,7 @@ describe('GET /admin/config', () => {
         id: 1,
         min_accuracy: 0.9,
         switch_cost_factor: 3,
+        best_accuracy_switch_threshold: 0.05,
         max_concurrency: 4,
         benchmark_user_id: null,
         benchmark_org_id: null,
@@ -384,6 +387,7 @@ describe('POST /admin/runs', () => {
       error: null,
       min_accuracy: 0.7,
       switch_cost_factor: 3,
+      best_accuracy_switch_threshold: 0.05,
       max_concurrency: 4,
       benchmark_user_id: null,
       benchmark_org_id: null,
@@ -425,6 +429,7 @@ describe('POST /admin/runs', () => {
     const [, runArg] = vi.mocked(insertRun).mock.calls[0];
     expect(runArg.min_accuracy).toBe(TEST_CONFIG.minAccuracy);
     expect(runArg.switch_cost_factor).toBe(TEST_CONFIG.switchCostFactor);
+    expect(runArg.best_accuracy_switch_threshold).toBe(TEST_CONFIG.bestAccuracySwitchThreshold);
     expect(runArg.benchmark_user_id).toBe(DEFAULT_BENCHMARK_USER_ID);
     expect(runArg.benchmark_org_id).toBe(DEFAULT_BENCHMARK_ORG_ID);
     const queuedMessages = queueSendBatch.mock.calls.flatMap(([messages]) => messages);
@@ -635,6 +640,7 @@ describe('GET /admin/routing-table', () => {
       generatedAt: '2026-06-01T10:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
       source: 'benchmark',
       routes: { 'implementation/code_generation': [candidate] },
     };

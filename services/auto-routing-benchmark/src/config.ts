@@ -14,6 +14,7 @@ export function mapConfigRows(
   configRow: {
     min_accuracy: number;
     switch_cost_factor: number;
+    best_accuracy_switch_threshold: number;
     max_concurrency: number;
     benchmark_user_id: string | null;
     benchmark_org_id: string | null;
@@ -59,6 +60,7 @@ export function mapConfigRows(
     excludedAutoDeciderModels,
     minAccuracy: configRow.min_accuracy,
     switchCostFactor: configRow.switch_cost_factor,
+    bestAccuracySwitchThreshold: configRow.best_accuracy_switch_threshold,
     maxConcurrency: configRow.max_concurrency,
     benchmarkUserId: configRow.benchmark_user_id,
     benchmarkOrgId: configRow.benchmark_org_id,
@@ -103,6 +105,7 @@ export async function saveBenchmarkConfig(
     {
       min_accuracy: config.minAccuracy,
       switch_cost_factor: config.switchCostFactor,
+      best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
       max_concurrency: config.maxConcurrency,
       benchmark_user_id: config.benchmarkUserId,
       benchmark_org_id: config.benchmarkOrgId,

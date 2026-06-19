@@ -167,7 +167,7 @@ describe('auto routing contracts', () => {
 });
 
 describe('BenchmarkConfigSchema defaults', () => {
-  it('applies config defaults for repetitions, classifier latency, and auto decider cost bounds', () => {
+  it('applies config defaults for repetitions, classifier latency, switch threshold, and auto decider cost bounds', () => {
     const result = BenchmarkConfigSchema.parse({
       classifierModels: ['model/a'],
       deciderModels: [{ id: 'model/b' }],
@@ -183,6 +183,7 @@ describe('BenchmarkConfigSchema defaults', () => {
     expect(result.classifierRepetitions).toBe(1);
     expect(result.deciderRepetitions).toBe(1);
     expect(result.classifierMaxP95LatencyMs).toBe(1000);
+    expect(result.bestAccuracySwitchThreshold).toBe(0.05);
     expect(result.autoDeciderMinCostUsd).toBe(15);
     expect(result.autoDeciderMaxCostUsd).toBe(25);
   });

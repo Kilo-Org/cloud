@@ -87,6 +87,7 @@ describe('RoutingTableView', () => {
             generatedAt: '2026-06-17T00:00:00.000Z',
             minAccuracy: 0.7,
             switchCostFactor: 3,
+            bestAccuracySwitchThreshold: 0.05,
             source: 'benchmark',
             routes: {
               'implementation/code_generation': [
@@ -124,6 +125,7 @@ describe('RoutingTableView', () => {
             generatedAt: '2026-06-17T00:00:00.000Z',
             minAccuracy: 0.7,
             switchCostFactor: 3,
+            bestAccuracySwitchThreshold: 0.05,
             source: 'benchmark',
             routes: {
               'implementation/code_generation': [
@@ -178,6 +180,7 @@ describe('formStateToConfig round-trip', () => {
     excludedAutoDeciderModels: ['excluded-auto-model'],
     minAccuracy: 0.8,
     switchCostFactor: 3,
+    bestAccuracySwitchThreshold: 0.05,
     maxConcurrency: 4,
     benchmarkUserId: 'user-123',
     benchmarkOrgId: 'org-123',

@@ -18,6 +18,7 @@ const table: RoutingTable = {
   generatedAt: '2026-06-11T00:00:00.000Z',
   minAccuracy: 0.7,
   switchCostFactor: 3,
+  bestAccuracySwitchThreshold: 0.05,
   source: 'benchmark',
   routes: {
     'implementation/code_generation': [
@@ -98,6 +99,70 @@ describe('computeDecision', () => {
   it('does not keep a lower-accuracy incumbent in best accuracy mode', () => {
     const decision = computeDecision(classification, table, 'mid/chat', new Set(), 'best_accuracy');
     expect(decision).toMatchObject({ model: 'pricey/chat', sticky: false });
+  });
+  it('keeps a best-accuracy incumbent when the fresh pick is less than five points better', () => {
+    const nearTieTable: RoutingTable = {
+      ...table,
+      bestAccuracySwitchThreshold: 0.05,
+      routes: {
+        ...table.routes,
+        'implementation/code_generation': [
+          {
+            model: 'incumbent/chat',
+            accuracy: 0.91,
+            avgCostUsd: 0.002,
+            meetsThreshold: true,
+          },
+          {
+            model: 'fresh/chat',
+            accuracy: 0.95,
+            avgCostUsd: 0.02,
+            meetsThreshold: true,
+          },
+        ],
+      },
+    };
+
+    const decision = computeDecision(
+      classification,
+      nearTieTable,
+      'incumbent/chat',
+      new Set(),
+      'best_accuracy'
+    );
+    expect(decision).toMatchObject({ model: 'incumbent/chat', sticky: true });
+  });
+  it('switches best-accuracy mode when the fresh pick clears the accuracy threshold', () => {
+    const betterTable: RoutingTable = {
+      ...table,
+      bestAccuracySwitchThreshold: 0.05,
+      routes: {
+        ...table.routes,
+        'implementation/code_generation': [
+          {
+            model: 'incumbent/chat',
+            accuracy: 0.89,
+            avgCostUsd: 0.002,
+            meetsThreshold: true,
+          },
+          {
+            model: 'fresh/chat',
+            accuracy: 0.95,
+            avgCostUsd: 0.02,
+            meetsThreshold: true,
+          },
+        ],
+      },
+    };
+
+    const decision = computeDecision(
+      classification,
+      betterTable,
+      'incumbent/chat',
+      new Set(),
+      'best_accuracy'
+    );
+    expect(decision).toMatchObject({ model: 'fresh/chat', sticky: false });
   });
   it('uses the classifier task type and subtype directly', () => {
     const debugging: ClassifierOutput = {

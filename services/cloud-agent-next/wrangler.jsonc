@@ -265,6 +265,148 @@
    * https://developers.cloudflare.com/workers/wrangler/configuration/#named-environments
    */
   "env": {
+    "staging": {
+      "name": "cloud-agent-next-staging",
+      "workers_dev": true,
+      "preview_urls": false,
+      "triggers": {
+        "crons": ["17 2 * * *"],
+      },
+      "routes": [],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+      "vars": {
+        "KILOCODE_BACKEND_BASE_URL": "https://staging-app.kilo.ai",
+        "KILO_OPENROUTER_BASE": "https://staging-app.kilo.ai/api",
+        "GITHUB_APP_SLUG": "kiloconnect-development",
+        "GITHUB_APP_BOT_USER_ID": "242397087",
+        "GITHUB_LITE_APP_SLUG": "",
+        "GITHUB_LITE_APP_BOT_USER_ID": "",
+        "WORKER_URL": "https://cloud-agent-next-staging.engineering-e11.workers.dev",
+        "CLI_TIMEOUT_SECONDS": "900",
+        "REAPER_INTERVAL_MS": "300000",
+        "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-staging",
+        "WS_ALLOWED_ORIGINS": "https://staging-app.kilo.ai",
+        "KILO_SESSION_INGEST_URL": "https://session-ingest-staging.engineering-e11.workers.dev",
+        "PER_SESSION_SANDBOX_ORG_IDS": "*",
+      },
+      "services": [
+        {
+          "binding": "SESSION_INGEST",
+          "service": "session-ingest-staging",
+          "entrypoint": "SessionIngestRPC",
+        },
+        {
+          "binding": "GIT_TOKEN_SERVICE",
+          "service": "git-token-service-staging",
+          "entrypoint": "GitTokenRPCEntrypoint",
+        },
+        {
+          "binding": "NOTIFICATIONS",
+          "service": "notifications-staging",
+          "entrypoint": "NotificationsService",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "INTERNAL_API_SECRET_PROD",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "INTERNAL_API_SECRET_PROD",
+        },
+      ],
+      "r2_buckets": [
+        {
+          "binding": "R2_BUCKET",
+          "bucket_name": "kilocode-sessions-staging",
+        },
+      ],
+      "containers": [
+        {
+          "class_name": "Sandbox",
+          "image": "./Dockerfile",
+          "instance_type": "standard-4",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.21",
+          },
+          "max_instances": 10,
+          "rollout_active_grace_period": 300,
+        },
+        {
+          "class_name": "SandboxSmall",
+          "image": "./Dockerfile",
+          "instance_type": "standard-4",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.21",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 300,
+        },
+        {
+          "class_name": "SandboxDIND",
+          "image": "./Dockerfile.dind",
+          "instance_type": "standard-3",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.21",
+          },
+          "max_instances": 1,
+          "rollout_active_grace_period": 300,
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "class_name": "Sandbox",
+            "name": "Sandbox",
+          },
+          {
+            "class_name": "SandboxSmall",
+            "name": "SandboxSmall",
+          },
+          {
+            "class_name": "SandboxDIND",
+            "name": "SandboxDIND",
+          },
+          {
+            "class_name": "CloudAgentSession",
+            "name": "CLOUD_AGENT_SESSION",
+          },
+          {
+            "class_name": "UserKiloFacade",
+            "name": "USER_KILO_FACADE",
+          },
+        ],
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "CALLBACK_QUEUE",
+            "queue": "cloud-agent-next-callback-queue-staging",
+          },
+          {
+            "binding": "CLOUD_AGENT_REPORT_QUEUE",
+            "queue": "cloud-agent-next-report-queue-staging",
+          },
+        ],
+        "consumers": [
+          {
+            "queue": "cloud-agent-next-callback-queue-staging",
+            "max_batch_size": 5,
+            // Keep aligned with CALLBACK_DELIVERY_MAX_ATTEMPTS = initial attempt + 4 redeliveries.
+            "max_retries": 4,
+          },
+          {
+            "queue": "cloud-agent-next-report-queue-staging",
+            "max_retries": 3,
+            "dead_letter_queue": "cloud-agent-next-report-queue-dlq-staging",
+          },
+        ],
+      },
+    },
     "dev": {
       "name": "cloud-agent-next-dev",
       "triggers": {

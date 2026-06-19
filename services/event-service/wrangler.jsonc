@@ -46,4 +46,35 @@
       "secret_name": "NEXTAUTH_SECRET_PROD",
     },
   ],
+  "env": {
+    "staging": {
+      "name": "event-service-staging",
+      "workers_dev": true,
+      "routes": [],
+      "vars": { "WORKER_ENV": "staging" },
+      "observability": { "enabled": true },
+      "logpush": true,
+      "placement": { "mode": "smart" },
+      "durable_objects": {
+        "bindings": [
+          { "name": "USER_SESSION_DO", "class_name": "UserSessionDO" },
+          { "name": "CONNECTION_TICKET_DO", "class_name": "ConnectionTicketDO" },
+        ],
+      },
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "NEXTAUTH_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "NEXTAUTH_SECRET_DEV",
+        },
+      ],
+    },
+  },
 }

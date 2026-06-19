@@ -53,6 +53,43 @@
     "port": 8802,
   },
   "env": {
+    "staging": {
+      "name": "git-token-service-staging",
+      "workers_dev": true,
+      "preview_urls": false,
+      "routes": [],
+      "vars": {
+        "GITHUB_APP_SLUG": "kiloconnect-development",
+        "GITHUB_APP_BOT_USER_ID": "242397087",
+        "GITHUB_LITE_APP_SLUG": "",
+        "GITHUB_LITE_APP_BOT_USER_ID": "",
+      },
+      "kv_namespaces": [
+        {
+          "binding": "TOKEN_CACHE",
+          "id": "7e0b82f3dd30498490a7ebb11f1d20b9",
+        },
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "NEXTAUTH_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "NEXTAUTH_SECRET_DEV",
+        },
+        {
+          "binding": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_DEV",
+        },
+      ],
+    },
     "dev": {
       "name": "git-token-service-dev",
       "vars": {

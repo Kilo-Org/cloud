@@ -111,4 +111,86 @@
       "secret_name": "INTERNAL_API_SECRET_PROD",
     },
   ],
+  "env": {
+    "staging": {
+      "name": "session-ingest-staging",
+      "workers_dev": true,
+      "routes": [],
+      "placement": {
+        "mode": "smart",
+      },
+      "observability": {
+        "enabled": true,
+      },
+      "logpush": true,
+      "kv_namespaces": [
+        {
+          "binding": "USER_EXISTS_CACHE",
+          "id": "ab836697b6034a95beb92aceea474b10",
+        },
+      ],
+      "hyperdrive": [
+        {
+          "binding": "HYPERDRIVE",
+          "id": "624ec80650dd414199349f4e217ddb10",
+          "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "SESSION_INGEST_DO",
+            "class_name": "SessionIngestDO",
+          },
+          {
+            "name": "SESSION_ACCESS_CACHE_DO",
+            "class_name": "SessionAccessCacheDO",
+          },
+          {
+            "name": "USER_CONNECTION_DO",
+            "class_name": "UserConnectionDO",
+          },
+        ],
+      },
+      "r2_buckets": [
+        {
+          "binding": "SESSION_INGEST_R2",
+          "bucket_name": "session-ingest-staging",
+        },
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "INGEST_QUEUE",
+            "queue": "session-ingest-processing-staging",
+          },
+        ],
+        "consumers": [
+          {
+            "queue": "session-ingest-processing-staging",
+            "max_retries": 3,
+            "dead_letter_queue": "session-ingest-dlq-staging",
+          },
+        ],
+      },
+      "services": [
+        {
+          "binding": "O11Y",
+          "service": "o11y",
+        },
+      ],
+      "secrets_store_secrets": [
+        {
+          "binding": "NEXTAUTH_SECRET_PROD",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "NEXTAUTH_SECRET_DEV",
+        },
+        {
+          "binding": "INTERNAL_API_SECRET_PROD",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "INTERNAL_API_SECRET_PROD",
+        },
+      ],
+    },
+  },
 }

@@ -224,27 +224,44 @@ when they appear in all capitals.
 3. The app MUST validate current execution context, route, owner, membership,
    assignment, config status, user eligibility, and instance state before issuing
    an authorization code.
-4. Authorization requests expire within 30 minutes.
-5. Authorization codes expire within 10 minutes, are opaque, and MUST be consumed
-   atomically with expiry enforced in the conditional update.
-6. Authorization codes bind client ID, redirect URI, canonical route URL, route
-   key, scopes, PKCE challenge, execution context, user, and instance.
-7. Refresh tokens bind the same identity and route context as the original code.
-8. Refresh tokens rotate on use and MUST be consumed atomically.
-9. Before issuing any access token from a code or refresh token, the app MUST
-   re-resolve current route, eligibility, config status, assignment, instance,
-   and execution context.
-10. Gateway access tokens are RS256 JWTs with a 15-minute lifetime.
-11. Gateway JWT claims MUST include `sub`, `aud`, `exp`, `iat`, `scope`, `MCPID`,
+4. Interactive authorization MUST present dynamically registered client identity as
+   unverified and MUST NOT present the self-asserted client name as verified identity.
+5. Before approval, the consent screen MUST display the exact validated redirect URI,
+   client ID, connection name, configured endpoint host, owner context, granting Kilo
+   account, and a truthful description of the effective MCP access.
+6. Consent MUST describe the effective MCP access independently of protocol scope
+   labels.
+7. Consent MUST provide explicit allow and deny actions. Denial MUST return
+   `access_denied` only through the validated redirect URI, preserve OAuth `state`,
+   and MUST NOT create authorization, provider, grant, or token state.
+8. Browser approval MUST be bound to the granting user, exact redirect URI, client,
+   resource, scopes, OAuth state, PKCE challenge, and execution context, and MUST
+   expire under server-side validation within 5 minutes.
+9. Consent responses MUST be non-cacheable, prevent framing, restrict form submission
+   and redirects to the app origin, HTTPS destinations, and the exact validated HTTP
+   loopback callback origin, suppress referrer disclosure, and avoid loading
+   client-controlled remote assets.
+10. Authorization requests expire within 30 minutes.
+11. Authorization codes expire within 10 minutes, are opaque, and MUST be consumed
+    atomically with expiry enforced in the conditional update.
+12. Authorization codes bind client ID, redirect URI, canonical route URL, route
+    key, scopes, PKCE challenge, execution context, user, and instance.
+13. Refresh tokens bind the same identity and route context as the original code.
+14. Refresh tokens rotate on use and MUST be consumed atomically.
+15. Before issuing any access token from a code or refresh token, the app MUST
+    re-resolve current route, eligibility, config status, assignment, instance,
+    and execution context.
+16. Gateway access tokens are RS256 JWTs with a 15-minute lifetime.
+17. Gateway JWT claims MUST include `sub`, `aud`, `exp`, `iat`, `scope`, `MCPID`,
     `owner_scope`, `owner_id`, `config_id`, `route_key`, `instance_id`,
     `execution_context`, and `config_version`.
-12. `aud` MUST equal the exact canonical scoped route URL.
-13. `MCPID` MUST equal `{owner_scope}:{owner_id}:{config_id}:{route_key}`.
-14. The Worker MUST verify signature, algorithm, issuer, audience, expiry, route
+18. `aud` MUST equal the exact canonical scoped route URL.
+19. `MCPID` MUST equal `{owner_scope}:{owner_id}:{config_id}:{route_key}`.
+20. The Worker MUST verify signature, algorithm, issuer, audience, expiry, route
     identity, owner tuple, instance ID, and execution context before proxying.
-15. Derived connect tokens use the same JWT contract and lifetime but do not
+21. Derived connect tokens use the same JWT contract and lifetime but do not
     issue refresh tokens.
-16. Raw Kilo session/user tokens MUST NOT be accepted as runtime bearer tokens
+22. Raw Kilo session/user tokens MUST NOT be accepted as runtime bearer tokens
     on `/mcp-connect/...` and MUST NEVER be forwarded upstream.
 
 ## Provider Authorization And Grants

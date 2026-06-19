@@ -569,19 +569,20 @@ const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
  * Read a review's usage data.
  *
  * Billing rows are the source of truth for review token usage. If no billing
- * usage exists, the review used zero tokens.
+ * usage exists, keep the persisted review totals because older reviews only
+ * stored usage on the review row.
  */
 async function getReviewUsageData(reviewId: string) {
   const review = await getCodeReviewById(reviewId);
-  const zeroUsage = {
+  const persistedUsage = {
     model: review?.model ?? null,
-    tokensIn: 0,
-    tokensOut: 0,
+    tokensIn: review?.total_tokens_in ?? 0,
+    tokensOut: review?.total_tokens_out ?? 0,
     cachedTokens: 0,
   };
 
   if (!review?.cli_session_id || !review.created_at) {
-    return zeroUsage;
+    return persistedUsage;
   }
 
   const billing = await getSessionUsageFromBilling(
@@ -590,7 +591,7 @@ async function getReviewUsageData(reviewId: string) {
     review.completed_at ?? undefined
   );
   if (!billing) {
-    return zeroUsage;
+    return persistedUsage;
   }
 
   updateCodeReviewUsage(reviewId, {

@@ -27,7 +27,7 @@ const OpenAICompatibleModelsResponseSchema = z.object({
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
-  status: z.enum(['alpha', 'beta', 'deprecated']).optional(),
+  status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
   limit: z
     .object({
       context: z.number().optional(),

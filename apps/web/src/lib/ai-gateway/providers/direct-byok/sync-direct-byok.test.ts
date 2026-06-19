@@ -18,6 +18,10 @@ describe('parseModelsDevProviderModels', () => {
           id: 'beta',
           status: 'beta',
         },
+        unknownStatus: {
+          id: 'unknown-status',
+          status: 'active',
+        },
         deprecated: {
           id: 'mimo-v2-omni',
           name: 'MiMo V2 Omni',
@@ -43,6 +47,13 @@ describe('parseModelsDevProviderModels', () => {
       },
       {
         id: 'beta',
+        name: undefined,
+        context_length: undefined,
+        max_completion_tokens: undefined,
+        input_modalities: undefined,
+      },
+      {
+        id: 'unknown-status',
         name: undefined,
         context_length: undefined,
         max_completion_tokens: undefined,

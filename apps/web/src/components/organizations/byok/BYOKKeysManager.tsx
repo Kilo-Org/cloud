@@ -757,8 +757,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             entry to appear.
                           </p>
                           {organizationId ? (
-                            <p className="mt-2 font-medium">
-                              Organization restrictions: This provider is considered trusted.
+                            <p className="mt-2">
+                              This provider is considered trusted in the context of organization
+                              restrictions.
                             </p>
                           ) : null}
                         </AlertDescription>
@@ -775,10 +776,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           same model, they are tried in unspecified order until one succeeds.
                         </p>
                         {organizationId ? (
-                          <p className="mt-2 font-medium">
-                            Organization restrictions: Models remain subject to
-                            organization-configured model restrictions, but this provider is
-                            considered trusted.
+                          <p className="mt-2">
+                            Models of this provider are subject to organization-configured model
+                            restrictions, but the provider itself is considered trusted.
                           </p>
                         ) : null}
                       </AlertDescription>

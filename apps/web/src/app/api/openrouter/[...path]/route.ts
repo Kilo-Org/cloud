@@ -277,7 +277,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     const efficientDecision =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id
         ? async () => {
-            const { user, authFailedResponse } = await authPromise;
+            const { user, authFailedResponse, organizationId } = await authPromise;
             // The classifier is a paid call on Kilo's own credential. Skip it
             // for unauthenticated requests: kilo-auto/efficient resolves to a
             // paid model, so an unauthenticated caller is rejected downstream
@@ -297,7 +297,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               providerHints: autoRoutingProviderHints,
               bodyBytes: Buffer.byteLength(requestBodyText),
               userId: user.id,
-              organizationId: authOrganizationId ?? null,
+              organizationId: organizationId ?? null,
               sessionId: taskId ?? sessionHeader,
               machineId: machineIdHeader,
               clientRequestId,

@@ -756,10 +756,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             you may need to wait a few minutes and restart your client for this
                             entry to appear.
                           </p>
-                          <p className="mt-2 font-medium">
-                            Organization restrictions: Direct providers are considered trusted in
-                            the context of organization-defined restrictions.
-                          </p>
+                          {organizationId ? (
+                            <p className="mt-2 font-medium">
+                              Organization restrictions: This provider is considered trusted.
+                            </p>
+                          ) : null}
                         </AlertDescription>
                       </Alert>
                     );
@@ -773,11 +774,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           requests one of the supported models above. If multiple keys apply to the
                           same model, they are tried in unspecified order until one succeeds.
                         </p>
-                        <p className="mt-2 font-medium">
-                          Organization restrictions: This Vercel-backed provider is subject to
-                          organization-configured model restrictions, but the provider itself is
-                          considered trusted.
-                        </p>
+                        {organizationId ? (
+                          <p className="mt-2 font-medium">
+                            Organization restrictions: Models remain subject to
+                            organization-configured model restrictions, but this provider is
+                            considered trusted.
+                          </p>
+                        ) : null}
                       </AlertDescription>
                     </Alert>
                   );

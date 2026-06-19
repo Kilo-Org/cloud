@@ -17,9 +17,11 @@ import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
   disableCodeReviewForRepeatedCloneTimeoutsToday,
+  getCodeReviewActionRequiredCopy,
   getCodeReviewActionRequiredRecoveryHref,
   getCodeReviewActionRequiredState,
 } from './action-required';
+import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from './action-required-shared';
 
 describe('classifyCodeReviewActionRequiredFailure', () => {
   it('classifies GitHub installation, GitHub IP allow-list, BYOK, GitLab, and selected model failures', () => {
@@ -165,6 +167,20 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
       'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
     );
   });
+
+  it.each(CODE_REVIEW_ACTION_REQUIRED_REASONS)(
+    'uses disabled-state copy for %s',
+    actionRequiredReason => {
+      const copy = getCodeReviewActionRequiredCopy(actionRequiredReason);
+
+      expect(copy.emailReason).toMatch(/Code Reviewer was disabled/);
+      expect(copy.checkSummary).toMatch(/Code Reviewer was disabled/);
+      expect(copy.recoveryLabel.trim()).not.toBe('');
+      expect(copy.checkTitle.trim()).not.toBe('');
+      expect(copy.gitlabDescription.trim()).not.toBe('');
+      expect(copy.gitlabDescription.length).toBeLessThanOrEqual(255);
+    }
+  );
 });
 
 describe('disableCodeReviewForActionRequiredFailure', () => {
@@ -426,7 +442,8 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
     expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledWith(
       testUser.google_user_email,
       expect.objectContaining({
-        reason: 'Repository cloning timed out for three code reviews today.',
+        reason:
+          'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
         recoveryLabel: 'Contact support',
         recoveryUrl:
           'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer',

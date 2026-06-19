@@ -616,7 +616,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         12345,
         expect.objectContaining({
           conclusion: 'action_required',
-          output: expect.objectContaining({ title: 'BYOK API key needs attention' }),
+          output: expect.objectContaining({ title: 'Code Reviewer disabled: BYOK key issue' }),
         }),
         'standard'
       );
@@ -693,7 +693,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'abc123',
         'failed',
         expect.objectContaining({
-          description: 'GitLab Project Access Token required for Code Reviewer',
+          description: 'Code Reviewer disabled: GitLab token setup required',
         }),
         'https://gitlab.com'
       );
@@ -747,7 +747,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         12345,
         expect.objectContaining({
           conclusion: 'action_required',
-          output: expect.objectContaining({ title: 'Selected model unavailable' }),
+          output: expect.objectContaining({ title: 'Code Reviewer disabled: model unavailable' }),
         }),
         'standard'
       );
@@ -789,7 +789,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         12345,
         expect.objectContaining({
           conclusion: 'action_required',
-          output: expect.objectContaining({ title: 'Selected model unavailable' }),
+          output: expect.objectContaining({ title: 'Code Reviewer disabled: model unavailable' }),
         }),
         'standard'
       );
@@ -2174,7 +2174,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           status: 'completed',
           conclusion: 'action_required',
           output: expect.objectContaining({
-            title: 'Repeated repository clone timeouts',
+            title: 'Code Reviewer disabled: clone timeouts',
             summary:
               'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
           }),
@@ -2242,7 +2242,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'abc123',
         'failed',
         expect.objectContaining({
-          description: 'Code Reviewer disabled after three repository clone timeouts today',
+          description: 'Code Reviewer disabled: three repository clone timeouts today',
         }),
         'https://gitlab.com'
       );

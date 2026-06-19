@@ -154,8 +154,10 @@ describe('kiloPassDuplicateCardCanceled template', () => {
 
 describe('codeReviewDisabled template', () => {
   test('renders neutral wording, reason, and recovery link', () => {
+    const reason =
+      'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.';
     const html = renderTemplate('codeReviewDisabled', {
-      reason: 'Repository cloning timed out for three code reviews today.',
+      reason,
       recovery_url:
         'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer',
       recovery_label: 'Contact support',
@@ -163,13 +165,14 @@ describe('codeReviewDisabled template', () => {
     });
 
     expect(html).toContain('Code Reviewer Disabled');
-    expect(html).toContain('Code Reviewer was disabled because it needs attention.');
-    expect(html).toContain('Repository cloning timed out for three code reviews today.');
+    expect(html).toContain('Code Reviewer was disabled for this reason');
+    expect(html).toContain(reason);
     expect(html).toMatch(/Resolve the issue, then enable Code\s+Reviewer again/);
     expect(html).toContain(
       'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
     );
     expect(html).toContain('Contact support');
+    expect(html).not.toContain('Code Reviewer was disabled because it needs attention.');
     expect(html).not.toContain('configuration attention');
     expect(html).not.toContain('Fix the configuration issue');
   });

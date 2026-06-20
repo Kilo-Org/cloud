@@ -281,6 +281,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
 
   let autoModel: string | null = null;
+  // Organization Auto can resolve through an intermediate route target before
+  // reaching a concrete model. Keep that target for nested free-tier rate
+  // limiting and direct-BYOK ownership validation after resolution.
   let routingTarget: string | null = null;
   let classifierCostUsd = 0;
   if (isKiloAutoModel(requestedModelLowerCased)) {

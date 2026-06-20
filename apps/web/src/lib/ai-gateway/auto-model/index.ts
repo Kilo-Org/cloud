@@ -22,7 +22,6 @@ export type AutoModel = {
   supports_images: boolean;
   supports_pdf: boolean;
   opencode_settings: OpenCodeSettings | undefined;
-  status?: 'public' | 'hidden';
 };
 
 export type ResolvedAutoModel = {
@@ -168,7 +167,6 @@ export const ORG_AUTO_MODEL: AutoModel = {
   id: 'kilo-auto/org',
   name: 'Organization Auto',
   description: "Routes requests using your organization's mode-specific model settings.",
-  status: 'hidden',
 };
 
 export const ORGANIZATION_AUTO_TARGET_MODELS = [

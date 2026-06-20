@@ -12,6 +12,7 @@ import { domainIsRestrictedFromStytchFreeCredits } from './domainIsRestrictedFro
 import { grantCreditForCategory } from './promotionalCredits';
 import PostHogClient from '@/lib/posthog';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
+import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 
 const NEXT_PUBLIC_STYTCH_PROJECT_ENV = getEnvVariable('NEXT_PUBLIC_STYTCH_PROJECT_ENV');
 const STYTCH_PROJECT_ID = getEnvVariable('STYTCH_PROJECT_ID');
@@ -160,6 +161,7 @@ export async function saveFingerprints(
       .where(and(eq(kilocode_users.id, user.id), isNull(kilocode_users.blocked_reason)))
       .returning({ id: kilocode_users.id });
     if (updateResult.length > 0) {
+      await revokeGatewayGrantsForBlockedUser(user.id);
       void reportEvents({
         events: [
           {

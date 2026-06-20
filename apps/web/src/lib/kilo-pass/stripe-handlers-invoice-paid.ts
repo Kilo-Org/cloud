@@ -60,6 +60,7 @@ import {
 import { processTopUp } from '@/lib/credits';
 import { randomUUID } from 'node:crypto';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
+import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,
@@ -828,6 +829,7 @@ export async function handleKiloPassInvoicePaid(params: {
   }
 
   if (duplicateCardEnforcement) {
+    await revokeGatewayGrantsForBlockedUser(duplicateCardEnforcement.kiloUserId);
     await enforceDuplicateCardBlock({
       enforcement: duplicateCardEnforcement,
       eventId,

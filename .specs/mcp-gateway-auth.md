@@ -292,9 +292,12 @@ when they appear in all capitals.
     refresh tokens, and OAuth-client access JWTs MUST bind the same Gateway OAuth
     grant ID.
 30. Reuse is allowed only when client, user, exact callback URI, scoped connect
-    resource, connection instance, execution context, config version, and granted
-    scopes are unchanged. A material binding change MUST revoke the old grant and
-    create a new grant ID; a revoked grant MUST NOT be reactivated.
+     resource, connection instance, execution context, config version, and granted
+     scopes are unchanged. A material binding change MUST revoke the old grant and
+     create a new grant ID; a revoked grant MUST NOT be reactivated. Adding or
+     removing `refresh_token` client grant capability is a material client metadata
+     change because it changes whether the client can extend the approved access
+     duration without another consent prompt.
 31. OAuth-client JWTs MUST contain `token_source=oauth_client`, `oauth_grant_id`,
     and the external `client_id`. Derived connect tokens MUST contain
     `token_source=derived_connect` and MUST NOT contain OAuth client grant identity.

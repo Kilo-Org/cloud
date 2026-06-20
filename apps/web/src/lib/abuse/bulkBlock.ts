@@ -3,8 +3,7 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { successResult, type CustomResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
-import { createGatewayRepository } from '@/lib/mcp-gateway/repository';
-import { createOAuthGrantService } from '@/lib/mcp-gateway/oauth-grant-service';
+import { revokeGatewayGrantsForBlockedUsers } from '@/lib/mcp-gateway/blocking-service';
 
 export type BulkBlockResponse = CustomResult<
   { updatedCount: number },
@@ -63,11 +62,7 @@ export async function bulkBlockUsers(
     .returning({ id: kilocode_users.id });
 
   if (updated.length > 0) {
-    const oauthGrantService = createOAuthGrantService(createGatewayRepository(db));
-    await oauthGrantService.revokeAllForUsers(
-      updated.map(u => u.id),
-      'user_blocked'
-    );
+    await revokeGatewayGrantsForBlockedUsers(updated.map(u => u.id));
     void reportEvents({
       events: updated.map(u => ({
         type: 'user.blocked' as const,

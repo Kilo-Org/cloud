@@ -69,8 +69,7 @@ import { assertNoError, successResult } from '@/lib/maybe-result';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
-import { createGatewayRepository } from '@/lib/mcp-gateway/repository';
-import { createOAuthGrantService } from '@/lib/mcp-gateway/oauth-grant-service';
+import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
@@ -537,8 +536,7 @@ export const adminRouter = createTRPCRouter({
         });
 
         if (didTransition && isBlocking) {
-          const oauthGrantService = createOAuthGrantService(createGatewayRepository(db));
-          await oauthGrantService.revokeAllForUser(input.userId, 'user_blocked');
+          await revokeGatewayGrantsForBlockedUser(input.userId);
         }
 
         if (didTransition) {

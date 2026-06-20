@@ -384,9 +384,12 @@ export function createAuthorizationService(params: {
       clientName: prepared.client.client_name,
       redirectUri: input.query.redirect_uri,
       resource: prepared.resolved.route.canonical_url,
+      configId: prepared.resolved.config.config_id,
+      connectResourceId: prepared.resolved.route.connect_resource_id,
       connectionName: prepared.resolved.config.name,
       endpointHost: new URL(prepared.resolved.config.remote_url).host,
       ownerScope: prepared.resolved.config.owner_scope,
+      ownerId: prepared.resolved.config.owner_id,
       contextName:
         prepared.resolved.config.owner_scope === 'organization'
           ? (organization?.name ?? 'Organization')

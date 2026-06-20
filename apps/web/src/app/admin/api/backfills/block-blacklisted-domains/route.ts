@@ -4,6 +4,7 @@ import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { and, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
 import { getBlacklistedDomains } from '@/lib/blacklist-domains-config';
+import { revokeGatewayGrantsForBlockedUsers } from '@/lib/mcp-gateway/blocking-service';
 
 /**
  * Builds a WHERE condition that matches users whose `email_domain` is on the
@@ -114,6 +115,9 @@ export async function POST(): Promise<
       .returning({ id: kilocode_users.id });
 
     totalProcessed += updated.length;
+    if (updated.length > 0) {
+      await revokeGatewayGrantsForBlockedUsers(updated.map(user => user.id));
+    }
 
     if (rows.length < BATCH_SIZE) {
       reachedEnd = true;

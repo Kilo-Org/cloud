@@ -27,23 +27,6 @@ export type GatewayOAuthClientRegistration = {
   declaredScopes: string[];
 };
 
-function normalizeRedirectUri(uri: string): string {
-  try {
-    const url = new URL(uri);
-    url.hash = '';
-    if (url.pathname !== '/' && url.pathname.endsWith('/')) {
-      url.pathname = url.pathname.replace(/\/+$/, '');
-    }
-    return url.toString();
-  } catch {
-    return uri;
-  }
-}
-
-function normalizeRedirectUris(uris: readonly string[]): string[] {
-  return [...new Set(uris.map(normalizeRedirectUri))];
-}
-
 function isAdditiveSuperset(previous: readonly string[], next: readonly string[]): boolean {
   const nextSet = new Set(next);
   return previous.every(value => nextSet.has(value));
@@ -228,17 +211,25 @@ export function createOAuthClientService(params: {
           400
         );
       }
-      const previousRedirectUris = normalizeRedirectUris(existing.redirect_uris);
-      const nextRedirectUris = normalizeRedirectUris(metadata.data.redirect_uris);
-      const redirectUrisShrank = !isAdditiveSuperset(previousRedirectUris, nextRedirectUris);
+      const redirectUrisShrank = !isAdditiveSuperset(
+        existing.redirect_uris,
+        metadata.data.redirect_uris
+      );
       const grantTypesShrank = !isAdditiveSuperset(existing.grant_types, metadata.data.grant_types);
+      const refreshTokenCapabilityChanged =
+        existing.grant_types.includes('refresh_token') !==
+        metadata.data.grant_types.includes('refresh_token');
       const responseTypesShrank = !isAdditiveSuperset(
         existing.response_types,
         metadata.data.response_types
       );
       const scopesShrank = !isAdditiveSuperset(existing.declared_scopes, declaredScopes);
       const isMaterialChange =
-        redirectUrisShrank || grantTypesShrank || responseTypesShrank || scopesShrank;
+        redirectUrisShrank ||
+        refreshTokenCapabilityChanged ||
+        grantTypesShrank ||
+        responseTypesShrank ||
+        scopesShrank;
       const [updated] = await tx
         .update(mcp_gateway_oauth_clients)
         .set({

@@ -6,6 +6,8 @@ import {
   mcp_gateway_connection_instances,
   mcp_gateway_oauth_clients,
   mcp_gateway_oauth_grants,
+  organization_memberships,
+  organizations,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerFactory, createTRPCRouter } from '@/lib/trpc/init';
@@ -108,6 +110,51 @@ describe('mcpGatewayAuthorizationsRouter', () => {
     expect(grants).toHaveLength(1);
     expect(grants[0]?.grantId).toBe(owned.grant.oauth_grant_id);
     expect(grants[0]?.connectionName).toBe('Personal MCP');
+  });
+
+  it('requires organization membership for organization-scoped listing', async () => {
+    const user = await insertTestUser({ is_admin: false });
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: 'Test Organization' })
+      .returning();
+    const owned = await seedGrant(user.id, 'organization');
+    await db
+      .update(mcp_gateway_configs)
+      .set({ owner_id: organization.id })
+      .where(eq(mcp_gateway_configs.config_id, owned.config.config_id));
+    await db
+      .update(mcp_gateway_connect_resources)
+      .set({ owner_id: organization.id })
+      .where(
+        eq(mcp_gateway_connect_resources.connect_resource_id, owned.route.connect_resource_id)
+      );
+    await db
+      .update(mcp_gateway_connection_instances)
+      .set({ owner_id: organization.id })
+      .where(eq(mcp_gateway_connection_instances.instance_id, owned.instance.instance_id));
+    await db
+      .update(mcp_gateway_oauth_grants)
+      .set({
+        owner_id: organization.id,
+        execution_context: { type: 'organization', organizationId: organization.id },
+      })
+      .where(eq(mcp_gateway_oauth_grants.oauth_grant_id, owned.grant.oauth_grant_id));
+    const caller = await createCallerForUser(user.id);
+
+    await expect(
+      caller.mcpGatewayAuthorizations.listMine({ organizationId: organization.id })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: user.id,
+      role: 'member',
+    });
+
+    await expect(
+      caller.mcpGatewayAuthorizations.listMine({ organizationId: organization.id })
+    ).resolves.toHaveLength(1);
   });
 
   it('revokes only the selected current user grant', async () => {

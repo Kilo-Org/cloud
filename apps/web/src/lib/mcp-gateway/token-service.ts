@@ -321,7 +321,8 @@ export function createTokenService(params: {
     ) {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
     }
-    const refreshToken = randomToken(32);
+    const issueRefreshToken = client.grant_types.includes('refresh_token');
+    const refreshToken = issueRefreshToken ? randomToken(32) : null;
     const [consumed] = await params.repository.database.transaction(async tx => {
       const [activeGrant] = await tx
         .select({ grantId: mcp_gateway_oauth_grants.oauth_grant_id })
@@ -354,21 +355,23 @@ export function createTokenService(params: {
         .returning();
       const consumedCode = consumedRows[0];
       if (!consumedCode) return [];
-      await tx.insert(mcp_gateway_refresh_tokens).values({
-        token_hash: hashToken(refreshToken),
-        oauth_client_id: client.oauth_client_id,
-        oauth_grant_id: oauthGrant.oauth_grant_id,
-        client_id: client.client_id,
-        owner_scope: resolved.config.owner_scope,
-        owner_id: resolved.config.owner_id,
-        config_id: resolved.config.config_id,
-        route_key: route.routeKey,
-        canonical_resource_url: params.routeService.canonicalUrl(route),
-        granted_scopes: code.granted_scopes,
-        execution_context: GatewayExecutionContextSchema.parse(code.execution_context),
-        kilo_user_id: code.kilo_user_id,
-        instance_id: instance.instance_id,
-      });
+      if (issueRefreshToken && refreshToken) {
+        await tx.insert(mcp_gateway_refresh_tokens).values({
+          token_hash: hashToken(refreshToken),
+          oauth_client_id: client.oauth_client_id,
+          oauth_grant_id: oauthGrant.oauth_grant_id,
+          client_id: client.client_id,
+          owner_scope: resolved.config.owner_scope,
+          owner_id: resolved.config.owner_id,
+          config_id: resolved.config.config_id,
+          route_key: route.routeKey,
+          canonical_resource_url: params.routeService.canonicalUrl(route),
+          granted_scopes: code.granted_scopes,
+          execution_context: GatewayExecutionContextSchema.parse(code.execution_context),
+          kilo_user_id: code.kilo_user_id,
+          instance_id: instance.instance_id,
+        });
+      }
       return [consumedCode];
     });
     if (!consumed) {
@@ -409,7 +412,7 @@ export function createTokenService(params: {
       access_token: accessToken.token,
       token_type: 'bearer',
       expires_in: params.config.accessTokenTtlSeconds,
-      refresh_token: refreshToken,
+      ...(refreshToken ? { refresh_token: refreshToken } : {}),
       scope: code.granted_scopes.join(' '),
     };
   }

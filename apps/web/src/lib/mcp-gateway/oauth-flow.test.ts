@@ -387,6 +387,7 @@ describe('MCP gateway app OAuth flow', () => {
       headers: new Headers(),
     });
     expect(refreshed.refresh_token).not.toBe(tokenResponse.refresh_token);
+    if (!refreshed.refresh_token) throw new Error('Expected refreshed token');
     const refreshedClaims = await services.tokenService.verifyUserInfoToken(refreshed.access_token);
     expect(refreshedClaims.token_source).toBe('oauth_client');
     expect(refreshedClaims.oauth_grant_id).toBe(claims.oauth_grant_id);
@@ -503,6 +504,194 @@ describe('MCP gateway app OAuth flow', () => {
       token_endpoint_auth_method: 'none',
       client_secret_hash: null,
     });
+  });
+
+  it('does not issue latent refresh tokens to code-only clients and revokes on refresh capability changes', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'Test MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        scope: 'mcp:access',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.33' }),
+    });
+    const verifier = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~';
+    const authorize = async () => {
+      const authorization = await services.authorizationService.authorize({
+        query: OAuthAuthorizationQuerySchema.parse({
+          client_id: registration.clientId,
+          redirect_uri: 'http://localhost:3000/callback',
+          response_type: 'code',
+          scope: 'mcp:access',
+          resource: created.route.canonical_url,
+          code_challenge: pkceChallenge(verifier),
+          code_challenge_method: 'S256',
+        }),
+        userId: user.id,
+        executionContext: { type: 'personal' },
+      });
+      if (authorization.kind !== 'redirect') throw new Error('Expected redirect');
+      const code = new URL(authorization.redirectUrl).searchParams.get('code');
+      if (!code) throw new Error('Expected code');
+      return code;
+    };
+
+    const firstCode = await authorize();
+    const firstTokenResponse = await services.tokenService.exchangeToken({
+      request: {
+        grant_type: 'authorization_code',
+        code: firstCode,
+        redirect_uri: 'http://localhost:3000/callback',
+        client_id: registration.clientId,
+        code_verifier: verifier,
+      },
+      headers: new Headers(),
+    });
+    expect(firstTokenResponse.refresh_token).toBeUndefined();
+    const refreshRows = await db
+      .select()
+      .from(mcp_gateway_refresh_tokens)
+      .where(eq(mcp_gateway_refresh_tokens.client_id, registration.clientId));
+    expect(refreshRows).toHaveLength(0);
+
+    const staleCode = await authorize();
+    const [activeGrant] = await db
+      .select()
+      .from(mcp_gateway_oauth_grants)
+      .where(eq(mcp_gateway_oauth_grants.kilo_user_id, user.id));
+    expect(activeGrant).toBeDefined();
+
+    await services.clientService.updateClient({
+      clientId: registration.clientId,
+      metadata: {
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'mcp:access',
+      },
+    });
+
+    const [revokedGrant] = await db
+      .select()
+      .from(mcp_gateway_oauth_grants)
+      .where(eq(mcp_gateway_oauth_grants.oauth_grant_id, activeGrant?.oauth_grant_id ?? ''));
+    expect(revokedGrant?.revocation_reason).toBe('oauth_client_metadata_changed');
+    await expect(
+      services.tokenService.exchangeToken({
+        request: {
+          grant_type: 'authorization_code',
+          code: staleCode,
+          redirect_uri: 'http://localhost:3000/callback',
+          client_id: registration.clientId,
+        },
+        headers: new Headers(),
+      })
+    ).rejects.toMatchObject({ code: 'invalid_grant' });
+
+    const freshCode = await authorize();
+    const freshTokenResponse = await services.tokenService.exchangeToken({
+      request: {
+        grant_type: 'authorization_code',
+        code: freshCode,
+        redirect_uri: 'http://localhost:3000/callback',
+        client_id: registration.clientId,
+        code_verifier: verifier,
+      },
+      headers: new Headers(),
+    });
+    expect(freshTokenResponse.refresh_token).toBeTruthy();
+  });
+
+  it('revokes grants when an exact redirect URI is removed', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'Test MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['https://client.example/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'mcp:access',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.34' }),
+    });
+    const verifier = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~';
+    const authorization = await services.authorizationService.authorize({
+      query: OAuthAuthorizationQuerySchema.parse({
+        client_id: registration.clientId,
+        redirect_uri: 'https://client.example/callback',
+        response_type: 'code',
+        scope: 'mcp:access',
+        resource: created.route.canonical_url,
+        code_challenge: pkceChallenge(verifier),
+        code_challenge_method: 'S256',
+      }),
+      userId: user.id,
+      executionContext: { type: 'personal' },
+    });
+    if (authorization.kind !== 'redirect') throw new Error('Expected redirect');
+    const code = new URL(authorization.redirectUrl).searchParams.get('code');
+    if (!code) throw new Error('Expected code');
+    const tokenResponse = await services.tokenService.exchangeToken({
+      request: {
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: 'https://client.example/callback',
+        client_id: registration.clientId,
+        code_verifier: verifier,
+      },
+      headers: new Headers(),
+    });
+    expect(tokenResponse.refresh_token).toBeTruthy();
+    if (!tokenResponse.refresh_token) throw new Error('Expected refresh token');
+    const claims = await services.tokenService.verifyUserInfoToken(tokenResponse.access_token);
+    if (claims.token_source !== 'oauth_client') throw new Error('Expected OAuth client token');
+
+    await services.clientService.updateClient({
+      clientId: registration.clientId,
+      metadata: {
+        redirect_uris: ['https://client.example/callback/'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'mcp:access',
+      },
+    });
+
+    const [revokedGrant] = await db
+      .select()
+      .from(mcp_gateway_oauth_grants)
+      .where(eq(mcp_gateway_oauth_grants.oauth_grant_id, claims.oauth_grant_id));
+    expect(revokedGrant?.revocation_reason).toBe('oauth_client_metadata_changed');
+    await expect(
+      services.tokenService.exchangeToken({
+        request: {
+          grant_type: 'refresh_token',
+          refresh_token: tokenResponse.refresh_token,
+          client_id: registration.clientId,
+        },
+        headers: new Headers(),
+      })
+    ).rejects.toMatchObject({ code: 'invalid_grant' });
   });
 
   it('does not redeem an authorization code after it expires', async () => {

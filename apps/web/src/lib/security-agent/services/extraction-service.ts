@@ -152,7 +152,16 @@ ${rawMarkdown}
 
 ---
 
-Please extract the structured analysis from the report above and call the submit_analysis_extraction tool with your findings.`;
+Please extract the structured analysis from the report above and call the submit_analysis_extraction tool with your findings. If tool calls are unavailable, return only a JSON object matching the tool parameters, without markdown or prose.`;
+}
+
+function extractJsonContent(content: string | null): string | null {
+  const trimmed = content?.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) return trimmed;
+
+  const fencedJson = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);
+  return fencedJson?.[1]?.trim() || null;
 }
 
 /**
@@ -213,6 +222,7 @@ function parseExtractionResult(
 
     return {
       isExploitable,
+      extractionStatus: 'succeeded',
       exploitabilityReasoning: parsed.exploitabilityReasoning,
       usageLocations: parsed.usageLocations.map(String),
       suggestedFix: parsed.suggestedFix,
@@ -236,6 +246,7 @@ function createFallbackExtraction(
 ): SecurityFindingSandboxAnalysis {
   return {
     isExploitable: 'unknown',
+    extractionStatus: 'failed',
     exploitabilityReasoning: `Extraction failed: ${reason}. Please review the raw analysis.`,
     usageLocations: [],
     suggestedFix: 'Review the raw analysis for fix recommendations.',
@@ -307,10 +318,7 @@ export async function extractSandboxAnalysis(options: {
             model,
             messages,
             tools: [SUBMIT_EXTRACTION_TOOL],
-            tool_choice: {
-              type: 'function',
-              function: { name: 'submit_analysis_extraction' },
-            },
+            tool_choice: 'auto',
           },
           organizationId,
           feature: 'security-agent',
@@ -394,28 +402,30 @@ export async function extractSandboxAnalysis(options: {
         }
 
         const message = choice.message;
-        const toolCall = message.tool_calls?.[0];
+        const toolCall = message.tool_calls?.find(
+          candidate =>
+            candidate.type === 'function' &&
+            candidate.function.name === 'submit_analysis_extraction'
+        );
+        const toolArguments =
+          toolCall?.type === 'function' ? toolCall.function.arguments : undefined;
+        const structuredJson =
+          toolArguments ??
+          extractJsonContent(typeof message.content === 'string' ? message.content : null);
 
-        if (!toolCall || toolCall.type !== 'function') {
-          logError('No tool call in response', { correlationId, findingId: finding.id });
-          span.setAttribute('security_agent.is_fallback', true);
-          return createFallbackExtraction(rawMarkdown, 'LLM did not call the extraction tool');
-        }
-
-        if (toolCall.function.name !== 'submit_analysis_extraction') {
-          logError('Unexpected tool call', {
+        if (!structuredJson) {
+          logError('No structured result in response', {
             correlationId,
             findingId: finding.id,
-            tool: toolCall.function.name,
           });
           span.setAttribute('security_agent.is_fallback', true);
           return createFallbackExtraction(
             rawMarkdown,
-            `Unexpected tool: ${toolCall.function.name}`
+            'LLM did not return a structured extraction result'
           );
         }
 
-        const parsed = parseExtractionResult(toolCall.function.arguments, rawMarkdown);
+        const parsed = parseExtractionResult(structuredJson, rawMarkdown);
         if (!parsed) {
           span.setAttribute('security_agent.is_fallback', true);
           return createFallbackExtraction(rawMarkdown, 'Failed to parse extraction result');

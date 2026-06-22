@@ -33,6 +33,7 @@ describe('submitManualAnalysisStart', () => {
         requestedModels: { analysisModel: 'analysis/model' },
         forceSandbox: true,
         retrySandboxOnly: true,
+        restartActive: true,
       })
     ).resolves.toEqual({
       queued: true,
@@ -55,6 +56,7 @@ describe('submitManualAnalysisStart', () => {
           requestedModels: { analysisModel: 'analysis/model' },
           forceSandbox: true,
           retrySandboxOnly: true,
+          restartActive: true,
         }),
       })
     );

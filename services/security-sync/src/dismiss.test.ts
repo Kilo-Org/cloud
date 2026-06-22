@@ -7,14 +7,42 @@ const finding = {
   source: 'dependabot',
   source_id: '42',
   repo_full_name: 'kilo/repo',
+  title: 'lodash vulnerable to prototype pollution',
+  severity: 'high',
   status: 'open',
+  package_name: 'lodash',
+  package_ecosystem: 'npm',
+  manifest_path: 'package.json',
+  patched_version: '4.17.21',
+  ghsa_id: 'GHSA-xxxx-yyyy-zzzz',
+  cve_id: 'CVE-2026-1234',
+  cwe_ids: ['CWE-1321'],
+  cvss_score: '7.5',
+  dependabot_html_url: 'https://github.com/kilo/repo/security/dependabot/42',
+  first_detected_at: '2026-05-17 08:30:00.000+00',
+  fixed_at: null,
+  sla_due_at: '2026-05-24 08:30:00.000+00',
+  session_id: null,
   owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   owned_by_user_id: null,
 };
 
-function createDb(selectedFinding = finding, options: { failAuditInsert?: boolean } = {}) {
+function createDb(
+  selectedFinding = finding,
+  options: {
+    failAuditInsert?: boolean;
+    actor?: { id: string; email: string; name: string; isAdmin: boolean };
+  } = {}
+) {
   const updates: unknown[] = [];
   const auditRows: unknown[] = [];
+  let selectCount = 0;
+  const actor = options.actor ?? {
+    id: 'user-123',
+    email: 'owner@example.com',
+    name: 'Owner Example',
+    isAdmin: false,
+  };
   function createOperations(targetUpdates: unknown[], targetAuditRows: unknown[]) {
     return {
       update: () => ({
@@ -25,12 +53,17 @@ function createDb(selectedFinding = finding, options: { failAuditInsert?: boolea
         }),
       }),
       insert: () => ({
-        values: async (values: unknown) => {
-          if (options.failAuditInsert) {
-            throw new Error('audit insert failed');
-          }
-          targetAuditRows.push(values);
-        },
+        values: (values: unknown) => ({
+          onConflictDoNothing: () => ({
+            returning: async () => {
+              if (options.failAuditInsert) {
+                throw new Error('audit insert failed');
+              }
+              targetAuditRows.push(values);
+              return [{ id: 'audit-row-1' }];
+            },
+          }),
+        }),
       }),
     };
   }
@@ -38,7 +71,7 @@ function createDb(selectedFinding = finding, options: { failAuditInsert?: boolea
     select: () => ({
       from: () => ({
         where: () => ({
-          limit: async () => [selectedFinding],
+          limit: async () => [selectCount++ === 0 ? selectedFinding : actor],
         }),
       }),
     }),
@@ -65,7 +98,7 @@ function createMessage(): SecurityDismissMessage {
     messageId: 'dismiss-message-123',
     dispatchedAt: '2026-05-18T08:30:00.000Z',
     owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-    actor: { id: 'user-123', email: 'owner@example.com', name: 'Owner Example' },
+    actor: { id: 'user-123' },
     findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
     installationId: 'installation-123',
     reason: 'not_used',
@@ -102,9 +135,48 @@ describe('processSecurityFindingDismissal', () => {
     });
     expect(auditRows[0]).toMatchObject({
       actor_id: 'user-123',
+      actor_type: 'customer_user',
       action: 'security.finding.dismissed',
       resource_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-      after_state: { status: 'ignored', ignoredReason: 'not_used' },
+      finding_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      event_key:
+        'security_finding_audit:v1:organization%3Aaaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb:security.finding.dismissed:dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      schema_version: 1,
+      source_context: 'security_sync',
+      after_state: { status: 'ignored', reason_code: 'not_used' },
+      metadata: {
+        source: 'dependabot',
+        reason_code: 'not_used',
+        source_writeback_outcome: 'dismissed',
+      },
+      finding_snapshot: {
+        status: 'ignored',
+        first_detected_at: '2026-05-17T08:30:00.000Z',
+      },
+    });
+  });
+
+  it('classifies the actor from authoritative user state at event-write time', async () => {
+    const { db, auditRows } = createDb(finding, {
+      actor: {
+        id: 'user-123',
+        email: 'customer-domain@example.com',
+        name: 'Kilo Operator',
+        isAdmin: true,
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+
+    await processSecurityFindingDismissal({
+      db,
+      gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+      message: createMessage(),
+    });
+
+    expect(auditRows[0]).toMatchObject({
+      actor_id: 'user-123',
+      actor_email: 'customer-domain@example.com',
+      actor_type: 'kilo_admin',
     });
   });
 

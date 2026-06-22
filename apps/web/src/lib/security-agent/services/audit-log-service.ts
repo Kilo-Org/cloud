@@ -13,15 +13,27 @@ import { db } from '@/lib/drizzle';
 import { SecurityAuditLogAction } from '../core/enums';
 import type { SecurityReviewOwner } from '../core/types';
 import { captureException } from '@sentry/nextjs';
+import { REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS } from '@kilocode/worker-utils/security-finding-audit';
 
 export { SecurityAuditLogAction };
+
+type ReportableSecurityFindingAuditAction =
+  (typeof REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS)[number];
+type NonReportableSecurityAuditLogAction = Exclude<
+  SecurityAuditLogAction,
+  ReportableSecurityFindingAuditAction
+>;
+
+const reportableSecurityFindingAuditActions = new Set<string>(
+  REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS
+);
 
 type CreateSecurityAuditLogParams = {
   owner: SecurityReviewOwner;
   actor_id: string | null;
   actor_email: string | null;
   actor_name: string | null;
-  action: SecurityAuditLogAction;
+  action: NonReportableSecurityAuditLogAction;
   resource_type: string;
   resource_id: string;
   before_state?: Record<string, unknown>;
@@ -33,6 +45,10 @@ type CreateSecurityAuditLogParams = {
 export async function createSecurityAuditLog(
   params: CreateSecurityAuditLogParams
 ): Promise<SecurityAuditLogEntry> {
+  if (reportableSecurityFindingAuditActions.has(params.action)) {
+    throw new Error('Reportable Security Finding activity requires canonical audit writer');
+  }
+
   const {
     owner,
     actor_id,

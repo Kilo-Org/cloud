@@ -446,11 +446,7 @@ describe('manual dismissal dispatch', () => {
         body: JSON.stringify({
           schemaVersion: 1,
           owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-          actor: {
-            id: 'user-123',
-            email: 'owner@example.com',
-            name: 'Owner Example',
-          },
+          actor: { id: 'user-123' },
           findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
           installationId: 'installation-123',
           reason: 'not_used',
@@ -473,7 +469,7 @@ describe('manual dismissal dispatch', () => {
     expect(queuedBatches[0]?.[0]?.body).toMatchObject({
       kind: 'dismiss',
       owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-      actor: { id: 'user-123', email: 'owner@example.com', name: 'Owner Example' },
+      actor: { id: 'user-123' },
       findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       installationId: 'installation-123',
       reason: 'not_used',
@@ -494,11 +490,7 @@ describe('manual dismissal dispatch', () => {
         body: JSON.stringify({
           schemaVersion: 1,
           owner: { userId: legacyUserId },
-          actor: {
-            id: legacyUserId,
-            email: 'owner@example.com',
-            name: 'Owner Example',
-          },
+          actor: { id: legacyUserId },
           findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
           installationId: 'installation-123',
           reason: 'not_used',
@@ -520,7 +512,7 @@ describe('manual dismissal dispatch', () => {
     expect(queuedBatches[0]?.[0]?.body).toMatchObject({
       kind: 'dismiss',
       owner: { userId: legacyUserId },
-      actor: { id: legacyUserId, email: 'owner@example.com', name: 'Owner Example' },
+      actor: { id: legacyUserId },
     });
   });
 
@@ -691,7 +683,7 @@ describe('manual dismissal dispatch', () => {
               messageId: 'dismiss-message-123',
               dispatchedAt: '2026-05-18T08:30:00.000Z',
               owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-              actor: { id: 'user-123', email: 'owner@example.com', name: 'Owner Example' },
+              actor: { id: 'user-123' },
               findingId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
               installationId: 'installation-123',
               reason: 'not_used',

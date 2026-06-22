@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { SecurityFindingAnalysisInput } from '@kilocode/db/schema-types';
 
 export const AUTO_ANALYSIS_OWNER_CAP = 2;
 export const SECURITY_ANALYSIS_OWNER_CAP = 3;
@@ -115,6 +116,7 @@ export type SecurityFindingTriage = {
 
 export type SecurityFindingSandboxAnalysis = {
   isExploitable: boolean | 'unknown';
+  extractionStatus?: 'succeeded' | 'failed';
   exploitabilityReasoning: string;
   usageLocations: string[];
   suggestedFix: string;
@@ -128,6 +130,7 @@ export type SecurityFindingSandboxAnalysis = {
 export type SecurityFindingAnalysis = {
   triage?: SecurityFindingTriage;
   sandboxAnalysis?: SecurityFindingSandboxAnalysis;
+  findingDataSnapshot?: SecurityFindingAnalysisInput;
   rawMarkdown?: string;
   analyzedAt: string;
   modelUsed?: string;

@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import type { BrowserContext, Locator } from '@playwright/test';
+import type { BrowserContext, Locator, Page } from '@playwright/test';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -29,6 +29,9 @@ const getToolResultHtmlLength = (body: unknown): string => {
 
 const chatCompletionStreamResponse = (events: unknown[]): string =>
   `${events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
+
+const longEvalIdentifier = `kilo${'VeryLongIdentifier'.repeat(16)}`;
+const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.outerHTML.length; return ${longEvalIdentifier};`;
 
 export const mockKiloApi = async (context: BrowserContext): Promise<void> => {
   let chatCompletionCalls = 0;
@@ -85,7 +88,7 @@ export const mockKiloApi = async (context: BrowserContext): Promise<void> => {
                   tool_calls: [
                     {
                       function: {
-                        arguments: '{"code":"return document.documentElement.outerHTML.length;"}',
+                        arguments: JSON.stringify({ code: evalFixtureCode }),
                         name: 'eval',
                       },
                       id: 'call_eval_1',
@@ -141,6 +144,36 @@ export const readSidePanelScrollState = (): {
     messagePaneScrollHeight: conversation.scrollHeight,
     renderedConversationItems: conversation.querySelectorAll(':scope > div > *').length,
   };
+};
+
+export const readEvalCodeBlockOverflowState = (): {
+  codeBlockClientWidth: number;
+  codeBlockOverflowX: string;
+  codeBlockScrollWidth: number;
+} => {
+  const codeLabel = [...document.querySelectorAll('p')].find(
+    element => element.textContent === 'Code'
+  );
+  const codeBlock = codeLabel?.parentElement?.querySelector('pre');
+
+  if (!(codeBlock instanceof HTMLElement)) {
+    throw new Error('Eval code block was not found.');
+  }
+
+  return {
+    codeBlockClientWidth: codeBlock.clientWidth,
+    codeBlockOverflowX: getComputedStyle(codeBlock).overflowX,
+    codeBlockScrollWidth: codeBlock.scrollWidth,
+  };
+};
+
+export const expectEvalCodeBlockNoHorizontalOverflow = async (sidePanel: Page): Promise<void> => {
+  const codeBlockOverflowState = await sidePanel.evaluate(readEvalCodeBlockOverflowState);
+
+  expect(codeBlockOverflowState.codeBlockScrollWidth).toBeLessThanOrEqual(
+    codeBlockOverflowState.codeBlockClientWidth
+  );
+  expect(codeBlockOverflowState.codeBlockOverflowX).toBe('hidden');
 };
 
 export const sendOverflowMessages = async (messageInput: Locator, count: number): Promise<void> => {

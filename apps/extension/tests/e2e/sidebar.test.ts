@@ -5,7 +5,12 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import type { BrowserContext, Page } from '@playwright/test';
-import { mockKiloApi, readSidePanelScrollState, sendOverflowMessages } from './kilo-api-fixture';
+import {
+  expectEvalCodeBlockNoHorizontalOverflow,
+  mockKiloApi,
+  readSidePanelScrollState,
+  sendOverflowMessages,
+} from './kilo-api-fixture';
 
 const extensionPath = resolvePath(import.meta.dirname, '../../.output/chrome-mv3');
 
@@ -248,6 +253,7 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
     await expect(sidePanel.getByText(/The selected tab HTML length is [0-9]+\./u)).toBeVisible();
     await sidePanel.getByText('eval completed').click();
     await expect(sidePanel.getByText('Code')).toBeVisible();
+    await expectEvalCodeBlockNoHorizontalOverflow(sidePanel);
 
     await sidePanel.getByLabel('New conversation').click();
     await expect(sidePanel.getByText('eval completed')).toBeHidden();

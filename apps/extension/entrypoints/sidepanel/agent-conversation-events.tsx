@@ -66,7 +66,7 @@ const ToolExchangeEvent = ({
     <div className="mt-2 grid gap-2">
       <div>
         <p className="text-[11px] font-medium text-red-200/80">Code</p>
-        <pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-red-100/90">
+        <pre className="mt-1 max-h-28 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-red-100/90">
           {item.toolCall.code}
         </pre>
       </div>
@@ -74,7 +74,7 @@ const ToolExchangeEvent = ({
         <p className="text-[11px] font-medium text-zinc-300">
           {item.result.ok ? 'Result' : 'Error'}
         </p>
-        <pre className="mt-1 max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400">
+        <pre className="mt-1 max-h-28 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400">
           {item.result.ok ? formatToolValue(item.result.value) : item.result.error}
         </pre>
       </div>
@@ -100,7 +100,7 @@ const StandaloneToolEvent = ({
   return (
     <div className="rounded-md border border-zinc-800 bg-zinc-900/70 px-3 py-2">
       <p className="text-xs font-semibold text-zinc-300">{title}</p>
-      <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400">
+      <pre className="mt-2 max-h-28 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400">
         {body}
       </pre>
     </div>

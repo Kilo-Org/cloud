@@ -17,14 +17,17 @@ describe('generateTrpcOpenApiDocument', () => {
     expect(document.paths).not.toHaveProperty('/api/trpc/admin');
   });
 
-  it('omits auth metadata so Swagger UI cannot offer token entry', () => {
+  it('documents bearer auth metadata for protected procedures', () => {
     const document = generateTrpcOpenApiDocument();
 
-    expect(document).not.toHaveProperty('components.securitySchemes');
+    expect(document.components.securitySchemes.bearerAuth).toEqual({
+      type: 'http',
+      scheme: 'bearer',
+    });
 
     for (const pathItem of Object.values(document.paths)) {
       for (const operation of Object.values(pathItem)) {
-        expect(operation).not.toHaveProperty('security');
+        expect(operation).toHaveProperty('security', [{ bearerAuth: [] }]);
       }
     }
   });

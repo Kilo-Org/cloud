@@ -14,6 +14,14 @@ type OpenApiDocument = {
   };
   servers: { url: string }[];
   tags: { name: string }[];
+  components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http';
+        scheme: 'bearer';
+      };
+    };
+  };
   paths: Record<string, Record<string, unknown>>;
 };
 
@@ -79,6 +87,7 @@ function operationForProcedure(procedure: TrpcOpenApiProcedure) {
     tags: procedure.tags,
     summary: procedure.summary,
     description: procedure.description,
+    security: [{ bearerAuth: [] }],
     requestBody: {
       required: true,
       content: {
@@ -125,6 +134,14 @@ export function generateTrpcOpenApiDocument(): OpenApiDocument {
     },
     servers: [{ url: '/' }],
     tags: [...tagNames].sort().map(name => ({ name })),
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+        },
+      },
+    },
     paths,
   };
 }

@@ -9,6 +9,8 @@ import type { FetchLike } from '@/src/shared/auth';
 import { fetchKiloGatewayChatCompletionStream } from '@/src/shared/kilo-api-client';
 import { executeEvalToolCall } from './agent-eval-runtime';
 
+type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+
 interface RunDangerousLlmTurnOptions {
   readonly apiBaseUrl: string;
   readonly appendEvents: (events: AgentConversationEvent[]) => void;
@@ -39,6 +41,7 @@ const isAbortError = (error: unknown): boolean =>
   error instanceof Error && error.name === 'AbortError';
 
 const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
+const maxEvalRounds = 4;
 
 export const runDangerousLlmTurn = async ({
   apiBaseUrl,
@@ -68,18 +71,23 @@ export const runDangerousLlmTurn = async ({
       tools: [evalToolDefinition],
     });
 
-  try {
-    const firstCompletionEvents: AgentConversationEvent[] = [];
+  const appendCompletion = async (
+    nextEvents: AgentConversationEvent[]
+  ): Promise<{
+    completionEvents: AgentConversationEvent[];
+    toolCallEvents: EvalToolCallEvent[];
+  }> => {
+    const completionEvents: AgentConversationEvent[] = [];
     let streamedText = '';
     let streamedAssistantEventId: string | undefined = undefined;
-    const firstCompletion = await getGatewayChatCompletion(conversationEvents, delta => {
+    const completion = await getGatewayChatCompletion(nextEvents, delta => {
       streamedText += delta;
 
       if (streamedAssistantEventId === undefined) {
         const assistantEvent = createAssistantMessageEvent(streamedText);
 
         streamedAssistantEventId = assistantEvent.id;
-        firstCompletionEvents.push(assistantEvent);
+        completionEvents.push(assistantEvent);
         appendEvents([assistantEvent]);
         return;
       }
@@ -88,13 +96,13 @@ export const runDangerousLlmTurn = async ({
     });
 
     if (streamedAssistantEventId !== undefined) {
-      const finalStreamedText = firstCompletion.content ?? streamedText;
-      const streamedAssistantEventIndex = firstCompletionEvents.findIndex(
+      const finalStreamedText = completion.content ?? streamedText;
+      const streamedAssistantEventIndex = completionEvents.findIndex(
         event => event.id === streamedAssistantEventId
       );
 
       if (streamedAssistantEventIndex !== -1) {
-        firstCompletionEvents.splice(streamedAssistantEventIndex, 1, {
+        completionEvents.splice(streamedAssistantEventIndex, 1, {
           id: streamedAssistantEventId,
           role: 'assistant',
           text: finalStreamedText,
@@ -103,77 +111,73 @@ export const runDangerousLlmTurn = async ({
       }
     }
 
-    if (firstCompletion.content !== undefined && streamedAssistantEventId === undefined) {
-      firstCompletionEvents.push(createAssistantMessage(firstCompletion.content));
+    if (completion.content !== undefined && streamedAssistantEventId === undefined) {
+      completionEvents.push(createAssistantMessage(completion.content));
     }
 
-    const toolCallEvents = firstCompletion.toolCalls.map(evalToolCall =>
+    const toolCallEvents = completion.toolCalls.map(evalToolCall =>
       createEvalToolCall({
         code: evalToolCall.code,
         providerToolCallId: evalToolCall.id,
         tabId: selectedTabId,
       })
     );
-    firstCompletionEvents.push(...toolCallEvents);
+    completionEvents.push(...toolCallEvents);
 
-    if (firstCompletionEvents.length === 0) {
-      appendEvents([createAssistantMessage('The model did not return a response.')]);
-      return;
-    }
+    appendEvents(completionEvents.filter(event => event.id !== streamedAssistantEventId));
 
-    appendEvents(firstCompletionEvents.filter(event => event.id !== streamedAssistantEventId));
+    return { completionEvents, toolCallEvents };
+  };
 
-    if (toolCallEvents.length === 0) {
-      return;
-    }
-
-    if (isSignalAborted(signal)) {
-      appendEvents([createAssistantMessage('Stopped.')]);
-      return;
-    }
-
-    const toolResultEvents: AgentConversationEvent[] = await runEvalToolCalls(
-      toolCallEvents,
-      executeEvalToolCall
-    );
-
-    if (isSignalAborted(signal)) {
-      appendEvents([createAssistantMessage('Stopped.')]);
-      return;
-    }
-
-    const conversationWithToolResult = [
-      ...conversationEvents,
-      ...firstCompletionEvents,
-      ...toolResultEvents,
-    ];
-
-    appendEvents(toolResultEvents);
-
-    let finalText = '';
-    let finalAssistantEventId: string | undefined = undefined;
-    const finalCompletion = await getGatewayChatCompletion(conversationWithToolResult, delta => {
-      finalText += delta;
-
-      if (finalAssistantEventId === undefined) {
-        const assistantEvent = createAssistantMessageEvent(finalText);
-
-        finalAssistantEventId = assistantEvent.id;
-        appendEvents([assistantEvent]);
+  try {
+    const continueConversation = async (
+      nextConversationEvents: AgentConversationEvent[],
+      remainingRounds: number
+    ): Promise<void> => {
+      if (remainingRounds === 0) {
+        appendEvents([
+          createAssistantMessage(
+            'The model requested too many eval rounds. Send another message to continue.'
+          ),
+        ]);
         return;
       }
 
-      updateAssistantMessage(finalAssistantEventId, finalText);
-    });
+      const { completionEvents, toolCallEvents } = await appendCompletion(nextConversationEvents);
 
-    if (finalAssistantEventId === undefined) {
-      appendEvents([
-        createAssistantMessage(
-          finalCompletion.content ??
-            'The model requested another eval after this tool result. Send another message to continue.'
-        ),
-      ]);
-    }
+      if (completionEvents.length === 0) {
+        appendEvents([createAssistantMessage('The model did not return a response.')]);
+        return;
+      }
+
+      nextConversationEvents.push(...completionEvents);
+
+      if (toolCallEvents.length === 0) {
+        return;
+      }
+
+      if (isSignalAborted(signal)) {
+        appendEvents([createAssistantMessage('Stopped.')]);
+        return;
+      }
+
+      const toolResultEvents: AgentConversationEvent[] = await runEvalToolCalls(
+        toolCallEvents,
+        executeEvalToolCall
+      );
+
+      if (isSignalAborted(signal)) {
+        appendEvents([createAssistantMessage('Stopped.')]);
+        return;
+      }
+
+      appendEvents(toolResultEvents);
+      nextConversationEvents.push(...toolResultEvents);
+
+      await continueConversation(nextConversationEvents, remainingRounds - 1);
+    };
+
+    await continueConversation([...conversationEvents], maxEvalRounds);
   } catch (error) {
     if (isAbortError(error)) {
       appendEvents([createAssistantMessage('Stopped.')]);

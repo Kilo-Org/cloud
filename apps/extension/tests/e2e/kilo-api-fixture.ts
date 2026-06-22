@@ -37,8 +37,11 @@ export const mockKiloApi = async (
   context: BrowserContext,
   options: {
     beforeFirstCompletion?: () => Promise<void>;
+    firstCompletionEvents?: unknown[];
     organizations?: { id: string; name: string }[];
+    secondCompletionEvents?: unknown[];
     seenChatOrganizationIds?: string[];
+    thirdCompletionEvents?: unknown[];
   } = {}
 ): Promise<void> => {
   let chatCompletionCalls = 0;
@@ -100,29 +103,47 @@ export const mockKiloApi = async (
       }
 
       return route.fulfill({
-        body: chatCompletionStreamResponse([
-          { choices: [{ delta: { content: 'I will ' } }] },
-          { choices: [{ delta: { content: 'inspect the selected tab.' } }] },
-          {
-            choices: [
-              {
-                delta: {
-                  tool_calls: [
-                    {
-                      function: {
-                        arguments: JSON.stringify({ code: evalFixtureCode }),
-                        name: 'eval',
+        body: chatCompletionStreamResponse(
+          options.firstCompletionEvents ?? [
+            { choices: [{ delta: { content: 'I will ' } }] },
+            { choices: [{ delta: { content: 'inspect the selected tab.' } }] },
+            {
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        function: {
+                          arguments: JSON.stringify({ code: evalFixtureCode }),
+                          name: 'eval',
+                        },
+                        id: 'call_eval_1',
+                        index: 0,
+                        type: 'function',
                       },
-                      id: 'call_eval_1',
-                      index: 0,
-                      type: 'function',
-                    },
-                  ],
+                    ],
+                  },
                 },
-              },
-            ],
-          },
-        ]),
+              ],
+            },
+          ]
+        ),
+        contentType: 'text/event-stream',
+        status: 200,
+      });
+    }
+
+    if (chatCompletionCalls === 2 && options.secondCompletionEvents !== undefined) {
+      return route.fulfill({
+        body: chatCompletionStreamResponse(options.secondCompletionEvents),
+        contentType: 'text/event-stream',
+        status: 200,
+      });
+    }
+
+    if (chatCompletionCalls === 3 && options.thirdCompletionEvents !== undefined) {
+      return route.fulfill({
+        body: chatCompletionStreamResponse(options.thirdCompletionEvents),
         contentType: 'text/event-stream',
         status: 200,
       });

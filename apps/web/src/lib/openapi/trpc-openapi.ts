@@ -29,6 +29,28 @@ function zodToJsonSchema(schema: z.ZodType): JsonSchema {
   return z.toJSONSchema(schema, { target: 'draft-7' }) as JsonSchema;
 }
 
+function pathForProcedure(procedure: TrpcOpenApiProcedure): `/api/trpc/${string}` {
+  return `/api/trpc/${procedure.procedurePath}`;
+}
+
+function successResponseSchema(data: JsonSchema): JsonSchema {
+  return {
+    type: 'object',
+    properties: {
+      result: {
+        type: 'object',
+        properties: {
+          data,
+        },
+        required: ['data'],
+        additionalProperties: true,
+      },
+    },
+    required: ['result'],
+    additionalProperties: true,
+  };
+}
+
 function errorResponse(description: string) {
   return {
     description,
@@ -79,7 +101,7 @@ function operationForProcedure(procedure: TrpcOpenApiProcedure) {
         description: 'Successful tRPC response',
         content: {
           'application/json': {
-            schema: zodToJsonSchema(procedure.output),
+            schema: successResponseSchema(zodToJsonSchema(procedure.output)),
           },
         },
       },
@@ -97,8 +119,9 @@ export function generateTrpcOpenApiDocument(): OpenApiDocument {
 
   for (const procedure of publicTrpcOpenApiProcedures) {
     for (const tag of procedure.tags) tagNames.add(tag);
-    paths[procedure.path] = {
-      ...paths[procedure.path],
+    const path = pathForProcedure(procedure);
+    paths[path] = {
+      ...paths[path],
       [procedure.method]: operationForProcedure(procedure),
     };
   }

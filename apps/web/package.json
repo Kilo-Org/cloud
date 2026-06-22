@@ -162,6 +162,7 @@
     "sonner": "2.0.7",
     "stripe": "catalog:",
     "stytch": "12.43.1",
+    "swagger-ui-dist": "5.32.6",
     "tailwind-merge": "3.5.0",
     "tldts": "7.0.30",
     "ulid": "catalog:",

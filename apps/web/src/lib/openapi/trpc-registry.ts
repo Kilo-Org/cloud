@@ -13,7 +13,6 @@ import {
 export type TrpcOpenApiProcedure = {
   procedurePath: string;
   method: 'post';
-  path: `/api/trpc/${string}`;
   tags: string[];
   summary: string;
   description?: string;
@@ -26,7 +25,6 @@ export const publicTrpcOpenApiProcedures = [
   {
     procedurePath: 'usageAnalytics.getSummary',
     method: 'post',
-    path: '/api/trpc/usageAnalytics.getSummary',
     tags: ['Usage Analytics'],
     summary: 'Get aggregate usage metrics',
     description:
@@ -38,7 +36,6 @@ export const publicTrpcOpenApiProcedures = [
   {
     procedurePath: 'usageAnalytics.getTimeseries',
     method: 'post',
-    path: '/api/trpc/usageAnalytics.getTimeseries',
     tags: ['Usage Analytics'],
     summary: 'Get usage over time',
     description:
@@ -50,7 +47,6 @@ export const publicTrpcOpenApiProcedures = [
   {
     procedurePath: 'usageAnalytics.getBreakdown',
     method: 'post',
-    path: '/api/trpc/usageAnalytics.getBreakdown',
     tags: ['Usage Analytics'],
     summary: 'Get usage breakdown',
     description: 'Returns top usage values grouped by a selected dimension.',
@@ -61,7 +57,6 @@ export const publicTrpcOpenApiProcedures = [
   {
     procedurePath: 'usageAnalytics.getTable',
     method: 'post',
-    path: '/api/trpc/usageAnalytics.getTable',
     tags: ['Usage Analytics'],
     summary: 'Get tabular usage analytics',
     description: 'Returns usage analytics rows grouped by up to three dimensions.',

@@ -135,3 +135,4 @@ allowBuilds:
   openclaw: false
   '@openrouter/sdk': false
   tree-sitter-bash: false
+  '@scarf/scarf': false

@@ -1,5 +1,11 @@
 import { generateTrpcOpenApiDocument } from '@/lib/openapi/trpc-openapi';
 
+const openApiDocument = generateTrpcOpenApiDocument();
+
 export function GET() {
-  return Response.json(generateTrpcOpenApiDocument());
+  return Response.json(openApiDocument, {
+    headers: {
+      'cache-control': 'public, max-age=3600',
+    },
+  });
 }

@@ -7,7 +7,7 @@ describe('generateTrpcOpenApiDocument', () => {
     const document = generateTrpcOpenApiDocument();
 
     expect(Object.keys(document.paths).sort()).toEqual(
-      publicTrpcOpenApiProcedures.map(procedure => procedure.path).sort()
+      publicTrpcOpenApiProcedures.map(procedure => `/api/trpc/${procedure.procedurePath}`).sort()
     );
     expect(document.paths['/api/trpc/usageAnalytics.getTable']?.post).toMatchObject({
       operationId: 'usageAnalytics_getTable',
@@ -46,10 +46,22 @@ describe('generateTrpcOpenApiDocument', () => {
             'application/json': {
               schema: {
                 type: 'object',
-                required: ['rows', 'effectiveGranularity'],
+                required: ['result'],
                 properties: {
-                  rows: { type: 'array' },
-                  effectiveGranularity: { enum: ['hour', 'day', 'week', 'month'] },
+                  result: {
+                    type: 'object',
+                    required: ['data'],
+                    properties: {
+                      data: {
+                        type: 'object',
+                        required: ['rows', 'effectiveGranularity'],
+                        properties: {
+                          rows: { type: 'array' },
+                          effectiveGranularity: { enum: ['hour', 'day', 'week', 'month'] },
+                        },
+                      },
+                    },
+                  },
                 },
               },
             },

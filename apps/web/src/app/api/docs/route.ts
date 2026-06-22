@@ -1,11 +1,14 @@
-const swaggerUiHtml = `<!doctype html>
+import { randomBytes } from 'node:crypto';
+
+function swaggerUiHtml(nonce: string) {
+  return `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Kilo Code API Docs</title>
-    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.32.7/swagger-ui.css" />
-    <style>
+    <link rel="stylesheet" href="/api/docs/swagger-ui.css" />
+    <style nonce="${nonce}">
       :root {
         color-scheme: dark;
         --kilo-background: #171717;
@@ -71,22 +74,39 @@ const swaggerUiHtml = `<!doctype html>
       <a class="kilo-docs-link" href="/api/openapi.json">Open JSON</a>
     </header>
     <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@5.32.7/swagger-ui-bundle.js"></script>
-    <script>
+    <script src="/api/docs/swagger-ui-bundle.js"></script>
+    <script nonce="${nonce}">
       window.ui = SwaggerUIBundle({
         url: '/api/openapi.json',
         dom_id: '#swagger-ui',
         deepLinking: true,
-        persistAuthorization: true,
+        persistAuthorization: false,
         tryItOutEnabled: true,
       });
     </script>
   </body>
 </html>`;
+}
+
+function contentSecurityPolicy(nonce: string) {
+  return [
+    "default-src 'none'",
+    "base-uri 'none'",
+    "connect-src 'self'",
+    "font-src 'self'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data:",
+    `script-src 'self' 'nonce-${nonce}'`,
+    `style-src 'self' 'nonce-${nonce}'`,
+  ].join('; ');
+}
 
 export function GET() {
-  return new Response(swaggerUiHtml, {
+  const nonce = randomBytes(16).toString('base64');
+
+  return new Response(swaggerUiHtml(nonce), {
     headers: {
+      'content-security-policy': contentSecurityPolicy(nonce),
       'content-type': 'text/html; charset=utf-8',
     },
   });

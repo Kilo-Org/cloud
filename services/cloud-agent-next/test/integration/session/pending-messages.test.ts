@@ -21,6 +21,7 @@ import {
   putSessionMessageState,
 } from '../../../src/session/session-message-state.js';
 import {
+  groupedRegisterSessionInput,
   queueRegisteredInitialInput,
   queueUserMessageInput,
   registerReadySession,
@@ -625,7 +626,11 @@ describe('pending session messages', () => {
       };
       instance['physicalWrapperObserver'] = async () => {
         authorizationInspections += 1;
-        return { status: 'inspection-failed', error: 'provider unavailable' };
+        return {
+          status: 'inspection-failed',
+          error: 'Wrapper process discovery timed out',
+          reason: 'wrapper_discovery_list_processes_timeout',
+        };
       };
       await registerReadySession(instance, {
         sessionId,
@@ -667,6 +672,9 @@ describe('pending session messages', () => {
       'Sandbox connection failed during wrapper discovery'
     );
     expect(result.pending[0]?.lastFlushFailureCode).toBe('SANDBOX_CONNECT_FAILED');
+    expect(result.pending[0]?.lastSandboxConnectFailureReason).toBe(
+      'wrapper_discovery_list_processes_timeout'
+    );
     expect(result.pending[0]?.nextFlushAttemptAt).toBeGreaterThanOrEqual(
       result.attemptStartedAt + 5_000
     );
@@ -682,6 +690,144 @@ describe('pending session messages', () => {
       reason: 'observation-failed',
       attempts: 0,
     });
+  });
+
+  it('terminalizes isolated discovery retry exhaustion without shared route reporting', async () => {
+    const userId = 'user_pending_discovery_recovery';
+    const sessionId = 'agent_pending_discovery_recovery';
+    const messageId = 'msg_018f1e2d3c4bDiscRecoverAbC';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const sharedFailoverRouteKeys: string[] = [];
+      instance['sharedSandboxFailoverRecorder'] = async routeKey => {
+        sharedFailoverRouteKeys.push(routeKey);
+      };
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: '48484848-4848-4848-8848-484848484848',
+        prompt: 'prepared prompt',
+        mode: 'code',
+        model: 'test-model',
+        kilocodeToken: 'token-discovery-recovery',
+        sandboxId: 'ses-123456789abc',
+      });
+      const now = Date.now();
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'stopping',
+        nextInstanceGeneration: 2,
+        target: { kind: 'session' },
+        reason: 'observation-failed',
+        requestedAt: now - 1_000,
+        attemptId: 'attempt_discovery_recovery',
+        attemptStartedAt: now - 500,
+        attemptDeadlineAt: now + 60_000,
+        attempts: 1,
+      });
+      await storePendingSessionMessage(
+        instance.ctx.storage,
+        createMessage({
+          messageId,
+          content: 'recover exhausted discovery',
+          createdAt: 1,
+          flushAttempts: 1,
+          nextFlushAttemptAt: now - 1,
+          lastFlushError: 'Sandbox connection failed during wrapper discovery',
+          lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
+          lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
+        })
+      );
+
+      await instance.alarm();
+      return {
+        sharedFailoverRouteKeys,
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+      };
+    });
+
+    expect(result.sharedFailoverRouteKeys).toEqual([]);
+    expect(result.pending).toHaveLength(0);
+  });
+
+  it('records one-way failover when the base shared sandbox exhausts discovery retries', async () => {
+    const userId = 'user_pending_shared_rotation';
+    const sessionId = 'agent_pending_shared_rotation';
+    const messageId = 'msg_018f1e2d3c4bSharedRouteAbC';
+    const sandboxId = 'usr-000000000000000000000000000000000000000000000000' as const;
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const failoverRouteKeys: string[] = [];
+      instance['sharedSandboxFailoverRecorder'] = async routeKey => {
+        failoverRouteKeys.push(routeKey);
+      };
+      const registration = await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          kiloSessionId: '58585858-5858-4858-8858-585858585858',
+          prompt: 'prepared prompt',
+          mode: 'code',
+          model: 'test-model',
+          kilocodeToken: 'token-shared-rotation',
+        }),
+        workspace: {
+          sandboxId,
+          sandboxRoute: {
+            kind: 'shared',
+            routeKey: sandboxId,
+          },
+        },
+      });
+      expect(registration.success).toBe(true);
+      const ready = await instance.recordSessionReady({
+        workspacePath: `/workspace/${userId}/sessions/${sessionId}`,
+        sandboxId,
+        sessionHome: `/home/${sessionId}`,
+        branchName: `session/${sessionId}`,
+        kiloSessionId: '58585858-5858-4858-8858-585858585858',
+      });
+      expect(ready.success).toBe(true);
+      const now = Date.now();
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'stopping',
+        nextInstanceGeneration: 2,
+        target: { kind: 'session' },
+        reason: 'observation-failed',
+        requestedAt: now - 1_000,
+        attemptId: 'attempt_shared_rotation',
+        attemptStartedAt: now - 500,
+        attemptDeadlineAt: now + 60_000,
+        attempts: 1,
+      });
+      await storePendingSessionMessage(
+        instance.ctx.storage,
+        createMessage({
+          messageId,
+          content: 'rotate exhausted shared sandbox',
+          createdAt: 1,
+          flushAttempts: 1,
+          nextFlushAttemptAt: now - 1,
+          lastFlushError: 'Sandbox connection failed during wrapper discovery',
+          lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
+          lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
+        })
+      );
+
+      await instance.alarm();
+      return {
+        failoverRouteKeys,
+        pending: await listPendingSessionMessages(instance.ctx.storage),
+      };
+    });
+
+    expect(result.failoverRouteKeys).toEqual([sandboxId]);
+    expect(result.pending).toHaveLength(0);
   });
 
   it('exhausts failed flush retries, emits cloud.message.failed, and removes the pending message', async () => {

@@ -336,6 +336,7 @@ describe('router sessionId validation', () => {
                 })),
               } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
               USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+              SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
               SESSION_INGEST: {
                 fetch: vi.fn(),
               } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -724,6 +725,7 @@ describe('router sessionId validation', () => {
               get: vi.fn(() => mockSessionStub),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+            SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -833,6 +835,7 @@ describe('router sessionId validation', () => {
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+            SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -1135,6 +1138,7 @@ describe('router sessionId validation', () => {
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+            SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -1385,6 +1389,7 @@ describe('router sessionId validation', () => {
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+            SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],

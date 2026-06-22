@@ -8,6 +8,10 @@ import type {
 
 export type SandboxDeleteReason = 'explicit' | 'retention-expired' | 'recovery';
 
+export const WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON =
+  'wrapper_discovery_list_processes_timeout';
+export type WrapperInspectionFailureReason = typeof WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON;
+
 export type WrapperInstanceLease = {
   instanceId: string;
   instanceGeneration: number;
@@ -24,7 +28,11 @@ export type ObservedWrapper = {
 export type WrapperObservation =
   | { status: 'absent' }
   | { status: 'present'; observed: ObservedWrapper[] }
-  | { status: 'inspection-failed'; error: string };
+  | {
+      status: 'inspection-failed';
+      error: string;
+      reason?: WrapperInspectionFailureReason;
+    };
 
 export type WrapperStopTarget =
   | { kind: 'instance'; instance: WrapperInstanceLease }

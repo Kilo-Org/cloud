@@ -509,6 +509,36 @@ describe('recordPendingFlushFailure', () => {
     }
   );
 
+  it('clears discovery timeout provenance when an unrelated retry failure exhausts', async () => {
+    const storage = createMemoryStorage();
+    let message = makeMessage();
+    await storePendingSessionMessage(storage, message);
+
+    const retry = await recordPendingFlushFailure(
+      storage,
+      message,
+      'Sandbox connection failed during wrapper discovery',
+      100_000,
+      {
+        policy: 'warm-followup',
+        code: 'SANDBOX_CONNECT_FAILED',
+        sandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
+      }
+    );
+    message = retry.message;
+    const exhausted = await recordPendingFlushFailure(
+      storage,
+      message,
+      'unrelated transport failure',
+      102_000,
+      { policy: 'warm-followup', code: 'UNKNOWN' }
+    );
+
+    expect(exhausted.exhausted).toBe(true);
+    expect(exhausted.message.lastFlushFailureCode).toBe('SANDBOX_CONNECT_FAILED');
+    expect(exhausted.message.lastSandboxConnectFailureReason).toBeUndefined();
+  });
+
   it('replaces the failure code and error together for a newer specific cause', async () => {
     const storage = createMemoryStorage();
     const message = makeMessage({

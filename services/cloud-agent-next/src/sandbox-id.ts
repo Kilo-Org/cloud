@@ -3,6 +3,32 @@ import type { Sandbox } from '@cloudflare/sandbox';
 
 const SHARED_SANDBOX_ID_VERSION = 'shared-v2';
 
+type SharedSandboxPrefix = 'org' | 'usr' | 'bot' | 'ubt';
+
+export type SharedSandboxRoutingTarget = {
+  kind: 'shared';
+  routeKey: SandboxId;
+};
+
+export type SandboxRoutingTarget =
+  | SharedSandboxRoutingTarget
+  | {
+      kind: 'isolated';
+      sandboxId: SandboxId;
+    };
+
+export function isGeneratedSharedSandboxId(sandboxId: string): sandboxId is SandboxId {
+  return /^(org|usr|bot|ubt)-[0-9a-f]{48}$/.test(sandboxId);
+}
+
+function getSharedSandboxPrefix(sandboxId: SandboxId): SharedSandboxPrefix {
+  if (sandboxId.startsWith('org-')) return 'org';
+  if (sandboxId.startsWith('usr-')) return 'usr';
+  if (sandboxId.startsWith('bot-')) return 'bot';
+  if (sandboxId.startsWith('ubt-')) return 'ubt';
+  throw new Error('Cannot derive a shared sandbox ID from an isolated sandbox');
+}
+
 /**
  * Parses a comma-separated org ID list into a set.
  * Returns an empty set when the value is falsy or blank.
@@ -37,6 +63,16 @@ async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId
   return `${prefix}-${hashHex.substring(0, 48)}` as SandboxId;
 }
 
+export async function deriveSharedSandboxId(
+  routeKey: SandboxId,
+  suffix: string
+): Promise<SandboxId> {
+  if (!isGeneratedSharedSandboxId(routeKey)) {
+    throw new Error('Shared sandbox route key must be a generated shared sandbox ID');
+  }
+  return hashToSandboxId(`${suffix}:${routeKey}`, getSharedSandboxPrefix(routeKey));
+}
+
 /**
  * Generate a deterministic, Cloudflare-compatible sandboxId (≤63 chars).
  *
@@ -52,6 +88,35 @@ async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId
  * @param botId    - Bot ID (optional)
  * @returns Deterministic sandboxId string (52 characters)
  */
+export async function generateSandboxRoutingTarget(
+  perSessionOrgIds: string | undefined,
+  orgId: string | undefined,
+  userId: string,
+  sessionId: string,
+  botId?: string,
+  devcontainer?: boolean
+): Promise<SandboxRoutingTarget> {
+  const perSessionOrgs = parseOrgIdList(perSessionOrgIds);
+  if (devcontainer) {
+    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'dind') };
+  }
+  if (perSessionOrgs.has('*') || (orgId !== undefined && perSessionOrgs.has(orgId))) {
+    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
+  }
+
+  const sandboxOrgSegment = orgId ?? `user:${userId}`;
+  const originalFormat = botId
+    ? `${sandboxOrgSegment}__${userId}__bot:${botId}`
+    : `${sandboxOrgSegment}__${userId}`;
+  const prefix: SharedSandboxPrefix = botId ? (orgId ? 'bot' : 'ubt') : orgId ? 'org' : 'usr';
+  const routeKey = await hashToSandboxId(`${SHARED_SANDBOX_ID_VERSION}:${originalFormat}`, prefix);
+
+  return {
+    kind: 'shared',
+    routeKey,
+  };
+}
+
 export async function generateSandboxId(
   perSessionOrgIds: string | undefined,
   orgId: string | undefined,
@@ -60,26 +125,13 @@ export async function generateSandboxId(
   botId?: string,
   devcontainer?: boolean
 ): Promise<SandboxId> {
-  const perSessionOrgs = parseOrgIdList(perSessionOrgIds);
-  if (devcontainer) {
-    return hashToSandboxId(sessionId, 'dind');
-  }
-  if (perSessionOrgs.has('*') || (orgId !== undefined && perSessionOrgs.has(orgId))) {
-    return hashToSandboxId(sessionId, 'ses');
-  }
-
-  // Shared sandbox: derive from org/user/bot
-  const sandboxOrgSegment = orgId ?? `user:${userId}`;
-  const originalFormat = botId
-    ? `${sandboxOrgSegment}__${userId}__bot:${botId}`
-    : `${sandboxOrgSegment}__${userId}`;
-
-  let prefix: string;
-  if (botId) {
-    prefix = orgId ? 'bot' : 'ubt';
-  } else {
-    prefix = orgId ? 'org' : 'usr';
-  }
-
-  return hashToSandboxId(`${SHARED_SANDBOX_ID_VERSION}:${originalFormat}`, prefix);
+  const target = await generateSandboxRoutingTarget(
+    perSessionOrgIds,
+    orgId,
+    userId,
+    sessionId,
+    botId,
+    devcontainer
+  );
+  return target.kind === 'shared' ? target.routeKey : target.sandboxId;
 }

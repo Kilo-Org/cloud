@@ -223,7 +223,9 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         await dependencies.requestAlarmAtOrBefore?.(now);
         if (observation.status === 'inspection-failed') {
           throw ExecutionError.sandboxConnectFailed(
-            'Sandbox connection failed during wrapper discovery'
+            'Sandbox connection failed during wrapper discovery',
+            undefined,
+            observation.reason
           );
         }
         throw cleanupBlockedError(cleanupLease);
@@ -252,7 +254,9 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       await dependencies.requestAlarmAtOrBefore?.(now);
       if (observation.status === 'inspection-failed') {
         throw ExecutionError.sandboxConnectFailed(
-          'Sandbox connection failed during wrapper discovery'
+          'Sandbox connection failed during wrapper discovery',
+          undefined,
+          observation.reason
         );
       }
       throw cleanupBlockedError(cleanupLease);

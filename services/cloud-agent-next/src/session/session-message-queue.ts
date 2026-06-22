@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON } from '../agent-sandbox/protocol.js';
 import type {
   ExecutionDeliveryContext,
   AdmitAcceptedSessionMessageRequest,
@@ -28,6 +29,7 @@ import {
   deletePendingSessionMessageByMessageId,
   checkPendingSessionMessageCapacity,
   recordPendingFlushFailure,
+  recordPendingSharedSandboxFailoverPublishFailure,
   resolvePendingSessionMessageIntent,
   shouldSkipPendingFlush,
   storePendingSessionMessage,
@@ -52,6 +54,7 @@ import type { QueuedMessageSnapshot } from '../websocket/stream.js';
 import { buildCloudMessageFailedPayload } from './message-settlement-outbox.js';
 
 export const PENDING_FLUSH_DEBOUNCE_MS = 1_000;
+const SHARED_SANDBOX_FAILOVER_RETRY_DELAYS_MS = [2_000, 4_000, 8_000] as const;
 
 export type SessionMessageQueueStorage = SessionQueueStorage & SessionMessageStorage;
 
@@ -147,13 +150,20 @@ export type SessionMessageQueueDependencies = {
     options?: QueueTerminalizationOptions
   ) => Promise<{
     changed: boolean;
-    state: { status: 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted' } | null;
+    state: Pick<
+      SessionMessageState,
+      'status' | 'completionSource' | 'failureCode' | 'failureReason' | 'attempts'
+    > | null;
   }>;
   repairTerminalMessageEffects: (messageId: string) => Promise<void>;
   finalizeTerminalCallbackEffects: (options?: {
     allowWithoutObservedIdle?: boolean;
   }) => Promise<void>;
   requestAlarmAtOrBefore: (deadline: number) => Promise<void>;
+  onWrapperDiscoveryRetriesExhausted?: (params: {
+    messageId: string;
+    attempts: number;
+  }) => Promise<void>;
   getSessionIdForLogs: () => string | undefined;
 };
 
@@ -326,6 +336,16 @@ export async function flushNextPendingSessionMessage(params: {
     await deletePendingSessionMessageByMessageId(params.storage, message.messageId);
     return { type: 'delivered', remainingCount: Math.max(0, totalCount - 1) };
   }
+  if (message.deliveryDisposition === 'terminalization-pending') {
+    return {
+      type: 'failure',
+      message,
+      attempts: message.flushAttempts ?? 0,
+      exhausted: true,
+      remainingCount: totalCount,
+    };
+  }
+
   if (
     existingState?.status === 'completed' ||
     existingState?.status === 'failed' ||
@@ -339,16 +359,6 @@ export async function flushNextPendingSessionMessage(params: {
     return {
       type: 'skipped',
       nextFlushAttemptAt: message.nextFlushAttemptAt,
-      remainingCount: totalCount,
-    };
-  }
-
-  if (message.deliveryDisposition === 'terminalization-pending') {
-    return {
-      type: 'failure',
-      message,
-      attempts: message.flushAttempts ?? 0,
-      exhausted: true,
       remainingCount: totalCount,
     };
   }
@@ -406,7 +416,11 @@ export async function flushNextPendingSessionMessage(params: {
         message,
         message.lastFlushError ?? 'Sandbox connection failed',
         params.now,
-        { policy, code: 'SANDBOX_CONNECT_FAILED' }
+        {
+          policy,
+          code: 'SANDBOX_CONNECT_FAILED',
+          sandboxConnectFailureReason: message.lastSandboxConnectFailureReason,
+        }
       );
       return toFailureResult(failure, totalCount);
     }
@@ -452,7 +466,11 @@ export async function flushNextPendingSessionMessage(params: {
           message,
           message.lastFlushError ?? 'Sandbox connection failed',
           Date.now(),
-          { policy, code: 'SANDBOX_CONNECT_FAILED' }
+          {
+            policy,
+            code: 'SANDBOX_CONNECT_FAILED',
+            sandboxConnectFailureReason: message.lastSandboxConnectFailureReason,
+          }
         );
         return toFailureResult(failure, totalCount);
       }
@@ -478,6 +496,9 @@ export async function flushNextPendingSessionMessage(params: {
         code: code ?? 'UNKNOWN',
         subtype: isExecutionError(error) ? error.workspaceFailureSubtype : undefined,
         safeFailureMessage: isExecutionError(error) ? error.safeFailureMessage : undefined,
+        sandboxConnectFailureReason: isExecutionError(error)
+          ? error.sandboxConnectFailureReason
+          : undefined,
         retryable: isExecutionError(error) ? error.retryable : undefined,
       }
     );
@@ -536,6 +557,7 @@ export function createSessionMessageQueue(
     repairTerminalMessageEffects,
     finalizeTerminalCallbackEffects,
     requestAlarmAtOrBefore,
+    onWrapperDiscoveryRetriesExhausted,
     getSessionIdForLogs,
   } = dependencies;
 
@@ -953,7 +975,7 @@ export function createSessionMessageQueue(
       .warn('Failed to flush pending session message');
     if (flushResult.exhausted) {
       const failure = classifyDeliveryFailure(flushResult.message.lastFlushFailureCode);
-      await persistTerminalTransition(
+      const terminalTransition = await persistTerminalTransition(
         flushResult.message.messageId,
         {
           kind: 'failed',
@@ -967,6 +989,58 @@ export function createSessionMessageQueue(
         },
         { allowIdleBatchWithoutObservedIdle: true }
       );
+      const ownsExhaustedDeliveryFailure =
+        terminalTransition.changed ||
+        (terminalTransition.state?.status === 'failed' &&
+          terminalTransition.state.completionSource === 'delivery_failure' &&
+          terminalTransition.state.failureCode === failure.failureCode &&
+          terminalTransition.state.failureReason === 'exhausted' &&
+          terminalTransition.state.attempts === flushResult.attempts);
+      if (
+        ownsExhaustedDeliveryFailure &&
+        onWrapperDiscoveryRetriesExhausted &&
+        flushResult.message.lastFlushFailureCode === 'SANDBOX_CONNECT_FAILED' &&
+        flushResult.message.lastSandboxConnectFailureReason ===
+          WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON
+      ) {
+        try {
+          await onWrapperDiscoveryRetriesExhausted({
+            messageId: flushResult.message.messageId,
+            attempts: flushResult.attempts,
+          });
+        } catch (error) {
+          const publishAttempts = await recordPendingSharedSandboxFailoverPublishFailure(
+            storage,
+            flushResult.message
+          );
+          const retryDelay = SHARED_SANDBOX_FAILOVER_RETRY_DELAYS_MS[publishAttempts - 1];
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (retryDelay !== undefined) {
+            const retryAt = Date.now() + retryDelay;
+            logger
+              .withFields({
+                sessionId: getSessionIdForLogs(),
+                messageId: flushResult.message.messageId,
+                publishAttempts,
+                retryAt,
+                error: errorMessage,
+              })
+              .warn('Shared sandbox failover publication failed; retry scheduled');
+            return {
+              retryAt,
+              remainingPendingCount: flushResult.remainingCount,
+            };
+          }
+          logger
+            .withFields({
+              sessionId: getSessionIdForLogs(),
+              messageId: flushResult.message.messageId,
+              publishAttempts,
+              error: errorMessage,
+            })
+            .error('Shared sandbox failover publication retries exhausted');
+        }
+      }
       try {
         await deletePendingSessionMessageByMessageId(storage, flushResult.message.messageId);
       } catch (error) {

@@ -712,6 +712,7 @@ describe('AgentRuntime', () => {
         name: 'ExecutionError',
         code: 'SANDBOX_CONNECT_FAILED',
         retryable: true,
+        sandboxConnectFailureReason: undefined,
       });
     } finally {
       clock.mockRestore();
@@ -724,6 +725,30 @@ describe('AgentRuntime', () => {
       reason: 'observation-failed',
     });
     await expect(getWrapperRuntimeState(storage)).resolves.not.toHaveProperty('wrapperRunId');
+  });
+
+  it('preserves a list-processes timeout through pre-dispatch failure classification', async () => {
+    const storage = createMemoryStorage();
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({ execute: vi.fn() }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      discoverSessionWrappers: vi.fn().mockResolvedValue({
+        status: 'inspection-failed',
+        error: 'Wrapper process discovery timed out',
+        reason: 'wrapper_discovery_list_processes_timeout',
+      }),
+    });
+
+    await expect(runtime.send(createPlan())).rejects.toMatchObject({
+      name: 'ExecutionError',
+      code: 'SANDBOX_CONNECT_FAILED',
+      retryable: true,
+      sandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
+    });
   });
 
   it('blocks cold launch when an unexpected physical wrapper is present', async () => {

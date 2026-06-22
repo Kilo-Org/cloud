@@ -81,7 +81,8 @@ import type {
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import type { Env as WorkerEnv, SandboxId } from '../types.js';
-import { generateSandboxId } from '../sandbox-id.js';
+import { deriveSharedSandboxId, generateSandboxId } from '../sandbox-id.js';
+import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
 
 import { validateStreamTicket } from '../auth.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
@@ -236,7 +237,7 @@ type GroupedRegisterSessionInput = {
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
     NonNullable<SessionMetadata['workspace']>,
-    'sandboxId' | 'shallow' | 'devcontainerRequested'
+    'sandboxId' | 'sandboxRoute' | 'shallow' | 'devcontainerRequested'
   >;
 };
 
@@ -266,11 +267,35 @@ function isSameAcceptedInitialTurn(
   );
 }
 
+async function validateSharedSandboxRouteAssignment(
+  input: GroupedRegisterSessionInput
+): Promise<string | null> {
+  const route = input.workspace?.sandboxRoute;
+  if (!route) return null;
+  try {
+    const expectedSandboxId = route.suffix
+      ? await deriveSharedSandboxId(route.routeKey, route.suffix)
+      : route.routeKey;
+    return input.workspace?.sandboxId === expectedSandboxId
+      ? null
+      : 'Shared sandbox assignment does not match its route suffix';
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
 function isSameInitialAdmissionConfiguration(
   metadata: SessionMetadata,
   input: CreateSessionWithInitialAdmissionInput
 ): boolean {
   return (
+    metadata.identity.sessionId === input.identity.sessionId &&
+    metadata.identity.userId === input.identity.userId &&
+    metadata.identity.orgId === input.identity.orgId &&
+    metadata.identity.botId === input.identity.botId &&
+    metadata.workspace?.sandboxId === input.workspace?.sandboxId &&
+    JSON.stringify(metadata.workspace?.sandboxRoute) ===
+      JSON.stringify(input.workspace?.sandboxRoute) &&
     metadata.agent?.mode === input.agent.mode &&
     metadata.agent.model === input.agent.model &&
     metadata.agent.variant === input.agent.variant &&
@@ -295,6 +320,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     attemptId: string;
     reason: WrapperStopReason;
   }) => Promise<StopWrappersResult>;
+  private sharedSandboxFailoverRecorder?: (routeKey: SandboxId) => Promise<void>;
   private agentRuntime?: AgentRuntime;
   private messageSettlementOutbox?: MessageSettlementOutbox;
   private sessionMessageQueue?: SessionMessageQueue;
@@ -645,6 +671,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         finalizeTerminalCallbackEffects: options =>
           this.getMessageSettlementOutbox().finalizeIdleBatchCallbackIfReady(options),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
+        onWrapperDiscoveryRetriesExhausted: async ({ messageId }) => {
+          const context = await this.getPendingMessageDeliveryContext();
+          if (!context) return;
+          const route = context.metadata.workspace?.sandboxRoute;
+          if (route?.kind !== 'shared' || route.suffix) return;
+
+          if (this.sharedSandboxFailoverRecorder) {
+            await this.sharedSandboxFailoverRecorder(route.routeKey);
+          } else {
+            await recordSharedSandboxFailover(this.env.SHARED_SANDBOX_OVERRIDES, route.routeKey);
+          }
+          logger
+            .withFields({
+              routeKey: route.routeKey,
+              sessionId: context.sessionId,
+              messageId,
+              logTag: 'shared_sandbox_failover_recorded',
+            })
+            .warn('Recorded one-way shared sandbox failover');
+        },
         getSessionIdForLogs: () => this.sessionId,
       });
     }
@@ -1604,6 +1650,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const existing = await this.ctx.storage.get('metadata');
     if (existing) {
       return { success: false, error: 'Session already registered' };
+    }
+    const routeAssignmentError = await validateSharedSandboxRouteAssignment(input);
+    if (routeAssignmentError) {
+      return { success: false, error: `Invalid metadata: ${routeAssignmentError}` };
     }
 
     const now = Date.now();

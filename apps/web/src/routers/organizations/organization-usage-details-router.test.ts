@@ -3,7 +3,12 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { insertUsageWithOverrides } from '@/tests/helpers/microdollar-usage.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { db, pool } from '@/lib/drizzle';
-import { microdollar_usage, organizations, platform_integrations } from '@kilocode/db/schema';
+import {
+  microdollar_usage,
+  organizations,
+  organization_recommendation_dismissals,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 
@@ -58,6 +63,11 @@ describe('organizations usage details trpc router', () => {
       db
         .delete(platform_integrations)
         .where(eq(platform_integrations.owned_by_organization_id, testOrganization.id)),
+      db
+        .delete(organization_recommendation_dismissals)
+        .where(
+          eq(organization_recommendation_dismissals.owned_by_organization_id, testOrganization.id)
+        ),
     ]);
   });
 
@@ -122,6 +132,79 @@ describe('organizations usage details trpc router', () => {
 
       await expect(
         caller.organizations.usageDetails.getFeatureAdoption({
+          organizationId: testOrganization.id,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+  });
+
+  describe('recommendations procedures', () => {
+    it('returns recommendations to an Enterprise member', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getRecommendations({
+        organizationId: testOrganization.id,
+      });
+
+      // A freshly created org has no SSO configured, so at least that fires.
+      expect(result.recommendations.map(r => r.key)).toContain('org-sso-not-configured');
+    });
+
+    it('hides a recommendation after an owner dismisses it', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      const owner = await createCallerForUser(regularUser.id);
+
+      await owner.organizations.usageDetails.dismissRecommendation({
+        organizationId: testOrganization.id,
+        recommendationKey: 'org-sso-not-configured',
+      });
+
+      const afterDismiss = await owner.organizations.usageDetails.getRecommendations({
+        organizationId: testOrganization.id,
+      });
+      expect(afterDismiss.recommendations.map(r => r.key)).not.toContain('org-sso-not-configured');
+
+      await owner.organizations.usageDetails.restoreRecommendation({
+        organizationId: testOrganization.id,
+        recommendationKey: 'org-sso-not-configured',
+      });
+      const afterRestore = await owner.organizations.usageDetails.getRecommendations({
+        organizationId: testOrganization.id,
+      });
+      expect(afterRestore.recommendations.map(r => r.key)).toContain('org-sso-not-configured');
+    });
+
+    it('rejects dismissal from a non-owner member', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      const member = await createCallerForUser(memberUser.id);
+
+      await expect(
+        member.organizations.usageDetails.dismissRecommendation({
+          organizationId: testOrganization.id,
+          recommendationKey: 'org-sso-not-configured',
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('rejects recommendations for a Teams organization', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'teams' })
+        .where(eq(organizations.id, testOrganization.id));
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.usageDetails.getRecommendations({
           organizationId: testOrganization.id,
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });

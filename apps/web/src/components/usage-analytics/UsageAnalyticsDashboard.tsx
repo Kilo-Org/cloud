@@ -56,6 +56,7 @@ import { formatDollarsFromMicrodollars, humanize } from './format';
 import { exportUsageTableToCsv } from './csvExport';
 import { AIAdoptionSummaryCard } from './AIAdoptionSummaryCard';
 import { FeatureAdoptionView } from './FeatureAdoptionView';
+import { RecommendationsView } from './RecommendationsView';
 import { UsageViewNavigation } from './UsageViewNavigation';
 
 type UsageAnalyticsDashboardProps = {
@@ -599,7 +600,13 @@ export function UsageAnalyticsDashboard({
                 </div>
               </>
             ) : hasEnterpriseUsageViews && organizationId && usageView === 'feature-adoption' ? (
-              <FeatureAdoptionView organizationId={organizationId} />
+              <div className="space-y-6">
+                <FeatureAdoptionView organizationId={organizationId} />
+                <RecommendationsView
+                  organizationId={organizationId}
+                  canDismiss={callerRole === 'owner'}
+                />
+              </div>
             ) : (
               <>
                 <UsageWarning />

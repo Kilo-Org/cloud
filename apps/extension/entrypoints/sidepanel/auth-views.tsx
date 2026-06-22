@@ -187,6 +187,6 @@ export const SignedInView = ({
   onSignOut: () => void;
 }): JSX.Element => (
   <Shell auth={auth} onSignOut={onSignOut}>
-    <AgentChatPanel />
+    <AgentChatPanel auth={auth} />
   </Shell>
 );

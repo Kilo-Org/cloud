@@ -1,152 +1,43 @@
-import { useMemo, useState } from 'react';
-import type { ChangeEvent, JSX, ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { ChangeEvent, JSX } from 'react';
 import {
   getDefaultAgentPanelState,
   getFooterControlDisplay,
 } from '@/src/shared/agent-chat-placeholder';
-import type { AgentChatMessage, AgentPanelFooterState } from '@/src/shared/agent-chat-placeholder';
+import type { AgentChatMessage } from '@/src/shared/agent-chat-placeholder';
+import { getKiloApiBaseUrl } from '@/src/shared/auth';
+import type { StoredAuth } from '@/src/shared/auth';
+import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
+import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
+import { AgentFooterControls } from './agent-footer-controls';
 
-const modeOptions = [
-  { label: 'Safe', value: 'safe' },
-  { label: 'Dangerous', value: 'dangerous' },
-] as const;
-
-const modelOptions = ['Claude Sonnet 4', 'Claude Opus 4', 'GPT-5'] as const;
 const effortOptions = ['low', 'medium', 'high'] as const;
+const defaultThinkingOption = 'default';
+const fallbackDefaultModelId = 'Claude Sonnet 4';
+const apiBaseUrl = getKiloApiBaseUrl();
+const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
+  fetch(input, init);
 
-const isThinkingEffort = (value: string): value is AgentPanelFooterState['thinkingEffort'] =>
-  value === 'low' || value === 'medium' || value === 'high';
-
-const ModeIcon = ({
-  className,
-  icon,
-  tone,
-}: {
-  className: string;
-  icon: ReturnType<typeof getFooterControlDisplay>['modeIcon'];
-  tone: ReturnType<typeof getFooterControlDisplay>['modeIconTone'];
-}): JSX.Element => {
-  const toneClassName = tone === 'safe' ? 'text-[#EDFF00]' : 'text-red-400';
-
-  return (
-    <svg
-      aria-hidden="true"
-      className={`${className} ${toneClassName}`}
-      fill="none"
-      viewBox="0 0 16 16"
-    >
-      {icon === 'shield' ? (
-        <path
-          d="M8 1.75 13 3.5v3.65c0 3.1-1.9 5.55-5 7.1-3.1-1.55-5-4-5-7.1V3.5l5-1.75Z"
-          stroke="currentColor"
-          strokeLinejoin="round"
-          strokeWidth="1.5"
-        />
-      ) : (
-        <path
-          d="M8 2.25 14.25 13H1.75L8 2.25Zm0 3.5v3.5m0 2.25h.01"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.5"
-        />
-      )}
-    </svg>
-  );
-};
-
-const CompactSelectControl = ({
-  ariaLabel,
-  children,
-  className,
-  onChange,
-  value,
-}: {
-  ariaLabel: string;
-  children: ReactNode;
-  className: string;
-  onChange: (value: string) => void;
-  value: string;
-}): JSX.Element => (
-  <select
-    aria-label={ariaLabel}
-    className={`h-8 min-w-0 rounded-md border border-zinc-800 bg-zinc-950 text-xs font-medium text-zinc-200 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30 ${className}`}
-    onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-      onChange(event.currentTarget.value);
-    }}
-    value={value}
-  >
-    {children}
-  </select>
-);
-
-const ModeControl = ({
-  mode,
-  onChange,
-}: {
-  mode: 'dangerous' | 'safe';
-  onChange: (mode: 'dangerous' | 'safe') => void;
-}): JSX.Element => {
-  const display = getFooterControlDisplay({ mode, model: '', thinkingEffort: 'medium' });
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="relative shrink-0">
-      <button
-        aria-expanded={isOpen}
-        aria-label={`${display.modeLabel} mode: ${display.modeDescription}`}
-        className="flex h-8 w-10 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
-        onClick={() => {
-          setIsOpen(current => !current);
-        }}
-        title={`${display.modeLabel} mode: ${display.modeDescription}`}
-        type="button"
-      >
-        <ModeIcon className="size-3.5" icon={display.modeIcon} tone={display.modeIconTone} />
-      </button>
-
-      {isOpen ? (
-        <div className="absolute bottom-10 left-0 z-10 grid w-56 gap-1 rounded-md border border-zinc-800 bg-zinc-950 p-1">
-          {modeOptions.map(option => {
-            const optionDisplay = getFooterControlDisplay({
-              mode: option.value,
-              model: '',
-              thinkingEffort: 'medium',
-            });
-
-            return (
-              <button
-                className={
-                  option.value === mode
-                    ? 'flex items-start gap-2 rounded-sm bg-zinc-900 px-2 py-2 text-left text-zinc-100'
-                    : 'flex items-start gap-2 rounded-sm px-2 py-2 text-left text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-1 focus:ring-offset-zinc-950'
-                }
-                key={option.value}
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                type="button"
-              >
-                <ModeIcon
-                  className="mt-0.5 size-3.5 shrink-0"
-                  icon={optionDisplay.modeIcon}
-                  tone={optionDisplay.modeIconTone}
-                />
-                <span className="grid gap-0.5">
-                  <span className="text-xs font-medium">{option.label}</span>
-                  <span className="text-[11px] leading-4 text-zinc-500">
-                    {optionDisplay.modeDescription}
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
-    </div>
-  );
-};
+const fallbackModelOptions: KiloGatewayModelOption[] = [
+  {
+    id: fallbackDefaultModelId,
+    isPreferred: true,
+    name: 'Claude Sonnet 4',
+    variants: [...effortOptions],
+  },
+  {
+    id: 'Claude Opus 4',
+    isPreferred: true,
+    name: 'Claude Opus 4',
+    variants: [...effortOptions],
+  },
+  {
+    id: 'GPT-5',
+    isPreferred: true,
+    name: 'GPT-5',
+    variants: [...effortOptions],
+  },
+];
 
 const Message = ({ message }: { message: AgentChatMessage }): JSX.Element => {
   const isUser = message.role === 'user';
@@ -166,13 +57,80 @@ const Message = ({ message }: { message: AgentChatMessage }): JSX.Element => {
   );
 };
 
-export const AgentChatPanel = (): JSX.Element => {
+export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
   const initialState = useMemo(() => getDefaultAgentPanelState(), []);
   const [draft, setDraft] = useState(initialState.draft);
   const [mode, setMode] = useState(initialState.footer.mode);
   const [model, setModel] = useState(initialState.footer.model);
+  const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>(fallbackModelOptions);
   const [thinkingEffort, setThinkingEffort] = useState(initialState.footer.thinkingEffort);
-  const footerDisplay = getFooterControlDisplay({ mode, model, thinkingEffort });
+  const selectedModel = useMemo(
+    () => modelOptions.find(option => option.id === model),
+    [model, modelOptions]
+  );
+  const thinkingOptions = useMemo(
+    () =>
+      selectedModel === undefined || selectedModel.variants.length === 0
+        ? [defaultThinkingOption]
+        : selectedModel.variants,
+    [selectedModel]
+  );
+  const footerDisplay = getFooterControlDisplay({
+    mode,
+    model: selectedModel?.name ?? model,
+    thinkingEffort,
+  });
+  const isThinkingSelectDisabled =
+    selectedModel !== undefined && selectedModel.variants.length === 0;
+
+  useEffect(() => {
+    const abort = new AbortController();
+
+    void (async (): Promise<void> => {
+      try {
+        const models = await fetchKiloGatewayModels({
+          apiBaseUrl,
+          fetch: fetchFromWindow,
+          signal: abort.signal,
+          token: auth.token,
+        });
+
+        if (!abort.signal.aborted && models.length > 0) {
+          setModelOptions(models);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+
+        setModelOptions(fallbackModelOptions);
+      }
+    })();
+
+    return () => {
+      abort.abort();
+    };
+  }, [auth.token]);
+
+  useEffect(() => {
+    if (modelOptions.length === 0) {
+      return;
+    }
+
+    if (!modelOptions.some(option => option.id === model)) {
+      setModel(modelOptions[0]?.id ?? fallbackDefaultModelId);
+    }
+  }, [model, modelOptions]);
+
+  useEffect(() => {
+    if (thinkingOptions.length === 0) {
+      return;
+    }
+
+    if (!thinkingOptions.includes(thinkingEffort)) {
+      setThinkingEffort(thinkingOptions[0] ?? defaultThinkingOption);
+    }
+  }, [thinkingEffort, thinkingOptions]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -215,49 +173,17 @@ export const AgentChatPanel = (): JSX.Element => {
       </form>
 
       <footer className="border-t border-zinc-900 bg-zinc-950 px-4 py-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <ModeControl mode={mode} onChange={setMode} />
-          <CompactSelectControl
-            ariaLabel="Model"
-            className="flex-1 pl-2 pr-6"
-            onChange={setModel}
-            value={model}
-          >
-            {modelOptions.map(option => (
-              <option key={option} value={option}>
-                {
-                  getFooterControlDisplay({
-                    mode,
-                    model: option,
-                    thinkingEffort,
-                  }).modelLabel
-                }
-              </option>
-            ))}
-          </CompactSelectControl>
-          <CompactSelectControl
-            ariaLabel="Thinking effort"
-            className="w-20 pl-2 pr-6"
-            onChange={value => {
-              if (isThinkingEffort(value)) {
-                setThinkingEffort(value);
-              }
-            }}
-            value={thinkingEffort}
-          >
-            {effortOptions.map(option => (
-              <option key={option} value={option}>
-                {
-                  getFooterControlDisplay({
-                    mode,
-                    model,
-                    thinkingEffort: option,
-                  }).thinkingLabel
-                }
-              </option>
-            ))}
-          </CompactSelectControl>
-        </div>
+        <AgentFooterControls
+          isThinkingSelectDisabled={isThinkingSelectDisabled}
+          mode={mode}
+          model={model}
+          modelOptions={modelOptions}
+          onModeChange={setMode}
+          onModelChange={setModel}
+          onThinkingEffortChange={setThinkingEffort}
+          thinkingEffort={thinkingEffort}
+          thinkingOptions={thinkingOptions}
+        />
         <p className="sr-only">
           Mode {footerDisplay.modeLabel}: {footerDisplay.modeDescription}, model{' '}
           {footerDisplay.modelLabel}, thinking {footerDisplay.thinkingLabel}

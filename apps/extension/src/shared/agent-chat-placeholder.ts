@@ -1,3 +1,5 @@
+import { thinkingEffortLabel } from './kilo-api-client';
+
 export interface AgentChatMessage {
   readonly body: string;
   readonly role: 'agent' | 'user';
@@ -6,7 +8,7 @@ export interface AgentChatMessage {
 export interface AgentPanelFooterState {
   readonly mode: 'dangerous' | 'safe';
   readonly model: string;
-  readonly thinkingEffort: 'high' | 'low' | 'medium';
+  readonly thinkingEffort: string;
 }
 
 export interface AgentPanelState {
@@ -21,27 +23,13 @@ export interface AgentFooterControlDisplay {
   readonly modeIconTone: 'danger' | 'safe';
   readonly modeLabel: 'Danger' | 'Safe';
   readonly modelLabel: string;
-  readonly thinkingLabel: 'High' | 'Low' | 'Med';
+  readonly thinkingLabel: string;
 }
 
 const modelLabels: Record<string, string> = {
   'Claude Opus 4': 'Opus 4',
   'Claude Sonnet 4': 'Sonnet 4',
   'GPT-5': 'GPT-5',
-};
-
-const getThinkingLabel = (
-  thinkingEffort: AgentPanelFooterState['thinkingEffort']
-): AgentFooterControlDisplay['thinkingLabel'] => {
-  if (thinkingEffort === 'medium') {
-    return 'Med';
-  }
-
-  if (thinkingEffort === 'low') {
-    return 'Low';
-  }
-
-  return 'High';
 };
 
 export const getFooterControlDisplay = (
@@ -52,7 +40,7 @@ export const getFooterControlDisplay = (
   modeIconTone: footer.mode === 'safe' ? 'safe' : 'danger',
   modeLabel: footer.mode === 'safe' ? 'Safe' : 'Danger',
   modelLabel: modelLabels[footer.model] ?? footer.model,
-  thinkingLabel: getThinkingLabel(footer.thinkingEffort),
+  thinkingLabel: thinkingEffortLabel(footer.thinkingEffort),
 });
 
 export const getDefaultAgentPanelState = (): AgentPanelState => ({

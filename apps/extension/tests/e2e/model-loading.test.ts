@@ -37,6 +37,23 @@ const delaySecondOrgOneModelRequest = ({
   };
 };
 
+const delayOrgTwoModels =
+  ({
+    markOrgTwoModelsRequested,
+    pendingOrgTwoModels,
+  }: {
+    markOrgTwoModelsRequested: () => void;
+    pendingOrgTwoModels: Promise<void>;
+  }): ((organizationId: string) => Promise<void>) =>
+  organizationId => {
+    if (organizationId !== orgTwoId) {
+      return Promise.resolve();
+    }
+
+    markOrgTwoModelsRequested();
+    return pendingOrgTwoModels;
+  };
+
 test('model and thinking controls wait for the model catalog', async () => {
   const { promise: pendingModels, resolve: releaseModels } = Promise.withResolvers<void>();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -90,6 +107,52 @@ test('model catalog failures can be retried', async () => {
     await expect(sidePanel.getByLabel('Model')).toBeEnabled();
     await expect(sidePanel.getByLabel('Model')).toContainText('Claude Sonnet 4');
   } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('switching credit accounts clears the model while the next catalog loads', async () => {
+  const { promise: pendingOrgTwoModels, resolve: releaseOrgTwoModels } =
+    Promise.withResolvers<void>();
+  const { promise: orgTwoModelsRequested, resolve: markOrgTwoModelsRequested } =
+    Promise.withResolvers<void>();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      beforeModels: delayOrgTwoModels({
+        markOrgTwoModelsRequested,
+        pendingOrgTwoModels,
+      }),
+      modelNameByOrganizationId: {
+        [orgTwoId]: 'Provider: Org Two Model',
+      },
+      organizations: [{ id: orgTwoId, name: 'Beta' }],
+    });
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await expect(sidePanel.getByLabel('Model')).toContainText('Claude Sonnet 4');
+    await sidePanel.getByLabel('Message agent').fill('Inspect this tab');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
+
+    await sidePanel.getByLabel('Settings').click();
+    await sidePanel.getByLabel('Credit account').selectOption(orgTwoId);
+    await orgTwoModelsRequested;
+
+    await expect(sidePanel.getByLabel('Model')).toBeDisabled();
+    await expect(sidePanel.getByLabel('Model')).toContainText('Loading models...');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeDisabled();
+
+    releaseOrgTwoModels();
+
+    await expect(sidePanel.getByLabel('Model')).toContainText('Org Two Model');
+  } finally {
+    releaseOrgTwoModels();
     await context.close();
     await rm(userDataDir, { force: true, recursive: true });
   }

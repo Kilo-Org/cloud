@@ -6,7 +6,7 @@ import {
   groupConversationEvents,
 } from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent, AgentMode } from '@/src/shared/agent-conversation';
-import { defaultMode, getFooterControlDisplay } from '@/src/shared/agent-chat-placeholder';
+import { defaultMode } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
@@ -58,11 +58,6 @@ export const AgentChatPanel = ({
     () => (selectedModel === undefined ? [] : selectedModel.variants),
     [selectedModel]
   );
-  const footerDisplay = getFooterControlDisplay({
-    mode,
-    model: selectedModel?.name ?? model,
-    thinkingEffort,
-  });
   const isModelSelectDisabled = modelOptions.length === 0;
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
 
@@ -80,6 +75,9 @@ export const AgentChatPanel = ({
         modelLoadRequestRef.current === requestId && signal?.aborted !== true;
 
       setModelLoadError(undefined);
+      setModelOptions([]);
+      setModel('');
+      setThinkingEffort('');
 
       try {
         const models = await fetchKiloGatewayModels({
@@ -290,10 +288,6 @@ export const AgentChatPanel = ({
           thinkingEffort={thinkingEffort}
           thinkingOptions={thinkingOptions}
         />
-        <p className="sr-only">
-          Mode {footerDisplay.modeLabel}: {footerDisplay.modeDescription}, model{' '}
-          {footerDisplay.modelLabel}, thinking {footerDisplay.thinkingLabel}
-        </p>
       </footer>
     </div>
   );

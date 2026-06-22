@@ -1,17 +1,12 @@
 import type { JSX, ReactNode } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
-import { KiloMark } from '@/src/shared/kilo-mark';
+import { KiloLogo } from '@/src/shared/kilo-logo';
 
 const Header = (): JSX.Element => (
   <div className="border-b border-zinc-800 px-4 py-3">
-    <div className="flex min-w-0 items-center gap-3">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[#EDFF00] text-zinc-950">
-        <KiloMark className="size-5" />
-      </span>
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-zinc-50">Kilo</p>
-        <p className="truncate text-xs text-zinc-400">Browser side panel</p>
-      </div>
+    <div className="flex min-w-0 items-center gap-2.5">
+      <KiloLogo className="size-8 shrink-0 text-[#EDFF00]" />
+      <p className="truncate text-sm font-semibold text-zinc-50">Kilo</p>
     </div>
   </div>
 );

@@ -62,8 +62,8 @@ const ToolExchangeEvent = ({
   const isSuccessful = item.result.ok;
 
   const panelClassName = isSuccessful
-    ? 'group rounded-md border border-zinc-800 bg-zinc-900/70 px-3 py-2'
-    : 'group rounded-md border border-red-500/30 bg-red-950/20 px-3 py-2';
+    ? 'group min-w-0 rounded-md border border-zinc-800 bg-zinc-900/70 px-3 py-2'
+    : 'group min-w-0 rounded-md border border-red-500/30 bg-red-950/20 px-3 py-2';
   const titleClassName = isSuccessful
     ? 'text-xs font-semibold text-zinc-300'
     : 'text-xs font-semibold text-red-200';
@@ -72,8 +72,8 @@ const ToolExchangeEvent = ({
     ? 'text-[11px] font-medium text-zinc-300'
     : 'text-[11px] font-medium text-red-200/80';
   const codeBlockClassName = isSuccessful
-    ? 'mt-1 max-h-28 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400'
-    : 'mt-1 max-h-28 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-red-100/90';
+    ? 'mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400'
+    : 'mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-red-100/90';
 
   return (
     <details className={panelClassName}>
@@ -81,16 +81,16 @@ const ToolExchangeEvent = ({
         <span className={titleClassName}>eval {isSuccessful ? 'completed' : 'failed'}</span>
         <span className={tabClassName}>tab {item.toolCall.tabId}</span>
       </summary>
-      <div className="mt-2 grid gap-2">
-        <div>
+      <div className="mt-2 grid min-w-0 gap-2">
+        <div className="min-w-0">
           <p className={codeLabelClassName}>Code</p>
           <pre className={codeBlockClassName}>{item.toolCall.code}</pre>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[11px] font-medium text-zinc-300">
             {isSuccessful ? 'Result' : 'Error'}
           </p>
-          <pre className="mt-1 max-h-28 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400">
+          <pre className="mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400">
             {isSuccessful ? formatToolValue(item.result.value) : item.result.error}
           </pre>
         </div>

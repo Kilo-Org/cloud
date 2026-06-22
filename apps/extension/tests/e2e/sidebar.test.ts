@@ -3,7 +3,8 @@ import { expect, test } from '@playwright/test';
 import type { Locator } from '@playwright/test';
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { expectEvalCodeBlockNoHorizontalOverflow, mockKiloApi } from './kilo-api-fixture';
+import { expectEvalToolBoxNoHorizontalOverflow } from './eval-overflow-fixture';
+import { mockKiloApi } from './kilo-api-fixture';
 import {
   extensionPath,
   launchExtensionContext,
@@ -180,7 +181,7 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
 
     await sidePanel.mouse.click(evalBoxRect.left + 4, evalBoxRect.top + 4);
     await expect(sidePanel.getByText('Code')).toBeVisible();
-    await expectEvalCodeBlockNoHorizontalOverflow(sidePanel);
+    await expectEvalToolBoxNoHorizontalOverflow(sidePanel);
 
     await sidePanel.getByLabel('New conversation').click();
     await expect(sidePanel.getByText('eval completed')).toBeHidden();

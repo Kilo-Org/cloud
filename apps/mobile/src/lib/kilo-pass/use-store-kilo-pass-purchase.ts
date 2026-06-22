@@ -62,6 +62,7 @@ type AppStoreKiloPassPurchaseActionsDeps = {
   completeAppStorePurchase: (input: { signedTransactionJws: string }) => Promise<unknown>;
   finishTransaction: (params: { purchase: Purchase; isConsumable: false }) => Promise<void>;
   enabledAppleProductIds: readonly string[];
+  loadEnabledAppleProductIds?: () => Promise<readonly string[]>;
   invalidateAfterCompletion: () => Promise<void> | void;
   onPurchaseCompleted?: () => void;
   setPendingPurchaseCompletedCallback?: (callback: (() => void) | null) => void;
@@ -100,6 +101,10 @@ type PurchaseCompletionOptions = {
 
 type PurchaseSuccessOptions = PurchaseCompletionOptions & {
   notifyCompletion?: boolean;
+};
+
+type RecoverPurchasesOptions = PurchaseCompletionOptions & {
+  enabledAppleProductIds?: readonly string[];
 };
 
 function isRecoverableKiloPassPurchase(
@@ -221,13 +226,21 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     return completed;
   }
 
+  async function getEnabledAppleProductIdsForRestore() {
+    if (deps.enabledAppleProductIds.length > 0) {
+      return deps.enabledAppleProductIds;
+    }
+    return (await deps.loadEnabledAppleProductIds?.()) ?? [];
+  }
+
   async function recoverPurchases(
     purchases: Purchase[],
-    options: PurchaseCompletionOptions = {}
+    options: RecoverPurchasesOptions = {}
   ): Promise<Purchase[]> {
+    const enabledAppleProductIds = options.enabledAppleProductIds ?? deps.enabledAppleProductIds;
     const recoveryResults = await Promise.all(
       purchases
-        .filter(purchase => isRecoverableKiloPassPurchase(purchase, deps.enabledAppleProductIds))
+        .filter(purchase => isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds))
         .map(async purchase => {
           const completed = await handlePurchaseSuccess(purchase, {
             invalidateAfterCompletion: false,
@@ -278,14 +291,21 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       try {
         await deps.restorePurchases();
         const availablePurchases = await deps.getAvailablePurchases();
+        const enabledAppleProductIds = await getEnabledAppleProductIdsForRestore();
+        if (enabledAppleProductIds.length === 0) {
+          deps.showError(RESTORE_PURCHASES_ERROR_MESSAGE);
+          return 'failed';
+        }
+
         const kiloPassPurchases = availablePurchases.filter(purchase =>
-          isRecoverableKiloPassPurchase(purchase, deps.enabledAppleProductIds)
+          isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds)
         );
         if (kiloPassPurchases.length === 0) {
           return 'empty';
         }
 
         const completedPurchases = await recoverPurchases(kiloPassPurchases, {
+          enabledAppleProductIds,
           notifyErrors: true,
         });
         return completedPurchases.length > 0 ? 'restored' : 'failed';
@@ -313,6 +333,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
     ...trpc.kiloPass.getMobileStoreProducts.queryOptions(),
     enabled: Platform.OS === 'ios',
   });
+  const { refetch: refetchMobileStoreProducts } = mobileStoreProductsQuery;
   const enabledAppleProductIds = useMemo(
     () => mobileStoreProductsQuery.data?.products.map(product => product.appleProductId) ?? [],
     [mobileStoreProductsQuery.data]
@@ -387,6 +408,10 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
         restorePurchases: restoreStorePurchases,
         completeAppStorePurchase: completeAppStorePurchase.mutateAsync,
         enabledAppleProductIds,
+        loadEnabledAppleProductIds: async () => {
+          const result = await refetchMobileStoreProducts();
+          return result.data?.products.map(product => product.appleProductId) ?? [];
+        },
         finishTransaction,
         invalidateAfterCompletion,
         onPurchaseCompleted: () => {
@@ -406,6 +431,7 @@ export function StoreKiloPassPurchaseProvider({ children }: { children: ReactNod
       enabledAppleProductIds,
       finishTransaction,
       invalidateAfterCompletion,
+      refetchMobileStoreProducts,
       requestPurchase,
       restoreStorePurchases,
     ]

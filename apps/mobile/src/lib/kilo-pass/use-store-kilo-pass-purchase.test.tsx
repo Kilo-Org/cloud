@@ -632,6 +632,25 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
   });
 
+  it('loads product IDs before deciding an explicit restore is empty', async () => {
+    const purchase = createPurchase();
+    const loadEnabledAppleProductIds = vi.fn().mockResolvedValue([product.appleProductId]);
+    const completeAppStorePurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const actions = createActions({
+      completeAppStorePurchase,
+      enabledAppleProductIds: [],
+      getAvailablePurchases: vi.fn().mockResolvedValue([purchase]),
+      loadEnabledAppleProductIds,
+      restorePurchases: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const result = await actions.restorePurchases();
+
+    expect(result).toBe('restored');
+    expect(loadEnabledAppleProductIds).toHaveBeenCalledTimes(1);
+    expect(completeAppStorePurchase).toHaveBeenCalledWith({ signedTransactionJws: 'signed-jws' });
+  });
+
   it('returns empty when StoreKit has no active Kilo Pass purchases to restore', async () => {
     const completeAppStorePurchase = vi.fn();
     const actions = createActions({

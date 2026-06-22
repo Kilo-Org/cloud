@@ -1,13 +1,10 @@
-import {
-  createAssistantMessage,
-  createEvalToolCall,
-  createToolResult,
-} from '@/src/shared/agent-conversation';
+import { createAssistantMessage, createEvalToolCall } from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import {
   buildGatewayMessagesFromEvents,
   createEvalToolDefinition,
 } from '@/src/shared/agent-llm-harness';
+import { runEvalToolCalls } from '@/src/shared/agent-tool-results';
 import type { FetchLike } from '@/src/shared/auth';
 import { fetchKiloGatewayChatCompletionStream } from '@/src/shared/kilo-api-client';
 import { executeEvalToolCall } from './agent-eval-runtime';
@@ -119,21 +116,9 @@ export const runDangerousLlmTurn = async ({
       return;
     }
 
-    const toolResultEvents: AgentConversationEvent[] = await Promise.all(
-      toolCallEvents.map(async toolCallEvent => {
-        const result = await executeEvalToolCall(toolCallEvent);
-        return result.ok
-          ? createToolResult({
-              ok: true,
-              toolCallId: toolCallEvent.id,
-              value: result.value,
-            })
-          : createToolResult({
-              error: result.error,
-              ok: false,
-              toolCallId: toolCallEvent.id,
-            });
-      })
+    const toolResultEvents: AgentConversationEvent[] = await runEvalToolCalls(
+      toolCallEvents,
+      executeEvalToolCall
     );
 
     const conversationWithToolResult = [

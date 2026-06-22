@@ -289,6 +289,9 @@ test('only the message pane scrolls overflowing conversation content', async () 
     expect(scrollState.messagePaneScrollHeight).toBeGreaterThan(
       scrollState.messagePaneClientHeight
     );
+    expect(
+      scrollState.messagePaneScrollTop + scrollState.messagePaneClientHeight
+    ).toBeGreaterThanOrEqual(scrollState.messagePaneScrollHeight - 4);
   } finally {
     await context.close();
     await rm(userDataDir, { force: true, recursive: true });

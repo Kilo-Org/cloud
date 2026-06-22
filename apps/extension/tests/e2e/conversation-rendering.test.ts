@@ -107,7 +107,7 @@ test('only the message pane scrolls virtualized overflowing conversation content
 
     const scrollState = await sidePanel.evaluate(readSidePanelScrollState);
     const mountedMessageItems = await sidePanel
-      .locator('section[aria-label="Agent conversation"] > *')
+      .locator('section[aria-label="Agent conversation"] [data-index]')
       .count();
 
     expect(scrollState.documentScrollHeight).toBe(scrollState.documentClientHeight);

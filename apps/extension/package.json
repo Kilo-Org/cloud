@@ -5,7 +5,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "wxt",
+    "dev": "wxt --port 3001",
     "dev:firefox": "wxt -b firefox --mv3",
     "debug:chrome": "pnpm run build && tsx scripts/debug-chrome.ts",
     "build": "wxt build",

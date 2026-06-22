@@ -1,10 +1,8 @@
 import { enableActionClickSidePanel } from '@/src/shared/side-panel';
 import {
   EVAL_TAB_MESSAGE,
-  GET_TAB_HTML_LENGTH_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
   evalInTab,
-  getTabHtmlLength,
   isTabDebuggerRequest,
   listInspectableTabs,
 } from '@/src/shared/tab-debugger';
@@ -43,14 +41,6 @@ const handleTabDebuggerRequest = async ({
         ok: true,
         tabs: await listInspectableTabs(debuggerApi),
         type: LIST_INSPECTABLE_TABS_MESSAGE,
-      };
-    }
-
-    if (request.type === GET_TAB_HTML_LENGTH_MESSAGE) {
-      return {
-        length: await getTabHtmlLength(debuggerApi, request.tabId),
-        ok: true,
-        type: GET_TAB_HTML_LENGTH_MESSAGE,
       };
     }
 

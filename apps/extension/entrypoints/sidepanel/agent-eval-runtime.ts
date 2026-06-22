@@ -3,39 +3,6 @@ import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import { EVAL_TAB_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 
-export const formatEvalValue = (value: unknown): string => {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (
-    typeof value === 'number' ||
-    typeof value === 'boolean' ||
-    typeof value === 'bigint' ||
-    value === null
-  ) {
-    return String(value);
-  }
-
-  if (value === undefined) {
-    return 'undefined';
-  }
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return 'Unserializable result';
-  }
-};
-
-export const getEvalSummary = (result: EvalTabResult): string => {
-  if (!result.ok) {
-    return `Eval failed: ${result.error}`;
-  }
-
-  return `Eval returned ${formatEvalValue(result.value)}.`;
-};
-
 export const executeEvalToolCall = async (
   toolCall: Extract<AgentConversationEvent, { readonly type: 'tool-call' }>
 ): Promise<EvalTabResult> => {

@@ -22,6 +22,8 @@ import {
 const pollIntervalMs = 3000;
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow: FetchLike = (input, init) => fetch(input, init);
+const isAbortError = (error: unknown): boolean =>
+  error instanceof Error && error.name === 'AbortError';
 
 type PanelState =
   | {
@@ -60,38 +62,46 @@ export const App = (): JSX.Element => {
     stopPolling();
     setState({ status: 'checking' });
 
-    const storedAuth = await loadStoredAuth(storage);
-    if (!storedAuth) {
-      setState({ status: 'signedOut' });
-      return;
+    try {
+      const storedAuth = await loadStoredAuth(storage);
+      if (!storedAuth) {
+        setState({ status: 'signedOut' });
+        return;
+      }
+
+      const abort = new AbortController();
+      abortRef.current = abort;
+      const result = await validateAuthToken({
+        apiBaseUrl,
+        fetch: fetchFromWindow,
+        signal: abort.signal,
+        token: storedAuth.token,
+      });
+
+      if (abort.signal.aborted) {
+        return;
+      }
+
+      if (result.status === 'valid') {
+        await saveStoredAuth(storage, result.auth);
+        setState({ auth: result.auth, status: 'signedIn' });
+        return;
+      }
+
+      if (result.status === 'invalid') {
+        await clearStoredAuth(storage);
+        setState({ message: 'Your session expired. Sign in again.', status: 'signedOut' });
+        return;
+      }
+
+      setState({ status: 'validationError' });
+    } catch (error) {
+      if (isAbortError(error)) {
+        return;
+      }
+
+      setState({ status: 'validationError' });
     }
-
-    const abort = new AbortController();
-    abortRef.current = abort;
-    const result = await validateAuthToken({
-      apiBaseUrl,
-      fetch: fetchFromWindow,
-      signal: abort.signal,
-      token: storedAuth.token,
-    });
-
-    if (abort.signal.aborted) {
-      return;
-    }
-
-    if (result.status === 'valid') {
-      await saveStoredAuth(storage, result.auth);
-      setState({ auth: result.auth, status: 'signedIn' });
-      return;
-    }
-
-    if (result.status === 'invalid') {
-      await clearStoredAuth(storage);
-      setState({ message: 'Your session expired. Sign in again.', status: 'signedOut' });
-      return;
-    }
-
-    setState({ status: 'validationError' });
   }, [stopPolling]);
 
   useEffect(() => {
@@ -110,7 +120,12 @@ export const App = (): JSX.Element => {
   const signOut = useCallback((): void => {
     stopPolling();
     void (async (): Promise<void> => {
-      await clearStoredAuth(storage);
+      try {
+        await clearStoredAuth(storage);
+      } catch {
+        // Storage clear failure should not keep the local panel signed in.
+      }
+
       setState({ status: 'signedOut' });
     })();
   }, [stopPolling]);
@@ -160,7 +175,7 @@ export const App = (): JSX.Element => {
             }
           }
         } catch (error) {
-          if (error instanceof Error && error.name === 'AbortError') {
+          if (isAbortError(error)) {
             return;
           }
 

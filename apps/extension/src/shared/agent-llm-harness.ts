@@ -47,6 +47,25 @@ const toToolResultContent = (
       : { error: event.error ?? 'Eval failed.', ok: false }
   );
 
+const getConsecutiveToolCalls = (
+  events: AgentConversationEvent[],
+  startIndex: number
+): EvalToolCallEvent[] => {
+  const toolCalls: EvalToolCallEvent[] = [];
+
+  for (let index = startIndex; index < events.length; index += 1) {
+    const toolCall = events[index];
+
+    if (toolCall === undefined || toolCall.type !== 'tool-call') {
+      break;
+    }
+
+    toolCalls.push(toolCall);
+  }
+
+  return toolCalls;
+};
+
 export const buildGatewayMessagesFromEvents = (
   events: AgentConversationEvent[]
 ): KiloGatewayChatMessage[] => {
@@ -55,41 +74,48 @@ export const buildGatewayMessagesFromEvents = (
     { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
   ];
 
-  for (const event of events) {
-    switch (event.type) {
-      case 'message': {
-        messages.push({ content: event.text, role: event.role });
-        break;
-      }
-      case 'tool-call': {
-        toolCallsById.set(event.id, event);
-        messages.push({
-          content: null,
-          role: 'assistant',
-          tool_calls: [
-            {
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index];
+
+    if (event !== undefined) {
+      switch (event.type) {
+        case 'message': {
+          messages.push({ content: event.text, role: event.role });
+          break;
+        }
+        case 'tool-call': {
+          const toolCalls = getConsecutiveToolCalls(events, index);
+          for (const toolCall of toolCalls) {
+            toolCallsById.set(toolCall.id, toolCall);
+          }
+
+          index += toolCalls.length - 1;
+          messages.push({
+            content: null,
+            role: 'assistant',
+            tool_calls: toolCalls.map(toolCall => ({
               function: {
-                arguments: JSON.stringify({ code: event.code }),
+                arguments: JSON.stringify({ code: toolCall.code }),
                 name: 'eval',
               },
-              id: getProviderToolCallId(event),
+              id: getProviderToolCallId(toolCall),
               type: 'function',
-            },
-          ],
-        });
-        break;
-      }
-      case 'tool-result': {
-        const toolCall = toolCallsById.get(event.toolCallId);
-
-        if (toolCall !== undefined) {
-          messages.push({
-            content: toToolResultContent(event),
-            role: 'tool',
-            tool_call_id: getProviderToolCallId(toolCall),
+            })),
           });
+          break;
         }
-        break;
+        case 'tool-result': {
+          const toolCall = toolCallsById.get(event.toolCallId);
+
+          if (toolCall !== undefined) {
+            messages.push({
+              content: toToolResultContent(event),
+              role: 'tool',
+              tool_call_id: getProviderToolCallId(toolCall),
+            });
+          }
+          break;
+        }
       }
     }
   }

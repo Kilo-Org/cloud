@@ -265,7 +265,7 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
   }
 });
 
-test('only the message pane scrolls and virtualizes overflowing conversation content', async () => {
+test('only the message pane scrolls overflowing conversation content', async () => {
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 
   try {
@@ -289,7 +289,6 @@ test('only the message pane scrolls and virtualizes overflowing conversation con
     expect(scrollState.messagePaneScrollHeight).toBeGreaterThan(
       scrollState.messagePaneClientHeight
     );
-    expect(scrollState.renderedConversationItems).toBeLessThan(30);
   } finally {
     await context.close();
     await rm(userDataDir, { force: true, recursive: true });

@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  HTML_LENGTH_EXPRESSION,
-  evalInTab,
-  getTabHtmlLength,
-  listInspectableTabs,
-} from './tab-debugger';
+import { evalInTab, listInspectableTabs } from './tab-debugger';
 import type { ChromeDebuggerApi, ChromeDebuggerTargetInfo } from './tab-debugger';
 
 const createDebuggerApi = ({
@@ -46,40 +41,6 @@ describe('tab debugger helpers', () => {
       { id: 1, title: 'Kilo', url: 'https://app.kilo.ai/' },
       { id: 3, title: 'Local app', url: 'http://localhost:3001/' },
     ]);
-  });
-
-  it('evaluates and returns the selected tab html length', async () => {
-    const calls: unknown[] = [];
-    const debuggerApi = createDebuggerApi({
-      sendCommand: (target, method, params) => {
-        calls.push({ method, params, target });
-        return { result: { type: 'number', value: 12_345 } };
-      },
-    });
-
-    await expect(getTabHtmlLength(debuggerApi, 7)).resolves.toBe(12_345);
-    expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
-    expect(calls).toStrictEqual([
-      {
-        method: 'Runtime.evaluate',
-        params: {
-          expression: HTML_LENGTH_EXPRESSION,
-          returnByValue: true,
-        },
-        target: { tabId: 7 },
-      },
-    ]);
-  });
-
-  it('detaches from the tab when evaluation fails', async () => {
-    const debuggerApi = createDebuggerApi({
-      sendCommand: () => {
-        throw new Error('Evaluation failed.');
-      },
-    });
-
-    await expect(getTabHtmlLength(debuggerApi, 7)).rejects.toThrow('Evaluation failed.');
-    expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
   });
 
   it('evaluates dangerous-mode code in the selected tab', async () => {

@@ -77,4 +77,43 @@ describe('agent LLM harness', () => {
       },
     ]);
   });
+
+  it('keeps consecutive eval tool calls in one assistant message', () => {
+    const firstToolCall = createEvalToolCall({
+      code: 'return document.title;',
+      providerToolCallId: 'call_eval_1',
+      tabId: 7,
+    });
+    const secondToolCall = createEvalToolCall({
+      code: 'return location.href;',
+      providerToolCallId: 'call_eval_2',
+      tabId: 7,
+    });
+
+    expect(buildGatewayMessagesFromEvents([firstToolCall, secondToolCall])).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      {
+        content: null,
+        role: 'assistant',
+        tool_calls: [
+          {
+            function: {
+              arguments: '{"code":"return document.title;"}',
+              name: 'eval',
+            },
+            id: 'call_eval_1',
+            type: 'function',
+          },
+          {
+            function: {
+              arguments: '{"code":"return location.href;"}',
+              name: 'eval',
+            },
+            id: 'call_eval_2',
+            type: 'function',
+          },
+        ],
+      },
+    ]);
+  });
 });

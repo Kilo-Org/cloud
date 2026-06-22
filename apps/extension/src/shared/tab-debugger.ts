@@ -1,7 +1,5 @@
 export const DEBUGGER_PROTOCOL_VERSION = '1.3';
-export const HTML_LENGTH_EXPRESSION = 'document.documentElement.outerHTML.length';
 export const LIST_INSPECTABLE_TABS_MESSAGE = 'kilo.tabs.listInspectable';
-export const GET_TAB_HTML_LENGTH_MESSAGE = 'kilo.tabs.getHtmlLength';
 export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
 
@@ -50,10 +48,6 @@ export type TabDebuggerRequest =
       readonly type: typeof LIST_INSPECTABLE_TABS_MESSAGE;
     }
   | {
-      readonly tabId: number;
-      readonly type: typeof GET_TAB_HTML_LENGTH_MESSAGE;
-    }
-  | {
       readonly code: string;
       readonly tabId: number;
       readonly timeoutMs?: number;
@@ -65,11 +59,6 @@ export type TabDebuggerResponse =
       readonly ok: true;
       readonly tabs: InspectableTab[];
       readonly type: typeof LIST_INSPECTABLE_TABS_MESSAGE;
-    }
-  | {
-      readonly length: number;
-      readonly ok: true;
-      readonly type: typeof GET_TAB_HTML_LENGTH_MESSAGE;
     }
   | {
       readonly result: EvalTabResult;
@@ -108,44 +97,6 @@ export const listInspectableTabs = async (
         url: target.url,
       };
     });
-};
-
-export const getTabHtmlLength = async (
-  debuggerApi: ChromeDebuggerApi,
-  tabId: number
-): Promise<number> => {
-  const target = { tabId };
-  let attached = false;
-
-  await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
-  attached = true;
-
-  try {
-    const response = await debuggerApi.sendCommand(target, 'Runtime.evaluate', {
-      expression: HTML_LENGTH_EXPRESSION,
-      returnByValue: true,
-    });
-
-    if (!isRecord(response)) {
-      throw new Error('Debugger did not return an HTML length.');
-    }
-
-    const { exceptionDetails, result } = response;
-
-    if (exceptionDetails !== undefined) {
-      throw new Error('Page evaluation failed.');
-    }
-
-    if (!isRecord(result) || typeof result['value'] !== 'number') {
-      throw new Error('Debugger did not return an HTML length.');
-    }
-
-    return result['value'];
-  } finally {
-    if (attached) {
-      await debuggerApi.detach(target);
-    }
-  }
 };
 
 const getEvalExpression = (code: string): string => `(async () => { ${code} })()`;
@@ -218,10 +169,6 @@ export const isTabDebuggerRequest = (value: unknown): value is TabDebuggerReques
     return true;
   }
 
-  if (value['type'] === GET_TAB_HTML_LENGTH_MESSAGE) {
-    return typeof value['tabId'] === 'number';
-  }
-
   return (
     value['type'] === EVAL_TAB_MESSAGE &&
     typeof value['tabId'] === 'number' &&
@@ -250,10 +197,6 @@ export const isTabDebuggerResponse = (value: unknown): value is TabDebuggerRespo
           typeof tab['url'] === 'string'
       )
     );
-  }
-
-  if (value['type'] === GET_TAB_HTML_LENGTH_MESSAGE) {
-    return typeof value['length'] === 'number';
   }
 
   if (value['type'] === EVAL_TAB_MESSAGE) {

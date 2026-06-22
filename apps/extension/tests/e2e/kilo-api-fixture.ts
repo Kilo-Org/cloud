@@ -129,7 +129,6 @@ export const readSidePanelScrollState = (): {
   documentScrollHeight: number;
   messagePaneClientHeight: number;
   messagePaneScrollHeight: number;
-  renderedConversationItems: number;
 } => {
   const conversation = document.querySelector('[aria-label="Agent conversation"]');
 
@@ -142,7 +141,6 @@ export const readSidePanelScrollState = (): {
     documentScrollHeight: document.documentElement.scrollHeight,
     messagePaneClientHeight: conversation.clientHeight,
     messagePaneScrollHeight: conversation.scrollHeight,
-    renderedConversationItems: conversation.querySelectorAll(':scope > div > *').length,
   };
 };
 

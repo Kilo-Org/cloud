@@ -5,11 +5,8 @@ import {
   createUserMessage,
   groupConversationEvents,
 } from '@/src/shared/agent-conversation';
-import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
-import {
-  getDefaultAgentPanelState,
-  getFooterControlDisplay,
-} from '@/src/shared/agent-chat-placeholder';
+import type { AgentConversationEvent, AgentMode } from '@/src/shared/agent-conversation';
+import { getFooterControlDisplay } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
@@ -17,11 +14,13 @@ import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { AgentFooterControls } from './agent-footer-controls';
 import { runDangerousLlmTurn } from './agent-llm-turn-runner';
 import { useTabDebugger } from './use-tab-debugger';
-import { VirtualizedConversationList } from './virtualized-conversation-list';
+import { ConversationList } from './conversation-list';
 
 const effortOptions = ['low', 'medium', 'high'] as const;
 const defaultThinkingOption = 'default';
 const fallbackDefaultModelId = 'Claude Sonnet 4';
+const defaultMode = 'safe';
+const defaultThinkingEffort = 'medium';
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
@@ -48,16 +47,15 @@ const fallbackModelOptions: KiloGatewayModelOption[] = [
 ];
 
 export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
-  const initialState = useMemo(() => getDefaultAgentPanelState(), []);
-  const [draft, setDraft] = useState(initialState.draft);
+  const [draft, setDraft] = useState('');
   const [events, setEvents] = useState<AgentConversationEvent[]>(() => [
     createAssistantMessage('Pick a tab, switch to dangerous mode, and ask Kilo to inspect it.'),
   ]);
   const [isRunning, setIsRunning] = useState(false);
-  const [mode, setMode] = useState(initialState.footer.mode);
-  const [model, setModel] = useState(initialState.footer.model);
+  const [mode, setMode] = useState<AgentMode>(defaultMode);
+  const [model, setModel] = useState(fallbackDefaultModelId);
   const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>(fallbackModelOptions);
-  const [thinkingEffort, setThinkingEffort] = useState(initialState.footer.thinkingEffort);
+  const [thinkingEffort, setThinkingEffort] = useState(defaultThinkingEffort);
   const { inspectableTabs, isLoadingTabs, loadInspectableTabs, selectTab, selectedTabId } =
     useTabDebugger();
   const selectedModel = useMemo(
@@ -198,7 +196,7 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <VirtualizedConversationList items={groupedEvents} />
+      <ConversationList items={groupedEvents} />
 
       <form
         className="border-t border-zinc-900 px-4 py-3"

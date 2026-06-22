@@ -99,17 +99,14 @@ export const runDangerousLlmTurn = async ({
       firstCompletionEvents.push(createAssistantMessage(firstCompletion.content));
     }
 
-    const [evalToolCall] = firstCompletion.toolCalls;
-
-    if (evalToolCall !== undefined) {
-      firstCompletionEvents.push(
-        createEvalToolCall({
-          code: evalToolCall.code,
-          providerToolCallId: evalToolCall.id,
-          tabId: selectedTabId,
-        })
-      );
-    }
+    const toolCallEvents = firstCompletion.toolCalls.map(evalToolCall =>
+      createEvalToolCall({
+        code: evalToolCall.code,
+        providerToolCallId: evalToolCall.id,
+        tabId: selectedTabId,
+      })
+    );
+    firstCompletionEvents.push(...toolCallEvents);
 
     if (firstCompletionEvents.length === 0) {
       appendEvents([createAssistantMessage('The model did not return a response.')]);
@@ -118,39 +115,34 @@ export const runDangerousLlmTurn = async ({
 
     appendEvents(firstCompletionEvents.filter(event => event.id !== streamedAssistantEventId));
 
-    if (evalToolCall === undefined) {
+    if (toolCallEvents.length === 0) {
       return;
     }
 
-    const toolCallEvent = firstCompletionEvents.find(
-      (event): event is Extract<AgentConversationEvent, { readonly type: 'tool-call' }> =>
-        event.type === 'tool-call'
+    const toolResultEvents: AgentConversationEvent[] = await Promise.all(
+      toolCallEvents.map(async toolCallEvent => {
+        const result = await executeEvalToolCall(toolCallEvent);
+        return result.ok
+          ? createToolResult({
+              ok: true,
+              toolCallId: toolCallEvent.id,
+              value: result.value,
+            })
+          : createToolResult({
+              error: result.error,
+              ok: false,
+              toolCallId: toolCallEvent.id,
+            });
+      })
     );
 
-    if (toolCallEvent === undefined) {
-      appendEvents([createAssistantMessage('The model did not return eval code.')]);
-      return;
-    }
-
-    const result = await executeEvalToolCall(toolCallEvent);
-    const toolResultEvent = result.ok
-      ? createToolResult({
-          ok: true,
-          toolCallId: toolCallEvent.id,
-          value: result.value,
-        })
-      : createToolResult({
-          error: result.error,
-          ok: false,
-          toolCallId: toolCallEvent.id,
-        });
     const conversationWithToolResult = [
       ...conversationEvents,
       ...firstCompletionEvents,
-      toolResultEvent,
+      ...toolResultEvents,
     ];
 
-    appendEvents([toolResultEvent]);
+    appendEvents(toolResultEvents);
 
     let finalText = '';
     let finalAssistantEventId: string | undefined = undefined;

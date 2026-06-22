@@ -24,6 +24,10 @@ export type AgentConversationEvent =
       readonly value?: unknown;
     };
 
+type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
+type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
+
 export type GroupedConversationItem =
   | {
       readonly event: AgentConversationEvent;
@@ -56,14 +60,14 @@ const createEventId = (): string => {
   return id;
 };
 
-export const createUserMessage = (text: string): AgentConversationEvent => ({
+export const createUserMessage = (text: string): MessageEvent => ({
   id: createEventId(),
   role: 'user',
   text,
   type: 'message',
 });
 
-export const createAssistantMessage = (text: string): AgentConversationEvent => ({
+export const createAssistantMessage = (text: string): MessageEvent => ({
   id: createEventId(),
   role: 'assistant',
   text,
@@ -74,7 +78,7 @@ export const createEvalToolCall = ({
   code,
   providerToolCallId,
   tabId,
-}: CreateEvalToolCallOptions): AgentConversationEvent => ({
+}: CreateEvalToolCallOptions): ToolCallEvent => ({
   code,
   id: createEventId(),
   name: 'eval',
@@ -88,7 +92,7 @@ export const createToolResult = ({
   ok,
   toolCallId,
   value,
-}: CreateToolResultOptions): AgentConversationEvent => ({
+}: CreateToolResultOptions): ToolResultEvent => ({
   id: createEventId(),
   ok,
   toolCallId,

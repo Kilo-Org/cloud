@@ -110,3 +110,23 @@ export const mockKiloApi = async (context: BrowserContext): Promise<void> => {
     });
   });
 };
+
+export const readSidePanelScrollState = (): {
+  documentClientHeight: number;
+  documentScrollHeight: number;
+  messagePaneClientHeight: number;
+  messagePaneScrollHeight: number;
+} => {
+  const conversation = document.querySelector('[aria-label="Agent conversation"]');
+
+  if (!(conversation instanceof HTMLElement)) {
+    throw new Error('Agent conversation pane was not found.');
+  }
+
+  return {
+    documentClientHeight: document.documentElement.clientHeight,
+    documentScrollHeight: document.documentElement.scrollHeight,
+    messagePaneClientHeight: conversation.clientHeight,
+    messagePaneScrollHeight: conversation.scrollHeight,
+  };
+};

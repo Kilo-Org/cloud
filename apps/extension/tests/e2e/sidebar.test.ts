@@ -5,7 +5,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import type { BrowserContext, Page } from '@playwright/test';
-import { mockKiloApi } from './kilo-api-fixture';
+import { mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
 
 const extensionPath = resolvePath(import.meta.dirname, '../../.output/chrome-mv3');
 
@@ -255,6 +255,37 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
   } finally {
     await context.close();
     await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('only the message pane scrolls when conversation content overflows', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.setViewportSize({ height: 420, width: 360 });
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    const messageInput = sidePanel.getByLabel('Message agent');
+    await messageInput.fill(Array.from({ length: 80 }, () => 'Overflow content.').join(' '));
+    await messageInput.press('Enter');
+
+    await expect(sidePanel.getByText('Switch to dangerous mode')).toBeVisible();
+    await expect(sidePanel.getByLabel('Agent conversation')).toBeVisible();
+
+    const scrollState = await sidePanel.evaluate(readSidePanelScrollState);
+
+    expect(scrollState.documentScrollHeight).toBe(scrollState.documentClientHeight);
+    expect(scrollState.messagePaneScrollHeight).toBeGreaterThan(
+      scrollState.messagePaneClientHeight
+    );
+  } finally {
+    await context.close();
     await rm(userDataDir, { force: true, recursive: true });
   }
 });

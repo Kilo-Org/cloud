@@ -131,3 +131,16 @@ export const groupConversationEvents = (
 
   return groupedItems;
 };
+
+export const getConversationScrollKey = (items: GroupedConversationItem[]): string =>
+  items
+    .map(item => {
+      if (item.type === 'tool-exchange') {
+        return `${item.toolCall.id}:${item.result.id}`;
+      }
+
+      const { event } = item;
+
+      return event.type === 'message' ? `${event.id}:${event.text.length}` : event.id;
+    })
+    .join('|');

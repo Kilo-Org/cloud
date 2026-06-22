@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { JSX } from 'react';
+import { getConversationScrollKey } from '@/src/shared/agent-conversation';
 import type { GroupedConversationItem } from '@/src/shared/agent-conversation';
 import { AgentConversationItemView } from './agent-conversation-events';
 
@@ -8,6 +9,7 @@ const getConversationItemKey = (item: GroupedConversationItem): string =>
 
 export const ConversationList = ({ items }: { items: GroupedConversationItem[] }): JSX.Element => {
   const listRef = useRef<HTMLElement | null>(null);
+  const scrollKey = getConversationScrollKey(items);
 
   useEffect(() => {
     const list = listRef.current;
@@ -15,7 +17,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
     if (list !== null) {
       list.scrollTop = list.scrollHeight;
     }
-  }, [items.length]);
+  }, [scrollKey]);
 
   return (
     <section

@@ -5,6 +5,7 @@ import {
   createToolResult,
   createUserMessage,
   groupConversationEvents,
+  getConversationScrollKey,
 } from './agent-conversation';
 
 describe('agent conversation events', () => {
@@ -85,5 +86,15 @@ describe('agent conversation events', () => {
       { result: toolResult, toolCall, type: 'tool-exchange' },
       { event: assistantMessage, type: 'event' },
     ]);
+  });
+
+  it('changes the scroll key when a streamed message grows in place', () => {
+    const assistantMessage = createAssistantMessage('Streaming');
+    const firstKey = getConversationScrollKey(groupConversationEvents([assistantMessage]));
+    const nextKey = getConversationScrollKey(
+      groupConversationEvents([{ ...assistantMessage, text: 'Streaming more tokens' }])
+    );
+
+    expect(nextKey).not.toBe(firstKey);
   });
 });

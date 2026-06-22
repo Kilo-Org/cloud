@@ -86,4 +86,52 @@ describe('kilo gateway chat stream client', () => {
     expect(seen[0]?.headers.get('x-kilocode-organizationid')).toBe('org-1');
     expect(seen[0]?.body).toMatchObject({ stream: true });
   });
+
+  it('sends selected thinking effort as gateway reasoning', async () => {
+    let seenBody: unknown = null;
+    const fetch: FetchLike = (_input, init) => {
+      seenBody = parseJsonRequestBody(init?.body);
+
+      return streamResponse(['data: [DONE]\n\n']);
+    };
+
+    await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://app.kilo.ai',
+      fetch,
+      messages: [{ content: 'Think hard', role: 'user' }],
+      model: 'anthropic/claude-sonnet-4',
+      onContentDelta: () => {},
+      thinkingEffort: 'high',
+      token: 'token-1',
+      tools: [],
+    });
+
+    expect(seenBody).toMatchObject({
+      reasoning: { effort: 'high', enabled: true },
+    });
+  });
+
+  it('disables gateway reasoning for none thinking effort', async () => {
+    let seenBody: unknown = null;
+    const fetch: FetchLike = (_input, init) => {
+      seenBody = parseJsonRequestBody(init?.body);
+
+      return streamResponse(['data: [DONE]\n\n']);
+    };
+
+    await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://app.kilo.ai',
+      fetch,
+      messages: [{ content: 'Be fast', role: 'user' }],
+      model: 'anthropic/claude-sonnet-4',
+      onContentDelta: () => {},
+      thinkingEffort: 'none',
+      token: 'token-1',
+      tools: [],
+    });
+
+    expect(seenBody).toMatchObject({
+      reasoning: { effort: 'none', enabled: false },
+    });
+  });
 });

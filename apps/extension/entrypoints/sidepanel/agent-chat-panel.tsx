@@ -194,6 +194,7 @@ export const AgentChatPanel = ({
           organizationId,
           selectedTabId,
           signal: abort.signal,
+          thinkingEffort,
           token: auth.token,
           updateAssistantMessage,
         });

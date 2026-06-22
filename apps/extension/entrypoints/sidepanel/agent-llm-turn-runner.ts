@@ -20,6 +20,7 @@ interface RunDangerousLlmTurnOptions {
   readonly organizationId?: string | undefined;
   readonly selectedTabId: number;
   readonly signal?: AbortSignal | undefined;
+  readonly thinkingEffort?: string | undefined;
   readonly token: string;
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
 }
@@ -52,6 +53,7 @@ export const runDangerousLlmTurn = async ({
   organizationId,
   selectedTabId,
   signal,
+  thinkingEffort,
   token,
   updateAssistantMessage,
 }: RunDangerousLlmTurnOptions): Promise<void> => {
@@ -67,6 +69,7 @@ export const runDangerousLlmTurn = async ({
       onContentDelta,
       organizationId,
       signal,
+      thinkingEffort,
       token,
       tools: [evalToolDefinition],
     });

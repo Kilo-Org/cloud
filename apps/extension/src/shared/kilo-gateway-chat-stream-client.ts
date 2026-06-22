@@ -14,6 +14,7 @@ interface FetchKiloGatewayChatCompletionStreamOptions {
   readonly onContentDelta: (delta: string) => void;
   readonly organizationId?: string | undefined;
   readonly signal?: AbortSignal | undefined;
+  readonly thinkingEffort?: string | undefined;
   readonly token: string;
   readonly tools: KiloGatewayToolDefinition[];
 }
@@ -40,10 +41,15 @@ interface StreamReaderContext {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 const organizationHeaderName = 'x-kilocode-organizationid';
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
-
+const toReasoning = (effort: string | undefined) =>
+  effort === undefined || effort === 'default'
+    ? undefined
+    : {
+        effort: effort === 'instant' ? 'none' : effort,
+        enabled: effort !== 'instant' && effort !== 'none',
+      };
 const parseJson = (value: string): unknown => {
   try {
     return JSON.parse(value);
@@ -51,7 +57,6 @@ const parseJson = (value: string): unknown => {
     throw new TypeError('Gateway eval tool call arguments were not valid JSON.');
   }
 };
-
 const getString = (value: unknown, message: string): string => {
   if (typeof value !== 'string' || value.length === 0) {
     throw new TypeError(message);
@@ -59,7 +64,6 @@ const getString = (value: unknown, message: string): string => {
 
   return value;
 };
-
 const parseEvalToolArguments = (value: unknown): { readonly code: string } => {
   if (typeof value !== 'string') {
     throw new TypeError('Gateway eval tool call did not include arguments.');
@@ -73,7 +77,6 @@ const parseEvalToolArguments = (value: unknown): { readonly code: string } => {
 
   return { code: parsed['code'] };
 };
-
 const parseEvalToolCallBuffer = (value: StreamingToolCallBuffer): KiloGatewayEvalToolCall => {
   if (value.name !== 'eval') {
     throw new TypeError('Gateway stream tool call did not include eval.');
@@ -87,7 +90,6 @@ const parseEvalToolCallBuffer = (value: StreamingToolCallBuffer): KiloGatewayEva
     name: value.name,
   };
 };
-
 const parseServerSentEvents = (text: string): string[] =>
   text
     .split('\n\n')
@@ -101,7 +103,6 @@ const parseServerSentEvents = (text: string): string[] =>
       return dataLines.length === 0 ? [] : [dataLines.join('\n')];
     })
     .filter(data => data.length > 0);
-
 const mergeStreamingToolCall = (
   toolCallsByIndex: Map<number, StreamingToolCallBuffer>,
   value: unknown
@@ -135,7 +136,6 @@ const mergeStreamingToolCall = (
 
   toolCallsByIndex.set(index, next);
 };
-
 const applyStreamingData = (
   accumulator: StreamingAccumulator,
   data: string,
@@ -171,7 +171,6 @@ const applyStreamingData = (
     }
   }
 };
-
 const toCompletion = (accumulator: StreamingAccumulator): KiloGatewayChatCompletion => ({
   ...(accumulator.content === '' ? {} : { content: accumulator.content }),
   toolCalls: [...accumulator.toolCallsByIndex.values()].map(toolCall =>
@@ -200,7 +199,6 @@ export const parseKiloGatewayChatCompletionStream = (
 
   return toCompletion(accumulator);
 };
-
 const consumeStreamReader = async ({
   accumulator,
   decoder,
@@ -233,7 +231,6 @@ const consumeStreamReader = async ({
 
   await consumeStreamReader({ accumulator, decoder, onContentDelta, reader });
 };
-
 const consumeKiloGatewayChatCompletionStream = async (
   body: ReadableStream<Uint8Array>,
   onContentDelta: (delta: string) => void
@@ -255,7 +252,6 @@ const consumeKiloGatewayChatCompletionStream = async (
 
   return toCompletion(accumulator);
 };
-
 export const fetchKiloGatewayChatCompletionStream = async ({
   apiBaseUrl,
   fetch,
@@ -264,13 +260,16 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   onContentDelta,
   organizationId,
   signal,
+  thinkingEffort,
   token,
   tools,
 }: FetchKiloGatewayChatCompletionStreamOptions): Promise<KiloGatewayChatCompletion> => {
+  const reasoning = toReasoning(thinkingEffort);
   const response = await fetch(`${trimTrailingSlash(apiBaseUrl)}/api/gateway/v1/chat/completions`, {
     body: JSON.stringify({
       messages,
       model,
+      ...(reasoning === undefined ? {} : { reasoning }),
       stream: true,
       temperature: 0,
       tool_choice: tools.length === 0 ? 'none' : 'auto',
@@ -287,14 +286,11 @@ export const fetchKiloGatewayChatCompletionStream = async ({
     method: 'POST',
     ...(signal === undefined ? {} : { signal }),
   });
-
   if (!response.ok) {
     throw new Error(`Failed to fetch gateway chat completion stream: ${response.status}`);
   }
-
   if (response.body === null) {
     throw new Error('Gateway chat completion stream did not include a body.');
   }
-
   return consumeKiloGatewayChatCompletionStream(response.body, onContentDelta);
 };

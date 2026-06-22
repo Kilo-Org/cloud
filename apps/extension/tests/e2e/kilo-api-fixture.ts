@@ -112,6 +112,7 @@ export const mockKiloApi = async (
     );
 
     const body: unknown = route.request().postDataJSON();
+    const messages = isRecord(body) && Array.isArray(body['messages']) ? body['messages'] : [];
 
     expect(body).toMatchObject({
       model: 'anthropic/claude-sonnet-4',
@@ -126,6 +127,15 @@ export const mockKiloApi = async (
         },
       ],
     });
+    const userMessages = messages.filter(
+      (message): message is Record<string, unknown> =>
+        isRecord(message) && message['role'] === 'user'
+    );
+    expect(userMessages.at(-1)?.['content']).toEqual(
+      expect.stringContaining('<system_environment>')
+    );
+    expect(userMessages.at(-1)?.['content']).toEqual(expect.stringContaining('Current time:'));
+    expect(userMessages.at(-1)?.['content']).toEqual(expect.stringContaining('Timezone:'));
 
     if (chatCompletionCalls === 1) {
       if (options.beforeFirstCompletion !== undefined) {
@@ -256,36 +266,6 @@ export const readSidePanelScrollState = (): {
     messagePaneScrollHeight: conversation.scrollHeight,
     messagePaneScrollTop: conversation.scrollTop,
   };
-};
-
-export const readEvalCodeBlockOverflowState = (): {
-  codeBlockClientWidth: number;
-  codeBlockOverflowX: string;
-  codeBlockScrollWidth: number;
-} => {
-  const codeLabel = [...document.querySelectorAll('p')].find(
-    element => element.textContent === 'Code'
-  );
-  const codeBlock = codeLabel?.parentElement?.querySelector('pre');
-
-  if (!(codeBlock instanceof HTMLElement)) {
-    throw new Error('Eval code block was not found.');
-  }
-
-  return {
-    codeBlockClientWidth: codeBlock.clientWidth,
-    codeBlockOverflowX: getComputedStyle(codeBlock).overflowX,
-    codeBlockScrollWidth: codeBlock.scrollWidth,
-  };
-};
-
-export const expectEvalCodeBlockNoHorizontalOverflow = async (sidePanel: Page): Promise<void> => {
-  const codeBlockOverflowState = await sidePanel.evaluate(readEvalCodeBlockOverflowState);
-
-  expect(codeBlockOverflowState.codeBlockScrollWidth).toBeLessThanOrEqual(
-    codeBlockOverflowState.codeBlockClientWidth
-  );
-  expect(codeBlockOverflowState.codeBlockOverflowX).toBe('hidden');
 };
 
 export const sendOverflowMessages = async (messageInput: Locator, count: number): Promise<void> => {

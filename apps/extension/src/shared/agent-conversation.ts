@@ -4,6 +4,7 @@ export type AgentConversationEvent =
   | {
       readonly id: string;
       readonly role: 'assistant' | 'user';
+      readonly systemEnvironment?: string;
       readonly text: string;
       readonly type: 'message';
     }
@@ -60,9 +61,10 @@ const createEventId = (): string => {
   return id;
 };
 
-export const createUserMessage = (text: string): MessageEvent => ({
+export const createUserMessage = (text: string, systemEnvironment?: string): MessageEvent => ({
   id: createEventId(),
   role: 'user',
+  ...(systemEnvironment === undefined ? {} : { systemEnvironment }),
   text,
   type: 'message',
 });

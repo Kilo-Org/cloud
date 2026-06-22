@@ -78,6 +78,50 @@ describe('agent LLM harness', () => {
     ]);
   });
 
+  it('adds selected tab context before user messages', () => {
+    const userMessage = createUserMessage(
+      'What is this page?',
+      [
+        '<system_environment>',
+        'Selected tab title: Kilo dashboard',
+        'Selected tab URL: https://app.kilo.ai/dashboard',
+        'Current time: 2026-06-23T01:15:00.000Z',
+        'Timezone: Europe/Belgrade',
+        '</system_environment>',
+      ].join('\n')
+    );
+
+    expect(buildGatewayMessagesFromEvents([userMessage])).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      {
+        content: [
+          'What is this page?',
+          '',
+          '<system_environment>',
+          'Selected tab title: Kilo dashboard',
+          'Selected tab URL: https://app.kilo.ai/dashboard',
+          'Current time: 2026-06-23T01:15:00.000Z',
+          'Timezone: Europe/Belgrade',
+          '</system_environment>',
+        ].join('\n'),
+        role: 'user',
+      },
+    ]);
+    expect(userMessage.text).toBe('What is this page?');
+  });
+
+  it('does not append environment to assistant messages', () => {
+    const assistantMessage = createAssistantMessage('Summary');
+
+    expect(buildGatewayMessagesFromEvents([assistantMessage])).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      {
+        content: 'Summary',
+        role: 'assistant',
+      },
+    ]);
+  });
+
   it('keeps consecutive eval tool calls in one assistant message', () => {
     const firstToolCall = createEvalToolCall({
       code: 'return document.title;',

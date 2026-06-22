@@ -2,6 +2,7 @@ import type { KiloGatewayChatMessage, KiloGatewayToolDefinition } from './kilo-a
 import type { AgentConversationEvent } from './agent-conversation';
 
 type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
 
 export const EXTENSION_AGENT_SYSTEM_PROMPT = [
   'You are Kilo, an agent running in a browser extension side panel.',
@@ -66,6 +67,11 @@ const getConsecutiveToolCalls = (
   return toolCalls;
 };
 
+const getGatewayMessageText = (event: MessageEvent): string =>
+  event.role === 'user' && event.systemEnvironment !== undefined
+    ? `${event.text}\n\n${event.systemEnvironment}`
+    : event.text;
+
 export const buildGatewayMessagesFromEvents = (
   events: AgentConversationEvent[]
 ): KiloGatewayChatMessage[] => {
@@ -80,7 +86,7 @@ export const buildGatewayMessagesFromEvents = (
     if (event !== undefined) {
       switch (event.type) {
         case 'message': {
-          messages.push({ content: event.text, role: event.role });
+          messages.push({ content: getGatewayMessageText(event), role: event.role });
           break;
         }
         case 'tool-call': {

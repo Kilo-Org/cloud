@@ -23,6 +23,14 @@ const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =
 const createDefaultConversationEvents = (): AgentConversationEvent[] => [
   createAssistantMessage('Pick a tab, switch to dangerous mode, and ask Kilo to inspect it.'),
 ];
+const formatSelectedTabSystemEnvironment = ({
+  title,
+  url,
+}: {
+  readonly title: string;
+  readonly url: string;
+}): string =>
+  `<system_environment>\nSelected tab title: ${title}\nSelected tab URL: ${url}\nCurrent time: ${new Date().toISOString()}\nTimezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}\n</system_environment>`;
 
 export const AgentChatPanel = ({
   auth,
@@ -157,7 +165,11 @@ export const AgentChatPanel = ({
   };
 
   const submitMessage = (text: string): void => {
-    const userEvent = createUserMessage(text);
+    const selectedTab = inspectableTabs.find(tab => tab.id === selectedTabId);
+    const userEvent = createUserMessage(
+      text,
+      selectedTab === undefined ? undefined : formatSelectedTabSystemEnvironment(selectedTab)
+    );
     const conversationWithUserMessage = [...events, userEvent];
 
     appendEvents([userEvent]);
@@ -264,6 +276,7 @@ export const AgentChatPanel = ({
           inspectableTabs={inspectableTabs}
           isLoadingTabs={isLoadingTabs}
           isModelSelectDisabled={isModelSelectDisabled}
+          isRunning={isRunning}
           isThinkingSelectDisabled={isThinkingSelectDisabled}
           mode={mode}
           model={model}

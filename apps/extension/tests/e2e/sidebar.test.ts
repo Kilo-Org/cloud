@@ -213,6 +213,8 @@ test('running conversation can be stopped', async () => {
 
     await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
     await sidePanel.getByRole('button', { name: 'Dangerous' }).click();
+    const targetTabSelect = sidePanel.getByLabel('Target tab');
+    await expect(targetTabSelect).toBeEnabled();
     await sidePanel.getByLabel('Message agent').fill('Inspect this tab');
     const sendButton = sidePanel.getByRole('button', { name: 'Send message' });
     const sendButtonRect = await sendButton.boundingBox();
@@ -222,12 +224,14 @@ test('running conversation can be stopped', async () => {
 
     const stopButton = sidePanel.getByRole('button', { name: 'Stop' });
     await expect(stopButton).toBeVisible();
+    await expect(targetTabSelect).toBeDisabled();
     const stopButtonRect = await stopButton.boundingBox();
 
     expect(stopButtonRect).toEqual(sendButtonRect);
     await stopButton.click();
 
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
+    await expect(targetTabSelect).toBeEnabled();
     await expect(sidePanel.getByText('Stopped.')).toBeVisible();
   } finally {
     releaseCompletion();

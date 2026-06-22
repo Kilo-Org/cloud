@@ -128,6 +128,7 @@ const ModeControl = ({
 export const AgentFooterControls = ({
   inspectableTabs,
   isLoadingTabs,
+  isRunning,
   isModelSelectDisabled,
   isThinkingSelectDisabled,
   mode,
@@ -147,6 +148,7 @@ export const AgentFooterControls = ({
 }: {
   inspectableTabs: InspectableTab[];
   isLoadingTabs: boolean;
+  isRunning: boolean;
   isModelSelectDisabled: boolean;
   isThinkingSelectDisabled: boolean;
   mode: AgentMode;
@@ -169,7 +171,7 @@ export const AgentFooterControls = ({
       <CompactSelectControl
         ariaLabel="Target tab"
         className="min-w-0 flex-1 pl-2 pr-6"
-        disabled={isLoadingTabs || inspectableTabs.length === 0}
+        disabled={isRunning || isLoadingTabs || inspectableTabs.length === 0}
         onChange={value => {
           const tabId = Number(value);
 

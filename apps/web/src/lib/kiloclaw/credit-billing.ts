@@ -484,7 +484,6 @@ export async function applyStripeFundedKiloClawPeriod(
   } = params;
 
   const amountCents = Math.round(amountMicrodollars / 10_000);
-  const periodStartDate = periodStart.slice(0, 10); // YYYY-MM-DD
 
   let wasSuspended = false;
   let resolvedInstanceId: string | undefined;
@@ -497,9 +496,8 @@ export async function applyStripeFundedKiloClawPeriod(
   // shouldSendSubscriptionStartedEmailForActivation.
   let shouldSendSubscriptionStartedEmailForNewSettlement = false;
   let requiresProviderNonRenewal = false;
-  // Set when the primary settlement insert was a duplicate (processTopUp
-  // returned false). In that case the downstream email side effect may not
-  // have run yet and we attempt best-effort recovery after commit.
+  // Tracks only a duplicate deposit from processTopUp so post-commit email
+  // recovery can run. A deduction conflict aborts and rolls back settlement.
   let settlementWasDuplicate = false;
 
   await db.transaction(async tx => {
@@ -661,7 +659,7 @@ export async function applyStripeFundedKiloClawPeriod(
       return;
     }
 
-    const deductionCategory = `kiloclaw-settlement:${stripeSubscriptionId}:${periodStartDate}`;
+    const deductionCategory = `kiloclaw-settlement:${stripeSubscriptionId}:payment:${stripePaymentId}`;
     const deductionResult = await tx
       .insert(credit_transactions)
       .values({
@@ -676,19 +674,18 @@ export async function applyStripeFundedKiloClawPeriod(
       })
       .onConflictDoNothing();
 
-    if ((deductionResult.rowCount ?? 0) > 0) {
-      await tx
-        .update(kilocode_users)
-        .set({
-          total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${amountMicrodollars}`,
-        })
-        .where(eq(kilocode_users.id, userId));
-    } else {
-      logInfo('Duplicate deduction skipped, proceeding with subscription update', {
-        user_id: userId,
-        deductionCategory,
-      });
+    if ((deductionResult.rowCount ?? 0) === 0) {
+      throw new Error(
+        `Stripe-funded KiloClaw settlement deduction conflict for payment ${stripePaymentId}`
+      );
     }
+
+    await tx
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${amountMicrodollars}`,
+      })
+      .where(eq(kilocode_users.id, userId));
 
     const updateSet = {
       instance_id: targetRow.instance_id,
@@ -1238,22 +1235,7 @@ export async function enrollWithCredits(params: {
     throw new CreditEnrollmentError('commit_unavailable', message);
   }
 
-  // Step 1: Read current state
-  const [user] = await db
-    .select({
-      total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
-      microdollars_used: kilocode_users.microdollars_used,
-      kilo_pass_threshold: kilocode_users.kilo_pass_threshold,
-    })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, userId))
-    .limit(1);
-
-  if (!user) {
-    logError('Credit enrollment failed: user not found', { user_id: userId, instanceId });
-    throw new CreditEnrollmentError('user_not_found', 'User not found');
-  }
-
+  // Step 1: Read current target state
   const [targetInstance] = await db
     .select({
       id: kiloclaw_instances.id,
@@ -1353,31 +1335,7 @@ export async function enrollWithCredits(params: {
   // Save suspension state for post-transaction auto-resume (spec rule 4)
   const wasSuspended = !!existingSub?.suspended_at;
 
-  // Step 2: Check effective balance (spec rule 3)
-  // Effective balance = raw balance + projected Kilo Pass bonus that would
-  // be awarded after the deduction by maybeIssueKiloPassBonusFromUsageThreshold.
-  // The deduction increments microdollars_used, so project the post-deduction
-  // value to correctly evaluate whether the spend crosses the bonus threshold.
-  const balance = user.total_microdollars_acquired - user.microdollars_used;
-  const { effectiveBalanceMicrodollars: effectiveBalance } = await getEffectiveCreditBalancePreview(
-    {
-      userId,
-      balanceMicrodollars: balance,
-      microdollarsUsed: user.microdollars_used,
-      kiloPassThreshold: user.kilo_pass_threshold,
-      costMicrodollars,
-    }
-  );
-
-  if (effectiveBalance < costMicrodollars) {
-    const shortfall = costMicrodollars - effectiveBalance;
-    throw new CreditEnrollmentError(
-      'insufficient_credits',
-      `Insufficient credit balance. You need ${shortfall} more microdollars to enroll.`
-    );
-  }
-
-  // Step 3: Single DB transaction (spec rule 5)
+  // Step 2: Serialize the balance decision and enrollment mutation.
   const now = new Date();
   const periodMonths = plan === 'commit' ? 6 : 1;
   const periodEnd = addMonths(now, periodMonths);
@@ -1395,6 +1353,22 @@ export async function enrollWithCredits(params: {
   const trialEndEntityId = existingSub?.status === 'trialing' ? existingSub.id : undefined;
 
   await db.transaction(async tx => {
+    const [user] = await tx
+      .select({
+        total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
+        microdollars_used: kilocode_users.microdollars_used,
+        kilo_pass_threshold: kilocode_users.kilo_pass_threshold,
+      })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId))
+      .for('update')
+      .limit(1);
+
+    if (!user) {
+      logError('Credit enrollment failed: user not found', { user_id: userId, instanceId });
+      throw new CreditEnrollmentError('user_not_found', 'User not found');
+    }
+
     const [transactionTargetInstance] = await tx
       .select({ destroyedAt: kiloclaw_instances.destroyed_at })
       .from(kiloclaw_instances)
@@ -1435,7 +1409,32 @@ export async function enrollWithCredits(params: {
       );
     }
 
-    // 5a: Insert negative credit transaction with period-encoded idempotency key
+    const projectedUsage = user.microdollars_used + costMicrodollars;
+    const effectiveThreshold = getEffectiveKiloPassThreshold(user.kilo_pass_threshold);
+    const kiloPassSubscription =
+      effectiveThreshold !== null && projectedUsage >= effectiveThreshold
+        ? await getKiloPassStateForUser(tx, userId)
+        : null;
+    const balance = user.total_microdollars_acquired - user.microdollars_used;
+    const { effectiveBalanceMicrodollars: effectiveBalance } =
+      await getEffectiveCreditBalancePreview({
+        userId,
+        balanceMicrodollars: balance,
+        microdollarsUsed: user.microdollars_used,
+        kiloPassThreshold: user.kilo_pass_threshold,
+        costMicrodollars,
+        subscription: kiloPassSubscription,
+      });
+
+    if (effectiveBalance < costMicrodollars) {
+      const shortfall = costMicrodollars - effectiveBalance;
+      throw new CreditEnrollmentError(
+        'insufficient_credits',
+        `Insufficient credit balance. You need ${shortfall} more microdollars to enroll.`
+      );
+    }
+
+    // Insert negative credit transaction with period-encoded idempotency key.
     const deductionResult = await tx
       .insert(credit_transactions)
       .values({
@@ -1473,8 +1472,8 @@ export async function enrollWithCredits(params: {
       );
     }
 
-    // 5b: Atomically increment microdollars_used so the deduction counts
-    //     as spend toward the Kilo Pass bonus unlock threshold.
+    // Increment microdollars_used so the deduction counts as spend toward
+    // the Kilo Pass bonus unlock threshold.
     await tx
       .update(kilocode_users)
       .set({
@@ -1482,7 +1481,7 @@ export async function enrollWithCredits(params: {
       })
       .where(eq(kilocode_users.id, userId));
 
-    // 5c: Upsert subscription row as pure credit
+    // Upsert subscription row as pure credit.
     const commitEndsAt = plan === 'commit' ? periodEndIso : null;
     const [mutatedSubscription] = await tx
       .insert(kiloclaw_subscriptions)

@@ -579,4 +579,136 @@ describe('Stripe-funded KiloClaw settlement', () => {
       -12_340_000, 12_340_000,
     ]);
   });
+
+  it('keeps distinct payments for the same period balance-neutral', async () => {
+    const user = await insertTestUser({ id: 'settlement-distinct-payment-user' });
+    const instanceId = '45454545-4545-4454-8454-454545454545';
+    const subscriptionId = '67676767-6767-4676-8676-676767676767';
+    const stripeSubscriptionId = 'sub_distinct_payment_same_period';
+    const periodStart = '2026-06-01T00:00:00.000Z';
+    const periodEnd = '2026-07-01T00:00:00.000Z';
+
+    await insertPersonalInstance({ id: instanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      id: subscriptionId,
+      user_id: user.id,
+      instance_id: instanceId,
+      stripe_subscription_id: stripeSubscriptionId,
+      payment_source: 'credits',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      plan: 'standard',
+      status: 'active',
+      current_period_start: periodStart,
+      current_period_end: periodEnd,
+      credit_renewal_at: periodEnd,
+    });
+
+    const settlement = {
+      userId: user.id,
+      metadataInstanceId: instanceId,
+      stripeSubscriptionId,
+      plan: 'standard',
+      priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+      amountMicrodollars: 55_000_000,
+      periodStart,
+      periodEnd,
+    } satisfies Omit<Parameters<typeof applyStripeFundedKiloClawPeriod>[0], 'stripePaymentId'>;
+
+    await expect(
+      applyStripeFundedKiloClawPeriod({
+        ...settlement,
+        stripePaymentId: 'ch_distinct_payment_first',
+      })
+    ).resolves.toBe(true);
+    await expect(
+      applyStripeFundedKiloClawPeriod({
+        ...settlement,
+        stripePaymentId: 'ch_distinct_payment_second',
+      })
+    ).resolves.toBe(true);
+
+    await expect(readUser(user.id)).resolves.toMatchObject({
+      total_microdollars_acquired: 0,
+    });
+
+    const transactions = await db
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        creditCategory: credit_transactions.credit_category,
+      })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(transactions.map(row => row.amountMicrodollars).sort((a, b) => a - b)).toEqual([
+      -55_000_000, -55_000_000, 55_000_000, 55_000_000,
+    ]);
+    expect(
+      new Set(
+        transactions
+          .filter(transaction => transaction.amountMicrodollars < 0)
+          .map(transaction => transaction.creditCategory)
+      ).size
+    ).toBe(2);
+  });
+
+  it('rolls back the deposit and subscription mutation when its deduction cannot be recorded', async () => {
+    const user = await insertTestUser({ id: 'settlement-deduction-conflict-user' });
+    const instanceId = '89898989-8989-4898-8989-898989898989';
+    const subscriptionId = '90909090-9090-4090-8090-909090909090';
+    const stripeSubscriptionId = 'sub_deduction_conflict';
+    const stripePaymentId = 'ch_deduction_conflict';
+
+    await insertPersonalInstance({ id: instanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      id: subscriptionId,
+      user_id: user.id,
+      instance_id: instanceId,
+      stripe_subscription_id: stripeSubscriptionId,
+      payment_source: 'credits',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      plan: 'standard',
+      status: 'past_due',
+      current_period_start: '2026-05-01T00:00:00.000Z',
+      current_period_end: '2026-06-01T00:00:00.000Z',
+      credit_renewal_at: '2026-06-01T00:00:00.000Z',
+      past_due_since: '2026-06-01T00:00:00.000Z',
+    });
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: -55_000_000,
+      is_free: false,
+      credit_category: `kiloclaw-settlement:${stripeSubscriptionId}:payment:${stripePaymentId}`,
+      check_category_uniqueness: true,
+    });
+
+    await expect(
+      applyStripeFundedKiloClawPeriod({
+        userId: user.id,
+        metadataInstanceId: instanceId,
+        stripeSubscriptionId,
+        stripePaymentId,
+        plan: 'standard',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        amountMicrodollars: 55_000_000,
+        periodStart: '2026-06-01T00:00:00.000Z',
+        periodEnd: '2026-07-01T00:00:00.000Z',
+      })
+    ).rejects.toThrow('settlement deduction conflict');
+
+    await expect(readUser(user.id)).resolves.toMatchObject({
+      total_microdollars_acquired: 0,
+    });
+    await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
+      status: 'past_due',
+      current_period_start: '2026-05-01 00:00:00+00',
+      current_period_end: '2026-06-01 00:00:00+00',
+      past_due_since: '2026-06-01 00:00:00+00',
+    });
+
+    const transactions = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(transactions).toHaveLength(1);
+    expect(transactions[0]?.stripe_payment_id).toBeNull();
+  });
 });

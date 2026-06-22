@@ -7584,6 +7584,68 @@ describe('enrollWithCredits', () => {
     );
   });
 
+  it('serializes intro eligibility so only one concurrent legacy trial enrollment is discounted', async () => {
+    await giveUserCredits(user.id, 13_000_000);
+    const [firstInstance, secondInstance] = await db
+      .insert(kiloclaw_instances)
+      .values([
+        {
+          user_id: user.id,
+          sandbox_id: `ki_concurrent_intro_first_${user.id}`,
+        },
+        {
+          user_id: user.id,
+          sandbox_id: `ki_concurrent_intro_second_${user.id}`,
+        },
+      ])
+      .returning();
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        user_id: user.id,
+        instance_id: firstInstance.id,
+        plan: 'trial',
+        status: 'trialing',
+        kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+      },
+      {
+        user_id: user.id,
+        instance_id: secondInstance.id,
+        plan: 'trial',
+        status: 'trialing',
+        kiloclaw_price_version: LEGACY_KILOCLAW_PRICE_VERSION,
+      },
+    ]);
+
+    const { enrollWithCredits } = await import('@/lib/kiloclaw/credit-billing');
+    await expect(
+      Promise.all([
+        enrollWithCredits({
+          userId: user.id,
+          instanceId: firstInstance.id,
+          plan: 'standard',
+          hadPaidSubscription: false,
+        }),
+        enrollWithCredits({
+          userId: user.id,
+          instanceId: secondInstance.id,
+          plan: 'standard',
+          hadPaidSubscription: false,
+        }),
+      ])
+    ).resolves.toEqual([undefined, undefined]);
+
+    const deductions = await db
+      .select({ amountMicrodollars: credit_transactions.amount_microdollars })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(
+      deductions
+        .filter(row => row.amountMicrodollars < 0)
+        .map(row => row.amountMicrodollars)
+        .sort((a, b) => a - b)
+    ).toEqual([-9_000_000, -4_000_000]);
+  });
+
   it('serializes concurrent enrollment balance decisions for different instances', async () => {
     await giveUserCredits(user.id, 55_000_000);
     const [firstInstance, secondInstance] = await db

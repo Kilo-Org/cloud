@@ -4,9 +4,9 @@ import { KiloLogo } from '@/src/shared/kilo-logo';
 
 const Header = (): JSX.Element => (
   <div className="border-b border-zinc-800 px-4 py-3">
-    <div className="flex min-w-0 items-center gap-2.5">
+    <div className="flex min-w-0 items-center">
       <KiloLogo className="size-8 shrink-0 text-[#EDFF00]" />
-      <p className="truncate text-sm font-semibold text-zinc-50">Kilo</p>
+      <span className="sr-only">Kilo</span>
     </div>
   </div>
 );

@@ -84,7 +84,6 @@ import {
 import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
-  disableCodeReviewForRepeatedCloneTimeoutsToday,
   getCodeReviewActionRequiredCopy,
   isCodeReviewActionRequiredReason,
   type CodeReviewActionRequiredReason,
@@ -1329,7 +1328,6 @@ export async function POST(
       await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
     }
 
-    let providerTerminalReason = terminalReason;
     const actionRequiredReason =
       status === 'failed' ? getActionRequiredTerminalReason(terminalReason, errorMessage) : null;
     if (actionRequiredReason) {
@@ -1351,30 +1349,6 @@ export async function POST(
           captureException(disableError, {
             tags: { source: 'code-review-status-action-required-disable' },
             extra: { reviewId, reason: actionRequiredReason },
-          });
-        }
-      }
-    } else if (status === 'failed') {
-      const ownerResolution = await getTerminalOwnerResolution();
-      if (ownerResolution) {
-        try {
-          const repeatedCloneTimeoutReason = await disableCodeReviewForRepeatedCloneTimeoutsToday({
-            owner: ownerResolution.owner,
-            platform: review.platform === 'gitlab' ? 'gitlab' : 'github',
-            reviewId,
-            errorMessage,
-          });
-          if (repeatedCloneTimeoutReason) {
-            providerTerminalReason = repeatedCloneTimeoutReason;
-          }
-        } catch (disableError) {
-          logExceptInTest(
-            '[code-review-status] Failed to disable Code Reviewer for repeated repository clone timeouts:',
-            disableError
-          );
-          captureException(disableError, {
-            tags: { source: 'code-review-status-repeated-clone-timeout-disable' },
-            extra: { reviewId },
           });
         }
       }
@@ -1401,7 +1375,7 @@ export async function POST(
           integration,
           status,
           errorMessage,
-          providerTerminalReason,
+          terminalReason,
           gitlabAccessToken,
           validGateResult
         );

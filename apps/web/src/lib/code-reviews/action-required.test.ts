@@ -407,7 +407,7 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
     expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
   });
 
-  it('disables and emails on the third repository clone timeout today', async () => {
+  it('keeps Code Reviewer enabled on the third repository clone timeout while auto-disable is paused', async () => {
     const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
     await seedFailedReview({ errorMessage: 'repository clone timed out' });
     await seedFailedReview({ errorMessage: 'Repository clone timed out' });
@@ -422,33 +422,17 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
     });
 
     const config = await getStoredConfig();
-    const state = getCodeReviewActionRequiredState(config);
     const [triggeringReview] = await db
       .select({ terminalReason: cloud_agent_code_reviews.terminal_reason })
       .from(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.id, triggeringReviewId))
       .limit(1);
 
-    expect(result).toBe('repeated_repository_clone_timeout');
-    expect(config?.is_enabled).toBe(false);
-    expect(state?.reason).toBe('repeated_repository_clone_timeout');
-    expect(state?.triggeringReviewId).toBe(triggeringReviewId);
-    expect(state?.lastErrorMessage).toBe(
-      'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.'
-    );
-    expect(state?.emailSentAt).toBeTruthy();
-    expect(triggeringReview?.terminalReason).toBe('repeated_repository_clone_timeout');
-    expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
-    expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledWith(
-      testUser.google_user_email,
-      expect.objectContaining({
-        reason:
-          'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
-        recoveryLabel: 'Contact support',
-        recoveryUrl:
-          'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer',
-      })
-    );
+    expect(result).toBeNull();
+    expect(config?.is_enabled).toBe(true);
+    expect(getCodeReviewActionRequiredState(config)).toBeNull();
+    expect(triggeringReview?.terminalReason).toBe('sandbox_error');
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
   });
 
   it('does not count other owners, other platforms, or yesterday for clone timeout threshold', async () => {

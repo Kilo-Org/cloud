@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 .output
 coverage
+playwright-report
+test-results
 stats.html
 stats-*.json
 .wxt

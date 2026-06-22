@@ -7,8 +7,11 @@
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox --mv3",
+    "debug:chrome": "pnpm run build && tsx scripts/debug-chrome.ts",
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox --mv3",
+    "e2e": "pnpm run build && playwright test -c playwright.config.ts",
+    "e2e:debug": "pnpm run build && playwright test -c playwright.config.ts --debug",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox --mv3",
     "typecheck": "tsc --noEmit",
@@ -27,6 +30,7 @@
     "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@playwright/test": "1.58.2",
     "@tailwindcss/vite": "4.3.1",
     "@types/node": "catalog:",
     "@types/react": "19.2.14",

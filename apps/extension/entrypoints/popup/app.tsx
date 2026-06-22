@@ -7,11 +7,22 @@ import {
 } from '@/src/shared/messages';
 import type { GetSidebarStateMessage, ToggleSidebarMessage } from '@/src/shared/messages';
 import { isMissingContentScriptConnectionError } from '@/src/shared/runtime-errors';
+import { selectPopupTargetTabId } from '@/src/shared/tabs';
 
 type PopupRequestMessage = GetSidebarStateMessage | ToggleSidebarMessage;
+interface ChromeScriptingApi {
+  executeScript(injection: {
+    files: string[];
+    target: {
+      tabId: number;
+    };
+  }): Promise<unknown>;
+}
 
 const unavailableStatus = 'Sidebar is unavailable on this page.';
-const sidebarContentScriptPath = '/content-scripts/content.js';
+const sidebarContentScriptPath = 'content-scripts/content.js';
+const sidebarMessageRetryDelayMs = 50;
+const sidebarMessageRetryLimit = 20;
 
 const getSidebarStatus = (isOpen: boolean): string => {
   if (isOpen) {
@@ -38,10 +49,66 @@ const getErrorMessage = (error: unknown): string => {
 };
 
 const injectSidebarContentScript = async (tabId: number): Promise<void> => {
-  await browser.scripting.executeScript({
+  const chromeScripting = (
+    globalThis as typeof globalThis & { chrome?: { scripting?: ChromeScriptingApi } }
+  ).chrome?.scripting;
+
+  if (!chromeScripting) {
+    throw new Error('Chrome scripting API is unavailable.');
+  }
+
+  await chromeScripting.executeScript({
     files: [sidebarContentScriptPath],
     target: { tabId },
   });
+};
+
+const delay = (delayMs: number): Promise<void> =>
+  // eslint-disable-next-line promise/avoid-new -- Browser timers are callback based.
+  new Promise(resolve => {
+    setTimeout(resolve, delayMs);
+  });
+
+const sendSidebarMessageToTab = async (
+  tabId: number,
+  message: PopupRequestMessage,
+  retryLimit: number
+): Promise<unknown> => {
+  let lastMissingConnectionError = new Error('Sidebar content script is unavailable.');
+
+  for (let attempt = 0; attempt < retryLimit; attempt += 1) {
+    try {
+      // eslint-disable-next-line no-await-in-loop -- Each retry depends on the previous missing-receiver result.
+      const response: unknown = await browser.tabs.sendMessage(tabId, message);
+      return response;
+    } catch (error) {
+      if (!isMissingContentScriptConnectionError(error)) {
+        throw error;
+      }
+
+      lastMissingConnectionError = error;
+      // eslint-disable-next-line no-await-in-loop -- Backoff is intentional between receiver checks.
+      await delay(sidebarMessageRetryDelayMs);
+    }
+  }
+
+  throw lastMissingConnectionError;
+};
+
+const getTargetTabId = async (): Promise<number> => {
+  const [activeTab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+  const tabs = await browser.tabs.query({ currentWindow: true });
+  const extensionOrigin = new URL(browser.runtime.getURL('/')).origin;
+  const tabId = selectPopupTargetTabId(activeTab, tabs, extensionOrigin);
+
+  if (typeof tabId !== 'number') {
+    throw new TypeError('No active tab is available.');
+  }
+
+  return tabId;
 };
 
 export const App = (): React.JSX.Element => {
@@ -51,19 +118,10 @@ export const App = (): React.JSX.Element => {
   const sendSidebarMessage = async (message: PopupRequestMessage): Promise<void> => {
     try {
       setStatus('Connecting to this tab...');
-      const [activeTab] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      if (typeof activeTab?.id !== 'number') {
-        throw new TypeError('No active tab is available.');
-      }
-
-      const tabId = activeTab.id;
+      const tabId = await getTargetTabId();
       const response: unknown = await (async (): Promise<unknown> => {
         try {
-          return await browser.tabs.sendMessage(tabId, message);
+          return await sendSidebarMessageToTab(tabId, message, 1);
         } catch (error) {
           if (!isMissingContentScriptConnectionError(error)) {
             throw error;
@@ -75,7 +133,7 @@ export const App = (): React.JSX.Element => {
             throw new Error(unavailableStatus);
           }
 
-          return browser.tabs.sendMessage(tabId, message);
+          return sendSidebarMessageToTab(tabId, message, sidebarMessageRetryLimit);
         }
       })();
 

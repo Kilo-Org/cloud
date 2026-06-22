@@ -2,6 +2,8 @@ export const DEBUGGER_PROTOCOL_VERSION = '1.3';
 export const HTML_LENGTH_EXPRESSION = 'document.documentElement.outerHTML.length';
 export const LIST_INSPECTABLE_TABS_MESSAGE = 'kilo.tabs.listInspectable';
 export const GET_TAB_HTML_LENGTH_MESSAGE = 'kilo.tabs.getHtmlLength';
+export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
+export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
 
 export interface ChromeDebuggerTargetInfo {
   readonly attached?: boolean;
@@ -32,6 +34,17 @@ export interface InspectableTab {
   readonly url: string;
 }
 
+export type EvalTabResult =
+  | {
+      readonly description?: string;
+      readonly ok: true;
+      readonly value?: unknown;
+    }
+  | {
+      readonly error: string;
+      readonly ok: false;
+    };
+
 export type TabDebuggerRequest =
   | {
       readonly type: typeof LIST_INSPECTABLE_TABS_MESSAGE;
@@ -39,6 +52,12 @@ export type TabDebuggerRequest =
   | {
       readonly tabId: number;
       readonly type: typeof GET_TAB_HTML_LENGTH_MESSAGE;
+    }
+  | {
+      readonly code: string;
+      readonly tabId: number;
+      readonly timeoutMs?: number;
+      readonly type: typeof EVAL_TAB_MESSAGE;
     };
 
 export type TabDebuggerResponse =
@@ -51,6 +70,11 @@ export type TabDebuggerResponse =
       readonly length: number;
       readonly ok: true;
       readonly type: typeof GET_TAB_HTML_LENGTH_MESSAGE;
+    }
+  | {
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof EVAL_TAB_MESSAGE;
     }
   | {
       readonly error: string;
@@ -124,6 +148,67 @@ export const getTabHtmlLength = async (
   }
 };
 
+const getEvalExpression = (code: string): string => `(async () => { ${code} })()`;
+
+export const evalInTab = async ({
+  code,
+  debuggerApi,
+  tabId,
+  timeoutMs = DEFAULT_EVAL_TIMEOUT_MS,
+}: {
+  readonly code: string;
+  readonly debuggerApi: ChromeDebuggerApi;
+  readonly tabId: number;
+  readonly timeoutMs?: number;
+}): Promise<EvalTabResult> => {
+  const target = { tabId };
+  let attached = false;
+
+  try {
+    await debuggerApi.attach(target, DEBUGGER_PROTOCOL_VERSION);
+    attached = true;
+
+    const response = await debuggerApi.sendCommand(target, 'Runtime.evaluate', {
+      awaitPromise: true,
+      expression: getEvalExpression(code),
+      returnByValue: true,
+      timeout: timeoutMs,
+    });
+
+    if (!isRecord(response)) {
+      return { error: 'Debugger returned an invalid eval response.', ok: false };
+    }
+
+    const { exceptionDetails, result } = response;
+
+    if (exceptionDetails !== undefined) {
+      return { error: 'Page evaluation failed.', ok: false };
+    }
+
+    if (!isRecord(result)) {
+      return { error: 'Debugger returned an invalid eval result.', ok: false };
+    }
+
+    const description =
+      typeof result['description'] === 'string' ? result['description'] : undefined;
+
+    return {
+      ok: true,
+      ...(description === undefined ? {} : { description }),
+      ...('value' in result ? { value: result['value'] } : {}),
+    };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Page evaluation failed.',
+      ok: false,
+    };
+  } finally {
+    if (attached) {
+      await debuggerApi.detach(target);
+    }
+  }
+};
+
 export const isTabDebuggerRequest = (value: unknown): value is TabDebuggerRequest => {
   if (!isRecord(value) || typeof value['type'] !== 'string') {
     return false;
@@ -133,7 +218,16 @@ export const isTabDebuggerRequest = (value: unknown): value is TabDebuggerReques
     return true;
   }
 
-  return value['type'] === GET_TAB_HTML_LENGTH_MESSAGE && typeof value['tabId'] === 'number';
+  if (value['type'] === GET_TAB_HTML_LENGTH_MESSAGE) {
+    return typeof value['tabId'] === 'number';
+  }
+
+  return (
+    value['type'] === EVAL_TAB_MESSAGE &&
+    typeof value['tabId'] === 'number' &&
+    typeof value['code'] === 'string' &&
+    (value['timeoutMs'] === undefined || typeof value['timeoutMs'] === 'number')
+  );
 };
 
 export const isTabDebuggerResponse = (value: unknown): value is TabDebuggerResponse => {
@@ -158,5 +252,18 @@ export const isTabDebuggerResponse = (value: unknown): value is TabDebuggerRespo
     );
   }
 
-  return value['type'] === GET_TAB_HTML_LENGTH_MESSAGE && typeof value['length'] === 'number';
+  if (value['type'] === GET_TAB_HTML_LENGTH_MESSAGE) {
+    return typeof value['length'] === 'number';
+  }
+
+  if (value['type'] === EVAL_TAB_MESSAGE) {
+    const { result } = value;
+    return (
+      isRecord(result) &&
+      typeof result['ok'] === 'boolean' &&
+      (result['ok'] || typeof result['error'] === 'string')
+    );
+  }
+
+  return false;
 };

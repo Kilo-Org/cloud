@@ -1,7 +1,9 @@
 import { enableActionClickSidePanel } from '@/src/shared/side-panel';
 import {
+  EVAL_TAB_MESSAGE,
   GET_TAB_HTML_LENGTH_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
+  evalInTab,
   getTabHtmlLength,
   isTabDebuggerRequest,
   listInspectableTabs,
@@ -44,10 +46,23 @@ const handleTabDebuggerRequest = async ({
       };
     }
 
+    if (request.type === GET_TAB_HTML_LENGTH_MESSAGE) {
+      return {
+        length: await getTabHtmlLength(debuggerApi, request.tabId),
+        ok: true,
+        type: GET_TAB_HTML_LENGTH_MESSAGE,
+      };
+    }
+
     return {
-      length: await getTabHtmlLength(debuggerApi, request.tabId),
       ok: true,
-      type: GET_TAB_HTML_LENGTH_MESSAGE,
+      result: await evalInTab({
+        code: request.code,
+        debuggerApi,
+        tabId: request.tabId,
+        ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+      }),
+      type: EVAL_TAB_MESSAGE,
     };
   } catch (error) {
     return {

@@ -1,15 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, JSX } from 'react';
 import {
+  createAssistantMessage,
+  createToolResult,
+  createUserMessage,
+  planLocalDangerousAgentTurn,
+} from '@/src/shared/agent-conversation';
+import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
+import {
   getDefaultAgentPanelState,
   getFooterControlDisplay,
 } from '@/src/shared/agent-chat-placeholder';
-import type { AgentChatMessage } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
+import { AgentConversationEventView } from './agent-conversation-events';
+import { executeEvalToolCall, getEvalSummary } from './agent-eval-runtime';
 import { AgentFooterControls } from './agent-footer-controls';
+import { useTabDebugger } from './use-tab-debugger';
 
 const effortOptions = ['low', 'medium', 'high'] as const;
 const defaultThinkingOption = 'default';
@@ -39,31 +48,19 @@ const fallbackModelOptions: KiloGatewayModelOption[] = [
   },
 ];
 
-const Message = ({ message }: { message: AgentChatMessage }): JSX.Element => {
-  const isUser = message.role === 'user';
-
-  return (
-    <div className={isUser ? 'flex justify-end' : 'flex justify-start'}>
-      <div
-        className={
-          isUser
-            ? 'max-w-[88%] rounded-lg bg-zinc-100 px-3 py-2 text-sm leading-5 text-zinc-950'
-            : 'max-w-[88%] rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm leading-5 text-zinc-200'
-        }
-      >
-        <p>{message.body}</p>
-      </div>
-    </div>
-  );
-};
-
 export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
   const initialState = useMemo(() => getDefaultAgentPanelState(), []);
   const [draft, setDraft] = useState(initialState.draft);
+  const [events, setEvents] = useState<AgentConversationEvent[]>(() => [
+    createAssistantMessage('Pick a tab, switch to dangerous mode, and ask Kilo to inspect it.'),
+  ]);
+  const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState(initialState.footer.mode);
   const [model, setModel] = useState(initialState.footer.model);
   const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>(fallbackModelOptions);
   const [thinkingEffort, setThinkingEffort] = useState(initialState.footer.thinkingEffort);
+  const { inspectableTabs, isLoadingTabs, loadInspectableTabs, selectTab, selectedTabId } =
+    useTabDebugger();
   const selectedModel = useMemo(
     () => modelOptions.find(option => option.id === model),
     [model, modelOptions]
@@ -82,6 +79,10 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
   });
   const isThinkingSelectDisabled =
     selectedModel !== undefined && selectedModel.variants.length === 0;
+
+  useEffect(() => {
+    void loadInspectableTabs();
+  }, [loadInspectableTabs]);
 
   useEffect(() => {
     const abort = new AbortController();
@@ -132,6 +133,52 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
     }
   }, [thinkingEffort, thinkingOptions]);
 
+  const submitMessage = (text: string): void => {
+    const userEvent = createUserMessage(text);
+    const plannedEvents = planLocalDangerousAgentTurn({
+      mode,
+      selectedTabId,
+      userText: text,
+    });
+    const toolCalls = plannedEvents.filter(
+      (event): event is Extract<AgentConversationEvent, { readonly type: 'tool-call' }> =>
+        event.type === 'tool-call'
+    );
+
+    setEvents(currentEvents => [...currentEvents, userEvent, ...plannedEvents]);
+
+    if (toolCalls.length === 0) {
+      return;
+    }
+
+    setIsRunning(true);
+
+    void (async (): Promise<void> => {
+      const completedEvents = await Promise.all(
+        toolCalls.map(async toolCall => {
+          const result = await executeEvalToolCall(toolCall);
+          const toolResultEvent = result.ok
+            ? createToolResult({
+                ok: true,
+                toolCallId: toolCall.id,
+                value: result.value,
+              })
+            : createToolResult({
+                error: result.error,
+                ok: false,
+                toolCallId: toolCall.id,
+              });
+
+          return [toolResultEvent, createAssistantMessage(getEvalSummary(result))];
+        })
+      );
+
+      setEvents(currentEvents => [...currentEvents, ...completedEvents.flat()]);
+
+      setIsRunning(false);
+    })();
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <section
@@ -139,8 +186,8 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
       >
         <div className="flex flex-1 flex-col justify-end gap-3">
-          {initialState.messages.map(message => (
-            <Message key={`${message.role}-${message.body}`} message={message} />
+          {events.map(event => (
+            <AgentConversationEventView event={event} key={event.id} />
           ))}
         </div>
       </section>
@@ -149,6 +196,14 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
         className="border-t border-zinc-900 px-4 py-3"
         onSubmit={event => {
           event.preventDefault();
+
+          const text = draft.trim();
+          if (text === '' || isRunning) {
+            return;
+          }
+
+          setDraft('');
+          submitMessage(text);
         }}
       >
         <label className="sr-only" htmlFor="agent-message">
@@ -165,22 +220,26 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
         />
         <button
           className="mt-2 h-9 w-full rounded-md bg-[#EDFF00] px-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-          disabled={draft.trim() === ''}
+          disabled={draft.trim() === '' || isRunning}
           type="submit"
         >
-          Send message
+          {isRunning ? 'Running...' : 'Send message'}
         </button>
       </form>
 
       <footer className="border-t border-zinc-900 bg-zinc-950 px-4 py-2">
         <AgentFooterControls
+          inspectableTabs={inspectableTabs}
+          isLoadingTabs={isLoadingTabs}
           isThinkingSelectDisabled={isThinkingSelectDisabled}
           mode={mode}
           model={model}
           modelOptions={modelOptions}
           onModeChange={setMode}
           onModelChange={setModel}
+          onSelectedTabChange={selectTab}
           onThinkingEffortChange={setThinkingEffort}
+          selectedTabId={selectedTabId}
           thinkingEffort={thinkingEffort}
           thinkingOptions={thinkingOptions}
         />

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { HTML_LENGTH_EXPRESSION, getTabHtmlLength, listInspectableTabs } from './tab-debugger';
+import {
+  HTML_LENGTH_EXPRESSION,
+  evalInTab,
+  getTabHtmlLength,
+  listInspectableTabs,
+} from './tab-debugger';
 import type { ChromeDebuggerApi, ChromeDebuggerTargetInfo } from './tab-debugger';
 
 const createDebuggerApi = ({
@@ -74,6 +79,55 @@ describe('tab debugger helpers', () => {
     });
 
     await expect(getTabHtmlLength(debuggerApi, 7)).rejects.toThrow('Evaluation failed.');
+    expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
+  });
+
+  it('evaluates dangerous-mode code in the selected tab', async () => {
+    const calls: unknown[] = [];
+    const debuggerApi = createDebuggerApi({
+      sendCommand: (target, method, params) => {
+        calls.push({ method, params, target });
+        return { result: { type: 'number', value: 12_345 } };
+      },
+    });
+
+    await expect(
+      evalInTab({
+        code: 'return document.documentElement.outerHTML.length;',
+        debuggerApi,
+        tabId: 7,
+      })
+    ).resolves.toStrictEqual({ ok: true, value: 12_345 });
+    expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
+    expect(calls).toStrictEqual([
+      {
+        method: 'Runtime.evaluate',
+        params: {
+          awaitPromise: true,
+          expression: '(async () => { return document.documentElement.outerHTML.length; })()',
+          returnByValue: true,
+          timeout: 5000,
+        },
+        target: { tabId: 7 },
+      },
+    ]);
+  });
+
+  it('returns eval errors and still detaches', async () => {
+    const debuggerApi = createDebuggerApi({
+      sendCommand: () => ({
+        exceptionDetails: { text: 'ReferenceError' },
+        result: { type: 'object' },
+      }),
+    });
+
+    await expect(
+      evalInTab({
+        code: 'return missingValue;',
+        debuggerApi,
+        tabId: 7,
+      })
+    ).resolves.toStrictEqual({ error: 'Page evaluation failed.', ok: false });
     expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
   });
 });

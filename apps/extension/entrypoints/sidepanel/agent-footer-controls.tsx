@@ -3,6 +3,7 @@ import type { JSX, ReactNode } from 'react';
 import { getFooterControlDisplay } from '@/src/shared/agent-chat-placeholder';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
+import type { InspectableTab } from '@/src/shared/tab-debugger';
 
 const modeOptions = [
   { label: 'Safe', value: 'safe' },
@@ -148,52 +149,85 @@ const ModeControl = ({
 };
 
 export const AgentFooterControls = ({
+  inspectableTabs,
+  isLoadingTabs,
   isThinkingSelectDisabled,
   mode,
   model,
   modelOptions,
   onModeChange,
   onModelChange,
+  onSelectedTabChange,
   onThinkingEffortChange,
+  selectedTabId,
   thinkingEffort,
   thinkingOptions,
 }: {
+  inspectableTabs: InspectableTab[];
+  isLoadingTabs: boolean;
   isThinkingSelectDisabled: boolean;
   mode: AgentMode;
   model: string;
   modelOptions: KiloGatewayModelOption[];
   onModeChange: (mode: AgentMode) => void;
   onModelChange: (model: string) => void;
+  onSelectedTabChange: (tabId: number) => void;
   onThinkingEffortChange: (thinkingEffort: string) => void;
+  selectedTabId: number | undefined;
   thinkingEffort: string;
   thinkingOptions: string[];
 }): JSX.Element => (
-  <div className="flex min-w-0 items-center gap-2">
-    <ModeControl mode={mode} onChange={onModeChange} />
+  <div className="grid gap-2">
     <CompactSelectControl
-      ariaLabel="Model"
-      className="flex-1 pl-2 pr-6"
-      onChange={onModelChange}
-      value={model}
+      ariaLabel="Target tab"
+      className="w-full pl-2 pr-6"
+      disabled={isLoadingTabs || inspectableTabs.length === 0}
+      onChange={value => {
+        const tabId = Number(value);
+
+        if (Number.isInteger(tabId)) {
+          onSelectedTabChange(tabId);
+        }
+      }}
+      value={selectedTabId === undefined ? '' : String(selectedTabId)}
     >
-      {modelOptions.map(option => (
-        <option key={option.id} value={option.id}>
-          {option.name}
-        </option>
-      ))}
+      {inspectableTabs.length === 0 ? (
+        <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tabs'}</option>
+      ) : (
+        inspectableTabs.map(tab => (
+          <option key={tab.id} value={tab.id}>
+            {tab.title}
+          </option>
+        ))
+      )}
     </CompactSelectControl>
-    <CompactSelectControl
-      ariaLabel="Thinking effort"
-      className="w-24 pl-2 pr-6"
-      disabled={isThinkingSelectDisabled}
-      onChange={onThinkingEffortChange}
-      value={thinkingEffort}
-    >
-      {thinkingOptions.map(option => (
-        <option key={option} value={option}>
-          {option === defaultThinkingOption ? 'Default' : thinkingEffortLabel(option)}
-        </option>
-      ))}
-    </CompactSelectControl>
+    <div className="flex min-w-0 items-center gap-2">
+      <ModeControl mode={mode} onChange={onModeChange} />
+      <CompactSelectControl
+        ariaLabel="Model"
+        className="flex-1 pl-2 pr-6"
+        onChange={onModelChange}
+        value={model}
+      >
+        {modelOptions.map(option => (
+          <option key={option.id} value={option.id}>
+            {option.name}
+          </option>
+        ))}
+      </CompactSelectControl>
+      <CompactSelectControl
+        ariaLabel="Thinking effort"
+        className="w-24 pl-2 pr-6"
+        disabled={isThinkingSelectDisabled}
+        onChange={onThinkingEffortChange}
+        value={thinkingEffort}
+      >
+        {thinkingOptions.map(option => (
+          <option key={option} value={option}>
+            {option === defaultThinkingOption ? 'Default' : thinkingEffortLabel(option)}
+          </option>
+        ))}
+      </CompactSelectControl>
+    </div>
   </div>
 );

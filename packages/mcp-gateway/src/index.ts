@@ -67,3 +67,14 @@ export {
   parseAuxiliaryHeaders,
 } from './headers';
 export { isIpAddress, isPublicIp } from './ip';
+export {
+  NativeMcpResourcePath,
+  NativeMcpResourceUrl,
+  NativeMcpTokenUse,
+  NativeMcpTokenClaimsSchema,
+  isNativeMcpResource,
+  nativeMcpProtectedResourceMetadata,
+  nativeMcpProtectedResourceMetadataUrl,
+  nativeMcpAuthorizationUrl,
+} from './native-resource';
+export type { NativeMcpTokenClaims } from './native-resource';

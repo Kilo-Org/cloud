@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import {
   GatewayMcpAccessScope,
   OAuthAuthorizationQuerySchema,
+  isNativeMcpResource,
   type OAuthAuthorizationQuery,
 } from '@kilocode/mcp-gateway';
 import { timingSafeEqual } from '@kilocode/encryption';
@@ -32,6 +33,17 @@ const authorizationSingletonParams = [
 ] as const;
 const consentDecisionValues = ['allow', 'deny'] as const;
 type ConsentDecision = (typeof consentDecisionValues)[number];
+type ConsentPreview = {
+  clientId: string;
+  clientName: string | null;
+  redirectUri: string;
+  resource: string;
+  connectionName: string;
+  endpointHost: string;
+  ownerScope: 'personal' | 'organization';
+  contextName: string;
+  scopes: string[];
+};
 
 function consentSecurityHeaders(redirectUri: string) {
   const callback = new URL(redirectUri);
@@ -75,9 +87,23 @@ export function redirectOAuthError(error: OAuthAuthorizationRedirectError, statu
   return response;
 }
 
-async function authorizationIdentity() {
-  const { user, authFailedResponse, organizationId } = await getUserFromAuth({ adminOnly: false });
-  if (authFailedResponse) return { response: authFailedResponse };
+async function authorizationIdentity(request: NextRequest, params: { adminOnly: boolean }) {
+  const { user, authFailedResponse, organizationId } = await getUserFromAuth({
+    adminOnly: params.adminOnly,
+  });
+  if (authFailedResponse) {
+    if (!request.headers.has('Authorization') && authFailedResponse.status === 401) {
+      const signIn = new URL('/users/sign_in', request.nextUrl.origin);
+      signIn.searchParams.set(
+        'callbackPath',
+        `${request.nextUrl.pathname}${request.nextUrl.search}`
+      );
+      const response = NextResponse.redirect(signIn.toString(), 303);
+      response.headers.set('Cache-Control', 'no-store');
+      return { response };
+    }
+    return { response: authFailedResponse };
+  }
   if (!user) return { response: NextResponse.json({ error: 'access_denied' }, { status: 401 }) };
   return { user, executionContext: executionContextFromAuth(organizationId) };
 }
@@ -90,6 +116,13 @@ async function authorizeRequest(
   allowBrowserOrgResourceContext: boolean
 ) {
   const services = createGatewayServices();
+  if (isNativeMcpResource(query.resource)) {
+    const result = await services.nativeMcpAuthorizationService.authorize({ query, userId });
+    const response = NextResponse.redirect(result.redirectUrl, 303);
+    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set('Referrer-Policy', 'no-referrer');
+    return response;
+  }
   const result = await services.authorizationService.authorize({
     query,
     route,
@@ -177,13 +210,21 @@ function consentDocument(params: {
   userEmail: string;
   scopes: string[];
   inputs: string;
+  nativeMcp?: boolean;
 }) {
   const callback = new URL(params.redirectUri);
   const callbackIsLoopback = ['127.0.0.1', '[::1]', 'localhost'].includes(callback.hostname);
   const scopes =
     params.scopes.length > 0
       ? params.scopes
-          .map(scope => `<span class="scope">${escapeHtml(consentScopeLabel(scope))}</span>`)
+          .map(
+            scope =>
+              `<span class="scope">${escapeHtml(
+                params.nativeMcp && scope === GatewayMcpAccessScope
+                  ? 'Read your Kilo stats'
+                  : consentScopeLabel(scope)
+              )}</span>`
+          )
           .join('')
       : '<span class="scope muted-scope">No permissions requested</span>';
   const contextLabel = params.ownerScope === 'organization' ? 'Organization' : 'Context';
@@ -378,18 +419,34 @@ function consentDocument(params: {
         <section class="card" aria-labelledby="authorization-title">
           <header class="header">
             <div class="eyebrow"><span class="badge">Unverified app</span></div>
-            <h1 id="authorization-title">Allow access to this MCP connection?</h1>
-            <p class="lead">An app is requesting access. Kilo has not verified who operates it.</p>
+            <h1 id="authorization-title">${
+              params.nativeMcp
+                ? 'Allow access to your Kilo usage stats?'
+                : 'Allow access to this MCP connection?'
+            }</h1>
+            <p class="lead">${
+              params.nativeMcp
+                ? 'An app is requesting read-only access to your individual Kilo stats. Kilo has not verified who operates it.'
+                : 'An app is requesting access. Kilo has not verified who operates it.'
+            }</p>
             <code class="client-id">${escapeHtml(params.clientId)}</code>
           </header>
           <div class="content">
             <div class="warning">
-              <strong>This grants broad MCP access</strong>
-              <p>The app will be able to use all tools and data exposed by this MCP connection. Requests may use credentials configured for the connection and may read, create, modify, or delete data on connected services.</p>
+              <strong>${
+                params.nativeMcp
+                  ? 'This grants read-only stats access'
+                  : 'This grants broad MCP access'
+              }</strong>
+              <p>${
+                params.nativeMcp
+                  ? 'The app can query aggregate Kilo usage, Code Reviewer, and session stats for your account for at most the last 60 days per query. It cannot list raw rows or access organization-wide stats.'
+                  : 'The app will be able to use all tools and data exposed by this MCP connection. Requests may use credentials configured for the connection and may read, create, modify, or delete data on connected services.'
+              }</p>
             </div>
             <dl>
               <div class="detail">
-                <dt>MCP connection</dt>
+                <dt>${params.nativeMcp ? 'MCP resource' : 'MCP connection'}</dt>
                 <dd><span class="value-primary">${escapeHtml(params.connectionName)}</span><span class="value-secondary">Endpoint: ${escapeHtml(params.endpointHost)}</span></dd>
               </div>
               <div class="detail">
@@ -426,8 +483,6 @@ function consentDocument(params: {
 }
 
 async function consentResponse(request: NextRequest, route?: ScopedConnectRoute) {
-  const identity = await authorizationIdentity();
-  if ('response' in identity) return identity.response;
   if (hasDuplicateSingletonParams(request.nextUrl.searchParams, authorizationSingletonParams)) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
@@ -437,17 +492,31 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
+  const nativeMcp = isNativeMcpResource(parsed.data.resource);
+  const identity = await authorizationIdentity(request, { adminOnly: nativeMcp });
+  if ('response' in identity) return identity.response;
   const services = createGatewayServices();
   const executionContext = identity.executionContext;
-  const preview = await services.authorizationService.previewAuthorization({
-    query: parsed.data,
-    route,
-    userId: identity.user.id,
-    executionContext,
-    allowBrowserOrgResourceContext: !request.headers.has('Authorization'),
-    redirectErrors: true,
-  });
-  const resolvedExecutionContext = preview.executionContext;
+  let preview: ConsentPreview;
+  let resolvedExecutionContext = executionContext;
+  if (nativeMcp) {
+    preview = await services.nativeMcpAuthorizationService.previewAuthorization({
+      query: parsed.data,
+      userId: identity.user.id,
+      redirectErrors: true,
+    });
+  } else {
+    const gatewayPreview = await services.authorizationService.previewAuthorization({
+      query: parsed.data,
+      route,
+      userId: identity.user.id,
+      executionContext,
+      allowBrowserOrgResourceContext: !request.headers.has('Authorization'),
+      redirectErrors: true,
+    });
+    preview = gatewayPreview;
+    resolvedExecutionContext = gatewayPreview.executionContext;
+  }
   const approvalState = createApprovalState();
   const approvalCookie = approvalSignature({
     approvalState,
@@ -483,6 +552,7 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
       userEmail: identity.user.google_user_email,
       scopes: preview.scopes,
       inputs,
+      nativeMcp,
     }),
     {
       headers: {
@@ -502,8 +572,6 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
 }
 
 async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) {
-  const identity = await authorizationIdentity();
-  if ('response' in identity) return identity.response;
   const form = await request.formData();
   if (
     hasDuplicateSingletonParams(form, [
@@ -524,17 +592,31 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
+  const nativeMcp = isNativeMcpResource(parsed.data.resource);
+  const identity = await authorizationIdentity(request, { adminOnly: nativeMcp });
+  if ('response' in identity) return identity.response;
   const services = createGatewayServices();
   const executionContext = identity.executionContext;
-  const preview = await services.authorizationService.previewAuthorization({
-    query: parsed.data,
-    route,
-    userId: identity.user.id,
-    executionContext,
-    allowBrowserOrgResourceContext: !request.headers.has('Authorization'),
-    redirectErrors: true,
-  });
-  const resolvedExecutionContext = preview.executionContext;
+  let preview: ConsentPreview;
+  let resolvedExecutionContext = executionContext;
+  if (nativeMcp) {
+    preview = await services.nativeMcpAuthorizationService.previewAuthorization({
+      query: parsed.data,
+      userId: identity.user.id,
+      redirectErrors: true,
+    });
+  } else {
+    const gatewayPreview = await services.authorizationService.previewAuthorization({
+      query: parsed.data,
+      route,
+      userId: identity.user.id,
+      executionContext,
+      allowBrowserOrgResourceContext: !request.headers.has('Authorization'),
+      redirectErrors: true,
+    });
+    preview = gatewayPreview;
+    resolvedExecutionContext = gatewayPreview.executionContext;
+  }
   const approvalStateValue = typeof approvalState === 'string' ? approvalState : '';
   const approvalStateValid =
     approvalStateValue.length > 0 && approvalStateIsFresh(approvalStateValue);

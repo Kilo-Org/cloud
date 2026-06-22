@@ -26,6 +26,21 @@ const mockPreviewAuthorization = jest.fn<
 >();
 const mockAuthorize =
   jest.fn<(params: unknown) => Promise<{ kind: 'provider_redirect'; authorizationUrl: string }>>();
+const mockNativePreviewAuthorization = jest.fn<
+  (params: unknown) => Promise<{
+    clientId: string;
+    clientName: string;
+    redirectUri: string;
+    resource: string;
+    connectionName: string;
+    endpointHost: string;
+    contextName: string;
+    ownerScope: 'personal';
+    scopes: string[];
+  }>
+>();
+const mockNativeAuthorize =
+  jest.fn<(params: unknown) => Promise<{ kind: 'redirect'; redirectUrl: string }>>();
 const mockRouteAuthorize = jest.fn();
 
 jest.mock('@/lib/user/server', () => ({
@@ -57,6 +72,10 @@ jest.mock('@/lib/mcp-gateway/services', () => ({
     authorizationService: {
       previewAuthorization: mockPreviewAuthorization,
       authorize: mockAuthorize,
+    },
+    nativeMcpAuthorizationService: {
+      previewAuthorization: mockNativePreviewAuthorization,
+      authorize: mockNativeAuthorize,
     },
   }),
 }));
@@ -117,6 +136,20 @@ function authorizationUrl(redirectUri = 'http://127.0.0.1:60424/callback') {
       'http://localhost:8806/mcp-connect/org/2ea138dc-8680-4edf-bfb7-3979329b5a7f/316e173c-1007-4f8a-b805-18fe4d95c203/HdEEQpx1wuG9q_iiHQRVTDQX4jB50UhF483SQuuDRVc',
     scope: 'mcp:access',
     state: 'client-state',
+  });
+  return `http://localhost:3000/api/mcp-gateway/oauth/authorize?${query}`;
+}
+
+function nativeAuthorizationUrl(redirectUri = 'http://127.0.0.1:60424/callback') {
+  const query = new URLSearchParams({
+    client_id: 'mcp:client',
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    resource: 'https://app.kilocode.ai/mcp',
+    scope: 'mcp:access',
+    state: 'client-state',
+    code_challenge: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk',
+    code_challenge_method: 'S256',
   });
   return `http://localhost:3000/api/mcp-gateway/oauth/authorize?${query}`;
 }
@@ -228,6 +261,35 @@ describe('POST /api/mcp-gateway/oauth/authorize', () => {
 });
 
 describe('GET /api/mcp-gateway/oauth/authorize', () => {
+  test('routes native MCP consent through the admin-only native branch', async () => {
+    mockGetUserFromAuth.mockResolvedValue({ user: mockUser, organizationId: undefined });
+    mockNativePreviewAuthorization.mockResolvedValue({
+      clientId: 'mcp:client',
+      clientName: 'Codex',
+      redirectUri: 'http://127.0.0.1:60424/callback',
+      resource: 'https://app.kilocode.ai/mcp',
+      connectionName: 'Kilo usage stats',
+      endpointHost: 'app.kilocode.ai',
+      contextName: 'Kilo admin preview',
+      ownerScope: 'personal',
+      scopes: ['mcp:access'],
+    });
+
+    const response = await loadedRoute().GET(new NextRequest(nativeAuthorizationUrl()));
+    if (!response) throw new Error('Expected native authorization response');
+    const document = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(mockGetUserFromAuth).toHaveBeenCalledWith({ adminOnly: true });
+    expect(mockNativePreviewAuthorization).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: mockUser.id, redirectErrors: true })
+    );
+    expect(mockPreviewAuthorization).not.toHaveBeenCalled();
+    expect(document).toContain('Allow access to your Kilo usage stats?');
+    expect(document).toContain('last 60 days per query');
+    expect(document).toContain('Read your Kilo stats');
+  });
+
   test('shows unverified identity, effective access, callback, connection, context, and account', async () => {
     const redirectUri = 'https://client.example/callback?source=mcp&mode=desktop';
     mockGetUserFromAuth.mockResolvedValue({ user: mockUser, organizationId: undefined });

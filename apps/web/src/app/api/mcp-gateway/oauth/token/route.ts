@@ -1,6 +1,6 @@
 import 'server-only';
 import { NextResponse, type NextRequest } from 'next/server';
-import { OAuthTokenRequestSchema } from '@kilocode/mcp-gateway';
+import { OAuthTokenRequestSchema, isNativeMcpResource } from '@kilocode/mcp-gateway';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
 import { gatewayErrorResponse } from '@/lib/mcp-gateway/http';
 import type { ScopedConnectRoute } from '@kilocode/mcp-gateway';
@@ -32,6 +32,13 @@ async function exchangeToken(request: NextRequest, route?: ScopedConnectRoute) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const services = createGatewayServices();
+  if (isNativeMcpResource(parsed.data.resource)) {
+    const result = await services.nativeMcpTokenService.exchangeToken({
+      request: parsed.data,
+      headers: request.headers,
+    });
+    return NextResponse.json(result);
+  }
   const result = await services.tokenService.exchangeToken({
     request: parsed.data,
     headers: request.headers,

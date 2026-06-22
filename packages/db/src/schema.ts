@@ -8524,6 +8524,74 @@ export const mcp_gateway_refresh_tokens = pgTable(
 export type MCPGatewayRefreshToken = typeof mcp_gateway_refresh_tokens.$inferSelect;
 export type NewMCPGatewayRefreshToken = typeof mcp_gateway_refresh_tokens.$inferInsert;
 
+export const mcp_native_authorization_codes = pgTable(
+  'mcp_native_authorization_codes',
+  {
+    authorization_code_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    code_hash: text().notNull(),
+    oauth_client_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    client_id: text().notNull(),
+    canonical_resource_url: text().notNull(),
+    redirect_uri: text().notNull(),
+    granted_scopes: text().array().notNull(),
+    code_challenge: text().notNull(),
+    code_challenge_method: text().notNull().default('S256'),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_native_authorization_codes_code_hash').on(table.code_hash),
+    index('IDX_mcp_native_authorization_codes_user').on(table.kilo_user_id),
+    index('IDX_mcp_native_authorization_codes_client').on(table.oauth_client_id, table.client_id),
+    index('IDX_mcp_native_authorization_codes_expires_at').on(table.expires_at),
+  ]
+);
+
+export type MCPNativeAuthorizationCode = typeof mcp_native_authorization_codes.$inferSelect;
+export type NewMCPNativeAuthorizationCode = typeof mcp_native_authorization_codes.$inferInsert;
+
+export const mcp_native_refresh_tokens = pgTable(
+  'mcp_native_refresh_tokens',
+  {
+    refresh_token_id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    token_hash: text().notNull(),
+    rotated_from_refresh_token_id: uuid(),
+    oauth_client_id: uuid()
+      .notNull()
+      .references(() => mcp_gateway_oauth_clients.oauth_client_id, { onDelete: 'cascade' }),
+    client_id: text().notNull(),
+    canonical_resource_url: text().notNull(),
+    granted_scopes: text().array().notNull(),
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_mcp_native_refresh_tokens_token_hash').on(table.token_hash),
+    index('IDX_mcp_native_refresh_tokens_user').on(table.kilo_user_id),
+    index('IDX_mcp_native_refresh_tokens_client').on(table.oauth_client_id, table.client_id),
+    index('IDX_mcp_native_refresh_tokens_consumed_revoked').on(table.consumed_at, table.revoked_at),
+  ]
+);
+
+export type MCPNativeRefreshToken = typeof mcp_native_refresh_tokens.$inferSelect;
+export type NewMCPNativeRefreshToken = typeof mcp_native_refresh_tokens.$inferInsert;
+
 export const mcp_gateway_pending_provider_authorizations = pgTable(
   'mcp_gateway_pending_provider_authorizations',
   {

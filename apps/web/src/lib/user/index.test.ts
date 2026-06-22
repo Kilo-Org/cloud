@@ -98,6 +98,8 @@ import {
   mcp_gateway_provider_grants,
   mcp_gateway_pending_provider_authorizations,
   mcp_gateway_oauth_clients,
+  mcp_native_authorization_codes,
+  mcp_native_refresh_tokens,
   deployments_ephemeral,
 } from '@kilocode/db/schema';
 
@@ -230,6 +232,8 @@ describe('User', () => {
     await db.delete(mcp_gateway_pending_provider_authorizations);
     await db.delete(mcp_gateway_authorization_codes);
     await db.delete(mcp_gateway_authorization_requests);
+    await db.delete(mcp_native_authorization_codes);
+    await db.delete(mcp_native_refresh_tokens);
     await db.delete(mcp_gateway_oauth_clients);
     await db.delete(mcp_gateway_provider_grants);
     await db.delete(mcp_gateway_connection_instances);
@@ -694,6 +698,92 @@ describe('User', () => {
       expect(pending).toHaveLength(0);
       expect(authorizationCodes).toHaveLength(0);
       expect(authorizationRequests).toHaveLength(0);
+    });
+
+    it('deletes native MCP OAuth authorization codes and refresh tokens', async () => {
+      const targetUser = await insertTestUser();
+      const controlUser = await insertTestUser();
+      const [oauthClient] = await db
+        .insert(mcp_gateway_oauth_clients)
+        .values({
+          client_id: 'mcp:native-test-client',
+          registration_token_hash: 'native-registration-token-hash',
+          token_endpoint_auth_method: 'none',
+          redirect_uris: ['http://127.0.0.1:60424/callback'],
+          grant_types: ['authorization_code', 'refresh_token'],
+          response_types: ['code'],
+          declared_scopes: ['mcp:access'],
+        })
+        .returning();
+
+      await db.insert(mcp_native_authorization_codes).values([
+        {
+          code_hash: 'target-native-code-hash',
+          oauth_client_id: oauthClient.oauth_client_id,
+          client_id: oauthClient.client_id,
+          canonical_resource_url: 'https://app.kilocode.ai/mcp',
+          redirect_uri: 'http://127.0.0.1:60424/callback',
+          granted_scopes: ['mcp:access'],
+          code_challenge: 'target-code-challenge',
+          code_challenge_method: 'S256',
+          kilo_user_id: targetUser.id,
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        },
+        {
+          code_hash: 'control-native-code-hash',
+          oauth_client_id: oauthClient.oauth_client_id,
+          client_id: oauthClient.client_id,
+          canonical_resource_url: 'https://app.kilocode.ai/mcp',
+          redirect_uri: 'http://127.0.0.1:60424/callback',
+          granted_scopes: ['mcp:access'],
+          code_challenge: 'control-code-challenge',
+          code_challenge_method: 'S256',
+          kilo_user_id: controlUser.id,
+          expires_at: new Date(Date.now() + 60_000).toISOString(),
+        },
+      ]);
+      await db.insert(mcp_native_refresh_tokens).values([
+        {
+          token_hash: 'target-native-refresh-hash',
+          oauth_client_id: oauthClient.oauth_client_id,
+          client_id: oauthClient.client_id,
+          canonical_resource_url: 'https://app.kilocode.ai/mcp',
+          granted_scopes: ['mcp:access'],
+          kilo_user_id: targetUser.id,
+        },
+        {
+          token_hash: 'control-native-refresh-hash',
+          oauth_client_id: oauthClient.oauth_client_id,
+          client_id: oauthClient.client_id,
+          canonical_resource_url: 'https://app.kilocode.ai/mcp',
+          granted_scopes: ['mcp:access'],
+          kilo_user_id: controlUser.id,
+        },
+      ]);
+
+      await softDeleteUser(targetUser.id);
+
+      const targetCodes = await db
+        .select()
+        .from(mcp_native_authorization_codes)
+        .where(eq(mcp_native_authorization_codes.kilo_user_id, targetUser.id));
+      const targetRefreshTokens = await db
+        .select()
+        .from(mcp_native_refresh_tokens)
+        .where(eq(mcp_native_refresh_tokens.kilo_user_id, targetUser.id));
+      const controlCodes = await db
+        .select()
+        .from(mcp_native_authorization_codes)
+        .where(eq(mcp_native_authorization_codes.kilo_user_id, controlUser.id));
+      const controlRefreshTokens = await db
+        .select()
+        .from(mcp_native_refresh_tokens)
+        .where(eq(mcp_native_refresh_tokens.kilo_user_id, controlUser.id));
+
+      expect(targetCodes).toHaveLength(0);
+      expect(targetRefreshTokens).toHaveLength(0);
+      expect(controlCodes).toHaveLength(1);
+      expect(controlRefreshTokens).toHaveLength(1);
     });
 
     it('should anonymize the user row and preserve it', async () => {

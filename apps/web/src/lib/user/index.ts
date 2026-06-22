@@ -92,6 +92,8 @@ import {
   coding_plan_availability_intents,
   coding_plan_subscriptions,
   deployments_ephemeral,
+  mcp_native_authorization_codes,
+  mcp_native_refresh_tokens,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -845,7 +847,8 @@ export class SoftDeletePreconditionError extends Error {
  *   cloud_agent_code_reviews, review memory feedback/proposals,
  *   device_auth_requests, auto_top_up_configs,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
- *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents)
+ *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
+ *   native MCP authorization codes and refresh tokens)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
  *   + free-form reason; cleared on the deleted user's retained destroyed
  *   instances, AND on any other instances where this user was the admin
@@ -925,6 +928,12 @@ export async function softDeleteUser(userId: string) {
 
     // ── Gateway cleanup ───────────────────────────────────────────────────
     await revokeGatewayStateForUser(tx, userId);
+    await tx
+      .delete(mcp_native_authorization_codes)
+      .where(eq(mcp_native_authorization_codes.kilo_user_id, userId));
+    await tx
+      .delete(mcp_native_refresh_tokens)
+      .where(eq(mcp_native_refresh_tokens.kilo_user_id, userId));
 
     // Remove recipient-addressed Security Agent notifications before user
     // anonymization and org membership removal. Org-owned findings can remain.

@@ -33,7 +33,9 @@ function publicJwks(config: GatewayAppConfig): { keys: Array<JsonWebKey & { kid:
   };
 }
 
-function activeSigningKey(config: GatewayAppConfig): GatewayJWTKey & { privateKeyPem: string } {
+export function activeSigningKey(
+  config: GatewayAppConfig
+): GatewayJWTKey & { privateKeyPem: string } {
   const key = config.jwtKeyset.keys.find(
     candidate => candidate.keyId === config.jwtKeyset.activeKeyId
   );
@@ -47,7 +49,7 @@ function activeSigningKey(config: GatewayAppConfig): GatewayJWTKey & { privateKe
   return { ...key, privateKeyPem: key.privateKeyPem };
 }
 
-function verificationKey(key: GatewayJWTKey) {
+export function verificationKey(key: GatewayJWTKey) {
   return key.publicKeyPem ?? createPublicKey({ key: key.publicJwk, format: 'jwk' });
 }
 
@@ -85,6 +87,61 @@ function parseBasicAuthorization(
   const clientSecret = decodeBasicComponent(decoded.slice(separator + 1));
   if (!clientId || !clientSecret) return null;
   return { clientId, clientSecret };
+}
+
+export async function authenticateGatewayOAuthClient(params: {
+  request: OAuthTokenRequest;
+  headers: Headers;
+  clientService: GatewayOAuthClientService;
+}) {
+  const basic = parseBasicAuthorization(params.headers.get('authorization'));
+  const clientId = basic?.clientId ?? params.request.client_id;
+  if (!clientId) {
+    throw createGatewayError(GatewayErrorCode.InvalidClient, 'Client ID is required', 401);
+  }
+  if (basic?.clientId && params.request.client_id && basic.clientId !== params.request.client_id) {
+    throw createGatewayError(GatewayErrorCode.InvalidClient, 'Client credentials conflict', 401);
+  }
+  const client = await params.clientService.findClientById(clientId);
+  if (!client) {
+    throw createGatewayError(GatewayErrorCode.InvalidClient, 'Unknown client', 401);
+  }
+  if (client.token_endpoint_auth_method === GatewayOAuthClientAuthMethod.None) {
+    if (basic || params.request.client_secret) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidClient,
+        'Public clients cannot use secrets',
+        401
+      );
+    }
+    return client;
+  }
+  if (client.token_endpoint_auth_method === GatewayOAuthClientAuthMethod.ClientSecretBasic) {
+    if (!basic || params.request.client_secret) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidClient,
+        'Client secret basic is required',
+        401
+      );
+    }
+    if (
+      !client.client_secret_hash ||
+      !timingSafeEqual(hashToken(basic.clientSecret), client.client_secret_hash)
+    ) {
+      throw createGatewayError(GatewayErrorCode.InvalidClient, 'Invalid client credentials', 401);
+    }
+    return client;
+  }
+  if (basic || !params.request.client_secret) {
+    throw createGatewayError(GatewayErrorCode.InvalidClient, 'Client secret post is required', 401);
+  }
+  if (
+    !client.client_secret_hash ||
+    !timingSafeEqual(hashToken(params.request.client_secret), client.client_secret_hash)
+  ) {
+    throw createGatewayError(GatewayErrorCode.InvalidClient, 'Invalid client credentials', 401);
+  }
+  return client;
 }
 
 export function createTokenService(params: {
@@ -149,58 +206,11 @@ export function createTokenService(params: {
   }
 
   async function authenticateClient(request: OAuthTokenRequest, headers: Headers) {
-    const basic = parseBasicAuthorization(headers.get('authorization'));
-    const clientId = basic?.clientId ?? request.client_id;
-    if (!clientId) {
-      throw createGatewayError(GatewayErrorCode.InvalidClient, 'Client ID is required', 401);
-    }
-    if (basic?.clientId && request.client_id && basic.clientId !== request.client_id) {
-      throw createGatewayError(GatewayErrorCode.InvalidClient, 'Client credentials conflict', 401);
-    }
-    const client = await params.clientService.findClientById(clientId);
-    if (!client) {
-      throw createGatewayError(GatewayErrorCode.InvalidClient, 'Unknown client', 401);
-    }
-    if (client.token_endpoint_auth_method === GatewayOAuthClientAuthMethod.None) {
-      if (basic || request.client_secret) {
-        throw createGatewayError(
-          GatewayErrorCode.InvalidClient,
-          'Public clients cannot use secrets',
-          401
-        );
-      }
-      return client;
-    }
-    if (client.token_endpoint_auth_method === GatewayOAuthClientAuthMethod.ClientSecretBasic) {
-      if (!basic || request.client_secret) {
-        throw createGatewayError(
-          GatewayErrorCode.InvalidClient,
-          'Client secret basic is required',
-          401
-        );
-      }
-      if (
-        !client.client_secret_hash ||
-        !timingSafeEqual(hashToken(basic.clientSecret), client.client_secret_hash)
-      ) {
-        throw createGatewayError(GatewayErrorCode.InvalidClient, 'Invalid client credentials', 401);
-      }
-      return client;
-    }
-    if (basic || !request.client_secret) {
-      throw createGatewayError(
-        GatewayErrorCode.InvalidClient,
-        'Client secret post is required',
-        401
-      );
-    }
-    if (
-      !client.client_secret_hash ||
-      !timingSafeEqual(hashToken(request.client_secret), client.client_secret_hash)
-    ) {
-      throw createGatewayError(GatewayErrorCode.InvalidClient, 'Invalid client credentials', 401);
-    }
-    return client;
+    return await authenticateGatewayOAuthClient({
+      request,
+      headers,
+      clientService: params.clientService,
+    });
   }
 
   async function issueRefreshToken(paramsInput: {

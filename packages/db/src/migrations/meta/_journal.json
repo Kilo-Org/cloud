@@ -1170,6 +1170,13 @@
       "when": 1781687965838,
       "tag": "0166_open_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 167,
+      "version": "7",
+      "when": 1782141452346,
+      "tag": "0167_perpetual_hulk",
+      "breakpoints": true
     }
   ]
 }

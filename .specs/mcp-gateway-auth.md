@@ -17,6 +17,11 @@ Kilo v1 is intentionally a two-plane system:
   upstream credential injection, streaming proxying, per-instance refresh
   coordination, runtime telemetry, and maintenance cleanup.
 
+Root `/mcp` is a separate first-party native MCP resource owned by `apps/web`. It
+MUST use native `token_use="native_mcp"` JWTs with the exact native resource as
+audience and MUST NOT reuse Gateway scoped-route claims, configs, connection
+instances, provider grants, or Worker runtime semantics.
+
 This document supersedes the earlier clean-room baseline/profile split. There is
 one in-repo contract for Kilo v1, not a baseline plus override layer.
 
@@ -105,6 +110,7 @@ when they appear in all capitals.
 | Surface | Owner | Required behavior |
 |---|---|---|
 | `GET /health` | Worker | Health response only. |
+| `POST /mcp` | App | First-party native MCP server for individual read-only stats; requires native `mcp:access` OAuth token and rejects Gateway/Kilo API tokens. |
 | `GET` or `POST /mcp-connect/user/{user_id}/{config_id}/{route_key}` | Worker | Protected runtime entrypoint. Unauthenticated callers receive an OAuth challenge; authorized callers are proxied. |
 | `GET` or `POST /mcp-connect/org/{org_id}/{config_id}/{route_key}` | Worker | Same as personal route, with org eligibility checks. |
 | Descendants under scoped connect routes | Worker | Allowed only when config path passthrough is enabled and authorized against the root route. |

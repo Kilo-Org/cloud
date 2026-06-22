@@ -37,17 +37,50 @@ NODE
 
 TEMP_DB="drizzle_bootstrap_$(date +%s)_${RANDOM}"
 TEMP_POSTGRES_URL="$(node -e "const u = new URL(process.argv[1]); u.pathname = '/${TEMP_DB}'; process.stdout.write(u.toString());" "$BASE_POSTGRES_URL")"
+ADMIN_POSTGRES_URL="$(node -e "const u = new URL(process.argv[1]); u.pathname = '/postgres'; process.stdout.write(u.toString());" "$BASE_POSTGRES_URL")"
+
+admin_db() {
+  ACTION="$1" TEMP_DB="$TEMP_DB" ADMIN_POSTGRES_URL="$ADMIN_POSTGRES_URL" \
+    pnpm --filter @kilocode/db exec node <<'NODE'
+const { Client } = require('pg');
+
+const action = process.env.ACTION;
+const database = process.env.TEMP_DB;
+const connectionString = process.env.ADMIN_POSTGRES_URL;
+
+if (!/^[A-Za-z0-9_]+$/.test(database || '')) {
+  throw new Error(`Unsafe temporary database name: ${database}`);
+}
+
+async function main() {
+  const client = new Client({ connectionString });
+  await client.connect();
+  try {
+    if (action === 'create') {
+      await client.query(`CREATE DATABASE "${database}";`);
+    } else if (action === 'drop') {
+      await client.query(`DROP DATABASE IF EXISTS "${database}" WITH (FORCE);`);
+    } else {
+      throw new Error(`Unknown action: ${action}`);
+    }
+  } finally {
+    await client.end();
+  }
+}
+
+main().catch(error => {
+  console.error(error);
+  process.exit(1);
+});
+NODE
+}
 
 cleanup() {
-  docker compose -f dev/docker-compose.yml exec -T postgres \
-    psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-    -c "DROP DATABASE IF EXISTS \"${TEMP_DB}\" WITH (FORCE);" >/dev/null
+  admin_db drop >/dev/null || true
 }
 trap cleanup EXIT
 
-docker compose -f dev/docker-compose.yml exec -T postgres \
-  psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
-  -c "CREATE DATABASE \"${TEMP_DB}\";" >/dev/null
+admin_db create >/dev/null
 
 POSTGRES_URL="$TEMP_POSTGRES_URL" pnpm drizzle migrate
 

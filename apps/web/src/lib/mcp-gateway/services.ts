@@ -12,6 +12,9 @@ import { createTokenService } from './token-service';
 import { createConfigService } from './config-service';
 import { createDiscoveryService } from './discovery-service';
 import { createAvailableService } from './available-service';
+import { createNativeMcpAuthorizationService } from '@/lib/native-mcp/oauth/native-authorization-service';
+import { createNativeMcpTokenService } from '@/lib/native-mcp/oauth/native-token-service';
+import { createNativeMcpTokenVerifier } from '@/lib/native-mcp/oauth/native-token-verifier';
 
 export function createGatewayServices(
   params: {
@@ -42,6 +45,20 @@ export function createGatewayServices(
     config,
   });
   const tokenService = createTokenService({ repository, routeService, clientService, config });
+  const nativeMcpAuthorizationService = createNativeMcpAuthorizationService({
+    database: params.database,
+    clientService,
+    config,
+  });
+  const nativeMcpTokenService = createNativeMcpTokenService({
+    database: params.database,
+    clientService,
+    config,
+  });
+  const nativeMcpTokenVerifier = createNativeMcpTokenVerifier({
+    database: params.database,
+    config,
+  });
   const configService = createConfigService({ repository, config, discoveryService });
   const availableService = createAvailableService(repository);
 
@@ -55,6 +72,9 @@ export function createGatewayServices(
     providerOAuthService,
     authorizationService,
     tokenService,
+    nativeMcpAuthorizationService,
+    nativeMcpTokenService,
+    nativeMcpTokenVerifier,
     configService,
     discoveryService,
     availableService,

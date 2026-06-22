@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
+const swaggerUiAssetBaseUrl = '/api-docs/swagger-ui/5.32.6';
+
 function swaggerUiHtml(nonce: string) {
   return `<!doctype html>
 <html lang="en">
@@ -7,7 +9,7 @@ function swaggerUiHtml(nonce: string) {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Kilo Code API Docs</title>
-    <link rel="stylesheet" href="/api/docs/swagger-ui.css" />
+    <link rel="stylesheet" href="${swaggerUiAssetBaseUrl}/swagger-ui.css" />
     <style nonce="${nonce}">
       :root {
         color-scheme: dark;
@@ -74,14 +76,14 @@ function swaggerUiHtml(nonce: string) {
       <a class="kilo-docs-link" href="/api/openapi.json">Open JSON</a>
     </header>
     <div id="swagger-ui"></div>
-    <script src="/api/docs/swagger-ui-bundle.js"></script>
+    <script src="${swaggerUiAssetBaseUrl}/swagger-ui-bundle.js"></script>
     <script nonce="${nonce}">
       window.ui = SwaggerUIBundle({
         url: '/api/openapi.json',
         dom_id: '#swagger-ui',
         deepLinking: true,
         persistAuthorization: false,
-        tryItOutEnabled: true,
+        tryItOutEnabled: false,
       });
     </script>
   </body>

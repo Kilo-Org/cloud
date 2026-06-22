@@ -1,4 +1,6 @@
+import type { inferRouterInputs } from '@trpc/server';
 import type * as z from 'zod';
+import type { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 import {
   BreakdownInputSchema,
   BreakdownOutputSchema,
@@ -21,8 +23,23 @@ export type TrpcOpenApiProcedure = {
   security: 'apiKey';
 };
 
+type UsageAnalyticsProcedureKey = Extract<
+  keyof inferRouterInputs<typeof usageAnalyticsRouter>,
+  string
+>;
+type UsageAnalyticsOpenApiProcedure<Key extends UsageAnalyticsProcedureKey> =
+  TrpcOpenApiProcedure & {
+    procedurePath: `usageAnalytics.${Key}`;
+  };
+
+function usageAnalyticsProcedure<Key extends UsageAnalyticsProcedureKey>(
+  procedure: UsageAnalyticsOpenApiProcedure<Key>
+) {
+  return procedure;
+}
+
 export const publicTrpcOpenApiProcedures = [
-  {
+  usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getSummary',
     method: 'post',
     tags: ['Usage Analytics'],
@@ -32,8 +49,8 @@ export const publicTrpcOpenApiProcedures = [
     input: UsageAnalyticsFiltersSchema,
     output: SummaryOutputSchema,
     security: 'apiKey',
-  },
-  {
+  }),
+  usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getTimeseries',
     method: 'post',
     tags: ['Usage Analytics'],
@@ -43,8 +60,8 @@ export const publicTrpcOpenApiProcedures = [
     input: TimeseriesInputSchema,
     output: TimeseriesOutputSchema,
     security: 'apiKey',
-  },
-  {
+  }),
+  usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getBreakdown',
     method: 'post',
     tags: ['Usage Analytics'],
@@ -53,8 +70,8 @@ export const publicTrpcOpenApiProcedures = [
     input: BreakdownInputSchema,
     output: BreakdownOutputSchema,
     security: 'apiKey',
-  },
-  {
+  }),
+  usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getTable',
     method: 'post',
     tags: ['Usage Analytics'],
@@ -63,5 +80,5 @@ export const publicTrpcOpenApiProcedures = [
     input: TableInputSchema,
     output: TableOutputSchema,
     security: 'apiKey',
-  },
-] satisfies TrpcOpenApiProcedure[];
+  }),
+];

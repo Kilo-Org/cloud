@@ -1,38 +1,12 @@
 import { useState } from 'react';
 import type { JSX, ReactNode } from 'react';
+import { Plus, Settings } from 'lucide-react';
 import type { StoredAuth } from '@/src/shared/auth';
 import type { KiloOrganizationOption } from '@/src/shared/kilo-api-client';
 import { KiloLogo } from '@/src/shared/kilo-logo';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
 
 const emptyOrganizationOptions: KiloOrganizationOption[] = [];
-
-const NewConversationIcon = ({ className }: { className: string }): JSX.Element => (
-  <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 16 16">
-    <path
-      d="M8 3.25v9.5M3.25 8h9.5"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeWidth="1.5"
-    />
-  </svg>
-);
-
-const SettingsIcon = ({ className }: { className: string }): JSX.Element => (
-  <svg aria-hidden="true" className={className} fill="none" viewBox="0 0 16 16">
-    <path
-      d="M6.9 2.15h2.2l.35 1.45c.36.13.7.32 1.01.57l1.42-.44 1.1 1.9-1.07 1.02a4 4 0 0 1 0 1.18l1.07 1.02-1.1 1.9-1.42-.44c-.31.25-.65.44-1.01.57l-.35 1.45H6.9l-.35-1.45a3.8 3.8 0 0 1-1.01-.57l-1.42.44-1.1-1.9 1.07-1.02a4 4 0 0 1 0-1.18L3.02 5.63l1.1-1.9 1.42.44c.31-.25.65-.44 1.01-.57l.35-1.45Z"
-      stroke="currentColor"
-      strokeLinejoin="round"
-      strokeWidth="1.2"
-    />
-    <path
-      d="M8 6.1a1.9 1.9 0 1 1 0 3.8 1.9 1.9 0 0 1 0-3.8Z"
-      stroke="currentColor"
-      strokeWidth="1.2"
-    />
-  </svg>
-);
 
 const IconButton = ({
   ariaLabel,
@@ -73,7 +47,7 @@ const HeaderActions = ({
   return (
     <div className="relative flex shrink-0 items-center justify-end gap-2">
       <IconButton ariaLabel="New conversation" onClick={onNewConversation}>
-        <NewConversationIcon className="size-4" />
+        <Plus aria-hidden="true" className="size-4" />
       </IconButton>
       <IconButton
         ariaLabel="Settings"
@@ -81,7 +55,7 @@ const HeaderActions = ({
           setIsSettingsOpen(current => !current);
         }}
       >
-        <SettingsIcon className="size-4" />
+        <Settings aria-hidden="true" className="size-4" />
       </IconButton>
 
       {isSettingsOpen ? (

@@ -250,20 +250,12 @@ export const AgentChatPanel = ({
         <div className="mt-2 grid gap-2">
           <button
             className="h-9 w-full rounded-md bg-[#EDFF00] px-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-            disabled={draft.trim() === '' || isRunning || model === ''}
-            type="submit"
+            disabled={isRunning ? false : draft.trim() === '' || model === ''}
+            onClick={isRunning ? stopRun : undefined}
+            type={isRunning ? 'button' : 'submit'}
           >
-            {isRunning ? 'Running...' : 'Send message'}
+            {isRunning ? 'Stop' : 'Send message'}
           </button>
-          {isRunning ? (
-            <button
-              className="h-9 w-full rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
-              onClick={stopRun}
-              type="button"
-            >
-              Stop
-            </button>
-          ) : null}
         </div>
       </form>
 

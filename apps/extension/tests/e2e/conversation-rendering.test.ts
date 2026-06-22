@@ -1,0 +1,125 @@
+/* eslint-disable import/no-nodejs-modules */
+import { expect, test } from '@playwright/test';
+import { rm } from 'node:fs/promises';
+import { mockKiloApi, readSidePanelScrollState, sendOverflowMessages } from './kilo-api-fixture';
+import {
+  launchExtensionContext,
+  seedExtensionAuth,
+  startFixtureServer,
+} from './extension-context-fixture';
+
+test('new conversation keeps the selected target tab', async () => {
+  const firstFixture = await startFixtureServer({ title: 'First target tab' });
+  const secondFixture = await startFixtureServer({ title: 'Second target tab' });
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const firstPage = await context.newPage();
+    await firstPage.goto(firstFixture.url);
+    const secondPage = await context.newPage();
+    await secondPage.goto(secondFixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await sidePanel.getByLabel('Target tab').selectOption({ label: 'Second target tab' });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Second target tab');
+
+    await sidePanel.getByLabel('New conversation').click();
+
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Second target tab');
+  } finally {
+    await context.close();
+    await firstFixture.close();
+    await secondFixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('assistant messages render markdown', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      firstCompletionEvents: [
+        {
+          choices: [
+            {
+              delta: {
+                content:
+                  '### Markdown title\n\nThis has **bold text** and [a link](https://kilo.ai).\n\n- first item',
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
+    await sidePanel.getByRole('button', { name: 'Dangerous' }).click();
+    await sidePanel.getByLabel('Message agent').fill('Show markdown');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+
+    await expect(sidePanel.getByRole('heading', { name: 'Markdown title' })).toBeVisible();
+    await expect(sidePanel.locator('strong').filter({ hasText: 'bold text' })).toBeVisible();
+    await expect(sidePanel.getByRole('link', { name: 'a link' })).toHaveAttribute(
+      'href',
+      'https://kilo.ai'
+    );
+    await expect(sidePanel.getByRole('listitem').filter({ hasText: 'first item' })).toBeVisible();
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('only the message pane scrolls virtualized overflowing conversation content', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.setViewportSize({ height: 420, width: 360 });
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    const messageInput = sidePanel.getByLabel('Message agent');
+    await sendOverflowMessages(messageInput, 80);
+
+    await expect(sidePanel.getByText('Pick a target tab first.').last()).toBeVisible();
+    await expect(sidePanel.getByLabel('Agent conversation')).toBeVisible();
+
+    const scrollState = await sidePanel.evaluate(readSidePanelScrollState);
+    const mountedMessageItems = await sidePanel
+      .locator('section[aria-label="Agent conversation"] > *')
+      .count();
+
+    expect(scrollState.documentScrollHeight).toBe(scrollState.documentClientHeight);
+    expect(scrollState.messagePaneScrollHeight).toBeGreaterThan(
+      scrollState.messagePaneClientHeight
+    );
+    expect(mountedMessageItems).toBeLessThan(80);
+    expect(
+      scrollState.messagePaneScrollTop + scrollState.messagePaneClientHeight
+    ).toBeGreaterThanOrEqual(scrollState.messagePaneScrollHeight - 4);
+  } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});

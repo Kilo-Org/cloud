@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { JSX, ReactNode } from 'react';
+import { RefreshCw, Shield, TriangleAlert } from 'lucide-react';
 import { getFooterControlDisplay } from '@/src/shared/agent-chat-placeholder';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
@@ -23,31 +24,9 @@ const ModeIcon = ({
 }): JSX.Element => {
   const toneClassName = tone === 'safe' ? 'text-[#EDFF00]' : 'text-red-400';
 
-  return (
-    <svg
-      aria-hidden="true"
-      className={`${className} ${toneClassName}`}
-      fill="none"
-      viewBox="0 0 16 16"
-    >
-      {icon === 'shield' ? (
-        <path
-          d="M8 1.75 13 3.5v3.65c0 3.1-1.9 5.55-5 7.1-3.1-1.55-5-4-5-7.1V3.5l5-1.75Z"
-          stroke="currentColor"
-          strokeLinejoin="round"
-          strokeWidth="1.5"
-        />
-      ) : (
-        <path
-          d="M8 2.25 14.25 13H1.75L8 2.25Zm0 3.5v3.5m0 2.25h.01"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.5"
-        />
-      )}
-    </svg>
-  );
+  const Icon = icon === 'shield' ? Shield : TriangleAlert;
+
+  return <Icon aria-hidden="true" className={`${className} ${toneClassName}`} />;
 };
 
 const CompactSelectControl = ({
@@ -220,15 +199,7 @@ export const AgentFooterControls = ({
         title="Refresh tabs"
         type="button"
       >
-        <svg aria-hidden="true" className="size-3.5" fill="none" viewBox="0 0 16 16">
-          <path
-            d="M13.25 7.75a5.25 5.25 0 1 1-1.54-3.71M13.25 2.75v3.5h-3.5"
-            stroke="currentColor"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth="1.5"
-          />
-        </svg>
+        <RefreshCw aria-hidden="true" className="size-3.5" />
       </button>
     </div>
     {tabDebuggerError === undefined ? null : (

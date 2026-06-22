@@ -1,13 +1,9 @@
 /* eslint-disable import/no-nodejs-modules */
 import { expect, test } from '@playwright/test';
+import type { Locator } from '@playwright/test';
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import {
-  expectEvalCodeBlockNoHorizontalOverflow,
-  mockKiloApi,
-  readSidePanelScrollState,
-  sendOverflowMessages,
-} from './kilo-api-fixture';
+import { expectEvalCodeBlockNoHorizontalOverflow, mockKiloApi } from './kilo-api-fixture';
 import {
   extensionPath,
   launchExtensionContext,
@@ -59,6 +55,23 @@ const getSidePanel = (value: unknown): ExtensionManifest['side_panel'] => {
 
   return {
     default_path: typeof value['default_path'] === 'string' ? value['default_path'] : undefined,
+  };
+};
+
+const requireBoundingBox = async (
+  locator: Locator
+): Promise<{ height: number; left: number; top: number; width: number }> => {
+  const boundingBox = await locator.boundingBox();
+
+  if (boundingBox === null) {
+    throw new Error('Expected locator to have a bounding box.');
+  }
+
+  return {
+    height: boundingBox.height,
+    left: boundingBox.x,
+    top: boundingBox.y,
+    width: boundingBox.width,
   };
 };
 
@@ -144,7 +157,10 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
     await expect(sidePanel.getByText('eval completed')).toBeVisible();
     await expect(sidePanel.getByText('Code')).toBeHidden();
     await expect(sidePanel.getByText(/The selected tab HTML length is [0-9]+\./u)).toBeVisible();
-    await sidePanel.getByText('eval completed').click();
+    const evalBox = sidePanel.getByText('eval completed').locator('..');
+    const evalBoxRect = await requireBoundingBox(evalBox);
+
+    await sidePanel.mouse.click(evalBoxRect.left + 4, evalBoxRect.top + 4);
     await expect(sidePanel.getByText('Code')).toBeVisible();
     await expectEvalCodeBlockNoHorizontalOverflow(sidePanel);
 
@@ -179,10 +195,18 @@ test('running conversation can be stopped', async () => {
     await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
     await sidePanel.getByRole('button', { name: 'Dangerous' }).click();
     await sidePanel.getByLabel('Message agent').fill('Inspect this tab');
+    const sendButton = sidePanel.getByRole('button', { name: 'Send message' });
+    const sendButtonRect = await sendButton.boundingBox();
+
+    expect(sendButtonRect).not.toBeNull();
     await sidePanel.getByLabel('Message agent').press('Enter');
 
-    await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
-    await sidePanel.getByRole('button', { name: 'Stop' }).click();
+    const stopButton = sidePanel.getByRole('button', { name: 'Stop' });
+    await expect(stopButton).toBeVisible();
+    const stopButtonRect = await stopButton.boundingBox();
+
+    expect(stopButtonRect).toEqual(sendButtonRect);
+    await stopButton.click();
 
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
     await expect(sidePanel.getByText('Stopped.')).toBeVisible();
@@ -244,39 +268,6 @@ test('conversation survives side panel reload', async () => {
 
     await expect(sidePanel.getByText('Remember this after reload')).toBeVisible();
     await expect(sidePanel.getByText('Pick a target tab first.')).toBeVisible();
-  } finally {
-    await context.close();
-    await rm(userDataDir, { force: true, recursive: true });
-  }
-});
-
-test('only the message pane scrolls overflowing conversation content', async () => {
-  const { context, extensionId, userDataDir } = await launchExtensionContext();
-
-  try {
-    await mockKiloApi(context);
-
-    const sidePanel = await context.newPage();
-    await sidePanel.setViewportSize({ height: 420, width: 360 });
-    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-    await seedExtensionAuth(sidePanel);
-    await sidePanel.reload();
-
-    const messageInput = sidePanel.getByLabel('Message agent');
-    await sendOverflowMessages(messageInput, 40);
-
-    await expect(sidePanel.getByText('Pick a target tab first.').last()).toBeVisible();
-    await expect(sidePanel.getByLabel('Agent conversation')).toBeVisible();
-
-    const scrollState = await sidePanel.evaluate(readSidePanelScrollState);
-
-    expect(scrollState.documentScrollHeight).toBe(scrollState.documentClientHeight);
-    expect(scrollState.messagePaneScrollHeight).toBeGreaterThan(
-      scrollState.messagePaneClientHeight
-    );
-    expect(
-      scrollState.messagePaneScrollTop + scrollState.messagePaneClientHeight
-    ).toBeGreaterThanOrEqual(scrollState.messagePaneScrollHeight - 4);
   } finally {
     await context.close();
     await rm(userDataDir, { force: true, recursive: true });

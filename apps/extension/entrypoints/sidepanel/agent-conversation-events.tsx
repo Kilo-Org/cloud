@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import ReactMarkdown from 'react-markdown';
 import type {
   AgentConversationEvent,
   GroupedConversationItem,
@@ -45,7 +46,9 @@ const MessageEvent = ({
             : 'max-w-[88%] rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm leading-5 text-zinc-200'
         }
       >
-        <p>{event.text}</p>
+        <div className="agent-message-markdown">
+          <ReactMarkdown>{event.text}</ReactMarkdown>
+        </div>
       </div>
     </div>
   );

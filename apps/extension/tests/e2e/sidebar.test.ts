@@ -75,6 +75,22 @@ const requireBoundingBox = async (
   };
 };
 
+const expectNonErrorToolPanel = async (locator: Locator): Promise<void> => {
+  const className = await locator.evaluate(element => element.getAttribute('class') ?? '');
+  const panelColors = await locator.evaluate(element => {
+    const style = getComputedStyle(element);
+
+    return {
+      backgroundColor: style.backgroundColor,
+      borderColor: style.borderColor,
+    };
+  });
+
+  expect(className).not.toContain('red-');
+  expect(panelColors.borderColor).not.toContain('239, 68, 68');
+  expect(panelColors.backgroundColor).not.toContain('69, 10, 10');
+};
+
 const readOutputManifest = async (): Promise<ExtensionManifest> => {
   const manifestText = await readFile(join(extensionPath, 'manifest.json'), 'utf8');
   const manifest: unknown = JSON.parse(manifestText);
@@ -157,6 +173,8 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
     await expect(sidePanel.getByText('eval completed')).toBeVisible();
     await expect(sidePanel.getByText('Code')).toBeHidden();
     await expect(sidePanel.getByText(/The selected tab HTML length is [0-9]+\./u)).toBeVisible();
+    const evalPanel = sidePanel.getByText('eval completed').locator('xpath=ancestor::details[1]');
+    await expectNonErrorToolPanel(evalPanel);
     const evalBox = sidePanel.getByText('eval completed').locator('..');
     const evalBoxRect = await requireBoundingBox(evalBox);
 

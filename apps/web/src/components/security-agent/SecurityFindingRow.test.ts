@@ -6,6 +6,7 @@ import type {
 import {
   getAnalysisPresentation,
   getDeadlinePresentation,
+  getFindingAnalysisState,
 } from './security-finding-list-presentation';
 
 const baseRemediationCapability: SecurityRemediationCapability = {
@@ -55,6 +56,42 @@ describe('Security Finding list presentation', () => {
     expect(getAnalysisPresentation(finding)).toMatchObject({
       label: 'Exploitable',
       tone: 'destructive',
+    });
+  });
+
+  it('uses shared review states for failed extraction and unknown exploitability', () => {
+    const extractionFailed = findingWith({
+      analysis_status: 'completed',
+      analysis: {
+        sandboxAnalysis: {
+          extractionStatus: 'failed',
+          isExploitable: false,
+        },
+      } as SecurityFindingWithRemediation['analysis'],
+    });
+    const unknownExploitability = findingWith({
+      analysis_status: 'completed',
+      analysis: {
+        sandboxAnalysis: {
+          extractionStatus: 'succeeded',
+          isExploitable: 'unknown',
+        },
+      } as SecurityFindingWithRemediation['analysis'],
+    });
+
+    expect(
+      getFindingAnalysisState(extractionFailed.analysis_status, extractionFailed.analysis)
+    ).toBe('extraction-failed');
+    expect(getAnalysisPresentation(extractionFailed)).toMatchObject({
+      label: 'Needs review',
+      tone: 'warning',
+    });
+    expect(
+      getFindingAnalysisState(unknownExploitability.analysis_status, unknownExploitability.analysis)
+    ).toBe('unknown');
+    expect(getAnalysisPresentation(unknownExploitability)).toMatchObject({
+      label: 'Needs review',
+      tone: 'warning',
     });
   });
 

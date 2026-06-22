@@ -75,6 +75,7 @@ import {
   getRemediationUnavailableCopy,
   isCodebaseAnalysisRequiredReason,
 } from './remediation-unavailable-copy';
+import { getFindingAnalysisState } from './security-finding-list-presentation';
 import type { SecurityFindingWithRemediation } from '@/lib/security-agent/db/security-remediation';
 
 type FindingAnalysis = SecurityFinding['analysis'];
@@ -319,20 +320,30 @@ function getFindingStatus(finding: SecurityFinding): StatusValue {
 }
 
 function getAnalysisStatus(analysis: FindingAnalysis, analysisStatus: string | null): StatusValue {
-  if (analysisStatus === 'pending') return { value: 'Queued', tone: 'warning' };
-  if (analysisStatus === 'running') return { value: 'Analyzing', tone: 'warning' };
-  if (analysisStatus === 'failed') return { value: 'Failed', tone: 'destructive' };
-  const sandbox = analysis?.sandboxAnalysis;
-  if (sandbox?.extractionStatus === 'failed') return { value: 'Needs review', tone: 'warning' };
-  if (sandbox?.isExploitable === true) return { value: 'Exploitable', tone: 'destructive' };
-  if (sandbox?.isExploitable === false) return { value: 'No reachable path', tone: 'success' };
-  if (sandbox?.isExploitable === 'unknown') return { value: 'Needs review', tone: 'warning' };
-  if (analysis?.triage?.suggestedAction === 'dismiss')
-    return { value: 'Safe to dismiss', tone: 'success' };
-  if (analysis?.triage?.suggestedAction === 'manual_review')
-    return { value: 'Needs review', tone: 'warning' };
-  if (analysis?.triage) return { value: 'Analysis required', tone: 'warning' };
-  return { value: 'Not analyzed', tone: 'neutral' };
+  switch (getFindingAnalysisState(analysisStatus, analysis)) {
+    case 'queued':
+      return { value: 'Analysis queued', tone: 'warning' };
+    case 'analyzing':
+      return { value: 'Analyzing', tone: 'warning' };
+    case 'failed':
+      return { value: 'Analysis failed', tone: 'destructive' };
+    case 'extraction-failed':
+    case 'unknown':
+    case 'manual-review':
+      return { value: 'Needs review', tone: 'warning' };
+    case 'exploitable':
+      return { value: 'Exploitable', tone: 'destructive' };
+    case 'not-exploitable':
+      return { value: 'No reachable path', tone: 'success' };
+    case 'safe-to-dismiss':
+      return { value: 'Safe to dismiss', tone: 'success' };
+    case 'analysis-required':
+      return { value: 'Analysis required', tone: 'warning' };
+    case 'completed':
+      return { value: 'Analyzed', tone: 'neutral' };
+    case 'not-analyzed':
+      return { value: 'Not analyzed', tone: 'neutral' };
+  }
 }
 
 function LabeledStatus({ label, value, tone }: StatusValue & { label: string }) {

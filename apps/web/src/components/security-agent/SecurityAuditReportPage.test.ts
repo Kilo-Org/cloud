@@ -9,6 +9,7 @@ import type {
 import {
   AuditReportProvenance,
   auditReportControlsReducer,
+  buildAuditReportSearchParams,
   createAuditReportControlsState,
   filterSecurityAgentAuditReport,
   formatAuditEventTime,
@@ -136,6 +137,34 @@ describe('audit report control state', () => {
     expect(nextState.draftRange).toBe(state.draftRange);
     expect(nextState.isRangePickerOpen).toBe(false);
   });
+
+  it('synchronizes submitted controls when browser navigation changes the URL', () => {
+    const state = createAuditReportControlsState({
+      initialRange: { startDate: '2026-03-19', endDate: '2026-06-16' },
+      initialFilters: { severity: 'all', state: 'all', repository: null },
+    });
+
+    const nextState = auditReportControlsReducer(state, {
+      type: 'sync-from-url',
+      range: { startDate: '2026-05-01', endDate: '2026-05-31' },
+      filters: { severity: 'critical', state: 'open', repository: 'kilo/web' },
+    });
+
+    expect(nextState.submittedRange).toEqual({
+      startDate: '2026-05-01',
+      endDate: '2026-05-31',
+    });
+    expect(nextState.draftRange).toEqual({
+      from: new Date(2026, 4, 1),
+      to: new Date(2026, 4, 31),
+    });
+    expect(nextState.draftFilters).toEqual({
+      severity: 'critical',
+      state: 'open',
+      repository: 'kilo/web',
+    });
+    expect(nextState.submittedFilters).toEqual(nextState.draftFilters);
+  });
 });
 
 describe('audit report filters', () => {
@@ -159,6 +188,26 @@ describe('audit report filters', () => {
       state: 'all',
       repository: null,
     });
+  });
+
+  it('writes submitted range and filters to shareable URL parameters', () => {
+    expect(
+      buildAuditReportSearchParams(
+        'unrelated=preserved&severity=low',
+        { startDate: '2026-05-01', endDate: '2026-05-31' },
+        { severity: 'high', state: 'ignored', repository: 'kilo/web' }
+      )
+    ).toBe(
+      'unrelated=preserved&severity=high&startDate=2026-05-01&endDate=2026-05-31&state=ignored&repoFullName=kilo%2Fweb'
+    );
+
+    expect(
+      buildAuditReportSearchParams(
+        'severity=high&state=ignored&repoFullName=kilo%2Fweb',
+        { startDate: '2026-06-01', endDate: '2026-06-16' },
+        { severity: 'all', state: 'all', repository: null }
+      )
+    ).toBe('startDate=2026-06-01&endDate=2026-06-16');
   });
 
   it('filters finding groups by severity, state, and repository while preserving complete timelines', () => {

@@ -1,7 +1,7 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import React, { type FormEvent, type ReactNode, useReducer } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import React, { type FormEvent, type ReactNode, useEffect, useReducer } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { differenceInCalendarDays, format as formatCalendarDateLabel } from 'date-fns';
 import {
@@ -98,7 +98,7 @@ type AuditReportControlsAction =
       filter: Partial<AuditReportFilters>;
     }
   | {
-      type: 'submit-report';
+      type: 'submit-report' | 'sync-from-url';
       range: DateRange;
       filters: AuditReportFilters;
     }
@@ -228,6 +228,14 @@ export function auditReportControlsReducer(
         ...state,
         draftFilters: { ...state.draftFilters, ...action.filter },
       };
+    case 'sync-from-url':
+      return {
+        draftRange: toDayPickerDateRange(action.range),
+        submittedRange: action.range,
+        draftFilters: action.filters,
+        submittedFilters: action.filters,
+        isRangePickerOpen: false,
+      };
     case 'submit-report':
       return {
         ...state,
@@ -246,6 +254,8 @@ export function auditReportControlsReducer(
 
 export function SecurityAuditReportPage() {
   const trpc = useTRPC();
+  const pathname = usePathname();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { isOrg, organizationId } = useSecurityAgent();
   const requestedRange = {
@@ -256,6 +266,12 @@ export function SecurityAuditReportPage() {
     ? requestedRange
     : getDefaultAuditReportDateRange();
   const initialFilters = parseAuditReportFilters(searchParams);
+  const { startDate: initialStartDate, endDate: initialEndDate } = initialRange;
+  const {
+    severity: initialSeverity,
+    state: initialState,
+    repository: initialRepository,
+  } = initialFilters;
   const [controlsState, dispatchControlsState] = useReducer(
     auditReportControlsReducer,
     { initialRange, initialFilters },
@@ -263,6 +279,19 @@ export function SecurityAuditReportPage() {
   );
   const { draftRange, submittedRange, draftFilters, submittedFilters, isRangePickerOpen } =
     controlsState;
+
+  useEffect(() => {
+    dispatchControlsState({
+      type: 'sync-from-url',
+      range: { startDate: initialStartDate, endDate: initialEndDate },
+      filters: {
+        severity: initialSeverity,
+        state: initialState,
+        repository: initialRepository,
+      },
+    });
+  }, [initialStartDate, initialEndDate, initialSeverity, initialState, initialRepository]);
+
   const completeDraftRange = toAuditReportDateRange(draftRange);
   const latestSelectableDate = utcDateAsLocalCalendarDate(new Date());
   const hasOwnerContext = hasSecurityAgentAuditReportOwnerContext(isOrg, organizationId);
@@ -279,6 +308,7 @@ export function SecurityAuditReportPage() {
     isFetching: isReportFetching,
     isLoading: isReportLoading,
     isError: isReportError,
+    refetch: refetchReport,
   } = useQuery({
     ...queryOptions,
     enabled: hasOwnerContext,
@@ -296,14 +326,25 @@ export function SecurityAuditReportPage() {
     ? filterSecurityAgentAuditReport(unfilteredReport, effectiveSubmittedFilters)
     : null;
 
+  function replaceReportUrl(range: DateRange, filters: AuditReportFilters) {
+    const queryString = buildAuditReportSearchParams(searchParams.toString(), range, filters);
+    router.replace(`${pathname}?${queryString}`, { scroll: false });
+  }
+
   function handleGenerateReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!completeDraftRange) return;
+    const isSameRange =
+      completeDraftRange.startDate === submittedRange.startDate &&
+      completeDraftRange.endDate === submittedRange.endDate;
+
     dispatchControlsState({
       type: 'submit-report',
       range: completeDraftRange,
       filters: effectiveDraftFilters,
     });
+    replaceReportUrl(completeDraftRange, effectiveDraftFilters);
+    if (isSameRange) void refetchReport();
   }
 
   function handleDateRangeSelect(nextRange: DayPickerDateRange | undefined) {
@@ -317,6 +358,7 @@ export function SecurityAuditReportPage() {
 
   function handleClearFilters() {
     dispatchControlsState({ type: 'clear-filters' });
+    replaceReportUrl(submittedRange, ALL_AUDIT_REPORT_FILTERS);
   }
 
   return (
@@ -1252,6 +1294,35 @@ type SearchParamsReader = {
   get(name: string): string | null;
 };
 
+export function buildAuditReportSearchParams(
+  currentSearchParams: string,
+  range: DateRange,
+  filters: AuditReportFilters
+): string {
+  const searchParams = new URLSearchParams(currentSearchParams);
+  searchParams.set('startDate', range.startDate);
+  searchParams.set('endDate', range.endDate);
+
+  setOptionalAuditReportSearchParam(searchParams, 'severity', filters.severity, 'all');
+  setOptionalAuditReportSearchParam(searchParams, 'state', filters.state, 'all');
+  setOptionalAuditReportSearchParam(searchParams, 'repoFullName', filters.repository, null);
+
+  return searchParams.toString();
+}
+
+function setOptionalAuditReportSearchParam(
+  searchParams: URLSearchParams,
+  name: string,
+  value: string | null,
+  defaultValue: string | null
+) {
+  if (value === defaultValue) {
+    searchParams.delete(name);
+    return;
+  }
+  if (value !== null) searchParams.set(name, value);
+}
+
 export function parseAuditReportFilters(searchParams: SearchParamsReader): AuditReportFilters {
   return {
     severity: parseAuditReportSeverityFilter(searchParams.get('severity')),
@@ -1439,7 +1510,7 @@ function formatDate(value: string): string {
 }
 
 function formatReportDateTime(value: string): string {
-  return formatDateTime24Hour(value).replace(/, (\d{2}:\d{2} UTC)$/, ' at $1');
+  return `${formatDate(value)} at ${formatAuditEventTime(value)}`;
 }
 
 function formatDateTime(value: string): string {

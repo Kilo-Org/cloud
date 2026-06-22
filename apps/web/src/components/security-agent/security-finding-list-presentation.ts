@@ -28,6 +28,20 @@ export type FindingDeadlinePresentation = FindingStatusPresentation & {
   detail: string;
 };
 
+export type FindingAnalysisState =
+  | 'queued'
+  | 'analyzing'
+  | 'failed'
+  | 'extraction-failed'
+  | 'exploitable'
+  | 'not-exploitable'
+  | 'unknown'
+  | 'safe-to-dismiss'
+  | 'manual-review'
+  | 'analysis-required'
+  | 'completed'
+  | 'not-analyzed';
+
 const gridWithSla = 'xl:grid-cols-[minmax(0,1fr)_9rem_8.5rem_minmax(9rem,auto)_2.25rem] xl:gap-x-3';
 const gridWithoutSla = 'xl:grid-cols-[minmax(0,1fr)_9rem_minmax(9rem,auto)_2.25rem] xl:gap-x-3';
 
@@ -39,81 +53,123 @@ function isSupersededFinding(finding: SecurityFinding) {
   return finding.status === 'ignored' && finding.ignored_reason?.startsWith('superseded:');
 }
 
-export function getAnalysisPresentation(finding: SecurityFinding): FindingStatusPresentation {
-  if (finding.analysis_status === 'pending') {
-    return {
-      icon: Loader2,
-      label: 'Analysis queued',
-      tone: 'warning',
-      spinning: true,
-      tooltip: 'Analysis is queued',
-    };
-  }
-  if (finding.analysis_status === 'running') {
-    return {
-      icon: Loader2,
-      label: 'Analyzing',
-      tone: 'warning',
-      spinning: true,
-      tooltip: 'Analysis is running',
-    };
-  }
-  if (finding.analysis_status === 'failed') {
-    return {
-      icon: XCircle,
-      label: 'Analysis failed',
-      tone: 'destructive',
-      tooltip: finding.analysis_error || 'Analysis failed. Retry to run it again.',
-    };
-  }
+export function getFindingAnalysisState(
+  analysisStatus: string | null,
+  analysis: SecurityFinding['analysis']
+): FindingAnalysisState {
+  if (analysisStatus === 'pending') return 'queued';
+  if (analysisStatus === 'running') return 'analyzing';
+  if (analysisStatus === 'failed') return 'failed';
 
+  const sandbox = analysis?.sandboxAnalysis;
+  if (sandbox?.extractionStatus === 'failed') return 'extraction-failed';
+  if (sandbox?.isExploitable === true) return 'exploitable';
+  if (sandbox?.isExploitable === false) return 'not-exploitable';
+  if (sandbox?.isExploitable === 'unknown') return 'unknown';
+
+  const triage = analysis?.triage;
+  if (triage?.suggestedAction === 'dismiss') return 'safe-to-dismiss';
+  if (triage?.suggestedAction === 'manual_review') return 'manual-review';
+  if (triage) return 'analysis-required';
+  if (analysisStatus === 'completed') return 'completed';
+  return 'not-analyzed';
+}
+
+export function getAnalysisPresentation(finding: SecurityFinding): FindingStatusPresentation {
+  const analysisState = getFindingAnalysisState(finding.analysis_status, finding.analysis);
   const sandbox = finding.analysis?.sandboxAnalysis;
   const triage = finding.analysis?.triage;
-  if (sandbox?.isExploitable === true) {
-    return {
-      icon: ShieldAlert,
-      label: 'Exploitable',
-      tone: 'destructive',
-      tooltip: sandbox.summary || 'Codebase analysis confirmed this vulnerability is exploitable',
-    };
+
+  switch (analysisState) {
+    case 'queued':
+      return {
+        icon: Loader2,
+        label: 'Analysis queued',
+        tone: 'warning',
+        spinning: true,
+        tooltip: 'Analysis is queued',
+      };
+    case 'analyzing':
+      return {
+        icon: Loader2,
+        label: 'Analyzing',
+        tone: 'warning',
+        spinning: true,
+        tooltip: 'Analysis is running',
+      };
+    case 'failed':
+      return {
+        icon: XCircle,
+        label: 'Analysis failed',
+        tone: 'destructive',
+        tooltip: finding.analysis_error || 'Analysis failed. Retry to run it again.',
+      };
+    case 'extraction-failed':
+      return {
+        icon: Eye,
+        label: 'Needs review',
+        tone: 'warning',
+        tooltip: 'Structured analysis result is unavailable. Review the technical report.',
+      };
+    case 'exploitable':
+      return {
+        icon: ShieldAlert,
+        label: 'Exploitable',
+        tone: 'destructive',
+        tooltip:
+          sandbox?.summary || 'Codebase analysis confirmed this vulnerability is exploitable',
+      };
+    case 'not-exploitable':
+      return {
+        icon: ShieldCheck,
+        label: 'No reachable path',
+        tone: 'success',
+        tooltip: sandbox?.summary || 'Codebase analysis found no reachable vulnerable path',
+      };
+    case 'unknown':
+      return {
+        icon: Eye,
+        label: 'Needs review',
+        tone: 'warning',
+        tooltip:
+          sandbox?.summary ||
+          sandbox?.exploitabilityReasoning ||
+          'Analysis could not confirm whether the vulnerable feature is reachable',
+      };
+    case 'safe-to-dismiss':
+      return {
+        icon: ShieldCheck,
+        label: 'Safe to dismiss',
+        tone: 'success',
+        tooltip: triage?.needsSandboxReasoning || 'Triage determined this can be safely dismissed',
+      };
+    case 'manual-review':
+      return {
+        icon: Eye,
+        label: 'Needs review',
+        tone: 'warning',
+        tooltip: triage?.needsSandboxReasoning || 'Triage flagged this for manual review',
+      };
+    case 'analysis-required':
+      return {
+        icon: Brain,
+        label: 'Analysis required',
+        tone: 'warning',
+        tooltip: triage?.needsSandboxReasoning || 'Codebase analysis is required',
+      };
+    case 'completed':
+      return {
+        icon: Shield,
+        label: 'Analyzed',
+        tone: 'neutral',
+      };
+    case 'not-analyzed':
+      return {
+        icon: Brain,
+        label: 'Not analyzed',
+        tone: 'neutral',
+      };
   }
-  if (sandbox?.isExploitable === false) {
-    return {
-      icon: ShieldCheck,
-      label: 'Not exploitable',
-      tone: 'success',
-      tooltip: sandbox.summary || 'Codebase analysis determined this is not exploitable',
-    };
-  }
-  if (triage?.suggestedAction === 'dismiss') {
-    return {
-      icon: ShieldCheck,
-      label: 'Safe to dismiss',
-      tone: 'success',
-      tooltip: triage.needsSandboxReasoning || 'Triage determined this can be safely dismissed',
-    };
-  }
-  if (triage?.suggestedAction === 'manual_review') {
-    return {
-      icon: Eye,
-      label: 'Needs review',
-      tone: 'warning',
-      tooltip: triage.needsSandboxReasoning || 'Triage flagged this for manual review',
-    };
-  }
-  if (finding.analysis_status === 'completed') {
-    return {
-      icon: Shield,
-      label: triage ? 'Triage complete' : 'Analyzed',
-      tone: 'neutral',
-      tooltip: triage?.needsSandboxReasoning || null,
-    };
-  }
-  return {
-    icon: Brain,
-    label: 'Not analyzed',
-    tone: 'neutral',
-  };
 }
 
 function formatFindingDate(date: Date) {

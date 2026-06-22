@@ -1,0 +1,42 @@
+{
+  "name": "kilo-extension",
+  "description": "Kilo browser extension.",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox --mv3",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox --mv3",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox --mv3",
+    "typecheck": "tsc --noEmit",
+    "compile": "pnpm run typecheck",
+    "lint": "pnpm -w exec oxlint --type-aware --type-check --import-plugin --react-plugin --react-perf-plugin --jsx-a11y-plugin --promise-plugin --vitest-plugin --deny-warnings --config apps/extension/.oxlintrc.json apps/extension",
+    "format": "pnpm -w exec oxfmt apps/extension",
+    "format:check": "pnpm -w exec oxfmt --list-different apps/extension",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "validate:firefox": "npx --loglevel error -y -p node@22 node ./node_modules/web-ext/bin/web-ext.js lint --source-dir .output/firefox-mv3 --no-input",
+    "verify": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run test",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.1",
+    "@types/node": "catalog:",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitest/coverage-v8": "catalog:",
+    "@wxt-dev/module-react": "1.2.2",
+    "tailwindcss": "4.3.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "web-ext": "10.4.0",
+    "wxt": "0.20.26"
+  }
+}

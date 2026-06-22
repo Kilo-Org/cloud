@@ -134,4 +134,5 @@ allowBuilds:
   koffi: false
   openclaw: false
   '@openrouter/sdk': false
+  spawn-sync: false
   tree-sitter-bash: false

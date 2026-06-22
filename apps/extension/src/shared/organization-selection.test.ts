@@ -12,6 +12,16 @@ describe('organization selection', () => {
     ).toBe('');
   });
 
+  it('does not replace a missing selected organization with stored organization', () => {
+    expect(
+      getSelectableOrganizationId({
+        organizations: [{ id: 'org-2', name: 'Other org' }],
+        selectedOrganizationId: 'org-1',
+        storedOrganizationId: 'org-2',
+      })
+    ).toBe('');
+  });
+
   it('keeps a selected organization that is still available', () => {
     expect(
       getSelectableOrganizationId({

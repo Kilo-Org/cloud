@@ -18,6 +18,10 @@ export const getSelectableOrganizationId = ({
     return selectedOrganizationId;
   }
 
+  if (selectedOrganizationId !== '') {
+    return '';
+  }
+
   if (storedOrganizationId !== null && hasOrganization(organizations, storedOrganizationId)) {
     return storedOrganizationId;
   }

@@ -118,6 +118,8 @@ export async function applyProviderSpecificLogic(
   userByok: BYOKResult[] | null,
   originalHeaders: FraudDetectionHeaders,
   userId: string,
+  organizationId: string | null,
+  sessionId: string | null,
   taskId: string | null
 ) {
   applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
@@ -196,5 +198,8 @@ export async function applyProviderSpecificLogic(
     originalHeaders,
     extraHeaders,
     userByok,
+    kilo_user_id: userId,
+    organization_id: organizationId,
+    session_id: sessionId,
   });
 }

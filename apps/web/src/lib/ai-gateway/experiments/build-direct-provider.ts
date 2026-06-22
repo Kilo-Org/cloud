@@ -45,9 +45,9 @@ async function compressWithHeadroom(context: TransformRequestContext) {
     const logId = await db
       .insert(api_request_compress_log)
       .values({
-        kilo_user_id,
-        organization_id,
-        session_id,
+        kilo_user_id: context.kilo_user_id,
+        organization_id: context.organization_id,
+        session_id: context.session_id,
         model: context.model,
         provider: context.provider.id,
         request: context.request,

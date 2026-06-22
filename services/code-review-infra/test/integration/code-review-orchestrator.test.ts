@@ -2,6 +2,10 @@
 import { env, runDurableObjectAlarm, runInDurableObject, SELF } from 'cloudflare:test';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { CodeReviewOrchestrator } from '../../src/code-review-orchestrator';
+import {
+  buildGitHubCloudReviewSkillCue,
+  GITHUB_CLOUD_REVIEW_SKILL_NAME,
+} from '../../src/github-cloud-review-skill';
 import type { CodeReview, SessionInput } from '../../src/types';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
 
@@ -25,6 +29,18 @@ function gitlabSessionInput(): SessionInput {
     ...sessionInput(),
     gitUrl: 'https://gitlab.example.test/acme/repo.git',
     platform: 'gitlab',
+  };
+}
+
+function githubSessionInput(): SessionInput {
+  return {
+    githubRepo: 'acme/repo',
+    githubToken: 'test-github-token',
+    prompt: 'Review this pull request',
+    mode: 'code',
+    model: 'test-model',
+    upstreamBranch: 'main',
+    platform: 'github',
   };
 }
 
@@ -339,10 +355,11 @@ describe('CodeReviewOrchestrator recovery', () => {
     );
   });
 
-  it('prepares fresh GitLab code-review sessions without selector transport', async () => {
+  it('attaches the trusted GitHub Cloud Review skill to GitHub prepareSession calls', async () => {
     const fetchMock = mockSuccessfulCloudAgentNextRun();
     const reviewId = crypto.randomUUID();
     const attemptId = crypto.randomUUID();
+    const originalPrompt = 'Review this pull request';
 
     const response = await SELF.fetch('https://worker.test/review', {
       method: 'POST',
@@ -351,7 +368,66 @@ describe('CodeReviewOrchestrator recovery', () => {
         reviewId,
         attemptId,
         authToken: 'test-auth-token',
-        sessionInput: gitlabSessionInput(),
+        sessionInput: {
+          ...githubSessionInput(),
+          prompt: originalPrompt,
+          runtimeSkills: [{ name: 'caller-skill', rawMarkdown: 'untrusted caller skill' }],
+        },
+        owner: { type: 'user', id: 'user-id', userId: 'user-id' },
+        agentVersion: 'v2',
+      }),
+    });
+
+    expect(response.status).toBe(202);
+    await SELF.fetch(`https://worker.test/reviews/${reviewId}/status?attemptId=${attemptId}`, {
+      headers: workerAuthHeaders(),
+    });
+
+    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
+    const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
+    const expectedCue = buildGitHubCloudReviewSkillCue(reviewId);
+
+    expect(prepareBody.runtimeSkills).toHaveLength(1);
+    expect(prepareBody.runtimeSkills[0]).toMatchObject({
+      name: GITHUB_CLOUD_REVIEW_SKILL_NAME,
+      rawMarkdown: expect.any(String),
+    });
+    expect(prepareBody.runtimeSkills[0]).not.toHaveProperty('files');
+
+    const rawMarkdown = String(prepareBody.runtimeSkills[0].rawMarkdown);
+    expect(rawMarkdown).toContain('---\nname: github-cloud-review');
+    expect(rawMarkdown).toContain(
+      'line: null is outdated even when legacy position remains numeric'
+    );
+    expect(rawMarkdown).toContain('Every list read uses --paginate');
+    expect(rawMarkdown).toContain('current HEAD');
+    expect(rawMarkdown).toContain('one atomic call only');
+    expect(rawMarkdown).toContain('trusted existing Kilo summary ID');
+    expect(rawMarkdown).toContain('fix link and verify it ends with the current review ID');
+
+    expect(prepareBody.prompt).toBe(`${expectedCue}\n\n${originalPrompt}`);
+    expect(prepareBody.prompt).toContain(`The current review ID is ${reviewId}`);
+    expect(prepareBody.prompt).not.toContain('untrusted caller skill');
+  });
+
+  it('prepares fresh GitLab code-review sessions without selector transport', async () => {
+    const fetchMock = mockSuccessfulCloudAgentNextRun();
+    const reviewId = crypto.randomUUID();
+    const attemptId = crypto.randomUUID();
+    const originalPrompt = 'Review this pull request';
+
+    const response = await SELF.fetch('https://worker.test/review', {
+      method: 'POST',
+      headers: { ...workerAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reviewId,
+        attemptId,
+        authToken: 'test-auth-token',
+        sessionInput: {
+          ...gitlabSessionInput(),
+          prompt: originalPrompt,
+          runtimeSkills: [{ name: 'caller-skill', rawMarkdown: 'untrusted caller skill' }],
+        },
         owner: { type: 'user', id: 'user-id', userId: 'user-id' },
         agentVersion: 'v2',
       }),
@@ -364,6 +440,9 @@ describe('CodeReviewOrchestrator recovery', () => {
     const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
     const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
     expect(prepareBody).toMatchObject({ platform: 'gitlab' });
+    expect(prepareBody.prompt).toBe(originalPrompt);
+    expect(prepareBody.prompt).not.toContain(GITHUB_CLOUD_REVIEW_SKILL_NAME);
+    expect(prepareBody).not.toHaveProperty('runtimeSkills');
     expect(prepareBody).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 

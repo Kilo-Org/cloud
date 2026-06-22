@@ -13,6 +13,7 @@ import {
   CloudAgentNextError,
   deriveCallbackToken,
   type CloudAgentNextFetchClient,
+  type CloudAgentPrepareSessionInput,
   type CloudAgentSessionHealthOutput,
   type CloudAgentTerminalReason,
 } from '@kilocode/worker-utils';
@@ -27,6 +28,12 @@ import type {
 } from './types';
 import { InternalStatusResponseSchema } from './types';
 import { doNameForAttempt } from './do-name';
+import {
+  buildGitHubCloudReviewSkillCue,
+  GITHUB_CLOUD_REVIEW_SKILL,
+  GITHUB_CLOUD_REVIEW_SKILL_NAME,
+  GITHUB_CLOUD_REVIEW_SKILL_VERSION,
+} from './github-cloud-review-skill';
 
 function callbackUrlForAttempt(apiUrl: string, reviewId: string, attemptId?: string): string {
   const url = new URL(`/api/internal/code-review-status/${reviewId}`, apiUrl);
@@ -1277,8 +1284,17 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         this.env.CALLBACK_TOKEN_SECRET
       );
 
-      const prepareInput = {
-        ...this.state.sessionInput,
+      const sessionInput = this.state.sessionInput;
+      const githubCloudReviewSkillAttached =
+        sessionInput.platform === 'github' &&
+        typeof sessionInput.githubRepo === 'string' &&
+        sessionInput.githubRepo.trim().length > 0;
+      const prepareInput: CloudAgentPrepareSessionInput = {
+        ...sessionInput,
+        prompt: githubCloudReviewSkillAttached
+          ? `${buildGitHubCloudReviewSkillCue(this.state.reviewId)}\n\n${sessionInput.prompt}`
+          : sessionInput.prompt,
+        runtimeSkills: githubCloudReviewSkillAttached ? [GITHUB_CLOUD_REVIEW_SKILL] : undefined,
         createdOnPlatform: 'code-review' as const,
         callbackTarget,
       };
@@ -1288,6 +1304,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         callbackUrl: callbackTarget.url,
         createdOnPlatform: prepareInput.createdOnPlatform,
         skipBalanceCheck: this.state.skipBalanceCheck,
+        githubCloudReviewSkill: {
+          attached: githubCloudReviewSkillAttached,
+          name: GITHUB_CLOUD_REVIEW_SKILL_NAME,
+          version: GITHUB_CLOUD_REVIEW_SKILL_VERSION,
+        },
       });
 
       const { cloudAgentSessionId, kiloSessionId } = await client.prepareSession(

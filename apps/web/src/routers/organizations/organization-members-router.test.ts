@@ -399,16 +399,17 @@ describe('organizations members trpc router', () => {
       ).rejects.toThrow('You do not have the required organizational role to access this feature');
     });
 
-    it('should reject billing managers inviting members', async () => {
+    it('should allow billing managers inviting members', async () => {
       const caller = await createCallerForUser(billingManagerUser.id);
 
-      await expect(
-        caller.organizations.members.invite({
-          organizationId: testOrganization.id,
-          email: `${crypto.randomUUID()}@billing-manager-member-invite.example.com`,
-          role: 'member',
-        })
-      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email: `${crypto.randomUUID()}@billing-manager-member-invite.example.com`,
+        role: 'member',
+      });
+
+      expect(result).toHaveProperty('acceptInviteUrl');
+      expect(result.acceptInviteUrl).toMatch(/^https?:\/\/.+\/users\/accept-invite\/.+$/);
     });
 
     it('should reject billing managers inviting billing managers', async () => {

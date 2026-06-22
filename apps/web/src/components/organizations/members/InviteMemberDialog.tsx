@@ -46,12 +46,14 @@ const ROLE_LABELS = {
 
 // Business rules for inviting members:
 // - Owners and Kilo admins can invite anyone
-// - Members and billing managers cannot invite anyone
+// - Billing managers can invite members only
+// - Members cannot invite anyone
 const getAvailableInviteRoles = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean
 ): OrganizationRole[] => {
   if (isKiloAdmin || currentUserRole === 'owner') return ['owner', 'member', 'billing_manager'];
+  if (currentUserRole === 'billing_manager') return ['member'];
 
   return [];
 };
@@ -137,7 +139,7 @@ export function InviteMemberDialog({
 
   const handleInviteMember = () => {
     if (!canInviteMembers) {
-      toast.error('Only organization owners can invite members');
+      toast.error('Only organization owners and billing managers can invite members');
       return;
     }
 
@@ -301,8 +303,9 @@ export function InviteMemberDialog({
             {!seatCapacityAvailable && !isOrgEnterprise && (
               <div className="rounded-md border border-amber-800 bg-amber-950/30 p-3">
                 <p className="text-sm text-amber-300">
-                  All seats are in use ({usedSeats}/{totalSeats}). You can still invite billing
-                  managers, who don&apos;t consume a seat.
+                  {availableRoles.includes('billing_manager')
+                    ? `All seats are in use (${usedSeats}/${totalSeats}). You can still invite billing managers, who don't consume a seat.`
+                    : `All seats are in use (${usedSeats}/${totalSeats}). Ask an organization owner to add seats before inviting more members.`}
                 </p>
               </div>
             )}

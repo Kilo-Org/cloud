@@ -14,7 +14,9 @@ import {
 import { db, sql } from '@/lib/drizzle';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
+  ensureOrganizationAccess,
   OrganizationIdInputSchema,
+  organizationBillingMutationProcedure,
   organizationOwnerMutationProcedure,
 } from '@/routers/organizations/utils';
 import { sendOrganizationInviteEmail } from '@/lib/email';
@@ -218,11 +220,15 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       return successResult({ updated: memberId });
     }),
-  invite: organizationOwnerMutationProcedure
+  invite: organizationBillingMutationProcedure
     .input(InviteMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
       const { organizationId, email, role } = input;
+
+      if (role !== 'member') {
+        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
+      }
 
       // Get organization details
       const organization = await getOrganizationById(organizationId);
@@ -233,7 +239,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      // Owners and Kilo admins can invite anyone (owner or member)
+      // Owners and Kilo admins can invite any role. Billing managers can invite members only.
       let invitation;
       try {
         invitation = await inviteUserToOrganization(organizationId, user.id, email, role);

@@ -73,6 +73,9 @@ function DailyUsageLimitDisplay({ member }: DailyUsageLimitDisplayProps) {
 const canManageMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
   isKiloAdmin || role === 'owner';
 
+const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
+  canManageMembers(role, isKiloAdmin) || role === 'billing_manager';
+
 // Business rules for member removal:
 // - Kilo admins can remove anyone
 // - Owners can remove anyone except themselves
@@ -352,7 +355,7 @@ export function OrganizationAdminMembers({
   // Show "Add Member" button only for Kilo admins
   const showAddMemberButton = isKiloAdmin;
 
-  const showInviteMemberButton = canManageMembers(currentUserRole, isKiloAdmin);
+  const showInviteMemberButton = canInviteMembers(currentUserRole, isKiloAdmin);
 
   return (
     <>

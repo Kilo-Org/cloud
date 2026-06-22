@@ -157,9 +157,11 @@ export const AgentFooterControls = ({
   modelOptions,
   onModeChange,
   onModelChange,
+  onRefreshTabs,
   onSelectedTabChange,
   onThinkingEffortChange,
   selectedTabId,
+  tabDebuggerError,
   thinkingEffort,
   thinkingOptions,
 }: {
@@ -171,36 +173,63 @@ export const AgentFooterControls = ({
   modelOptions: KiloGatewayModelOption[];
   onModeChange: (mode: AgentMode) => void;
   onModelChange: (model: string) => void;
+  onRefreshTabs: () => Promise<void>;
   onSelectedTabChange: (tabId: number) => void;
   onThinkingEffortChange: (thinkingEffort: string) => void;
   selectedTabId: number | undefined;
+  tabDebuggerError: string | undefined;
   thinkingEffort: string;
   thinkingOptions: string[];
 }): JSX.Element => (
   <div className="grid gap-2">
-    <CompactSelectControl
-      ariaLabel="Target tab"
-      className="w-full pl-2 pr-6"
-      disabled={isLoadingTabs || inspectableTabs.length === 0}
-      onChange={value => {
-        const tabId = Number(value);
+    <div className="flex min-w-0 items-center gap-2">
+      <CompactSelectControl
+        ariaLabel="Target tab"
+        className="min-w-0 flex-1 pl-2 pr-6"
+        disabled={isLoadingTabs || inspectableTabs.length === 0}
+        onChange={value => {
+          const tabId = Number(value);
 
-        if (Number.isInteger(tabId)) {
-          onSelectedTabChange(tabId);
-        }
-      }}
-      value={selectedTabId === undefined ? '' : String(selectedTabId)}
-    >
-      {inspectableTabs.length === 0 ? (
-        <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tabs'}</option>
-      ) : (
-        inspectableTabs.map(tab => (
-          <option key={tab.id} value={tab.id}>
-            {tab.title}
-          </option>
-        ))
-      )}
-    </CompactSelectControl>
+          if (Number.isInteger(tabId)) {
+            onSelectedTabChange(tabId);
+          }
+        }}
+        value={selectedTabId === undefined ? '' : String(selectedTabId)}
+      >
+        {inspectableTabs.length === 0 ? (
+          <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tabs'}</option>
+        ) : (
+          inspectableTabs.map(tab => (
+            <option key={tab.id} value={tab.id}>
+              {tab.title}
+            </option>
+          ))
+        )}
+      </CompactSelectControl>
+      <button
+        aria-label="Refresh tabs"
+        className="flex size-8 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-xs font-semibold text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:text-zinc-600"
+        disabled={isLoadingTabs}
+        onClick={() => {
+          void onRefreshTabs();
+        }}
+        title="Refresh tabs"
+        type="button"
+      >
+        <svg aria-hidden="true" className="size-3.5" fill="none" viewBox="0 0 16 16">
+          <path
+            d="M13.25 7.75a5.25 5.25 0 1 1-1.54-3.71M13.25 2.75v3.5h-3.5"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="1.5"
+          />
+        </svg>
+      </button>
+    </div>
+    {tabDebuggerError === undefined ? null : (
+      <p className="text-xs leading-4 text-red-300">{tabDebuggerError}</p>
+    )}
     <div className="flex min-w-0 items-center gap-2">
       <ModeControl mode={mode} onChange={onModeChange} />
       <CompactSelectControl

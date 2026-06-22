@@ -63,8 +63,14 @@ export const AgentChatPanel = ({
   const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>(fallbackModelOptions);
   const [thinkingEffort, setThinkingEffort] = useState(defaultThinkingEffort);
   const runAbortRef = useRef<AbortController | null>(null);
-  const { inspectableTabs, isLoadingTabs, loadInspectableTabs, selectTab, selectedTabId } =
-    useTabDebugger();
+  const {
+    inspectableTabs,
+    isLoadingTabs,
+    loadInspectableTabs,
+    selectTab,
+    selectedTabId,
+    tabDebuggerError,
+  } = useTabDebugger();
   const selectedModel = useMemo(
     () => modelOptions.find(option => option.id === model),
     [model, modelOptions]
@@ -273,9 +279,11 @@ export const AgentChatPanel = ({
           modelOptions={modelOptions}
           onModeChange={setMode}
           onModelChange={setModel}
+          onRefreshTabs={loadInspectableTabs}
           onSelectedTabChange={selectTab}
           onThinkingEffortChange={setThinkingEffort}
           selectedTabId={selectedTabId}
+          tabDebuggerError={tabDebuggerError}
           thinkingEffort={thinkingEffort}
           thinkingOptions={thinkingOptions}
         />

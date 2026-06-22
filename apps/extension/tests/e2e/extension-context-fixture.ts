@@ -8,19 +8,20 @@ import { join, resolve as resolvePath } from 'node:path';
 
 export const extensionPath = resolvePath(import.meta.dirname, '../../.output/chrome-mv3');
 
-export const startFixtureServer = async (): Promise<{
-  close: () => Promise<void>;
-  url: string;
-}> => {
+export const startFixtureServer = async ({
+  title = 'Kilo extension fixture',
+}: {
+  title?: string;
+} = {}): Promise<{ close: () => Promise<void>; url: string }> => {
   const server = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
     response.end(`
       <!doctype html>
       <html>
-        <head><title>Kilo extension fixture</title></head>
+        <head><title>${title}</title></head>
         <body>
           <main>
-            <h1>Kilo extension fixture page</h1>
+            <h1>${title}</h1>
             <p>This page exists so content scripts run in a normal HTTP tab.</p>
           </main>
         </body>

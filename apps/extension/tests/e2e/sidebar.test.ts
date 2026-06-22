@@ -146,6 +146,7 @@ test('native side panel is outside the page DOM', async () => {
   const manifest = await readOutputManifest();
   expect(manifest.side_panel?.default_path).toBe('sidepanel.html');
   expect(manifest.host_permissions).toContain('https://app.kilo.ai/*');
+  expect(manifest.permissions).toContain('debugger');
   expect(manifest.permissions).toContain('sidePanel');
   expect(manifest.action?.default_popup).toBeUndefined();
   expect(manifest.content_scripts).toBeUndefined();

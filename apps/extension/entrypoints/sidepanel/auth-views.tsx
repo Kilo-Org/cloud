@@ -1,6 +1,7 @@
-import type { JSX, ReactNode } from 'react';
+import type { ChangeEvent, JSX, ReactNode } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
 import { KiloLogo } from '@/src/shared/kilo-logo';
+import type { InspectableTab } from '@/src/shared/tab-debugger';
 
 const HeaderAccountControls = ({
   auth,
@@ -55,6 +56,24 @@ const Shell = ({
     {children}
   </main>
 );
+
+const getMeasureButtonLabel = ({
+  htmlLength,
+  isMeasuringHtml,
+}: {
+  htmlLength: number | undefined;
+  isMeasuringHtml: boolean;
+}): string => {
+  if (isMeasuringHtml) {
+    return 'Measuring...';
+  }
+
+  if (htmlLength === undefined) {
+    return 'Measure HTML';
+  }
+
+  return `HTML length: ${htmlLength.toLocaleString()}`;
+};
 
 export const LoadingView = (): JSX.Element => (
   <Shell>
@@ -180,19 +199,79 @@ export const ValidationErrorView = ({
 
 export const SignedInView = ({
   auth,
+  htmlLength,
+  inspectableTabs,
+  isLoadingTabs,
+  isMeasuringHtml,
+  onMeasureHtml,
+  onRefreshTabs,
+  onSelectTab,
   onSignOut,
+  selectedTabId,
+  tabDebuggerError,
 }: {
   auth: StoredAuth;
+  htmlLength: number | undefined;
+  inspectableTabs: InspectableTab[];
+  isLoadingTabs: boolean;
+  isMeasuringHtml: boolean;
+  onMeasureHtml: () => void;
+  onRefreshTabs: () => void;
+  onSelectTab: (tabId: number) => void;
   onSignOut: () => void;
+  selectedTabId: number | undefined;
+  tabDebuggerError: string | undefined;
 }): JSX.Element => (
   <Shell auth={auth} onSignOut={onSignOut}>
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="flex flex-1 flex-col px-4 py-5">
-        <div className="rounded-md border border-dashed border-zinc-800 bg-zinc-900/40 p-4">
-          <p className="text-sm font-medium text-zinc-100">No actions yet</p>
-          <p className="mt-1 text-sm leading-5 text-zinc-400">
-            Tools for this tab will appear here.
-          </p>
+      <div className="flex flex-1 flex-col gap-3 px-4 py-5">
+        <div className="rounded-md border border-zinc-800 bg-zinc-900/70 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <label className="text-sm font-medium text-zinc-100" htmlFor="inspectable-tab">
+              Tab
+            </label>
+            <button
+              className="h-8 rounded-md border border-zinc-700 px-3 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
+              disabled={isLoadingTabs}
+              onClick={onRefreshTabs}
+              type="button"
+            >
+              {isLoadingTabs ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+
+          <select
+            className="mt-3 h-10 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm text-zinc-100 outline-none transition focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30 disabled:cursor-not-allowed disabled:border-zinc-800 disabled:text-zinc-600"
+            disabled={isLoadingTabs || inspectableTabs.length === 0}
+            id="inspectable-tab"
+            onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+              onSelectTab(Number(event.currentTarget.value));
+            }}
+            value={selectedTabId?.toString() ?? ''}
+          >
+            {inspectableTabs.length === 0 ? (
+              <option value="">No inspectable tabs</option>
+            ) : (
+              inspectableTabs.map(tab => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.title} - {tab.url}
+                </option>
+              ))
+            )}
+          </select>
+
+          <button
+            className="mt-3 h-10 w-full rounded-md bg-[#EDFF00] px-4 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+            disabled={isMeasuringHtml || selectedTabId === undefined}
+            onClick={onMeasureHtml}
+            type="button"
+          >
+            {getMeasureButtonLabel({ htmlLength, isMeasuringHtml })}
+          </button>
+
+          {tabDebuggerError === undefined ? null : (
+            <p className="mt-3 text-sm leading-5 text-red-300">{tabDebuggerError}</p>
+          )}
         </div>
       </div>
     </div>

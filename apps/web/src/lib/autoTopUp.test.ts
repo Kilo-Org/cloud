@@ -3,8 +3,9 @@ import { auto_top_up_configs, kilocode_users, organizations } from '@kilocode/db
 import type { User, Organization } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { maybePerformAutoTopUp, maybePerformOrganizationAutoTopUp } from '@/lib/autoTopUp';
+import { sendAutoTopUpFailedEmail } from '@/lib/email';
 import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
@@ -689,5 +690,45 @@ describe('invoice metadata includes traceId', () => {
         }),
       })
     );
+  });
+});
+
+describe('auto top-up failed email recipients for organizations', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    jest.clearAllMocks();
+  });
+
+  test('sends auto top-up failed email to both org owners and billing managers', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `atuf-owner-${Date.now()}@example.com`,
+    });
+    const billingManager = await insertTestUser({
+      google_user_email: `atuf-billing-mgr-${Date.now()}@example.com`,
+    });
+    const member = await insertTestUser({
+      google_user_email: `atuf-member-${Date.now()}@example.com`,
+    });
+
+    const org = await createOrganization('ATUF Test Org', owner.id);
+    await db
+      .update(organizations)
+      .set({ auto_top_up_enabled: true, stripe_customer_id: `cus_atuf_${Date.now()}` })
+      .where(eq(organizations.id, org.id));
+    await addUserToOrganization(org.id, billingManager.id, 'billing_manager');
+    await addUserToOrganization(org.id, member.id, 'member');
+
+    // Trigger auto-top-up with no config — causes disable and failure email
+    await maybePerformOrganizationAutoTopUp({
+      id: org.id,
+      auto_top_up_enabled: true,
+      total_microdollars_acquired: 0,
+      microdollars_used: 0,
+    });
+
+    const sendMock = sendAutoTopUpFailedEmail as jest.Mock;
+    const recipients = sendMock.mock.calls.map((call: [string, ...unknown[]]) => call[0]).sort();
+    expect(recipients).toEqual([owner.google_user_email, billingManager.google_user_email].sort());
+    expect(recipients).not.toContain(member.google_user_email);
   });
 });

@@ -724,6 +724,7 @@ export const organizationAdminRouter = createTRPCRouter({
         created_by_kilo_user_id: organizations.created_by_kilo_user_id,
         deleted_at: organizations.deleted_at,
         sso_domain: organizations.sso_domain,
+        parent_organization_id: organizations.parent_organization_id,
         plan: organizations.plan,
         free_trial_end_at: organizations.free_trial_end_at,
         company_domain: organizations.company_domain,

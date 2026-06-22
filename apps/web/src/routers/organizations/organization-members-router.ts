@@ -14,8 +14,10 @@ import {
 import { db, sql } from '@/lib/drizzle';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
+  ensureOrganizationAccess,
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
+  organizationOwnerMutationProcedure,
 } from '@/routers/organizations/utils';
 import { sendOrganizationInviteEmail } from '@/lib/email';
 import { TRPCError } from '@trpc/server';
@@ -50,7 +52,7 @@ const DeleteInviteSchema = OrganizationIdInputSchema.extend({
 });
 
 export const organizationsMembersRouter = createTRPCRouter({
-  update: organizationBillingMutationProcedure
+  update: organizationOwnerMutationProcedure
     .input(UpdateMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
@@ -118,7 +120,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         updated: role !== undefined ? 'role and limit' : 'limit',
       });
     }),
-  remove: organizationBillingMutationProcedure
+  remove: organizationOwnerMutationProcedure
     .input(RemoveMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
@@ -224,6 +226,10 @@ export const organizationsMembersRouter = createTRPCRouter({
       const { user } = ctx;
       const { organizationId, email, role } = input;
 
+      if (role !== 'member') {
+        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
+      }
+
       // Get organization details
       const organization = await getOrganizationById(organizationId);
       if (!organization) {
@@ -233,7 +239,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         });
       }
 
-      // Owners and Kilo admins can invite anyone (owner or member)
+      // Owners and Kilo admins can invite any role. Billing managers can invite members only.
       let invitation;
       try {
         invitation = await inviteUserToOrganization(organizationId, user.id, email, role);
@@ -289,7 +295,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         acceptInviteUrl,
       };
     }),
-  deleteInvite: organizationBillingMutationProcedure
+  deleteInvite: organizationOwnerMutationProcedure
     .input(DeleteInviteSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, inviteId } = input;

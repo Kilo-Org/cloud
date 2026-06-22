@@ -64,7 +64,7 @@ function SectionHeader({
         )}
       >
         <div className={cn('flex gap-3', hasContent ? 'items-start' : 'items-center')}>
-          <div className="bg-muted text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">
+          <div className="bg-surface-overlay text-muted-foreground flex size-10 shrink-0 items-center justify-center rounded-lg">
             <Icon className="size-5" aria-hidden="true" />
           </div>
           <div className="space-y-1">
@@ -133,15 +133,20 @@ function SectionToggle({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-3">
-      <span className="text-muted-foreground text-xs font-medium" aria-hidden="true">
-        {checked ? 'On' : 'Off'}
-      </span>
+      <div className="space-y-0.5 text-right">
+        <Label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </Label>
+        <div id={`${id}-state`} className="text-muted-foreground text-xs font-medium">
+          {checked ? 'On' : 'Off'}
+        </div>
+      </div>
       <Switch
         id={id}
         checked={checked}
         disabled={disabled}
         onCheckedChange={onCheckedChange}
-        aria-label={label}
+        aria-describedby={`${id}-state`}
       />
     </div>
   );
@@ -224,11 +229,11 @@ function OptionGrid<Value extends string>({
               className={cn('mt-0.5', selected && 'border-brand-primary text-brand-primary')}
               disabled={disabled}
             />
-            <span className="space-y-1">
+            <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className={cn('block font-medium', selected && 'text-brand-primary')}>
                 {option.label}
               </span>
-              <span className="text-muted-foreground block text-xs font-normal">
+              <span className="text-muted-foreground block min-h-10 text-xs leading-5 font-normal">
                 {option.description}
               </span>
             </span>

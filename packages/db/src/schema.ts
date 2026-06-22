@@ -2198,6 +2198,22 @@ export const api_request_log = pgTable(
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
 
+export const api_request_compress_log = pgTable(
+  'api_request_compress_log',
+  {
+    id: bigserial({ mode: 'bigint' }).notNull().primaryKey(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: text(),
+    session_id: text(),
+    provider: text().notNull(),
+    model: text().notNull(),
+    request: jsonb().notNull(),
+    result: jsonb().notNull(),
+  },
+  table => [index('idx_api_request_compress_log_created_at').on(table.created_at)]
+);
+
 export const http_user_agent = pgTable(
   'http_user_agent',
   {
@@ -2626,13 +2642,21 @@ export const organizations = pgTable(
     created_by_kilo_user_id: text(),
     deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
     sso_domain: text(),
+    parent_organization_id: uuid().references((): AnyPgColumn => organizations.id, {
+      onDelete: 'restrict',
+    }),
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
     company_domain: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
+    check(
+      'organizations_not_parented_by_self_check',
+      sql`${table.parent_organization_id} IS NULL OR ${table.parent_organization_id} <> ${table.id}`
+    ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
+    index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
   ]
 );
 

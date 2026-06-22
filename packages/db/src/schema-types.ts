@@ -1494,6 +1494,7 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
+  enable_headroom_compression: z.boolean().optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;

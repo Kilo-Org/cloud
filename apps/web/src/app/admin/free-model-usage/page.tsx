@@ -6,6 +6,7 @@ import { PromotedModelUsageStats } from '../components/PromotedModelUsageStats';
 import { RateLimitTesting } from '../components/RateLimitTesting';
 import AdminPage from '../components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
+import { Button } from '@/components/ui/button';
 
 const breadcrumbs = (
   <>
@@ -34,14 +35,15 @@ export default function FreeModelUsagePage() {
           <p className="text-muted-foreground mb-4">
             View comprehensive free model usage analytics and breakdowns on Metabase.
           </p>
-          <a
-            href="https://novel-topmast.metabaseapp.com/dashboard/38-free-model-usage"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block rounded-md bg-[#2B6AD2] px-4 py-2 text-sm font-bold text-white hover:bg-[#225eb9] focus:ring-2 focus:ring-[#3b7de8] focus:ring-offset-2 focus:outline-hidden"
-          >
-            View detailed usage dashboard on Metabase →
-          </a>
+          <Button asChild>
+            <a
+              href="https://novel-topmast.metabaseapp.com/dashboard/38-free-model-usage"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View detailed usage dashboard on Metabase →
+            </a>
+          </Button>
         </div>
 
         <div className="bg-background rounded-lg border p-6">
@@ -51,14 +53,15 @@ export default function FreeModelUsagePage() {
             hour, and what percentage sign up within 3 hours. Includes helper queries for
             investigating individual IPs and their usage patterns.
           </p>
-          <a
-            href="https://novel-topmast.metabaseapp.com/dashboard/69-free-tier-sign-up-conversion"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block rounded-md bg-[#2B6AD2] px-4 py-2 text-sm font-bold text-white hover:bg-[#225eb9] focus:ring-2 focus:ring-[#3b7de8] focus:ring-offset-2 focus:outline-hidden"
-          >
-            View sign-up conversion dashboard on Metabase →
-          </a>
+          <Button asChild>
+            <a
+              href="https://novel-topmast.metabaseapp.com/dashboard/69-free-tier-sign-up-conversion"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              View sign-up conversion dashboard on Metabase →
+            </a>
+          </Button>
         </div>
 
         <RateLimitTesting />

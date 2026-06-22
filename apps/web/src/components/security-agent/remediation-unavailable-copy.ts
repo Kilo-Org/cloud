@@ -1,4 +1,10 @@
-const REMEDIATION_UNAVAILABLE_COPY: Record<string, string> = {
+import {
+  SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS,
+  type SecurityRemediationAdmissionRejectionReason,
+} from '@kilocode/worker-utils/security-remediation-policy';
+
+const REMEDIATION_UNAVAILABLE_COPY: Record<SecurityRemediationAdmissionRejectionReason, string> = {
+  finding_not_found: 'Security finding no longer exists.',
   finding_not_open: 'Finding is no longer open.',
   repo_not_in_scope: 'Repository is not selected for Security Agent.',
   analysis_required: 'Run codebase analysis before starting remediation.',
@@ -26,7 +32,23 @@ const REMEDIATION_UNAVAILABLE_COPY: Record<string, string> = {
     'Analysis completed before Auto Remediation was enabled. Manual remediation can still start when safety gates pass.',
 };
 
+function isRemediationAdmissionRejectionReason(
+  reason: string
+): reason is SecurityRemediationAdmissionRejectionReason {
+  return SECURITY_REMEDIATION_ADMISSION_REJECTION_REASONS.some(candidate => candidate === reason);
+}
+
+export function isCodebaseAnalysisRequiredReason(reason: string | null | undefined): boolean {
+  return (
+    reason === 'analysis_required' ||
+    reason === 'sandbox_analysis_required' ||
+    reason === 'triage_only'
+  );
+}
+
 export function getRemediationUnavailableCopy(reason: string | null | undefined): string | null {
   if (!reason || reason === 'eligible') return null;
-  return REMEDIATION_UNAVAILABLE_COPY[reason] ?? 'Remediation is unavailable for this finding.';
+  return isRemediationAdmissionRejectionReason(reason)
+    ? REMEDIATION_UNAVAILABLE_COPY[reason]
+    : 'Remediation is unavailable for this finding.';
 }

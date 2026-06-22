@@ -110,7 +110,7 @@ export function applyGatewayModelsFallback(
   delete requestToMutate.body.models;
 }
 
-export function applyProviderSpecificLogic(
+export async function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
   requestToMutate: GatewayRequest,
@@ -118,6 +118,8 @@ export function applyProviderSpecificLogic(
   userByok: BYOKResult[] | null,
   originalHeaders: FraudDetectionHeaders,
   userId: string,
+  organizationId: string | null,
+  sessionId: string | null,
   taskId: string | null
 ) {
   applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
@@ -189,12 +191,15 @@ export function applyProviderSpecificLogic(
     requestToMutate.body.thinking = { type: 'disabled' };
   }
 
-  provider.transformRequest({
+  await provider.transformRequest({
     provider,
     model: requestedModel,
     request: requestToMutate,
     originalHeaders,
     extraHeaders,
     userByok,
+    kilo_user_id: userId,
+    organization_id: organizationId,
+    session_id: sessionId,
   });
 }

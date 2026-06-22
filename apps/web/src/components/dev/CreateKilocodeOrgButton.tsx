@@ -63,12 +63,13 @@ export function CreateKilocodeOrgButton() {
         </h3>
       </div>
       <button
+        type="button"
         onClick={handleCreateOrg}
         disabled={isLoading}
-        className="relative inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-md border border-blue-700 bg-blue-950 px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:border-blue-600 hover:bg-blue-900 hover:shadow-md focus-visible:ring-1 focus-visible:ring-blue-400 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
+        className="border-primary bg-primary text-primary-foreground hover:bg-primary-hover focus-visible:ring-ring relative inline-flex h-9 w-full cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-md border px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md focus-visible:ring-[3px] focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50"
         style={{
           backgroundImage:
-            'repeating-linear-gradient(-45deg, transparent, transparent 5px, rgba(191, 219, 254, 0.4) 5px, rgba(191, 219, 254, 0.4) 10px)',
+            'repeating-linear-gradient(-45deg, transparent, transparent 5px, color-mix(in oklab, var(--primary-foreground) 18%, transparent) 5px, color-mix(in oklab, var(--primary-foreground) 18%, transparent) 10px)',
           fontFamily: "'Comic Sans MS', 'Marker Felt', cursive",
         }}
       >

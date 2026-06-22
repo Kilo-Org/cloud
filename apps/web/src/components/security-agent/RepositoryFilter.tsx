@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 type Repository = {
   id: number;
@@ -20,6 +21,8 @@ type RepositoryFilterProps = {
   value: string | undefined;
   onValueChange: (value: string | undefined) => void;
   isLoading?: boolean;
+  id?: string;
+  className?: string;
 };
 
 export function RepositoryFilter({
@@ -27,6 +30,8 @@ export function RepositoryFilter({
   value,
   onValueChange,
   isLoading,
+  id,
+  className,
 }: RepositoryFilterProps) {
   return (
     <Select
@@ -34,7 +39,11 @@ export function RepositoryFilter({
       onValueChange={v => onValueChange(v === 'all' ? undefined : v)}
       disabled={isLoading}
     >
-      <SelectTrigger className="w-full sm:w-52" aria-label="Filter by repository">
+      <SelectTrigger
+        id={id}
+        className={cn('w-full sm:w-52', className)}
+        aria-label={id ? undefined : 'Filter by repository'}
+      >
         <SelectValue placeholder="All repositories" />
       </SelectTrigger>
       <SelectContent>

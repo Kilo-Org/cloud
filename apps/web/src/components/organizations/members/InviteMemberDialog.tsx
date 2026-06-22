@@ -45,18 +45,16 @@ const ROLE_LABELS = {
 } as const;
 
 // Business rules for inviting members:
-// - Owners can invite anyone (owner, admin, member)
-// - Admins can only invite admin or member (not owner)
-// - Members cannot invite anyone (handled at component level)
+// - Owners and Kilo admins can invite anyone
+// - Billing managers can invite members only
+// - Members cannot invite anyone
 const getAvailableInviteRoles = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean
 ): OrganizationRole[] => {
-  // Kilo admin can invite anyone
-  if (isKiloAdmin || currentUserRole === 'owner' || currentUserRole === 'billing_manager')
-    return ['owner', 'member', 'billing_manager'];
+  if (isKiloAdmin || currentUserRole === 'owner') return ['owner', 'member', 'billing_manager'];
+  if (currentUserRole === 'billing_manager') return ['member'];
 
-  // Members cannot invite anyone
   return [];
 };
 
@@ -104,6 +102,7 @@ export function InviteMemberDialog({
   const availableRoles = useMemo(() => {
     return getAvailableInviteRoles(currentUserRole, isKiloAdmin);
   }, [currentUserRole, isKiloAdmin]);
+  const canInviteMembers = availableRoles.length > 0;
 
   const isEmailValid = useMemo(() => {
     if (!email.trim()) return false;
@@ -139,6 +138,11 @@ export function InviteMemberDialog({
   const hasSeatsAvailable = seatCapacityAvailable || !isSeatConsumingRole;
 
   const handleInviteMember = () => {
+    if (!canInviteMembers) {
+      toast.error('Only organization owners and billing managers can invite members');
+      return;
+    }
+
     if (!email.trim()) {
       toast.error('Please enter an email address');
       return;
@@ -299,8 +303,9 @@ export function InviteMemberDialog({
             {!seatCapacityAvailable && !isOrgEnterprise && (
               <div className="rounded-md border border-amber-800 bg-amber-950/30 p-3">
                 <p className="text-sm text-amber-300">
-                  All seats are in use ({usedSeats}/{totalSeats}). You can still invite billing
-                  managers, who don&apos;t consume a seat.
+                  {availableRoles.includes('billing_manager')
+                    ? `All seats are in use (${usedSeats}/${totalSeats}). You can still invite billing managers, who don't consume a seat.`
+                    : `All seats are in use (${usedSeats}/${totalSeats}). Ask an organization owner to add seats before inviting more members.`}
                 </p>
               </div>
             )}
@@ -339,6 +344,7 @@ export function InviteMemberDialog({
                 !isEmailValid ||
                 emailDomainMatchesSSODomain ||
                 inviteMemberMutation.isPending ||
+                !canInviteMembers ||
                 !hasSeatsAvailable
               }
             >

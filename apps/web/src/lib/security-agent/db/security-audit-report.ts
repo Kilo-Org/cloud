@@ -438,7 +438,7 @@ async function assembleSecurityAgentAuditReport(params: {
   const { dataThrough, rows, cutoffStates } = await db.transaction(
     async tx => {
       const dataThrough = await getDatabaseNow(tx);
-      const eventCount = await countReportEvents(tx, params.owner, params.period, dataThrough);
+      const eventCount = await countReportEvents(tx, params.owner, params.period);
       params.onEventCount(eventCount);
 
       if (eventCount > SECURITY_AGENT_AUDIT_REPORT_MAX_EVENTS) {
@@ -448,7 +448,7 @@ async function assembleSecurityAgentAuditReport(params: {
         );
       }
 
-      const rows = await scanReportRows(tx, params.owner, params.period, dataThrough);
+      const rows = await scanReportRows(tx, params.owner, params.period);
       if (rows.length !== eventCount) {
         throw new SecurityAgentAuditReportQueryError(
           'Report scan row count does not match counted events',
@@ -461,12 +461,7 @@ async function assembleSecurityAgentAuditReport(params: {
           rows.map(getRowFindingId).filter((findingId): findingId is string => Boolean(findingId))
         )
       );
-      const cutoffStates = await loadReportFindingCutoffStates(
-        tx,
-        params.owner,
-        findingIds,
-        dataThrough
-      );
+      const cutoffStates = await loadReportFindingCutoffStates(tx, params.owner, findingIds);
 
       return { dataThrough, rows, cutoffStates };
     },
@@ -563,15 +558,14 @@ async function getDatabaseNow(tx: DrizzleTransaction): Promise<string> {
 async function countReportEvents(
   tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
-  period: NormalizedAuditReportPeriod,
-  dataThrough: string
+  period: NormalizedAuditReportPeriod
 ): Promise<number> {
   try {
     const [row] = await withSecurityAgentAuditReportTimeout(
       tx
         .select({ eventCount: count(security_audit_log.id) })
         .from(security_audit_log)
-        .where(and(...baseReportConditions(owner, period, dataThrough))),
+        .where(and(...baseReportConditions(owner, period))),
       SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
       'count'
     );
@@ -588,14 +582,13 @@ async function countReportEvents(
 async function scanReportRows(
   tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
-  period: NormalizedAuditReportPeriod,
-  dataThrough: string
+  period: NormalizedAuditReportPeriod
 ): Promise<AuditReportRow[]> {
   const rows: AuditReportRow[] = [];
   let cursor: AuditReportCursor | null = null;
 
   while (true) {
-    const page = await scanReportPage(tx, owner, period, dataThrough, cursor);
+    const page = await scanReportPage(tx, owner, period, cursor);
     rows.push(...page);
 
     if (page.length < SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE) return rows;
@@ -608,11 +601,10 @@ async function scanReportPage(
   tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
   period: NormalizedAuditReportPeriod,
-  dataThrough: string,
   cursor: AuditReportCursor | null
 ): Promise<AuditReportRow[]> {
   const effectiveAt = reportEffectiveAtSql();
-  const whereConditions = baseReportConditions(owner, period, dataThrough);
+  const whereConditions = baseReportConditions(owner, period);
   if (cursor) {
     const cursorCondition = or(
       gt(effectiveAt, cursor.effectiveAt),
@@ -661,8 +653,7 @@ async function scanReportPage(
 async function loadReportFindingCutoffStates(
   tx: DrizzleTransaction,
   owner: SecurityAgentAuditReportOwner,
-  findingIds: string[],
-  dataThrough: string
+  findingIds: string[]
 ): Promise<AuditReportFindingCutoffState[]> {
   if (findingIds.length === 0) return [];
 
@@ -684,8 +675,8 @@ async function loadReportFindingCutoffStates(
       ? eq(security_audit_log.owned_by_user_id, owner.id)
       : eq(security_audit_log.owned_by_organization_id, owner.id),
     inArray(security_audit_log.action, [...REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS]),
-    lte(effectiveAt, dataThrough),
-    lte(security_audit_log.created_at, dataThrough),
+    lte(effectiveAt, reportDataThroughSql()),
+    lte(security_audit_log.created_at, reportDataThroughSql()),
     findingIdentityCondition,
   ];
 
@@ -736,8 +727,7 @@ async function loadReportFindingCutoffStates(
 
 function baseReportConditions(
   owner: SecurityAgentAuditReportOwner,
-  period: NormalizedAuditReportPeriod,
-  dataThrough: string
+  period: NormalizedAuditReportPeriod
 ) {
   const effectiveAt = reportEffectiveAtSql();
   const findingIdentityCondition = or(
@@ -758,13 +748,17 @@ function baseReportConditions(
     inArray(security_audit_log.action, [...REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS]),
     gte(effectiveAt, period.start),
     lt(effectiveAt, period.endExclusive),
-    lte(security_audit_log.created_at, dataThrough),
+    lte(security_audit_log.created_at, reportDataThroughSql()),
     findingIdentityCondition,
   ];
 }
 
 function reportEffectiveAtSql() {
   return sql<string>`COALESCE(${security_audit_log.occurred_at}, ${security_audit_log.created_at})`;
+}
+
+function reportDataThroughSql() {
+  return sql<string>`transaction_timestamp()`;
 }
 
 function reportFindingIdSql() {

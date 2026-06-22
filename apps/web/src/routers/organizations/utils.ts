@@ -130,6 +130,23 @@ export const organizationMemberMutationProcedure = baseProcedure
     return next();
   });
 
+// Custom procedure that ensures user has owner access to the organization
+export const organizationOwnerProcedure = baseProcedure
+  .input(OrganizationIdInputSchema)
+  .use(async ({ ctx, next, input }) => {
+    await ensureOrganizationAccess(ctx, input.organizationId, ['owner']);
+    return next();
+  });
+
+// Owner procedure that also enforces trial/subscription status on mutations
+export const organizationOwnerMutationProcedure = baseProcedure
+  .input(OrganizationIdInputSchema)
+  .use(async ({ ctx, next, input }) => {
+    await ensureOrganizationAccess(ctx, input.organizationId, ['owner']);
+    await requireActiveSubscriptionOrTrial(input.organizationId);
+    return next();
+  });
+
 // Custom procedure that ensures user has owner or billing_manager access to the organization
 export const organizationBillingProcedure = baseProcedure
   .input(OrganizationIdInputSchema)

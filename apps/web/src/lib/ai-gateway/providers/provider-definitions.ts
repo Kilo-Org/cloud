@@ -9,7 +9,7 @@ export default {
     apiUrl: 'https://openrouter.ai/api/v1',
     apiKey: getEnvVariable('OPENROUTER_API_KEY'),
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
-    transformRequest() {},
+    async transformRequest() {},
   },
   ALIBABA: {
     id: 'alibaba',
@@ -17,7 +17,7 @@ export default {
     apiKey: getEnvVariable('ALIBABA_API_KEY'),
     // Prompt caching is not supported on the responses API for Alibaba; enabling it is therefore dangerous.
     supportedChatApis: ['chat_completions' /*, 'responses'*/],
-    transformRequest(context) {
+    async transformRequest(context) {
       context.request.body.enable_thinking = !isReasoningExplicitlyDisabled(context.request);
     },
   },
@@ -27,7 +27,7 @@ export default {
     apiKey: getEnvVariable('BYTEDANCE_API_KEY'),
     // Prompt caching is not supported on the responses API for Bytedance; enabling it is therefore dangerous.
     supportedChatApis: ['chat_completions' /*, 'responses'*/],
-    transformRequest(context) {
+    async transformRequest(context) {
       if (!isReasoningExplicitlyDisabled(context.request)) {
         context.request.body.thinking = { type: 'enabled' };
         if (context.request.kind === 'chat_completions') {
@@ -49,7 +49,7 @@ export default {
     apiUrl: 'https://api.withmartian.com/v1',
     apiKey: getEnvVariable('MARTIAN_API_KEY'),
     supportedChatApis: ['chat_completions', 'responses', 'messages'],
-    transformRequest(context) {
+    async transformRequest(context) {
       delete context.request.body.provider;
     },
   },
@@ -58,14 +58,14 @@ export default {
     apiUrl: 'https://api.mistral.ai/v1',
     apiKey: getEnvVariable('MISTRAL_API_KEY'),
     supportedChatApis: [],
-    transformRequest() {},
+    async transformRequest() {},
   },
   VERCEL_AI_GATEWAY: {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',
     apiKey: getEnvVariable('VERCEL_AI_GATEWAY_API_KEY'),
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
-    transformRequest(context) {
+    async transformRequest(context) {
       applyVercelSettings(context.model, context.request, context.userByok);
     },
   },

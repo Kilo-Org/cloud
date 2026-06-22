@@ -211,8 +211,8 @@ function DriftAuditPage() {
 
       <Row
         area="Primary action color"
-        status="drift"
-        decision="Primary CTAs should use the Kilo yellow-green primary token. Migrate --primary and ui/button 'primary' away from hardcoded blue; keep blue for inline links and legacy drift only."
+        status="aligned"
+        decision="Primary CTAs use the Kilo yellow-green primary token. Blue remains reserved for inline links and informational status."
         proposal={
           <>
             <Swatch color="#EDFF00" label="#EDFF00" />
@@ -221,12 +221,9 @@ function DriftAuditPage() {
         }
         actual={
           <>
-            <Swatch color="oklch(0.922 0 0)" label="--primary" />
-            <Swatch color="#2B6AD2" label="ui/button primary" />
-            <Note>
-              --primary token is still near-white; button &quot;primary&quot; variant is still
-              hardcoded blue
-            </Note>
+            <Button>Primary action</Button>
+            <LegacyButton>Legacy primary action</LegacyButton>
+            <Note>both button primitives use the semantic primary token</Note>
           </>
         }
       />
@@ -248,7 +245,6 @@ function DriftAuditPage() {
           <>
             <LegacyButton>primary</LegacyButton>
             <LegacyButton variant="secondary">secondary</LegacyButton>
-            <LegacyButton variant="blue">blue</LegacyButton>
             <LegacyButton variant="green">green</LegacyButton>
             <LegacyButton variant="yellow">yellow</LegacyButton>
             <LegacyButton variant="purple">purple</LegacyButton>

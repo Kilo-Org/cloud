@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import type { ChangeEvent, JSX, ReactNode } from 'react';
-import { getDefaultAgentPanelState } from '@/src/shared/agent-chat-placeholder';
+import {
+  getDefaultAgentPanelState,
+  getFooterControlDisplay,
+} from '@/src/shared/agent-chat-placeholder';
 import type { AgentChatMessage, AgentPanelFooterState } from '@/src/shared/agent-chat-placeholder';
 
 const modeOptions = [
@@ -14,38 +17,59 @@ const effortOptions = ['low', 'medium', 'high'] as const;
 const isThinkingEffort = (value: string): value is AgentPanelFooterState['thinkingEffort'] =>
   value === 'low' || value === 'medium' || value === 'high';
 
-const FieldLabel = ({ children, htmlFor }: { children: string; htmlFor: string }): JSX.Element => (
-  <label className="text-[11px] font-medium text-zinc-500" htmlFor={htmlFor}>
-    {children}
-  </label>
+const ModeIcon = ({
+  icon,
+}: {
+  icon: ReturnType<typeof getFooterControlDisplay>['modeIcon'];
+}): JSX.Element => (
+  <svg
+    aria-hidden="true"
+    className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-zinc-400"
+    fill="none"
+    viewBox="0 0 16 16"
+  >
+    {icon === 'shield' ? (
+      <path
+        d="M8 1.75 13 3.5v3.65c0 3.1-1.9 5.55-5 7.1-3.1-1.55-5-4-5-7.1V3.5l5-1.75Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    ) : (
+      <path
+        d="M8 2.25 14.25 13H1.75L8 2.25Zm0 3.5v3.5m0 2.25h.01"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    )}
+  </svg>
 );
 
-const SelectControl = ({
+const CompactSelectControl = ({
+  ariaLabel,
   children,
-  id,
-  label,
+  className,
   onChange,
   value,
 }: {
+  ariaLabel: string;
   children: ReactNode;
-  id: string;
-  label: string;
+  className: string;
   onChange: (value: string) => void;
   value: string;
 }): JSX.Element => (
-  <div className="grid min-w-0 gap-1">
-    <FieldLabel htmlFor={id}>{label}</FieldLabel>
-    <select
-      className="h-8 min-w-0 rounded-md border border-zinc-800 bg-zinc-950 px-2 text-xs font-medium text-zinc-200 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
-      id={id}
-      onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-        onChange(event.currentTarget.value);
-      }}
-      value={value}
-    >
-      {children}
-    </select>
-  </div>
+  <select
+    aria-label={ariaLabel}
+    className={`h-8 min-w-0 rounded-md border border-zinc-800 bg-zinc-950 text-xs font-medium text-zinc-200 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30 ${className}`}
+    onChange={(event: ChangeEvent<HTMLSelectElement>) => {
+      onChange(event.currentTarget.value);
+    }}
+    value={value}
+  >
+    {children}
+  </select>
 );
 
 const ModeControl = ({
@@ -55,26 +79,32 @@ const ModeControl = ({
   mode: 'dangerous' | 'safe';
   onChange: (mode: 'dangerous' | 'safe') => void;
 }): JSX.Element => (
-  <div className="grid gap-1">
-    <p className="text-[11px] font-medium text-zinc-500">Mode</p>
-    <div className="grid grid-cols-2 rounded-md border border-zinc-800 bg-zinc-950 p-0.5">
+  <div className="relative shrink-0">
+    <ModeIcon
+      icon={getFooterControlDisplay({ mode, model: '', thinkingEffort: 'medium' }).modeIcon}
+    />
+    <CompactSelectControl
+      ariaLabel="Mode"
+      className="w-28 py-0 pl-8 pr-2"
+      onChange={value => {
+        if (value === 'safe' || value === 'dangerous') {
+          onChange(value);
+        }
+      }}
+      value={mode}
+    >
       {modeOptions.map(option => (
-        <button
-          className={
-            option.value === mode
-              ? 'h-7 rounded-sm bg-zinc-200 px-2 text-xs font-semibold text-zinc-950'
-              : 'h-7 rounded-sm px-2 text-xs font-medium text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-1 focus:ring-offset-zinc-950'
+        <option key={option.value} value={option.value}>
+          {
+            getFooterControlDisplay({
+              mode: option.value,
+              model: '',
+              thinkingEffort: 'medium',
+            }).modeLabel
           }
-          key={option.value}
-          onClick={() => {
-            onChange(option.value);
-          }}
-          type="button"
-        >
-          {option.label}
-        </button>
+        </option>
       ))}
-    </div>
+    </CompactSelectControl>
   </div>
 );
 
@@ -102,6 +132,7 @@ export const AgentChatPanel = (): JSX.Element => {
   const [mode, setMode] = useState(initialState.footer.mode);
   const [model, setModel] = useState(initialState.footer.model);
   const [thinkingEffort, setThinkingEffort] = useState(initialState.footer.thinkingEffort);
+  const footerDisplay = getFooterControlDisplay({ mode, model, thinkingEffort });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -109,13 +140,6 @@ export const AgentChatPanel = (): JSX.Element => {
         aria-label="Agent conversation"
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
       >
-        <div className="space-y-1 border-b border-zinc-900 pb-3">
-          <p className="text-sm font-semibold text-zinc-100">Agent</p>
-          <p className="text-xs leading-5 text-zinc-500">
-            Placeholder conversation for the selected browser tab.
-          </p>
-        </div>
-
         <div className="flex flex-1 flex-col justify-end gap-3">
           {initialState.messages.map(message => (
             <Message key={`${message.role}-${message.body}`} message={message} />
@@ -150,36 +174,54 @@ export const AgentChatPanel = (): JSX.Element => {
         </button>
       </form>
 
-      <footer className="border-t border-zinc-900 bg-zinc-950 px-4 py-3">
-        <div className="grid gap-3">
+      <footer className="border-t border-zinc-900 bg-zinc-950 px-4 py-2">
+        <div className="flex min-w-0 items-center gap-2">
           <ModeControl mode={mode} onChange={setMode} />
-          <div className="grid grid-cols-[minmax(0,1fr)_8.5rem] gap-2">
-            <SelectControl id="agent-model" label="Model" onChange={setModel} value={model}>
-              {modelOptions.map(option => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </SelectControl>
-            <SelectControl
-              id="thinking-effort"
-              label="Thinking"
-              onChange={value => {
-                if (isThinkingEffort(value)) {
-                  setThinkingEffort(value);
+          <CompactSelectControl
+            ariaLabel="Model"
+            className="flex-1 px-2"
+            onChange={setModel}
+            value={model}
+          >
+            {modelOptions.map(option => (
+              <option key={option} value={option}>
+                {
+                  getFooterControlDisplay({
+                    mode,
+                    model: option,
+                    thinkingEffort,
+                  }).modelLabel
                 }
-              }}
-              value={thinkingEffort}
-            >
-              {effortOptions.map(option => (
-                <option key={option} value={option}>
-                  {option[0]?.toUpperCase()}
-                  {option.slice(1)}
-                </option>
-              ))}
-            </SelectControl>
-          </div>
+              </option>
+            ))}
+          </CompactSelectControl>
+          <CompactSelectControl
+            ariaLabel="Thinking effort"
+            className="w-16 px-2"
+            onChange={value => {
+              if (isThinkingEffort(value)) {
+                setThinkingEffort(value);
+              }
+            }}
+            value={thinkingEffort}
+          >
+            {effortOptions.map(option => (
+              <option key={option} value={option}>
+                {
+                  getFooterControlDisplay({
+                    mode,
+                    model,
+                    thinkingEffort: option,
+                  }).thinkingLabel
+                }
+              </option>
+            ))}
+          </CompactSelectControl>
         </div>
+        <p className="sr-only">
+          Mode {footerDisplay.modeLabel}, model {footerDisplay.modelLabel}, thinking{' '}
+          {footerDisplay.thinkingLabel}
+        </p>
       </footer>
     </div>
   );

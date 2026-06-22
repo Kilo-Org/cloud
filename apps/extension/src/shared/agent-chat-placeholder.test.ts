@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getDefaultAgentPanelState } from './agent-chat-placeholder';
+import { getDefaultAgentPanelState, getFooterControlDisplay } from './agent-chat-placeholder';
 
 describe('agent chat placeholder state', () => {
   it('provides the initial extension agent shell defaults', () => {
@@ -24,6 +24,34 @@ describe('agent chat placeholder state', () => {
           role: 'agent',
         },
       ],
+    });
+  });
+
+  it('provides compact footer labels for the sidebar controls', () => {
+    expect(
+      getFooterControlDisplay({
+        mode: 'safe',
+        model: 'Claude Sonnet 4',
+        thinkingEffort: 'medium',
+      })
+    ).toStrictEqual({
+      modeIcon: 'shield',
+      modeLabel: 'Safe',
+      modelLabel: 'Sonnet 4',
+      thinkingLabel: 'Med',
+    });
+
+    expect(
+      getFooterControlDisplay({
+        mode: 'dangerous',
+        model: 'Claude Opus 4',
+        thinkingEffort: 'high',
+      })
+    ).toStrictEqual({
+      modeIcon: 'alert',
+      modeLabel: 'Danger',
+      modelLabel: 'Opus 4',
+      thinkingLabel: 'High',
     });
   });
 });

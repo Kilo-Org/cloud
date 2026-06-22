@@ -8,6 +8,7 @@ import {
   isGetSidebarStateMessage,
   isToggleSidebarMessage,
 } from '@/src/shared/messages';
+import { KiloMark } from '@/src/shared/kilo-mark';
 import {
   DEFAULT_SIDEBAR_PREFERENCES,
   SIDEBAR_PREFERENCES_STORAGE_KEY,
@@ -70,15 +71,20 @@ const KiloSidebar = (): React.JSX.Element | null => {
   }
 
   return (
-    <aside className="fixed right-0 top-0 z-[2147483647] flex h-dvh w-[min(380px,100vw)] flex-col border-l border-zinc-800 bg-zinc-950 font-sans text-zinc-50 shadow-2xl">
-      <div className="flex items-start justify-between gap-4 border-b border-zinc-800 p-4">
-        <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#EDFF00]">Kilo</p>
-          <h1 className="text-lg font-semibold">Hello world</h1>
+    <aside className="fixed right-0 top-0 z-[2147483647] flex h-dvh w-[min(400px,100vw)] flex-col border-l border-zinc-800 bg-zinc-950 font-sans text-zinc-50 shadow-2xl">
+      <div className="flex items-center justify-between gap-4 border-b border-zinc-800 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[#EDFF00] text-zinc-950">
+            <KiloMark className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-zinc-50">Kilo</p>
+            <p className="truncate text-xs text-zinc-400">Extension sidebar</p>
+          </div>
         </div>
         <button
           aria-label="Close Kilo sidebar"
-          className="rounded-md border border-zinc-700 px-2 py-1 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-[#EDFF00]"
+          className="h-8 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
           onClick={() => {
             void setSidebarOpen(false);
           }}
@@ -87,10 +93,24 @@ const KiloSidebar = (): React.JSX.Element | null => {
           Close
         </button>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-        <p className="text-sm leading-6 text-zinc-300">
-          This full-height sidebar is rendered by the Kilo extension.
-        </p>
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="border-b border-zinc-800 px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-medium text-zinc-100">Current tab</p>
+            <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs font-medium text-zinc-300">
+              Connected
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-1 flex-col px-4 py-5">
+          <div className="rounded-md border border-dashed border-zinc-800 bg-zinc-900/40 p-4">
+            <p className="text-sm font-medium text-zinc-100">No actions yet</p>
+            <p className="mt-1 text-sm leading-5 text-zinc-400">
+              Tools for this tab will appear here.
+            </p>
+          </div>
+        </div>
       </div>
     </aside>
   );

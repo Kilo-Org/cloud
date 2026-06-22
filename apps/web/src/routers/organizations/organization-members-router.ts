@@ -15,7 +15,7 @@ import { db, sql } from '@/lib/drizzle';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
-  organizationBillingMutationProcedure,
+  organizationOwnerMutationProcedure,
 } from '@/routers/organizations/utils';
 import { sendOrganizationInviteEmail } from '@/lib/email';
 import { TRPCError } from '@trpc/server';
@@ -50,7 +50,7 @@ const DeleteInviteSchema = OrganizationIdInputSchema.extend({
 });
 
 export const organizationsMembersRouter = createTRPCRouter({
-  update: organizationBillingMutationProcedure
+  update: organizationOwnerMutationProcedure
     .input(UpdateMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
@@ -118,7 +118,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         updated: role !== undefined ? 'role and limit' : 'limit',
       });
     }),
-  remove: organizationBillingMutationProcedure
+  remove: organizationOwnerMutationProcedure
     .input(RemoveMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
@@ -218,7 +218,7 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       return successResult({ updated: memberId });
     }),
-  invite: organizationBillingMutationProcedure
+  invite: organizationOwnerMutationProcedure
     .input(InviteMemberSchema)
     .mutation(async ({ input, ctx }) => {
       const { user } = ctx;
@@ -289,7 +289,7 @@ export const organizationsMembersRouter = createTRPCRouter({
         acceptInviteUrl,
       };
     }),
-  deleteInvite: organizationBillingMutationProcedure
+  deleteInvite: organizationOwnerMutationProcedure
     .input(DeleteInviteSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, inviteId } = input;

@@ -1,5 +1,4 @@
 import { thinkingEffortLabel } from './kilo-api-client';
-import type { KiloGatewayModelOption } from './kilo-api-client';
 
 export interface AgentPanelFooterState {
   readonly mode: 'dangerous' | 'safe';
@@ -22,33 +21,7 @@ const modelLabels: Record<string, string> = {
   'GPT-5': 'GPT-5',
 };
 
-const effortOptions = ['low', 'medium', 'high'] as const;
-
 export const defaultMode = 'safe';
-export const defaultThinkingEffort = 'medium';
-export const fallbackDefaultModelId = 'Claude Sonnet 4';
-export const defaultThinkingOption = 'default';
-
-export const fallbackModelOptions: KiloGatewayModelOption[] = [
-  {
-    id: fallbackDefaultModelId,
-    isPreferred: true,
-    name: 'Claude Sonnet 4',
-    variants: [...effortOptions],
-  },
-  {
-    id: 'Claude Opus 4',
-    isPreferred: true,
-    name: 'Claude Opus 4',
-    variants: [...effortOptions],
-  },
-  {
-    id: 'GPT-5',
-    isPreferred: true,
-    name: 'GPT-5',
-    variants: [...effortOptions],
-  },
-];
 
 export const getFooterControlDisplay = (
   footer: AgentPanelFooterState

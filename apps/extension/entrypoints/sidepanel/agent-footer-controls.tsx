@@ -10,8 +10,6 @@ const modeOptions = [
   { label: 'Dangerous', value: 'dangerous' },
 ] as const;
 
-const defaultThinkingOption = 'default';
-
 type AgentMode = 'dangerous' | 'safe';
 
 const ModeIcon = ({
@@ -151,6 +149,7 @@ const ModeControl = ({
 export const AgentFooterControls = ({
   inspectableTabs,
   isLoadingTabs,
+  isModelSelectDisabled,
   isThinkingSelectDisabled,
   mode,
   model,
@@ -167,6 +166,7 @@ export const AgentFooterControls = ({
 }: {
   inspectableTabs: InspectableTab[];
   isLoadingTabs: boolean;
+  isModelSelectDisabled: boolean;
   isThinkingSelectDisabled: boolean;
   mode: AgentMode;
   model: string;
@@ -235,14 +235,19 @@ export const AgentFooterControls = ({
       <CompactSelectControl
         ariaLabel="Model"
         className="flex-1 pl-2 pr-6"
+        disabled={isModelSelectDisabled}
         onChange={onModelChange}
         value={model}
       >
-        {modelOptions.map(option => (
-          <option key={option.id} value={option.id}>
-            {option.name}
-          </option>
-        ))}
+        {modelOptions.length === 0 ? (
+          <option value="">Loading models...</option>
+        ) : (
+          modelOptions.map(option => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))
+        )}
       </CompactSelectControl>
       <CompactSelectControl
         ariaLabel="Thinking effort"
@@ -251,11 +256,15 @@ export const AgentFooterControls = ({
         onChange={onThinkingEffortChange}
         value={thinkingEffort}
       >
-        {thinkingOptions.map(option => (
-          <option key={option} value={option}>
-            {option === defaultThinkingOption ? 'Default' : thinkingEffortLabel(option)}
-          </option>
-        ))}
+        {thinkingOptions.length === 0 ? (
+          <option value="">...</option>
+        ) : (
+          thinkingOptions.map(option => (
+            <option key={option} value={option}>
+              {thinkingEffortLabel(option)}
+            </option>
+          ))
+        )}
       </CompactSelectControl>
     </div>
   </div>

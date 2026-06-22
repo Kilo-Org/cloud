@@ -37,6 +37,7 @@ export const mockKiloApi = async (
   context: BrowserContext,
   options: {
     beforeFirstCompletion?: () => Promise<void>;
+    beforeModels?: () => Promise<void>;
     firstCompletionEvents?: unknown[];
     organizations?: { id: string; name: string }[];
     secondCompletionEvents?: unknown[];
@@ -60,8 +61,12 @@ export const mockKiloApi = async (
       status: 200,
     })
   );
-  await context.route('https://app.kilo.ai/api/gateway/models', route =>
-    route.fulfill({
+  await context.route('https://app.kilo.ai/api/gateway/models', async route => {
+    if (options.beforeModels !== undefined) {
+      await options.beforeModels();
+    }
+
+    await route.fulfill({
       json: {
         data: [
           {
@@ -73,8 +78,8 @@ export const mockKiloApi = async (
         ],
       },
       status: 200,
-    })
-  );
+    });
+  });
   await context.route('https://app.kilo.ai/api/gateway/v1/chat/completions', async route => {
     chatCompletionCalls += 1;
     options.seenChatOrganizationIds?.push(

@@ -134,4 +134,50 @@ describe('kilo gateway chat stream client', () => {
       reasoning: { effort: 'none', enabled: false },
     });
   });
+
+  it('maps instant thinking effort to disabled gateway reasoning', async () => {
+    let seenBody: unknown = null;
+    const fetch: FetchLike = (_input, init) => {
+      seenBody = parseJsonRequestBody(init?.body);
+
+      return streamResponse(['data: [DONE]\n\n']);
+    };
+
+    await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://app.kilo.ai',
+      fetch,
+      messages: [{ content: 'Be instant', role: 'user' }],
+      model: 'anthropic/claude-sonnet-4',
+      onContentDelta: () => {},
+      thinkingEffort: 'instant',
+      token: 'token-1',
+      tools: [],
+    });
+
+    expect(seenBody).toMatchObject({
+      reasoning: { effort: 'none', enabled: false },
+    });
+  });
+
+  it('omits unsupported thinking effort variants from gateway reasoning', async () => {
+    let seenBody: unknown = null;
+    const fetch: FetchLike = (_input, init) => {
+      seenBody = parseJsonRequestBody(init?.body);
+
+      return streamResponse(['data: [DONE]\n\n']);
+    };
+
+    await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://app.kilo.ai',
+      fetch,
+      messages: [{ content: 'Think harder', role: 'user' }],
+      model: 'anthropic/claude-sonnet-4',
+      onContentDelta: () => {},
+      thinkingEffort: 'xhigh',
+      token: 'token-1',
+      tools: [],
+    });
+
+    expect(seenBody).not.toHaveProperty('reasoning');
+  });
 });

@@ -6,14 +6,7 @@ import {
   groupConversationEvents,
 } from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent, AgentMode } from '@/src/shared/agent-conversation';
-import {
-  defaultMode,
-  defaultThinkingEffort,
-  defaultThinkingOption,
-  fallbackDefaultModelId,
-  fallbackModelOptions,
-  getFooterControlDisplay,
-} from '@/src/shared/agent-chat-placeholder';
+import { defaultMode, getFooterControlDisplay } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
@@ -42,9 +35,9 @@ export const AgentChatPanel = ({
   const [events, setEvents] = useStoredAgentConversation(createDefaultConversationEvents);
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState<AgentMode>(defaultMode);
-  const [model, setModel] = useState(fallbackDefaultModelId);
-  const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>(fallbackModelOptions);
-  const [thinkingEffort, setThinkingEffort] = useState(defaultThinkingEffort);
+  const [model, setModel] = useState('');
+  const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>([]);
+  const [thinkingEffort, setThinkingEffort] = useState('');
   const runAbortRef = useRef<AbortController | null>(null);
   const {
     inspectableTabs,
@@ -60,10 +53,7 @@ export const AgentChatPanel = ({
   );
   const groupedEvents = useMemo(() => groupConversationEvents(events), [events]);
   const thinkingOptions = useMemo(
-    () =>
-      selectedModel === undefined || selectedModel.variants.length === 0
-        ? [defaultThinkingOption]
-        : selectedModel.variants,
+    () => (selectedModel === undefined ? [] : selectedModel.variants),
     [selectedModel]
   );
   const footerDisplay = getFooterControlDisplay({
@@ -71,8 +61,8 @@ export const AgentChatPanel = ({
     model: selectedModel?.name ?? model,
     thinkingEffort,
   });
-  const isThinkingSelectDisabled =
-    selectedModel !== undefined && selectedModel.variants.length === 0;
+  const isModelSelectDisabled = modelOptions.length === 0;
+  const isThinkingSelectDisabled = thinkingOptions.length === 0;
 
   useEffect(() => {
     void loadInspectableTabs();
@@ -94,15 +84,14 @@ export const AgentChatPanel = ({
           token: auth.token,
         });
 
-        if (!abort.signal.aborted && models.length > 0) {
+        if (!abort.signal.aborted) {
           setModelOptions(models);
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           return;
         }
-
-        setModelOptions(fallbackModelOptions);
+        setModelOptions([]);
       }
     })();
 
@@ -113,21 +102,27 @@ export const AgentChatPanel = ({
 
   useEffect(() => {
     if (modelOptions.length === 0) {
+      if (model !== '') {
+        setModel('');
+      }
       return;
     }
 
     if (!modelOptions.some(option => option.id === model)) {
-      setModel(modelOptions[0]?.id ?? fallbackDefaultModelId);
+      setModel(modelOptions[0]?.id ?? '');
     }
   }, [model, modelOptions]);
 
   useEffect(() => {
     if (thinkingOptions.length === 0) {
+      if (thinkingEffort !== '') {
+        setThinkingEffort('');
+      }
       return;
     }
 
     if (!thinkingOptions.includes(thinkingEffort)) {
-      setThinkingEffort(thinkingOptions[0] ?? defaultThinkingOption);
+      setThinkingEffort(thinkingOptions[0] ?? '');
     }
   }, [thinkingEffort, thinkingOptions]);
 
@@ -163,6 +158,11 @@ export const AgentChatPanel = ({
       return;
     }
 
+    if (model === '') {
+      appendEvents([createAssistantMessage('Models are still loading.')]);
+      return;
+    }
+
     const abort = new AbortController();
     runAbortRef.current = abort;
     setIsRunning(true);
@@ -195,7 +195,7 @@ export const AgentChatPanel = ({
   const submitDraft = (): void => {
     const text = draft.trim();
 
-    if (text === '' || isRunning) {
+    if (text === '' || isRunning || model === '') {
       return;
     }
 
@@ -239,7 +239,7 @@ export const AgentChatPanel = ({
         <div className="mt-2 grid gap-2">
           <button
             className="h-9 w-full rounded-md bg-[#EDFF00] px-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-            disabled={draft.trim() === '' || isRunning}
+            disabled={draft.trim() === '' || isRunning || model === ''}
             type="submit"
           >
             {isRunning ? 'Running...' : 'Send message'}
@@ -260,6 +260,7 @@ export const AgentChatPanel = ({
         <AgentFooterControls
           inspectableTabs={inspectableTabs}
           isLoadingTabs={isLoadingTabs}
+          isModelSelectDisabled={isModelSelectDisabled}
           isThinkingSelectDisabled={isThinkingSelectDisabled}
           mode={mode}
           model={model}

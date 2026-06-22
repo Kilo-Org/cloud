@@ -41,15 +41,18 @@ interface StreamReaderContext {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 const organizationHeaderName = 'x-kilocode-organizationid';
+const validGatewayReasoningEfforts = new Set(['high', 'low', 'medium', 'minimal', 'none']);
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
-const toReasoning = (effort: string | undefined) =>
-  effort === undefined || effort === 'default'
-    ? undefined
-    : {
-        effort: effort === 'instant' ? 'none' : effort,
-        enabled: effort !== 'instant' && effort !== 'none',
-      };
+const toReasoning = (effort: string | undefined) => {
+  const gatewayEffort = effort === 'instant' ? 'none' : effort;
+
+  if (gatewayEffort === undefined || !validGatewayReasoningEfforts.has(gatewayEffort)) {
+    return;
+  }
+
+  return { effort: gatewayEffort, enabled: gatewayEffort !== 'none' };
+};
 const parseJson = (value: string): unknown => {
   try {
     return JSON.parse(value);

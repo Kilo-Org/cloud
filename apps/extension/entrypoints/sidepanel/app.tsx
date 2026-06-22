@@ -1,38 +1,243 @@
-import React from 'react';
-import { KiloMark } from '@/src/shared/kilo-mark';
+import { browser, storage } from '#imports';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { JSX } from 'react';
+import {
+  clearStoredAuth,
+  createDeviceAuthRequest,
+  getKiloApiBaseUrl,
+  loadStoredAuth,
+  pollDeviceAuthCode,
+  saveStoredAuth,
+  validateAuthToken,
+} from '@/src/shared/auth';
+import type { FetchLike, StoredAuth } from '@/src/shared/auth';
+import {
+  LoadingView,
+  PendingView,
+  SignedInView,
+  SignedOutView,
+  ValidationErrorView,
+} from './auth-views';
 
-export const App = (): React.JSX.Element => (
-  <main className="flex min-h-dvh flex-col bg-zinc-950 text-zinc-50">
-    <div className="border-b border-zinc-800 px-4 py-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[#EDFF00] text-zinc-950">
-          <KiloMark className="size-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-zinc-50">Kilo</p>
-          <p className="truncate text-xs text-zinc-400">Native side panel</p>
-        </div>
-      </div>
-    </div>
+const pollIntervalMs = 3000;
+const apiBaseUrl = getKiloApiBaseUrl();
+const fetchFromWindow: FetchLike = (input, init) => fetch(input, init);
 
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="border-b border-zinc-800 px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm font-medium text-zinc-100">Current tab</p>
-          <span className="rounded-full border border-zinc-700 px-2 py-0.5 text-xs font-medium text-zinc-300">
-            Connected
-          </span>
-        </div>
-      </div>
+type PanelState =
+  | {
+      readonly message?: string;
+      readonly status: 'checking' | 'signedOut' | 'starting';
+    }
+  | {
+      readonly code: string;
+      readonly status: 'pending';
+      readonly verificationUrl: string;
+    }
+  | {
+      readonly auth: StoredAuth;
+      readonly status: 'signedIn';
+    }
+  | {
+      readonly status: 'validationError';
+    };
 
-      <div className="flex flex-1 flex-col px-4 py-5">
-        <div className="rounded-md border border-dashed border-zinc-800 bg-zinc-900/40 p-4">
-          <p className="text-sm font-medium text-zinc-100">No actions yet</p>
-          <p className="mt-1 text-sm leading-5 text-zinc-400">
-            Tools for this tab will appear here.
-          </p>
-        </div>
-      </div>
-    </div>
-  </main>
-);
+export const App = (): JSX.Element => {
+  const [state, setState] = useState<PanelState>({ status: 'checking' });
+  const abortRef = useRef<AbortController | null>(null);
+  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopPolling = useCallback((): void => {
+    if (pollTimeoutRef.current !== null) {
+      clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
+  const validateStoredAuth = useCallback(async (): Promise<void> => {
+    stopPolling();
+    setState({ status: 'checking' });
+
+    const storedAuth = await loadStoredAuth(storage);
+    if (!storedAuth) {
+      setState({ status: 'signedOut' });
+      return;
+    }
+
+    const abort = new AbortController();
+    abortRef.current = abort;
+    const result = await validateAuthToken({
+      apiBaseUrl,
+      fetch: fetchFromWindow,
+      signal: abort.signal,
+      token: storedAuth.token,
+    });
+
+    if (abort.signal.aborted) {
+      return;
+    }
+
+    if (result.status === 'valid') {
+      await saveStoredAuth(storage, result.auth);
+      setState({ auth: result.auth, status: 'signedIn' });
+      return;
+    }
+
+    if (result.status === 'invalid') {
+      await clearStoredAuth(storage);
+      setState({ message: 'Your session expired. Sign in again.', status: 'signedOut' });
+      return;
+    }
+
+    setState({ status: 'validationError' });
+  }, [stopPolling]);
+
+  useEffect(() => {
+    void validateStoredAuth();
+
+    return () => {
+      stopPolling();
+    };
+  }, [stopPolling, validateStoredAuth]);
+
+  const cancelSignIn = useCallback((): void => {
+    stopPolling();
+    setState({ status: 'signedOut' });
+  }, [stopPolling]);
+
+  const signOut = useCallback((): void => {
+    stopPolling();
+    void (async (): Promise<void> => {
+      await clearStoredAuth(storage);
+      setState({ status: 'signedOut' });
+    })();
+  }, [stopPolling]);
+
+  const startPolling = useCallback(
+    (code: string): void => {
+      const tick = async (): Promise<void> => {
+        const abort = abortRef.current;
+
+        if (abort === null) {
+          return;
+        }
+
+        try {
+          const result = await pollDeviceAuthCode({
+            apiBaseUrl,
+            code,
+            fetch: fetchFromWindow,
+            signal: abort.signal,
+          });
+
+          if (abort.signal.aborted) {
+            return;
+          }
+
+          switch (result.status) {
+            case 'pending': {
+              pollTimeoutRef.current = setTimeout(() => {
+                void tick();
+              }, pollIntervalMs);
+              return;
+            }
+            case 'approved': {
+              stopPolling();
+              await saveStoredAuth(storage, result.auth);
+              setState({ auth: result.auth, status: 'signedIn' });
+              return;
+            }
+            case 'denied': {
+              stopPolling();
+              setState({ message: 'Access was denied.', status: 'signedOut' });
+              return;
+            }
+            case 'expired': {
+              stopPolling();
+              setState({ message: 'Your sign-in code expired.', status: 'signedOut' });
+            }
+          }
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            return;
+          }
+
+          stopPolling();
+          setState({ message: 'Sign in failed. Try again.', status: 'signedOut' });
+        }
+      };
+
+      void tick();
+    },
+    [stopPolling]
+  );
+
+  const startSignIn = useCallback((): void => {
+    stopPolling();
+    setState({ status: 'starting' });
+
+    void (async (): Promise<void> => {
+      try {
+        const authRequest = await createDeviceAuthRequest({
+          apiBaseUrl,
+          fetch: fetchFromWindow,
+        });
+        const abort = new AbortController();
+        abortRef.current = abort;
+
+        setState({
+          code: authRequest.code,
+          status: 'pending',
+          verificationUrl: authRequest.verificationUrl,
+        });
+        await browser.tabs.create({ url: authRequest.verificationUrl });
+        startPolling(authRequest.code);
+      } catch {
+        setState({ message: 'Failed to start sign in. Try again.', status: 'signedOut' });
+      }
+    })();
+  }, [startPolling, stopPolling]);
+
+  if (state.status === 'checking') {
+    return <LoadingView />;
+  }
+
+  if (state.status === 'starting') {
+    return <SignedOutView isStarting message={state.message} onSignIn={startSignIn} />;
+  }
+
+  if (state.status === 'signedOut') {
+    return <SignedOutView isStarting={false} message={state.message} onSignIn={startSignIn} />;
+  }
+
+  if (state.status === 'pending') {
+    return (
+      <PendingView
+        code={state.code}
+        onCancel={cancelSignIn}
+        onOpen={() => {
+          void browser.tabs.create({ url: state.verificationUrl });
+        }}
+      />
+    );
+  }
+
+  if (state.status === 'validationError') {
+    return (
+      <ValidationErrorView
+        onRetry={() => {
+          void validateStoredAuth();
+        }}
+        onSignInAgain={startSignIn}
+      />
+    );
+  }
+
+  if (state.status === 'signedIn') {
+    return <SignedInView auth={state.auth} onSignOut={signOut} />;
+  }
+
+  return <LoadingView />;
+};

@@ -15,6 +15,7 @@ interface ExtensionManifest {
       }
     | undefined;
   readonly content_scripts: unknown[] | undefined;
+  readonly host_permissions: string[] | undefined;
   readonly permissions: string[] | undefined;
   readonly side_panel:
     | {
@@ -135,6 +136,7 @@ const readOutputManifest = async (): Promise<ExtensionManifest> => {
     content_scripts: Array.isArray(manifest['content_scripts'])
       ? manifest['content_scripts']
       : undefined,
+    host_permissions: getStringArray(manifest['host_permissions']),
     permissions: getStringArray(manifest['permissions']),
     side_panel: getSidePanel(manifest['side_panel']),
   };
@@ -143,6 +145,7 @@ const readOutputManifest = async (): Promise<ExtensionManifest> => {
 test('native side panel is outside the page DOM', async () => {
   const manifest = await readOutputManifest();
   expect(manifest.side_panel?.default_path).toBe('sidepanel.html');
+  expect(manifest.host_permissions).toContain('https://app.kilo.ai/*');
   expect(manifest.permissions).toContain('sidePanel');
   expect(manifest.action?.default_popup).toBeUndefined();
   expect(manifest.content_scripts).toBeUndefined();
@@ -158,7 +161,8 @@ test('native side panel is outside the page DOM', async () => {
 
     const sidePanel = await context.newPage();
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-    await expect(sidePanel.getByText('Native side panel')).toBeVisible();
+    await expect(sidePanel.getByRole('button', { name: 'Sign in' })).toBeVisible();
+    await expect(sidePanel.getByText('No actions yet')).toBeHidden();
   } finally {
     await context.close();
     await fixture.close();

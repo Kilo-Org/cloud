@@ -8,7 +8,6 @@ describe('side panel behavior', () => {
     await enableActionClickSidePanel({
       setPanelBehavior: options => {
         calls.push(options);
-        return Promise.resolve();
       },
     });
 

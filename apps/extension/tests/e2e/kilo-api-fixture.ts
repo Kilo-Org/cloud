@@ -32,6 +32,11 @@ const chatCompletionStreamResponse = (events: unknown[]): string =>
 
 const longEvalIdentifier = `kilo${'VeryLongIdentifier'.repeat(16)}`;
 const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.outerHTML.length; return ${longEvalIdentifier};`;
+const chatCompletionsPath = '/api/gateway/v1/chat/completions';
+
+type ChatAbortObserverWindow = typeof globalThis & {
+  __kiloChatCompletionAborted?: boolean;
+};
 
 export const mockKiloApi = async (
   context: BrowserContext,
@@ -171,6 +176,45 @@ export const mockKiloApi = async (
     });
   });
 };
+
+export const installChatCompletionAbortObserver = async (sidePanel: Page): Promise<void> => {
+  await sidePanel.evaluate(chatPath => {
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    const state = globalThis as ChatAbortObserverWindow;
+
+    state.__kiloChatCompletionAborted = false;
+    globalThis.fetch = ((input, init) => {
+      let requestUrl = '';
+
+      if (input instanceof Request) {
+        requestUrl = input.url;
+      } else if (input instanceof URL) {
+        requestUrl = input.href;
+      } else {
+        requestUrl = input;
+      }
+
+      if (requestUrl.endsWith(chatPath)) {
+        init?.signal?.addEventListener(
+          'abort',
+          () => {
+            state.__kiloChatCompletionAborted = true;
+          },
+          { once: true }
+        );
+      }
+
+      return originalFetch(input, init);
+    }) as typeof globalThis.fetch;
+  }, chatCompletionsPath);
+};
+
+export const wasChatCompletionAborted = (sidePanel: Page): Promise<boolean> =>
+  sidePanel.evaluate(() => {
+    const state = globalThis as ChatAbortObserverWindow;
+
+    return state.__kiloChatCompletionAborted === true;
+  });
 
 export const readSidePanelScrollState = (): {
   documentClientHeight: number;

@@ -6,7 +6,11 @@ import {
   seedExtensionAuth,
   startFixtureServer,
 } from './extension-context-fixture';
-import { mockKiloApi } from './kilo-api-fixture';
+import {
+  installChatCompletionAbortObserver,
+  mockKiloApi,
+  wasChatCompletionAborted,
+} from './kilo-api-fixture';
 
 test('new conversation aborts a running request', async () => {
   const fixture = await startFixtureServer();
@@ -25,23 +29,7 @@ test('new conversation aborts a running request', async () => {
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await seedExtensionAuth(sidePanel);
     await sidePanel.reload();
-    await sidePanel.evaluate(() => {
-      const originalFetch = globalThis.fetch.bind(globalThis);
-      const state = globalThis as typeof globalThis & { __kiloChatAborted?: boolean };
-
-      state.__kiloChatAborted = false;
-      globalThis.fetch = ((input, init) => {
-        init?.signal?.addEventListener(
-          'abort',
-          () => {
-            state.__kiloChatAborted = true;
-          },
-          { once: true }
-        );
-
-        return originalFetch(input, init);
-      }) as typeof globalThis.fetch;
-    });
+    await installChatCompletionAbortObserver(sidePanel);
 
     await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
     await sidePanel.getByRole('button', { name: 'Dangerous' }).click();
@@ -51,15 +39,7 @@ test('new conversation aborts a running request', async () => {
     await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
     await sidePanel.getByLabel('New conversation').click();
 
-    await expect
-      .poll(() =>
-        sidePanel.evaluate(() => {
-          const state = globalThis as typeof globalThis & { __kiloChatAborted?: boolean };
-
-          return state.__kiloChatAborted === true;
-        })
-      )
-      .toBe(true);
+    await expect.poll(() => wasChatCompletionAborted(sidePanel)).toBe(true);
   } finally {
     releaseCompletion();
     await context.close();

@@ -14,7 +14,7 @@ import {
 
 export type TrpcOpenApiProcedure = {
   procedurePath: string;
-  method: 'post';
+  method: 'get' | 'post';
   tags: string[];
   summary: string;
   description?: string;
@@ -40,7 +40,7 @@ function usageAnalyticsProcedure<Key extends UsageAnalyticsProcedureKey>(
 export const publicTrpcOpenApiProcedures = [
   usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getSummary',
-    method: 'post',
+    method: 'get',
     tags: ['Usage Analytics'],
     summary: 'Return aggregate KPI metrics',
     description:
@@ -50,7 +50,7 @@ export const publicTrpcOpenApiProcedures = [
   }),
   usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getTimeseries',
-    method: 'post',
+    method: 'get',
     tags: ['Usage Analytics'],
     summary: 'Return usage analytics grouped into time buckets',
     description:
@@ -60,7 +60,7 @@ export const publicTrpcOpenApiProcedures = [
   }),
   usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getBreakdown',
-    method: 'post',
+    method: 'get',
     tags: ['Usage Analytics'],
     summary: 'Return top usage values grouped by dimension',
     description:
@@ -70,7 +70,7 @@ export const publicTrpcOpenApiProcedures = [
   }),
   usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getTable',
-    method: 'post',
+    method: 'get',
     tags: ['Usage Analytics'],
     summary: 'Return aggregated tabular usage rows',
     description:

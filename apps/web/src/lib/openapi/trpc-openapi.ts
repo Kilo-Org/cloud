@@ -3,6 +3,7 @@ import {
   publicTrpcOpenApiProcedures,
   type TrpcOpenApiProcedure,
 } from '@/lib/openapi/trpc-registry';
+import { TrpcErrorResponseSchema, trpcSuccessResponseJsonSchema } from '@/lib/trpc/transport';
 
 type JsonSchema = Record<string, unknown>;
 
@@ -34,21 +35,7 @@ function pathForProcedure(procedure: TrpcOpenApiProcedure): `/api/trpc/${string}
 }
 
 function successResponseSchema(data: JsonSchema): JsonSchema {
-  return {
-    type: 'object',
-    properties: {
-      result: {
-        type: 'object',
-        properties: {
-          data,
-        },
-        required: ['data'],
-        additionalProperties: true,
-      },
-    },
-    required: ['result'],
-    additionalProperties: true,
-  };
+  return trpcSuccessResponseJsonSchema(data);
 }
 
 function errorResponse(description: string) {
@@ -56,25 +43,39 @@ function errorResponse(description: string) {
     description,
     content: {
       'application/json': {
-        schema: {
-          type: 'object',
-          properties: {
-            error: {
-              type: 'object',
-              properties: {
-                message: { type: 'string' },
-                code: { type: 'number' },
-                data: {
-                  type: 'object',
-                  additionalProperties: true,
-                },
-              },
-              required: ['message', 'code'],
-              additionalProperties: true,
+        schema: zodToJsonSchema(TrpcErrorResponseSchema),
+      },
+    },
+  };
+}
+
+function requestShapeForProcedure(procedure: TrpcOpenApiProcedure) {
+  const schema = zodToJsonSchema(procedure.input);
+
+  if (procedure.method === 'get') {
+    return {
+      parameters: [
+        {
+          name: 'input',
+          in: 'query',
+          required: true,
+          description: 'URL-encoded JSON tRPC input payload.',
+          content: {
+            'application/json': {
+              schema,
             },
           },
-          required: ['error'],
-          additionalProperties: true,
+        },
+      ],
+    };
+  }
+
+  return {
+    requestBody: {
+      required: true,
+      content: {
+        'application/json': {
+          schema,
         },
       },
     },
@@ -88,14 +89,7 @@ function operationForProcedure(procedure: TrpcOpenApiProcedure) {
     summary: procedure.summary,
     description: procedure.description,
     security: [{ bearerAuth: [] }],
-    requestBody: {
-      required: true,
-      content: {
-        'application/json': {
-          schema: zodToJsonSchema(procedure.input),
-        },
-      },
-    },
+    ...requestShapeForProcedure(procedure),
     responses: {
       '200': {
         description: 'Successful tRPC response',

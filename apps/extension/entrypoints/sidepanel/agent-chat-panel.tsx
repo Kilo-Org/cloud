@@ -12,6 +12,7 @@ import type { StoredAuth } from '@/src/shared/auth';
 import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { AgentFooterControls } from './agent-footer-controls';
+import { useStoredAgentConversation } from './agent-conversation-storage';
 import { runDangerousLlmTurn } from './agent-llm-turn-runner';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
@@ -24,6 +25,9 @@ const defaultThinkingEffort = 'medium';
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
+const createDefaultConversationEvents = (): AgentConversationEvent[] => [
+  createAssistantMessage('Pick a tab, switch to dangerous mode, and ask Kilo to inspect it.'),
+];
 
 const fallbackModelOptions: KiloGatewayModelOption[] = [
   {
@@ -54,9 +58,7 @@ export const AgentChatPanel = ({
   organizationId: string | undefined;
 }): JSX.Element => {
   const [draft, setDraft] = useState('');
-  const [events, setEvents] = useState<AgentConversationEvent[]>(() => [
-    createAssistantMessage('Pick a tab, switch to dangerous mode, and ask Kilo to inspect it.'),
-  ]);
+  const [events, setEvents] = useStoredAgentConversation(createDefaultConversationEvents);
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState<AgentMode>(defaultMode);
   const [model, setModel] = useState(fallbackDefaultModelId);

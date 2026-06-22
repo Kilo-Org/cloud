@@ -225,6 +225,31 @@ test('target tab list can be refreshed', async () => {
   }
 });
 
+test('conversation survives side panel reload', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await sidePanel.getByLabel('Message agent').fill('Remember this after reload');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText('Pick a target tab first.')).toBeVisible();
+
+    await sidePanel.reload();
+
+    await expect(sidePanel.getByText('Remember this after reload')).toBeVisible();
+    await expect(sidePanel.getByText('Pick a target tab first.')).toBeVisible();
+  } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
 test('only the message pane scrolls overflowing conversation content', async () => {
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 

@@ -153,10 +153,12 @@ export const AgentFooterControls = ({
   isThinkingSelectDisabled,
   mode,
   model,
+  modelLoadError,
   modelOptions,
   onModeChange,
   onModelChange,
   onRefreshTabs,
+  onRetryModels,
   onSelectedTabChange,
   onThinkingEffortChange,
   selectedTabId,
@@ -170,10 +172,12 @@ export const AgentFooterControls = ({
   isThinkingSelectDisabled: boolean;
   mode: AgentMode;
   model: string;
+  modelLoadError: string | undefined;
   modelOptions: KiloGatewayModelOption[];
   onModeChange: (mode: AgentMode) => void;
   onModelChange: (model: string) => void;
   onRefreshTabs: () => Promise<void>;
+  onRetryModels: () => Promise<void>;
   onSelectedTabChange: (tabId: number) => void;
   onThinkingEffortChange: (thinkingEffort: string) => void;
   selectedTabId: number | undefined;
@@ -267,5 +271,19 @@ export const AgentFooterControls = ({
         )}
       </CompactSelectControl>
     </div>
+    {modelLoadError === undefined ? null : (
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs leading-4 text-red-300">{modelLoadError}</p>
+        <button
+          className="h-7 shrink-0 rounded-md border border-zinc-700 px-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+          onClick={() => {
+            void onRetryModels();
+          }}
+          type="button"
+        >
+          Retry models
+        </button>
+      </div>
+    )}
   </div>
 );

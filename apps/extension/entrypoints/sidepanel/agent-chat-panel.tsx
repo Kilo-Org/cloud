@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
 import {
   createAssistantMessage,
@@ -36,6 +36,7 @@ export const AgentChatPanel = ({
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState<AgentMode>(defaultMode);
   const [model, setModel] = useState('');
+  const [modelLoadError, setModelLoadError] = useState<string | undefined>();
   const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>([]);
   const [thinkingEffort, setThinkingEffort] = useState('');
   const runAbortRef = useRef<AbortController | null>(null);
@@ -71,34 +72,42 @@ export const AgentChatPanel = ({
     };
   }, [loadInspectableTabs]);
 
-  useEffect(() => {
-    const abort = new AbortController();
+  const loadModels = useCallback(
+    async (signal?: AbortSignal): Promise<void> => {
+      setModelLoadError(undefined);
 
-    void (async (): Promise<void> => {
       try {
         const models = await fetchKiloGatewayModels({
           apiBaseUrl,
           fetch: fetchFromWindow,
           organizationId,
-          signal: abort.signal,
+          ...(signal === undefined ? {} : { signal }),
           token: auth.token,
         });
 
-        if (!abort.signal.aborted) {
+        if (signal?.aborted !== true) {
           setModelOptions(models);
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
           return;
         }
-        setModelOptions([]);
-      }
-    })();
 
+        setModelOptions([]);
+        setModelLoadError('Could not load models.');
+      }
+    },
+    [auth.token, organizationId]
+  );
+
+  useEffect(() => {
+    const abort = new AbortController();
+
+    void loadModels(abort.signal);
     return () => {
       abort.abort();
     };
-  }, [auth.token, organizationId]);
+  }, [loadModels]);
 
   useEffect(() => {
     if (modelOptions.length === 0) {
@@ -264,10 +273,12 @@ export const AgentChatPanel = ({
           isThinkingSelectDisabled={isThinkingSelectDisabled}
           mode={mode}
           model={model}
+          modelLoadError={modelLoadError}
           modelOptions={modelOptions}
           onModeChange={setMode}
           onModelChange={setModel}
           onRefreshTabs={loadInspectableTabs}
+          onRetryModels={() => loadModels()}
           onSelectedTabChange={selectTab}
           onThinkingEffortChange={setThinkingEffort}
           selectedTabId={selectedTabId}

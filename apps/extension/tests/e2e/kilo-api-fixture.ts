@@ -44,6 +44,7 @@ export const mockKiloApi = async (
     beforeFirstCompletion?: () => Promise<void>;
     beforeModels?: () => Promise<void>;
     firstCompletionEvents?: unknown[];
+    modelFailuresBeforeSuccess?: number;
     organizations?: { id: string; name: string }[];
     secondCompletionEvents?: unknown[];
     seenChatOrganizationIds?: string[];
@@ -51,6 +52,7 @@ export const mockKiloApi = async (
   } = {}
 ): Promise<void> => {
   let chatCompletionCalls = 0;
+  let modelCalls = 0;
 
   await context.route('https://app.kilo.ai/api/user', route =>
     route.fulfill({
@@ -67,8 +69,15 @@ export const mockKiloApi = async (
     })
   );
   await context.route('https://app.kilo.ai/api/gateway/models', async route => {
+    modelCalls += 1;
+
     if (options.beforeModels !== undefined) {
       await options.beforeModels();
+    }
+
+    if (modelCalls <= (options.modelFailuresBeforeSuccess ?? 0)) {
+      await route.fulfill({ status: 500 });
+      return;
     }
 
     await route.fulfill({

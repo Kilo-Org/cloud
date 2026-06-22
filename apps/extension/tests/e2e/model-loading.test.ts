@@ -35,3 +35,29 @@ test('model and thinking controls wait for the model catalog', async () => {
     await rm(userDataDir, { force: true, recursive: true });
   }
 });
+
+test('model catalog failures can be retried', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      modelFailuresBeforeSuccess: 1,
+    });
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await expect(sidePanel.getByText('Could not load models.')).toBeVisible();
+    await expect(sidePanel.getByLabel('Model')).toBeDisabled();
+
+    await sidePanel.getByRole('button', { name: 'Retry models' }).click();
+
+    await expect(sidePanel.getByLabel('Model')).toBeEnabled();
+    await expect(sidePanel.getByLabel('Model')).toContainText('Claude Sonnet 4');
+  } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});

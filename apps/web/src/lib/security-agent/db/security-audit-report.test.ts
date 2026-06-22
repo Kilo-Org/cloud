@@ -237,6 +237,119 @@ describe('getSecurityAgentAuditReport', () => {
     expect(new Set(scannedEventIds).size).toBe(SECURITY_AGENT_AUDIT_REPORT_PAGE_SIZE + 1);
   }, 20_000);
 
+  it('uses latest recorded state through cutoff without adding out-of-period events', async () => {
+    const owner = await createIntegrationOwner();
+    const fixedFindingId = randomUUID();
+    const deletedFindingId = randomUUID();
+    const fixedInitialEventId = randomUUID();
+    const deletedInitialEventId = randomUUID();
+    const fixedEventId = randomUUID();
+    const deletedEventId = randomUUID();
+    const inPeriodAt = new Date();
+    inPeriodAt.setUTCDate(inPeriodAt.getUTCDate() - 2);
+    inPeriodAt.setUTCHours(10, 0, 0, 0);
+    const afterPeriodAt = new Date(inPeriodAt);
+    afterPeriodAt.setUTCDate(afterPeriodAt.getUTCDate() + 1);
+    const deadline = new Date(afterPeriodAt.getTime() + 60 * 60 * 1000).toISOString();
+
+    await db.insert(security_audit_log).values([
+      {
+        id: fixedInitialEventId,
+        owned_by_user_id: owner.id,
+        actor_type: SecurityAuditLogActorType.System,
+        action: SecurityAuditLogAction.FindingCreated,
+        resource_type: 'security_finding',
+        resource_id: fixedFindingId,
+        finding_id: fixedFindingId,
+        occurred_at: inPeriodAt.toISOString(),
+        finding_snapshot: {
+          ...findingSnapshot(fixedFindingId),
+          fixed_at: null,
+          sla_due_at: deadline,
+        },
+      },
+      {
+        id: deletedInitialEventId,
+        owned_by_user_id: owner.id,
+        actor_type: SecurityAuditLogActorType.System,
+        action: SecurityAuditLogAction.FindingCreated,
+        resource_type: 'security_finding',
+        resource_id: deletedFindingId,
+        finding_id: deletedFindingId,
+        occurred_at: inPeriodAt.toISOString(),
+        finding_snapshot: {
+          ...findingSnapshot(deletedFindingId),
+          fixed_at: null,
+          sla_due_at: deadline,
+        },
+      },
+      {
+        id: fixedEventId,
+        owned_by_user_id: owner.id,
+        actor_type: SecurityAuditLogActorType.System,
+        action: SecurityAuditLogAction.FindingStatusChange,
+        resource_type: 'security_finding',
+        resource_id: fixedFindingId,
+        finding_id: fixedFindingId,
+        occurred_at: afterPeriodAt.toISOString(),
+        finding_snapshot: {
+          ...findingSnapshot(fixedFindingId),
+          status: 'fixed',
+          fixed_at: afterPeriodAt.toISOString(),
+          sla_due_at: deadline,
+        },
+      },
+      {
+        id: deletedEventId,
+        owned_by_user_id: owner.id,
+        actor_type: SecurityAuditLogActorType.System,
+        action: SecurityAuditLogAction.FindingDeleted,
+        resource_type: 'security_finding',
+        resource_id: deletedFindingId,
+        finding_id: deletedFindingId,
+        occurred_at: afterPeriodAt.toISOString(),
+        finding_snapshot: {
+          ...findingSnapshot(deletedFindingId),
+          fixed_at: null,
+          sla_due_at: deadline,
+        },
+      },
+    ]);
+
+    const report = await getSecurityAgentAuditReport({
+      owner,
+      input: {
+        startDate: dateOnly(inPeriodAt.toISOString()),
+        endDate: dateOnly(inPeriodAt.toISOString()),
+      },
+      isRequestingUserKiloAdmin: false,
+    });
+    const fixedFinding = report.findings.find(finding => finding.findingId === fixedFindingId);
+    const deletedFinding = report.findings.find(finding => finding.findingId === deletedFindingId);
+
+    expect(report.summary.activityCount).toBe(2);
+    expect(fixedFinding).toMatchObject({
+      status: 'fixed',
+      deleted: false,
+      sla: {
+        status: 'terminal_met',
+        deadline,
+        terminalAt: afterPeriodAt.toISOString(),
+      },
+    });
+    expect(fixedFinding?.events.map(event => event.id)).toEqual([fixedInitialEventId]);
+    expect(deletedFinding).toMatchObject({
+      status: 'open',
+      deleted: true,
+      sla: {
+        status: 'unknown',
+        deadline,
+        reason: 'deleted_without_terminal_timestamp',
+      },
+    });
+    expect(deletedFinding?.events.map(event => event.id)).toEqual([deletedInitialEventId]);
+  });
+
   it('excludes an event committed after its snapshot and includes it in a fresh report', async () => {
     const owner = await createIntegrationOwner();
     const findingId = randomUUID();
@@ -418,7 +531,11 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
     });
     expect(report.findings[0].events[1].afterState).toEqual({ status: 'ignored' });
     expect(report.findings[0].events[1].metadata).toEqual({ reason_code: 'not_used' });
-    expect(report.findings[0].sla.status).toBe('terminal_met');
+    expect(report.findings[0].sla).toEqual({
+      status: 'unknown',
+      deadline: '2026-06-08T08:00:00.000Z',
+      reason: 'ignored_or_superseded_without_terminal_time',
+    });
     expect(report.findings[1]).toMatchObject({
       findingId: '22222222-2222-4222-8222-222222222222',
       title: 'Legacy Security Finding',
@@ -539,6 +656,124 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
       status: 'open_past_deadline',
       deadline: '2026-06-08T08:00:00.000Z',
       terminalAt: null,
+    });
+  });
+
+  it('treats terminal timestamp equality as missed SLA evidence', () => {
+    const deadline = '2026-06-08T08:00:00.000Z';
+    const report = buildSecurityAgentAuditReportFromRows({
+      owner: {
+        type: 'user',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Ada',
+      },
+      period,
+      generatedAt: '2026-06-12T15:00:00.000Z',
+      dataThrough: '2026-06-12T15:00:00.000Z',
+      isRequestingUserKiloAdmin: false,
+      rows: [
+        row({
+          finding_snapshot: {
+            ...(row({}).finding_snapshot ?? {}),
+            status: 'fixed',
+            fixed_at: deadline,
+            sla_due_at: deadline,
+          },
+        }),
+      ],
+    });
+
+    expect(report.findings[0].sla).toEqual({
+      status: 'terminal_missed',
+      deadline,
+      terminalAt: deadline,
+    });
+  });
+
+  it('treats report cutoff equality as past-deadline SLA evidence', () => {
+    const deadline = '2026-06-08T08:00:00.000Z';
+    const report = buildSecurityAgentAuditReportFromRows({
+      owner: {
+        type: 'user',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Ada',
+      },
+      period,
+      generatedAt: deadline,
+      dataThrough: deadline,
+      isRequestingUserKiloAdmin: false,
+      rows: [row({})],
+    });
+
+    expect(report.findings[0].sla).toEqual({
+      status: 'open_past_deadline',
+      deadline,
+      terminalAt: null,
+    });
+  });
+
+  it('does not classify a deleted finding as open without a terminal timestamp', () => {
+    const report = buildSecurityAgentAuditReportFromRows({
+      owner: {
+        type: 'user',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Ada',
+      },
+      period,
+      generatedAt: '2026-06-12T15:00:00.000Z',
+      dataThrough: '2026-06-12T15:00:00.000Z',
+      isRequestingUserKiloAdmin: false,
+      rows: [
+        row({
+          action: SecurityAuditLogAction.FindingDeleted,
+          after_state: { deleted: true },
+        }),
+      ],
+    });
+
+    expect(report.findings[0]).toMatchObject({
+      deleted: true,
+      sla: {
+        status: 'unknown',
+        deadline: '2026-06-08T08:00:00.000Z',
+        reason: 'deleted_without_terminal_timestamp',
+      },
+    });
+  });
+
+  it('preserves terminal SLA evidence when a fixed finding is later deleted', () => {
+    const deadline = '2026-06-08T08:00:00.000Z';
+    const report = buildSecurityAgentAuditReportFromRows({
+      owner: {
+        type: 'user',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Ada',
+      },
+      period,
+      generatedAt: '2026-06-12T15:00:00.000Z',
+      dataThrough: '2026-06-12T15:00:00.000Z',
+      isRequestingUserKiloAdmin: false,
+      rows: [
+        row({
+          action: SecurityAuditLogAction.FindingDeleted,
+          after_state: { deleted: true },
+          finding_snapshot: {
+            ...(row({}).finding_snapshot ?? {}),
+            status: 'fixed',
+            fixed_at: deadline,
+            sla_due_at: deadline,
+          },
+        }),
+      ],
+    });
+
+    expect(report.findings[0]).toMatchObject({
+      deleted: true,
+      sla: {
+        status: 'terminal_missed',
+        deadline,
+        terminalAt: deadline,
+      },
     });
   });
 

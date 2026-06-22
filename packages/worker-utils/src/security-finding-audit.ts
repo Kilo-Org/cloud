@@ -423,9 +423,10 @@ function pickPresent<T extends Record<string, unknown>>(values: T): Partial<T> {
 const DISALLOWED_AUDIT_JSON_KEY_PATTERN =
   /(^|_)(actor|recipient|email|prompt|rawmarkdown|raw_markdown|transcript|assistant|provider_response|authorization|auth_header|cookie|token|secret|password|credential|headers|raw_error)(_|$)/i;
 const EMAIL_VALUE_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i;
+const EMAIL_VALUE_REPLACEMENT_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 
 function auditText(value: string): string {
-  return value.replace(EMAIL_VALUE_PATTERN, '[redacted-email]');
+  return value.replace(EMAIL_VALUE_REPLACEMENT_PATTERN, '[redacted-email]');
 }
 
 function optionalAuditText(value: string | null | undefined): string | undefined {

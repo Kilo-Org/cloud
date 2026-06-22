@@ -7,7 +7,21 @@ import {
   SecuritySeverity,
 } from '@kilocode/db/schema-types';
 import { REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS } from '@kilocode/worker-utils/security-finding-audit';
-import { and, asc, count, eq, gt, gte, inArray, isNotNull, lt, lte, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  lte,
+  or,
+  sql,
+} from 'drizzle-orm';
 import * as z from 'zod';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 
@@ -173,6 +187,12 @@ type AuditReportRow = {
 type AuditReportCursor = {
   effectiveAt: string;
   id: string;
+};
+
+type AuditReportFindingCutoffState = {
+  findingId: string;
+  snapshot: Record<string, unknown> | null;
+  deleted: boolean;
 };
 
 const ACTION_LABELS: Partial<Record<SecurityAuditLogAction, string>> = {
@@ -415,7 +435,7 @@ async function assembleSecurityAgentAuditReport(params: {
   isRequestingUserKiloAdmin: boolean;
   onEventCount: (eventCount: number) => void;
 }): Promise<SecurityAgentAuditReport> {
-  const { dataThrough, rows } = await db.transaction(
+  const { dataThrough, rows, cutoffStates } = await db.transaction(
     async tx => {
       const dataThrough = await getDatabaseNow(tx);
       const eventCount = await countReportEvents(tx, params.owner, params.period, dataThrough);
@@ -436,7 +456,19 @@ async function assembleSecurityAgentAuditReport(params: {
         );
       }
 
-      return { dataThrough, rows };
+      const findingIds = Array.from(
+        new Set(
+          rows.map(getRowFindingId).filter((findingId): findingId is string => Boolean(findingId))
+        )
+      );
+      const cutoffStates = await loadReportFindingCutoffStates(
+        tx,
+        params.owner,
+        findingIds,
+        dataThrough
+      );
+
+      return { dataThrough, rows, cutoffStates };
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );
@@ -447,6 +479,7 @@ async function assembleSecurityAgentAuditReport(params: {
     generatedAt: params.generatedAt,
     dataThrough,
     rows,
+    cutoffStates,
     isRequestingUserKiloAdmin: params.isRequestingUserKiloAdmin,
   });
   assertSecurityAgentAuditReportSerializedByteBudget(report);
@@ -459,6 +492,7 @@ export function buildSecurityAgentAuditReportFromRows(params: {
   generatedAt: string;
   dataThrough: string;
   rows: AuditReportRow[];
+  cutoffStates?: AuditReportFindingCutoffState[];
   isRequestingUserKiloAdmin: boolean;
 }): SecurityAgentAuditReport {
   const groups = new Map<string, AuditReportRow[]>();
@@ -470,8 +504,11 @@ export function buildSecurityAgentAuditReportFromRows(params: {
     groups.set(findingId, existing);
   }
 
+  const cutoffStateByFindingId = new Map(
+    params.cutoffStates?.map(state => [state.findingId, state]) ?? []
+  );
   const findings = Array.from(groups.entries()).map(([findingId, rows]) =>
-    buildFindingSection(findingId, rows, params)
+    buildFindingSection(findingId, rows, params, cutoffStateByFindingId.get(findingId))
   );
 
   findings.sort((left, right) => {
@@ -621,6 +658,82 @@ async function scanReportPage(
   }
 }
 
+async function loadReportFindingCutoffStates(
+  tx: DrizzleTransaction,
+  owner: SecurityAgentAuditReportOwner,
+  findingIds: string[],
+  dataThrough: string
+): Promise<AuditReportFindingCutoffState[]> {
+  if (findingIds.length === 0) return [];
+
+  const effectiveAt = reportEffectiveAtSql();
+  const findingId = reportFindingIdSql();
+  const findingIdentityCondition = or(
+    inArray(security_audit_log.finding_id, findingIds),
+    and(
+      eq(security_audit_log.resource_type, 'security_finding'),
+      inArray(security_audit_log.resource_id, findingIds)
+    )
+  );
+  if (!findingIdentityCondition) {
+    throw new SecurityAgentAuditReportQueryError('Report cutoff identity query failed', 'scan');
+  }
+
+  const conditions = [
+    owner.type === 'user'
+      ? eq(security_audit_log.owned_by_user_id, owner.id)
+      : eq(security_audit_log.owned_by_organization_id, owner.id),
+    inArray(security_audit_log.action, [...REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS]),
+    lte(effectiveAt, dataThrough),
+    lte(security_audit_log.created_at, dataThrough),
+    findingIdentityCondition,
+  ];
+
+  try {
+    const latestRows = await withSecurityAgentAuditReportTimeout(
+      tx
+        .selectDistinctOn([findingId], {
+          findingId,
+          snapshot: security_audit_log.finding_snapshot,
+        })
+        .from(security_audit_log)
+        .where(and(...conditions, isNotNull(security_audit_log.finding_snapshot)))
+        .orderBy(
+          asc(findingId),
+          desc(effectiveAt),
+          desc(security_audit_log.created_at),
+          desc(security_audit_log.id)
+        ),
+      SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
+      'scan'
+    );
+    const deletionRows = await withSecurityAgentAuditReportTimeout(
+      tx
+        .select({ findingId })
+        .from(security_audit_log)
+        .where(
+          and(...conditions, eq(security_audit_log.action, SecurityAuditLogAction.FindingDeleted))
+        ),
+      SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
+      'scan'
+    );
+    const latestSnapshotByFindingId = new Map(latestRows.map(row => [row.findingId, row.snapshot]));
+    const deletedFindingIds = new Set(deletionRows.map(row => row.findingId));
+
+    return findingIds.map(findingId => ({
+      findingId,
+      snapshot: latestSnapshotByFindingId.get(findingId) ?? null,
+      deleted: deletedFindingIds.has(findingId),
+    }));
+  } catch (error) {
+    if (error instanceof SecurityAgentAuditReportQueryError) throw error;
+    throw new SecurityAgentAuditReportQueryError(
+      error instanceof Error ? error.message : 'Report query did not finish',
+      'scan'
+    );
+  }
+}
+
 function baseReportConditions(
   owner: SecurityAgentAuditReportOwner,
   period: NormalizedAuditReportPeriod,
@@ -652,6 +765,10 @@ function baseReportConditions(
 
 function reportEffectiveAtSql() {
   return sql<string>`COALESCE(${security_audit_log.occurred_at}, ${security_audit_log.created_at})`;
+}
+
+function reportFindingIdSql() {
+  return sql<string>`COALESCE(${security_audit_log.finding_id}::text, ${security_audit_log.resource_id})`;
 }
 
 export async function withSecurityAgentAuditReportTimeout<T>(
@@ -709,7 +826,8 @@ function buildFindingSection(
   reportParams: {
     dataThrough: string;
     isRequestingUserKiloAdmin: boolean;
-  }
+  },
+  cutoffState: AuditReportFindingCutoffState | undefined
 ): SecurityFindingAuditSection {
   rows.sort(
     (left, right) =>
@@ -717,8 +835,11 @@ function buildFindingSection(
   );
   const latestSnapshot = latestFindingSnapshot(rows);
   const evidenceSnapshot = withRecordedTimelineEvidence(rows, latestSnapshot);
+  const stateSnapshot = cutoffState ? cutoffState.snapshot : evidenceSnapshot;
   const events = rows.map(row => buildReportEvent(row, reportParams.isRequestingUserKiloAdmin));
-  const deleted = rows.some(row => row.action === SecurityAuditLogAction.FindingDeleted);
+  const deleted = cutoffState
+    ? cutoffState.deleted
+    : rows.some(row => row.action === SecurityAuditLogAction.FindingDeleted);
   const legacySupplemental = rows.some(row => isLegacySupplementalRow(row));
 
   return {
@@ -728,7 +849,7 @@ function buildFindingSection(
     repository: stringFromSnapshot(latestSnapshot, 'repo_full_name'),
     title: stringFromSnapshot(latestSnapshot, 'title') ?? 'Legacy Security Finding',
     severity: severityFromSnapshot(latestSnapshot),
-    status: stringFromSnapshot(latestSnapshot, 'status'),
+    status: stringFromSnapshot(stateSnapshot, 'status'),
     packageName: stringFromSnapshot(latestSnapshot, 'package_name'),
     packageEcosystem: stringFromSnapshot(latestSnapshot, 'package_ecosystem'),
     manifestPath: stringFromSnapshot(latestSnapshot, 'manifest_path'),
@@ -739,9 +860,9 @@ function buildFindingSection(
     cvssScore: cvssFromSnapshot(latestSnapshot),
     dependabotUrl: safeUrl(stringFromSnapshot(latestSnapshot, 'dependabot_html_url')),
     firstDetectedAt: stringFromSnapshot(evidenceSnapshot, 'first_detected_at'),
-    canonicalFindingId: stringFromSnapshot(latestSnapshot, 'canonical_finding_id'),
+    canonicalFindingId: stringFromSnapshot(stateSnapshot, 'canonical_finding_id'),
     deleted,
-    sla: buildSlaEvidence(evidenceSnapshot, reportParams.dataThrough),
+    sla: buildSlaEvidence(stateSnapshot, reportParams.dataThrough, deleted),
     events,
     hasLegacySupplementalActivity: legacySupplemental,
   };
@@ -845,7 +966,8 @@ function isLegacySupplementalRow(row: AuditReportRow): boolean {
 
 function buildSlaEvidence(
   snapshot: Record<string, unknown> | null,
-  dataThrough: string
+  dataThrough: string,
+  deleted: boolean
 ): SecurityAgentAuditSlaEvidence {
   const deadline = stringFromSnapshot(snapshot, 'sla_due_at');
   if (!deadline) return { status: 'unknown', deadline: null, reason: 'missing_recorded_deadline' };
@@ -855,6 +977,12 @@ function buildSlaEvidence(
     return { status: 'unknown', deadline, reason: 'invalid_recorded_deadline' };
   }
 
+  const status = stringFromSnapshot(snapshot, 'status');
+  const canonicalFindingId = stringFromSnapshot(snapshot, 'canonical_finding_id');
+  if (status === 'ignored' || canonicalFindingId) {
+    return { status: 'unknown', deadline, reason: 'ignored_or_superseded_without_terminal_time' };
+  }
+
   const fixedAt = stringFromSnapshot(snapshot, 'fixed_at');
   if (fixedAt) {
     const fixedAtMs = Date.parse(fixedAt);
@@ -862,16 +990,14 @@ function buildSlaEvidence(
       return { status: 'unknown', deadline, reason: 'invalid_terminal_timestamp' };
     }
     return {
-      status: fixedAtMs <= deadlineMs ? 'terminal_met' : 'terminal_missed',
+      status: fixedAtMs < deadlineMs ? 'terminal_met' : 'terminal_missed',
       deadline,
       terminalAt: fixedAt,
     };
   }
 
-  const status = stringFromSnapshot(snapshot, 'status');
-  const canonicalFindingId = stringFromSnapshot(snapshot, 'canonical_finding_id');
-  if (status === 'ignored' || canonicalFindingId) {
-    return { status: 'unknown', deadline, reason: 'ignored_or_superseded_without_terminal_time' };
+  if (deleted) {
+    return { status: 'unknown', deadline, reason: 'deleted_without_terminal_timestamp' };
   }
   if (status === 'fixed') {
     return { status: 'unknown', deadline, reason: 'missing_terminal_timestamp' };
@@ -886,7 +1012,7 @@ function buildSlaEvidence(
   }
 
   return {
-    status: cutoffMs <= deadlineMs ? 'open_within_deadline' : 'open_past_deadline',
+    status: cutoffMs < deadlineMs ? 'open_within_deadline' : 'open_past_deadline',
     deadline,
     terminalAt: null,
   };

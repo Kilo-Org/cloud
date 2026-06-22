@@ -453,7 +453,7 @@ describe('Worker GitHub auth-invalid sync', () => {
               source: 'dependabot',
               sourceId: '23',
               repoFullName: 'acme/widgets',
-              title: 'Contact security@example.com about lodash',
+              title: 'Contact security@example.com or support@example.com about lodash',
               packageName: 'lodash',
               packageEcosystem: 'npm',
               manifestPath: 'package.json',
@@ -490,7 +490,7 @@ describe('Worker GitHub auth-invalid sync', () => {
             html_url: 'not a valid url',
             security_advisory: {
               ...createDependabotAlert().security_advisory,
-              summary: 'Contact security@example.com about lodash',
+              summary: 'Contact security@example.com or support@example.com about lodash',
             },
           }),
         ]),
@@ -509,7 +509,7 @@ describe('Worker GitHub auth-invalid sync', () => {
 
     expect(auditRows).toHaveLength(1);
     expect(auditRows[0]?.finding_snapshot).toMatchObject({
-      title: 'Contact [redacted-email] about lodash',
+      title: 'Contact [redacted-email] or [redacted-email] about lodash',
     });
     expect(auditRows[0]?.finding_snapshot).not.toHaveProperty('dependabot_html_url');
   });

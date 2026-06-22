@@ -11,7 +11,7 @@ describe('generateTrpcOpenApiDocument', () => {
     );
     expect(document.paths['/api/trpc/usageAnalytics.getTable']?.post).toMatchObject({
       operationId: 'usageAnalytics_getTable',
-      summary: 'Get tabular usage analytics',
+      summary: 'Return aggregated tabular usage rows',
       tags: ['Usage Analytics'],
     });
     expect(document.paths).not.toHaveProperty('/api/trpc/admin');

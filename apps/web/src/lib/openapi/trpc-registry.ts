@@ -43,7 +43,7 @@ export const publicTrpcOpenApiProcedures = [
     procedurePath: 'usageAnalytics.getSummary',
     method: 'post',
     tags: ['Usage Analytics'],
-    summary: 'Get aggregate usage metrics',
+    summary: 'Return aggregate KPI metrics',
     description:
       'Returns aggregate KPI metrics for the authenticated user or an accessible organization. Use this for summary cards and high-level totals.',
     input: UsageAnalyticsFiltersSchema,
@@ -54,7 +54,7 @@ export const publicTrpcOpenApiProcedures = [
     procedurePath: 'usageAnalytics.getTimeseries',
     method: 'post',
     tags: ['Usage Analytics'],
-    summary: 'Get usage over time',
+    summary: 'Return usage analytics grouped into time buckets',
     description:
       'Returns usage analytics grouped into time buckets. Use this for trend charts and optional split-by series views.',
     input: TimeseriesInputSchema,
@@ -65,7 +65,7 @@ export const publicTrpcOpenApiProcedures = [
     procedurePath: 'usageAnalytics.getBreakdown',
     method: 'post',
     tags: ['Usage Analytics'],
-    summary: 'Get usage breakdown',
+    summary: 'Return top usage values grouped by dimension',
     description:
       'Returns top usage values grouped by a single selected dimension. Use this for dedicated breakdown charts such as features, models, projects, or users.',
     input: BreakdownInputSchema,
@@ -76,7 +76,7 @@ export const publicTrpcOpenApiProcedures = [
     procedurePath: 'usageAnalytics.getTable',
     method: 'post',
     tags: ['Usage Analytics'],
-    summary: 'Get tabular usage analytics',
+    summary: 'Return aggregated tabular usage rows',
     description:
       'Returns aggregated tabular usage rows grouped by time bucket and optional dimensions. Use this for the detailed breakdown table and CSV export view.',
     input: TableInputSchema,

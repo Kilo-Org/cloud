@@ -155,12 +155,10 @@ async function getFeatureAdoptionState(organizationId: string): Promise<FeatureA
           SELECT 1 FROM cli_sessions_v2
           WHERE organization_id = ${organizationId}
             AND cloud_agent_session_id IS NOT NULL
-            AND created_on_platform IN ('cloud-agent', 'cloud-agent-web')
         ) OR EXISTS (
           SELECT 1 FROM cli_sessions
           WHERE organization_id = ${organizationId}
             AND cloud_agent_session_id IS NOT NULL
-            AND created_on_platform IN ('cloud-agent', 'cloud-agent-web')
         )
       ) AS cloud_agent_used,
       EXISTS (

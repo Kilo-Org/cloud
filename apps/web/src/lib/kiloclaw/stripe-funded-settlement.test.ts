@@ -651,7 +651,7 @@ describe('Stripe-funded KiloClaw settlement', () => {
     ).toBe(2);
   });
 
-  it('reconciles a duplicate payment deposit not covered by a legacy period deduction', async () => {
+  it('does not guess which duplicate payment is covered by a legacy period deduction', async () => {
     const user = await insertTestUser({ id: 'settlement-legacy-deduction-reconcile-user' });
     const instanceId = '78787878-7878-4787-8787-787878787878';
     const subscriptionId = '79797979-7979-4797-8797-797979797979';
@@ -734,7 +734,7 @@ describe('Stripe-funded KiloClaw settlement', () => {
     ).resolves.toBe(true);
 
     await expect(readUser(user.id)).resolves.toMatchObject({
-      total_microdollars_acquired: 0,
+      total_microdollars_acquired: 55_000_000,
     });
     await expect(readSubscription(subscriptionId)).resolves.toMatchObject({
       status: 'active',
@@ -751,13 +751,80 @@ describe('Stripe-funded KiloClaw settlement', () => {
       .from(credit_transactions)
       .where(eq(credit_transactions.kilo_user_id, user.id));
     expect(transactions.map(row => row.amountMicrodollars).sort((a, b) => a - b)).toEqual([
-      -55_000_000, -55_000_000, 55_000_000, 55_000_000,
+      -55_000_000, 55_000_000, 55_000_000,
     ]);
-    expect(transactions).toContainEqual(
+    expect(transactions).not.toContainEqual(
       expect.objectContaining({
         creditCategory: `kiloclaw-settlement:${stripeSubscriptionId}:payment:${replayedPaymentId}`,
       })
     );
+  });
+
+  it('does not double-deduct a replay already covered by a legacy period deduction', async () => {
+    const user = await insertTestUser({ id: 'settlement-legacy-covered-replay-user' });
+    const instanceId = '80808080-8080-4080-8080-808080808080';
+    const subscriptionId = '85858585-8585-4585-8585-858585858585';
+    const stripeSubscriptionId = 'sub_legacy_covered_replay';
+    const stripePaymentId = 'ch_legacy_covered_replay';
+    const periodStart = '2026-06-01T00:00:00.000Z';
+    const periodEnd = '2026-07-01T00:00:00.000Z';
+
+    await insertPersonalInstance({ id: instanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values({
+      id: subscriptionId,
+      user_id: user.id,
+      instance_id: instanceId,
+      stripe_subscription_id: stripeSubscriptionId,
+      payment_source: 'credits',
+      kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+      plan: 'standard',
+      status: 'active',
+      current_period_start: periodStart,
+      current_period_end: periodEnd,
+      credit_renewal_at: periodEnd,
+    });
+    await db.insert(credit_transactions).values([
+      {
+        kilo_user_id: user.id,
+        amount_microdollars: 55_000_000,
+        is_free: false,
+        stripe_payment_id: stripePaymentId,
+        description: 'KiloClaw standard settlement',
+      },
+      {
+        kilo_user_id: user.id,
+        amount_microdollars: -55_000_000,
+        is_free: false,
+        credit_category: `kiloclaw-settlement:${stripeSubscriptionId}:2026-06-01`,
+        check_category_uniqueness: true,
+      },
+    ]);
+
+    await expect(
+      applyStripeFundedKiloClawPeriod({
+        userId: user.id,
+        metadataInstanceId: instanceId,
+        stripeSubscriptionId,
+        stripePaymentId,
+        plan: 'standard',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        amountMicrodollars: 55_000_000,
+        periodStart,
+        periodEnd,
+      })
+    ).resolves.toBe(true);
+
+    const transactions = await db
+      .select({ creditCategory: credit_transactions.credit_category })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(transactions).toHaveLength(2);
+    expect(transactions).not.toContainEqual(
+      expect.objectContaining({ creditCategory: expect.stringContaining(':payment:') })
+    );
+    await expect(readUser(user.id)).resolves.toMatchObject({
+      total_microdollars_acquired: 0,
+    });
   });
 
   it('does not use another subscription deposit to reconcile a legacy-covered replay', async () => {

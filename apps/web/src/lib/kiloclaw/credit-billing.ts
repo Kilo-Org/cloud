@@ -692,7 +692,7 @@ export async function applyStripeFundedKiloClawPeriod(
             )
             .limit(1);
       const shouldReconcilePaymentDeduction =
-        !matchingPaymentDeduction && (!legacyPeriodDeduction || !!settledSamePeriod);
+        !matchingPaymentDeduction && !legacyPeriodDeduction && !settledSamePeriod;
 
       if (shouldReconcilePaymentDeduction) {
         await tx.insert(credit_transactions).values({

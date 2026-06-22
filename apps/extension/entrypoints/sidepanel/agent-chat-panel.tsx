@@ -14,10 +14,10 @@ import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
-import { AgentConversationItemView } from './agent-conversation-events';
 import { AgentFooterControls } from './agent-footer-controls';
 import { runDangerousLlmTurn } from './agent-llm-turn-runner';
 import { useTabDebugger } from './use-tab-debugger';
+import { VirtualizedConversationList } from './virtualized-conversation-list';
 
 const effortOptions = ['low', 'medium', 'high'] as const;
 const defaultThinkingOption = 'default';
@@ -187,19 +187,7 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <section
-        aria-label="Agent conversation"
-        className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
-      >
-        <div className="flex flex-1 flex-col justify-end gap-3">
-          {groupedEvents.map(item => (
-            <AgentConversationItemView
-              item={item}
-              key={item.type === 'event' ? item.event.id : item.toolCall.id}
-            />
-          ))}
-        </div>
-      </section>
+      <VirtualizedConversationList items={groupedEvents} />
 
       <form
         className="border-t border-zinc-900 px-4 py-3"

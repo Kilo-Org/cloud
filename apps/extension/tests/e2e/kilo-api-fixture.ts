@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import type { BrowserContext } from '@playwright/test';
+import type { BrowserContext, Locator } from '@playwright/test';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -116,6 +116,7 @@ export const readSidePanelScrollState = (): {
   documentScrollHeight: number;
   messagePaneClientHeight: number;
   messagePaneScrollHeight: number;
+  renderedConversationItems: number;
 } => {
   const conversation = document.querySelector('[aria-label="Agent conversation"]');
 
@@ -128,5 +129,17 @@ export const readSidePanelScrollState = (): {
     documentScrollHeight: document.documentElement.scrollHeight,
     messagePaneClientHeight: conversation.clientHeight,
     messagePaneScrollHeight: conversation.scrollHeight,
+    renderedConversationItems: conversation.querySelectorAll(':scope > div > *').length,
   };
+};
+
+export const sendOverflowMessages = async (messageInput: Locator, count: number): Promise<void> => {
+  await Array.from({ length: count }).reduce<Promise<void>>(
+    async (previousMessage, _value, index) => {
+      await previousMessage;
+      await messageInput.fill(`Overflow content ${index}`);
+      await messageInput.press('Enter');
+    },
+    Promise.resolve()
+  );
 };

@@ -73,7 +73,7 @@ describe('organizations usage details trpc router', () => {
         organizationId: testOrganization.id,
       });
 
-      expect(result.checks).toHaveLength(4);
+      expect(result.checks).toHaveLength(6);
       expect(result.checks.every(check => !check.adopted)).toBe(true);
     });
 
@@ -88,7 +88,7 @@ describe('organizations usage details trpc router', () => {
         organizationId: testOrganization.id,
       });
 
-      expect(result).toEqual({ pendingCount: 4 });
+      expect(result).toEqual({ pendingCount: 6 });
     });
 
     it('requires a bot-enabled Linear integration for team workflow adoption', async () => {

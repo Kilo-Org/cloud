@@ -56,20 +56,34 @@ export default function OrganizationAppSidebar({
   // Fetch full organization data to access settings
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
   const trpc = useTRPC();
+  const usagePath = `/organizations/${organizationId}/usage-details`;
+  const isUsagePath = pathname === usagePath || pathname.startsWith(`${usagePath}/`);
   const featureAdoptionQuery = useQuery({
+    ...trpc.organizations.usageDetails.getFeatureAdoption.queryOptions({ organizationId }),
+    enabled: organizationData?.plan === 'enterprise' && isUsagePath,
+    staleTime: 5 * 60 * 1000,
+  });
+  const pendingFeatureAdoptionQuery = useQuery({
     ...trpc.organizations.usageDetails.getPendingFeatureAdoptionCount.queryOptions({
       organizationId,
     }),
-    enabled: organizationData?.plan === 'enterprise',
+    enabled: organizationData?.plan === 'enterprise' && !isUsagePath,
     staleTime: 5 * 60 * 1000,
   });
-  const pendingFeatureAdoptionCount = featureAdoptionQuery.data?.pendingCount ?? 0;
+  const pendingFeatureAdoptionCount =
+    organizationData?.plan === 'enterprise'
+      ? isUsagePath
+        ? (featureAdoptionQuery.data?.checks.filter(check => !check.adopted).length ?? 0)
+        : (pendingFeatureAdoptionQuery.data?.pendingCount ?? 0)
+      : 0;
   const previousPathname = useRef(pathname);
   useEffect(() => {
     const adoptionConfigurationRoutes = [
       `/organizations/${organizationId}/integrations`,
       `/organizations/${organizationId}/code-reviews`,
       `/organizations/${organizationId}/security-agent`,
+      `/organizations/${organizationId}/cloud`,
+      `/organizations/${organizationId}/deploy`,
     ];
     const previousRouteWasAdoptionConfiguration = adoptionConfigurationRoutes.some(
       route =>
@@ -80,10 +94,17 @@ export default function OrganizationAppSidebar({
       previousPathname.current !== pathname &&
       previousRouteWasAdoptionConfiguration
     ) {
-      void featureAdoptionQuery.refetch();
+      void (isUsagePath ? featureAdoptionQuery.refetch() : pendingFeatureAdoptionQuery.refetch());
     }
     previousPathname.current = pathname;
-  }, [featureAdoptionQuery.refetch, organizationData?.plan, organizationId, pathname]);
+  }, [
+    featureAdoptionQuery.refetch,
+    isUsagePath,
+    organizationData?.plan,
+    organizationId,
+    pathname,
+    pendingFeatureAdoptionQuery.refetch,
+  ]);
   const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags

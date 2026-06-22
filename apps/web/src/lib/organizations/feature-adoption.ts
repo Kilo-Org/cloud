@@ -8,6 +8,8 @@ export const FEATURE_ADOPTION_KEYS = [
   'code-reviewer',
   'security-agent',
   'team-integration',
+  'cloud-agent-used',
+  'project-deployed',
 ] as const;
 
 export type FeatureAdoptionKey = (typeof FEATURE_ADOPTION_KEYS)[number];
@@ -17,6 +19,8 @@ export type FeatureAdoptionCheck = {
   title: string;
   description: string;
   adopted: boolean;
+  adoptedLabel: string;
+  notAdoptedLabel: string;
   actionLabel: string;
   actionUrl: string;
 };
@@ -26,6 +30,8 @@ type FeatureAdoptionState = {
   codeReviewerEnabled: boolean;
   securityAgentEnabled: boolean;
   teamIntegrationConnected: boolean;
+  cloudAgentUsed: boolean;
+  projectDeployed: boolean;
 };
 
 type FeatureAdoptionStateRow = {
@@ -33,6 +39,8 @@ type FeatureAdoptionStateRow = {
   code_reviewer_enabled: boolean;
   security_agent_enabled: boolean;
   team_integration_connected: boolean;
+  cloud_agent_used: boolean;
+  project_deployed: boolean;
 };
 
 export function buildFeatureAdoptionChecks(
@@ -46,6 +54,8 @@ export function buildFeatureAdoptionChecks(
       description:
         'Connect GitHub or GitLab to bring repositories and development workflows into Kilo.',
       adopted: state.sourceControlConnected,
+      adoptedLabel: 'Connected',
+      notAdoptedLabel: 'Not connected',
       actionLabel: state.sourceControlConnected ? 'Manage integrations' : 'Connect source control',
       actionUrl: `/organizations/${organizationId}/integrations`,
     },
@@ -54,6 +64,8 @@ export function buildFeatureAdoptionChecks(
       title: 'Code Reviewer enabled',
       description: 'Run AI assisted reviews on pull requests or merge requests.',
       adopted: state.codeReviewerEnabled,
+      adoptedLabel: 'Enabled',
+      notAdoptedLabel: 'Not enabled',
       actionLabel: state.codeReviewerEnabled ? 'Review settings' : 'Enable Code Reviewer',
       actionUrl: `/organizations/${organizationId}/code-reviews`,
     },
@@ -62,6 +74,8 @@ export function buildFeatureAdoptionChecks(
       title: 'Security Agent enabled',
       description: 'Monitor repositories for Security Findings and remediation opportunities.',
       adopted: state.securityAgentEnabled,
+      adoptedLabel: 'Enabled',
+      notAdoptedLabel: 'Not enabled',
       actionLabel: state.securityAgentEnabled ? 'Review settings' : 'Enable Security Agent',
       actionUrl: `/organizations/${organizationId}/security-agent/config`,
     },
@@ -70,10 +84,32 @@ export function buildFeatureAdoptionChecks(
       title: 'Team workflow connected',
       description: 'Connect Slack, Discord, or Linear to bring Kilo into your team workflow.',
       adopted: state.teamIntegrationConnected,
+      adoptedLabel: 'Connected',
+      notAdoptedLabel: 'Not connected',
       actionLabel: state.teamIntegrationConnected
         ? 'Manage integrations'
         : 'Connect an integration',
       actionUrl: `/organizations/${organizationId}/integrations`,
+    },
+    {
+      key: 'cloud-agent-used',
+      title: 'Cloud Agent',
+      description: 'Start a Cloud Agent session for organization development work.',
+      adopted: state.cloudAgentUsed,
+      adoptedLabel: 'Used',
+      notAdoptedLabel: 'Not used',
+      actionLabel: state.cloudAgentUsed ? 'View Cloud Agent' : 'Start with Cloud Agent',
+      actionUrl: `/organizations/${organizationId}/cloud`,
+    },
+    {
+      key: 'project-deployed',
+      title: 'Deploy',
+      description: 'Deploy a project from a connected repository.',
+      adopted: state.projectDeployed,
+      adoptedLabel: 'Deployed',
+      notAdoptedLabel: 'Not deployed',
+      actionLabel: state.projectDeployed ? 'View deployments' : 'Deploy a project',
+      actionUrl: `/organizations/${organizationId}/deploy`,
     },
   ];
 }
@@ -113,7 +149,26 @@ async function getFeatureAdoptionState(organizationId: string): Promise<FeatureA
             platform IN ('slack', 'discord') OR
             (platform = 'linear' AND metadata -> 'bot_enabled' = 'true'::jsonb)
           )
-      ) AS team_integration_connected
+      ) AS team_integration_connected,
+      (
+        EXISTS (
+          SELECT 1 FROM cli_sessions_v2
+          WHERE organization_id = ${organizationId}
+            AND cloud_agent_session_id IS NOT NULL
+            AND created_on_platform IN ('cloud-agent', 'cloud-agent-web')
+        ) OR EXISTS (
+          SELECT 1 FROM cli_sessions
+          WHERE organization_id = ${organizationId}
+            AND cloud_agent_session_id IS NOT NULL
+            AND created_on_platform IN ('cloud-agent', 'cloud-agent-web')
+        )
+      ) AS cloud_agent_used,
+      EXISTS (
+        SELECT 1 FROM deployments
+        WHERE owned_by_organization_id = ${organizationId}
+          AND created_from = 'deploy'
+          AND last_deployed_at IS NOT NULL
+      ) AS project_deployed
   `);
   const row = result.rows[0] as FeatureAdoptionStateRow | undefined;
   return {
@@ -121,6 +176,8 @@ async function getFeatureAdoptionState(organizationId: string): Promise<FeatureA
     codeReviewerEnabled: row?.code_reviewer_enabled ?? false,
     securityAgentEnabled: row?.security_agent_enabled ?? false,
     teamIntegrationConnected: row?.team_integration_connected ?? false,
+    cloudAgentUsed: row?.cloud_agent_used ?? false,
+    projectDeployed: row?.project_deployed ?? false,
   };
 }
 

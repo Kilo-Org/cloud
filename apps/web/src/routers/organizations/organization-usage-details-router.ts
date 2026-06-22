@@ -90,6 +90,8 @@ const FeatureAdoptionOutputSchema = z.object({
       title: z.string(),
       description: z.string(),
       adopted: z.boolean(),
+      adoptedLabel: z.string(),
+      notAdoptedLabel: z.string(),
       actionLabel: z.string(),
       actionUrl: z.string(),
     })

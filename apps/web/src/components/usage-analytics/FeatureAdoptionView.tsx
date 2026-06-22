@@ -2,7 +2,17 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, ArrowRight, Bot, Cable, Check, Circle, Shield } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowRight,
+  Bot,
+  Cable,
+  Check,
+  Circle,
+  Cloud,
+  Rocket,
+  Shield,
+} from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,6 +26,8 @@ const featureIcons: Record<FeatureAdoptionKey, typeof Bot> = {
   'code-reviewer': Bot,
   'security-agent': Shield,
   'team-integration': Cable,
+  'cloud-agent-used': Cloud,
+  'project-deployed': Rocket,
 };
 
 export function FeatureAdoptionView({
@@ -71,7 +83,7 @@ export function FeatureAdoptionView({
               <Badge variant="secondary">Enterprise</Badge>
             </div>
             <p className="text-muted-foreground text-sm">
-              Organization features that are configured and ready to use.
+              See which organization features are configured or have been used.
             </p>
           </div>
           <div className="text-right">
@@ -113,7 +125,7 @@ export function FeatureAdoptionView({
                     ) : (
                       <Circle className="size-2.5" aria-hidden="true" />
                     )}
-                    {check.adopted ? 'Adopted' : 'Not adopted'}
+                    {check.adopted ? check.adoptedLabel : check.notAdoptedLabel}
                   </Badge>
                 </div>
                 {!compact && (

@@ -20,7 +20,6 @@ export type TrpcOpenApiProcedure = {
   description?: string;
   input: z.ZodType;
   output: z.ZodType;
-  security: 'apiKey';
 };
 
 type UsageAnalyticsProcedureKey = Extract<
@@ -48,7 +47,6 @@ export const publicTrpcOpenApiProcedures = [
       'Returns aggregate KPI metrics for the authenticated user or an accessible organization. Use this for summary cards and high-level totals.',
     input: UsageAnalyticsFiltersSchema,
     output: SummaryOutputSchema,
-    security: 'apiKey',
   }),
   usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getTimeseries',
@@ -59,7 +57,6 @@ export const publicTrpcOpenApiProcedures = [
       'Returns usage analytics grouped into time buckets. Use this for trend charts and optional split-by series views.',
     input: TimeseriesInputSchema,
     output: TimeseriesOutputSchema,
-    security: 'apiKey',
   }),
   usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getBreakdown',
@@ -70,7 +67,6 @@ export const publicTrpcOpenApiProcedures = [
       'Returns top usage values grouped by a single selected dimension. Use this for dedicated breakdown charts such as features, models, projects, or users.',
     input: BreakdownInputSchema,
     output: BreakdownOutputSchema,
-    security: 'apiKey',
   }),
   usageAnalyticsProcedure({
     procedurePath: 'usageAnalytics.getTable',
@@ -81,6 +77,5 @@ export const publicTrpcOpenApiProcedures = [
       'Returns aggregated tabular usage rows grouped by time bucket and optional dimensions. Use this for the detailed breakdown table and CSV export view.',
     input: TableInputSchema,
     output: TableOutputSchema,
-    security: 'apiKey',
   }),
 ];

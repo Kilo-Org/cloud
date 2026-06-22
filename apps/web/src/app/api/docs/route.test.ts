@@ -10,7 +10,7 @@ describe('GET /api/docs', () => {
     expect(response.headers.get('content-type')).toBe('text/html; charset=utf-8');
     expect(body).toContain('supportedSubmitMethods: []');
     expect(body).toContain('tryItOutEnabled: false');
-    expect(body).toContain('.swagger-ui .auth-wrapper');
-    expect(body).toContain('display: none');
+    expect(body).not.toContain('.swagger-ui .auth-wrapper');
+    expect(body).not.toContain('.swagger-ui .authorization__btn');
   });
 });

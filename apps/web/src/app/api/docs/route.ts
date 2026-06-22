@@ -66,9 +66,6 @@ function swaggerUiHtml(nonce: string) {
         min-height: calc(100vh - 73px);
       }
 
-      .swagger-ui .auth-wrapper {
-        display: none;
-      }
     </style>
   </head>
   <body>

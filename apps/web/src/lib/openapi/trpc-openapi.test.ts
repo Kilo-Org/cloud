@@ -17,6 +17,18 @@ describe('generateTrpcOpenApiDocument', () => {
     expect(document.paths).not.toHaveProperty('/api/trpc/admin');
   });
 
+  it('omits auth metadata so Swagger UI cannot offer token entry', () => {
+    const document = generateTrpcOpenApiDocument();
+
+    expect(document).not.toHaveProperty('components.securitySchemes');
+
+    for (const pathItem of Object.values(document.paths)) {
+      for (const operation of Object.values(pathItem)) {
+        expect(operation).not.toHaveProperty('security');
+      }
+    }
+  });
+
   it('generates request and response schemas for usageAnalytics.getTable', () => {
     const document = generateTrpcOpenApiDocument();
     const operation = document.paths['/api/trpc/usageAnalytics.getTable']?.post;

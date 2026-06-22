@@ -236,10 +236,12 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
 
     await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
     await sidePanel.getByRole('button', { name: 'Dangerous' }).click();
-    await sidePanel
-      .getByLabel('Message agent')
-      .fill('Inspect this tab and tell me the HTML length');
-    await sidePanel.getByRole('button', { name: 'Send message' }).click();
+    const messageInput = sidePanel.getByLabel('Message agent');
+    await messageInput.fill('Inspect this tab');
+    await messageInput.press('Shift+Enter');
+    await expect(messageInput).toHaveValue('Inspect this tab\n');
+    await messageInput.fill('Inspect this tab and tell me the HTML length');
+    await messageInput.press('Enter');
 
     await expect(sidePanel.getByText('eval completed')).toBeVisible();
     await expect(sidePanel.getByText('Code')).toBeHidden();

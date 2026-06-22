@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ChangeEvent, JSX } from 'react';
+import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
 import {
   createAssistantMessage,
   createUserMessage,
@@ -174,6 +174,17 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
     })();
   };
 
+  const submitDraft = (): void => {
+    const text = draft.trim();
+
+    if (text === '' || isRunning) {
+      return;
+    }
+
+    setDraft('');
+    submitMessage(text);
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <section
@@ -194,14 +205,7 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
         className="border-t border-zinc-900 px-4 py-3"
         onSubmit={event => {
           event.preventDefault();
-
-          const text = draft.trim();
-          if (text === '' || isRunning) {
-            return;
-          }
-
-          setDraft('');
-          submitMessage(text);
+          submitDraft();
         }}
       >
         <label className="sr-only" htmlFor="agent-message">
@@ -212,6 +216,12 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
           id="agent-message"
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
             setDraft(event.currentTarget.value);
+          }}
+          onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              submitDraft();
+            }
           }}
           placeholder="Ask Kilo to inspect this tab..."
           value={draft}

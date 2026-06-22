@@ -11,6 +11,12 @@ export type ChangelogEntry = {
 // Newest entries first. Developers add new entries to the top of this array.
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: '2026-06-22',
+    description: 'OpenClaw 2026.6.8 is now generally available to everyone.',
+    category: 'feature',
+    deployHint: 'upgrade_required',
+  },
+  {
     date: '2026-06-18',
     description: 'OpenClaw 2026.6.8 is available now as an Early Access upgrade.',
     category: 'feature',

@@ -9,6 +9,14 @@ import {
 import { and, count, eq, inArray, sql } from 'drizzle-orm';
 import { readDb } from '@/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
+import { FEATURE_ADOPTION_KEYS } from '@/lib/organizations/feature-adoption';
+
+// Which surface a recommendation ties back to. Per-feature recommendations reuse
+// the feature adoption key so the UI can show the same icon; organization-level
+// ones (SSO, seats) are not tied to one feature.
+export const RECOMMENDATION_FEATURES = [...FEATURE_ADOPTION_KEYS, 'organization'] as const;
+
+export type RecommendationFeature = (typeof RECOMMENDATION_FEATURES)[number];
 
 export const RECOMMENDATION_KEYS = [
   'integration-needs-reconnect',
@@ -27,8 +35,14 @@ export type RecommendationKey = (typeof RECOMMENDATION_KEYS)[number];
 
 export type RecommendationSeverity = 'attention' | 'suggestion';
 
+// open = the gap still exists, completed = the org reached the good state,
+// dismissed = an owner chose to stop seeing it.
+export type RecommendationStatus = 'open' | 'completed' | 'dismissed';
+
 export type Recommendation = {
   key: RecommendationKey;
+  feature: RecommendationFeature;
+  status: RecommendationStatus;
   title: string;
   description: string;
   actionLabel: string;
@@ -48,6 +62,7 @@ export type RecommendationState = {
   linearBotEnabled: boolean;
   cloudAgentUsed: boolean;
   webhookTriggerCount: number;
+  githubConnected: boolean;
   githubLiteApp: boolean;
   ssoConfigured: boolean;
   seatCount: number;
@@ -68,154 +83,256 @@ function platformLabel(platform: string): string {
   return PLATFORM_LABELS[platform] ?? platform;
 }
 
+type RuleContent = {
+  title: string;
+  description: string;
+  actionLabel: string;
+  actionUrl: string;
+};
+
+type Rule = {
+  key: RecommendationKey;
+  feature: RecommendationFeature;
+  severity: RecommendationSeverity;
+  // The done-phrased copy shown in the Completed list. Omit for break-fix items
+  // (reconnect) that are open-only: "no broken integrations" is not a milestone.
+  completed?: { title: string; description: string };
+  applicable: (state: RecommendationState) => boolean;
+  // True when the gap still exists (the org should act).
+  open: (state: RecommendationState) => boolean;
+  content: (organizationId: string, state: RecommendationState) => RuleContent;
+};
+
+function integrationsUrl(organizationId: string): string {
+  return `/organizations/${organizationId}/integrations`;
+}
+function codeReviewsUrl(organizationId: string): string {
+  return `/organizations/${organizationId}/code-reviews`;
+}
+function securityAgentUrl(organizationId: string): string {
+  return `/organizations/${organizationId}/security-agent/config`;
+}
+function organizationUrl(organizationId: string): string {
+  return `/organizations/${organizationId}`;
+}
+
+// Order encodes priority within a pane: broken/blocking first, then per-feature
+// tuning, then organization-level. Per-feature rules are only applicable when the
+// feature is enabled (enablement-first); reconnect/bot states are themselves the
+// enablement problem.
+const RULES: Rule[] = [
+  {
+    key: 'integration-needs-reconnect',
+    feature: 'source-control-integration',
+    severity: 'attention',
+    applicable: state => state.brokenIntegrationPlatforms.length > 0,
+    open: state => state.brokenIntegrationPlatforms.length > 0,
+    content: (organizationId, state) => {
+      const labels = state.brokenIntegrationPlatforms.map(platformLabel);
+      return {
+        title: labels.length === 1 ? `Reconnect ${labels[0]}` : 'Reconnect integrations',
+        description:
+          labels.length === 1
+            ? `${labels[0]} needs reauthorization. Automation is paused until you reconnect it.`
+            : `${labels.join(' and ')} need reauthorization. Automation is paused until you reconnect them.`,
+        actionLabel: 'Reconnect',
+        actionUrl: integrationsUrl(organizationId),
+      };
+    },
+  },
+  {
+    key: 'org-github-lite-app',
+    feature: 'source-control-integration',
+    severity: 'suggestion',
+    completed: {
+      title: 'Using the full GitHub app',
+      description: 'Code Reviewer can post results and gate pull requests.',
+    },
+    applicable: state => state.githubConnected,
+    open: state => state.githubLiteApp,
+    content: organizationId => ({
+      title: 'Switch to the full GitHub app',
+      description:
+        'You are on the read-only GitHub app. Code Reviewer cannot post results or gate pull requests until you switch to the full app.',
+      actionLabel: 'Update GitHub app',
+      actionUrl: integrationsUrl(organizationId),
+    }),
+  },
+  {
+    key: 'code-reviewer-security-focus-missing',
+    feature: 'code-reviewer',
+    severity: 'suggestion',
+    completed: {
+      title: 'Security review focus enabled',
+      description: 'Code Reviewer emphasizes security vulnerabilities.',
+    },
+    applicable: state => state.codeReviewerEnabled,
+    open: state => state.codeReviewMissingSecurityFocus,
+    content: organizationId => ({
+      title: 'Add a security review focus',
+      description:
+        'Code Reviewer is on, but Security vulnerabilities is not a selected focus area. Add it for extra emphasis on issues like injection and leaked credentials.',
+      actionLabel: 'Update focus areas',
+      actionUrl: codeReviewsUrl(organizationId),
+    }),
+  },
+  {
+    key: 'code-reviewer-no-merge-gate',
+    feature: 'code-reviewer',
+    severity: 'suggestion',
+    completed: {
+      title: 'Merge gate enabled',
+      description: 'Code Reviewer gates pull requests on findings.',
+    },
+    // Impossible on the read-only app, so not applicable there (C2 covers it).
+    applicable: state => state.codeReviewerEnabled && !state.githubLiteApp,
+    open: state => state.codeReviewGateOff,
+    content: organizationId => ({
+      title: 'Turn on a merge gate',
+      description:
+        'Code Reviewer posts comments but does not gate pull requests. Set a gate threshold so risky changes are flagged.',
+      actionLabel: 'Set a gate threshold',
+      actionUrl: codeReviewsUrl(organizationId),
+    }),
+  },
+  {
+    key: 'security-agent-sla-disabled',
+    feature: 'security-agent',
+    severity: 'suggestion',
+    completed: {
+      title: 'SLA deadlines set',
+      description: 'Security findings get a due date.',
+    },
+    applicable: state => state.securityAgentEnabled,
+    open: state => state.securitySlaDisabled,
+    content: organizationId => ({
+      title: 'Set Security Agent SLA deadlines',
+      description: 'Findings have no due dates. Turn on SLAs so issues get a deadline.',
+      actionLabel: 'Set SLA deadlines',
+      actionUrl: securityAgentUrl(organizationId),
+    }),
+  },
+  {
+    key: 'security-agent-auto-analysis-disabled',
+    feature: 'security-agent',
+    severity: 'suggestion',
+    completed: {
+      title: 'Automatic analysis on',
+      description: 'New findings are triaged as they arrive.',
+    },
+    applicable: state => state.securityAgentEnabled,
+    open: state => state.securityAutoAnalysisDisabled,
+    content: organizationId => ({
+      title: 'Turn on automatic analysis',
+      description:
+        'New findings are not analyzed automatically. Turn on analysis so they are triaged as they arrive.',
+      actionLabel: 'Enable auto analysis',
+      actionUrl: securityAgentUrl(organizationId),
+    }),
+  },
+  {
+    key: 'linear-bot-disabled',
+    feature: 'team-integration',
+    severity: 'suggestion',
+    completed: {
+      title: 'Linear bot enabled',
+      description: 'The bot can act on issues.',
+    },
+    applicable: state => state.linearConnected,
+    open: state => !state.linearBotEnabled,
+    content: organizationId => ({
+      title: 'Enable the Linear bot',
+      description: 'Linear is connected but the bot is off, so it cannot act on issues.',
+      actionLabel: 'Enable the bot',
+      actionUrl: integrationsUrl(organizationId),
+    }),
+  },
+  {
+    key: 'cloud-agent-no-automation',
+    feature: 'cloud-agent-used',
+    severity: 'suggestion',
+    completed: {
+      title: 'Cloud Agent automated',
+      description: 'A trigger can start Cloud Agent from your tools.',
+    },
+    applicable: state => state.cloudAgentUsed,
+    open: state => state.webhookTriggerCount === 0,
+    content: organizationId => ({
+      title: 'Automate Cloud Agent',
+      description:
+        'Cloud Agent runs only manually. Add a webhook trigger to start it from your tools.',
+      actionLabel: 'Create a trigger',
+      actionUrl: `/organizations/${organizationId}/cloud/triggers`,
+    }),
+  },
+  {
+    key: 'org-sso-not-configured',
+    feature: 'organization',
+    severity: 'suggestion',
+    completed: {
+      title: 'SSO configured',
+      description: 'Single sign-on is set up for this organization.',
+    },
+    applicable: () => true,
+    open: state => !state.ssoConfigured,
+    content: organizationId => ({
+      title: 'Set up SSO',
+      description: 'Single sign-on is not configured for this organization.',
+      actionLabel: 'Set up SSO',
+      actionUrl: organizationUrl(organizationId),
+    }),
+  },
+  {
+    key: 'org-unused-seats',
+    feature: 'organization',
+    severity: 'suggestion',
+    completed: {
+      title: 'All seats in use',
+      description: 'Every paid seat is assigned.',
+    },
+    applicable: () => true,
+    open: state => state.seatCount > state.memberCount,
+    content: organizationId => ({
+      title: 'Invite more members',
+      description: 'You have unused seats. Invite teammates to use them.',
+      actionLabel: 'Invite members',
+      actionUrl: organizationUrl(organizationId),
+    }),
+  },
+];
+
 /**
- * Pure rule evaluation. Order encodes priority: broken/blocking states first,
- * then per-feature tuning, then organization-level suggestions. Recommendations
- * for a feature are only emitted when that feature is enabled (enablement-first);
- * the only exceptions are reconnect/bot states, which are themselves enablement
- * problems surfaced here.
+ * Pure rule evaluation. Returns every applicable rule with an open/completed
+ * status. Dismissals are applied separately in getOrganizationRecommendations.
+ * Non-applicable rules (feature disabled, nothing connected) are omitted.
  */
 export function buildRecommendations(
   organizationId: string,
   state: RecommendationState
 ): Recommendation[] {
   const recommendations: Recommendation[] = [];
-  const integrationsUrl = `/organizations/${organizationId}/integrations`;
-  const codeReviewsUrl = `/organizations/${organizationId}/code-reviews`;
-  const securityAgentUrl = `/organizations/${organizationId}/security-agent/config`;
-  const organizationUrl = `/organizations/${organizationId}`;
-
-  // A6 — a connected integration is broken and needs reauthorization.
-  if (state.brokenIntegrationPlatforms.length > 0) {
-    const labels = state.brokenIntegrationPlatforms.map(platformLabel);
-    const title = labels.length === 1 ? `Reconnect ${labels[0]}` : 'Reconnect integrations';
+  for (const rule of RULES) {
+    if (!rule.applicable(state)) {
+      continue;
+    }
+    const isOpen = rule.open(state);
+    if (!isOpen && !rule.completed) {
+      continue;
+    }
+    const content = rule.content(organizationId, state);
     recommendations.push({
-      key: 'integration-needs-reconnect',
-      title,
-      description:
-        labels.length === 1
-          ? `${labels[0]} needs reauthorization. Automation is paused until you reconnect it.`
-          : `${labels.join(' and ')} need reauthorization. Automation is paused until you reconnect them.`,
-      actionLabel: 'Reconnect',
-      actionUrl: integrationsUrl,
-      severity: 'attention',
+      key: rule.key,
+      feature: rule.feature,
+      status: isOpen ? 'open' : 'completed',
+      severity: rule.severity,
+      title: isOpen ? content.title : (rule.completed?.title ?? content.title),
+      description: isOpen
+        ? content.description
+        : (rule.completed?.description ?? content.description),
+      actionLabel: content.actionLabel,
+      actionUrl: content.actionUrl,
     });
   }
-
-  // C2 — read-only GitHub app blocks write-back features. Upstream of the merge gate.
-  if (state.githubLiteApp) {
-    recommendations.push({
-      key: 'org-github-lite-app',
-      title: 'Switch to the full GitHub app',
-      description:
-        'You are on the read-only GitHub app. Code Reviewer cannot post results or gate pull requests until you switch to the full app.',
-      actionLabel: 'Update GitHub app',
-      actionUrl: integrationsUrl,
-      severity: 'suggestion',
-    });
-  }
-
-  // A1 — Code Reviewer enabled but Security is not a selected focus area.
-  if (state.codeReviewerEnabled && state.codeReviewMissingSecurityFocus) {
-    recommendations.push({
-      key: 'code-reviewer-security-focus-missing',
-      title: 'Add a security review focus',
-      description:
-        'Code Reviewer is on, but Security vulnerabilities is not a selected focus area. Add it for extra emphasis on issues like injection and leaked credentials.',
-      actionLabel: 'Update focus areas',
-      actionUrl: codeReviewsUrl,
-      severity: 'suggestion',
-    });
-  }
-
-  // A2 — Code Reviewer enabled but no merge gate. Impossible on the lite app, so
-  // only suggest it when the full app is in use (C2 covers the lite case).
-  if (state.codeReviewerEnabled && state.codeReviewGateOff && !state.githubLiteApp) {
-    recommendations.push({
-      key: 'code-reviewer-no-merge-gate',
-      title: 'Turn on a merge gate',
-      description:
-        'Code Reviewer posts comments but does not gate pull requests. Set a gate threshold so risky changes are flagged.',
-      actionLabel: 'Set a gate threshold',
-      actionUrl: codeReviewsUrl,
-      severity: 'suggestion',
-    });
-  }
-
-  // A3 — Security Agent enabled but SLAs off.
-  if (state.securityAgentEnabled && state.securitySlaDisabled) {
-    recommendations.push({
-      key: 'security-agent-sla-disabled',
-      title: 'Set Security Agent SLA deadlines',
-      description: 'Findings have no due dates. Turn on SLAs so issues get a deadline.',
-      actionLabel: 'Set SLA deadlines',
-      actionUrl: securityAgentUrl,
-      severity: 'suggestion',
-    });
-  }
-
-  // A4 — Security Agent enabled but new findings are not analyzed automatically.
-  if (state.securityAgentEnabled && state.securityAutoAnalysisDisabled) {
-    recommendations.push({
-      key: 'security-agent-auto-analysis-disabled',
-      title: 'Turn on automatic analysis',
-      description:
-        'New findings are not analyzed automatically. Turn on analysis so they are triaged as they arrive.',
-      actionLabel: 'Enable auto analysis',
-      actionUrl: securityAgentUrl,
-      severity: 'suggestion',
-    });
-  }
-
-  // A7 — Linear connected but its bot is off.
-  if (state.linearConnected && !state.linearBotEnabled) {
-    recommendations.push({
-      key: 'linear-bot-disabled',
-      title: 'Enable the Linear bot',
-      description: 'Linear is connected but the bot is off, so it cannot act on issues.',
-      actionLabel: 'Enable the bot',
-      actionUrl: integrationsUrl,
-      severity: 'suggestion',
-    });
-  }
-
-  // A8 — Cloud Agent used but never automated.
-  if (state.cloudAgentUsed && state.webhookTriggerCount === 0) {
-    recommendations.push({
-      key: 'cloud-agent-no-automation',
-      title: 'Automate Cloud Agent',
-      description:
-        'Cloud Agent runs only manually. Add a webhook trigger to start it from your tools.',
-      actionLabel: 'Create a trigger',
-      actionUrl: `/organizations/${organizationId}/cloud/triggers`,
-      severity: 'suggestion',
-    });
-  }
-
-  // C1 — SSO not configured.
-  if (!state.ssoConfigured) {
-    recommendations.push({
-      key: 'org-sso-not-configured',
-      title: 'Set up SSO',
-      description: 'Single sign-on is not configured for this organization.',
-      actionLabel: 'Set up SSO',
-      actionUrl: organizationUrl,
-      severity: 'suggestion',
-    });
-  }
-
-  // C3 — paid seats that nobody is using.
-  if (state.seatCount > state.memberCount) {
-    recommendations.push({
-      key: 'org-unused-seats',
-      title: 'Invite more members',
-      description: 'You have unused seats. Invite teammates to use them.',
-      actionLabel: 'Invite members',
-      actionUrl: organizationUrl,
-      severity: 'suggestion',
-    });
-  }
-
   return recommendations;
 }
 
@@ -324,9 +441,9 @@ async function getRecommendationState(organizationId: string): Promise<Recommend
     row => readBoolean(row.metadata, 'bot_enabled') === true
   );
 
-  const githubLiteApp = integrationRows.some(
-    row => row.platform === 'github' && isActive(row) && row.github_app_type === 'lite'
-  );
+  const activeGithub = integrationRows.filter(row => row.platform === 'github' && isActive(row));
+  const githubConnected = activeGithub.length > 0;
+  const githubLiteApp = activeGithub.some(row => row.github_app_type === 'lite');
 
   const orgRow = await readDb
     .select({ sso_domain: organizations.sso_domain, seat_count: organizations.seat_count })
@@ -355,6 +472,7 @@ async function getRecommendationState(organizationId: string): Promise<Recommend
     linearBotEnabled,
     cloudAgentUsed: cloudUsedResult.rows[0]?.used === true,
     webhookTriggerCount: triggerRows[0]?.value ?? 0,
+    githubConnected,
     githubLiteApp,
     ssoConfigured: sso !== null && sso !== '',
     seatCount: orgRow[0]?.seat_count ?? 0,
@@ -388,8 +506,10 @@ export async function getOrganizationRecommendations(organizationId: string): Pr
   ]);
 
   const dismissed = new Set(dismissedRows.map(row => row.key));
-  const recommendations = buildRecommendations(organizationId, state).filter(
-    recommendation => !dismissed.has(recommendation.key)
+  const recommendations = buildRecommendations(organizationId, state).map(recommendation =>
+    dismissed.has(recommendation.key)
+      ? { ...recommendation, status: 'dismissed' as const }
+      : recommendation
   );
 
   return { plan: organization.plan, recommendations };

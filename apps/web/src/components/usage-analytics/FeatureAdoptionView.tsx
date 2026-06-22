@@ -21,7 +21,7 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { FeatureAdoptionKey } from '@/lib/organizations/feature-adoption';
 
-const featureIcons: Record<FeatureAdoptionKey, typeof Bot> = {
+export const featureIcons: Record<FeatureAdoptionKey, typeof Bot> = {
   'source-control-integration': Cable,
   'code-reviewer': Bot,
   'security-agent': Shield,

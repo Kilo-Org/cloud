@@ -150,8 +150,10 @@ describe('organizations usage details trpc router', () => {
         organizationId: testOrganization.id,
       });
 
-      // A freshly created org has no SSO configured, so at least that fires.
-      expect(result.recommendations.map(r => r.key)).toContain('org-sso-not-configured');
+      // A freshly created org has no SSO configured, so that fires as an open item.
+      expect(result.recommendations.find(r => r.key === 'org-sso-not-configured')?.status).toBe(
+        'open'
+      );
     });
 
     it('hides a recommendation after an owner dismisses it', async () => {
@@ -169,7 +171,10 @@ describe('organizations usage details trpc router', () => {
       const afterDismiss = await owner.organizations.usageDetails.getRecommendations({
         organizationId: testOrganization.id,
       });
-      expect(afterDismiss.recommendations.map(r => r.key)).not.toContain('org-sso-not-configured');
+      // Dismissed items move to the dismissed status, not removed entirely.
+      expect(
+        afterDismiss.recommendations.find(r => r.key === 'org-sso-not-configured')?.status
+      ).toBe('dismissed');
 
       await owner.organizations.usageDetails.restoreRecommendation({
         organizationId: testOrganization.id,
@@ -178,7 +183,9 @@ describe('organizations usage details trpc router', () => {
       const afterRestore = await owner.organizations.usageDetails.getRecommendations({
         organizationId: testOrganization.id,
       });
-      expect(afterRestore.recommendations.map(r => r.key)).toContain('org-sso-not-configured');
+      expect(
+        afterRestore.recommendations.find(r => r.key === 'org-sso-not-configured')?.status
+      ).toBe('open');
     });
 
     it('rejects dismissal from a non-owner member', async () => {

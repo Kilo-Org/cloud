@@ -22,6 +22,7 @@ import {
   getOrganizationFeatureAdoption,
 } from '@/lib/organizations/feature-adoption';
 import {
+  RECOMMENDATION_FEATURES,
   RECOMMENDATION_KEYS,
   getOrganizationRecommendations,
 } from '@/lib/organizations/recommendations';
@@ -111,6 +112,8 @@ const RecommendationsOutputSchema = z.object({
   recommendations: z.array(
     z.object({
       key: z.enum(RECOMMENDATION_KEYS),
+      feature: z.enum(RECOMMENDATION_FEATURES),
+      status: z.enum(['open', 'completed', 'dismissed']),
       title: z.string(),
       description: z.string(),
       actionLabel: z.string(),

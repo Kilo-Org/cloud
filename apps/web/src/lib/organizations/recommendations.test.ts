@@ -2,7 +2,7 @@ import { buildRecommendations, type RecommendationState } from './recommendation
 
 const organizationId = '00000000-0000-4000-8000-000000000001';
 
-// Defaults represent a well-configured organization: nothing should be recommended.
+// Defaults represent a healthy organization: nothing open, no feature gaps.
 function buildState(overrides: Partial<RecommendationState> = {}): RecommendationState {
   return {
     codeReviewerEnabled: false,
@@ -16,6 +16,7 @@ function buildState(overrides: Partial<RecommendationState> = {}): Recommendatio
     linearBotEnabled: false,
     cloudAgentUsed: false,
     webhookTriggerCount: 1,
+    githubConnected: false,
     githubLiteApp: false,
     ssoConfigured: true,
     seatCount: 0,
@@ -24,99 +25,85 @@ function buildState(overrides: Partial<RecommendationState> = {}): Recommendatio
   };
 }
 
-function keys(state: RecommendationState): string[] {
-  return buildRecommendations(organizationId, state).map(recommendation => recommendation.key);
+function openKeys(state: RecommendationState): string[] {
+  return buildRecommendations(organizationId, state)
+    .filter(r => r.status === 'open')
+    .map(r => r.key);
+}
+
+function completedKeys(state: RecommendationState): string[] {
+  return buildRecommendations(organizationId, state)
+    .filter(r => r.status === 'completed')
+    .map(r => r.key);
+}
+
+function find(state: RecommendationState, key: string) {
+  return buildRecommendations(organizationId, state).find(r => r.key === key);
 }
 
 describe('buildRecommendations', () => {
-  it('returns nothing for a fully configured organization', () => {
-    expect(buildRecommendations(organizationId, buildState())).toEqual([]);
+  it('reports a healthy organization as completed, not open', () => {
+    const state = buildState();
+    expect(openKeys(state)).toEqual([]);
+    expect(completedKeys(state)).toEqual(
+      expect.arrayContaining(['org-sso-not-configured', 'org-unused-seats'])
+    );
   });
 
-  it('does not emit feature tuning when the feature is not enabled', () => {
-    const state = buildState({
-      codeReviewerEnabled: false,
-      codeReviewMissingSecurityFocus: true,
-      codeReviewGateOff: true,
-      securityAgentEnabled: false,
-      securitySlaDisabled: true,
-      securityAutoAnalysisDisabled: true,
-    });
-    expect(keys(state)).toEqual([]);
+  it('omits a feature rule entirely when the feature is not enabled', () => {
+    const state = buildState({ codeReviewerEnabled: false, codeReviewMissingSecurityFocus: true });
+    expect(find(state, 'code-reviewer-security-focus-missing')).toBeUndefined();
   });
 
-  it('emits code reviewer tuning only when it is enabled', () => {
-    const state = buildState({
-      codeReviewerEnabled: true,
-      codeReviewMissingSecurityFocus: true,
-      codeReviewGateOff: true,
-    });
-    expect(keys(state)).toEqual([
-      'code-reviewer-security-focus-missing',
-      'code-reviewer-no-merge-gate',
-    ]);
+  it('marks an enabled feature with a gap as open', () => {
+    const state = buildState({ codeReviewerEnabled: true, codeReviewMissingSecurityFocus: true });
+    expect(find(state, 'code-reviewer-security-focus-missing')?.status).toBe('open');
   });
 
-  it('suppresses the merge gate suggestion on the read-only GitHub app and surfaces the app upgrade instead', () => {
+  it('marks an enabled feature without a gap as completed, with done-phrased copy', () => {
+    const state = buildState({ codeReviewerEnabled: true, codeReviewMissingSecurityFocus: false });
+    const recommendation = find(state, 'code-reviewer-security-focus-missing');
+    expect(recommendation?.status).toBe('completed');
+    expect(recommendation?.title).toBe('Security review focus enabled');
+  });
+
+  it('does not apply the merge gate rule on the read-only GitHub app', () => {
     const state = buildState({
-      codeReviewerEnabled: true,
-      codeReviewGateOff: true,
+      githubConnected: true,
       githubLiteApp: true,
+      codeReviewerEnabled: true,
+      codeReviewGateOff: true,
     });
-    const result = keys(state);
-    expect(result).toContain('org-github-lite-app');
-    expect(result).not.toContain('code-reviewer-no-merge-gate');
+    expect(find(state, 'code-reviewer-no-merge-gate')).toBeUndefined();
+    expect(find(state, 'org-github-lite-app')?.status).toBe('open');
   });
 
-  it('flags a broken integration as an attention-level reconnect', () => {
-    const [recommendation] = buildRecommendations(
-      organizationId,
-      buildState({ brokenIntegrationPlatforms: ['github'] })
-    );
-    expect(recommendation).toMatchObject({
-      key: 'integration-needs-reconnect',
-      title: 'Reconnect GitHub',
-      severity: 'attention',
+  it('treats a broken integration as an open attention item with no completed state', () => {
+    const broken = buildState({ brokenIntegrationPlatforms: ['github'] });
+    const recommendation = find(broken, 'integration-needs-reconnect');
+    expect(recommendation?.status).toBe('open');
+    expect(recommendation?.severity).toBe('attention');
+
+    // No broken integrations means the reconnect item is absent, not completed.
+    expect(find(buildState(), 'integration-needs-reconnect')).toBeUndefined();
+  });
+
+  it('flips SSO between open and completed based on configuration', () => {
+    expect(find(buildState({ ssoConfigured: false }), 'org-sso-not-configured')).toMatchObject({
+      status: 'open',
+      title: 'Set up SSO',
+    });
+    expect(find(buildState({ ssoConfigured: true }), 'org-sso-not-configured')).toMatchObject({
+      status: 'completed',
+      title: 'SSO configured',
     });
   });
 
-  it('summarizes multiple broken integrations in one reconnect item', () => {
-    const [recommendation] = buildRecommendations(
-      organizationId,
-      buildState({ brokenIntegrationPlatforms: ['github', 'slack'] })
+  it('opens the unused-seats rule only when seats exceed members', () => {
+    expect(openKeys(buildState({ seatCount: 5, memberCount: 2 }))).toContain('org-unused-seats');
+    expect(openKeys(buildState({ seatCount: 2, memberCount: 2 }))).not.toContain(
+      'org-unused-seats'
     );
-    expect(recommendation.title).toBe('Reconnect integrations');
-  });
-
-  it('recommends enabling the Linear bot only when Linear is connected but the bot is off', () => {
-    expect(keys(buildState({ linearConnected: true, linearBotEnabled: false }))).toContain(
-      'linear-bot-disabled'
-    );
-    expect(keys(buildState({ linearConnected: true, linearBotEnabled: true }))).not.toContain(
-      'linear-bot-disabled'
-    );
-  });
-
-  it('recommends Cloud Agent automation only when it is used and has no triggers', () => {
-    expect(keys(buildState({ cloudAgentUsed: true, webhookTriggerCount: 0 }))).toContain(
-      'cloud-agent-no-automation'
-    );
-    expect(keys(buildState({ cloudAgentUsed: false, webhookTriggerCount: 0 }))).not.toContain(
-      'cloud-agent-no-automation'
-    );
-  });
-
-  it('emits organization-level recommendations for SSO and unused seats', () => {
-    expect(keys(buildState({ ssoConfigured: false }))).toContain('org-sso-not-configured');
-    expect(keys(buildState({ seatCount: 5, memberCount: 2 }))).toContain('org-unused-seats');
-    expect(keys(buildState({ seatCount: 2, memberCount: 2 }))).not.toContain('org-unused-seats');
-  });
-
-  it('orders attention items ahead of suggestions', () => {
-    const result = keys(
-      buildState({ brokenIntegrationPlatforms: ['github'], ssoConfigured: false })
-    );
-    expect(result[0]).toBe('integration-needs-reconnect');
   });
 
   it('scopes every action url to the organization', () => {

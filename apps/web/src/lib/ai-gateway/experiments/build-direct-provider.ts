@@ -39,7 +39,7 @@ async function compressWithHeadroom(context: TransformRequestContext) {
   }
   try {
     const result = await compress(messages, {
-      model: context.model,
+      model: context.request.body.model,
       fallback: false,
     });
     const logId = await db

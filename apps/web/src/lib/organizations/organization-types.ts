@@ -69,6 +69,7 @@ export const OrganizationSchema = z.object({
   created_by_kilo_user_id: z.string().nullable(),
   deleted_at: z.string().nullable(),
   sso_domain: z.string().nullable(),
+  parent_organization_id: z.string().nullable(),
   plan: z.enum(['teams', 'enterprise']),
   free_trial_end_at: z.string().nullable(),
   company_domain: z.string().nullable(),

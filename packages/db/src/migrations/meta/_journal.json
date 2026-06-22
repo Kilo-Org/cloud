@@ -1170,6 +1170,13 @@
       "when": 1781687965838,
       "tag": "0166_open_xorn",
       "breakpoints": true
+    },
+    {
+      "idx": 167,
+      "version": "7",
+      "when": 1782127871399,
+      "tag": "0167_sour_thunderbolt_ross",
+      "breakpoints": true
     }
   ]
 }

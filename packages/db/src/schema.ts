@@ -2622,13 +2622,21 @@ export const organizations = pgTable(
     created_by_kilo_user_id: text(),
     deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
     sso_domain: text(),
+    parent_organization_id: uuid().references((): AnyPgColumn => organizations.id, {
+      onDelete: 'restrict',
+    }),
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
     company_domain: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
+    check(
+      'organizations_not_parented_by_self_check',
+      sql`${table.parent_organization_id} IS NULL OR ${table.parent_organization_id} <> ${table.id}`
+    ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
+    index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
   ]
 );
 

@@ -23,6 +23,17 @@ export type AgentConversationEvent =
       readonly value?: unknown;
     };
 
+export type GroupedConversationItem =
+  | {
+      readonly event: AgentConversationEvent;
+      readonly type: 'event';
+    }
+  | {
+      readonly result: Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
+      readonly toolCall: Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+      readonly type: 'tool-exchange';
+    };
+
 interface CreateEvalToolCallOptions {
   readonly code: string;
   readonly tabId: number;
@@ -125,4 +136,35 @@ export const planLocalDangerousAgentTurn = ({
       'Dangerous mode is connected. For now, ask me to inspect the selected tab.'
     ),
   ];
+};
+
+export const groupConversationEvents = (
+  events: AgentConversationEvent[]
+): GroupedConversationItem[] => {
+  const groupedItems: GroupedConversationItem[] = [];
+  const consumedEventIds = new Set<string>();
+
+  for (const event of events) {
+    if (!consumedEventIds.has(event.id)) {
+      if (event.type === 'tool-call') {
+        const result = events.find(
+          (
+            candidate
+          ): candidate is Extract<AgentConversationEvent, { readonly type: 'tool-result' }> =>
+            candidate.type === 'tool-result' && candidate.toolCallId === event.id
+        );
+
+        if (result === undefined) {
+          groupedItems.push({ event, type: 'event' });
+        } else {
+          consumedEventIds.add(result.id);
+          groupedItems.push({ result, toolCall: event, type: 'tool-exchange' });
+        }
+      } else {
+        groupedItems.push({ event, type: 'event' });
+      }
+    }
+  }
+
+  return groupedItems;
 };

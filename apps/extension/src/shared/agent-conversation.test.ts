@@ -4,6 +4,7 @@ import {
   createEvalToolCall,
   createToolResult,
   createUserMessage,
+  groupConversationEvents,
   planLocalDangerousAgentTurn,
 } from './agent-conversation';
 
@@ -116,6 +117,28 @@ describe('agent conversation events', () => {
         text: 'Pick a target tab first.',
         type: 'message',
       },
+    ]);
+  });
+
+  it('groups matching eval tool calls and results into one transcript item', () => {
+    const userMessage = createUserMessage('Inspect');
+    const toolCall = createEvalToolCall({
+      code: 'return document.title;',
+      tabId: 7,
+    });
+    const toolResult = createToolResult({
+      ok: true,
+      toolCallId: toolCall.id,
+      value: 'Kilo',
+    });
+    const assistantMessage = createAssistantMessage('Eval returned Kilo.');
+
+    expect(
+      groupConversationEvents([userMessage, toolCall, toolResult, assistantMessage])
+    ).toStrictEqual([
+      { event: userMessage, type: 'event' },
+      { result: toolResult, toolCall, type: 'tool-exchange' },
+      { event: assistantMessage, type: 'event' },
     ]);
   });
 });

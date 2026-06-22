@@ -250,7 +250,11 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
     await seedExtensionAuth(sidePanel);
     await sidePanel.reload();
 
+    await expect(sidePanel.getByLabel('Settings')).toBeVisible();
+    await expect(sidePanel.getByText('user@kilo.ai')).toBeHidden();
+    await sidePanel.getByLabel('Settings').click();
     await expect(sidePanel.getByText('user@kilo.ai')).toBeVisible();
+    await sidePanel.getByLabel('Settings').click();
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
 
     await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
@@ -260,8 +264,15 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
       .fill('Inspect this tab and tell me the HTML length');
     await sidePanel.getByRole('button', { name: 'Send message' }).click();
 
-    await expect(sidePanel.getByText('eval', { exact: true })).toBeVisible();
+    await expect(sidePanel.getByText('eval completed')).toBeVisible();
+    await expect(sidePanel.getByText('Code')).toBeHidden();
     await expect(sidePanel.getByText(/Eval returned [0-9]+\./u)).toBeVisible();
+    await sidePanel.getByText('eval completed').click();
+    await expect(sidePanel.getByText('Code')).toBeVisible();
+
+    await sidePanel.getByLabel('New conversation').click();
+    await expect(sidePanel.getByText('eval completed')).toBeHidden();
+    await expect(sidePanel.getByText('Pick a tab, switch to dangerous mode')).toBeVisible();
   } finally {
     await context.close();
     await fixture.close();

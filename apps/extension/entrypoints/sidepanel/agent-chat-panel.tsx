@@ -4,6 +4,7 @@ import {
   createAssistantMessage,
   createToolResult,
   createUserMessage,
+  groupConversationEvents,
   planLocalDangerousAgentTurn,
 } from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
@@ -15,7 +16,7 @@ import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
-import { AgentConversationEventView } from './agent-conversation-events';
+import { AgentConversationItemView } from './agent-conversation-events';
 import { executeEvalToolCall, getEvalSummary } from './agent-eval-runtime';
 import { AgentFooterControls } from './agent-footer-controls';
 import { useTabDebugger } from './use-tab-debugger';
@@ -65,6 +66,7 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
     () => modelOptions.find(option => option.id === model),
     [model, modelOptions]
   );
+  const groupedEvents = useMemo(() => groupConversationEvents(events), [events]);
   const thinkingOptions = useMemo(
     () =>
       selectedModel === undefined || selectedModel.variants.length === 0
@@ -186,8 +188,11 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
         className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4"
       >
         <div className="flex flex-1 flex-col justify-end gap-3">
-          {events.map(event => (
-            <AgentConversationEventView event={event} key={event.id} />
+          {groupedEvents.map(item => (
+            <AgentConversationItemView
+              item={item}
+              key={item.type === 'event' ? item.event.id : item.toolCall.id}
+            />
           ))}
         </div>
       </section>

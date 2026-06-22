@@ -2,10 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ChangeEvent, JSX } from 'react';
 import {
   createAssistantMessage,
-  createToolResult,
   createUserMessage,
   groupConversationEvents,
-  planLocalDangerousAgentTurn,
 } from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import {
@@ -17,8 +15,8 @@ import type { StoredAuth } from '@/src/shared/auth';
 import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { AgentConversationItemView } from './agent-conversation-events';
-import { executeEvalToolCall, getEvalSummary } from './agent-eval-runtime';
 import { AgentFooterControls } from './agent-footer-controls';
+import { runDangerousLlmTurn } from './agent-llm-turn-runner';
 import { useTabDebugger } from './use-tab-debugger';
 
 const effortOptions = ['low', 'medium', 'high'] as const;
@@ -135,49 +133,44 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
     }
   }, [thinkingEffort, thinkingOptions]);
 
+  const appendEvents = (nextEvents: AgentConversationEvent[]): void => {
+    setEvents(currentEvents => [...currentEvents, ...nextEvents]);
+  };
+
   const submitMessage = (text: string): void => {
     const userEvent = createUserMessage(text);
-    const plannedEvents = planLocalDangerousAgentTurn({
-      mode,
-      selectedTabId,
-      userText: text,
-    });
-    const toolCalls = plannedEvents.filter(
-      (event): event is Extract<AgentConversationEvent, { readonly type: 'tool-call' }> =>
-        event.type === 'tool-call'
-    );
+    const conversationWithUserMessage = [...events, userEvent];
 
-    setEvents(currentEvents => [...currentEvents, userEvent, ...plannedEvents]);
+    appendEvents([userEvent]);
 
-    if (toolCalls.length === 0) {
+    if (selectedTabId === undefined) {
+      appendEvents([createAssistantMessage('Pick a target tab first.')]);
+      return;
+    }
+
+    if (mode !== 'dangerous') {
+      appendEvents([
+        createAssistantMessage('Switch to dangerous mode before I can run eval in a tab.'),
+      ]);
       return;
     }
 
     setIsRunning(true);
 
     void (async (): Promise<void> => {
-      const completedEvents = await Promise.all(
-        toolCalls.map(async toolCall => {
-          const result = await executeEvalToolCall(toolCall);
-          const toolResultEvent = result.ok
-            ? createToolResult({
-                ok: true,
-                toolCallId: toolCall.id,
-                value: result.value,
-              })
-            : createToolResult({
-                error: result.error,
-                ok: false,
-                toolCallId: toolCall.id,
-              });
-
-          return [toolResultEvent, createAssistantMessage(getEvalSummary(result))];
-        })
-      );
-
-      setEvents(currentEvents => [...currentEvents, ...completedEvents.flat()]);
-
-      setIsRunning(false);
+      try {
+        await runDangerousLlmTurn({
+          apiBaseUrl,
+          appendEvents,
+          conversationEvents: conversationWithUserMessage,
+          fetch: fetchFromWindow,
+          model,
+          selectedTabId,
+          token: auth.token,
+        });
+      } finally {
+        setIsRunning(false);
+      }
     })();
   };
 

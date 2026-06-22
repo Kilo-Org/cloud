@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fetchKiloGatewayChatCompletion,
   fetchKiloGatewayModels,
+  parseKiloGatewayChatCompletionResponse,
   parseKiloGatewayModelsResponse,
   thinkingEffortLabel,
 } from './kilo-api-client';
@@ -10,6 +12,14 @@ const jsonResponse = (body: unknown, init: ResponseInit = {}): Response =>
   Response.json(body, {
     ...init,
   });
+
+const parseJsonRequestBody = (body: BodyInit | null | undefined): unknown => {
+  if (typeof body !== 'string') {
+    throw new TypeError('Expected JSON string request body.');
+  }
+
+  return JSON.parse(body);
+};
 
 describe('kilo API client', () => {
   it('fetches gateway models with bearer auth', async () => {
@@ -110,6 +120,123 @@ describe('kilo API client', () => {
     expect(() => parseKiloGatewayModelsResponse({ data: {} })).toThrow(
       'Gateway models response did not include a model list.'
     );
+  });
+
+  it('fetches chat completions with eval tools and bearer auth', async () => {
+    const seen: { body: unknown; headers: Headers; input: string; method: string | undefined }[] =
+      [];
+    const fetch: FetchLike = (input, init) => {
+      seen.push({
+        body: parseJsonRequestBody(init?.body),
+        headers: new Headers(init?.headers),
+        input: String(input),
+        method: init?.method,
+      });
+
+      return jsonResponse({
+        choices: [
+          {
+            message: {
+              content: 'I will inspect the page.',
+              role: 'assistant',
+              tool_calls: [
+                {
+                  function: {
+                    arguments: '{"code":"return document.documentElement.outerHTML.length;"}',
+                    name: 'eval',
+                  },
+                  id: 'call_eval_1',
+                  type: 'function',
+                },
+              ],
+            },
+          },
+        ],
+      });
+    };
+
+    await expect(
+      fetchKiloGatewayChatCompletion({
+        apiBaseUrl: 'https://app.kilo.ai/',
+        fetch,
+        messages: [{ content: 'Inspect this page', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        token: 'token-1',
+        tools: [
+          {
+            function: {
+              description: 'Run JavaScript',
+              name: 'eval',
+              parameters: { additionalProperties: false, type: 'object' },
+            },
+            type: 'function',
+          },
+        ],
+      })
+    ).resolves.toStrictEqual({
+      content: 'I will inspect the page.',
+      toolCalls: [
+        {
+          code: 'return document.documentElement.outerHTML.length;',
+          id: 'call_eval_1',
+          name: 'eval',
+        },
+      ],
+    });
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({
+      input: 'https://app.kilo.ai/api/gateway/v1/chat/completions',
+      method: 'POST',
+    });
+    expect({
+      accept: seen[0]?.headers.get('accept'),
+      authorization: seen[0]?.headers.get('authorization'),
+      contentType: seen[0]?.headers.get('content-type'),
+    }).toStrictEqual({
+      accept: 'application/json',
+      authorization: 'Bearer token-1',
+      contentType: 'application/json',
+    });
+    expect(seen[0]?.body).toStrictEqual({
+      messages: [{ content: 'Inspect this page', role: 'user' }],
+      model: 'anthropic/claude-sonnet-4',
+      temperature: 0,
+      tool_choice: 'auto',
+      tools: [
+        {
+          function: {
+            description: 'Run JavaScript',
+            name: 'eval',
+            parameters: { additionalProperties: false, type: 'object' },
+          },
+          type: 'function',
+        },
+      ],
+    });
+  });
+
+  it('rejects malformed eval tool calls', () => {
+    expect(() =>
+      parseKiloGatewayChatCompletionResponse({
+        choices: [
+          {
+            message: {
+              role: 'assistant',
+              tool_calls: [
+                {
+                  function: {
+                    arguments: '{"code":7}',
+                    name: 'eval',
+                  },
+                  id: 'call_eval_1',
+                  type: 'function',
+                },
+              ],
+            },
+          },
+        ],
+      })
+    ).toThrow('Gateway eval tool call did not include code.');
   });
 
   it('labels thinking efforts compactly', () => {

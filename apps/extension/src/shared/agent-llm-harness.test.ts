@@ -1,0 +1,80 @@
+import { describe, expect, it } from 'vitest';
+import {
+  EXTENSION_AGENT_SYSTEM_PROMPT,
+  buildGatewayMessagesFromEvents,
+  createEvalToolDefinition,
+} from './agent-llm-harness';
+import {
+  createAssistantMessage,
+  createEvalToolCall,
+  createToolResult,
+  createUserMessage,
+} from './agent-conversation';
+
+describe('agent LLM harness', () => {
+  it('defines the eval tool as an async function body contract', () => {
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain('selected browser tab');
+    expect(createEvalToolDefinition()).toStrictEqual({
+      function: {
+        description:
+          'Run JavaScript in the selected browser tab. The code is inserted inside an async function body, so use return for the value Kilo should read.',
+        name: 'eval',
+        parameters: {
+          additionalProperties: false,
+          properties: {
+            code: {
+              description:
+                'JavaScript async function body to run in the selected tab. Return a JSON-serializable value. Do not wrap it in markdown fences.',
+              type: 'string',
+            },
+          },
+          required: ['code'],
+          type: 'object',
+        },
+      },
+      type: 'function',
+    });
+  });
+
+  it('maps conversation events to gateway messages with tool results', () => {
+    const userMessage = createUserMessage('What is this page?');
+    const assistantMessage = createAssistantMessage('I will inspect it.');
+    const toolCall = createEvalToolCall({
+      code: 'return document.title;',
+      providerToolCallId: 'call_eval_1',
+      tabId: 7,
+    });
+    const toolResult = createToolResult({
+      ok: true,
+      toolCallId: toolCall.id,
+      value: 'Kilo fixture',
+    });
+
+    expect(
+      buildGatewayMessagesFromEvents([userMessage, assistantMessage, toolCall, toolResult])
+    ).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      { content: 'What is this page?', role: 'user' },
+      { content: 'I will inspect it.', role: 'assistant' },
+      {
+        content: null,
+        role: 'assistant',
+        tool_calls: [
+          {
+            function: {
+              arguments: '{"code":"return document.title;"}',
+              name: 'eval',
+            },
+            id: 'call_eval_1',
+            type: 'function',
+          },
+        ],
+      },
+      {
+        content: '{"ok":true,"value":"Kilo fixture"}',
+        role: 'tool',
+        tool_call_id: 'call_eval_1',
+      },
+    ]);
+  });
+});

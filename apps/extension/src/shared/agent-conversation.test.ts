@@ -5,7 +5,6 @@ import {
   createToolResult,
   createUserMessage,
   groupConversationEvents,
-  planLocalDangerousAgentTurn,
 } from './agent-conversation';
 
 describe('agent conversation events', () => {
@@ -64,60 +63,6 @@ describe('agent conversation events', () => {
         type: 'message',
       },
     });
-  });
-
-  it('plans an eval tool call for dangerous-mode page inspection prompts', () => {
-    expect(
-      planLocalDangerousAgentTurn({
-        mode: 'dangerous',
-        selectedTabId: 7,
-        userText: 'Inspect this tab and tell me the HTML length',
-      })
-    ).toMatchObject([
-      {
-        role: 'assistant',
-        text: 'I will inspect the selected tab with eval.',
-        type: 'message',
-      },
-      {
-        code: 'return document.documentElement.outerHTML.length;',
-        name: 'eval',
-        tabId: 7,
-        type: 'tool-call',
-      },
-    ]);
-  });
-
-  it('does not plan eval outside dangerous mode', () => {
-    expect(
-      planLocalDangerousAgentTurn({
-        mode: 'safe',
-        selectedTabId: 7,
-        userText: 'Inspect this tab and tell me the HTML length',
-      })
-    ).toMatchObject([
-      {
-        role: 'assistant',
-        text: 'Switch to dangerous mode before I can run eval in a tab.',
-        type: 'message',
-      },
-    ]);
-  });
-
-  it('asks for a target tab before planning eval', () => {
-    expect(
-      planLocalDangerousAgentTurn({
-        mode: 'dangerous',
-        selectedTabId: undefined,
-        userText: 'Inspect this tab and tell me the HTML length',
-      })
-    ).toMatchObject([
-      {
-        role: 'assistant',
-        text: 'Pick a target tab first.',
-        type: 'message',
-      },
-    ]);
   });
 
   it('groups matching eval tool calls and results into one transcript item', () => {

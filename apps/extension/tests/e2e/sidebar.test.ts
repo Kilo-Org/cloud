@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import type { BrowserContext, Page } from '@playwright/test';
+import { mockKiloApi } from './kilo-api-fixture';
 
 const extensionPath = resolvePath(import.meta.dirname, '../../.output/chrome-mv3');
 
@@ -90,30 +91,6 @@ const launchExtensionContext = async (): Promise<{
   const extensionId = new URL(serviceWorker.url()).host;
 
   return { context, extensionId, userDataDir };
-};
-
-const mockKiloApi = async (context: BrowserContext): Promise<void> => {
-  await context.route('https://app.kilo.ai/api/user', route =>
-    route.fulfill({
-      json: { google_user_email: 'user@kilo.ai' },
-      status: 200,
-    })
-  );
-  await context.route('https://app.kilo.ai/api/gateway/models', route =>
-    route.fulfill({
-      json: {
-        data: [
-          {
-            id: 'anthropic/claude-sonnet-4',
-            name: 'Anthropic: Claude Sonnet 4',
-            opencode: { variants: { high: {}, low: {}, medium: {} } },
-            preferredIndex: 0,
-          },
-        ],
-      },
-      status: 200,
-    })
-  );
 };
 
 const seedExtensionAuth = async (page: Page): Promise<void> => {
@@ -266,7 +243,7 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
 
     await expect(sidePanel.getByText('eval completed')).toBeVisible();
     await expect(sidePanel.getByText('Code')).toBeHidden();
-    await expect(sidePanel.getByText(/Eval returned [0-9]+\./u)).toBeVisible();
+    await expect(sidePanel.getByText(/The selected tab HTML length is [0-9]+\./u)).toBeVisible();
     await sidePanel.getByText('eval completed').click();
     await expect(sidePanel.getByText('Code')).toBeVisible();
 

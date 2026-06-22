@@ -11,6 +11,7 @@ export type AgentConversationEvent =
       readonly code: string;
       readonly id: string;
       readonly name: 'eval';
+      readonly providerToolCallId?: string;
       readonly tabId: number;
       readonly type: 'tool-call';
     }
@@ -36,6 +37,7 @@ export type GroupedConversationItem =
 
 interface CreateEvalToolCallOptions {
   readonly code: string;
+  readonly providerToolCallId?: string;
   readonly tabId: number;
 }
 
@@ -46,27 +48,12 @@ interface CreateToolResultOptions {
   readonly value?: unknown;
 }
 
-interface PlanLocalDangerousAgentTurnOptions {
-  readonly mode: AgentMode;
-  readonly selectedTabId: number | undefined;
-  readonly userText: string;
-}
-
 let nextEventId = 1;
 
 const createEventId = (): string => {
   const id = `event-${nextEventId}`;
   nextEventId += 1;
   return id;
-};
-
-const looksLikePageInspectionPrompt = (text: string): boolean => {
-  const normalizedText = text.toLowerCase();
-  return (
-    normalizedText.includes('html length') ||
-    (normalizedText.includes('inspect') && normalizedText.includes('tab')) ||
-    normalizedText.includes('page')
-  );
 };
 
 export const createUserMessage = (text: string): AgentConversationEvent => ({
@@ -85,11 +72,13 @@ export const createAssistantMessage = (text: string): AgentConversationEvent => 
 
 export const createEvalToolCall = ({
   code,
+  providerToolCallId,
   tabId,
 }: CreateEvalToolCallOptions): AgentConversationEvent => ({
   code,
   id: createEventId(),
   name: 'eval',
+  ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
   tabId,
   type: 'tool-call',
 });
@@ -107,36 +96,6 @@ export const createToolResult = ({
   ...(error === undefined ? {} : { error }),
   ...(value === undefined ? {} : { value }),
 });
-
-export const planLocalDangerousAgentTurn = ({
-  mode,
-  selectedTabId,
-  userText,
-}: PlanLocalDangerousAgentTurnOptions): AgentConversationEvent[] => {
-  if (selectedTabId === undefined) {
-    return [createAssistantMessage('Pick a target tab first.')];
-  }
-
-  if (mode !== 'dangerous') {
-    return [createAssistantMessage('Switch to dangerous mode before I can run eval in a tab.')];
-  }
-
-  if (looksLikePageInspectionPrompt(userText)) {
-    return [
-      createAssistantMessage('I will inspect the selected tab with eval.'),
-      createEvalToolCall({
-        code: 'return document.documentElement.outerHTML.length;',
-        tabId: selectedTabId,
-      }),
-    ];
-  }
-
-  return [
-    createAssistantMessage(
-      'Dangerous mode is connected. For now, ask me to inspect the selected tab.'
-    ),
-  ];
-};
 
 export const groupConversationEvents = (
   events: AgentConversationEvent[]

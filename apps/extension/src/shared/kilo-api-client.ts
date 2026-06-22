@@ -1,4 +1,15 @@
 import type { FetchLike } from './auth';
+export {
+  fetchKiloGatewayChatCompletion,
+  parseKiloGatewayChatCompletionResponse,
+} from './kilo-gateway-chat-client';
+export type {
+  KiloGatewayChatCompletion,
+  KiloGatewayChatMessage,
+  KiloGatewayChatToolCall,
+  KiloGatewayEvalToolCall,
+  KiloGatewayToolDefinition,
+} from './kilo-gateway-chat-client';
 
 export interface KiloGatewayModelOption {
   readonly hasUserByokAvailable?: boolean;

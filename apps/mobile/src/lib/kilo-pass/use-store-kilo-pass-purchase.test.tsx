@@ -237,6 +237,14 @@ function createDeferredPromise() {
   return { promise, resolve: resolvePromise };
 }
 
+function createDeferredRejectablePromise() {
+  let rejectPromise: (reason?: unknown) => void = ignoreDeferredResolution;
+  const promise = new Promise((_resolve, reject) => {
+    rejectPromise = reject;
+  });
+  return { promise, reject: rejectPromise };
+}
+
 function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
   return {
     id: 'purchase-1',
@@ -687,6 +695,37 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const result = await actions.restorePurchases();
 
     expect(result).toBe('failed');
+    expect(showError).toHaveBeenCalledWith(
+      'This App Store subscription is linked to another Kilo account.'
+    );
+  });
+
+  it('shows explicit restore errors when silent recovery already started completion', async () => {
+    const purchase = createPurchase();
+    const backendCompletion = createDeferredRejectablePromise();
+    const showError = vi.fn();
+    const actions = createActions({
+      completeAppStorePurchase: vi.fn().mockReturnValue(backendCompletion.promise),
+      getAvailablePurchases: vi.fn().mockResolvedValue([purchase]),
+      restorePurchases: vi.fn().mockResolvedValue(undefined),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    const silentRecovery = actions.handlePurchaseSuccess(purchase, {
+      notifyCompletion: false,
+      notifyErrors: false,
+    });
+    const explicitRestore = actions.restorePurchases();
+    await flushPromises();
+    backendCompletion.reject(
+      new Error('App Store purchase account token does not match the signed-in user.')
+    );
+
+    const [, restoreResult] = await Promise.all([silentRecovery, explicitRestore]);
+
+    expect(restoreResult).toBe('failed');
     expect(showError).toHaveBeenCalledWith(
       'This App Store subscription is linked to another Kilo account.'
     );

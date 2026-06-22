@@ -87,7 +87,11 @@ type StoreKiloPassPurchaseContextValue = {
 };
 
 const StoreKiloPassPurchaseContext = createContext<StoreKiloPassPurchaseContextValue | null>(null);
-const sharedPurchaseCompletions = new Map<string, Promise<boolean>>();
+type PurchaseCompletionResult =
+  | { completed: true; errorMessage?: never }
+  | { completed: false; errorMessage: string | null };
+
+const sharedPurchaseCompletions = new Map<string, Promise<PurchaseCompletionResult>>();
 let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
 
 export function resetPurchaseErrorToastDedup() {
@@ -181,7 +185,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
   async function completePurchase(
     purchase: Purchase,
     options: PurchaseCompletionOptions = {}
-  ): Promise<boolean> {
+  ): Promise<PurchaseCompletionResult> {
     try {
       const signedTransactionJws = getPurchaseToken(purchase);
       await deps.completeAppStorePurchase({ signedTransactionJws });
@@ -189,13 +193,19 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
         await deps.invalidateAfterCompletion();
       }
       await deps.finishTransaction({ purchase, isConsumable: false });
-      return true;
+      return { completed: true };
     } catch (error) {
       const message = getKiloPassPurchaseErrorMessage(error, 'Failed to complete purchase.');
-      if (message && (options.notifyErrors ?? true)) {
-        deps.showError(message);
-      }
-      return false;
+      return { completed: false, errorMessage: message };
+    }
+  }
+
+  function reportPurchaseCompletionErrorIfNeeded(
+    result: PurchaseCompletionResult,
+    options: PurchaseCompletionOptions
+  ) {
+    if (!result.completed && result.errorMessage && (options.notifyErrors ?? true)) {
+      deps.showError(result.errorMessage);
     }
   }
 
@@ -206,14 +216,20 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     const purchaseId = getPurchaseCompletionId(purchase);
     const existingCompletion = sharedPurchaseCompletions.get(purchaseId);
     if (existingCompletion) {
-      return existingCompletion;
+      const result = await existingCompletion;
+      reportPurchaseCompletionErrorIfNeeded(result, options);
+      return result.completed;
     }
 
     const completion = completePurchase(purchase, options);
     sharedPurchaseCompletions.set(purchaseId, completion);
-    const completed = await completion;
-    sharedPurchaseCompletions.delete(purchaseId);
-    return completed;
+    try {
+      const result = await completion;
+      reportPurchaseCompletionErrorIfNeeded(result, options);
+      return result.completed;
+    } finally {
+      sharedPurchaseCompletions.delete(purchaseId);
+    }
   }
 
   async function handlePurchaseSuccess(purchase: Purchase, options: PurchaseSuccessOptions = {}) {

@@ -3,7 +3,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 // See https://wxt.dev/api/config.html
 export default defineConfig({
-  manifest: {
+  manifest: ({ browser }) => ({
     action: {
       default_title: 'Kilo',
     },
@@ -18,8 +18,8 @@ export default defineConfig({
     description: 'Kilo browser extension.',
     host_permissions: ['https://app.kilo.ai/*', 'http://127.0.0.1/*', 'http://localhost/*'],
     name: 'Kilo Extension',
-    permissions: ['debugger', 'storage'],
-  },
+    permissions: browser === 'firefox' ? ['storage'] : ['debugger', 'storage'],
+  }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({
     plugins: [tailwindcss()],

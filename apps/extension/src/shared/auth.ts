@@ -1,5 +1,6 @@
 export const AUTH_STORAGE_KEY = 'local:kiloAuth';
 export const DEFAULT_KILO_API_BASE_URL = 'https://app.kilo.ai';
+export const DEFAULT_LOCAL_KILO_API_BASE_URL = 'http://localhost:3000';
 
 export interface StoredAuth {
   readonly token: string;
@@ -67,6 +68,10 @@ export const getKiloApiBaseUrl = (): string => {
 
   if (typeof configuredUrl === 'string' && configuredUrl.trim().length > 0) {
     return trimTrailingSlash(configuredUrl.trim());
+  }
+
+  if (import.meta.env.COMMAND === 'serve') {
+    return DEFAULT_LOCAL_KILO_API_BASE_URL;
   }
 
   return DEFAULT_KILO_API_BASE_URL;

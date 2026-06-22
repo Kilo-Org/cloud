@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AUTH_STORAGE_KEY,
+  DEFAULT_KILO_API_BASE_URL,
+  DEFAULT_LOCAL_KILO_API_BASE_URL,
   clearStoredAuth,
   createDeviceAuthRequest,
+  getKiloApiBaseUrl,
   loadStoredAuth,
   normalizeStoredAuth,
   pollDeviceAuthCode,
@@ -37,6 +40,40 @@ const createStorage = (initialValue?: unknown): AuthStorageArea & { value: unkno
     },
   };
 };
+
+const withStubbedEnv = (env: Record<string, string>, assertion: () => void): void => {
+  vi.unstubAllEnvs();
+
+  for (const [key, value] of Object.entries(env)) {
+    vi.stubEnv(key, value);
+  }
+
+  try {
+    assertion();
+  } finally {
+    vi.unstubAllEnvs();
+  }
+};
+
+describe('extension auth configuration', () => {
+  it('defaults local extension development to the local web backend', () => {
+    withStubbedEnv({ COMMAND: 'serve' }, () => {
+      expect(getKiloApiBaseUrl()).toBe(DEFAULT_LOCAL_KILO_API_BASE_URL);
+    });
+  });
+
+  it('defaults production builds to the hosted backend', () => {
+    withStubbedEnv({ COMMAND: 'build' }, () => {
+      expect(getKiloApiBaseUrl()).toBe(DEFAULT_KILO_API_BASE_URL);
+    });
+  });
+
+  it('lets an explicit backend URL override the build-mode default', () => {
+    withStubbedEnv({ COMMAND: 'serve', VITE_KILO_API_BASE_URL: ' http://localhost:3001/ ' }, () => {
+      expect(getKiloApiBaseUrl()).toBe('http://localhost:3001');
+    });
+  });
+});
 
 describe('extension auth storage', () => {
   it('normalizes valid stored auth and rejects malformed values', () => {

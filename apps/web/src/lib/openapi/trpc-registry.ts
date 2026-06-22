@@ -45,7 +45,7 @@ export const publicTrpcOpenApiProcedures = [
     tags: ['Usage Analytics'],
     summary: 'Get aggregate usage metrics',
     description:
-      'Returns aggregate usage metrics for the authenticated user or an accessible organization.',
+      'Returns aggregate KPI metrics for the authenticated user or an accessible organization. Use this for summary cards and high-level totals.',
     input: UsageAnalyticsFiltersSchema,
     output: SummaryOutputSchema,
     security: 'apiKey',
@@ -56,7 +56,7 @@ export const publicTrpcOpenApiProcedures = [
     tags: ['Usage Analytics'],
     summary: 'Get usage over time',
     description:
-      'Returns usage analytics grouped into time buckets for the authenticated user or organization.',
+      'Returns usage analytics grouped into time buckets. Use this for trend charts and optional split-by series views.',
     input: TimeseriesInputSchema,
     output: TimeseriesOutputSchema,
     security: 'apiKey',
@@ -66,7 +66,8 @@ export const publicTrpcOpenApiProcedures = [
     method: 'post',
     tags: ['Usage Analytics'],
     summary: 'Get usage breakdown',
-    description: 'Returns top usage values grouped by a selected dimension.',
+    description:
+      'Returns top usage values grouped by a single selected dimension. Use this for dedicated breakdown charts such as features, models, projects, or users.',
     input: BreakdownInputSchema,
     output: BreakdownOutputSchema,
     security: 'apiKey',
@@ -76,7 +77,8 @@ export const publicTrpcOpenApiProcedures = [
     method: 'post',
     tags: ['Usage Analytics'],
     summary: 'Get tabular usage analytics',
-    description: 'Returns usage analytics rows grouped by up to three dimensions.',
+    description:
+      'Returns aggregated tabular usage rows grouped by time bucket and optional dimensions. Use this for the detailed breakdown table and CSV export view.',
     input: TableInputSchema,
     output: TableOutputSchema,
     security: 'apiKey',

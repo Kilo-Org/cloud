@@ -2,18 +2,56 @@ import type { JSX, ReactNode } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
 import { KiloLogo } from '@/src/shared/kilo-logo';
 
-const Header = (): JSX.Element => (
+const HeaderAccountControls = ({
+  auth,
+  onSignOut,
+}: {
+  auth: StoredAuth;
+  onSignOut: () => void;
+}): JSX.Element => (
+  <div className="flex min-w-0 items-center justify-end gap-2">
+    {auth.userEmail === undefined ? null : (
+      <p className="min-w-0 truncate text-xs text-zinc-400">{auth.userEmail}</p>
+    )}
+    <button
+      className="h-8 shrink-0 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+      onClick={onSignOut}
+      type="button"
+    >
+      Sign out
+    </button>
+  </div>
+);
+
+const Header = ({
+  auth,
+  onSignOut,
+}: {
+  auth?: StoredAuth | undefined;
+  onSignOut?: (() => void) | undefined;
+}): JSX.Element => (
   <div className="border-b border-zinc-800 px-4 py-3">
-    <div className="flex min-w-0 items-center">
+    <div className="flex min-w-0 items-center justify-between gap-3">
       <KiloLogo className="size-8 shrink-0 text-[#EDFF00]" />
       <span className="sr-only">Kilo</span>
+      {auth === undefined || onSignOut === undefined ? null : (
+        <HeaderAccountControls auth={auth} onSignOut={onSignOut} />
+      )}
     </div>
   </div>
 );
 
-const Shell = ({ children }: { children: ReactNode }): JSX.Element => (
+const Shell = ({
+  auth,
+  children,
+  onSignOut,
+}: {
+  auth?: StoredAuth | undefined;
+  children: ReactNode;
+  onSignOut?: (() => void) | undefined;
+}): JSX.Element => (
   <main className="flex min-h-dvh flex-col bg-zinc-950 text-zinc-50">
-    <Header />
+    <Header auth={auth} onSignOut={onSignOut} />
     {children}
   </main>
 );
@@ -147,26 +185,8 @@ export const SignedInView = ({
   auth: StoredAuth;
   onSignOut: () => void;
 }): JSX.Element => (
-  <Shell>
+  <Shell auth={auth} onSignOut={onSignOut}>
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="border-b border-zinc-800 px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-zinc-100">Current tab</p>
-            {auth.userEmail === undefined ? null : (
-              <p className="mt-0.5 truncate text-xs text-zinc-500">{auth.userEmail}</p>
-            )}
-          </div>
-          <button
-            className="h-8 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
-            onClick={onSignOut}
-            type="button"
-          >
-            Sign out
-          </button>
-        </div>
-      </div>
-
       <div className="flex flex-1 flex-col px-4 py-5">
         <div className="rounded-md border border-dashed border-zinc-800 bg-zinc-900/40 p-4">
           <p className="text-sm font-medium text-zinc-100">No actions yet</p>

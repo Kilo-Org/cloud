@@ -2636,7 +2636,6 @@ export const organizations = pgTable(
       sql`${table.parent_organization_id} IS NULL OR ${table.parent_organization_id} <> ${table.id}`
     ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
-    index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
   ]
 );
 

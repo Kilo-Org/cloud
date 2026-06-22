@@ -1,5 +1,5 @@
 {
-  "id": "117a8670-02e5-4214-8196-e96875216bdd",
+  "id": "041e74b7-c466-4b72-8d62-c757386484a7",
   "prevId": "f9732794-dd86-47a7-9414-d025ec7a50a0",
   "version": "7",
   "dialect": "postgresql",
@@ -22925,21 +22925,6 @@
           "columns": [
             {
               "expression": "sso_domain",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_organizations_parent_organization_id": {
-          "name": "IDX_organizations_parent_organization_id",
-          "columns": [
-            {
-              "expression": "parent_organization_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

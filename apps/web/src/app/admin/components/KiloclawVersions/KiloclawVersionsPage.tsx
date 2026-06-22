@@ -219,7 +219,7 @@ function RolloutStatusPanel({
               </Button>
               <Button
                 size="sm"
-                className="h-7 bg-blue-600 text-xs hover:bg-blue-700"
+                className="h-7 text-xs"
                 onClick={() => {
                   if (
                     window.confirm(
@@ -1179,8 +1179,9 @@ export function VersionsTab() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
+                                  variant="outline"
                                   size="sm"
-                                  className="h-8 w-8 bg-blue-600 p-0 text-white hover:bg-blue-700"
+                                  className="h-8 w-8 p-0"
                                   aria-label="Make :latest"
                                   onClick={() => {
                                     if (

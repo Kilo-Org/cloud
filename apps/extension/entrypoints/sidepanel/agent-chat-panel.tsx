@@ -6,7 +6,14 @@ import {
   groupConversationEvents,
 } from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent, AgentMode } from '@/src/shared/agent-conversation';
-import { getFooterControlDisplay } from '@/src/shared/agent-chat-placeholder';
+import {
+  defaultMode,
+  defaultThinkingEffort,
+  defaultThinkingOption,
+  fallbackDefaultModelId,
+  fallbackModelOptions,
+  getFooterControlDisplay,
+} from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
@@ -17,37 +24,11 @@ import { runDangerousLlmTurn } from './agent-llm-turn-runner';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
 
-const effortOptions = ['low', 'medium', 'high'] as const;
-const defaultThinkingOption = 'default';
-const fallbackDefaultModelId = 'Claude Sonnet 4';
-const defaultMode = 'safe';
-const defaultThinkingEffort = 'medium';
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
 const createDefaultConversationEvents = (): AgentConversationEvent[] => [
   createAssistantMessage('Pick a tab, switch to dangerous mode, and ask Kilo to inspect it.'),
-];
-
-const fallbackModelOptions: KiloGatewayModelOption[] = [
-  {
-    id: fallbackDefaultModelId,
-    isPreferred: true,
-    name: 'Claude Sonnet 4',
-    variants: [...effortOptions],
-  },
-  {
-    id: 'Claude Opus 4',
-    isPreferred: true,
-    name: 'Claude Opus 4',
-    variants: [...effortOptions],
-  },
-  {
-    id: 'GPT-5',
-    isPreferred: true,
-    name: 'GPT-5',
-    variants: [...effortOptions],
-  },
 ];
 
 export const AgentChatPanel = ({
@@ -95,6 +76,9 @@ export const AgentChatPanel = ({
 
   useEffect(() => {
     void loadInspectableTabs();
+    return () => {
+      runAbortRef.current?.abort();
+    };
   }, [loadInspectableTabs]);
 
   useEffect(() => {

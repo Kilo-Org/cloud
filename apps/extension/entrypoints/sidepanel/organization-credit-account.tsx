@@ -1,10 +1,11 @@
 import { storage } from '#imports';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { FetchLike } from '@/src/shared/auth';
 import { fetchKiloOrganizations } from '@/src/shared/kilo-api-client';
 import type { KiloOrganizationOption } from '@/src/shared/kilo-api-client';
+import { getSelectableOrganizationId } from '@/src/shared/organization-selection';
 
 const selectedOrganizationStorageKey = 'local:kiloSelectedOrganizationId';
 const apiBaseUrl = getKiloApiBaseUrl();
@@ -19,6 +20,7 @@ export const useOrganizationCreditAccount = (
 } => {
   const [organizationOptions, setOrganizationOptions] = useState<KiloOrganizationOption[]>([]);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState('');
+  const selectedOrganizationIdRef = useRef('');
 
   useEffect(() => {
     const abort = new AbortController();
@@ -39,11 +41,18 @@ export const useOrganizationCreditAccount = (
 
         setOrganizationOptions(organizations);
 
-        if (
-          typeof storedOrganizationId === 'string' &&
-          organizations.some(organization => organization.id === storedOrganizationId)
-        ) {
-          setSelectedOrganizationId(storedOrganizationId);
+        const nextOrganizationId = getSelectableOrganizationId({
+          organizations,
+          selectedOrganizationId: selectedOrganizationIdRef.current,
+          storedOrganizationId:
+            typeof storedOrganizationId === 'string' ? storedOrganizationId : null,
+        });
+
+        selectedOrganizationIdRef.current = nextOrganizationId;
+        setSelectedOrganizationId(nextOrganizationId);
+
+        if (nextOrganizationId === '') {
+          await storage.removeItem(selectedOrganizationStorageKey);
         }
       } catch (error) {
         if (!(error instanceof Error) || error.name !== 'AbortError') {
@@ -58,6 +67,7 @@ export const useOrganizationCreditAccount = (
   }, [token]);
 
   const selectOrganization = (organizationId: string): void => {
+    selectedOrganizationIdRef.current = organizationId;
     setSelectedOrganizationId(organizationId);
 
     if (organizationId === '') {

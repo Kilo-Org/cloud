@@ -42,8 +42,10 @@ export const mockKiloApi = async (
   context: BrowserContext,
   options: {
     beforeFirstCompletion?: () => Promise<void>;
-    beforeModels?: () => Promise<void>;
+    beforeModels?: (organizationId: string) => Promise<void>;
     firstCompletionEvents?: unknown[];
+    modelFailuresBeforeSuccessByOrganizationId?: Record<string, number>;
+    modelNameByOrganizationId?: Record<string, string>;
     modelFailuresBeforeSuccess?: number;
     organizations?: { id: string; name: string }[];
     secondCompletionEvents?: unknown[];
@@ -53,6 +55,7 @@ export const mockKiloApi = async (
 ): Promise<void> => {
   let chatCompletionCalls = 0;
   let modelCalls = 0;
+  const modelCallsByOrganizationId = new Map<string, number>();
 
   await context.route('https://app.kilo.ai/api/user', route =>
     route.fulfill({
@@ -70,12 +73,19 @@ export const mockKiloApi = async (
   );
   await context.route('https://app.kilo.ai/api/gateway/models', async route => {
     modelCalls += 1;
+    const organizationId = route.request().headers()['x-kilocode-organizationid'] ?? '';
+    const organizationModelCalls = (modelCallsByOrganizationId.get(organizationId) ?? 0) + 1;
+    modelCallsByOrganizationId.set(organizationId, organizationModelCalls);
 
     if (options.beforeModels !== undefined) {
-      await options.beforeModels();
+      await options.beforeModels(organizationId);
     }
 
-    if (modelCalls <= (options.modelFailuresBeforeSuccess ?? 0)) {
+    if (
+      modelCalls <= (options.modelFailuresBeforeSuccess ?? 0) ||
+      organizationModelCalls <=
+        (options.modelFailuresBeforeSuccessByOrganizationId?.[organizationId] ?? 0)
+    ) {
       await route.fulfill({ status: 500 });
       return;
     }
@@ -85,7 +95,8 @@ export const mockKiloApi = async (
         data: [
           {
             id: 'anthropic/claude-sonnet-4',
-            name: 'Anthropic: Claude Sonnet 4',
+            name:
+              options.modelNameByOrganizationId?.[organizationId] ?? 'Anthropic: Claude Sonnet 4',
             opencode: { variants: { high: {}, low: {}, medium: {} } },
             preferredIndex: 0,
           },

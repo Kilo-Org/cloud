@@ -1,8 +1,41 @@
 /* eslint-disable import/no-nodejs-modules */
 import { expect, test } from '@playwright/test';
+import type { Response } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { launchExtensionContext, seedExtensionAuth } from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
+
+const orgOneId = 'org-1';
+const orgTwoId = 'org-2';
+
+const isOrgOneModelsResponse = (response: Response): boolean =>
+  response.url().endsWith('/api/gateway/models') &&
+  response.request().headers()['x-kilocode-organizationid'] === orgOneId;
+
+const delaySecondOrgOneModelRequest = ({
+  pendingOrgOneModels,
+  markOrgOneModelsRequested,
+}: {
+  markOrgOneModelsRequested: () => void;
+  pendingOrgOneModels: Promise<void>;
+}): ((organizationId: string) => Promise<void>) => {
+  let orgOneModelCalls = 0;
+
+  return organizationId => {
+    if (organizationId !== orgOneId) {
+      return Promise.resolve();
+    }
+
+    orgOneModelCalls += 1;
+
+    if (orgOneModelCalls === 2) {
+      markOrgOneModelsRequested();
+      return pendingOrgOneModels;
+    }
+
+    return Promise.resolve();
+  };
+};
 
 test('model and thinking controls wait for the model catalog', async () => {
   const { promise: pendingModels, resolve: releaseModels } = Promise.withResolvers<void>();
@@ -57,6 +90,55 @@ test('model catalog failures can be retried', async () => {
     await expect(sidePanel.getByLabel('Model')).toBeEnabled();
     await expect(sidePanel.getByLabel('Model')).toContainText('Claude Sonnet 4');
   } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('stale organization model loads cannot overwrite the current catalog', async () => {
+  const { promise: pendingOrgOneModels, resolve: releaseOrgOneModels } =
+    Promise.withResolvers<void>();
+  const { promise: orgOneModelsRequested, resolve: markOrgOneModelsRequested } =
+    Promise.withResolvers<void>();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      beforeModels: delaySecondOrgOneModelRequest({
+        markOrgOneModelsRequested,
+        pendingOrgOneModels,
+      }),
+      modelFailuresBeforeSuccessByOrganizationId: { [orgOneId]: 1 },
+      modelNameByOrganizationId: {
+        [orgOneId]: 'Provider: Org One Model',
+        [orgTwoId]: 'Provider: Org Two Model',
+      },
+      organizations: [
+        { id: orgOneId, name: 'Acme' },
+        { id: orgTwoId, name: 'Beta' },
+      ],
+    });
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await sidePanel.getByLabel('Settings').click();
+    await sidePanel.getByLabel('Credit account').selectOption(orgOneId);
+    await expect(sidePanel.getByText('Could not load models.')).toBeVisible();
+    await sidePanel.getByRole('button', { name: 'Retry models' }).click();
+    await orgOneModelsRequested;
+    await sidePanel.getByLabel('Credit account').selectOption(orgTwoId);
+    await expect(sidePanel.getByLabel('Model')).toContainText('Org Two Model');
+
+    const orgOneResponse = sidePanel.waitForResponse(isOrgOneModelsResponse);
+    releaseOrgOneModels();
+    await orgOneResponse;
+
+    await expect(sidePanel.getByLabel('Model')).toContainText('Org Two Model');
+  } finally {
+    releaseOrgOneModels();
     await context.close();
     await rm(userDataDir, { force: true, recursive: true });
   }

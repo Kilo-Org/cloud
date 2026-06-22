@@ -40,6 +40,7 @@ export const AgentChatPanel = ({
   const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>([]);
   const [thinkingEffort, setThinkingEffort] = useState('');
   const runAbortRef = useRef<AbortController | null>(null);
+  const modelLoadRequestRef = useRef(0);
   const {
     inspectableTabs,
     isLoadingTabs,
@@ -74,6 +75,10 @@ export const AgentChatPanel = ({
 
   const loadModels = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      const requestId = (modelLoadRequestRef.current += 1);
+      const isCurrentRequest = (): boolean =>
+        modelLoadRequestRef.current === requestId && signal?.aborted !== true;
+
       setModelLoadError(undefined);
 
       try {
@@ -85,11 +90,15 @@ export const AgentChatPanel = ({
           token: auth.token,
         });
 
-        if (signal?.aborted !== true) {
+        if (isCurrentRequest()) {
           setModelOptions(models);
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
+          return;
+        }
+
+        if (!isCurrentRequest()) {
           return;
         }
 
@@ -164,11 +173,6 @@ export const AgentChatPanel = ({
       appendEvents([
         createAssistantMessage('Switch to dangerous mode before I can run eval in a tab.'),
       ]);
-      return;
-    }
-
-    if (model === '') {
-      appendEvents([createAssistantMessage('Models are still loading.')]);
       return;
     }
 

@@ -13,7 +13,7 @@ interface FetchKiloGatewayChatCompletionStreamOptions {
   readonly model: string;
   readonly onContentDelta: (delta: string) => void;
   readonly organizationId?: string | undefined;
-  readonly signal?: AbortSignal;
+  readonly signal?: AbortSignal | undefined;
   readonly token: string;
   readonly tools: KiloGatewayToolDefinition[];
 }

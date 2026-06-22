@@ -36,6 +36,7 @@ const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.
 export const mockKiloApi = async (
   context: BrowserContext,
   options: {
+    beforeFirstCompletion?: () => Promise<void>;
     organizations?: { id: string; name: string }[];
     seenChatOrganizationIds?: string[];
   } = {}
@@ -71,7 +72,7 @@ export const mockKiloApi = async (
       status: 200,
     })
   );
-  await context.route('https://app.kilo.ai/api/gateway/v1/chat/completions', route => {
+  await context.route('https://app.kilo.ai/api/gateway/v1/chat/completions', async route => {
     chatCompletionCalls += 1;
     options.seenChatOrganizationIds?.push(
       route.request().headers()['x-kilocode-organizationid'] ?? ''
@@ -94,6 +95,10 @@ export const mockKiloApi = async (
     });
 
     if (chatCompletionCalls === 1) {
+      if (options.beforeFirstCompletion !== undefined) {
+        await options.beforeFirstCompletion();
+      }
+
       return route.fulfill({
         body: chatCompletionStreamResponse([
           { choices: [{ delta: { content: 'I will ' } }] },

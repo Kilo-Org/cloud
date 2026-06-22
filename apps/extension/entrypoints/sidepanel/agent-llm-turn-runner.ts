@@ -17,6 +17,7 @@ interface RunDangerousLlmTurnOptions {
   readonly model: string;
   readonly organizationId?: string | undefined;
   readonly selectedTabId: number;
+  readonly signal?: AbortSignal | undefined;
   readonly token: string;
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
 }
@@ -34,6 +35,11 @@ const createAssistantMessageEvent = (
   return event;
 };
 
+const isAbortError = (error: unknown): boolean =>
+  error instanceof Error && error.name === 'AbortError';
+
+const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
+
 export const runDangerousLlmTurn = async ({
   apiBaseUrl,
   appendEvents,
@@ -42,6 +48,7 @@ export const runDangerousLlmTurn = async ({
   model,
   organizationId,
   selectedTabId,
+  signal,
   token,
   updateAssistantMessage,
 }: RunDangerousLlmTurnOptions): Promise<void> => {
@@ -56,6 +63,7 @@ export const runDangerousLlmTurn = async ({
       model,
       onContentDelta,
       organizationId,
+      signal,
       token,
       tools: [evalToolDefinition],
     });
@@ -119,10 +127,20 @@ export const runDangerousLlmTurn = async ({
       return;
     }
 
+    if (isSignalAborted(signal)) {
+      appendEvents([createAssistantMessage('Stopped.')]);
+      return;
+    }
+
     const toolResultEvents: AgentConversationEvent[] = await runEvalToolCalls(
       toolCallEvents,
       executeEvalToolCall
     );
+
+    if (isSignalAborted(signal)) {
+      appendEvents([createAssistantMessage('Stopped.')]);
+      return;
+    }
 
     const conversationWithToolResult = [
       ...conversationEvents,
@@ -157,6 +175,11 @@ export const runDangerousLlmTurn = async ({
       ]);
     }
   } catch (error) {
+    if (isAbortError(error)) {
+      appendEvents([createAssistantMessage('Stopped.')]);
+      return;
+    }
+
     appendEvents([
       createAssistantMessage(
         `LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`

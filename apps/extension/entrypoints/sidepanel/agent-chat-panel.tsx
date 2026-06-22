@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
 import {
   createAssistantMessage,
@@ -62,6 +62,7 @@ export const AgentChatPanel = ({
   const [model, setModel] = useState(fallbackDefaultModelId);
   const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>(fallbackModelOptions);
   const [thinkingEffort, setThinkingEffort] = useState(defaultThinkingEffort);
+  const runAbortRef = useRef<AbortController | null>(null);
   const { inspectableTabs, isLoadingTabs, loadInspectableTabs, selectTab, selectedTabId } =
     useTabDebugger();
   const selectedModel = useMemo(
@@ -170,6 +171,8 @@ export const AgentChatPanel = ({
       return;
     }
 
+    const abort = new AbortController();
+    runAbortRef.current = abort;
     setIsRunning(true);
 
     void (async (): Promise<void> => {
@@ -182,10 +185,15 @@ export const AgentChatPanel = ({
           model,
           organizationId,
           selectedTabId,
+          signal: abort.signal,
           token: auth.token,
           updateAssistantMessage,
         });
       } finally {
+        if (runAbortRef.current === abort) {
+          runAbortRef.current = null;
+        }
+
         setIsRunning(false);
       }
     })();
@@ -200,6 +208,10 @@ export const AgentChatPanel = ({
 
     setDraft('');
     submitMessage(text);
+  };
+
+  const stopRun = (): void => {
+    runAbortRef.current?.abort();
   };
 
   return (
@@ -231,13 +243,24 @@ export const AgentChatPanel = ({
           placeholder="Ask Kilo to inspect this tab..."
           value={draft}
         />
-        <button
-          className="mt-2 h-9 w-full rounded-md bg-[#EDFF00] px-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-          disabled={draft.trim() === '' || isRunning}
-          type="submit"
-        >
-          {isRunning ? 'Running...' : 'Send message'}
-        </button>
+        <div className="mt-2 grid gap-2">
+          <button
+            className="h-9 w-full rounded-md bg-[#EDFF00] px-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
+            disabled={draft.trim() === '' || isRunning}
+            type="submit"
+          >
+            {isRunning ? 'Running...' : 'Send message'}
+          </button>
+          {isRunning ? (
+            <button
+              className="h-9 w-full rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+              onClick={stopRun}
+              type="button"
+            >
+              Stop
+            </button>
+          ) : null}
+        </div>
       </form>
 
       <footer className="border-t border-zinc-900 bg-zinc-950 px-4 py-2">

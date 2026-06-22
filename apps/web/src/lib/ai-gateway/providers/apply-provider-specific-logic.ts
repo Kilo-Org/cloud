@@ -110,7 +110,7 @@ export function applyGatewayModelsFallback(
   delete requestToMutate.body.models;
 }
 
-export function applyProviderSpecificLogic(
+export async function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
   requestToMutate: GatewayRequest,
@@ -189,7 +189,7 @@ export function applyProviderSpecificLogic(
     requestToMutate.body.thinking = { type: 'disabled' };
   }
 
-  provider.transformRequest({
+  await provider.transformRequest({
     provider,
     model: requestedModel,
     request: requestToMutate,

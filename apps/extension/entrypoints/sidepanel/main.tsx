@@ -6,7 +6,7 @@ import { App } from './app';
 const root = document.querySelector('#root');
 
 if (!(root instanceof HTMLElement)) {
-  throw new Error('Popup root element was not found.');
+  throw new Error('Side panel root element was not found.');
 }
 
 createRoot(root).render(

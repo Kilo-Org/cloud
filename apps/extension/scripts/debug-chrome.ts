@@ -17,7 +17,7 @@ const startFixtureServer = async (): Promise<{ close: () => Promise<void>; url: 
         <body>
           <main>
             <h1>Kilo extension debug fixture</h1>
-            <p>This page exists so content scripts run in a normal HTTP tab.</p>
+            <p>This page exists so the extension can be tested next to a normal HTTP tab.</p>
           </main>
         </body>
       </html>
@@ -70,12 +70,13 @@ const extensionId = new URL(serviceWorker.url()).host;
 const fixturePage = await context.newPage();
 await fixturePage.goto(fixture.url);
 
-const popupPage = await context.newPage();
-await popupPage.goto(`chrome-extension://${extensionId}/popup.html`);
+const sidePanelPage = await context.newPage();
+await sidePanelPage.goto(`chrome-extension://${extensionId}/sidepanel.html`);
 
 console.log(`Extension ID: ${extensionId}`);
 console.log(`Fixture page: ${fixture.url}`);
-console.log(`Popup page: chrome-extension://${extensionId}/popup.html`);
+console.log(`Side panel page: chrome-extension://${extensionId}/sidepanel.html`);
+console.log("Click the extension toolbar icon to open Chrome's native side panel.");
 console.log('Press Ctrl+C to close the debug browser.');
 
 const cleanup = async (): Promise<void> => {

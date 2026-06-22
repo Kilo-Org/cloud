@@ -408,9 +408,11 @@ export async function handleSubscriptionEvent(
 
 async function getOwnerEmailsForOrg(organizationId: string): Promise<string[]> {
   const members = await getOrganizationMembers(organizationId);
-  // Only active (non-invitation) owners — exclude pending invited owners
-  const activeOwners = members.filter(m => m.role === 'owner' && m.status === 'active');
-  return activeOwners.map(o => o.email);
+  // Only active (non-invitation) owners and billing managers — exclude pending invited members
+  const activeRecipients = members.filter(
+    m => (m.role === 'owner' || m.role === 'billing_manager') && m.status === 'active'
+  );
+  return activeRecipients.map(o => o.email);
 }
 
 function handleSubscriptionUpdatedNonEssential(meta: SubscriptionMetadata, seats: number) {

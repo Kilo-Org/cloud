@@ -22,7 +22,6 @@ type MenuItem = {
   suffixIcon?: React.ElementType;
   subtitle?: string;
   badge?: string;
-  badgeVariant?: 'brand' | 'alert';
   className?: string;
 };
 
@@ -109,14 +108,7 @@ export default function SidebarMenuList({
                   </SidebarMenuButton>
                 )}
                 {item.badge && (
-                  <SidebarMenuBadge
-                    className={cn(
-                      'right-4 !top-1/2 h-4 min-w-0 !-translate-y-1/2 rounded-full px-1.5 text-[10px] font-bold tracking-wide uppercase',
-                      item.badgeVariant === 'alert'
-                        ? 'bg-destructive/15 text-destructive ring-1 ring-destructive/30'
-                        : 'bg-brand-primary text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-[active=true]/menu-button:text-primary-foreground ring-1 ring-brand-primary/30'
-                    )}
-                  >
+                  <SidebarMenuBadge className="bg-brand-primary text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-[active=true]/menu-button:text-primary-foreground right-4 !top-1/2 h-4 min-w-0 !-translate-y-1/2 rounded-full px-1.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-brand-primary/30">
                     {item.badge}
                   </SidebarMenuBadge>
                 )}

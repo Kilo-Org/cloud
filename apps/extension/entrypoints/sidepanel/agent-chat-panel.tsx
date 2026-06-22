@@ -18,34 +18,42 @@ const isThinkingEffort = (value: string): value is AgentPanelFooterState['thinki
   value === 'low' || value === 'medium' || value === 'high';
 
 const ModeIcon = ({
+  className,
   icon,
+  tone,
 }: {
+  className: string;
   icon: ReturnType<typeof getFooterControlDisplay>['modeIcon'];
-}): JSX.Element => (
-  <svg
-    aria-hidden="true"
-    className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-zinc-400"
-    fill="none"
-    viewBox="0 0 16 16"
-  >
-    {icon === 'shield' ? (
-      <path
-        d="M8 1.75 13 3.5v3.65c0 3.1-1.9 5.55-5 7.1-3.1-1.55-5-4-5-7.1V3.5l5-1.75Z"
-        stroke="currentColor"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    ) : (
-      <path
-        d="M8 2.25 14.25 13H1.75L8 2.25Zm0 3.5v3.5m0 2.25h.01"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.5"
-      />
-    )}
-  </svg>
-);
+  tone: ReturnType<typeof getFooterControlDisplay>['modeIconTone'];
+}): JSX.Element => {
+  const toneClassName = tone === 'safe' ? 'text-[#EDFF00]' : 'text-red-400';
+
+  return (
+    <svg
+      aria-hidden="true"
+      className={`${className} ${toneClassName}`}
+      fill="none"
+      viewBox="0 0 16 16"
+    >
+      {icon === 'shield' ? (
+        <path
+          d="M8 1.75 13 3.5v3.65c0 3.1-1.9 5.55-5 7.1-3.1-1.55-5-4-5-7.1V3.5l5-1.75Z"
+          stroke="currentColor"
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+        />
+      ) : (
+        <path
+          d="M8 2.25 14.25 13H1.75L8 2.25Zm0 3.5v3.5m0 2.25h.01"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+        />
+      )}
+    </svg>
+  );
+};
 
 const CompactSelectControl = ({
   ariaLabel,
@@ -78,35 +86,61 @@ const ModeControl = ({
 }: {
   mode: 'dangerous' | 'safe';
   onChange: (mode: 'dangerous' | 'safe') => void;
-}): JSX.Element => (
-  <div className="relative shrink-0">
-    <ModeIcon
-      icon={getFooterControlDisplay({ mode, model: '', thinkingEffort: 'medium' }).modeIcon}
-    />
-    <CompactSelectControl
-      ariaLabel="Mode"
-      className="w-28 py-0 pl-8 pr-2"
-      onChange={value => {
-        if (value === 'safe' || value === 'dangerous') {
-          onChange(value);
-        }
-      }}
-      value={mode}
-    >
-      {modeOptions.map(option => (
-        <option key={option.value} value={option.value}>
-          {
-            getFooterControlDisplay({
+}): JSX.Element => {
+  const display = getFooterControlDisplay({ mode, model: '', thinkingEffort: 'medium' });
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative shrink-0">
+      <button
+        aria-expanded={isOpen}
+        aria-label={`Mode: ${display.modeLabel}`}
+        className="flex h-8 w-10 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
+        onClick={() => {
+          setIsOpen(current => !current);
+        }}
+        type="button"
+      >
+        <ModeIcon className="size-3.5" icon={display.modeIcon} tone={display.modeIconTone} />
+      </button>
+
+      {isOpen ? (
+        <div className="absolute bottom-10 left-0 z-10 grid w-32 gap-1 rounded-md border border-zinc-800 bg-zinc-950 p-1">
+          {modeOptions.map(option => {
+            const optionDisplay = getFooterControlDisplay({
               mode: option.value,
               model: '',
               thinkingEffort: 'medium',
-            }).modeLabel
-          }
-        </option>
-      ))}
-    </CompactSelectControl>
-  </div>
-);
+            });
+
+            return (
+              <button
+                className={
+                  option.value === mode
+                    ? 'flex h-8 items-center gap-2 rounded-sm bg-zinc-900 px-2 text-xs font-medium text-zinc-100'
+                    : 'flex h-8 items-center gap-2 rounded-sm px-2 text-xs font-medium text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-1 focus:ring-offset-zinc-950'
+                }
+                key={option.value}
+                onClick={() => {
+                  onChange(option.value);
+                  setIsOpen(false);
+                }}
+                type="button"
+              >
+                <ModeIcon
+                  className="size-3.5"
+                  icon={optionDisplay.modeIcon}
+                  tone={optionDisplay.modeIconTone}
+                />
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 const Message = ({ message }: { message: AgentChatMessage }): JSX.Element => {
   const isUser = message.role === 'user';
@@ -179,7 +213,7 @@ export const AgentChatPanel = (): JSX.Element => {
           <ModeControl mode={mode} onChange={setMode} />
           <CompactSelectControl
             ariaLabel="Model"
-            className="flex-1 px-2"
+            className="flex-1 pl-2 pr-6"
             onChange={setModel}
             value={model}
           >
@@ -197,7 +231,7 @@ export const AgentChatPanel = (): JSX.Element => {
           </CompactSelectControl>
           <CompactSelectControl
             ariaLabel="Thinking effort"
-            className="w-16 px-2"
+            className="w-20 pl-2 pr-6"
             onChange={value => {
               if (isThinkingEffort(value)) {
                 setThinkingEffort(value);

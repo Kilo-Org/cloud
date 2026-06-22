@@ -17,6 +17,7 @@ export interface AgentPanelState {
 
 export interface AgentFooterControlDisplay {
   readonly modeIcon: 'alert' | 'shield';
+  readonly modeIconTone: 'danger' | 'safe';
   readonly modeLabel: 'Danger' | 'Safe';
   readonly modelLabel: string;
   readonly thinkingLabel: 'High' | 'Low' | 'Med';
@@ -46,6 +47,7 @@ export const getFooterControlDisplay = (
   footer: AgentPanelFooterState
 ): AgentFooterControlDisplay => ({
   modeIcon: footer.mode === 'safe' ? 'shield' : 'alert',
+  modeIconTone: footer.mode === 'safe' ? 'safe' : 'danger',
   modeLabel: footer.mode === 'safe' ? 'Safe' : 'Danger',
   modelLabel: modelLabels[footer.model] ?? footer.model,
   thinkingLabel: getThinkingLabel(footer.thinkingEffort),

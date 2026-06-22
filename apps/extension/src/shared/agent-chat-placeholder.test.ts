@@ -36,6 +36,7 @@ describe('agent chat placeholder state', () => {
       })
     ).toStrictEqual({
       modeIcon: 'shield',
+      modeIconTone: 'safe',
       modeLabel: 'Safe',
       modelLabel: 'Sonnet 4',
       thinkingLabel: 'Med',
@@ -49,6 +50,7 @@ describe('agent chat placeholder state', () => {
       })
     ).toStrictEqual({
       modeIcon: 'alert',
+      modeIconTone: 'danger',
       modeLabel: 'Danger',
       modelLabel: 'Opus 4',
       thinkingLabel: 'High',

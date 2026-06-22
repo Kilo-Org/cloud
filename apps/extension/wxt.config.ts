@@ -17,7 +17,7 @@ export default defineConfig({
     },
     description: 'Kilo browser extension.',
     name: 'Kilo Extension',
-    permissions: ['activeTab'],
+    permissions: ['activeTab', 'scripting'],
   },
   modules: ['@wxt-dev/module-react'],
   vite: () => ({

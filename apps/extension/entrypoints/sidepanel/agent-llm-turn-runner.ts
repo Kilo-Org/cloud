@@ -15,6 +15,7 @@ interface RunDangerousLlmTurnOptions {
   readonly conversationEvents: AgentConversationEvent[];
   readonly fetch: FetchLike;
   readonly model: string;
+  readonly organizationId?: string | undefined;
   readonly selectedTabId: number;
   readonly token: string;
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
@@ -39,6 +40,7 @@ export const runDangerousLlmTurn = async ({
   conversationEvents,
   fetch,
   model,
+  organizationId,
   selectedTabId,
   token,
   updateAssistantMessage,
@@ -53,6 +55,7 @@ export const runDangerousLlmTurn = async ({
       messages: buildGatewayMessagesFromEvents(nextEvents),
       model,
       onContentDelta,
+      organizationId,
       token,
       tools: [evalToolDefinition],
     });

@@ -58,6 +58,7 @@ describe('kilo gateway chat stream client', () => {
         onContentDelta: delta => {
           contentDeltas.push(delta);
         },
+        organizationId: 'org-1',
         token: 'token-1',
         tools: [
           {
@@ -82,6 +83,7 @@ describe('kilo gateway chat stream client', () => {
     });
     expect(contentDeltas).toStrictEqual(['I will ', 'inspect.']);
     expect(seen[0]?.headers.get('accept')).toBe('text/event-stream');
+    expect(seen[0]?.headers.get('x-kilocode-organizationid')).toBe('org-1');
     expect(seen[0]?.body).toMatchObject({ stream: true });
   });
 });

@@ -33,12 +33,26 @@ const chatCompletionStreamResponse = (events: unknown[]): string =>
 const longEvalIdentifier = `kilo${'VeryLongIdentifier'.repeat(16)}`;
 const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.outerHTML.length; return ${longEvalIdentifier};`;
 
-export const mockKiloApi = async (context: BrowserContext): Promise<void> => {
+export const mockKiloApi = async (
+  context: BrowserContext,
+  options: {
+    organizations?: { id: string; name: string }[];
+    seenChatOrganizationIds?: string[];
+  } = {}
+): Promise<void> => {
   let chatCompletionCalls = 0;
 
   await context.route('https://app.kilo.ai/api/user', route =>
     route.fulfill({
       json: { google_user_email: 'user@kilo.ai' },
+      status: 200,
+    })
+  );
+  await context.route('https://app.kilo.ai/api/organizations', route =>
+    route.fulfill({
+      json: {
+        organizations: options.organizations ?? [],
+      },
       status: 200,
     })
   );
@@ -59,6 +73,9 @@ export const mockKiloApi = async (context: BrowserContext): Promise<void> => {
   );
   await context.route('https://app.kilo.ai/api/gateway/v1/chat/completions', route => {
     chatCompletionCalls += 1;
+    options.seenChatOrganizationIds?.push(
+      route.request().headers()['x-kilocode-organizationid'] ?? ''
+    );
 
     const body: unknown = route.request().postDataJSON();
 

@@ -12,6 +12,7 @@ interface FetchKiloGatewayChatCompletionStreamOptions {
   readonly messages: KiloGatewayChatMessage[];
   readonly model: string;
   readonly onContentDelta: (delta: string) => void;
+  readonly organizationId?: string | undefined;
   readonly signal?: AbortSignal;
   readonly token: string;
   readonly tools: KiloGatewayToolDefinition[];
@@ -38,6 +39,7 @@ interface StreamReaderContext {
 }
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
+const organizationHeaderName = 'x-kilocode-organizationid';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -260,6 +262,7 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   messages,
   model,
   onContentDelta,
+  organizationId,
   signal,
   token,
   tools,
@@ -277,6 +280,9 @@ export const fetchKiloGatewayChatCompletionStream = async ({
       Accept: 'text/event-stream',
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      ...(organizationId === undefined || organizationId === ''
+        ? {}
+        : { [organizationHeaderName]: organizationId }),
     },
     method: 'POST',
     ...(signal === undefined ? {} : { signal }),

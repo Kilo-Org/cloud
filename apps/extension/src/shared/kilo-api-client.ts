@@ -21,7 +21,20 @@ export interface KiloGatewayModelOption {
   readonly variants: string[];
 }
 
+export interface KiloOrganizationOption {
+  readonly id: string;
+  readonly name: string;
+}
+
 interface FetchKiloGatewayModelsOptions {
+  readonly apiBaseUrl: string;
+  readonly fetch: FetchLike;
+  readonly organizationId?: string | undefined;
+  readonly signal?: AbortSignal;
+  readonly token: string;
+}
+
+interface FetchKiloOrganizationsOptions {
   readonly apiBaseUrl: string;
   readonly fetch: FetchLike;
   readonly signal?: AbortSignal;
@@ -57,6 +70,16 @@ const formatShortModelName = (name: string): string => {
   const colonIndex = name.indexOf(': ');
   return colonIndex === -1 ? name : name.slice(colonIndex + 2);
 };
+
+const organizationHeaderName = 'x-kilocode-organizationid';
+
+const withOrganizationHeader = (
+  headers: Record<string, string>,
+  organizationId: string | undefined
+): Record<string, string> =>
+  organizationId === undefined || organizationId === ''
+    ? headers
+    : { ...headers, [organizationHeaderName]: organizationId };
 
 const getModelVariants = (model: Record<string, unknown>): string[] => {
   const { opencode } = model;
@@ -162,17 +185,38 @@ export const parseKiloGatewayModelsResponse = (value: unknown): KiloGatewayModel
     .map(model => toGatewayModelOption(model));
 };
 
+export const parseKiloOrganizationsResponse = (value: unknown): KiloOrganizationOption[] => {
+  if (!isRecord(value) || !Array.isArray(value['organizations'])) {
+    throw new TypeError('Organizations response did not include a list.');
+  }
+
+  return value['organizations'].flatMap(organization => {
+    if (!isRecord(organization)) {
+      return [];
+    }
+
+    const id = getOptionalString(organization['id']);
+    const name = getOptionalString(organization['name']);
+
+    return id === undefined || name === undefined ? [] : [{ id, name }];
+  });
+};
+
 export const fetchKiloGatewayModels = async ({
   apiBaseUrl,
   fetch,
+  organizationId,
   signal,
   token,
 }: FetchKiloGatewayModelsOptions): Promise<KiloGatewayModelOption[]> => {
   const response = await fetch(`${trimTrailingSlash(apiBaseUrl)}/api/gateway/models`, {
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
+    headers: withOrganizationHeader(
+      {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      organizationId
+    ),
     ...(signal === undefined ? {} : { signal }),
   });
 
@@ -182,6 +226,28 @@ export const fetchKiloGatewayModels = async ({
 
   const data: unknown = await response.json();
   return parseKiloGatewayModelsResponse(data);
+};
+
+export const fetchKiloOrganizations = async ({
+  apiBaseUrl,
+  fetch,
+  signal,
+  token,
+}: FetchKiloOrganizationsOptions): Promise<KiloOrganizationOption[]> => {
+  const response = await fetch(`${trimTrailingSlash(apiBaseUrl)}/api/organizations`, {
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    ...(signal === undefined ? {} : { signal }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch organizations: ${response.status}`);
+  }
+
+  const data: unknown = await response.json();
+  return parseKiloOrganizationsResponse(data);
 };
 
 export const thinkingEffortLabel = (variant: string): string => {

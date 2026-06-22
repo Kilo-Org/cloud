@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fetchKiloOrganizations,
   fetchKiloGatewayModels,
   parseKiloGatewayModelsResponse,
+  parseKiloOrganizationsResponse,
   thinkingEffortLabel,
 } from './kilo-api-client';
 import type { FetchLike } from './auth';
@@ -10,6 +12,16 @@ const jsonResponse = (body: unknown, init: ResponseInit = {}): Response =>
   Response.json(body, {
     ...init,
   });
+
+const firstRequest = <Request>(requests: Request[]): Request => {
+  const [request] = requests;
+
+  if (request === undefined) {
+    throw new Error('Expected request to be captured.');
+  }
+
+  return request;
+};
 
 describe('kilo API client', () => {
   it('fetches gateway models with bearer auth', async () => {
@@ -32,6 +44,7 @@ describe('kilo API client', () => {
       fetchKiloGatewayModels({
         apiBaseUrl: 'https://app.kilo.ai/',
         fetch,
+        organizationId: 'org-1',
         token: 'token-1',
       })
     ).resolves.toStrictEqual([
@@ -43,7 +56,38 @@ describe('kilo API client', () => {
       },
     ]);
     expect(seen).toHaveLength(1);
-    expect(seen[0]?.input).toBe('https://app.kilo.ai/api/gateway/models');
+    const request = firstRequest(seen);
+    expect(request.input).toBe('https://app.kilo.ai/api/gateway/models');
+    expect(Object.fromEntries(request.headers.entries())).toMatchObject({
+      accept: 'application/json',
+      authorization: 'Bearer token-1',
+      'x-kilocode-organizationid': 'org-1',
+    });
+  });
+
+  it('fetches organizations with bearer auth', async () => {
+    const seen: { headers: Headers; input: string }[] = [];
+    const fetch: FetchLike = (input, init) => {
+      seen.push({ headers: new Headers(init?.headers), input: String(input) });
+      return jsonResponse({
+        organizations: [
+          { id: 'org-1', name: 'Acme' },
+          { id: 'org-2', name: 'Kilo' },
+        ],
+      });
+    };
+
+    await expect(
+      fetchKiloOrganizations({
+        apiBaseUrl: 'https://app.kilo.ai/',
+        fetch,
+        token: 'token-1',
+      })
+    ).resolves.toStrictEqual([
+      { id: 'org-1', name: 'Acme' },
+      { id: 'org-2', name: 'Kilo' },
+    ]);
+    expect(seen[0]?.input).toBe('https://app.kilo.ai/api/organizations');
     expect(seen[0]?.headers.get('accept')).toBe('application/json');
     expect(seen[0]?.headers.get('authorization')).toBe('Bearer token-1');
   });
@@ -109,6 +153,25 @@ describe('kilo API client', () => {
   it('rejects malformed model responses', () => {
     expect(() => parseKiloGatewayModelsResponse({ data: {} })).toThrow(
       'Gateway models response did not include a model list.'
+    );
+  });
+
+  it('parses organizations and drops malformed entries', () => {
+    expect(
+      parseKiloOrganizationsResponse({
+        organizations: [
+          { id: 'org-1', name: 'Acme' },
+          { id: '', name: 'Nope' },
+          { id: 'org-2', name: '' },
+          { id: 'org-3', name: 'Kilo' },
+        ],
+      })
+    ).toStrictEqual([
+      { id: 'org-1', name: 'Acme' },
+      { id: 'org-3', name: 'Kilo' },
+    ]);
+    expect(() => parseKiloOrganizationsResponse({ organizations: {} })).toThrow(
+      'Organizations response did not include a list.'
     );
   });
 

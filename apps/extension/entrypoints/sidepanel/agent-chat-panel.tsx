@@ -46,7 +46,13 @@ const fallbackModelOptions: KiloGatewayModelOption[] = [
   },
 ];
 
-export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
+export const AgentChatPanel = ({
+  auth,
+  organizationId,
+}: {
+  auth: StoredAuth;
+  organizationId: string | undefined;
+}): JSX.Element => {
   const [draft, setDraft] = useState('');
   const [events, setEvents] = useState<AgentConversationEvent[]>(() => [
     createAssistantMessage('Pick a tab, switch to dangerous mode, and ask Kilo to inspect it.'),
@@ -90,6 +96,7 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
         const models = await fetchKiloGatewayModels({
           apiBaseUrl,
           fetch: fetchFromWindow,
+          organizationId,
           signal: abort.signal,
           token: auth.token,
         });
@@ -109,7 +116,7 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
     return () => {
       abort.abort();
     };
-  }, [auth.token]);
+  }, [auth.token, organizationId]);
 
   useEffect(() => {
     if (modelOptions.length === 0) {
@@ -173,6 +180,7 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
           conversationEvents: conversationWithUserMessage,
           fetch: fetchFromWindow,
           model,
+          organizationId,
           selectedTabId,
           token: auth.token,
           updateAssistantMessage,

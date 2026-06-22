@@ -18,7 +18,6 @@ import {
   SignedOutView,
   ValidationErrorView,
 } from './auth-views';
-import { useTabDebugger } from './use-tab-debugger';
 
 const pollIntervalMs = 3000;
 const apiBaseUrl = getKiloApiBaseUrl();
@@ -44,17 +43,6 @@ type PanelState =
 
 export const App = (): JSX.Element => {
   const [state, setState] = useState<PanelState>({ status: 'checking' });
-  const {
-    htmlLength,
-    inspectableTabs,
-    isLoadingTabs,
-    isMeasuringHtml,
-    loadInspectableTabs,
-    measureSelectedTabHtml,
-    selectTab,
-    selectedTabId,
-    tabDebuggerError,
-  } = useTabDebugger();
   const abortRef = useRef<AbortController | null>(null);
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -113,14 +101,6 @@ export const App = (): JSX.Element => {
       stopPolling();
     };
   }, [stopPolling, validateStoredAuth]);
-
-  useEffect(() => {
-    if (state.status !== 'signedIn') {
-      return;
-    }
-
-    void loadInspectableTabs();
-  }, [loadInspectableTabs, state.status]);
 
   const cancelSignIn = useCallback((): void => {
     stopPolling();
@@ -256,23 +236,7 @@ export const App = (): JSX.Element => {
   }
 
   if (state.status === 'signedIn') {
-    return (
-      <SignedInView
-        auth={state.auth}
-        htmlLength={htmlLength}
-        inspectableTabs={inspectableTabs}
-        isLoadingTabs={isLoadingTabs}
-        isMeasuringHtml={isMeasuringHtml}
-        onMeasureHtml={measureSelectedTabHtml}
-        onRefreshTabs={() => {
-          void loadInspectableTabs();
-        }}
-        onSelectTab={selectTab}
-        onSignOut={signOut}
-        selectedTabId={selectedTabId}
-        tabDebuggerError={tabDebuggerError}
-      />
-    );
+    return <SignedInView auth={state.auth} onSignOut={signOut} />;
   }
 
   return <LoadingView />;

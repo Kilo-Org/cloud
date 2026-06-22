@@ -94,18 +94,19 @@ const ModeControl = ({
     <div className="relative shrink-0">
       <button
         aria-expanded={isOpen}
-        aria-label={`Mode: ${display.modeLabel}`}
+        aria-label={`${display.modeLabel} mode: ${display.modeDescription}`}
         className="flex h-8 w-10 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
         onClick={() => {
           setIsOpen(current => !current);
         }}
+        title={`${display.modeLabel} mode: ${display.modeDescription}`}
         type="button"
       >
         <ModeIcon className="size-3.5" icon={display.modeIcon} tone={display.modeIconTone} />
       </button>
 
       {isOpen ? (
-        <div className="absolute bottom-10 left-0 z-10 grid w-32 gap-1 rounded-md border border-zinc-800 bg-zinc-950 p-1">
+        <div className="absolute bottom-10 left-0 z-10 grid w-56 gap-1 rounded-md border border-zinc-800 bg-zinc-950 p-1">
           {modeOptions.map(option => {
             const optionDisplay = getFooterControlDisplay({
               mode: option.value,
@@ -117,8 +118,8 @@ const ModeControl = ({
               <button
                 className={
                   option.value === mode
-                    ? 'flex h-8 items-center gap-2 rounded-sm bg-zinc-900 px-2 text-xs font-medium text-zinc-100'
-                    : 'flex h-8 items-center gap-2 rounded-sm px-2 text-xs font-medium text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-1 focus:ring-offset-zinc-950'
+                    ? 'flex items-start gap-2 rounded-sm bg-zinc-900 px-2 py-2 text-left text-zinc-100'
+                    : 'flex items-start gap-2 rounded-sm px-2 py-2 text-left text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-1 focus:ring-offset-zinc-950'
                 }
                 key={option.value}
                 onClick={() => {
@@ -128,11 +129,16 @@ const ModeControl = ({
                 type="button"
               >
                 <ModeIcon
-                  className="size-3.5"
+                  className="mt-0.5 size-3.5 shrink-0"
                   icon={optionDisplay.modeIcon}
                   tone={optionDisplay.modeIconTone}
                 />
-                {option.label}
+                <span className="grid gap-0.5">
+                  <span className="text-xs font-medium">{option.label}</span>
+                  <span className="text-[11px] leading-4 text-zinc-500">
+                    {optionDisplay.modeDescription}
+                  </span>
+                </span>
               </button>
             );
           })}
@@ -253,8 +259,8 @@ export const AgentChatPanel = (): JSX.Element => {
           </CompactSelectControl>
         </div>
         <p className="sr-only">
-          Mode {footerDisplay.modeLabel}, model {footerDisplay.modelLabel}, thinking{' '}
-          {footerDisplay.thinkingLabel}
+          Mode {footerDisplay.modeLabel}: {footerDisplay.modeDescription}, model{' '}
+          {footerDisplay.modelLabel}, thinking {footerDisplay.thinkingLabel}
         </p>
       </footer>
     </div>

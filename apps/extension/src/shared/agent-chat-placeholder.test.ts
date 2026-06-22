@@ -35,6 +35,7 @@ describe('agent chat placeholder state', () => {
         thinkingEffort: 'medium',
       })
     ).toStrictEqual({
+      modeDescription: 'Read only',
       modeIcon: 'shield',
       modeIconTone: 'safe',
       modeLabel: 'Safe',
@@ -49,6 +50,7 @@ describe('agent chat placeholder state', () => {
         thinkingEffort: 'high',
       })
     ).toStrictEqual({
+      modeDescription: 'Arbitrary webpage control',
       modeIcon: 'alert',
       modeIconTone: 'danger',
       modeLabel: 'Danger',

@@ -16,6 +16,7 @@ export interface AgentPanelState {
 }
 
 export interface AgentFooterControlDisplay {
+  readonly modeDescription: 'Arbitrary webpage control' | 'Read only';
   readonly modeIcon: 'alert' | 'shield';
   readonly modeIconTone: 'danger' | 'safe';
   readonly modeLabel: 'Danger' | 'Safe';
@@ -46,6 +47,7 @@ const getThinkingLabel = (
 export const getFooterControlDisplay = (
   footer: AgentPanelFooterState
 ): AgentFooterControlDisplay => ({
+  modeDescription: footer.mode === 'safe' ? 'Read only' : 'Arbitrary webpage control',
   modeIcon: footer.mode === 'safe' ? 'shield' : 'alert',
   modeIconTone: footer.mode === 'safe' ? 'safe' : 'danger',
   modeLabel: footer.mode === 'safe' ? 'Safe' : 'Danger',

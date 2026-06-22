@@ -137,6 +137,16 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
     setEvents(currentEvents => [...currentEvents, ...nextEvents]);
   };
 
+  const updateAssistantMessage = (eventId: string, text: string): void => {
+    setEvents(currentEvents =>
+      currentEvents.map(event =>
+        event.id === eventId && event.type === 'message' && event.role === 'assistant'
+          ? { ...event, text }
+          : event
+      )
+    );
+  };
+
   const submitMessage = (text: string): void => {
     const userEvent = createUserMessage(text);
     const conversationWithUserMessage = [...events, userEvent];
@@ -167,6 +177,7 @@ export const AgentChatPanel = ({ auth }: { auth: StoredAuth }): JSX.Element => {
           model,
           selectedTabId,
           token: auth.token,
+          updateAssistantMessage,
         });
       } finally {
         setIsRunning(false);

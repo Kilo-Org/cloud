@@ -3,6 +3,10 @@ export {
   fetchKiloGatewayChatCompletion,
   parseKiloGatewayChatCompletionResponse,
 } from './kilo-gateway-chat-client';
+export {
+  fetchKiloGatewayChatCompletionStream,
+  parseKiloGatewayChatCompletionStream,
+} from './kilo-gateway-chat-stream-client';
 export type {
   KiloGatewayChatCompletion,
   KiloGatewayChatMessage,

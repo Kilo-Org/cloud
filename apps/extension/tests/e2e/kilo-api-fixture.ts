@@ -27,6 +27,9 @@ const getToolResultHtmlLength = (body: unknown): string => {
   return String(toolResult['value']);
 };
 
+const chatCompletionStreamResponse = (events: unknown[]): string =>
+  `${events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
+
 export const mockKiloApi = async (context: BrowserContext): Promise<void> => {
   let chatCompletionCalls = 0;
 
@@ -58,6 +61,7 @@ export const mockKiloApi = async (context: BrowserContext): Promise<void> => {
 
     expect(body).toMatchObject({
       model: 'anthropic/claude-sonnet-4',
+      stream: true,
       tool_choice: 'auto',
       tools: [
         {
@@ -71,41 +75,47 @@ export const mockKiloApi = async (context: BrowserContext): Promise<void> => {
 
     if (chatCompletionCalls === 1) {
       return route.fulfill({
-        json: {
-          choices: [
-            {
-              message: {
-                content: 'I will inspect the selected tab.',
-                role: 'assistant',
-                tool_calls: [
-                  {
-                    function: {
-                      arguments: '{"code":"return document.documentElement.outerHTML.length;"}',
-                      name: 'eval',
+        body: chatCompletionStreamResponse([
+          { choices: [{ delta: { content: 'I will ' } }] },
+          { choices: [{ delta: { content: 'inspect the selected tab.' } }] },
+          {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      function: {
+                        arguments: '{"code":"return document.documentElement.outerHTML.length;"}',
+                        name: 'eval',
+                      },
+                      id: 'call_eval_1',
+                      index: 0,
+                      type: 'function',
                     },
-                    id: 'call_eval_1',
-                    type: 'function',
-                  },
-                ],
+                  ],
+                },
               },
-            },
-          ],
-        },
+            ],
+          },
+        ]),
+        contentType: 'text/event-stream',
         status: 200,
       });
     }
 
     return route.fulfill({
-      json: {
-        choices: [
-          {
-            message: {
-              content: `The selected tab HTML length is ${getToolResultHtmlLength(body)}.`,
-              role: 'assistant',
+      body: chatCompletionStreamResponse([
+        {
+          choices: [
+            {
+              delta: {
+                content: `The selected tab HTML length is ${getToolResultHtmlLength(body)}.`,
+              },
             },
-          },
-        ],
-      },
+          ],
+        },
+      ]),
+      contentType: 'text/event-stream',
       status: 200,
     });
   });

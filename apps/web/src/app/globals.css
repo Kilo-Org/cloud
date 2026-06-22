@@ -424,15 +424,15 @@
   @keyframes pulse-glow {
     0% {
       transform: scale(1);
-      box-shadow: 0 0 0 rgba(237, 255, 0, 0);
+      box-shadow: 0 0 0 transparent;
     }
     50% {
       transform: scale(1.02);
-      box-shadow: 0 0 20px rgba(237, 255, 0, 0.4);
+      box-shadow: 0 0 20px color-mix(in srgb, var(--brand-primary) 40%, transparent);
     }
     100% {
       transform: scale(1);
-      box-shadow: 0 0 20px rgba(237, 255, 0, 0.3);
+      box-shadow: 0 0 20px color-mix(in srgb, var(--brand-primary) 30%, transparent);
     }
   }
 

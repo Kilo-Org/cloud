@@ -169,7 +169,7 @@ Name tokens semantically, not by value. In Kilo product UI, prefer canonical `ty
 
 - **Never disable zoom.** `user-scalable=no` breaks accessibility.
 - **Use `rem`/`em` for font sizes.** Never `px` for body text.
-- **Mobile readability.** Use `bodyLg` for long-form mobile reading and keep form controls at 16px where needed to prevent browser zoom. Canonical compact product `body` remains 14px.
+- **Mobile readability.** Use the `type-body-lg` utility for long-form mobile reading. Keep form controls at 16px where needed to prevent browser zoom. The canonical compact product `body` role remains 14px.
 - **Adequate touch targets.** Text links need padding or line-height that
   yields a 44px+ tap target.
 

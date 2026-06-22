@@ -65,6 +65,10 @@ function swaggerUiHtml(nonce: string) {
         background: #ffffff;
         min-height: calc(100vh - 73px);
       }
+
+      .swagger-ui .auth-wrapper {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -83,6 +87,7 @@ function swaggerUiHtml(nonce: string) {
         dom_id: '#swagger-ui',
         deepLinking: true,
         persistAuthorization: false,
+        supportedSubmitMethods: [],
         tryItOutEnabled: false,
       });
     </script>

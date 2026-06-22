@@ -14,7 +14,6 @@ import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import {
   FEATURE_ADOPTION_KEYS,
   getOrganizationFeatureAdoption,
-  getOrganizationPendingFeatureAdoptionCount,
 } from '@/lib/organizations/feature-adoption';
 import { getOrganizationMembers } from '@/lib/organizations/organizations';
 import { TRPCError } from '@trpc/server';
@@ -98,10 +97,6 @@ const FeatureAdoptionOutputSchema = z.object({
   ),
 });
 
-const PendingFeatureAdoptionOutputSchema = z.object({
-  pendingCount: z.number().int().min(0).max(FEATURE_ADOPTION_KEYS.length),
-});
-
 const AIAdoptionTimeseriesOutputSchema = z.object({
   timeseries: z.array(
     z.object({
@@ -163,19 +158,6 @@ function getDateThreshold(period: string): string | null {
 }
 
 export const organizationsUsageDetailsRouter = createTRPCRouter({
-  getPendingFeatureAdoptionCount: organizationMemberProcedure
-    .input(OrganizationIdInputSchema)
-    .output(PendingFeatureAdoptionOutputSchema)
-    .query(async ({ input }) => {
-      const adoption = await getOrganizationPendingFeatureAdoptionCount(input.organizationId);
-      if (adoption.plan !== 'enterprise') {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Feature adoption reporting is available on the Enterprise plan.',
-        });
-      }
-      return { pendingCount: adoption.pendingCount };
-    }),
   getFeatureAdoption: organizationMemberProcedure
     .input(OrganizationIdInputSchema)
     .output(FeatureAdoptionOutputSchema)

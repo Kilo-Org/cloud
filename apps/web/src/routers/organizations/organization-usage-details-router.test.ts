@@ -77,20 +77,6 @@ describe('organizations usage details trpc router', () => {
       expect(result.checks.every(check => !check.adopted)).toBe(true);
     });
 
-    it('returns the pending feature count to an Enterprise member', async () => {
-      await db
-        .update(organizations)
-        .set({ plan: 'enterprise' })
-        .where(eq(organizations.id, testOrganization.id));
-      const caller = await createCallerForUser(memberUser.id);
-
-      const result = await caller.organizations.usageDetails.getPendingFeatureAdoptionCount({
-        organizationId: testOrganization.id,
-      });
-
-      expect(result).toEqual({ pendingCount: 6 });
-    });
-
     it('requires a bot-enabled Linear integration for team workflow adoption', async () => {
       await db
         .update(organizations)

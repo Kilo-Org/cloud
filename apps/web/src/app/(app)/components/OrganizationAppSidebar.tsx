@@ -29,13 +29,11 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import HeaderLogo from '@/components/HeaderLogo';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-import { useQuery } from '@tanstack/react-query';
-import { useTRPC } from '@/lib/trpc/utils';
 import { useOrgKiloClawNavState } from '@/hooks/useOrgKiloClaw';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
@@ -55,56 +53,6 @@ export default function OrganizationAppSidebar({
   const { assumedRole, setAssumedRole, setOriginalRole } = useRoleTesting();
   // Fetch full organization data to access settings
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
-  const trpc = useTRPC();
-  const usagePath = `/organizations/${organizationId}/usage-details`;
-  const isUsagePath = pathname === usagePath || pathname.startsWith(`${usagePath}/`);
-  const featureAdoptionQuery = useQuery({
-    ...trpc.organizations.usageDetails.getFeatureAdoption.queryOptions({ organizationId }),
-    enabled: organizationData?.plan === 'enterprise' && isUsagePath,
-    staleTime: 5 * 60 * 1000,
-  });
-  const pendingFeatureAdoptionQuery = useQuery({
-    ...trpc.organizations.usageDetails.getPendingFeatureAdoptionCount.queryOptions({
-      organizationId,
-    }),
-    enabled: organizationData?.plan === 'enterprise' && !isUsagePath,
-    staleTime: 5 * 60 * 1000,
-  });
-  const pendingFeatureAdoptionCount =
-    organizationData?.plan === 'enterprise'
-      ? isUsagePath
-        ? (featureAdoptionQuery.data?.checks.filter(check => !check.adopted).length ?? 0)
-        : (pendingFeatureAdoptionQuery.data?.pendingCount ?? 0)
-      : 0;
-  const previousPathname = useRef(pathname);
-  useEffect(() => {
-    const adoptionConfigurationRoutes = [
-      `/organizations/${organizationId}/integrations`,
-      `/organizations/${organizationId}/code-reviews`,
-      `/organizations/${organizationId}/security-agent`,
-      `/organizations/${organizationId}/cloud`,
-      `/organizations/${organizationId}/deploy`,
-    ];
-    const previousRouteWasAdoptionConfiguration = adoptionConfigurationRoutes.some(
-      route =>
-        previousPathname.current === route || previousPathname.current.startsWith(`${route}/`)
-    );
-    if (
-      organizationData?.plan === 'enterprise' &&
-      previousPathname.current !== pathname &&
-      previousRouteWasAdoptionConfiguration
-    ) {
-      void (isUsagePath ? featureAdoptionQuery.refetch() : pendingFeatureAdoptionQuery.refetch());
-    }
-    previousPathname.current = pathname;
-  }, [
-    featureAdoptionQuery.refetch,
-    isUsagePath,
-    organizationData?.plan,
-    organizationId,
-    pathname,
-    pendingFeatureAdoptionQuery.refetch,
-  ]);
   const kiloClawNavStateQuery = useOrgKiloClawNavState(organizationId);
 
   // Feature flags
@@ -157,8 +105,6 @@ export default function OrganizationAppSidebar({
     icon: React.ElementType;
     url: string;
     className?: string;
-    badge?: string;
-    badgeVariant?: 'brand' | 'alert';
   }> = [
     ...(showWelcome
       ? [
@@ -178,8 +124,6 @@ export default function OrganizationAppSidebar({
       title: 'Usage',
       icon: ChartColumnIncreasing,
       url: `/organizations/${organizationId}/usage-details`,
-      badge: pendingFeatureAdoptionCount > 0 ? String(pendingFeatureAdoptionCount) : undefined,
-      badgeVariant: 'alert',
     },
   ];
 

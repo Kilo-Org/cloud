@@ -179,16 +179,6 @@ async function getFeatureAdoptionState(organizationId: string): Promise<FeatureA
   };
 }
 
-export async function getOrganizationPendingFeatureAdoptionCount(
-  organizationId: string
-): Promise<{ plan: 'teams' | 'enterprise'; pendingCount: number }> {
-  const adoption = await getOrganizationFeatureAdoption(organizationId);
-  return {
-    plan: adoption.plan,
-    pendingCount: adoption.checks.filter(check => !check.adopted).length,
-  };
-}
-
 export async function getOrganizationFeatureAdoption(organizationId: string): Promise<{
   plan: 'teams' | 'enterprise';
   checks: FeatureAdoptionCheck[];

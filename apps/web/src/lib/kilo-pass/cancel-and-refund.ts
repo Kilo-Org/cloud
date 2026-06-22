@@ -178,16 +178,6 @@ export async function cancelAndRefundKiloPassForUser({
   }
 
   const balanceResetAmountUsd = await db.transaction(async tx => {
-    const freshUserRows = await tx
-      .select({
-        microdollars_used: kilocode_users.microdollars_used,
-        total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
-      })
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, userId))
-      .for('update')
-      .limit(1);
-
     await tx
       .update(kilo_pass_subscriptions)
       .set({
@@ -208,6 +198,16 @@ export async function cancelAndRefundKiloPassForUser({
         })
         .where(eq(kilocode_users.id, userId));
     }
+
+    const freshUserRows = await tx
+      .select({
+        microdollars_used: kilocode_users.microdollars_used,
+        total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
+      })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId))
+      .for('update')
+      .limit(1);
     const freshUser = freshUserRows[0];
     const currentBalanceMicrodollars = freshUser
       ? freshUser.total_microdollars_acquired - freshUser.microdollars_used

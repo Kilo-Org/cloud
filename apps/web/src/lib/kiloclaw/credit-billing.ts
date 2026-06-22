@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, gte, isNotNull, isNull, like, lte, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
@@ -661,7 +661,7 @@ export async function applyStripeFundedKiloClawPeriod(
           )
         )
         .limit(1);
-      const periodSettlementDeposits = matchingPaymentDeduction
+      const [legacyPeriodDeduction] = matchingPaymentDeduction
         ? []
         : await tx
             .select({ id: credit_transactions.id })
@@ -669,34 +669,32 @@ export async function applyStripeFundedKiloClawPeriod(
             .where(
               and(
                 eq(credit_transactions.kilo_user_id, userId),
-                eq(credit_transactions.amount_microdollars, amountMicrodollars),
-                eq(credit_transactions.description, `KiloClaw ${plan} settlement`),
-                gte(credit_transactions.created_at, periodStart),
-                lte(credit_transactions.created_at, periodEnd)
-              )
-            );
-      const periodSettlementDeductions = matchingPaymentDeduction
-        ? []
-        : await tx
-            .select({ id: credit_transactions.id })
-            .from(credit_transactions)
-            .where(
-              and(
-                eq(credit_transactions.kilo_user_id, userId),
-                eq(credit_transactions.amount_microdollars, -amountMicrodollars),
-                like(
+                eq(
                   credit_transactions.credit_category,
-                  `kiloclaw-settlement:${stripeSubscriptionId}:%`
-                ),
-                gte(credit_transactions.created_at, periodStart),
-                lte(credit_transactions.created_at, periodEnd)
+                  `kiloclaw-settlement:${stripeSubscriptionId}:${periodStart.slice(0, 10)}`
+                )
               )
-            );
-      const hasUnmatchedDeposit =
-        !matchingPaymentDeduction &&
-        periodSettlementDeposits.length > periodSettlementDeductions.length;
+            )
+            .limit(1);
+      const [settledSamePeriod] = matchingPaymentDeduction
+        ? []
+        : await tx
+            .select({ id: kiloclaw_subscription_change_log.id })
+            .from(kiloclaw_subscription_change_log)
+            .where(
+              and(
+                eq(kiloclaw_subscription_change_log.subscription_id, targetRow.id),
+                eq(kiloclaw_subscription_change_log.action, 'period_advanced'),
+                eq(kiloclaw_subscription_change_log.reason, 'stripe_invoice_settlement'),
+                sql`${kiloclaw_subscription_change_log.after_state}->>'current_period_start' = ${periodStart}`,
+                sql`${kiloclaw_subscription_change_log.after_state}->>'current_period_end' = ${periodEnd}`
+              )
+            )
+            .limit(1);
+      const shouldReconcilePaymentDeduction =
+        !matchingPaymentDeduction && (!legacyPeriodDeduction || !!settledSamePeriod);
 
-      if (hasUnmatchedDeposit) {
+      if (shouldReconcilePaymentDeduction) {
         await tx.insert(credit_transactions).values({
           id: crypto.randomUUID(),
           kilo_user_id: userId,
@@ -718,7 +716,7 @@ export async function applyStripeFundedKiloClawPeriod(
       logInfo('Duplicate settlement credit reconciled', {
         user_id: userId,
         stripe_payment_id: stripePaymentId,
-        reconciled_unmatched_deposit: hasUnmatchedDeposit,
+        reconciled_payment_deduction: shouldReconcilePaymentDeduction,
       });
       settlementWasDuplicate = true;
     } else {

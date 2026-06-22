@@ -5,6 +5,7 @@ import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@
 import {
   credit_transactions,
   kiloclaw_instances,
+  kiloclaw_subscription_change_log,
   kiloclaw_subscriptions,
   kilocode_users,
 } from '@kilocode/db/schema';
@@ -701,6 +702,18 @@ describe('Stripe-funded KiloClaw settlement', () => {
         created_at: '2026-06-01T00:00:01.000Z',
       },
     ]);
+    await db.insert(kiloclaw_subscription_change_log).values({
+      subscription_id: subscriptionId,
+      actor_type: 'system',
+      actor_id: 'kiloclaw-credit-billing',
+      action: 'period_advanced',
+      reason: 'stripe_invoice_settlement',
+      before_state: null,
+      after_state: {
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+      },
+    });
     await db
       .update(kilocode_users)
       .set({ total_microdollars_acquired: 55_000_000 })
@@ -743,6 +756,103 @@ describe('Stripe-funded KiloClaw settlement', () => {
     expect(transactions).toContainEqual(
       expect.objectContaining({
         creditCategory: `kiloclaw-settlement:${stripeSubscriptionId}:payment:${replayedPaymentId}`,
+      })
+    );
+  });
+
+  it('does not use another subscription deposit to reconcile a legacy-covered replay', async () => {
+    const user = await insertTestUser({ id: 'settlement-cross-subscription-user' });
+    const firstInstanceId = '81818181-8181-4181-8181-818181818181';
+    const secondInstanceId = '82828282-8282-4282-8282-828282828282';
+    const firstSubscriptionId = '83838383-8383-4383-8383-838383838383';
+    const secondSubscriptionId = '84848484-8484-4484-8484-848484848484';
+    const firstStripeSubscriptionId = 'sub_cross_subscription_first';
+    const secondStripeSubscriptionId = 'sub_cross_subscription_second';
+    const periodStart = '2026-06-01T00:00:00.000Z';
+    const periodEnd = '2026-07-01T00:00:00.000Z';
+
+    await insertPersonalInstance({ id: firstInstanceId, userId: user.id });
+    await insertPersonalInstance({ id: secondInstanceId, userId: user.id });
+    await db.insert(kiloclaw_subscriptions).values([
+      {
+        id: firstSubscriptionId,
+        user_id: user.id,
+        instance_id: firstInstanceId,
+        stripe_subscription_id: firstStripeSubscriptionId,
+        payment_source: 'credits',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+        plan: 'standard',
+        status: 'active',
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+        credit_renewal_at: periodEnd,
+      },
+      {
+        id: secondSubscriptionId,
+        user_id: user.id,
+        instance_id: secondInstanceId,
+        stripe_subscription_id: secondStripeSubscriptionId,
+        payment_source: 'credits',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+        plan: 'standard',
+        status: 'past_due',
+        current_period_start: '2026-05-01T00:00:00.000Z',
+        current_period_end: periodStart,
+        credit_renewal_at: periodStart,
+      },
+    ]);
+    await db.insert(credit_transactions).values([
+      {
+        kilo_user_id: user.id,
+        amount_microdollars: 55_000_000,
+        is_free: false,
+        stripe_payment_id: 'ch_cross_subscription_other',
+        description: 'KiloClaw standard settlement',
+      },
+      {
+        kilo_user_id: user.id,
+        amount_microdollars: 55_000_000,
+        is_free: false,
+        stripe_payment_id: 'ch_cross_subscription_replay',
+        description: 'KiloClaw standard settlement',
+      },
+      {
+        kilo_user_id: user.id,
+        amount_microdollars: -55_000_000,
+        is_free: false,
+        credit_category: `kiloclaw-settlement:${firstStripeSubscriptionId}:payment:ch_cross_subscription_other`,
+        check_category_uniqueness: true,
+      },
+      {
+        kilo_user_id: user.id,
+        amount_microdollars: -55_000_000,
+        is_free: false,
+        credit_category: `kiloclaw-settlement:${secondStripeSubscriptionId}:2026-06-01`,
+        check_category_uniqueness: true,
+      },
+    ]);
+
+    await expect(
+      applyStripeFundedKiloClawPeriod({
+        userId: user.id,
+        metadataInstanceId: secondInstanceId,
+        stripeSubscriptionId: secondStripeSubscriptionId,
+        stripePaymentId: 'ch_cross_subscription_replay',
+        plan: 'standard',
+        priceVersion: CURRENT_KILOCLAW_PRICE_VERSION,
+        amountMicrodollars: 55_000_000,
+        periodStart,
+        periodEnd,
+      })
+    ).resolves.toBe(true);
+
+    const deductions = await db
+      .select({ creditCategory: credit_transactions.credit_category })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(deductions).not.toContainEqual(
+      expect.objectContaining({
+        creditCategory: `kiloclaw-settlement:${secondStripeSubscriptionId}:payment:ch_cross_subscription_replay`,
       })
     );
   });

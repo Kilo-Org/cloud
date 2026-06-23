@@ -1,4 +1,14 @@
 {
   "$schema": "https://app.kilo.ai/config.json",
-  "instructions": [".kilo/rules/*.md"]
+  "instructions": [".kilo/rules/*.md"],
+  "mcp": {
+    "local-kilo": {
+      "type": "remote",
+      "url": "http://localhost:3000/mcp",
+      "oauth": {
+        "scope": "mcp:access"
+      },
+      "enabled": true
+    }
+  }
 }

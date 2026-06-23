@@ -9,11 +9,10 @@ import {
   nativeMcpResourceUrl,
   parseScopeString,
 } from '@kilocode/mcp-gateway';
-import { kilocode_users, organization_memberships, type User } from '@kilocode/db/schema';
+import { kilocode_users, type User } from '@kilocode/db/schema';
 import { readDb, type db } from '@/lib/drizzle';
 import { getGatewayAppConfig, type GatewayAppConfig } from '@/lib/mcp-gateway/config';
 import { verificationKey } from '@/lib/mcp-gateway/token-service';
-import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 
 type Database = typeof db;
 
@@ -24,13 +23,6 @@ export async function findEligibleNativeMcpUser(
   const [row] = await database
     .select({ user: kilocode_users })
     .from(kilocode_users)
-    .innerJoin(
-      organization_memberships,
-      and(
-        eq(organization_memberships.kilo_user_id, kilocode_users.id),
-        eq(organization_memberships.organization_id, KILO_ORGANIZATION_ID)
-      )
-    )
     .where(
       and(
         eq(kilocode_users.id, userId),

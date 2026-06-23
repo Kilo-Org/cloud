@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Pin, PinOff, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
@@ -16,16 +16,133 @@ import {
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 type ClawMutations = ReturnType<typeof useKiloClawMutations>;
 
+function truncateTag(tag: string) {
+  if (tag.length <= 20) return tag;
+  return `${tag.slice(0, 8)}...${tag.slice(-8)}`;
+}
+
+/**
+ * One row in the compact image table: a label plus the OpenClaw version and
+ * the (truncated) image tag/hash. Either piece may be missing — a row renders
+ * whatever it has, falling back to "Unknown" only when both are absent.
+ */
+function ImageRow({
+  label,
+  openclawVersion,
+  imageTag,
+  tooltip,
+  spaced = false,
+}: {
+  label: string;
+  openclawVersion: string | null | undefined;
+  imageTag: string | null | undefined;
+  /** Optional explanatory text surfaced via an info icon next to the label. */
+  tooltip?: string;
+  spaced?: boolean;
+}) {
+  return (
+    <tr>
+      <td className={`text-muted-foreground pr-3 align-top${spaced ? ' pt-1' : ''}`}>
+        <span className="inline-flex items-center gap-1">
+          {label}
+          {tooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" aria-label={tooltip} className="inline-flex cursor-help">
+                  <Info className="size-3.5 shrink-0" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
+            </Tooltip>
+          )}
+        </span>
+      </td>
+      <td className={spaced ? 'pt-1' : undefined}>
+        <span className="inline-flex flex-wrap items-center gap-1.5">
+          {openclawVersion && <span className="text-foreground">OpenClaw {openclawVersion}</span>}
+          {imageTag ? (
+            <code className="bg-muted rounded px-1.5 py-0.5 text-xs" title={imageTag}>
+              {truncateTag(imageTag)}
+            </code>
+          ) : (
+            !openclawVersion && <span className="text-muted-foreground">Unknown</span>
+          )}
+        </span>
+      </td>
+    </tr>
+  );
+}
+
+/**
+ * The "Active" and "Latest" image rows shown to an unpinned instance. Each
+ * pairs the OpenClaw version with its image tag/hash so the two columns read
+ * e.g. "Active  OpenClaw 2026.6.5  img-5f02b9408089". Rendered inside a
+ * <tbody>; a row is omitted only when both its version and tag are absent.
+ */
+export function VersionImageMetadata({
+  currentOpenClawVersion,
+  trackedImageTag,
+  latestOpenClawVersion,
+  latestImageTag,
+}: {
+  currentOpenClawVersion: string | null | undefined;
+  trackedImageTag: string | null | undefined;
+  latestOpenClawVersion: string | null | undefined;
+  latestImageTag: string | null | undefined;
+}) {
+  // The active and latest images can share the same OpenClaw version while
+  // still being different builds (the image tag differs). In that case the
+  // "Update available" framing would be confusing, so explain that the latest
+  // image carries non-version changes rather than a newer OpenClaw release.
+  const sameOpenClawVersionDifferentImage =
+    !!currentOpenClawVersion &&
+    !!latestOpenClawVersion &&
+    currentOpenClawVersion === latestOpenClawVersion &&
+    !!trackedImageTag &&
+    !!latestImageTag &&
+    trackedImageTag !== latestImageTag;
+
+  return (
+    <>
+      {(trackedImageTag || currentOpenClawVersion) && (
+        <ImageRow
+          label="Active"
+          openclawVersion={currentOpenClawVersion}
+          imageTag={trackedImageTag}
+        />
+      )}
+      {(latestImageTag || latestOpenClawVersion) && (
+        <ImageRow
+          label="Latest"
+          openclawVersion={latestOpenClawVersion}
+          imageTag={latestImageTag}
+          tooltip={
+            sameOpenClawVersionDifferentImage
+              ? 'Both images run the same OpenClaw version, but the latest image includes additional fixes, improvements, and features.'
+              : undefined
+          }
+          spaced
+        />
+      )}
+    </>
+  );
+}
+
 export function VersionPinCard({
   trackedImageTag,
+  trackedOpenClawVersion,
   latestImageTag,
+  latestOpenClawVersion,
   mutations,
 }: {
   trackedImageTag: string | null;
+  trackedOpenClawVersion: string | null;
   latestImageTag: string | null;
+  latestOpenClawVersion: string | null;
   mutations: ClawMutations;
 }) {
   const { data: myPin, isLoading: pinLoading } = useClawMyPin();
@@ -89,11 +206,6 @@ export function VersionPinCard({
       </div>
     );
   }
-
-  const truncateTag = (tag: string) => {
-    if (tag.length <= 20) return tag;
-    return `${tag.slice(0, 8)}...${tag.slice(-8)}`;
-  };
 
   return (
     <div>
@@ -219,46 +331,18 @@ export function VersionPinCard({
           <table>
             <tbody>
               {isPinned ? (
-                <tr>
-                  <td className="text-muted-foreground pr-3 align-top">Pinned image</td>
-                  <td>
-                    <code
-                      className="bg-muted rounded px-1.5 py-0.5 text-xs"
-                      title={myPin.image_tag}
-                    >
-                      {truncateTag(myPin.image_tag)}
-                    </code>
-                  </td>
-                </tr>
+                <ImageRow
+                  label="Pinned image"
+                  openclawVersion={myPin.openclaw_version}
+                  imageTag={myPin.image_tag}
+                />
               ) : (
-                <>
-                  {trackedImageTag && (
-                    <tr>
-                      <td className="text-muted-foreground pr-3 align-top">Current image</td>
-                      <td>
-                        <code
-                          className="bg-muted rounded px-1.5 py-0.5 text-xs"
-                          title={trackedImageTag}
-                        >
-                          {truncateTag(trackedImageTag)}
-                        </code>
-                      </td>
-                    </tr>
-                  )}
-                  {latestImageTag && (
-                    <tr>
-                      <td className="text-muted-foreground pr-3 pt-1 align-top">Latest image</td>
-                      <td className="pt-1">
-                        <code
-                          className="bg-muted rounded px-1.5 py-0.5 text-xs"
-                          title={latestImageTag}
-                        >
-                          {truncateTag(latestImageTag)}
-                        </code>
-                      </td>
-                    </tr>
-                  )}
-                </>
+                <VersionImageMetadata
+                  currentOpenClawVersion={trackedOpenClawVersion}
+                  trackedImageTag={trackedImageTag}
+                  latestOpenClawVersion={latestOpenClawVersion}
+                  latestImageTag={latestImageTag}
+                />
               )}
             </tbody>
           </table>

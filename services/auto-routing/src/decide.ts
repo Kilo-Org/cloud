@@ -28,7 +28,9 @@ import { computeDecision } from './decision-engine';
 import { ClassifierRunError, classifyNormalizedInput } from './model-classifier';
 import type { ClassifierRunResult } from './model-classifier';
 import { getRoutingTable } from './routing-table';
+import { getAutoRoutingMode } from './routing-mode';
 import type { HonoEnv } from './hono-env';
+import { codingPlanDefaultDecision, getCodingPlanPreference } from './coding-plan-preference';
 
 // Isolate-scoped request counter, used to correlate latency with isolate
 // warm-up in logs.
@@ -204,6 +206,7 @@ function recordDecision(
   ctx: DecisionContext,
   durationMs: number,
   outcome: DecisionOutcome,
+  autoRoutingMode: string,
   decision: AutoRoutingDecision | null = null
 ): void {
   const summary = summarizeOutcome(outcome);
@@ -252,6 +255,7 @@ function recordDecision(
       clientRequestId: ctx.payload.clientRequestId,
       hasMachineId: ctx.payload.machineId !== null,
       mode: ctx.payload.mode,
+      autoRoutingMode,
       uaPrefix: ctx.payload.userAgent?.slice(0, 40) ?? null,
       decidedModel: decision?.model ?? null,
       decidedTaskType: decision?.taskType ?? null,
@@ -280,13 +284,33 @@ export const decideHandler: Handler<HonoEnv> = async c => {
 
   const payload = parsed.data;
   const startedAt = performance.now();
-  const [hashes, userIdHash, classifierModel, successSampleRate, routingTable] = await Promise.all([
-    computeContentHashes(payload.input),
-    hashIdentifierForTelemetry(payload.userId),
-    getClassifierModel(c.env),
-    getDecisionLogSampleRate(c.env),
-    getRoutingTable(c.env),
-  ]);
+  const deniedModelIds = new Set(payload.routingPolicy?.deniedModelIds ?? []);
+  const codingPlanPreference = await getCodingPlanPreference(c.env, payload.userId);
+  if (codingPlanPreference.active && !deniedModelIds.has(codingPlanPreference.modelId)) {
+    const decision = codingPlanDefaultDecision(codingPlanPreference);
+    writeClassifierMetricsDataPoint(c.env, {
+      status: 'coding_plan_default',
+      classifierModel: 'coding_plan_default',
+      requestedModel: payload.input.requestedModel,
+      classifierDurationMs: performance.now() - startedAt,
+      classifierCostCredits: 0,
+      cacheHit: false,
+    });
+    return c.json({ cost: 0, decision, classifierResult: null });
+  }
+
+  const [hashes, userIdHash, classifierModel, successSampleRate, routingTable, routingMode] =
+    await Promise.all([
+      computeContentHashes(payload.input),
+      hashIdentifierForTelemetry(payload.userId),
+      getClassifierModel(c.env),
+      getDecisionLogSampleRate(c.env),
+      getRoutingTable(c.env),
+      getAutoRoutingMode(c.env, {
+        userId: payload.userId,
+        organizationId: payload.organizationId,
+      }),
+    ]);
   const ctx: DecisionContext = {
     payload,
     hashes,
@@ -302,9 +326,14 @@ export const decideHandler: Handler<HonoEnv> = async c => {
     getCachedClassification(c.env, ctx.conversationKey, hashes.exact, classifierModel),
     getStickyDecision(c.env, ctx.conversationKey),
   ]);
-  const deniedModelIds = new Set(payload.routingPolicy?.deniedModelIds ?? []);
   if (cached) {
-    const decision = computeDecision(cached, routingTable, stickyModel, deniedModelIds);
+    const decision = computeDecision(
+      cached,
+      routingTable,
+      stickyModel,
+      deniedModelIds,
+      routingMode
+    );
     if (decision) {
       c.executionCtx.waitUntil(putStickyDecision(c.env, ctx.conversationKey, decision.model));
     }
@@ -313,6 +342,7 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       ctx,
       performance.now() - startedAt,
       { kind: 'cache_hit', classifierModel, classification: cached },
+      routingMode,
       decision
     );
     return c.json(decisionResponse(0, cached, payload.input, decision));
@@ -337,7 +367,8 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       classifier.classification,
       routingTable,
       stickyModel,
-      deniedModelIds
+      deniedModelIds,
+      routingMode
     );
     // Like the classification cache, sticky state only trusts real classifier
     // output: a heuristic fallback must not re-anchor the session's model.
@@ -349,13 +380,20 @@ export const decideHandler: Handler<HonoEnv> = async c => {
       ctx,
       performance.now() - startedAt,
       { kind: 'model', classifier },
+      routingMode,
       decision
     );
     return c.json(
       decisionResponse(classifier.cost ?? 0, classifier.classification, payload.input, decision)
     );
   } catch (error) {
-    recordDecision(c.env, ctx, performance.now() - startedAt, { kind: 'error', error });
+    recordDecision(
+      c.env,
+      ctx,
+      performance.now() - startedAt,
+      { kind: 'error', error },
+      routingMode
+    );
     // A failed run can still have billed the first attempt (e.g. a valid-but-
     // invalid response followed by a throwing retry), so report that cost
     // even though there is no usable classifier result.

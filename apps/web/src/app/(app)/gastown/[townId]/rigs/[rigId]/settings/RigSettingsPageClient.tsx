@@ -102,6 +102,7 @@ export function RigSettingsPageClient({ townId, rigId, organizationId }: Props) 
         name: model.name,
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+        hasUserByokAvailable: model.hasUserByokAvailable,
       })) ?? [],
     [modelsData]
   );

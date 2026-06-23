@@ -163,22 +163,6 @@ export function replacePlatformPlaceholders(
 }
 
 /**
- * Get the feature flag name for prompt template by platform
- */
-export function getPromptTemplateFeatureFlag(platform: CodeReviewPlatform): string {
-  switch (platform) {
-    case 'github':
-      return 'code-review-prompt-template';
-    case PLATFORM.GITLAB:
-      return 'code-review-prompt-template-gitlab';
-    default: {
-      const _exhaustive: never = platform;
-      throw new Error(`Unknown platform: ${_exhaustive}`);
-    }
-  }
-}
-
-/**
  * Terminology mapping for platform-agnostic documentation
  */
 export const PLATFORM_TERMINOLOGY = {

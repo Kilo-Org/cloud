@@ -57,6 +57,7 @@ export function useClawModelOptions(enabled = true): {
           name: model.name,
           isFree: model.isFree,
           mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+          hasUserByokAvailable: model.hasUserByokAvailable,
         })),
         trackedOpenClawVersion: trackedVersion,
         runningOpenClawVersion: runningVersion,

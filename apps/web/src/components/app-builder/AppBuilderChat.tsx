@@ -539,6 +539,7 @@ export function AppBuilderChat({ organizationId }: AppBuilderChatProps) {
           supportsVision,
           isFree: m.isFree,
           mayTrainOnYourPrompts: m.mayTrainOnYourPrompts,
+          hasUserByokAvailable: m.hasUserByokAvailable,
         };
       }),
     [availableModels]

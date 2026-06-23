@@ -1,10 +1,4 @@
-import {
-  BOT_USER_AGENT,
-  BOT_VERSION,
-  DEFAULT_BOT_MODEL,
-  MAX_ITERATIONS,
-  SUMMARY_MODEL,
-} from '@/lib/bot/constants';
+import { BOT_USER_AGENT, BOT_VERSION, MAX_ITERATIONS, SUMMARY_MODEL } from '@/lib/bot/constants';
 import { botPlatforms, type BotPlatform } from '@/lib/bot/platforms';
 import { buildPrSignature } from '@/lib/bot/pr-signature';
 import {
@@ -13,6 +7,7 @@ import {
   updateBotRequest,
 } from '@/lib/bot/request-logging';
 import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
+import { resolveBotModelSlug } from '@/lib/bot/model';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
@@ -209,9 +204,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     headers,
   });
 
-  const modelSlug =
-    ((params.platformIntegration.metadata || {}) as { model_slug?: string }).model_slug ??
-    DEFAULT_BOT_MODEL;
+  const modelSlug = resolveBotModelSlug(params.platformIntegration);
   const owner = ownerFromIntegration(params.platformIntegration);
   const chatPlatform = params.thread.adapter.name;
   const botPlatform = botPlatforms.requireByAdapter(params.thread.adapter);

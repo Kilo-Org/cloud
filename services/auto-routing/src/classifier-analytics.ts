@@ -2,6 +2,7 @@ import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifi
 
 export type ClassifierAnalyticsStatus =
   | 'classified'
+  | 'coding_plan_default'
   | 'invalid_json'
   | 'invalid_envelope'
   | `fallback:${string}`

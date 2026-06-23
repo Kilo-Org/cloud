@@ -126,6 +126,7 @@ import {
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
 import {
+  SecurityAuditLogActorType,
   SecurityFindingNotificationKind,
   SecurityFindingNotificationStatus,
 } from '@kilocode/db/schema-types';
@@ -602,7 +603,7 @@ describe('User', () => {
           redirect_uris: ['https://client.example/callback'],
           grant_types: ['authorization_code'],
           response_types: ['code'],
-          declared_scopes: ['profile'],
+          declared_scopes: ['mcp:access'],
         })
         .returning();
       const [authorizationRequest] = await db
@@ -617,8 +618,8 @@ describe('User', () => {
           route_key: route.route_key,
           canonical_resource_url: route.canonical_url,
           redirect_uri: 'https://client.example/callback',
-          requested_scopes: ['profile'],
-          granted_scopes: ['profile'],
+          requested_scopes: ['mcp:access'],
+          granted_scopes: ['mcp:access'],
           code_challenge: 'challenge',
           code_challenge_method: 'S256',
           execution_context: { type: 'personal' },
@@ -639,7 +640,7 @@ describe('User', () => {
         route_key: route.route_key,
         canonical_resource_url: route.canonical_url,
         redirect_uri: authorizationRequest.redirect_uri,
-        granted_scopes: ['profile'],
+        granted_scopes: ['mcp:access'],
         code_challenge: 'challenge',
         code_challenge_method: 'S256',
         execution_context: { type: 'personal' },
@@ -1632,6 +1633,7 @@ describe('User', () => {
         actor_id: user.id,
         actor_email: user.google_user_email,
         actor_name: user.google_user_name,
+        actor_type: SecurityAuditLogActorType.CustomerUser,
         action: SecurityAuditLogAction.FindingDismissed,
         resource_type: 'security_finding',
         resource_id: randomUUID(),
@@ -1647,6 +1649,7 @@ describe('User', () => {
       expect(logs[0].actor_email).toBeNull();
       expect(logs[0].actor_name).toBeNull();
       expect(logs[0].actor_id).toBe(user.id); // actor_id preserved
+      expect(logs[0].actor_type).toBe(SecurityAuditLogActorType.CustomerUser);
       expect(logs[0].action).toBe(SecurityAuditLogAction.FindingDismissed); // action preserved
     });
 

@@ -19,9 +19,11 @@ import { preferredModels } from '@/lib/ai-gateway/models';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import {
+  BYOK_MODEL_LABEL,
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataTooltip,
+  hasUserByokAvailable,
   isFreeModelOption,
   mayTrainOnYourPrompts,
 } from '@/components/shared/free-model-data-disclosure';
@@ -32,6 +34,7 @@ export type ModelOption = {
   supportsVision?: boolean;
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
+  hasUserByokAvailable?: boolean;
   /** Ordered list of variant key names (e.g., ["none","low","medium","high","max"]) */
   variants?: string[];
 };
@@ -462,15 +465,21 @@ function FreeModelDataIcon({ compact = false }: { compact?: boolean }) {
 
 function ModelMetadataBadges({ model }: { model: ModelOption }) {
   const free = isFreeModelOption(model);
+  const byok = hasUserByokAvailable(model);
   const collectsData = mayTrainOnYourPrompts(model);
 
-  if (!free && !collectsData) return null;
+  if (!free && !byok && !collectsData) return null;
 
   return (
     <span className="inline-flex shrink-0 items-center gap-1">
-      {free && (
+      {free && !byok && (
         <span className="inline-flex shrink-0 items-center rounded-full bg-green-500/20 px-1.5 py-0.5 text-[10px] font-medium text-green-400 ring-1 ring-green-500/20">
           {FREE_MODEL_FREE_LABEL}
+        </span>
+      )}
+      {byok && (
+        <span className="bg-muted text-muted-foreground ring-border inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1">
+          {BYOK_MODEL_LABEL}
         </span>
       )}
       {collectsData && <FreeModelDataIcon compact />}

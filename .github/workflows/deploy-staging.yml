@@ -88,3 +88,10 @@ jobs:
       target_environment: staging
       vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
     secrets: inherit
+
+  deploy-workers:
+    needs: [check-staging-db-startup, run-migrations, deploy-app, deploy-global-app]
+    uses: ./.github/workflows/deploy-workers.yml
+    with:
+      target_environment: staging
+    secrets: inherit

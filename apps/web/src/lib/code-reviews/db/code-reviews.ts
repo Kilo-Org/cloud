@@ -13,7 +13,7 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
 } from '@kilocode/db/schema';
-import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, isNull } from 'drizzle-orm';
+import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, lte, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
@@ -355,6 +355,7 @@ export async function createCodeReviewAttempt(params: {
   terminalReason?: CodeReviewTerminalReason;
   startedAt?: Date;
   completedAt?: Date;
+  analyticsEnabledAtDispatch?: boolean;
 }): Promise<CloudAgentCodeReviewAttempt> {
   try {
     return await db.transaction(async tx => {
@@ -386,6 +387,7 @@ export async function createCodeReviewAttempt(params: {
           session_id: params.sessionId ?? null,
           cli_session_id: params.cliSessionId ?? null,
           execution_id: params.executionId ?? null,
+          analytics_enabled_at_dispatch: params.analyticsEnabledAtDispatch ?? null,
           status,
           error_message: params.errorMessage ?? null,
           terminal_reason: params.terminalReason ?? null,
@@ -446,6 +448,23 @@ export async function createInfraRetryAttemptIfMissing(params: {
         };
       }
 
+      const [sourceAttempt] = await tx
+        .select()
+        .from(cloud_agent_code_review_attempts)
+        .where(
+          and(
+            eq(cloud_agent_code_review_attempts.id, params.retryOfAttemptId),
+            eq(cloud_agent_code_review_attempts.code_review_id, params.codeReviewId)
+          )
+        )
+        .limit(1);
+
+      if (!sourceAttempt) {
+        throw new Error(
+          `Code review attempt ${params.retryOfAttemptId} not found for review ${params.codeReviewId}`
+        );
+      }
+
       const [existingForAttempt] = await tx
         .select()
         .from(cloud_agent_code_review_attempts)
@@ -491,6 +510,7 @@ export async function createInfraRetryAttemptIfMissing(params: {
           attempt_number: (latest?.attempt_number ?? 0) + 1,
           retry_of_attempt_id: params.retryOfAttemptId,
           retry_reason: 'infra_failure',
+          analytics_enabled_at_dispatch: sourceAttempt.analytics_enabled_at_dispatch,
           status: 'pending',
         })
         .returning();
@@ -721,12 +741,13 @@ export async function hasInfraRetryAttempt(codeReviewId: string): Promise<boolea
 }
 
 export async function ensureCurrentCodeReviewAttemptFromReview(
-  review: CloudAgentCodeReview
+  review: CloudAgentCodeReview,
+  analyticsEnabledAtDispatch?: boolean
 ): Promise<CloudAgentCodeReviewAttempt> {
-  const latestAttempt = await getLatestCodeReviewAttempt(review.id);
-  if (latestAttempt) {
+  let attempt = await getLatestCodeReviewAttempt(review.id);
+  if (attempt) {
     if (
-      latestAttempt.status === 'pending' &&
+      attempt.status === 'pending' &&
       (review.session_id || review.cli_session_id || review.status !== 'pending')
     ) {
       const [updated] = await db
@@ -742,25 +763,46 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
             completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
           })
         )
-        .where(eq(cloud_agent_code_review_attempts.id, latestAttempt.id))
+        .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
         .returning();
 
-      return updated ?? latestAttempt;
+      attempt = updated ?? attempt;
     }
-
-    return latestAttempt;
+  } else {
+    attempt = await createCodeReviewAttempt({
+      codeReviewId: review.id,
+      status: review.status as CodeReviewAttemptStatus,
+      sessionId: review.session_id ?? undefined,
+      cliSessionId: review.cli_session_id ?? undefined,
+      errorMessage: review.error_message ?? undefined,
+      terminalReason: review.terminal_reason as CodeReviewTerminalReason | undefined,
+      startedAt: review.started_at ? new Date(review.started_at) : undefined,
+      completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
+      analyticsEnabledAtDispatch,
+    });
   }
 
-  return await createCodeReviewAttempt({
-    codeReviewId: review.id,
-    status: review.status as CodeReviewAttemptStatus,
-    sessionId: review.session_id ?? undefined,
-    cliSessionId: review.cli_session_id ?? undefined,
-    errorMessage: review.error_message ?? undefined,
-    terminalReason: review.terminal_reason as CodeReviewTerminalReason | undefined,
-    startedAt: review.started_at ? new Date(review.started_at) : undefined,
-    completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
-  });
+  if (analyticsEnabledAtDispatch === undefined || attempt.analytics_enabled_at_dispatch !== null) {
+    return attempt;
+  }
+
+  const [snapshotted] = await db
+    .update(cloud_agent_code_review_attempts)
+    .set({
+      analytics_enabled_at_dispatch: analyticsEnabledAtDispatch,
+      updated_at: new Date().toISOString(),
+    })
+    .where(
+      and(
+        eq(cloud_agent_code_review_attempts.id, attempt.id),
+        isNull(cloud_agent_code_review_attempts.analytics_enabled_at_dispatch)
+      )
+    )
+    .returning();
+
+  if (snapshotted) return snapshotted;
+
+  return (await getCodeReviewAttemptForReview(review.id, attempt.id)) ?? attempt;
 }
 
 /**
@@ -1631,6 +1673,9 @@ export type SessionUsageSummary = {
   model: string;
   totalTokensIn: number;
   totalTokensOut: number;
+  tokensIn: number;
+  tokensOut: number;
+  cachedTokens: number;
   totalCostMusd: number;
 };
 
@@ -1642,19 +1687,22 @@ export type SessionUsageSummary = {
  * system (processUsage → microdollar_usage) already records per-request
  * usage keyed by session_id, so we aggregate here.
  *
- * The `reviewCreatedAt` lower bound lets Postgres use the existing
+ * The review time bounds let Postgres use the existing
  * `idx_microdollar_usage_metadata_created_at` index instead of seq-scanning
- * the full table (~469 M rows). Billing rows cannot exist before the review.
+ * the full table (~469 M rows). The upper bound prevents later reviews that
+ * continue the same session from changing a completed review's totals.
  */
 export async function getSessionUsageFromBilling(
   cliSessionId: string,
-  reviewCreatedAt: string
+  reviewCreatedAt: string,
+  reviewCompletedAt?: string
 ): Promise<SessionUsageSummary | null> {
   try {
     const joinCondition = eq(microdollar_usage.id, microdollar_usage_metadata.id);
     const sessionFilter = and(
       eq(microdollar_usage_metadata.session_id, cliSessionId),
-      gte(microdollar_usage_metadata.created_at, reviewCreatedAt)
+      gte(microdollar_usage_metadata.created_at, reviewCreatedAt),
+      reviewCompletedAt ? lte(microdollar_usage_metadata.created_at, reviewCompletedAt) : undefined
     );
 
     // 1. Session-wide totals (all models combined)
@@ -1662,6 +1710,8 @@ export async function getSessionUsageFromBilling(
       .select({
         totalTokensIn: sum(microdollar_usage.input_tokens).mapWith(Number),
         totalTokensOut: sum(microdollar_usage.output_tokens).mapWith(Number),
+        totalCacheHitTokens: sum(microdollar_usage.cache_hit_tokens).mapWith(Number),
+        totalCacheWriteTokens: sum(microdollar_usage.cache_write_tokens).mapWith(Number),
         totalCostMusd: sum(microdollar_usage.cost).mapWith(Number),
       })
       .from(microdollar_usage)
@@ -1684,10 +1734,15 @@ export async function getSessionUsageFromBilling(
 
     if (!topModel?.model) return null;
 
+    const cachedTokens = (totals.totalCacheHitTokens ?? 0) + (totals.totalCacheWriteTokens ?? 0);
+
     return {
       model: topModel.model,
       totalTokensIn: totals.totalTokensIn,
       totalTokensOut: totals.totalTokensOut ?? 0,
+      tokensIn: Math.max(0, totals.totalTokensIn - cachedTokens),
+      tokensOut: totals.totalTokensOut ?? 0,
+      cachedTokens,
       totalCostMusd: totals.totalCostMusd ?? 0,
     };
   } catch (error) {

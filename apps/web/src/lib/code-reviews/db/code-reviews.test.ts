@@ -3,9 +3,11 @@ import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
+  microdollar_usage,
+  microdollar_usage_metadata,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -13,7 +15,9 @@ import {
   createCodeReview,
   createCodeReviewAttempt,
   createInfraRetryAttemptIfMissing,
+  ensureCurrentCodeReviewAttemptFromReview,
   getCodeReviewAttemptForReview,
+  getSessionUsageFromBilling,
   listCodeReviewAttempts,
   updateCodeReviewAttemptForCallback,
   findPreviousCompletedReview,
@@ -616,5 +620,111 @@ describe('findPreviousCompletedReview', () => {
         errorMessage: 'bad callback',
       })
     ).rejects.toThrow('not found');
+  });
+
+  it('snapshots analytics enrollment once for a dispatched attempt', async () => {
+    const reviewId = await createReview('sha-analytics-snapshot');
+    const [review] = await db
+      .select()
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    const enabledAttempt = await ensureCurrentCodeReviewAttemptFromReview(review, true);
+    const unchangedAttempt = await ensureCurrentCodeReviewAttemptFromReview(review, false);
+
+    expect(enabledAttempt.analytics_enabled_at_dispatch).toBe(true);
+    expect(unchangedAttempt.id).toBe(enabledAttempt.id);
+    expect(unchangedAttempt.analytics_enabled_at_dispatch).toBe(true);
+  });
+
+  it('copies analytics enrollment to an infrastructure retry attempt', async () => {
+    const reviewId = await createReview('sha-analytics-retry-snapshot');
+    await updateCodeReviewStatus(reviewId, 'running');
+    const failedAttempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'failed',
+      analyticsEnabledAtDispatch: true,
+    });
+
+    const result = await createInfraRetryAttemptIfMissing({
+      codeReviewId: reviewId,
+      retryOfAttemptId: failedAttempt.id,
+    });
+
+    expect(result.outcome).toBe('created');
+    if (result.outcome !== 'created') throw new Error('Expected infrastructure retry attempt');
+    expect(result.attempt.analytics_enabled_at_dispatch).toBe(true);
+  });
+});
+
+describe('getSessionUsageFromBilling', () => {
+  const usageIds: string[] = [];
+
+  afterEach(async () => {
+    if (usageIds.length === 0) return;
+
+    await db
+      .delete(microdollar_usage_metadata)
+      .where(inArray(microdollar_usage_metadata.id, usageIds));
+    await db.delete(microdollar_usage).where(inArray(microdollar_usage.id, usageIds));
+    usageIds.length = 0;
+  });
+
+  it('excludes later usage when a completed review session is reused', async () => {
+    const sessionId = `ses_usage_window_${crypto.randomUUID()}`;
+    const firstUsageId = crypto.randomUUID();
+    const laterUsageId = crypto.randomUUID();
+    usageIds.push(firstUsageId, laterUsageId);
+
+    await db.insert(microdollar_usage).values([
+      {
+        id: firstUsageId,
+        kilo_user_id: 'code-review-usage-test',
+        cost: 100,
+        input_tokens: 1000,
+        output_tokens: 100,
+        cache_write_tokens: 100,
+        cache_hit_tokens: 600,
+        created_at: '2026-06-18T10:00:00.000Z',
+        model: 'anthropic/claude-sonnet-4.6',
+      },
+      {
+        id: laterUsageId,
+        kilo_user_id: 'code-review-usage-test',
+        cost: 200,
+        input_tokens: 2000,
+        output_tokens: 200,
+        cache_write_tokens: 200,
+        cache_hit_tokens: 1200,
+        created_at: '2026-06-18T12:00:00.000Z',
+        model: 'openai/gpt-4o',
+      },
+    ]);
+    await db.insert(microdollar_usage_metadata).values([
+      {
+        id: firstUsageId,
+        message_id: `msg_${firstUsageId}`,
+        session_id: sessionId,
+        created_at: '2026-06-18T10:00:00.000Z',
+      },
+      {
+        id: laterUsageId,
+        message_id: `msg_${laterUsageId}`,
+        session_id: sessionId,
+        created_at: '2026-06-18T12:00:00.000Z',
+      },
+    ]);
+
+    await expect(
+      getSessionUsageFromBilling(sessionId, '2026-06-18T09:00:00.000Z', '2026-06-18T11:00:00.000Z')
+    ).resolves.toEqual({
+      model: 'anthropic/claude-sonnet-4.6',
+      totalTokensIn: 1000,
+      totalTokensOut: 100,
+      tokensIn: 300,
+      tokensOut: 100,
+      cachedTokens: 700,
+      totalCostMusd: 100,
+    });
   });
 });

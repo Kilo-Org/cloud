@@ -1,12 +1,50 @@
 import { db } from '@/lib/drizzle';
 import { agent_configs } from '@kilocode/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 
 type AgentConfigOwner = { type: 'org'; id: string } | { type: 'user'; id: string };
+
+type AgentConfigUpsertOptions = {
+  preserveCodeReviewFeatureSettings?: boolean;
+};
+
+function configForAtomicUpdate(
+  config: CodeReviewAgentConfig | Record<string, unknown>,
+  options: AgentConfigUpsertOptions
+) {
+  if (!options.preserveCodeReviewFeatureSettings) {
+    return config;
+  }
+
+  const serializedConfig = JSON.stringify(config);
+  if (serializedConfig === undefined) {
+    throw new Error('Agent config must be JSON serializable');
+  }
+
+  return sql<CodeReviewAgentConfig | Record<string, unknown>>`jsonb_set(
+    jsonb_set(
+      ${serializedConfig}::jsonb,
+      '{review_memory_enabled}',
+      CASE
+        WHEN jsonb_typeof(${agent_configs.config}->'review_memory_enabled') = 'boolean'
+          THEN ${agent_configs.config}->'review_memory_enabled'
+        ELSE 'false'::jsonb
+      END,
+      true
+    ),
+    '{review_analytics_enabled}',
+    CASE
+      WHEN jsonb_typeof(${agent_configs.config}->'review_analytics_enabled') = 'boolean'
+        THEN ${agent_configs.config}->'review_analytics_enabled'
+      ELSE 'false'::jsonb
+    END,
+    true
+  )`;
+}
 
 /**
  * Gets agent configuration for an organization
@@ -30,21 +68,21 @@ export async function getAgentConfig(organizationId: string, agentType: string, 
 /**
  * Creates or updates agent configuration
  */
-export async function upsertAgentConfig(data: {
-  organizationId: string;
-  agentType: string;
-  platform: string;
-  config: CodeReviewAgentConfig | Record<string, unknown>;
-  isEnabled?: boolean;
-  createdBy: string;
-}) {
-  const updateSet: Partial<typeof agent_configs.$inferInsert> = {
-    config: data.config,
+export async function upsertAgentConfig(
+  data: {
+    organizationId: string;
+    agentType: string;
+    platform: string;
+    config: CodeReviewAgentConfig | Record<string, unknown>;
+    isEnabled?: boolean;
+    createdBy: string;
+  } & AgentConfigUpsertOptions
+) {
+  const updateSet = {
+    config: configForAtomicUpdate(data.config, data),
     updated_at: new Date().toISOString(),
+    ...(data.isEnabled !== undefined ? { is_enabled: data.isEnabled } : {}),
   };
-  if (data.isEnabled !== undefined) {
-    updateSet.is_enabled = data.isEnabled;
-  }
 
   await db
     .insert(agent_configs)
@@ -157,21 +195,21 @@ export async function getAgentConfigForOwner(
  * Creates or updates agent configuration for an owner (organization or personal user)
  * Supports both organization and personal user ownership
  */
-export async function upsertAgentConfigForOwner(data: {
-  owner: AgentConfigOwner;
-  agentType: string;
-  platform: string;
-  config: CodeReviewAgentConfig | Record<string, unknown>;
-  isEnabled?: boolean;
-  createdBy: string;
-}) {
-  const updateSet: Partial<typeof agent_configs.$inferInsert> = {
-    config: data.config,
+export async function upsertAgentConfigForOwner(
+  data: {
+    owner: AgentConfigOwner;
+    agentType: string;
+    platform: string;
+    config: CodeReviewAgentConfig | Record<string, unknown>;
+    isEnabled?: boolean;
+    createdBy: string;
+  } & AgentConfigUpsertOptions
+) {
+  const updateSet = {
+    config: configForAtomicUpdate(data.config, data),
     updated_at: new Date().toISOString(),
+    ...(data.isEnabled !== undefined ? { is_enabled: data.isEnabled } : {}),
   };
-  if (data.isEnabled !== undefined) {
-    updateSet.is_enabled = data.isEnabled;
-  }
 
   const values =
     data.owner.type === 'org'

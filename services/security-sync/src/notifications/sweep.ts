@@ -5,6 +5,17 @@ import {
   security_finding_notifications,
 } from '@kilocode/db/schema';
 import {
+  SecurityAuditLogAction,
+  SecurityFindingAuditSourceContext,
+} from '@kilocode/db/schema-types';
+import {
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+  type SecurityFindingAuditEventFinding,
+  type SecurityFindingAuditOwner,
+} from '@kilocode/worker-utils/security-finding-audit';
+import {
   SecurityNotificationPolicySchema,
   calculateSlaWarningBoundary,
   getEligibleSlaNotificationKind,
@@ -62,6 +73,39 @@ type NotificationFindingRow = {
   slaDueAt: string | null;
   ignoredReason: string | null;
 };
+
+const dbTimestampSchema = z.union([z.string(), z.date()]);
+const nullableDbTimestampSchema = dbTimestampSchema.nullable();
+const securityFindingStatusSchema = z.enum(['open', 'fixed', 'ignored']);
+const securitySeveritySchema = z.enum(['critical', 'high', 'medium', 'low']);
+const supersededSecurityFindingResultSchema = z.object({
+  findingId: z.string().uuid(),
+  previousStatus: securityFindingStatusSchema.nullable(),
+  previousSeverity: securitySeveritySchema.nullable(),
+  effectiveStatus: securityFindingStatusSchema,
+  effectiveSeverity: securitySeveritySchema,
+  findingCreatedAt: dbTimestampSchema,
+  ownedByUserId: z.string().nullable(),
+  ownedByOrganizationId: z.string().uuid().nullable(),
+  source: z.string(),
+  sourceId: z.string(),
+  repoFullName: z.string(),
+  title: z.string(),
+  packageName: z.string(),
+  packageEcosystem: z.string(),
+  manifestPath: z.string().nullable(),
+  patchedVersion: z.string().nullable(),
+  ghsaId: z.string().nullable(),
+  cveId: z.string().nullable(),
+  cweIds: z.array(z.string()).nullable(),
+  cvssScore: z.union([z.string(), z.number()]).nullable(),
+  dependabotHtmlUrl: z.string().nullable(),
+  firstDetectedAt: dbTimestampSchema,
+  fixedAt: nullableDbTimestampSchema,
+  slaDueAt: nullableDbTimestampSchema,
+  canonicalFindingId: z.string().uuid(),
+});
+type SupersededSecurityFindingResult = z.infer<typeof supersededSecurityFindingResultSchema>;
 
 type KindCount = {
   kind: 'new_finding' | 'sla_warning' | 'sla_breach';
@@ -366,7 +410,7 @@ async function recoverStagedRows(
 }
 
 async function canonicalizeStagedOwnerRepos(
-  db: Pick<WorkerDb, 'execute'>,
+  db: Pick<WorkerDb, 'transaction'>,
   rows: NotificationFindingRow[],
   states: Map<OwnerKey, OwnerConfigState>
 ): Promise<void> {
@@ -388,56 +432,158 @@ async function canonicalizeStagedOwnerRepos(
 }
 
 async function supersedeDuplicateFindings(
-  db: Pick<WorkerDb, 'execute'>,
+  db: Pick<WorkerDb, 'transaction'>,
   repoFullName: string,
   owner: SecurityNotificationOwner
 ): Promise<void> {
   const partitionColumn = ownerPartitionColumn(owner);
-  await db.execute(sql`
-    WITH ranked AS (
-      SELECT
-        ${security_findings.id} AS id,
-        ROW_NUMBER() OVER (
-          PARTITION BY ${partitionColumn},
-                       ${security_findings.repo_full_name},
-                       ${security_findings.source},
-                       ${security_findings.ghsa_id},
-                       ${security_findings.package_name},
-                       ${security_findings.manifest_path}
-          ORDER BY CASE
-            WHEN ${security_findings.source_id} ~ '^[0-9]+$' THEN ${security_findings.source_id}::int
-            ELSE 0
-          END DESC
-        ) AS rn,
-        FIRST_VALUE(${security_findings.id}) OVER (
-          PARTITION BY ${partitionColumn},
-                       ${security_findings.repo_full_name},
-                       ${security_findings.source},
-                       ${security_findings.ghsa_id},
-                       ${security_findings.package_name},
-                       ${security_findings.manifest_path}
-          ORDER BY CASE
-            WHEN ${security_findings.source_id} ~ '^[0-9]+$' THEN ${security_findings.source_id}::int
-            ELSE 0
-          END DESC
-        ) AS canonical_id
-      FROM ${security_findings}
-      WHERE ${security_findings.repo_full_name} = ${repoFullName}
-        AND ${ownerPredicate(owner)}
-        AND ${security_findings.source} = 'dependabot'
-        AND ${security_findings.ghsa_id} IS NOT NULL
-        AND ${security_findings.status} = 'open'
-    )
-    UPDATE ${security_findings}
-    SET
-      ${sql.identifier(security_findings.status.name)} = 'ignored',
-      ${sql.identifier(security_findings.ignored_reason.name)} = 'superseded:' || ranked.canonical_id,
-      ${sql.identifier(security_findings.ignored_by.name)} = 'system',
-      ${sql.identifier(security_findings.updated_at.name)} = now()
-    FROM ranked
-    WHERE ${security_findings.id} = ranked.id
-      AND ranked.rn > 1
-  `);
+  await db.transaction(async tx => {
+    const result = await tx.execute<Record<string, unknown>>(sql`
+      WITH ranked AS (
+        SELECT
+          ${security_findings.id} AS id,
+          ${security_findings.status} AS previous_status,
+          ${security_findings.severity} AS previous_severity,
+          ROW_NUMBER() OVER (
+            PARTITION BY ${partitionColumn},
+                         ${security_findings.repo_full_name},
+                         ${security_findings.source},
+                         ${security_findings.ghsa_id},
+                         ${security_findings.package_name},
+                         ${security_findings.manifest_path}
+            ORDER BY CASE
+              WHEN ${security_findings.source_id} ~ '^[0-9]+$' THEN ${security_findings.source_id}::int
+              ELSE 0
+            END DESC
+          ) AS rn,
+          FIRST_VALUE(${security_findings.id}) OVER (
+            PARTITION BY ${partitionColumn},
+                         ${security_findings.repo_full_name},
+                         ${security_findings.source},
+                         ${security_findings.ghsa_id},
+                         ${security_findings.package_name},
+                         ${security_findings.manifest_path}
+            ORDER BY CASE
+              WHEN ${security_findings.source_id} ~ '^[0-9]+$' THEN ${security_findings.source_id}::int
+              ELSE 0
+            END DESC
+          ) AS canonical_id
+        FROM ${security_findings}
+        WHERE ${security_findings.repo_full_name} = ${repoFullName}
+          AND ${ownerPredicate(owner)}
+          AND ${security_findings.source} = 'dependabot'
+          AND ${security_findings.ghsa_id} IS NOT NULL
+          AND ${security_findings.status} = 'open'
+      ),
+      superseded AS (
+        UPDATE ${security_findings}
+        SET
+          ${sql.identifier(security_findings.status.name)} = 'ignored',
+          ${sql.identifier(security_findings.ignored_reason.name)} = 'superseded:' || ranked.canonical_id,
+          ${sql.identifier(security_findings.ignored_by.name)} = 'system',
+          ${sql.identifier(security_findings.updated_at.name)} = now()
+        FROM ranked
+        WHERE ${security_findings.id} = ranked.id
+          AND ranked.rn > 1
+        RETURNING
+          ${security_findings.id} AS "findingId",
+          ranked.previous_status AS "previousStatus",
+          ranked.previous_severity AS "previousSeverity",
+          ${security_findings.status} AS "effectiveStatus",
+          ${security_findings.severity} AS "effectiveSeverity",
+          ${security_findings.created_at} AS "findingCreatedAt",
+          ${security_findings.owned_by_user_id} AS "ownedByUserId",
+          ${security_findings.owned_by_organization_id} AS "ownedByOrganizationId",
+          ${security_findings.source} AS "source",
+          ${security_findings.source_id} AS "sourceId",
+          ${security_findings.repo_full_name} AS "repoFullName",
+          ${security_findings.title} AS "title",
+          ${security_findings.package_name} AS "packageName",
+          ${security_findings.package_ecosystem} AS "packageEcosystem",
+          ${security_findings.manifest_path} AS "manifestPath",
+          ${security_findings.patched_version} AS "patchedVersion",
+          ${security_findings.ghsa_id} AS "ghsaId",
+          ${security_findings.cve_id} AS "cveId",
+          ${security_findings.cwe_ids} AS "cweIds",
+          ${security_findings.cvss_score} AS "cvssScore",
+          ${security_findings.dependabot_html_url} AS "dependabotHtmlUrl",
+          ${security_findings.first_detected_at} AS "firstDetectedAt",
+          ${security_findings.fixed_at} AS "fixedAt",
+          ${security_findings.sla_due_at} AS "slaDueAt",
+          ranked.canonical_id AS "canonicalFindingId"
+      )
+      SELECT * FROM superseded
+    `);
+    const superseded = result.rows.map(row => supersededSecurityFindingResultSchema.parse(row));
+    const occurredAt = new Date().toISOString();
+    for (const finding of superseded) {
+      await insertSecurityFindingAuditEvent(tx, {
+        owner: toSecurityFindingAuditOwner(owner),
+        finding: toAuditEventFinding(finding),
+        actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+        action: SecurityAuditLogAction.FindingSuperseded,
+        occurredAt,
+        eventKey: deriveSecurityFindingAuditEventKey([
+          ownerAuditKeyPart(owner),
+          finding.findingId,
+          SecurityAuditLogAction.FindingSuperseded,
+          finding.canonicalFindingId,
+        ]),
+        sourceContext: SecurityFindingAuditSourceContext.SecuritySync,
+        snapshotExtras: { canonical_finding_id: finding.canonicalFindingId },
+        beforeState: { status: finding.previousStatus ?? 'open' },
+        afterState: {
+          status: finding.effectiveStatus,
+          reason_code: 'superseded',
+          canonical_finding_id: finding.canonicalFindingId,
+        },
+        metadata: {
+          repo_full_name: finding.repoFullName,
+          source_alert_number: finding.sourceId,
+        },
+      });
+    }
+  });
+}
+
+function toSecurityFindingAuditOwner(owner: SecurityNotificationOwner): SecurityFindingAuditOwner {
+  return isOrganizationNotificationOwner(owner)
+    ? { type: 'organization', organizationId: owner.organizationId }
+    : { type: 'user', userId: owner.userId };
+}
+
+function ownerAuditKeyPart(owner: SecurityNotificationOwner): string {
+  return isOrganizationNotificationOwner(owner)
+    ? `organization:${owner.organizationId}`
+    : `user:${owner.userId}`;
+}
+
+function toAuditEventFinding(
+  finding: SupersededSecurityFindingResult
+): SecurityFindingAuditEventFinding {
+  return {
+    id: finding.findingId,
+    owned_by_user_id: finding.ownedByUserId,
+    owned_by_organization_id: finding.ownedByOrganizationId,
+    source: finding.source,
+    source_id: finding.sourceId,
+    repo_full_name: finding.repoFullName,
+    title: finding.title,
+    severity: finding.effectiveSeverity,
+    status: finding.effectiveStatus,
+    package_name: finding.packageName,
+    package_ecosystem: finding.packageEcosystem,
+    manifest_path: finding.manifestPath,
+    patched_version: finding.patchedVersion,
+    ghsa_id: finding.ghsaId,
+    cve_id: finding.cveId,
+    cwe_ids: finding.cweIds,
+    cvss_score: finding.cvssScore,
+    dependabot_html_url: finding.dependabotHtmlUrl,
+    first_detected_at: finding.firstDetectedAt,
+    fixed_at: finding.fixedAt,
+    sla_due_at: finding.slaDueAt,
+  };
 }
 
 async function selectNotificationRows(

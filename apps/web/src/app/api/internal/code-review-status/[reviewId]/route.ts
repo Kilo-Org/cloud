@@ -18,6 +18,7 @@
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import * as z from 'zod';
 import {
   updateCodeReviewStatus,
   updateCodeReviewStatusIfNonTerminal,
@@ -83,42 +84,54 @@ import {
 import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
+  disableCodeReviewForRepeatedCloneTimeoutsToday,
   getCodeReviewActionRequiredCopy,
   isCodeReviewActionRequiredReason,
   type CodeReviewActionRequiredReason,
 } from '@/lib/code-reviews/action-required';
 import type { Owner } from '@/lib/code-reviews/core';
+import { parseCodeReviewAnalyticsManifest } from '@/lib/code-reviews/analytics/contracts';
+import { finalizeCompletedCodeReviewWithAnalytics } from '@/lib/code-reviews/analytics/db';
 
-/**
- * Payload from the orchestrator DO (legacy format).
- */
-type OrchestratorPayload = {
-  sessionId?: string;
-  cliSessionId?: string;
-  status: 'running' | 'completed' | 'failed' | 'cancelled';
-  errorMessage?: string;
-  terminalReason?: CodeReviewTerminalReason;
-  gateResult?: 'pass' | 'fail';
-};
+const CallbackTextTruncationSchema = z
+  .object({
+    originalUtf8ByteLength: z.number().int().nonnegative(),
+    retainedUtf8ByteLength: z.number().int().nonnegative(),
+  })
+  .strict();
 
-/**
- * Payload from cloud-agent-next callback (ExecutionCallbackPayload).
- */
-type CloudAgentNextCallbackPayload = {
-  sessionId?: string;
-  cloudAgentSessionId?: string;
-  executionId?: string;
-  kiloSessionId?: string;
-  status: 'completed' | 'failed' | 'interrupted';
-  errorMessage?: string;
-  terminalReason?: CodeReviewTerminalReason;
-  modelNotFoundRuntimeDiagnostics?: unknown;
-  failure?: unknown;
-  lastSeenBranch?: string;
-  gateResult?: 'pass' | 'fail';
-};
+const StatusUpdatePayloadSchema = z
+  .object({
+    sessionId: z.string().optional(),
+    cliSessionId: z.string().optional(),
+    cloudAgentSessionId: z.string().optional(),
+    executionId: z.string().optional(),
+    messageId: z.string().optional(),
+    kiloSessionId: z.string().optional(),
+    idempotencyKey: z.string().optional(),
+    status: z.enum(['running', 'completed', 'failed', 'cancelled', 'interrupted']),
+    errorMessage: z.string().optional(),
+    terminalReason: z.enum(CODE_REVIEW_TERMINAL_REASONS).optional(),
+    modelNotFoundRuntimeDiagnostics: z.unknown().optional(),
+    failure: z.unknown().optional(),
+    failureStage: z.unknown().optional(),
+    clientError: z.unknown().optional(),
+    errorMessageTruncation: CallbackTextTruncationSchema.optional(),
+    lastSeenBranch: z.string().optional(),
+    gateResult: z.enum(['pass', 'fail']).optional(),
+    lastAssistantMessageText: z.string().optional(),
+    lastAssistantMessageTextTruncation: CallbackTextTruncationSchema.optional(),
+  })
+  .refine(
+    payload =>
+      !(
+        payload.lastAssistantMessageText !== undefined &&
+        payload.lastAssistantMessageTextTruncation?.retainedUtf8ByteLength === 0
+      ),
+    { message: 'Assistant text cannot be present when it was omitted' }
+  );
 
-type StatusUpdatePayload = OrchestratorPayload | CloudAgentNextCallbackPayload;
+type StatusUpdatePayload = z.infer<typeof StatusUpdatePayloadSchema>;
 
 type TerminalOwnerResolution = {
   owner: Owner;
@@ -568,60 +581,47 @@ const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
 /**
  * Read a review's usage data.
  *
- * For v1 (SSE) reviews the orchestrator writes usage to the record just
- * before the completion callback, so a short poll handles the race.
- * For v2 (cloud-agent-next) the orchestrator never writes usage — we
- * skip the poll and go straight to the billing tables.
- *
- * When the billing fallback is used we also back-fill the code_reviews
- * record so later reads (e.g. admin panel) don't repeat the aggregation.
+ * Billing rows are the source of truth for review token usage. If no billing
+ * usage exists, keep the persisted review totals because older reviews only
+ * stored usage on the review row.
  */
 async function getReviewUsageData(reviewId: string) {
-  let review = await getCodeReviewById(reviewId);
+  const review = await getCodeReviewById(reviewId);
+  const persistedUsage = {
+    model: review?.model ?? null,
+    tokensIn: review?.total_tokens_in ?? 0,
+    tokensOut: review?.total_tokens_out ?? 0,
+    cachedTokens: 0,
+  };
 
-  // v1 only: poll briefly — usage may arrive from the orchestrator
-  // right before the callback. v2 never writes usage to the record,
-  // so polling would just waste ~1.4s for nothing.
-  if (review && !review.model && review.agent_version !== 'v2') {
-    const MAX_RETRIES = 3;
-    const BASE_DELAY_MS = 200;
-    for (let attempt = 0; attempt < MAX_RETRIES && review && !review.model; attempt++) {
-      await new Promise(resolve => setTimeout(resolve, BASE_DELAY_MS * 2 ** attempt));
-      review = await getCodeReviewById(reviewId);
-    }
+  if (!review?.cli_session_id || !review.created_at) {
+    return persistedUsage;
   }
 
-  if (review?.model) {
-    return {
-      model: review.model,
-      tokensIn: review.total_tokens_in ?? null,
-      tokensOut: review.total_tokens_out ?? null,
-    };
+  const billing = await getSessionUsageFromBilling(
+    review.cli_session_id,
+    review.created_at,
+    review.completed_at ?? undefined
+  );
+  if (!billing) {
+    return persistedUsage;
   }
 
-  // Fallback: aggregate from billing tables (covers v2 / cloud-agent-next reviews)
-  if (review?.cli_session_id && review.created_at) {
-    const billing = await getSessionUsageFromBilling(review.cli_session_id, review.created_at);
-    if (billing) {
-      // Back-fill the code_reviews record so we don't repeat this aggregation
-      updateCodeReviewUsage(reviewId, {
-        model: billing.model,
-        totalTokensIn: billing.totalTokensIn,
-        totalTokensOut: billing.totalTokensOut,
-        totalCostMusd: billing.totalCostMusd,
-      }).catch(err => {
-        logExceptInTest('[code-review-status] Failed to back-fill usage from billing', err);
-      });
+  updateCodeReviewUsage(reviewId, {
+    ...(review.model == null ? { model: billing.model } : {}),
+    totalTokensIn: billing.totalTokensIn,
+    totalTokensOut: billing.totalTokensOut,
+    totalCostMusd: billing.totalCostMusd,
+  }).catch(err => {
+    logExceptInTest('[code-review-status] Failed to back-fill usage from billing', err);
+  });
 
-      return {
-        model: billing.model,
-        tokensIn: billing.totalTokensIn,
-        tokensOut: billing.totalTokensOut,
-      };
-    }
-  }
-
-  return { model: null, tokensIn: null, tokensOut: null };
+  return {
+    model: review.model ?? billing.model,
+    tokensIn: billing.tokensIn,
+    tokensOut: billing.tokensOut,
+    cachedTokens: billing.cachedTokens,
+  };
 }
 
 function getReviewGuidanceFooterData(review: CloudAgentCodeReview) {
@@ -980,24 +980,18 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const rawPayload: StatusUpdatePayload = await req.json();
+    const rawBody: unknown = await req.json();
+    const parsedPayload = StatusUpdatePayloadSchema.safeParse(rawBody);
+    if (!parsedPayload.success) {
+      return NextResponse.json({ error: 'Invalid callback payload' }, { status: 400 });
+    }
+
+    const rawPayload = parsedPayload.data;
     const attemptId = callbackAttemptId || undefined;
     const { status, sessionId, cliSessionId, errorMessage, terminalReason, gateResult, failure } =
       normalizePayload(rawPayload);
-    const executionId = 'executionId' in rawPayload ? rawPayload.executionId : undefined;
-
-    // Validate payload
-    if (!status) {
-      return NextResponse.json({ error: 'Missing required field: status' }, { status: 400 });
-    }
-
-    // Warn on unexpected gateResult values so agent-side typos surface early
-    const validGateResult = gateResult === 'pass' || gateResult === 'fail' ? gateResult : undefined;
-    if (gateResult && !validGateResult) {
-      logExceptInTest('[code-review-status] Unexpected gateResult value, ignoring', {
-        gateResult,
-      });
-    }
+    const executionId = rawPayload.executionId;
+    const validGateResult = gateResult;
 
     const loggableErrorMessage = getLoggableStatusErrorMessage(errorMessage, terminalReason);
     logExceptInTest('[code-review-status] Received status update', {
@@ -1018,35 +1012,78 @@ export async function POST(
       return NextResponse.json({ error: 'Review not found' }, { status: 404 });
     }
 
-    const attempt = await updateCodeReviewAttemptForCallback({
-      codeReviewId: reviewId,
-      attemptId: attemptId ?? undefined,
-      status,
-      sessionId,
-      cliSessionId,
-      executionId,
-      errorMessage,
-      terminalReason,
-      startedAt: status === 'running' ? new Date() : undefined,
-      completedAt:
-        status === 'completed' || status === 'failed' || status === 'cancelled'
-          ? new Date()
-          : undefined,
-    });
+    const callbackCompletedAt = new Date();
+    let attempt: CloudAgentCodeReviewAttempt;
+    let latestAttempt = await getLatestCodeReviewAttempt(reviewId);
+    let analyticsCompletionApplied = false;
 
-    const latestAttempt = await getLatestCodeReviewAttempt(reviewId);
-    const isStaleAttempt = !!latestAttempt && attempt.id !== latestAttempt.id;
-    if (isStaleAttempt) {
-      logExceptInTest('[code-review-status] Stale callback updated old attempt, skipping parent', {
-        reviewId,
-        attemptId: attempt.id,
-        latestAttemptId: latestAttempt?.id,
-        requestedStatus: status,
+    if (status === 'completed' && latestAttempt?.analytics_enabled_at_dispatch === true) {
+      const capture = parseCodeReviewAnalyticsManifest(rawPayload.lastAssistantMessageText, {
+        assistantTextWasOmitted:
+          rawPayload.lastAssistantMessageText === undefined &&
+          rawPayload.lastAssistantMessageTextTruncation?.retainedUtf8ByteLength === 0,
       });
-      return NextResponse.json({
-        success: true,
-        message: 'Stale callback from superseded attempt',
+      const completionResult = await finalizeCompletedCodeReviewWithAnalytics({
+        codeReviewId: reviewId,
+        sourceAttemptId: attemptId,
+        sessionId,
+        cliSessionId,
+        executionId,
+        completedAt: callbackCompletedAt,
+        capture,
       });
+
+      if (completionResult.outcome !== 'applied') {
+        return NextResponse.json({
+          success: true,
+          message:
+            completionResult.outcome === 'stale'
+              ? 'Stale callback from superseded attempt'
+              : completionResult.outcome === 'terminal'
+                ? 'Review already in terminal state'
+                : 'Review completion already processed',
+          outcome: completionResult.outcome,
+          currentStatus: completionResult.currentStatus,
+          terminalReason: completionResult.terminalReason,
+        });
+      }
+
+      attempt = latestAttempt;
+      analyticsCompletionApplied = true;
+    } else {
+      attempt = await updateCodeReviewAttemptForCallback({
+        codeReviewId: reviewId,
+        attemptId: attemptId ?? undefined,
+        status,
+        sessionId,
+        cliSessionId,
+        executionId,
+        errorMessage,
+        terminalReason,
+        startedAt: status === 'running' ? callbackCompletedAt : undefined,
+        completedAt:
+          status === 'completed' || status === 'failed' || status === 'cancelled'
+            ? callbackCompletedAt
+            : undefined,
+      });
+
+      latestAttempt = await getLatestCodeReviewAttempt(reviewId);
+      const isStaleAttempt = !!latestAttempt && attempt.id !== latestAttempt.id;
+      if (isStaleAttempt) {
+        logExceptInTest(
+          '[code-review-status] Stale callback updated old attempt, skipping parent',
+          {
+            reviewId,
+            attemptId: attempt.id,
+            latestAttemptId: latestAttempt?.id,
+            requestedStatus: status,
+          }
+        );
+        return NextResponse.json({
+          success: true,
+          message: 'Stale callback from superseded attempt',
+        });
+      }
     }
 
     // Determine valid transitions based on incoming status
@@ -1077,6 +1114,7 @@ export async function POST(
     const updatesLatestAttemptSession =
       sessionId && latestAttempt?.id === attempt.id && attempt.session_id === sessionId;
     if (
+      !analyticsCompletionApplied &&
       sessionId &&
       review.session_id &&
       sessionId !== review.session_id &&
@@ -1262,7 +1300,9 @@ export async function POST(
       status === 'cancelled' &&
       isModelNotFoundCodeReviewTerminalReason(terminalReason, errorMessage);
 
-    if (isModelNotFoundCancellation) {
+    if (analyticsCompletionApplied) {
+      // Parent and accepted attempt completion were claimed with analytics in one transaction.
+    } else if (isModelNotFoundCancellation) {
       const claimedTerminalUpdate = await updateCodeReviewStatusIfNonTerminal(
         reviewId,
         status,
@@ -1289,6 +1329,7 @@ export async function POST(
       await updateCodeReviewStatus(reviewId, status, parentStatusUpdates);
     }
 
+    let providerTerminalReason = terminalReason;
     const actionRequiredReason =
       status === 'failed' ? getActionRequiredTerminalReason(terminalReason, errorMessage) : null;
     if (actionRequiredReason) {
@@ -1310,6 +1351,30 @@ export async function POST(
           captureException(disableError, {
             tags: { source: 'code-review-status-action-required-disable' },
             extra: { reviewId, reason: actionRequiredReason },
+          });
+        }
+      }
+    } else if (status === 'failed') {
+      const ownerResolution = await getTerminalOwnerResolution();
+      if (ownerResolution) {
+        try {
+          const repeatedCloneTimeoutReason = await disableCodeReviewForRepeatedCloneTimeoutsToday({
+            owner: ownerResolution.owner,
+            platform: review.platform === 'gitlab' ? 'gitlab' : 'github',
+            reviewId,
+            errorMessage,
+          });
+          if (repeatedCloneTimeoutReason) {
+            providerTerminalReason = repeatedCloneTimeoutReason;
+          }
+        } catch (disableError) {
+          logExceptInTest(
+            '[code-review-status] Failed to disable Code Reviewer for repeated repository clone timeouts:',
+            disableError
+          );
+          captureException(disableError, {
+            tags: { source: 'code-review-status-repeated-clone-timeout-disable' },
+            extra: { reviewId },
           });
         }
       }
@@ -1336,7 +1401,7 @@ export async function POST(
           integration,
           status,
           errorMessage,
-          terminalReason,
+          providerTerminalReason,
           gitlabAccessToken,
           validGateResult
         );
@@ -1455,11 +1520,9 @@ export async function POST(
 
               // Summary history and footer (completed only)
               if (status === 'completed') {
-                const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
-                const usage =
-                  model && tokensIn != null && tokensOut != null
-                    ? { model, tokensIn, tokensOut }
-                    : undefined;
+                const { model, tokensIn, tokensOut, cachedTokens } =
+                  await getReviewUsageData(reviewId);
+                const usage = model ? { model, tokensIn, tokensOut, cachedTokens } : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
                 const summaryFooter = { usage, reviewGuidance };
                 const reservedFooterCharacters = buildReviewSummaryFooter(summaryFooter).length;
@@ -1548,11 +1611,9 @@ export async function POST(
 
               // Summary history and footer (completed only)
               if (status === 'completed') {
-                const { model, tokensIn, tokensOut } = await getReviewUsageData(reviewId);
-                const usage =
-                  model && tokensIn != null && tokensOut != null
-                    ? { model, tokensIn, tokensOut }
-                    : undefined;
+                const { model, tokensIn, tokensOut, cachedTokens } =
+                  await getReviewUsageData(reviewId);
+                const usage = model ? { model, tokensIn, tokensOut, cachedTokens } : undefined;
                 const reviewGuidance = getReviewGuidanceFooterData(review);
 
                 const existing = await findKiloReviewNote(

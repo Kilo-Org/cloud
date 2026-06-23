@@ -7,7 +7,6 @@ jest.mock('@/lib/posthog', () => {
     __esModule: true,
     default: jest.fn(() => ({
       getFeatureFlag: mockGetFeatureFlag,
-      getFeatureFlagPayload: jest.fn(),
     })),
     mockGetFeatureFlag,
   };

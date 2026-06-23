@@ -61,6 +61,7 @@ export function GitHubIntegrationDetails({
         name: model.name,
         isFree: model.isFree,
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+        hasUserByokAvailable: model.hasUserByokAvailable,
       })) ?? []
     );
   }, [openRouterModels]);

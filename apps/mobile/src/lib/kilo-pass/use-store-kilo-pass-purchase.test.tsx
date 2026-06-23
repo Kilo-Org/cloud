@@ -20,6 +20,7 @@ const mockedIap = vi.hoisted(() => ({
     onPurchaseSuccess: (purchase: Purchase) => void;
   } | null,
   requestPurchase: vi.fn(),
+  restorePurchases: vi.fn(),
 }));
 
 const mockedReactQuery = vi.hoisted(() => ({
@@ -37,6 +38,7 @@ vi.mock('expo-iap', () => ({
     AlreadyOwned: 'already-owned',
     UserCancelled: 'user-cancelled',
   },
+  getAvailablePurchases: mockedIap.getAvailablePurchases,
   useIAP: (handlers: {
     onPurchaseError: (error: Error) => void;
     onPurchaseSuccess: (purchase: Purchase) => void;
@@ -46,6 +48,7 @@ vi.mock('expo-iap', () => ({
     finishTransaction: mockedIap.finishTransaction,
     getAvailablePurchases: mockedIap.getAvailablePurchases,
     requestPurchase: mockedIap.requestPurchase,
+    restorePurchases: mockedIap.restorePurchases,
     ...(() => {
       mockedIap.handlers = handlers;
       return {};
@@ -69,7 +72,7 @@ vi.mock('@tanstack/react-query', () => ({
 }));
 
 vi.mock('sonner-native', () => ({
-  toast: { error: vi.fn() },
+  toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
 
 vi.mock('@/lib/trpc', () => ({
@@ -93,7 +96,9 @@ type StoreKiloPassPurchaseContextValue = {
     product: AppStoreKiloPassProduct,
     options?: { onCompleted?: () => void }
   ) => Promise<void>;
+  restorePurchases: () => Promise<'restored' | 'empty' | 'failed'>;
   isPending: boolean;
+  isRestoringPurchases: boolean;
 };
 
 type ReactInternals = {
@@ -215,8 +220,10 @@ function createActions(
     completeAppStorePurchase: vi.fn(),
     enabledAppleProductIds: [product.appleProductId],
     finishTransaction: vi.fn(),
+    getAvailablePurchases: vi.fn().mockResolvedValue([]),
     invalidateAfterCompletion: vi.fn(),
     requestPurchase: vi.fn(),
+    restorePurchases: vi.fn(),
     showError: () => undefined,
     ...overrides,
   });
@@ -228,6 +235,14 @@ function createDeferredPromise() {
     resolvePromise = resolve;
   });
   return { promise, resolve: resolvePromise };
+}
+
+function createDeferredRejectablePromise() {
+  let rejectPromise: (reason?: unknown) => void = ignoreDeferredResolution;
+  const promise = new Promise((_resolve, reject) => {
+    rejectPromise = reject;
+  });
+  return { promise, reject: rejectPromise };
 }
 
 function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
@@ -255,6 +270,7 @@ beforeEach(() => {
   mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
   mockedIap.handlers = null;
   mockedIap.requestPurchase.mockResolvedValue(null);
+  mockedIap.restorePurchases.mockResolvedValue(undefined);
   mockedReactQuery.completeAppStorePurchase.mockResolvedValue({ alreadyProcessed: false });
   mockedReactQuery.completeAppStorePurchaseIsPending = false;
   mockedReactQuery.invalidateQueries.mockResolvedValue(undefined);
@@ -567,19 +583,23 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       completeAppStorePurchase: completeFromRecovery,
       enabledAppleProductIds: [product.appleProductId],
       finishTransaction: finishFromRecovery,
+      getAvailablePurchases: vi.fn().mockResolvedValue([]),
       invalidateAfterCompletion: vi.fn(),
       requestPurchase: vi.fn(),
+      restorePurchases: vi.fn(),
       showError: () => undefined,
     });
     const sheetActions = createAppStoreKiloPassPurchaseActions({
       completeAppStorePurchase: completeFromSheet,
       enabledAppleProductIds: [product.appleProductId],
       finishTransaction: finishFromSheet,
+      getAvailablePurchases: vi.fn().mockResolvedValue([]),
       invalidateAfterCompletion: vi.fn(),
       onPurchaseCompleted: () => {
         onPurchaseCompleted();
       },
       requestPurchase: vi.fn(),
+      restorePurchases: vi.fn(),
       showError: () => undefined,
     });
 
@@ -593,6 +613,138 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(finishFromRecovery).toHaveBeenCalledTimes(1);
     expect(finishFromSheet).not.toHaveBeenCalled();
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('explicitly restores active Kilo Pass purchases through StoreKit and backend completion', async () => {
+    const purchase = createPurchase();
+    const restorePurchases = vi.fn().mockResolvedValue(undefined);
+    const getAvailablePurchases = vi.fn().mockResolvedValue([purchase]);
+    const completeAppStorePurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const invalidateAfterCompletion = vi.fn();
+    const actions = createActions({
+      completeAppStorePurchase,
+      finishTransaction,
+      getAvailablePurchases,
+      invalidateAfterCompletion,
+      restorePurchases,
+    });
+
+    const result = await actions.restorePurchases();
+
+    expect(result).toBe('restored');
+    expect(restorePurchases).toHaveBeenCalledTimes(1);
+    expect(getAvailablePurchases).toHaveBeenCalledTimes(1);
+    expect(completeAppStorePurchase).toHaveBeenCalledWith({ signedTransactionJws: 'signed-jws' });
+    expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
+    expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads product IDs before deciding an explicit restore is empty', async () => {
+    const purchase = createPurchase();
+    const loadEnabledAppleProductIds = vi.fn().mockResolvedValue([product.appleProductId]);
+    const completeAppStorePurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const actions = createActions({
+      completeAppStorePurchase,
+      enabledAppleProductIds: [],
+      getAvailablePurchases: vi.fn().mockResolvedValue([purchase]),
+      loadEnabledAppleProductIds,
+      restorePurchases: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const result = await actions.restorePurchases();
+
+    expect(result).toBe('restored');
+    expect(loadEnabledAppleProductIds).toHaveBeenCalledTimes(1);
+    expect(completeAppStorePurchase).toHaveBeenCalledWith({ signedTransactionJws: 'signed-jws' });
+  });
+
+  it('returns empty when StoreKit has no active Kilo Pass purchases to restore', async () => {
+    const completeAppStorePurchase = vi.fn();
+    const actions = createActions({
+      completeAppStorePurchase,
+      getAvailablePurchases: vi
+        .fn()
+        .mockResolvedValue([
+          createPurchase({ productId: 'other.product', transactionId: 'other-tx' }),
+        ]),
+      restorePurchases: vi.fn().mockResolvedValue(undefined),
+    });
+
+    const result = await actions.restorePurchases();
+
+    expect(result).toBe('empty');
+    expect(completeAppStorePurchase).not.toHaveBeenCalled();
+  });
+
+  it('does not report empty when an eligible restored purchase belongs to another Kilo account', async () => {
+    const showError = vi.fn();
+    const actions = createActions({
+      completeAppStorePurchase: vi
+        .fn()
+        .mockRejectedValue(
+          new Error('App Store purchase account token does not match the signed-in user.')
+        ),
+      getAvailablePurchases: vi.fn().mockResolvedValue([createPurchase()]),
+      restorePurchases: vi.fn().mockResolvedValue(undefined),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    const result = await actions.restorePurchases();
+
+    expect(result).toBe('failed');
+    expect(showError).toHaveBeenCalledWith(
+      'This App Store subscription is linked to another Kilo account.'
+    );
+  });
+
+  it('shows explicit restore errors when silent recovery already started completion', async () => {
+    const purchase = createPurchase();
+    const backendCompletion = createDeferredRejectablePromise();
+    const showError = vi.fn();
+    const actions = createActions({
+      completeAppStorePurchase: vi.fn().mockReturnValue(backendCompletion.promise),
+      getAvailablePurchases: vi.fn().mockResolvedValue([purchase]),
+      restorePurchases: vi.fn().mockResolvedValue(undefined),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    const silentRecovery = actions.handlePurchaseSuccess(purchase, {
+      notifyCompletion: false,
+      notifyErrors: false,
+    });
+    const explicitRestore = actions.restorePurchases();
+    await flushPromises();
+    backendCompletion.reject(
+      new Error('App Store purchase account token does not match the signed-in user.')
+    );
+
+    const [, restoreResult] = await Promise.all([silentRecovery, explicitRestore]);
+
+    expect(restoreResult).toBe('failed');
+    expect(showError).toHaveBeenCalledWith(
+      'This App Store subscription is linked to another Kilo account.'
+    );
+  });
+
+  it('shows a generic retryable error when StoreKit restore fails', async () => {
+    const showError = vi.fn();
+    const actions = createActions({
+      getAvailablePurchases: vi.fn(),
+      restorePurchases: vi.fn().mockRejectedValue(new Error('StoreKit unavailable')),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    const result = await actions.restorePurchases();
+
+    expect(result).toBe('failed');
+    expect(showError).toHaveBeenCalledWith('Failed to restore purchases. Try again.');
   });
 });
 

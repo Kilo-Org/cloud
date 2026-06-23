@@ -3,6 +3,8 @@ import { z } from 'zod';
 import {
   buildMCPID,
   buildScopedConnectCanonicalUrl,
+  GatewayMcpAccessScope,
+  parseScopeString,
   parseScopedConnectPath,
   parseAuxiliaryHeaders,
   type ScopedConnectRoute,
@@ -27,7 +29,7 @@ import {
 import { resolveProviderAuthorization } from '../lib/provider-refresh';
 import { loadStaticHeaders } from '../lib/credentials';
 import { proxyUpstream } from '../lib/upstream-proxy';
-import { challengeResponse, forbiddenResponse } from '../lib/responses';
+import { challengeResponse, forbiddenResponse, insufficientScopeResponse } from '../lib/responses';
 import { validateIncomingOrigin } from '../lib/origin';
 
 function bearerToken(header: string | undefined): string | null {
@@ -146,14 +148,14 @@ async function handleConnect(
       routeKey: route.routeKey,
     });
     validateIncomingOrigin({ request: c.req.raw, env: c.env });
-    phase = 'load_route';
-    const activeRoute = await resolveActiveRoute({ env: c.env, route });
-    if (!activeRoute) {
-      return c.json({ error: 'not_found' }, 404);
-    }
     const token = bearerToken(c.req.header('authorization'));
     hasBearerToken = Boolean(token);
     if (!token) {
+      phase = 'load_route';
+      const activeRoute = await resolveActiveRoute({ env: c.env, route });
+      if (!activeRoute) {
+        return c.json({ error: 'not_found' }, 404);
+      }
       return challengeResponse(c, canonicalUrl);
     }
     phase = 'load_jwt_keyset';
@@ -180,6 +182,9 @@ async function handleConnect(
     } catch {
       return challengeResponse(c, canonicalUrl);
     }
+    if (!parseScopeString(claims.scope).includes(GatewayMcpAccessScope)) {
+      return insufficientScopeResponse(c, canonicalUrl);
+    }
     if (
       claims.sub.length === 0 ||
       claims.owner_scope !== route.ownerScope ||
@@ -199,6 +204,11 @@ async function handleConnect(
         })
     ) {
       return forbiddenResponse(c);
+    }
+    phase = 'load_route';
+    const activeRoute = await resolveActiveRoute({ env: c.env, route });
+    if (!activeRoute) {
+      return c.json({ error: 'not_found' }, 404);
     }
     phase = 'load_runtime_state';
     let resolution = await resolveRuntimeState({ env: c.env, route, userId: claims.sub });

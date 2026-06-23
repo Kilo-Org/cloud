@@ -17,8 +17,7 @@ type ColorSchemeConfig = {
   text: string;
   iconColor: string;
   Icon: LucideIcon;
-  buttonVariant: 'warning' | 'secondary';
-  buttonClassName?: string;
+  buttonVariant: 'primary' | 'warning';
 };
 
 const colorSchemes: Record<ColorScheme, ColorSchemeConfig> = {
@@ -36,8 +35,7 @@ const colorSchemes: Record<ColorScheme, ColorSchemeConfig> = {
     text: 'text-blue-100',
     iconColor: 'text-blue-400',
     Icon: Info,
-    buttonVariant: 'secondary',
-    buttonClassName: 'border-blue-500/50 bg-blue-500/20 hover:bg-blue-500/30',
+    buttonVariant: 'primary',
   },
 };
 
@@ -162,7 +160,7 @@ export function InsufficientBalanceBanner({
           <Button
             variant={scheme.buttonVariant}
             size="sm"
-            className={cn('shrink-0', scheme.buttonClassName)}
+            className="shrink-0"
             onClick={handleAddCreditsClick}
           >
             Add Credits
@@ -201,11 +199,7 @@ export function InsufficientBalanceBanner({
       </div>
 
       {/* Add Credits button */}
-      <Button
-        variant={scheme.buttonVariant}
-        className={cn('shrink-0', scheme.buttonClassName)}
-        onClick={handleAddCreditsClick}
-      >
+      <Button variant={scheme.buttonVariant} className="shrink-0" onClick={handleAddCreditsClick}>
         Add Credits
       </Button>
     </div>

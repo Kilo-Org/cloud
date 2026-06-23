@@ -735,7 +735,7 @@ export function MarkDoneDialog({
             <button
               type="submit"
               disabled={doneMutation.isPending || !evidence.trim()}
-              className="inline-flex items-center gap-1.5 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sky-500 disabled:opacity-50"
+              className="bg-primary text-primary-foreground hover:bg-primary-hover inline-flex items-center gap-1.5 rounded-md px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
             >
               {doneMutation.isPending && <Loader2 className="size-3.5 animate-spin" />}
               Mark as done

@@ -27,6 +27,7 @@ import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
 import { UserProfileCard } from '@/components/profile/UserProfileCard';
 import { ProfileKiloClawBanner } from '@/components/profile/ProfileKiloClawBanner';
 import { getContributorChampionProfileBadgeForUser } from '@/lib/contributor-champions/service';
+import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 
 export default async function ProfilePage({ searchParams }: AppPageProps) {
   const user = await getUserFromAuthOrRedirect('/users/sign_in');
@@ -106,6 +107,8 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
           <AutoTopUpToggle />
         </CardContent>
       </Card>
+
+      <AutoRoutingModeCard />
 
       {params.source && (
         <IntegrationsCard

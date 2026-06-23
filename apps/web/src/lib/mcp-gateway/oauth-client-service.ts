@@ -1,6 +1,7 @@
 import 'server-only';
 import {
   GatewayOAuthClientAuthMethod,
+  GatewayMcpAccessScope,
   OAuthClientMetadataSchema,
   filterSupportedScopes,
   parseScopeString,
@@ -75,6 +76,13 @@ export function createOAuthClientService(params: {
     const declaredScopes = filterSupportedScopes(requestedScopes);
     if (declaredScopes.length !== requestedScopes.length) {
       throw createGatewayError(GatewayErrorCode.InvalidClientMetadata, 'Unsupported scopes', 400);
+    }
+    if (!declaredScopes.includes(GatewayMcpAccessScope)) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidClientMetadata,
+        `${GatewayMcpAccessScope} scope is required`,
+        400
+      );
     }
     return declaredScopes;
   }

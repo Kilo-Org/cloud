@@ -20,6 +20,7 @@ const configResponse = {
     deciderModels: [{ id: 'anthropic/claude-sonnet-4', reasoningEffort: null }],
     minAccuracy: 0.8,
     switchCostFactor: 3,
+    bestAccuracySwitchThreshold: 0.05,
     maxConcurrency: 4,
     benchmarkUserId: null,
     benchmarkOrgId: null,

@@ -1,19 +1,18 @@
 import { getAiSdkProvider } from '../model-settings';
-import { isOpenCodeGoAnthropicMessagesModel } from './opencode-go';
 
-describe('isOpenCodeGoAnthropicMessagesModel', () => {
+describe('getAiSdkProvider', () => {
   test.each(['opencode-go/minimax-m3', 'opencode-go/qwen3.7-plus'])(
-    'matches OpenCode Go Messages model %s',
+    'uses the Anthropic Messages API for OpenCode Go model %s',
     model => {
-      expect(isOpenCodeGoAnthropicMessagesModel(model)).toBe(true);
-      expect(getAiSdkProvider(model)).toBe('anthropic');
+      expect(getAiSdkProvider(model, 'opencode-go')).toBe('anthropic');
     }
   );
 
-  test.each(['opencode-go/deepseek-v4-flash', 'other-provider/qwen3.7-plus'])(
-    'does not match %s',
-    model => {
-      expect(isOpenCodeGoAnthropicMessagesModel(model)).toBe(false);
-    }
-  );
+  test('uses Chat Completions for MiniMax models from other direct providers', () => {
+    expect(getAiSdkProvider('minimax/minimax-m2.5', 'crofai')).toBeUndefined();
+  });
+
+  test('uses the Anthropic Messages API for MiniMax models through the gateway', () => {
+    expect(getAiSdkProvider('minimax/minimax-m2.5', null)).toBe('anthropic');
+  });
 });

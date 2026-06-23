@@ -13,17 +13,26 @@ import {
 // models with no cost signal at all (avgCostUsd null means every case failed
 // to report cost; ranking such a model as cheapest would hand it the route).
 // Throws when any route ends up empty so the caller keeps the previous
-// published table. deciderModels/minAccuracy/switchCostFactor come from the
-// run's snapshot, not live config.
+// published table. The routing knobs come from the run's snapshot, not live
+// config.
 export function buildRoutingTable(params: {
   runId: string;
   generatedAt: string;
   minAccuracy: number;
   switchCostFactor: number;
+  bestAccuracySwitchThreshold: number;
   deciderModels: BenchmarkDeciderModel[];
   summaries: BenchmarkModelSummary[];
 }): RoutingTable {
-  const { runId, generatedAt, minAccuracy, switchCostFactor, deciderModels, summaries } = params;
+  const {
+    runId,
+    generatedAt,
+    minAccuracy,
+    switchCostFactor,
+    bestAccuracySwitchThreshold,
+    deciderModels,
+    summaries,
+  } = params;
   const modelConfigById = new Map(deciderModels.map(m => [m.id, m] as const));
 
   const routeCandidates = (routeKey: TaxonomyRouteKey) =>
@@ -48,6 +57,7 @@ export function buildRoutingTable(params: {
     generatedAt,
     minAccuracy,
     switchCostFactor,
+    bestAccuracySwitchThreshold,
     source: 'benchmark',
     routes,
   };

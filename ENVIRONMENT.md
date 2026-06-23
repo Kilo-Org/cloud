@@ -16,6 +16,8 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 ## App (apps/web)
 
+Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-global-app` Vercel deployments, and 1Password storage for sensitive Production values. See `DEVELOPMENT.md` for the full workflow.
+
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `apps/web/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
@@ -28,6 +30,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 - `JEST_SILENT` - When `false`, shows verbose Jest output; read in `apps/web/jest.config.ts` and `apps/web/.env.test`. [SERVER]
 - `JEST_WORKER_ID` - Set by Jest to identify the current worker thread; used by db connection pooling and libraries to handle worker-specific state. [SERVER]
 - `IS_SCRIPT` - Set to `'true'` by `apps/web/src/scripts/index.ts` to indicate a script-mode run (bypasses web server logic). Used by Drizzle in `packages/db/src/database-url.ts`. [SERVER]
+- `SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START` - Earliest ISO timestamp from which Security Agent Audit Report event coverage is reliable. [SERVER]
 
 ### Analytics & Monitoring
 

@@ -63,6 +63,10 @@ Destroy is failure-safe:
 
 This prevents orphaning resources on transient Fly API errors.
 
+## Contributing Integrations
+
+Before adding an external service, OAuth flow, remote MCP server, credential, or agent skill, read [INTEGRATIONS.md](./INTEGRATIONS.md). It documents the supported credential architectures, lifecycle and security requirements, testing expectations, and partner contribution checklist.
+
 ## Commands
 
 ```bash

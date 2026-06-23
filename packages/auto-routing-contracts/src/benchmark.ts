@@ -76,6 +76,9 @@ export const BenchmarkConfigSchema = z
     // cheaper than fresh input tokens), so switching only pays off when the
     // recurring savings clearly outweigh the cache-rebuild penalty.
     switchCostFactor: z.number().min(1).max(100),
+    // Absolute accuracy delta required before best-accuracy mode switches away
+    // from a session incumbent that still meets the route threshold.
+    bestAccuracySwitchThreshold: z.number().min(0).max(1).default(0.05),
     // How many times to repeat each case for classifier / decider benchmarks.
     // Repeated runs reduce variance; the default of 1 preserves the current
     // single-pass behaviour.

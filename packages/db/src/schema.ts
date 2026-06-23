@@ -40,6 +40,8 @@ import {
   FeedbackSource,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
+  SecurityFindingAuditSourceContext,
   SecurityFindingNotificationKind,
   SecurityFindingNotificationStatus,
   KiloClawPlan,
@@ -83,6 +85,16 @@ import {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
+  CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
+  CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
+  CodeReviewAnalyticsCaptureStatus,
+  CodeReviewAnalyticsChangeType,
+  CodeReviewAnalyticsImpactLevel,
+  CodeReviewAnalyticsComplexityLevel,
+  CodeReviewAnalyticsClassificationConfidence,
+  CodeReviewFindingSeverity,
+  CodeReviewFindingCategory,
+  CodeReviewFindingSecurityClass,
   MCPGatewayOwnerScope,
   MCPGatewayAuthMode,
   MCPGatewaySharingMode,
@@ -179,6 +191,8 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassScheduledChangeStatus,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
+  SecurityFindingAuditSourceContext,
   KiloClawPlan,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
@@ -218,6 +232,14 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
+  CodeReviewAnalyticsCaptureStatus,
+  CodeReviewAnalyticsChangeType,
+  CodeReviewAnalyticsImpactLevel,
+  CodeReviewAnalyticsComplexityLevel,
+  CodeReviewAnalyticsClassificationConfidence,
+  CodeReviewFindingSeverity,
+  CodeReviewFindingCategory,
+  CodeReviewFindingSecurityClass,
   MCPGatewayOwnerScope,
   MCPGatewayAuthMode,
   MCPGatewaySharingMode,
@@ -2176,6 +2198,22 @@ export const api_request_log = pgTable(
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
 
+export const api_request_compress_log = pgTable(
+  'api_request_compress_log',
+  {
+    id: bigserial({ mode: 'bigint' }).notNull().primaryKey(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: text(),
+    session_id: text(),
+    provider: text().notNull(),
+    model: text().notNull(),
+    request: jsonb().notNull(),
+    result: jsonb().notNull(),
+  },
+  table => [index('idx_api_request_compress_log_created_at').on(table.created_at)]
+);
+
 export const http_user_agent = pgTable(
   'http_user_agent',
   {
@@ -2604,13 +2642,21 @@ export const organizations = pgTable(
     created_by_kilo_user_id: text(),
     deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
     sso_domain: text(),
+    parent_organization_id: uuid().references((): AnyPgColumn => organizations.id, {
+      onDelete: 'restrict',
+    }),
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
     company_domain: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
+    check(
+      'organizations_not_parented_by_self_check',
+      sql`${table.parent_organization_id} IS NULL OR ${table.parent_organization_id} <> ${table.id}`
+    ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
+    index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
   ]
 );
 
@@ -4108,6 +4154,7 @@ export const cloud_agent_code_review_attempts = pgTable(
     session_id: text(),
     cli_session_id: text(),
     execution_id: text(),
+    analytics_enabled_at_dispatch: boolean(),
     status: text().notNull().default('pending'),
     error_message: text(),
     terminal_reason: text(),
@@ -4137,6 +4184,130 @@ export const cloud_agent_code_review_attempts = pgTable(
 );
 
 export type CloudAgentCodeReviewAttempt = typeof cloud_agent_code_review_attempts.$inferSelect;
+
+export const code_review_analytics_results = pgTable(
+  'code_review_analytics_results',
+  {
+    id: idPrimaryKeyColumn,
+    code_review_id: uuid()
+      .notNull()
+      .references(() => cloud_agent_code_reviews.id, { onDelete: 'cascade' }),
+    source_attempt_id: uuid()
+      .notNull()
+      .references(() => cloud_agent_code_review_attempts.id, { onDelete: 'cascade' }),
+    capture_status: text().notNull().$type<CodeReviewAnalyticsCaptureStatus>(),
+    schema_version: integer().notNull().default(CODE_REVIEW_ANALYTICS_SCHEMA_VERSION),
+    taxonomy_version: integer().notNull().default(CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION),
+    change_type: text().$type<CodeReviewAnalyticsChangeType>(),
+    impact_level: text().$type<CodeReviewAnalyticsImpactLevel>(),
+    complexity_level: text().$type<CodeReviewAnalyticsComplexityLevel>(),
+    classification_confidence: text().$type<CodeReviewAnalyticsClassificationConfidence>(),
+    finalized_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_code_review_analytics_results_code_review_id').on(table.code_review_id),
+    index('idx_code_review_analytics_results_source_attempt_id').on(table.source_attempt_id),
+    index('idx_code_review_analytics_results_finalized_at').on(table.finalized_at),
+    enumCheck(
+      'code_review_analytics_results_capture_status_check',
+      table.capture_status,
+      CodeReviewAnalyticsCaptureStatus
+    ),
+    enumCheck(
+      'code_review_analytics_results_change_type_check',
+      table.change_type,
+      CodeReviewAnalyticsChangeType
+    ),
+    enumCheck(
+      'code_review_analytics_results_impact_level_check',
+      table.impact_level,
+      CodeReviewAnalyticsImpactLevel
+    ),
+    enumCheck(
+      'code_review_analytics_results_complexity_level_check',
+      table.complexity_level,
+      CodeReviewAnalyticsComplexityLevel
+    ),
+    enumCheck(
+      'code_review_analytics_results_classification_confidence_check',
+      table.classification_confidence,
+      CodeReviewAnalyticsClassificationConfidence
+    ),
+    check(
+      'code_review_analytics_results_classification_presence_check',
+      sql`(
+        (
+          ${table.capture_status} = 'captured'
+          AND ${table.change_type} IS NOT NULL
+          AND ${table.impact_level} IS NOT NULL
+          AND ${table.complexity_level} IS NOT NULL
+          AND ${table.classification_confidence} IS NOT NULL
+        ) OR (
+          ${table.capture_status} <> 'captured'
+          AND ${table.change_type} IS NULL
+          AND ${table.impact_level} IS NULL
+          AND ${table.complexity_level} IS NULL
+          AND ${table.classification_confidence} IS NULL
+        )
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewAnalyticsResult = typeof code_review_analytics_results.$inferSelect;
+export type NewCodeReviewAnalyticsResult = typeof code_review_analytics_results.$inferInsert;
+
+export const code_review_analytics_findings = pgTable(
+  'code_review_analytics_findings',
+  {
+    id: idPrimaryKeyColumn,
+    analytics_result_id: uuid()
+      .notNull()
+      .references(() => code_review_analytics_results.id, { onDelete: 'cascade' }),
+    ordinal: integer().notNull(),
+    severity: text().notNull().$type<CodeReviewFindingSeverity>(),
+    category: text().notNull().$type<CodeReviewFindingCategory>(),
+    security_class: text().$type<CodeReviewFindingSecurityClass>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_code_review_analytics_findings_result_ordinal').on(
+      table.analytics_result_id,
+      table.ordinal
+    ),
+    enumCheck(
+      'code_review_analytics_findings_severity_check',
+      table.severity,
+      CodeReviewFindingSeverity
+    ),
+    enumCheck(
+      'code_review_analytics_findings_category_check',
+      table.category,
+      CodeReviewFindingCategory
+    ),
+    enumCheck(
+      'code_review_analytics_findings_security_class_check',
+      table.security_class,
+      CodeReviewFindingSecurityClass
+    ),
+    check('code_review_analytics_findings_ordinal_check', sql`${table.ordinal} >= 0`),
+    check(
+      'code_review_analytics_findings_security_class_presence_check',
+      sql`(
+        (${table.category} = 'security' AND ${table.security_class} IS NOT NULL) OR
+        (${table.category} <> 'security' AND ${table.security_class} IS NULL)
+      )`
+    ),
+  ]
+);
+
+export type CodeReviewAnalyticsFinding = typeof code_review_analytics_findings.$inferSelect;
+export type NewCodeReviewAnalyticsFinding = typeof code_review_analytics_findings.$inferInsert;
 
 export const cliSessions = pgTable(
   'cli_sessions',
@@ -5430,12 +5601,20 @@ export const security_audit_log = pgTable(
     actor_id: text(),
     actor_email: text(),
     actor_name: text(),
+    actor_type: text().$type<SecurityAuditLogActorType>(),
     action: text().$type<SecurityAuditLogAction>().notNull(),
     resource_type: text().notNull(),
     resource_id: text().notNull(),
     before_state: jsonb().$type<Record<string, unknown>>(),
     after_state: jsonb().$type<Record<string, unknown>>(),
     metadata: jsonb().$type<Record<string, unknown>>(),
+    finding_id: uuid(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }),
+    source_occurred_at: timestamp({ withTimezone: true, mode: 'string' }),
+    event_key: text(),
+    schema_version: smallint(),
+    finding_snapshot: jsonb().$type<Record<string, unknown>>(),
+    source_context: text().$type<SecurityFindingAuditSourceContext>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -5444,6 +5623,12 @@ export const security_audit_log = pgTable(
       sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
     ),
     enumCheck('security_audit_log_action_check', table.action, SecurityAuditLogAction),
+    enumCheck('security_audit_log_actor_type_check', table.actor_type, SecurityAuditLogActorType),
+    enumCheck(
+      'security_audit_log_source_context_check',
+      table.source_context,
+      SecurityFindingAuditSourceContext
+    ),
     index('IDX_security_audit_log_org_created').on(
       table.owned_by_organization_id,
       table.created_at
@@ -5452,6 +5637,20 @@ export const security_audit_log = pgTable(
     index('IDX_security_audit_log_resource').on(table.resource_type, table.resource_id),
     index('IDX_security_audit_log_actor').on(table.actor_id, table.created_at),
     index('IDX_security_audit_log_action').on(table.action, table.created_at),
+    uniqueIndex('UQ_security_audit_log_org_event_key')
+      .on(table.owned_by_organization_id, table.event_key)
+      .where(sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.event_key} IS NOT NULL`),
+    uniqueIndex('UQ_security_audit_log_user_event_key')
+      .on(table.owned_by_user_id, table.event_key)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.event_key} IS NOT NULL`),
+    index('IDX_security_audit_log_org_occurred')
+      .on(table.owned_by_organization_id, table.occurred_at, table.id)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.occurred_at} IS NOT NULL`
+      ),
+    index('IDX_security_audit_log_user_occurred')
+      .on(table.owned_by_user_id, table.occurred_at, table.id)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.occurred_at} IS NOT NULL`),
   ]
 );
 

@@ -53,6 +53,7 @@ describe('buildRoutingTable', () => {
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
       deciderModels: DECIDER_MODELS,
       summaries: summariesForEveryRoute(),
     });
@@ -71,6 +72,7 @@ describe('buildRoutingTable', () => {
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
       deciderModels: DECIDER_MODELS,
       summaries: summariesForEveryRoute({
         [routeKey]: [
@@ -89,6 +91,7 @@ describe('buildRoutingTable', () => {
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
       deciderModels: DECIDER_MODELS,
       summaries: summariesForEveryRoute(),
     });
@@ -111,6 +114,7 @@ describe('buildRoutingTable', () => {
         generatedAt: '2026-01-01T00:00:00.000Z',
         minAccuracy: 0.7,
         switchCostFactor: 3,
+        bestAccuracySwitchThreshold: 0.05,
         deciderModels: DECIDER_MODELS,
         summaries: summariesForEveryRoute({ 'implementation/code_generation': [] }),
       })
@@ -123,6 +127,7 @@ describe('buildRoutingTable', () => {
       generatedAt: '2026-01-01T00:00:00.000Z',
       minAccuracy: 0.7,
       switchCostFactor: 3,
+      bestAccuracySwitchThreshold: 0.05,
       deciderModels: DECIDER_MODELS,
       summaries: [...summariesForEveryRoute(), summary('model/value', '*', 1, 0.0001)],
     });

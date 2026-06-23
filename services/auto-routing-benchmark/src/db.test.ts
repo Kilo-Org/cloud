@@ -79,6 +79,7 @@ describe('mapRunRow', () => {
       error: null,
       min_accuracy: 0.7,
       switch_cost_factor: 3,
+      best_accuracy_switch_threshold: 0.05,
       max_concurrency: 4,
       benchmark_user_id: null,
       benchmark_org_id: null,
@@ -121,6 +122,7 @@ describe('mapRunRow', () => {
       error: null,
       min_accuracy: 0.7,
       switch_cost_factor: 3,
+      best_accuracy_switch_threshold: 0.05,
       max_concurrency: 4,
       benchmark_user_id: null,
       benchmark_org_id: null,
@@ -151,6 +153,7 @@ const sampleTable: RoutingTable = {
   generatedAt: '2026-06-01T10:00:00.000Z',
   minAccuracy: 0.7,
   switchCostFactor: 3,
+  bestAccuracySwitchThreshold: 0.05,
   source: 'benchmark',
   routes: {
     'implementation/code_generation': [candidate('model-a'), candidate('model-b')],
@@ -166,6 +169,7 @@ describe('routingTableToRows', () => {
     expect(tableRow.generated_at).toBe('2026-06-01T10:00:00.000Z');
     expect(tableRow.min_accuracy).toBe(0.7);
     expect(tableRow.switch_cost_factor).toBe(3);
+    expect(tableRow.best_accuracy_switch_threshold).toBe(0.05);
     expect(tableRow.source).toBe('benchmark');
   });
 

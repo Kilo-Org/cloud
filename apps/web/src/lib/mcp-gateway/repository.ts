@@ -169,6 +169,15 @@ export function createGatewayRepository(database: GatewayDatabase = db) {
     return rows[0]?.organization_memberships ?? null;
   }
 
+  async function findOrganization(organizationId: string) {
+    const rows = await database
+      .select({ id: organizations.id, name: organizations.name })
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+      .limit(1);
+    return rows[0] ?? null;
+  }
+
   async function findActiveAssignment(configId: string, userId: string) {
     const rows = await database
       .select()
@@ -376,6 +385,7 @@ export function createGatewayRepository(database: GatewayDatabase = db) {
     findActiveRouteByCanonicalUrl,
     findUser,
     findMembership,
+    findOrganization,
     findActiveAssignment,
     authorizeUserForRoute,
     findNonTerminalInstance,

@@ -1,6 +1,7 @@
 import 'server-only';
 import {
   GatewayOAuthClientAuthMethod,
+  GatewayMcpAccessScope,
   GatewayInstanceStatus,
   GatewayTokenClaimsSchema,
   GatewayExecutionContextSchema,
@@ -48,6 +49,16 @@ function activeSigningKey(config: GatewayAppConfig): GatewayJWTKey & { privateKe
 
 function verificationKey(key: GatewayJWTKey) {
   return key.publicKeyPem ?? createPublicKey({ key: key.publicJwk, format: 'jwk' });
+}
+
+function requireMcpAccessGrant(scopes: string[]) {
+  if (!scopes.includes(GatewayMcpAccessScope)) {
+    throw createGatewayError(
+      GatewayErrorCode.InvalidGrant,
+      `${GatewayMcpAccessScope} scope is required`,
+      400
+    );
+  }
 }
 
 function decodeBasicComponent(value: string): string | null {
@@ -257,6 +268,7 @@ export function createTokenService(params: {
     if (!code || code.client_id !== client.client_id) {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Authorization code is invalid', 400);
     }
+    requireMcpAccessGrant(code.granted_scopes);
     if (paramsInput.request.redirect_uri !== code.redirect_uri) {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Redirect URI mismatch', 400);
     }
@@ -396,6 +408,7 @@ export function createTokenService(params: {
     if (!refreshToken || refreshToken.client_id !== client.client_id) {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Refresh token is invalid', 400);
     }
+    requireMcpAccessGrant(refreshToken.granted_scopes);
     const route = params.routeService.parseResource(refreshToken.canonical_resource_url);
     if (paramsInput.request.resource) {
       const requestedRoute = params.routeService.parseResource(paramsInput.request.resource);
@@ -555,7 +568,7 @@ export function createTokenService(params: {
       instance_id: instance.instance_id,
       execution_context: paramsInput.executionContext,
       config_version: resolved.config.config_version,
-      scopes: ['profile'],
+      scopes: [GatewayMcpAccessScope],
     });
   }
 

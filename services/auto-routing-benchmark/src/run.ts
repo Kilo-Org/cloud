@@ -377,6 +377,7 @@ export async function startRun(
         startedAt,
         min_accuracy: config.minAccuracy,
         switch_cost_factor: config.switchCostFactor,
+        best_accuracy_switch_threshold: config.bestAccuracySwitchThreshold,
         max_concurrency: config.maxConcurrency,
         benchmark_user_id: benchmarkIdentity.benchmarkUserId,
         benchmark_org_id: benchmarkIdentity.benchmarkOrgId,
@@ -418,6 +419,7 @@ export async function startRun(
       maxConcurrency: config.maxConcurrency,
       minAccuracy: config.minAccuracy,
       switchCostFactor: config.switchCostFactor,
+      bestAccuracySwitchThreshold: config.bestAccuracySwitchThreshold,
       benchmarkUserId: benchmarkIdentity.benchmarkUserId,
       benchmarkOrgId: benchmarkIdentity.benchmarkOrgId,
       models: runModelRows,
@@ -539,6 +541,7 @@ type RunState = {
   maxConcurrency: number;
   minAccuracy: number;
   switchCostFactor: number;
+  bestAccuracySwitchThreshold: number;
   benchmarkUserId: string | null;
   benchmarkOrgId: string | null;
   models: RunModelRow[];
@@ -556,6 +559,7 @@ async function getRunState(env: Env, runId: string): Promise<RunState> {
     maxConcurrency: run.max_concurrency,
     minAccuracy: run.min_accuracy,
     switchCostFactor: run.switch_cost_factor,
+    bestAccuracySwitchThreshold: run.best_accuracy_switch_threshold,
     benchmarkUserId: run.benchmark_user_id,
     benchmarkOrgId: run.benchmark_org_id,
     models,
@@ -913,6 +917,7 @@ async function finalizeRunIfComplete(
         generatedAt,
         minAccuracy: state.minAccuracy,
         switchCostFactor: state.switchCostFactor,
+        bestAccuracySwitchThreshold: state.bestAccuracySwitchThreshold,
         deciderModels,
         summaries: allSummaries,
       });

@@ -9,7 +9,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE="${IMAGE:-kiloclaw:controller}"
 IMAGE_BEFORE="${IMAGE_BEFORE:-$IMAGE}"
 IMAGE_AFTER="${IMAGE_AFTER:-$IMAGE}"
-PORT="${PORT:-18791}"
+# Default to a free ephemeral loopback port so the smoke never collides with a
+# running dev stack (e.g. workerd holding the old fixed 18791). Set PORT to pin
+# one. The brief bind/close races against `docker run`, but on a random high port
+# a collision is far less likely than the previous fixed default.
+PORT="${PORT:-$(python3 -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')}"
 TOKEN="${TOKEN:-$(python3 -c 'import secrets; print(secrets.token_hex(32))')}"
 KILOCODE_CONFIG_PATH="${KILOCODE_CONFIG_PATH:-$HOME/.kilocode/cli/config.json}"
 KILOCODE_SMOKE_MODEL="${KILOCODE_SMOKE_MODEL:-kilocode/kilo-auto/free}"
@@ -17,11 +25,12 @@ EXPECTED_VERSION_BEFORE="${EXPECTED_VERSION_BEFORE:-}"
 EXPECTED_VERSION_AFTER="${EXPECTED_VERSION_AFTER:-}"
 MODE="fresh"
 
-source "$SCRIPT_DIR/controller-smoke-helpers.sh"
+source "$SCRIPT_DIR/smoke-helpers.sh"
+source "$SCRIPT_DIR/provider-creds.sh"
 
 usage() {
   cat <<'EOF'
-Usage: bash scripts/controller-live-provider-smoke-test.sh [--upgrade]
+Usage: bash scripts/tests/smoke-live-provider.sh [--upgrade]
 
 Runs a packaged KiloClaw image against the real Kilo Gateway using the Auto Free
 model by default. Provide KILOCODE_API_KEY explicitly or authenticate with the
@@ -42,38 +51,6 @@ case "${1:-}" in
   -h|--help) usage; exit 0 ;;
   *) usage >&2; exit 2 ;;
 esac
-
-read_active_provider_value() {
-  local field="$1"
-  python3 - "$KILOCODE_CONFIG_PATH" "$field" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1]).expanduser()
-field = sys.argv[2]
-try:
-    document = json.loads(path.read_text())
-except FileNotFoundError:
-    raise SystemExit(0)
-except (OSError, json.JSONDecodeError) as error:
-    print(f'Unable to read Kilo CLI config at {path}: {error}', file=sys.stderr)
-    raise SystemExit(1)
-
-active_id = document.get('provider')
-providers = document.get('providers', [])
-if not isinstance(active_id, str) or not isinstance(providers, list):
-    raise SystemExit(0)
-
-for provider in providers:
-    if not isinstance(provider, dict) or provider.get('id') != active_id:
-        continue
-    value = provider.get(field)
-    if isinstance(value, str) and value:
-        sys.stdout.write(value)
-    raise SystemExit(0)
-PY
-}
 
 CREDENTIAL_SOURCE="environment"
 if [ -z "${KILOCODE_API_KEY:-}" ]; then
@@ -318,6 +295,8 @@ run_phase() {
   local label="$1"
   local image="$2"
   local expected_version="$3"
+  # 1 = run the app config-write assertions (they MUTATE openclaw.json). Default 1.
+  local mutate_config="${4:-1}"
 
   echo
   echo "=== $label: $image ==="
@@ -329,6 +308,16 @@ run_phase() {
   assert_control_ui_proxy
   assert_configured_model
   assert_kilo_chat_smoke "$CID" "$PORT" "$TOKEN"
+  # The app config-write routes rewrite openclaw.json. In --upgrade mode they run
+  # ONLY on the candidate — after it has booted on the UNTOUCHED baseline-generated
+  # root — so the baseline CLI does not rewrite the persisted config first and mask
+  # an incompatibility in how the candidate reads the original baseline config.
+  if [ "$mutate_config" = "1" ]; then
+    assert_app_config_patch "$CID" "$PORT" "$TOKEN"
+    assert_app_config_agent_defaults "$CID" "$PORT" "$TOKEN"
+    assert_app_config_agents_crud "$CID" "$PORT" "$TOKEN"
+  fi
+  assert_exec_approvals_seeded "$CID"
   echo
   echo "--- live Auto Free agent turn ---"
   assert_live_agent_turn
@@ -344,10 +333,14 @@ else
 fi
 
 if [ "$MODE" = "upgrade" ]; then
-  run_phase "before-image" "$IMAGE_BEFORE" "$EXPECTED_VERSION_BEFORE"
-  run_phase "after-image persisted-root" "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER"
+  # Baseline: no config mutations, so its persisted root stays the pristine
+  # baseline-generated config the candidate then boots against.
+  run_phase "before-image" "$IMAGE_BEFORE" "$EXPECTED_VERSION_BEFORE" 0
+  # Candidate: boots on the untouched baseline root, then exercises the config-write
+  # routes against the upgraded image.
+  run_phase "after-image persisted-root" "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER" 1
 else
-  run_phase "candidate-image" "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER"
+  run_phase "candidate-image" "$IMAGE_AFTER" "$EXPECTED_VERSION_AFTER" 1
 fi
 
 echo

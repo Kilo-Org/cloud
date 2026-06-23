@@ -91,7 +91,8 @@ export const GatewaySecretKind = {
 
 export type GatewaySecretKind = (typeof GatewaySecretKind)[keyof typeof GatewaySecretKind];
 
-export const GatewaySupportedScopes = ['profile'] as const;
+export const GatewayMcpAccessScope = 'mcp:access';
+export const GatewaySupportedScopes = [GatewayMcpAccessScope, 'profile'] as const;
 export type GatewaySupportedScope = (typeof GatewaySupportedScopes)[number];
 
 export const GatewayExecutionContextSchema = z.discriminatedUnion('type', [

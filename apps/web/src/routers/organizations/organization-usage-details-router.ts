@@ -11,7 +11,12 @@ import { microdollar_usage, kilocode_users } from '@kilocode/db/schema';
 import { eq, sum, count, sql, and, gte, lte } from 'drizzle-orm';
 import * as z from 'zod';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
+import {
+  FEATURE_ADOPTION_KEYS,
+  getOrganizationFeatureAdoption,
+} from '@/lib/organizations/feature-adoption';
 import { getOrganizationMembers } from '@/lib/organizations/organizations';
+import { TRPCError } from '@trpc/server';
 import {
   getAgentInteractionsPerDay,
   getCloudAgentSessionsPerDay,
@@ -77,6 +82,21 @@ const AutocompleteMetricsOutputSchema = z.object({
   tokens: z.number(),
 });
 
+const FeatureAdoptionOutputSchema = z.object({
+  checks: z.array(
+    z.object({
+      key: z.enum(FEATURE_ADOPTION_KEYS),
+      title: z.string(),
+      description: z.string(),
+      adopted: z.boolean(),
+      adoptedLabel: z.string(),
+      notAdoptedLabel: z.string(),
+      actionLabel: z.string(),
+      actionUrl: z.string(),
+    })
+  ),
+});
+
 const AIAdoptionTimeseriesOutputSchema = z.object({
   timeseries: z.array(
     z.object({
@@ -138,6 +158,19 @@ function getDateThreshold(period: string): string | null {
 }
 
 export const organizationsUsageDetailsRouter = createTRPCRouter({
+  getFeatureAdoption: organizationMemberProcedure
+    .input(OrganizationIdInputSchema)
+    .output(FeatureAdoptionOutputSchema)
+    .query(async ({ input }) => {
+      const adoption = await getOrganizationFeatureAdoption(input.organizationId);
+      if (adoption.plan !== 'enterprise') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Feature adoption reporting is available on the Enterprise plan.',
+        });
+      }
+      return { checks: adoption.checks };
+    }),
   getTimeSeries: organizationMemberProcedure
     .input(UsageTimeseriesInputSchema)
     .output(UsageTimeseriesOutputSchema)

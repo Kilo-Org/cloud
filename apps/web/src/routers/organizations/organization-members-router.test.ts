@@ -18,6 +18,7 @@ jest.mock('@/lib/email', () => ({
 let regularUser: User;
 let adminUser: User;
 let memberUser: User;
+let billingManagerUser: User;
 let nonMemberUser: User;
 let testOrganization: Organization;
 
@@ -42,6 +43,12 @@ describe('organizations members trpc router', () => {
       is_admin: false,
     });
 
+    billingManagerUser = await insertTestUser({
+      google_user_email: 'billing-manager-members@example.com',
+      google_user_name: 'Billing Manager Members User',
+      is_admin: false,
+    });
+
     nonMemberUser = await insertTestUser({
       google_user_email: 'non-member-members@example.com',
       google_user_name: 'Non Member Members User',
@@ -53,6 +60,7 @@ describe('organizations members trpc router', () => {
 
     // Add member user to organization using CRUD method
     await addUserToOrganization(testOrganization.id, memberUser.id, 'member');
+    await addUserToOrganization(testOrganization.id, billingManagerUser.id, 'billing_manager');
   });
 
   describe('update procedure', () => {
@@ -130,6 +138,49 @@ describe('organizations members trpc router', () => {
           organizationId: testOrganization.id,
           memberId: targetUser.id,
           role: 'owner',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+
+    it('should reject billing managers promoting members to owner', async () => {
+      const targetUser = await insertTestUser({
+        google_user_email: `${crypto.randomUUID()}@billing-manager-promote.example.com`,
+        google_user_name: 'Billing Manager Promote Target',
+        is_admin: false,
+      });
+      await addUserToOrganization(testOrganization.id, targetUser.id, 'member');
+
+      const caller = await createCallerForUser(billingManagerUser.id);
+
+      await expect(
+        caller.organizations.members.update({
+          organizationId: testOrganization.id,
+          memberId: targetUser.id,
+          role: 'owner',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+
+    it('should reject billing managers changing owner roles', async () => {
+      const caller = await createCallerForUser(billingManagerUser.id);
+
+      await expect(
+        caller.organizations.members.update({
+          organizationId: testOrganization.id,
+          memberId: regularUser.id,
+          role: 'member',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+
+    it('should reject billing managers updating member usage limits', async () => {
+      const caller = await createCallerForUser(billingManagerUser.id);
+
+      await expect(
+        caller.organizations.members.update({
+          organizationId: testOrganization.id,
+          memberId: memberUser.id,
+          dailyUsageLimitUsd: 50.0,
         })
       ).rejects.toThrow('You do not have the required organizational role to access this feature');
     });
@@ -272,6 +323,17 @@ describe('organizations members trpc router', () => {
       ).rejects.toThrow('You do not have access to this organization');
     });
 
+    it('should reject billing managers removing owners', async () => {
+      const caller = await createCallerForUser(billingManagerUser.id);
+
+      await expect(
+        caller.organizations.members.remove({
+          organizationId: testOrganization.id,
+          memberId: regularUser.id,
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+
     it('should validate input schema', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
@@ -323,6 +385,43 @@ describe('organizations members trpc router', () => {
 
       expect(result).toHaveProperty('acceptInviteUrl');
       expect(result.acceptInviteUrl).toMatch(/^https?:\/\/.+\/users\/accept-invite\/.+$/);
+    });
+
+    it('should reject billing managers inviting owners', async () => {
+      const caller = await createCallerForUser(billingManagerUser.id);
+
+      await expect(
+        caller.organizations.members.invite({
+          organizationId: testOrganization.id,
+          email: `${crypto.randomUUID()}@billing-manager-owner-invite.example.com`,
+          role: 'owner',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+
+    it('should allow billing managers inviting members', async () => {
+      const caller = await createCallerForUser(billingManagerUser.id);
+
+      const result = await caller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email: `${crypto.randomUUID()}@billing-manager-member-invite.example.com`,
+        role: 'member',
+      });
+
+      expect(result).toHaveProperty('acceptInviteUrl');
+      expect(result.acceptInviteUrl).toMatch(/^https?:\/\/.+\/users\/accept-invite\/.+$/);
+    });
+
+    it('should reject billing managers inviting billing managers', async () => {
+      const caller = await createCallerForUser(billingManagerUser.id);
+
+      await expect(
+        caller.organizations.members.invite({
+          organizationId: testOrganization.id,
+          email: `${crypto.randomUUID()}@billing-manager-billing-invite.example.com`,
+          role: 'billing_manager',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
     });
 
     it('should throw UNAUTHORIZED error for non-member users', async () => {
@@ -514,6 +613,40 @@ describe('organizations members trpc router', () => {
         success: true,
         updated: inviteId,
       });
+    });
+
+    it('should reject billing managers deleting invitations', async () => {
+      const ownerCaller = await createCallerForUser(regularUser.id);
+      const invitedEmail = `${crypto.randomUUID()}@billing-manager-delete-invite.example.com`;
+      await ownerCaller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email: invitedEmail,
+        role: 'member',
+      });
+
+      const { db } = await import('@/lib/drizzle');
+      const { organization_invitations } = await import('@kilocode/db/schema');
+      const { eq, and } = await import('drizzle-orm');
+
+      const invitation = await db
+        .select()
+        .from(organization_invitations)
+        .where(
+          and(
+            eq(organization_invitations.organization_id, testOrganization.id),
+            eq(organization_invitations.email, invitedEmail)
+          )
+        )
+        .limit(1);
+
+      const caller = await createCallerForUser(billingManagerUser.id);
+
+      await expect(
+        caller.organizations.members.deleteInvite({
+          organizationId: testOrganization.id,
+          inviteId: invitation[0].id,
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
     });
 
     it('should throw NOT_FOUND error for non-existent invitation', async () => {

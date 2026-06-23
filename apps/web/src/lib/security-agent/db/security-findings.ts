@@ -4,6 +4,16 @@ import { security_findings, agent_configs } from '@kilocode/db/schema';
 import { eq, and, desc, count, sql, max, or, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { SecurityFinding, NewSecurityFinding } from '@kilocode/db/schema';
+import {
+  SecurityAuditLogAction,
+  SecurityFindingAuditSourceContext,
+} from '@kilocode/db/schema-types';
+import {
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+  type SecurityFindingAuditHumanActor,
+  type SecurityFindingAuditOwner,
+} from '@kilocode/worker-utils/security-finding-audit';
 import type {
   SecurityReviewOwner,
   SecurityFindingStatus,
@@ -35,6 +45,16 @@ function ownerConflictTarget(owner: Owner): SQL {
   return owner.type === 'org'
     ? sql`(${sql.identifier(security_findings.owned_by_organization_id.name)}, ${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) WHERE ${sql.identifier(security_findings.owned_by_organization_id.name)} IS NOT NULL`
     : sql`(${sql.identifier(security_findings.owned_by_user_id.name)}, ${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) WHERE ${sql.identifier(security_findings.owned_by_user_id.name)} IS NOT NULL`;
+}
+
+function toSecurityFindingAuditOwner(owner: Owner): SecurityFindingAuditOwner {
+  return owner.type === 'org'
+    ? { type: 'organization', organizationId: owner.id }
+    : { type: 'user', userId: owner.id };
+}
+
+function ownerAuditKeyPart(owner: Owner): string {
+  return owner.type === 'org' ? `organization:${owner.id}` : `user:${owner.id}`;
 }
 
 type CreateFindingParams = ParsedSecurityFinding & {
@@ -190,8 +210,11 @@ export async function upsertSecurityFinding(
           ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
           ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
           ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
+          ${sql.identifier(security_findings.package_name.name)} = EXCLUDED.${sql.identifier(security_findings.package_name.name)},
+          ${sql.identifier(security_findings.package_ecosystem.name)} = EXCLUDED.${sql.identifier(security_findings.package_ecosystem.name)},
           ${sql.identifier(security_findings.vulnerable_version_range.name)} = EXCLUDED.${sql.identifier(security_findings.vulnerable_version_range.name)},
           ${sql.identifier(security_findings.patched_version.name)} = EXCLUDED.${sql.identifier(security_findings.patched_version.name)},
+          ${sql.identifier(security_findings.manifest_path.name)} = EXCLUDED.${sql.identifier(security_findings.manifest_path.name)},
           ${sql.identifier(security_findings.title.name)} = EXCLUDED.${sql.identifier(security_findings.title.name)},
           ${sql.identifier(security_findings.description.name)} = EXCLUDED.${sql.identifier(security_findings.description.name)},
           ${sql.identifier(security_findings.status.name)} = CASE
@@ -413,7 +436,7 @@ export async function listSecurityFindings(
     } = params;
     const ownerConverted = toOwner(owner);
 
-    const conditions = [];
+    const conditions: Array<SQL | undefined> = [];
 
     if (ownerConverted.type === 'org') {
       conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
@@ -584,7 +607,7 @@ export async function countSecurityFindings(params: {
     const { owner, status, severity, repoFullName } = params;
     const ownerConverted = toOwner(owner);
 
-    const conditions = [];
+    const conditions: Array<SQL | undefined> = [];
 
     // Owner condition
     if (ownerConverted.type === 'org') {
@@ -874,7 +897,7 @@ export async function getOrphanedRepositoriesWithFindingCounts(params: {
     const { owner, accessibleRepoFullNames } = params;
     const ownerConverted = toOwner(owner);
 
-    const conditions = [];
+    const conditions: SQL[] = [];
 
     // Owner condition
     if (ownerConverted.type === 'org') {
@@ -909,12 +932,13 @@ export async function getOrphanedRepositoriesWithFindingCounts(params: {
 export async function deleteFindingsByRepository(params: {
   owner: SecurityReviewOwner;
   repoFullName: string;
+  actor: SecurityFindingAuditHumanActor;
 }): Promise<{ deletedCount: number }> {
   try {
     const { owner, repoFullName } = params;
     const ownerConverted = toOwner(owner);
 
-    const conditions = [];
+    const conditions: SQL[] = [];
 
     // Owner condition
     if (ownerConverted.type === 'org') {
@@ -926,13 +950,44 @@ export async function deleteFindingsByRepository(params: {
     // Repository condition
     conditions.push(eq(security_findings.repo_full_name, repoFullName));
 
-    // Delete findings and get count
-    const result = await db
-      .delete(security_findings)
-      .where(and(...conditions))
-      .returning({ id: security_findings.id });
+    const ownerForAudit = toSecurityFindingAuditOwner(ownerConverted);
+    const ownerKeyPart = ownerAuditKeyPart(ownerConverted);
 
-    return { deletedCount: result.length };
+    const deletedCount = await db.transaction(async tx => {
+      const findings = await tx
+        .select()
+        .from(security_findings)
+        .where(and(...conditions));
+      const occurredAt = new Date().toISOString();
+
+      for (const finding of findings) {
+        await insertSecurityFindingAuditEvent(tx, {
+          owner: ownerForAudit,
+          finding,
+          actor: params.actor,
+          action: SecurityAuditLogAction.FindingDeleted,
+          occurredAt,
+          eventKey: deriveSecurityFindingAuditEventKey([
+            ownerKeyPart,
+            finding.id,
+            SecurityAuditLogAction.FindingDeleted,
+          ]),
+          sourceContext: SecurityFindingAuditSourceContext.Web,
+          beforeState: { status: finding.status },
+          afterState: { deleted: true },
+          metadata: { repo_full_name: repoFullName },
+        });
+      }
+
+      const deleted = await tx
+        .delete(security_findings)
+        .where(and(...conditions))
+        .returning({ id: security_findings.id });
+
+      return deleted.length;
+    });
+
+    return { deletedCount };
   } catch (error) {
     captureException(error, {
       tags: { operation: 'deleteFindingsByRepository' },

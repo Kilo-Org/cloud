@@ -131,11 +131,14 @@ export enum CliSessionSharedState {
  */
 export enum SecurityAuditLogAction {
   FindingCreated = 'security.finding.created',
+  FindingSeverityChanged = 'security.finding.severity_changed',
   FindingStatusChange = 'security.finding.status_change',
   FindingDismissed = 'security.finding.dismissed',
   FindingAutoDismissed = 'security.finding.auto_dismissed',
+  FindingSuperseded = 'security.finding.superseded',
   FindingAnalysisStarted = 'security.finding.analysis_started',
   FindingAnalysisCompleted = 'security.finding.analysis_completed',
+  FindingAnalysisFailed = 'security.finding.analysis_failed',
   RemediationQueued = 'security.remediation.queued',
   RemediationStarted = 'security.remediation.started',
   RemediationPrOpened = 'security.remediation.pr_opened',
@@ -151,6 +154,21 @@ export enum SecurityAuditLogAction {
   SyncTriggered = 'security.sync.triggered',
   SyncCompleted = 'security.sync.completed',
   AuditLogExported = 'security.audit_log.exported',
+  AuditReportGenerated = 'security.audit_report.generated',
+}
+
+export enum SecurityFindingAuditSourceContext {
+  SecuritySync = 'security_sync',
+  Web = 'web',
+  AnalysisWorker = 'analysis_worker',
+  RemediationCallback = 'remediation_callback',
+  RolloutBaseline = 'rollout_baseline',
+}
+
+export enum SecurityAuditLogActorType {
+  CustomerUser = 'customer_user',
+  KiloAdmin = 'kilo_admin',
+  System = 'system',
 }
 
 // --- KiloClaw enums ---
@@ -1021,6 +1039,106 @@ export const buildStatusSchema = z.enum([
 
 export type BuildStatus = z.infer<typeof buildStatusSchema>;
 
+// --- Code Reviewer analytics ---
+
+export const CODE_REVIEW_ANALYTICS_SCHEMA_VERSION = 1;
+export const CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION = 1;
+
+export const CodeReviewAnalyticsCaptureStatus = {
+  Captured: 'captured',
+  Missing: 'missing',
+  Invalid: 'invalid',
+  Omitted: 'omitted',
+} as const;
+
+export type CodeReviewAnalyticsCaptureStatus =
+  (typeof CodeReviewAnalyticsCaptureStatus)[keyof typeof CodeReviewAnalyticsCaptureStatus];
+
+export const CodeReviewAnalyticsChangeType = {
+  BugFix: 'bug_fix',
+  Feature: 'feature',
+  Refactor: 'refactor',
+  Maintenance: 'maintenance',
+  Dependency: 'dependency',
+  Test: 'test',
+  Documentation: 'documentation',
+  Mixed: 'mixed',
+  Other: 'other',
+} as const;
+
+export type CodeReviewAnalyticsChangeType =
+  (typeof CodeReviewAnalyticsChangeType)[keyof typeof CodeReviewAnalyticsChangeType];
+
+export const CodeReviewAnalyticsImpactLevel = {
+  Low: 'low',
+  Medium: 'medium',
+  High: 'high',
+} as const;
+
+export type CodeReviewAnalyticsImpactLevel =
+  (typeof CodeReviewAnalyticsImpactLevel)[keyof typeof CodeReviewAnalyticsImpactLevel];
+
+export const CodeReviewAnalyticsComplexityLevel = {
+  Low: 'low',
+  Medium: 'medium',
+  High: 'high',
+} as const;
+
+export type CodeReviewAnalyticsComplexityLevel =
+  (typeof CodeReviewAnalyticsComplexityLevel)[keyof typeof CodeReviewAnalyticsComplexityLevel];
+
+export const CodeReviewAnalyticsClassificationConfidence = {
+  Low: 'low',
+  Medium: 'medium',
+  High: 'high',
+} as const;
+
+export type CodeReviewAnalyticsClassificationConfidence =
+  (typeof CodeReviewAnalyticsClassificationConfidence)[keyof typeof CodeReviewAnalyticsClassificationConfidence];
+
+export const CodeReviewFindingSeverity = {
+  Critical: 'critical',
+  Warning: 'warning',
+  Suggestion: 'suggestion',
+} as const;
+
+export type CodeReviewFindingSeverity =
+  (typeof CodeReviewFindingSeverity)[keyof typeof CodeReviewFindingSeverity];
+
+export const CodeReviewFindingCategory = {
+  Security: 'security',
+  Correctness: 'correctness',
+  Reliability: 'reliability',
+  DataIntegrity: 'data_integrity',
+  Performance: 'performance',
+  Compatibility: 'compatibility',
+  Maintainability: 'maintainability',
+  TestQuality: 'test_quality',
+  Documentation: 'documentation',
+  Accessibility: 'accessibility',
+  Other: 'other',
+} as const;
+
+export type CodeReviewFindingCategory =
+  (typeof CodeReviewFindingCategory)[keyof typeof CodeReviewFindingCategory];
+
+export const CodeReviewFindingSecurityClass = {
+  AuthAccess: 'auth_access',
+  Injection: 'injection',
+  DataProtection: 'data_protection',
+  RequestResourceBoundary: 'request_resource_boundary',
+  DeserializationObjectIntegrity: 'deserialization_object_integrity',
+  DependencySupplyChain: 'dependency_supply_chain',
+  MemorySafety: 'memory_safety',
+  Availability: 'availability',
+  Concurrency: 'concurrency',
+  SecurityConfiguration: 'security_configuration',
+  Other: 'other',
+} as const;
+
+export type CodeReviewFindingSecurityClass =
+  (typeof CodeReviewFindingSecurityClass)[keyof typeof CodeReviewFindingSecurityClass];
+
 // --- CodeReviewAgentConfig ---
 
 export const ManuallyAddedRepositorySchema = z.object({
@@ -1058,6 +1176,7 @@ export const CodeReviewAgentConfigSchema = z.object({
   //   'critical' — gate fails only on critical issues
   gate_threshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
   review_memory_enabled: z.boolean().optional(),
+  review_analytics_enabled: z.boolean().optional(),
 });
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;
@@ -1169,6 +1288,7 @@ export type SandboxSuggestedAction =
 
 export type SecurityFindingSandboxAnalysis = {
   isExploitable: boolean | 'unknown';
+  extractionStatus?: 'succeeded' | 'failed';
   exploitabilityReasoning: string;
   usageLocations: string[];
   suggestedFix: string;
@@ -1179,9 +1299,32 @@ export type SecurityFindingSandboxAnalysis = {
   modelUsed?: string;
 };
 
+export type SecurityFindingAnalysisInput = {
+  schemaVersion: 1;
+  source: string;
+  sourceId: string;
+  sourceUpdatedAt: string | null;
+  repoFullName: string;
+  status: string;
+  severity: string | null;
+  packageName: string;
+  packageEcosystem: string;
+  dependencyScope: string | null;
+  cveId: string | null;
+  ghsaId: string | null;
+  cweIds: string[];
+  cvssScore: string | null;
+  title: string;
+  description: string | null;
+  vulnerableVersionRange: string | null;
+  patchedVersion: string | null;
+  manifestPath: string | null;
+};
+
 export type SecurityFindingAnalysis = {
   triage?: SecurityFindingTriage;
   sandboxAnalysis?: SecurityFindingSandboxAnalysis;
+  findingDataSnapshot?: SecurityFindingAnalysisInput;
   rawMarkdown?: string;
   analyzedAt: string;
   modelUsed?: string;
@@ -1382,6 +1525,7 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
+  enable_headroom_compression: z.boolean().optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
@@ -1471,6 +1615,7 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'gitlab_project_access_required',
   'byok_invalid_key',
   'selected_model_unavailable',
+  'repeated_repository_clone_timeout',
   'user_cancelled',
   'superseded',
   'interrupted',

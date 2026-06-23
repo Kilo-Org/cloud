@@ -23,11 +23,22 @@ import {
   security_analysis_owner_state,
   security_audit_log,
 } from '@kilocode/db/schema';
-import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import {
+  SecurityAuditLogAction,
+  SecurityFindingAuditSourceContext,
+} from '@kilocode/db/schema-types';
 import {
   decideAutoAnalysisEligibility,
   type AutoAnalysisMinSeverity,
 } from '@kilocode/worker-utils/security-auto-analysis-policy';
+import {
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+  type SecurityFindingAuditEventFinding,
+  type SecurityFindingAuditOwner,
+  type SecurityFindingAuditWriterDb,
+} from '@kilocode/worker-utils/security-finding-audit';
 import {
   SecurityNotificationPolicySchema,
   isOpenFindingEligibleForNewFindingNotification,
@@ -598,19 +609,46 @@ const securityFindingStatusSchema = z.enum([
   SecurityFindingStatus.IGNORED,
 ]);
 
+const dbTimestampSchema = z
+  .union([z.string(), z.date()])
+  .transform(value =>
+    value instanceof Date ? value.toISOString() : new Date(value).toISOString()
+  );
+const nullableDbTimestampSchema = dbTimestampSchema.nullable();
+
 const upsertSecurityFindingResultSchema = z.object({
   findingId: z.string().uuid(),
   wasInserted: z.boolean(),
   previousStatus: securityFindingStatusSchema.nullable(),
+  previousSeverity: securitySeveritySchema.nullable(),
   effectiveStatus: securityFindingStatusSchema,
-  findingCreatedAt: z
-    .union([z.string(), z.date()])
-    .transform(value =>
-      value instanceof Date ? value.toISOString() : new Date(value).toISOString()
-    ),
+  effectiveSeverity: securitySeveritySchema,
+  findingCreatedAt: dbTimestampSchema,
+  ownedByUserId: z.string().nullable(),
+  ownedByOrganizationId: z.string().uuid().nullable(),
+  source: z.string(),
+  sourceId: z.string(),
+  repoFullName: z.string(),
+  title: z.string(),
+  packageName: z.string(),
+  packageEcosystem: z.string(),
+  manifestPath: z.string().nullable(),
+  patchedVersion: z.string().nullable(),
+  ghsaId: z.string().nullable(),
+  cveId: z.string().nullable(),
+  cweIds: z.array(z.string()).nullable(),
+  cvssScore: z.union([z.string(), z.number()]).nullable(),
+  dependabotHtmlUrl: z.string().nullable(),
+  firstDetectedAt: dbTimestampSchema,
+  fixedAt: nullableDbTimestampSchema,
+  slaDueAt: nullableDbTimestampSchema,
 });
 
 type UpsertSecurityFindingResult = z.infer<typeof upsertSecurityFindingResultSchema>;
+const supersededSecurityFindingResultSchema = upsertSecurityFindingResultSchema.extend({
+  canonicalFindingId: z.string().uuid(),
+});
+type SupersededSecurityFindingResult = z.infer<typeof supersededSecurityFindingResultSchema>;
 
 async function upsertSecurityFinding(
   db: Pick<WorkerDb, 'execute'>,
@@ -629,7 +667,8 @@ async function upsertSecurityFinding(
   const result = await db.execute<Record<string, unknown>>(sql`
     WITH existing_match AS (
       SELECT ${security_findings.id} AS id,
-             ${security_findings.status} AS previous_status
+             ${security_findings.status} AS previous_status,
+             ${security_findings.severity} AS previous_severity
       FROM ${security_findings}
       WHERE ${security_findings.repo_full_name} = ${repoFullName}
         AND ${security_findings.source} = ${finding.source}
@@ -702,8 +741,11 @@ async function upsertSecurityFinding(
         ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
         ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
         ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
+        ${sql.identifier(security_findings.package_name.name)} = EXCLUDED.${sql.identifier(security_findings.package_name.name)},
+        ${sql.identifier(security_findings.package_ecosystem.name)} = EXCLUDED.${sql.identifier(security_findings.package_ecosystem.name)},
         ${sql.identifier(security_findings.vulnerable_version_range.name)} = EXCLUDED.${sql.identifier(security_findings.vulnerable_version_range.name)},
         ${sql.identifier(security_findings.patched_version.name)} = EXCLUDED.${sql.identifier(security_findings.patched_version.name)},
+        ${sql.identifier(security_findings.manifest_path.name)} = EXCLUDED.${sql.identifier(security_findings.manifest_path.name)},
         ${sql.identifier(security_findings.title.name)} = EXCLUDED.${sql.identifier(security_findings.title.name)},
         ${sql.identifier(security_findings.description.name)} = EXCLUDED.${sql.identifier(security_findings.description.name)},
         ${sql.identifier(security_findings.status.name)} = CASE
@@ -731,7 +773,26 @@ async function upsertSecurityFinding(
       RETURNING
         ${security_findings.id} AS id,
         (xmax = 0) AS was_inserted,
+        ${security_findings.owned_by_user_id} AS owned_by_user_id,
+        ${security_findings.owned_by_organization_id} AS owned_by_organization_id,
+        ${security_findings.source} AS source,
+        ${security_findings.source_id} AS source_id,
+        ${security_findings.repo_full_name} AS repo_full_name,
+        ${security_findings.severity} AS effective_severity,
         ${security_findings.status} AS effective_status,
+        ${security_findings.package_name} AS package_name,
+        ${security_findings.package_ecosystem} AS package_ecosystem,
+        ${security_findings.manifest_path} AS manifest_path,
+        ${security_findings.patched_version} AS patched_version,
+        ${security_findings.ghsa_id} AS ghsa_id,
+        ${security_findings.cve_id} AS cve_id,
+        ${security_findings.title} AS title,
+        ${security_findings.cwe_ids} AS cwe_ids,
+        ${security_findings.cvss_score} AS cvss_score,
+        ${security_findings.dependabot_html_url} AS dependabot_html_url,
+        ${security_findings.first_detected_at} AS first_detected_at,
+        ${security_findings.fixed_at} AS fixed_at,
+        ${security_findings.sla_due_at} AS sla_due_at,
         ${security_findings.created_at} AS created_at
     )
     SELECT
@@ -741,8 +802,31 @@ async function upsertSecurityFinding(
         WHEN upserted.was_inserted THEN NULL::text
         ELSE COALESCE(existing_match.previous_status, upserted.effective_status)
       END AS "previousStatus",
+      CASE
+        WHEN upserted.was_inserted THEN NULL::text
+        ELSE COALESCE(existing_match.previous_severity, upserted.effective_severity)
+      END AS "previousSeverity",
       upserted.effective_status AS "effectiveStatus",
-      upserted.created_at AS "findingCreatedAt"
+      upserted.effective_severity AS "effectiveSeverity",
+      upserted.created_at AS "findingCreatedAt",
+      upserted.owned_by_user_id AS "ownedByUserId",
+      upserted.owned_by_organization_id AS "ownedByOrganizationId",
+      upserted.source AS "source",
+      upserted.source_id AS "sourceId",
+      upserted.repo_full_name AS "repoFullName",
+      upserted.title AS "title",
+      upserted.package_name AS "packageName",
+      upserted.package_ecosystem AS "packageEcosystem",
+      upserted.manifest_path AS "manifestPath",
+      upserted.patched_version AS "patchedVersion",
+      upserted.ghsa_id AS "ghsaId",
+      upserted.cve_id AS "cveId",
+      upserted.cwe_ids AS "cweIds",
+      upserted.cvss_score AS "cvssScore",
+      upserted.dependabot_html_url AS "dependabotHtmlUrl",
+      upserted.first_detected_at AS "firstDetectedAt",
+      upserted.fixed_at AS "fixedAt",
+      upserted.sla_due_at AS "slaDueAt"
     FROM upserted
     LEFT JOIN existing_match ON existing_match.id = upserted.id
     LIMIT 1
@@ -756,8 +840,28 @@ async function upsertSecurityFinding(
       ${security_findings.id} AS "findingId",
       false AS "wasInserted",
       ${security_findings.status} AS "previousStatus",
+      ${security_findings.severity} AS "previousSeverity",
       ${security_findings.status} AS "effectiveStatus",
-      ${security_findings.created_at} AS "findingCreatedAt"
+      ${security_findings.severity} AS "effectiveSeverity",
+      ${security_findings.created_at} AS "findingCreatedAt",
+      ${security_findings.owned_by_user_id} AS "ownedByUserId",
+      ${security_findings.owned_by_organization_id} AS "ownedByOrganizationId",
+      ${security_findings.source} AS "source",
+      ${security_findings.source_id} AS "sourceId",
+      ${security_findings.repo_full_name} AS "repoFullName",
+      ${security_findings.title} AS "title",
+      ${security_findings.package_name} AS "packageName",
+      ${security_findings.package_ecosystem} AS "packageEcosystem",
+      ${security_findings.manifest_path} AS "manifestPath",
+      ${security_findings.patched_version} AS "patchedVersion",
+      ${security_findings.ghsa_id} AS "ghsaId",
+      ${security_findings.cve_id} AS "cveId",
+      ${security_findings.cwe_ids} AS "cweIds",
+      ${security_findings.cvss_score} AS "cvssScore",
+      ${security_findings.dependabot_html_url} AS "dependabotHtmlUrl",
+      ${security_findings.first_detected_at} AS "firstDetectedAt",
+      ${security_findings.fixed_at} AS "fixedAt",
+      ${security_findings.sla_due_at} AS "slaDueAt"
     FROM ${security_findings}
     WHERE ${security_findings.repo_full_name} = ${repoFullName}
       AND ${security_findings.source} = ${finding.source}
@@ -768,6 +872,162 @@ async function upsertSecurityFinding(
   const recovered = fallback.rows[0];
   if (!recovered) throw new Error('Failed to upsert security finding');
   return upsertSecurityFindingResultSchema.parse(recovered);
+}
+
+function toSecurityFindingAuditOwner(owner: SecurityReviewOwner): SecurityFindingAuditOwner {
+  return isOrgOwner(owner)
+    ? { type: 'organization', organizationId: owner.organizationId }
+    : { type: 'user', userId: owner.userId };
+}
+
+function ownerAuditKeyPart(owner: SecurityReviewOwner): string {
+  return isOrgOwner(owner) ? `organization:${owner.organizationId}` : `user:${owner.userId}`;
+}
+
+function toAuditEventFinding(
+  upserted: UpsertSecurityFindingResult
+): SecurityFindingAuditEventFinding {
+  return {
+    id: upserted.findingId,
+    owned_by_user_id: upserted.ownedByUserId,
+    owned_by_organization_id: upserted.ownedByOrganizationId,
+    source: upserted.source,
+    source_id: upserted.sourceId,
+    repo_full_name: upserted.repoFullName,
+    title: upserted.title,
+    severity: upserted.effectiveSeverity,
+    status: upserted.effectiveStatus,
+    package_name: upserted.packageName,
+    package_ecosystem: upserted.packageEcosystem,
+    manifest_path: upserted.manifestPath,
+    patched_version: upserted.patchedVersion,
+    ghsa_id: upserted.ghsaId,
+    cve_id: upserted.cveId,
+    cwe_ids: upserted.cweIds,
+    cvss_score: upserted.cvssScore,
+    dependabot_html_url: upserted.dependabotHtmlUrl,
+    first_detected_at: upserted.firstDetectedAt,
+    fixed_at: upserted.fixedAt,
+    sla_due_at: upserted.slaDueAt,
+  };
+}
+
+async function writeSyncFindingAuditEvents(
+  db: SecurityFindingAuditWriterDb,
+  params: {
+    owner: SecurityReviewOwner;
+    upserted: UpsertSecurityFindingResult;
+    finding: ParsedSecurityFinding;
+    runId: string;
+    occurredAt: string;
+  }
+): Promise<void> {
+  const { owner, upserted, finding, runId, occurredAt } = params;
+  const auditOwner = toSecurityFindingAuditOwner(owner);
+  const auditFinding = toAuditEventFinding(upserted);
+  const keyBase = [ownerAuditKeyPart(owner), upserted.findingId];
+  const commonMetadata = {
+    run_id: runId,
+    repo_full_name: upserted.repoFullName,
+    source_state: finding.raw_data.state,
+    source_alert_number: finding.source_id,
+  };
+
+  if (upserted.wasInserted) {
+    await insertSecurityFindingAuditEvent(db, {
+      owner: auditOwner,
+      finding: auditFinding,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+      action: SecurityAuditLogAction.FindingCreated,
+      occurredAt,
+      sourceOccurredAt: finding.first_detected_at,
+      eventKey: deriveSecurityFindingAuditEventKey([
+        ...keyBase,
+        SecurityAuditLogAction.FindingCreated,
+        finding.first_detected_at,
+      ]),
+      sourceContext: SecurityFindingAuditSourceContext.SecuritySync,
+      afterState: {
+        status: upserted.effectiveStatus,
+        severity: upserted.effectiveSeverity,
+      },
+      metadata: commonMetadata,
+    });
+    return;
+  }
+
+  if (
+    upserted.previousSeverity !== null &&
+    upserted.previousSeverity !== upserted.effectiveSeverity
+  ) {
+    await insertSecurityFindingAuditEvent(db, {
+      owner: auditOwner,
+      finding: auditFinding,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+      action: SecurityAuditLogAction.FindingSeverityChanged,
+      occurredAt,
+      sourceOccurredAt: finding.raw_data.updated_at,
+      eventKey: deriveSecurityFindingAuditEventKey([
+        ...keyBase,
+        SecurityAuditLogAction.FindingSeverityChanged,
+        finding.raw_data.updated_at,
+        upserted.previousSeverity,
+        upserted.effectiveSeverity,
+      ]),
+      sourceContext: SecurityFindingAuditSourceContext.SecuritySync,
+      beforeState: { severity: upserted.previousSeverity },
+      afterState: { severity: upserted.effectiveSeverity },
+      metadata: commonMetadata,
+    });
+  }
+
+  if (upserted.previousStatus !== null && upserted.previousStatus !== upserted.effectiveStatus) {
+    const action = getSyncStatusAuditAction(finding.raw_data.state);
+    const sourceOccurredAt = getStatusSourceOccurredAt(finding);
+    await insertSecurityFindingAuditEvent(db, {
+      owner: auditOwner,
+      finding: auditFinding,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+      action,
+      occurredAt,
+      sourceOccurredAt,
+      eventKey: deriveSecurityFindingAuditEventKey([
+        ...keyBase,
+        action,
+        sourceOccurredAt,
+        upserted.previousStatus,
+        upserted.effectiveStatus,
+      ]),
+      sourceContext: SecurityFindingAuditSourceContext.SecuritySync,
+      beforeState: { status: upserted.previousStatus },
+      afterState: {
+        status: upserted.effectiveStatus,
+        ...(finding.ignored_reason ? { reason_code: finding.ignored_reason } : {}),
+        ...(finding.fixed_at ? { fixed_at: new Date(finding.fixed_at).toISOString() } : {}),
+      },
+      metadata: commonMetadata,
+    });
+  }
+}
+
+function getSyncStatusAuditAction(state: DependabotAlertState): SecurityAuditLogAction {
+  if (state === 'auto_dismissed') return SecurityAuditLogAction.FindingAutoDismissed;
+  if (state === 'dismissed') return SecurityAuditLogAction.FindingDismissed;
+  return SecurityAuditLogAction.FindingStatusChange;
+}
+
+function getStatusSourceOccurredAt(finding: ParsedSecurityFinding): string {
+  if (finding.raw_data.state === 'auto_dismissed') {
+    return (
+      finding.raw_data.auto_dismissed_at ??
+      finding.raw_data.dismissed_at ??
+      finding.raw_data.updated_at
+    );
+  }
+  if (finding.raw_data.state === 'dismissed') {
+    return finding.raw_data.dismissed_at ?? finding.raw_data.updated_at;
+  }
+  return finding.fixed_at ?? finding.raw_data.updated_at;
 }
 
 async function insertStagedNewFindingNotifications(
@@ -1005,15 +1265,17 @@ export async function syncAutoAnalysisQueueForFinding(
 type SupersedeResult = { count: number; supersededFindingIds: string[] };
 
 async function supersedeDuplicateFindings(
-  db: Pick<WorkerDb, 'execute'>,
+  db: Pick<WorkerDb, 'execute'> & SecurityFindingAuditWriterDb,
   repoFullName: string,
   owner: SecurityReviewOwner
 ): Promise<SupersedeResult> {
   const ownerPartitionColumn = findingOwnerPartitionColumn(owner);
-  const result = await db.execute<{ id: string }>(sql`
+  const result = await db.execute<Record<string, unknown>>(sql`
       WITH ranked AS (
         SELECT
           id,
+          status AS previous_status,
+          severity AS previous_severity,
           ROW_NUMBER() OVER (
             PARTITION BY ${ownerPartitionColumn}, repo_full_name, source, ghsa_id, package_name, manifest_path
             ORDER BY CASE WHEN source_id ~ '^[0-9]+$' THEN source_id::int ELSE 0 END DESC
@@ -1039,12 +1301,79 @@ async function supersedeDuplicateFindings(
         FROM ranked
         WHERE security_findings.id = ranked.id
           AND ranked.rn > 1
-        RETURNING security_findings.id
+        RETURNING
+          security_findings.id AS "findingId",
+          false AS "wasInserted",
+          ranked.previous_status AS "previousStatus",
+          ranked.previous_severity AS "previousSeverity",
+          security_findings.status AS "effectiveStatus",
+          security_findings.severity AS "effectiveSeverity",
+          security_findings.created_at AS "findingCreatedAt",
+          security_findings.owned_by_user_id AS "ownedByUserId",
+          security_findings.owned_by_organization_id AS "ownedByOrganizationId",
+          security_findings.source AS "source",
+          security_findings.source_id AS "sourceId",
+          security_findings.repo_full_name AS "repoFullName",
+          security_findings.title AS "title",
+          security_findings.package_name AS "packageName",
+          security_findings.package_ecosystem AS "packageEcosystem",
+          security_findings.manifest_path AS "manifestPath",
+          security_findings.patched_version AS "patchedVersion",
+          security_findings.ghsa_id AS "ghsaId",
+          security_findings.cve_id AS "cveId",
+          security_findings.cwe_ids AS "cweIds",
+          security_findings.cvss_score AS "cvssScore",
+          security_findings.dependabot_html_url AS "dependabotHtmlUrl",
+          security_findings.first_detected_at AS "firstDetectedAt",
+          security_findings.fixed_at AS "fixedAt",
+          security_findings.sla_due_at AS "slaDueAt",
+          ranked.canonical_id AS "canonicalFindingId"
       )
-      SELECT id FROM superseded
+      SELECT * FROM superseded
     `);
-  const supersededFindingIds = result.rows.map(r => r.id);
+  const superseded = result.rows.map(row => supersededSecurityFindingResultSchema.parse(row));
+  const occurredAt = new Date().toISOString();
+  for (const finding of superseded) {
+    await writeSupersededFindingAuditEvent(db, { owner, finding, occurredAt });
+  }
+  const supersededFindingIds = superseded.map(r => r.findingId);
   return { count: supersededFindingIds.length, supersededFindingIds };
+}
+
+async function writeSupersededFindingAuditEvent(
+  db: SecurityFindingAuditWriterDb,
+  params: {
+    owner: SecurityReviewOwner;
+    finding: SupersededSecurityFindingResult;
+    occurredAt: string;
+  }
+): Promise<void> {
+  const { owner, finding, occurredAt } = params;
+  await insertSecurityFindingAuditEvent(db, {
+    owner: toSecurityFindingAuditOwner(owner),
+    finding: toAuditEventFinding(finding),
+    actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+    action: SecurityAuditLogAction.FindingSuperseded,
+    occurredAt,
+    eventKey: deriveSecurityFindingAuditEventKey([
+      ownerAuditKeyPart(owner),
+      finding.findingId,
+      SecurityAuditLogAction.FindingSuperseded,
+      finding.canonicalFindingId,
+    ]),
+    sourceContext: SecurityFindingAuditSourceContext.SecuritySync,
+    snapshotExtras: { canonical_finding_id: finding.canonicalFindingId },
+    beforeState: { status: finding.previousStatus ?? SecurityFindingStatus.OPEN },
+    afterState: {
+      status: finding.effectiveStatus,
+      reason_code: 'superseded',
+      canonical_finding_id: finding.canonicalFindingId,
+    },
+    metadata: {
+      repo_full_name: finding.repoFullName,
+      source_alert_number: finding.sourceId,
+    },
+  });
 }
 
 /**
@@ -1112,7 +1441,7 @@ async function writeAuditLog(
   params: {
     owner: SecurityReviewOwner;
     actor?: { id: string; email?: string | null; name?: string | null };
-    action: SecurityAuditLogAction;
+    action: SecurityAuditLogAction.SyncCompleted;
     resource_type: string;
     resource_id: string;
     metadata: Record<string, unknown>;
@@ -1312,6 +1641,7 @@ export async function syncOwner(params: {
         gitTokenService,
         installationId: config.installationId,
         owner,
+        runId,
         platformIntegrationId: config.platformIntegrationId,
         repoFullName,
         slaConfig: config.slaConfig,
@@ -1475,6 +1805,7 @@ async function syncRepo(params: {
   gitTokenService: GitTokenService;
   installationId: string;
   owner: SecurityReviewOwner;
+  runId: string;
   platformIntegrationId: string;
   repoFullName: string;
   slaConfig: SecurityAgentConfig;
@@ -1487,6 +1818,7 @@ async function syncRepo(params: {
     gitTokenService,
     installationId,
     owner,
+    runId,
     platformIntegrationId,
     repoFullName,
     slaConfig,
@@ -1573,6 +1905,14 @@ async function syncRepo(params: {
           platformIntegrationId,
           repoFullName,
           slaDueAt,
+        });
+
+        await writeSyncFindingAuditEvents(tx, {
+          owner,
+          upserted,
+          finding,
+          runId,
+          occurredAt: new Date().toISOString(),
         });
 
         if (

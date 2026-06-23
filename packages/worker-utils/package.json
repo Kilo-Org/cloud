@@ -23,6 +23,7 @@
     "./security-auto-analysis-policy": "./src/security-auto-analysis-policy.ts",
     "./security-remediation-policy": "./src/security-remediation-policy.ts",
     "./security-notification-policy": "./src/security-notification-policy.ts",
+    "./security-finding-audit": "./src/security-finding-audit.ts",
     "./dependabot-dismissal-target": "./src/dependabot-dismissal-target.ts",
     "./client-error": "./src/client-error.ts"
   },

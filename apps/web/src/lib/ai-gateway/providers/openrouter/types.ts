@@ -14,6 +14,7 @@ export type OpenRouterProviderConfig = {
   ignore?: string[];
   data_collection?: 'allow' | 'deny';
   zdr?: boolean;
+  require_parameters?: boolean;
 };
 
 export type VercelInferenceProviderConfig = { apiKey: string; baseURL?: string } | AwsCredentials;

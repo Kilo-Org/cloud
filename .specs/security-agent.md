@@ -2,22 +2,23 @@
 
 ## Role of This Document
 
-This spec defines the business rules and outcome guarantees for Security Agent Auto Remediation and Security Agent Notifications. It is the source of truth for what users should be able to rely on when Security Agent creates or manages remediation work and sends New-finding, SLA Warning, or SLA Breach Notifications.
+This spec defines the business rules and outcome guarantees for Security Agent Auto Remediation, Security Agent Notifications, and Security Agent Audit Reports. It is the source of truth for what users should be able to rely on when Security Agent creates or manages remediation work, sends New-finding, SLA Warning, or SLA Breach Notifications, and reports recorded Security Finding activity.
 
 This document deliberately does not specify database tables, queue design, worker names, router names, UI layout, email markup, or prompt implementation details. Those belong in plans and code.
 
 ## Status
 
-Draft -- created 2026-06-09; notification rules added 2026-06-11.
+Draft -- created 2026-06-09; notification rules added 2026-06-11; audit report rules added 2026-06-12.
 
 ## Scope
 
-This spec covers two Security Agent capabilities:
+This spec covers three Security Agent capabilities:
 
 - Auto Remediation;
-- New-finding, SLA Warning, and SLA Breach Notifications.
+- New-finding, SLA Warning, and SLA Breach Notifications;
+- Security Agent Audit Reports.
 
-It does not backfill the complete Security Agent product spec. Existing Security Agent behavior such as finding sync, Auto Analysis, Auto Dismiss, dashboard statistics, SLA calculation, and Dependabot writeback is included only where it affects Auto Remediation or notification outcomes.
+It does not backfill the complete Security Agent product spec. Existing Security Agent behavior such as finding sync, Auto Analysis, Auto Dismiss, dashboard statistics, SLA calculation, and Dependabot writeback is included only where it affects Auto Remediation, notification outcomes, or audit report evidence.
 
 ## Conventions
 
@@ -41,6 +42,8 @@ BDD-style scenarios use "Given", "When", and "Then" to describe user-visible beh
 - **SLA Breach Notification**: A Security Agent Notification admitted when an eligible open finding reaches or passes its persisted SLA deadline.
 - **Notification Recipient**: The personal owner or a current organization owner authorized to receive a notification for a finding.
 - **Email Delivery**: An attempt to render and send one Security Agent Notification through the email provider.
+- **Security Finding Activity Event**: An immutable owner-scoped record of one material user, system-policy, or source-driven action or outcome that changes or explains a Security Finding.
+- **Security Agent Audit Report**: An owner-scoped, period-bounded audit view of Security Finding Activity Events grouped by Security Finding.
 
 ## Auto Remediation configuration
 
@@ -425,6 +428,134 @@ Given Auto Remediation starts a remediation after analysis
 When the remediation appears in history
 Then Security Agent SHOULD identify it as policy-driven automatic remediation.
 
+## Security Agent Audit Reports
+
+### Report purpose and evidence basis
+
+Security Agent Audit Reports MUST report Security Finding activity recorded by Kilo. They MUST NOT claim that legacy history is complete, prove repository scan coverage, reconstruct activity Kilo did not record, or calculate authoritative historical SLA compliance.
+
+The report evidence basis MUST be Security Finding Activity Events. A Security Finding Activity Event MUST belong to exactly one Security Agent owner and one Security Finding, including after that finding is deleted.
+
+Security Agent MAY include supplemental legacy audit records when they can be mapped to a Security Finding without ambiguity. Legacy supplemental activity MUST be labeled as potentially incomplete. Ambiguous legacy records MUST NOT be guessed into a Security Finding group.
+
+Every report MUST display the reliable event-coverage start. Baseline events for existing Security Findings, if produced, MUST use actual capture time and MUST NOT be backdated or presented as original creation events.
+
+### Reportable activity
+
+Security Agent Audit Reports MUST include material Security Finding activity when recorded during the selected period:
+
+- finding imported into Kilo;
+- severity changed;
+- status changed, including reopened and fixed;
+- finding manually dismissed, automatically dismissed, or superseded;
+- terminal analysis completed or failed when the outcome explains a disposition or remediation decision;
+- remediation requested;
+- remediation ended with PR opened, failed, blocked, cancelled, or no changes needed;
+- finding deleted.
+
+Security Agent Audit Reports MUST NOT include reads, page views, unchanged sync observations, queue claims, heartbeats, retries with no new finding-level outcome, analysis admission or start, stale cleanup, recipient-level notification transitions, repository scan-coverage evidence, configuration timelines, or report-generation events inside the report itself.
+
+### Periods and ordering
+
+Reports MUST use UTC calendar-day boundaries. The default period SHOULD end on the current UTC calendar day and include the preceding 89 calendar days.
+
+Report ranges MUST be valid, non-future, non-reversed, and no longer than 90 inclusive calendar days. Period inclusion MUST use when Kilo recorded or applied the event. External source timestamps MAY be shown as supporting evidence but MUST NOT determine report inclusion.
+
+A report MUST include a Security Finding when at least one reportable Security Finding Activity Event falls inside the selected period. The report MUST group events by Security Finding. Events inside each Security Finding group MUST be chronological. Security Finding groups MUST be deterministically ordered by first in-period event, repository, title, and Security Finding ID.
+
+The interactive report MUST let viewers filter Security Finding groups by severity, recorded state, and repository. Filters MUST retain the complete in-period timeline for every matching Security Finding group.
+
+Repository filter options MUST come from repository names recorded in report evidence, not current Security Agent repository selection or current repository accessibility. Repository matching MUST use the exact recorded full name. Renamed or transferred repositories MAY appear as separate options when report evidence contains both names. Security Findings without recorded repository identity MUST remain visible when all repositories are selected.
+
+### Authorization and availability
+
+Personal Security Agent Audit Reports MUST be available only to the owning user.
+
+Organization Security Agent Audit Reports MUST be available to organization owners, billing managers, and Kilo platform admins. Ordinary organization members and non-members MUST NOT access organization reports solely because they can access other organization surfaces.
+
+Report access MUST NOT have a separate plan, active-subscription, enabled Security Agent, or active GitHub integration entitlement. Authorized viewers MUST retain read-only historical access after Security Agent or the GitHub integration is disabled.
+
+Every platform-admin report generation MUST be audited after successful report assembly. Ordinary customer access MAY rely on existing operational request logs in v1.
+
+### Report content
+
+Successful reports MUST include every matching reportable Security Finding Activity Event recorded through the displayed cutoff. Timeout, over-budget, or query failure MUST return no report content and MUST NOT return a partial report.
+
+Each Security Finding group SHOULD show stable Security Finding and source identity, repository, title, severity, status, safe advisory metadata, first detected time, canonical Security Finding ID when recorded, and deletion status when applicable.
+
+Human actions MUST show an event-time display name and stable typed actor reference. Automated actions MUST show explicit system attribution. Actor email and notification recipient identity MUST NOT be report evidence.
+
+Internal Kilo admin actors MUST be masked for non-admin viewers. Deleting an actor's Kilo account MUST anonymize dedicated identity fields in organization-owned Security Finding Activity Events while preserving stable non-PII attribution and event evidence.
+
+Security Agent Audit Reports MAY show recorded SLA evidence for a Security Finding when trustworthy event or snapshot data exists:
+
+- persisted SLA deadline;
+- recorded terminal timestamp;
+- whether terminal timestamp was before or at/after recorded deadline;
+- whether an open finding was before or at/after recorded deadline at report cutoff;
+- `unknown` when legacy or missing history prevents trustworthy classification.
+
+Security Agent Audit Reports MUST NOT publish aggregate SLA compliance percentages. They MUST NOT classify ignored or superseded findings as compliant controls. They MUST NOT change SLA enable, disable, severity, warning, breach, reopen, or deadline behavior.
+
+### Privacy and redaction
+
+Security Finding Activity Event snapshots and metadata MUST contain only structured, sanitized evidence needed for the report. They MUST NOT contain actor identity, notification recipient identity, prompts, raw analysis markdown, transcripts, assistant messages, full execution logs, provider responses, raw source payloads, credentials, tokens, auth headers, cookies, webhook secrets, or unredacted raw errors.
+
+External links in reports MUST be validated and rendered safely. Source-controlled text MUST be rendered as escaped text.
+
+### Scenario: UTC report period
+
+Given an authorized owner requests a same-day UTC report
+When Security Agent assembles the report
+Then events recorded at or after `00:00:00.000Z` on that day and before `00:00:00.000Z` on the next day MUST be eligible.
+And events outside that range MUST NOT be included.
+
+### Scenario: Invalid report period
+
+Given an authorized owner requests a future, reversed, or longer-than-90-day range
+When Security Agent validates the request
+Then Security Agent MUST reject the request before scanning report events.
+
+### Scenario: Complete query failure
+
+Given a report scan has loaded some matching events
+When a later page fails, times out, or exceeds the tested budget
+Then Security Agent MUST discard accumulated data.
+And Security Agent MUST return a complete-query failure state rather than a partial report.
+
+### Scenario: Deleted finding remains reportable
+
+Given a Security Finding has been deleted
+And a deletion Security Finding Activity Event with a final compact snapshot was recorded
+When an authorized owner requests a period containing that event
+Then the report MUST show the deleted Security Finding from immutable event evidence.
+And the report MUST NOT rely on joining through the mutable Security Finding row.
+
+### Scenario: Organization report permissions
+
+Given an organization has Security Finding Activity Events
+When an organization owner, billing manager, or Kilo platform admin requests its report
+Then Security Agent MUST allow the report.
+
+Given an ordinary organization member or non-member requests the report
+When Security Agent checks authorization
+Then Security Agent MUST reject access before loading counts or report data.
+
+### Scenario: Legacy coverage wording
+
+Given a report period overlaps activity before reliable event coverage began
+When Security Agent renders the report
+Then the report MUST state that it contains activity recorded by Kilo.
+And it MUST label supplemental legacy activity as potentially incomplete.
+
+### Scenario: Repository report filter
+
+Given a report contains Security Finding groups with recorded repository identity
+When an authorized viewer selects one repository
+Then the report MUST show only groups whose recorded repository full name matches that selection.
+And every event in each matching group's in-period timeline MUST remain visible.
+And current Security Agent repository selection or accessibility MUST NOT remove recorded repository options from the report.
+
 ## Security Agent Notifications
 
 ### Delivery and policy ownership
@@ -635,4 +766,11 @@ The following are intentionally outside the guaranteed v1 behavior:
 - Settings-time or launch-time repository write-permission preflight by Security Agent.
 - Notification channels other than email.
 - Per-member organization notification overrides.
-- Backfilling complete specifications for Security Agent features unrelated to Auto Remediation or Security Agent Notifications.
+- Historical SLA compliance metrics.
+- Repository scan-coverage appendices.
+- Configuration policy appendices.
+- Exhaustive notification delivery history in Audit Reports.
+- Report ranges longer than 90 days.
+- Server-side stored report artifacts or server-generated PDFs.
+- Server-side report result caching.
+- Backfilling complete specifications for Security Agent features unrelated to Auto Remediation, Security Agent Notifications, or Security Agent Audit Reports.

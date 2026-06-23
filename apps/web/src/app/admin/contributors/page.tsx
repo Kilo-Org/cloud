@@ -849,8 +849,9 @@ export default function ContributorChampionsAdminPage() {
                               </SelectContent>
                             </Select>
                             <Button
+                              variant="outline"
                               size="icon"
-                              className="h-8 w-8 bg-blue-600 hover:bg-blue-700"
+                              className="h-8 w-8"
                               disabled={
                                 !upgradeSelections[row.contributorId] || upgradeMutation.isPending
                               }

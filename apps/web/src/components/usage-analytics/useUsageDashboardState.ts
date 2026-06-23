@@ -7,6 +7,7 @@ import {
   type Granularity,
   type MetricKey,
   type Dimension,
+  type OrganizationUsageView,
 } from './types';
 import type { UsageFilters } from './hooks';
 import { EMPTY_FILTERS } from './hooks';
@@ -20,11 +21,13 @@ export type DashboardState = {
   groupBy: Dimension | 'none';
   personalView: string;
   viewAs: 'self' | 'org-wide';
+  usageView: OrganizationUsageView;
 };
 
 const VALID_PERIODS: PeriodOption[] = ['today', 'yesterday', '7d', '30d', '1y'];
 const VALID_GRANULARITIES: Granularity[] = ['hour', 'day', 'week', 'month'];
 const VALID_DIMENSIONS: Dimension[] = ['feature', 'model', 'mode', 'user', 'provider', 'project'];
+const VALID_USAGE_VIEWS: OrganizationUsageView[] = ['overview', 'feature-adoption', 'ai-usage'];
 
 const INCLUDE_DIM_KEYS: (keyof UsageFilters)[] = [
   'features',
@@ -199,9 +202,24 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     const viewAsRaw = params.get('viewAs');
     const viewAs = viewAsRaw === 'org-wide' ? 'org-wide' : (defaultState?.viewAs ?? 'self');
 
+    const usageViewRaw = params.get('view');
+    const usageView = VALID_USAGE_VIEWS.includes(usageViewRaw as OrganizationUsageView)
+      ? (usageViewRaw as OrganizationUsageView)
+      : (defaultState?.usageView ?? 'overview');
+
     const filters = deserializeFiltersFromParams(params);
 
-    return { period, granularity, costSource, chartMetric, filters, groupBy, personalView, viewAs };
+    return {
+      period,
+      granularity,
+      costSource,
+      chartMetric,
+      filters,
+      groupBy,
+      personalView,
+      viewAs,
+      usageView,
+    };
   });
 
   const isInitialized = useRef(false);
@@ -241,6 +259,10 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
       const personalView = params.get('personalView') ?? state.personalView;
       const viewAsRaw = params.get('viewAs');
       const viewAs = viewAsRaw === 'org-wide' ? 'org-wide' : state.viewAs;
+      const usageViewRaw = params.get('view');
+      const usageView = VALID_USAGE_VIEWS.includes(usageViewRaw as OrganizationUsageView)
+        ? (usageViewRaw as OrganizationUsageView)
+        : 'overview';
       const filters = deserializeFiltersFromParams(params);
 
       setStateInternal({
@@ -252,6 +274,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
         groupBy,
         personalView,
         viewAs,
+        usageView,
       });
 
       // After the state update flushes, resume pushing to the URL.
@@ -271,6 +294,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     state.groupBy,
     state.personalView,
     state.viewAs,
+    state.usageView,
   ]);
 
   // Sync state to URL parameters when state changes
@@ -309,6 +333,12 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
       params.set('viewAs', 'org-wide');
     } else {
       params.delete('viewAs');
+    }
+
+    if (state.usageView === 'overview') {
+      params.delete('view');
+    } else {
+      params.set('view', state.usageView);
     }
 
     serializeFiltersToParams(params, state.filters);

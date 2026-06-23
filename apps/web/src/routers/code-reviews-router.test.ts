@@ -1,5 +1,7 @@
 const mockCancelReview = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
+const mockSyncWebhooksForRepositories = jest.fn();
+const mockGetValidGitLabToken = jest.fn();
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
@@ -9,6 +11,14 @@ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
 
 jest.mock('@/lib/code-reviews/dispatch/dispatch-pending-reviews', () => ({
   tryDispatchPendingReviews: (...args: unknown[]) => mockTryDispatchPendingReviews(...args),
+}));
+
+jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
+  syncWebhooksForRepositories: (...args: unknown[]) => mockSyncWebhooksForRepositories(...args),
+}));
+
+jest.mock('@/lib/integrations/gitlab-service', () => ({
+  getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -30,16 +40,18 @@ import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
+  microdollar_usage,
+  microdollar_usage_metadata,
   organization_audit_logs,
   organizations,
   platform_integrations,
   type Organization,
   type User,
 } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 
 const REPO = `test-org/code-reviews-cancel-${Date.now()}`;
-type ReviewStatus = 'pending' | 'queued' | 'running' | 'failed';
+type ReviewStatus = 'pending' | 'queued' | 'running' | 'completed' | 'failed';
 type CodeReviewInsert = typeof cloud_agent_code_reviews.$inferInsert;
 const mockUpdateCheckRun = jest.mocked(updateCheckRun);
 
@@ -265,13 +277,20 @@ describe('review agent config REVIEW.md setting', () => {
     organization = await createTestOrganization('Review Config Org', testUser.id, 0, {}, false);
   });
 
+  beforeEach(() => {
+    mockGetValidGitLabToken.mockResolvedValue('gitlab-token');
+    mockSyncWebhooksForRepositories.mockResolvedValue({
+      result: { created: [], updated: [], deleted: [], errors: [] },
+      updatedWebhooks: {},
+    });
+  });
+
   afterEach(async () => {
     await db
       .delete(agent_configs)
       .where(
         and(
           eq(agent_configs.agent_type, 'code_review'),
-          eq(agent_configs.platform, 'github'),
           eq(agent_configs.owned_by_user_id, testUser.id)
         )
       );
@@ -280,13 +299,20 @@ describe('review agent config REVIEW.md setting', () => {
       .where(
         and(
           eq(agent_configs.agent_type, 'code_review'),
-          eq(agent_configs.platform, 'github'),
           eq(agent_configs.owned_by_organization_id, organization.id)
         )
       );
     await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organization.id));
+    await db
       .delete(organization_audit_logs)
       .where(eq(organization_audit_logs.organization_id, organization.id));
+    mockGetValidGitLabToken.mockReset();
+    mockSyncWebhooksForRepositories.mockReset();
   });
 
   afterAll(async () => {
@@ -371,6 +397,128 @@ describe('review agent config REVIEW.md setting', () => {
     expect(config?.is_enabled).toBe(false);
   });
 
+  it('preserves personal review feature settings during a full config save', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'github',
+      reviewStyle: 'strict',
+      focusAreas: ['correctness'],
+      modelSlug: 'test-model',
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_user_id, testUser.id)
+      ),
+    });
+
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'strict',
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      })
+    );
+  });
+
+  it('keeps previous GitLab repository ids for webhook synchronization', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await db.insert(agent_configs).values({
+      owned_by_user_id: testUser.id,
+      agent_type: 'code_review',
+      platform: 'gitlab',
+      config: {
+        selected_repository_ids: [101, 202],
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: testUser.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      integration_status: 'active',
+      metadata: {
+        webhook_secret: 'webhook-secret',
+        gitlab_instance_url: 'https://gitlab.example.com',
+        configured_webhooks: {},
+      },
+    });
+
+    await caller.personalReviewAgent.saveReviewConfig({
+      platform: 'gitlab',
+      reviewStyle: 'balanced',
+      focusAreas: [],
+      modelSlug: 'test-model',
+      repositorySelectionMode: 'selected',
+      selectedRepositoryIds: [202, 303],
+    });
+
+    expect(mockSyncWebhooksForRepositories).toHaveBeenCalledWith(
+      'gitlab-token',
+      'webhook-secret',
+      [202, 303],
+      [101, 202],
+      {},
+      'https://gitlab.example.com'
+    );
+  });
+
+  it('preserves organization review feature settings during a full config save', async () => {
+    const caller = await createCallerForUser(testUser.id);
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      },
+      is_enabled: false,
+      created_by: testUser.id,
+    });
+
+    await caller.organizations.reviewAgent.saveReviewConfig({
+      organizationId: organization.id,
+      platform: 'github',
+      reviewStyle: 'lenient',
+      focusAreas: ['maintainability'],
+      modelSlug: 'test-model',
+    });
+
+    const config = await db.query.agent_configs.findFirst({
+      where: and(
+        eq(agent_configs.agent_type, 'code_review'),
+        eq(agent_configs.platform, 'github'),
+        eq(agent_configs.owned_by_organization_id, organization.id)
+      ),
+    });
+
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        review_style: 'lenient',
+        review_memory_enabled: true,
+        review_analytics_enabled: true,
+      })
+    );
+  });
+
   it('clears actionRequired state when toggling personal Code Reviewer', async () => {
     const caller = await createCallerForUser(testUser.id);
     await db.insert(agent_configs).values({
@@ -424,7 +572,13 @@ describe('review agent config REVIEW.md setting', () => {
       ),
     });
 
-    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        disable_review_md: true,
+        review_memory_enabled: false,
+        review_analytics_enabled: false,
+      })
+    );
     expect(config?.config).not.toHaveProperty('max_review_time_minutes');
 
     const refetched = await caller.personalReviewAgent.getReviewConfig({ platform: 'github' });
@@ -452,7 +606,13 @@ describe('review agent config REVIEW.md setting', () => {
       ),
     });
 
-    expect(config?.config).toEqual(expect.objectContaining({ disable_review_md: true }));
+    expect(config?.config).toEqual(
+      expect.objectContaining({
+        disable_review_md: true,
+        review_memory_enabled: false,
+        review_analytics_enabled: false,
+      })
+    );
     expect(config?.config).not.toHaveProperty('max_review_time_minutes');
 
     const refetched = await caller.organizations.reviewAgent.getReviewConfig({
@@ -511,12 +671,20 @@ describe('review agent config REVIEW.md setting', () => {
 
 describe('codeReviewRouter attempts', () => {
   let testUser: User;
+  const usageIds: string[] = [];
 
   beforeAll(async () => {
     testUser = await insertTestUser();
   });
 
   afterEach(async () => {
+    if (usageIds.length > 0) {
+      await db
+        .delete(microdollar_usage_metadata)
+        .where(inArray(microdollar_usage_metadata.id, usageIds));
+      await db.delete(microdollar_usage).where(inArray(microdollar_usage.id, usageIds));
+      usageIds.length = 0;
+    }
     await db
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
@@ -552,31 +720,86 @@ describe('codeReviewRouter attempts', () => {
           status: 'failed',
           error_message: 'Container shutdown: SIGTERM',
           terminal_reason: 'sandbox_error',
+          total_tokens_in: 1200,
+          total_tokens_out: 300,
         })
       )
       .returning({ id: cloud_agent_code_reviews.id });
 
     const caller = await createCallerForUser(testUser.id);
     const before = await caller.codeReviews.get({ reviewId: review.id });
-    expect(before.success).toBe(true);
-    expect(before.success ? before.attempts : []).toEqual([]);
+    expect(before).toEqual(
+      expect.objectContaining({
+        success: true,
+        attempts: [],
+        tokenUsage: { input: 1200, output: 300, cached: 0 },
+      })
+    );
 
     await caller.codeReviews.retrigger({ reviewId: review.id });
 
     const after = await caller.codeReviews.get({ reviewId: review.id });
-    if (!after.success) {
-      throw new Error('Expected successful code review get');
-    }
-
-    expect(after.attempts).toHaveLength(2);
-    expect(after.attempts.map(attempt => attempt.retry_reason)).toEqual([null, 'manual_retrigger']);
-    expect(after.attempts[0]?.session_id).toBe('agent-first');
+    expect(after).toEqual(
+      expect.objectContaining({
+        success: true,
+        attempts: [
+          expect.objectContaining({ session_id: 'agent-first', retry_reason: null }),
+          expect.objectContaining({ retry_reason: 'manual_retrigger' }),
+        ],
+      })
+    );
 
     const storedReview = await db.query.cloud_agent_code_reviews.findFirst({
       where: eq(cloud_agent_code_reviews.id, review.id),
     });
     expect(storedReview?.status).toBe('pending');
     expect(storedReview?.session_id).toBeNull();
+  });
+
+  it('returns billing-derived display token usage from get', async () => {
+    const sessionId = `ses_router_usage_${crypto.randomUUID()}`;
+    const usageId = crypto.randomUUID();
+    usageIds.push(usageId);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'completed', {
+          cli_session_id: sessionId,
+          created_at: '2026-06-18T09:00:00.000Z',
+          started_at: '2026-06-18T09:10:00.000Z',
+          completed_at: '2026-06-18T11:00:00.000Z',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(microdollar_usage).values({
+      id: usageId,
+      kilo_user_id: testUser.id,
+      cost: 100,
+      input_tokens: 1000,
+      output_tokens: 200,
+      cache_write_tokens: 100,
+      cache_hit_tokens: 600,
+      created_at: '2026-06-18T10:00:00.000Z',
+      model: 'anthropic/claude-sonnet-4.6',
+    });
+    await db.insert(microdollar_usage_metadata).values({
+      id: usageId,
+      message_id: `msg_${usageId}`,
+      session_id: sessionId,
+      created_at: '2026-06-18T10:00:00.000Z',
+    });
+
+    const caller = await createCallerForUser(testUser.id);
+    const result = await caller.codeReviews.get({ reviewId: review.id });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        tokenUsage: { input: 300, output: 200, cached: 700 },
+      })
+    );
   });
 
   it('retrigger dispatches using the newly created attempt id', async () => {

@@ -111,12 +111,6 @@ import {
   hasMiddleOutTransform,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import {
-  createStreamLifecycleTracker,
-  observeEventStream,
-  shouldObserveEventStream,
-  STREAM_ATTEMPT_HEADER,
-} from '@/lib/ai-gateway/o11y/stream-lifecycle.server';
 
 export const maxDuration = 1800;
 
@@ -291,7 +285,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     const efficientDecision =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id
         ? async () => {
-            const { user, authFailedResponse } = await authPromise;
+            const { user, authFailedResponse, organizationId } = await authPromise;
             // The classifier is a paid call on Kilo's own credential. Skip it
             // for unauthenticated requests: kilo-auto/efficient resolves to a
             // paid model, so an unauthenticated caller is rejected downstream
@@ -311,6 +305,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               providerHints: autoRoutingProviderHints,
               bodyBytes: Buffer.byteLength(requestBodyText),
               userId: user.id,
+              organizationId: organizationId ?? null,
               sessionId: taskId ?? sessionHeader,
               machineId: machineIdHeader,
               clientRequestId,
@@ -855,7 +850,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
 
   const extraHeaders: Record<string, string> = {};
-  applyProviderSpecificLogic(
+  await applyProviderSpecificLogic(
     effectiveProviderContext.provider,
     effectiveModelIdLowerCased,
     requestBodyParsed,
@@ -863,6 +858,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     effectiveProviderContext.userByok,
     fraudHeaders,
     user.id,
+    organizationId ?? null,
+    usageContext.session_id,
     taskId ?? null
   );
 
@@ -881,8 +878,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
   }
 
-  const observesProvider = effectiveProviderContext.provider.id === 'custom';
-  const attemptId = observesProvider ? crypto.randomUUID() : null;
   const response = await upstreamRequest({
     path,
     search: url.search,
@@ -930,9 +925,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
 
     // Return a service unavailable error instead of the 402
-    const errorResponse = temporarilyUnavailableResponse();
-    if (attemptId) errorResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
-    return errorResponse;
+    return temporarilyUnavailableResponse();
   }
 
   if (response.status >= 400) {
@@ -947,29 +940,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     });
   }
 
-  let clonedReponse = response.clone(); // reading from body is side-effectful
-  const observesStream = shouldObserveEventStream({
-    provider_id: effectiveProviderContext.provider.id,
-    status: response.status,
-    has_body: response.body !== null,
-    content_type: response.headers.get('content-type'),
-  });
-  const streamTracker =
-    observesStream && attemptId
-      ? createStreamLifecycleTracker({
-          attempt_id: attemptId,
-          provider_id: effectiveProviderContext.provider.id,
-          api_kind: requestBodyParsed.kind,
-        })
-      : null;
-  if (streamTracker && clonedReponse.body) {
-    const owner = clonedReponse;
-    const body = clonedReponse.body;
-    clonedReponse = new Response(
-      observeEventStream(body, outcome => streamTracker.observe('provider', outcome), owner),
-      owner
-    );
-  }
+  const clonedReponse = response.clone(); // reading from body is side-effectful
 
   if (!shouldBlockOnClassify) {
     classifyResult = await awaitClassifyAbuse(classifyPromise);
@@ -1006,7 +977,6 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       isUserByok: !!effectiveProviderContext.userByok,
     });
     if (errorResponse) {
-      if (attemptId) errorResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
       return errorResponse;
     }
   }
@@ -1018,17 +988,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     requestBodyParsed.kind
   );
   if (rewrittenResponse) {
-    // Rewritten streams are excluded because their final bytes cannot be compared to the source.
-    if (attemptId) rewrittenResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
     return rewrittenResponse;
   }
 
-  const finalResponse = wrapInSafeNextResponse(response);
-  if (attemptId) finalResponse.headers.set(STREAM_ATTEMPT_HEADER, attemptId);
-  if (!streamTracker || !finalResponse.body) return finalResponse;
-
-  return new NextResponse(
-    observeEventStream(finalResponse.body, outcome => streamTracker.observe('final', outcome)),
-    finalResponse
-  );
+  return wrapInSafeNextResponse(response);
 }

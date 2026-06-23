@@ -80,7 +80,9 @@ export function ProfileKiloPassSection() {
         pending={pending}
         showFirstMonthPromo={showFirstMonthPromo}
         showSecondMonthPromo={showSecondMonthPromo}
-        headerAction={<KiloPassReferralButton className="w-full sm:w-auto" />}
+        headerAction={
+          <KiloPassReferralButton className="w-full sm:w-auto" source="profile_kilo_pass_section" />
+        }
         recommendedTier={recommendedTier}
         onSelectTier={tier => checkoutMutation.mutate({ tier, cadence })}
       />

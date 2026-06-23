@@ -4,6 +4,7 @@ import {
   GatewayAuthorizationRequestStatus,
   GatewayInstanceStatus,
   GatewayOAuthClientAuthMethod,
+  GatewayMcpAccessScope,
   createGatewayError,
   GatewayErrorCode,
   GatewayError,
@@ -97,6 +98,13 @@ export function createAuthorizationService(params: {
       throw createGatewayError(
         GatewayErrorCode.InvalidScope,
         'Scope is not declared by client',
+        400
+      );
+    }
+    if (!supportedScopes.includes(GatewayMcpAccessScope)) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidScope,
+        `${GatewayMcpAccessScope} scope is required`,
         400
       );
     }
@@ -252,6 +260,12 @@ export function createAuthorizationService(params: {
         redirectError(GatewayErrorCode.InvalidRequest, 'PKCE is required for public clients');
       }
     }
+    if (!client.declared_scopes.includes(GatewayMcpAccessScope)) {
+      redirectError(
+        GatewayErrorCode.UnauthorizedClient,
+        `Client must register the ${GatewayMcpAccessScope} scope`
+      );
+    }
     let route: ScopedConnectRoute;
     let resolved: ResolvedGatewayRoute;
     let executionContext = input.executionContext;
@@ -308,10 +322,22 @@ export function createAuthorizationService(params: {
     redirectErrors?: boolean;
   }) {
     const prepared = await prepareAuthorization(input);
+    const organization =
+      prepared.resolved.config.owner_scope === 'organization'
+        ? await params.repository.findOrganization(prepared.resolved.config.owner_id)
+        : null;
     return {
       clientId: prepared.client.client_id,
       clientName: prepared.client.client_name,
+      redirectUri: input.query.redirect_uri,
       resource: prepared.resolved.route.canonical_url,
+      connectionName: prepared.resolved.config.name,
+      endpointHost: new URL(prepared.resolved.config.remote_url).host,
+      ownerScope: prepared.resolved.config.owner_scope,
+      contextName:
+        prepared.resolved.config.owner_scope === 'organization'
+          ? (organization?.name ?? 'Organization')
+          : 'Personal',
       scopes: prepared.scopes,
       executionContext: prepared.executionContext,
     };

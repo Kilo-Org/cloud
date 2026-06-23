@@ -12,9 +12,14 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getKiloPassLegalLinks, KILO_PASS_LEGAL_DISCLOSURE } from '@/lib/kilo-pass/legal-links';
 import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
+import {
+  formatKiloPassTierDescription,
+  KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION,
+} from '@/lib/kilo-pass/subscription-page-copy';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useStoreKiloPassProducts } from '@/lib/kilo-pass/use-store-kilo-pass-products';
 import { useStoreKiloPassPurchase } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { RestorePurchasesButton } from './restore-purchases-button';
 
 function formatTier(product: AppStoreKiloPassProduct): string {
   return `$${product.webMonthlyPriceUsd} credits`;
@@ -50,6 +55,10 @@ export function KiloPassSubscriptionScreen() {
           contentContainerClassName="gap-3 px-1 pb-6"
           showsVerticalScrollIndicator={false}
         >
+          <Text className="px-1 text-sm leading-5 text-muted-foreground">
+            {KILO_PASS_SUBSCRIPTION_HEADER_DESCRIPTION}
+          </Text>
+
           {productsQuery.isLoading &&
             [0, 1, 2].map(index => (
               <Skeleton key={index} className="h-[112px] w-full rounded-xl" />
@@ -97,7 +106,7 @@ export function KiloPassSubscriptionScreen() {
                   <View className="flex-1 gap-1.5">
                     <Text className="font-semibold text-foreground">{formatTier(product)}</Text>
                     <Text className="text-xs text-muted-foreground">
-                      Monthly Kilo Pass with bonus progress.
+                      {formatKiloPassTierDescription(product.webMonthlyPriceUsd)}
                     </Text>
                   </View>
                   <Text className="text-base font-semibold text-foreground tabular-nums">
@@ -106,6 +115,8 @@ export function KiloPassSubscriptionScreen() {
                 </View>
               </Pressable>
             ))}
+
+          <RestorePurchasesButton />
 
           <Text className="px-1 pt-1 text-xs leading-5 text-muted-foreground">
             {KILO_PASS_LEGAL_DISCLOSURE}

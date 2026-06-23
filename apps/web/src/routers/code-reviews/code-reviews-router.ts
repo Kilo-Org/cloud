@@ -25,6 +25,7 @@ import {
   ensureCurrentCodeReviewAttemptFromReview,
   createCodeReviewAttempt,
   getLatestCodeReviewAttempt,
+  getSessionUsageFromBilling,
 } from '@/lib/code-reviews/db/code-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCheckRun, updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
@@ -59,6 +60,7 @@ import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/session-log';
+import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
 
 /**
  * Re-creates the PR gate check (GitHub Check Run / GitLab commit status)
@@ -195,6 +197,8 @@ async function cancelPRGateCheck(review: CloudAgentCodeReview) {
 }
 
 export const codeReviewRouter = createTRPCRouter({
+  analytics: codeReviewAnalyticsRouter,
+
   /**
    * List code reviews for an organization
    * Requires organization membership
@@ -329,9 +333,33 @@ export const codeReviewRouter = createTRPCRouter({
         });
       }
 
-      const attempts = await listCodeReviewAttempts(input.reviewId);
+      const cliSessionId = review.cli_session_id;
+      const shouldLoadBillingUsage =
+        ['completed', 'failed', 'cancelled', 'interrupted'].includes(review.status) &&
+        cliSessionId !== null;
+      const [attempts, billingUsage] = await Promise.all([
+        listCodeReviewAttempts(input.reviewId),
+        shouldLoadBillingUsage
+          ? getSessionUsageFromBilling(
+              cliSessionId,
+              review.created_at,
+              review.completed_at ?? undefined
+            )
+          : Promise.resolve(null),
+      ]);
+      const tokenUsage = billingUsage
+        ? {
+            input: billingUsage.tokensIn,
+            output: billingUsage.tokensOut,
+            cached: billingUsage.cachedTokens,
+          }
+        : {
+            input: review.total_tokens_in ?? 0,
+            output: review.total_tokens_out ?? 0,
+            cached: 0,
+          };
 
-      return successResult({ review, attempts });
+      return successResult({ review, attempts, tokenUsage });
     } catch (error) {
       if (error instanceof TRPCError) {
         throw error;

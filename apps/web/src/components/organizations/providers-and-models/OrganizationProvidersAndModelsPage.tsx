@@ -30,6 +30,7 @@ import {
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 import { preferredModels } from '@/lib/ai-gateway/models';
+import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 
 type Props = {
   organizationId: string;
@@ -454,6 +455,8 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
           title="Providers & Models"
           showBackButton={false}
         />
+
+        <AutoRoutingModeCard organizationId={organizationId} readonly={!canEdit} />
 
         <Tabs defaultValue="models">
           <TabsList className="w-fit">

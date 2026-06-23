@@ -5,14 +5,14 @@ set -euo pipefail
 # waits for the full bootstrap (onboard path), then verifies controller
 # HTTP endpoints, auth, and env patching.
 #
-# For the volume-mount doctor path, use controller-entrypoint-smoke-test.sh.
+# For the volume-mount doctor path, use smoke-entrypoint.sh.
 
 IMAGE="${IMAGE:-kiloclaw:controller}"
 TOKEN="${TOKEN:-smoke-token}"
 PORT="${PORT:-18789}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-source "$SCRIPT_DIR/controller-smoke-helpers.sh"
+source "$SCRIPT_DIR/smoke-helpers.sh"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "Image '$IMAGE' is not available locally."

@@ -194,13 +194,13 @@ pnpm start            # wrangler dev
 When working on machine-side controller behavior, use the Docker smoke scripts in
 `scripts/` (build image first: `docker buildx build --build-context workspace=../.. --load -t kiloclaw:controller .`):
 
-- `scripts/controller-smoke-test.sh`
+- `scripts/tests/smoke-controller.sh`
   - Fresh container (onboard path). Tests auth, env patch, version endpoints.
   - Best for quick auth/proxy sanity checks.
-- `scripts/controller-entrypoint-smoke-test.sh`
+- `scripts/tests/smoke-entrypoint.sh`
   - Volume-mounted container with pre-seeded config (doctor path).
   - Best for startup/Docker integration changes.
-- `scripts/controller-proxy-auth-smoke-test.sh`
+- `scripts/tests/smoke-proxy-auth.sh`
   - Confirms proxy-token enforcement semantics (`401` without token, pass-through with token).
   - Best for proxy auth and routing-order validation.
 
@@ -213,7 +213,8 @@ Before submitting any change:
 3. Do not reintroduce optional `userId` or `sandboxId` parameters (they are always required)
 4. If changing bootstrap behavior, update `controller/src/bootstrap.ts` and its tests
 5. If adding or changing user-facing features, add a changelog entry to `src/app/(app)/claw/components/changelog-data.ts` (newest first)
-6. If adding a new route that resolves a KiloClawInstance DO stub, accept optional `?instanceId=` and use it as the DO key when present (see "Multi-Instance Migration" section)
+6. If adding or changing an integration or an integration architecture, review and update `services/kiloclaw/INTEGRATIONS.md` in the same PR when its guidance, examples, requirements, or repository references are affected
+7. If adding a new route that resolves a KiloClawInstance DO stub, accept optional `?instanceId=` and use it as the DO key when present (see "Multi-Instance Migration" section)
 
 ## Test Targets by Change Type
 

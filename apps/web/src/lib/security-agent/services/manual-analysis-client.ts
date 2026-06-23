@@ -16,6 +16,7 @@ type ManualAnalysisStartParams = {
   };
   forceSandbox?: boolean;
   retrySandboxOnly?: boolean;
+  restartActive?: boolean;
 };
 
 type ManualAnalysisResponse = {
@@ -51,6 +52,7 @@ export async function submitManualAnalysisStart(
         requestedModels: params.requestedModels,
         forceSandbox: params.forceSandbox,
         retrySandboxOnly: params.retrySandboxOnly,
+        restartActive: params.restartActive,
       }),
     }
   );

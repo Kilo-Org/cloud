@@ -70,17 +70,19 @@ function DailyUsageLimitDisplay({ member }: DailyUsageLimitDisplayProps) {
   return null;
 }
 
-const isPrivilegedRole = (role: OrganizationRole): boolean =>
-  role === 'owner' || role === 'billing_manager';
+const canManageMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
+  isKiloAdmin || role === 'owner';
+
+const canInviteMembers = (role: OrganizationRole, isKiloAdmin: boolean): boolean =>
+  canManageMembers(role, isKiloAdmin) || role === 'billing_manager';
 
 // Business rules for member removal:
 // - Kilo admins can remove anyone
-// - Owners and billing managers can remove anyone except themselves
+// - Owners can remove anyone except themselves
 // - Members cannot remove anyone
 const canRemoveMember = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean,
-  targetMemberRole: OrganizationRole,
   isCurrentUser: boolean
 ): boolean => {
   // Kilo admin can remove anyone including themselves
@@ -89,8 +91,7 @@ const canRemoveMember = (
   // Cannot remove yourself
   if (isCurrentUser) return false;
 
-  // Owners and billing managers can remove anyone (except themselves)
-  if (isPrivilegedRole(currentUserRole)) return true;
+  if (canManageMembers(currentUserRole, isKiloAdmin)) return true;
 
   // Members cannot remove anyone
   return false;
@@ -114,7 +115,7 @@ function DeleteMemberButton({ organizationId, member }: DeleteMemberButtonProps)
     (member.status === 'active' && member.id === kiloUserId) || member.email === kiloUserEmail;
 
   // Only show delete button for active members and if user has permission to remove
-  const canRemove = canRemoveMember(currentUserRole, isKiloAdmin, member.role, isCurrentUser);
+  const canRemove = canRemoveMember(currentUserRole, isKiloAdmin, isCurrentUser);
 
   if (member.status !== 'active' || !canRemove) {
     return null;
@@ -152,10 +153,7 @@ function DeleteInvitationButton({ organizationId, member }: DeleteInvitationButt
     return null;
   }
 
-  // Apply same role restrictions as invitation creation
-  // - Owners and billing managers can delete any invitation
-  // - Members cannot delete invitations
-  const canDelete = isKiloAdmin || isPrivilegedRole(currentUserRole);
+  const canDelete = canManageMembers(currentUserRole, isKiloAdmin);
 
   if (!canDelete) {
     return null;
@@ -192,7 +190,7 @@ function InvitedBadge({ member }: InvitedBadgeProps) {
     return null;
   }
 
-  const canCopy = isKiloAdmin || isPrivilegedRole(currentUserRole);
+  const canCopy = canManageMembers(currentUserRole, isKiloAdmin);
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -245,9 +243,8 @@ function EditLimitButton({ organization, member }: EditLimitButtonProps) {
     return null;
   }
 
-  // Only show edit limit button for active members and if user has permission (admin/owner/billing_manager)
-  const canEditLimit =
-    member.status === 'active' && (isKiloAdmin || isPrivilegedRole(currentUserRole));
+  // This uses the same mutation as role changes, so it follows owner-only member management.
+  const canEditLimit = member.status === 'active' && canManageMembers(currentUserRole, isKiloAdmin);
 
   if (!canEditLimit) {
     return null;
@@ -358,8 +355,7 @@ export function OrganizationAdminMembers({
   // Show "Add Member" button only for Kilo admins
   const showAddMemberButton = isKiloAdmin;
 
-  // Show "Invite Member" button for all roles except 'member'
-  const showInviteMemberButton = currentUserRole !== 'member';
+  const showInviteMemberButton = canInviteMembers(currentUserRole, isKiloAdmin);
 
   return (
     <>
@@ -416,16 +412,16 @@ export function OrganizationAdminMembers({
                   // Determine what actions are available for this member
                   const canEditRole =
                     member.status === 'active' &&
-                    (isKiloAdmin || isPrivilegedRole(currentUserRole)) &&
+                    canManageMembers(currentUserRole, isKiloAdmin) &&
                     (!isCurrentUser || isKiloAdmin);
                   const canEditLimit =
                     organizationData.plan === 'enterprise' &&
                     member.status === 'active' &&
-                    (isKiloAdmin || isPrivilegedRole(currentUserRole));
+                    canManageMembers(currentUserRole, isKiloAdmin);
                   const canDelete =
                     member.status === 'active'
-                      ? canRemoveMember(currentUserRole, isKiloAdmin, member.role, isCurrentUser)
-                      : isKiloAdmin || isPrivilegedRole(currentUserRole);
+                      ? canRemoveMember(currentUserRole, isKiloAdmin, isCurrentUser)
+                      : canManageMembers(currentUserRole, isKiloAdmin);
 
                   const hasAnyEditableActions = canEditRole || canEditLimit || canDelete;
 

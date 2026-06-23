@@ -1,6 +1,7 @@
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 import type { NextRequest } from 'next/server';
 import type * as codeReviewsDbModule from '@/lib/code-reviews/db/code-reviews';
+import type * as analyticsDbModule from '@/lib/code-reviews/analytics/db';
 import type * as platformIntegrationsModule from '@/lib/integrations/db/platform-integrations';
 import type {
   CloudAgentCodeReview,
@@ -34,6 +35,9 @@ const mockGetLatestCodeReviewAttempt = jest.fn() as jest.MockedFunction<
 >;
 const mockCreateInfraRetryAttemptIfMissing = jest.fn() as jest.MockedFunction<
   typeof codeReviewsDbModule.createInfraRetryAttemptIfMissing
+>;
+const mockFinalizeCompletedCodeReviewWithAnalytics = jest.fn() as jest.MockedFunction<
+  typeof analyticsDbModule.finalizeCompletedCodeReviewWithAnalytics
 >;
 const mockGetIntegrationById = jest.fn() as jest.MockedFunction<
   typeof platformIntegrationsModule.getIntegrationById
@@ -80,6 +84,8 @@ const mockBuildReviewSummaryFooter = jest.fn<any>();
 const mockRetryReviewFresh = jest.fn<any>();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockDisableCodeReviewForActionRequiredFailure = jest.fn<any>();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDisableCodeReviewForRepeatedCloneTimeoutsToday = jest.fn<any>();
 
 // --- Module mocks ---
 
@@ -96,6 +102,10 @@ jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
   updateCodeReviewAttemptForCallback: mockUpdateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt: mockGetLatestCodeReviewAttempt,
   createInfraRetryAttemptIfMissing: mockCreateInfraRetryAttemptIfMissing,
+}));
+
+jest.mock('@/lib/code-reviews/analytics/db', () => ({
+  finalizeCompletedCodeReviewWithAnalytics: mockFinalizeCompletedCodeReviewWithAnalytics,
 }));
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
@@ -160,6 +170,8 @@ jest.mock('@/lib/code-reviews/action-required', () => {
     ...actual,
     disableCodeReviewForActionRequiredFailure: (...args: unknown[]) =>
       mockDisableCodeReviewForActionRequiredFailure(...args),
+    disableCodeReviewForRepeatedCloneTimeoutsToday: (...args: unknown[]) =>
+      mockDisableCodeReviewForRepeatedCloneTimeoutsToday(...args),
   };
 });
 
@@ -261,6 +273,7 @@ function makeAttempt(
     session_id: null,
     cli_session_id: null,
     execution_id: null,
+    analytics_enabled_at_dispatch: null,
     status: 'running',
     error_message: null,
     terminal_reason: null,
@@ -391,6 +404,7 @@ beforeEach(async () => {
   mockGetSessionUsageFromBilling.mockResolvedValue(null);
   mockUpdateCodeReviewUsage.mockResolvedValue(undefined);
   mockUpdateCodeReviewStatusIfNonTerminal.mockResolvedValue(true);
+  mockFinalizeCompletedCodeReviewWithAnalytics.mockResolvedValue({ outcome: 'applied' });
   mockAppendPreviousReviewSummaryHistory.mockImplementation((body: string) => body);
   mockBuildReviewSummaryFooter.mockImplementation(
     (footer: { usage?: unknown; reviewGuidance?: { used: boolean } }) =>
@@ -401,6 +415,7 @@ beforeEach(async () => {
       footer.usage || footer.reviewGuidance?.used ? 'body with footer' : body
   );
   mockDisableCodeReviewForActionRequiredFailure.mockResolvedValue(undefined);
+  mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
   ({ POST } = await import('./route'));
 });
 
@@ -456,6 +471,91 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
 
       expect(response.status).toBe(401);
+    });
+  });
+
+  describe('analytics completion callbacks', () => {
+    it('rejects invalid callback payloads at runtime', async () => {
+      const response = await POST(makeRequest({ status: 'unknown' }), makeParams(REVIEW_ID));
+
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'Invalid callback payload' });
+      expect(mockGetCodeReviewById).not.toHaveBeenCalled();
+    });
+
+    it('finalizes an enrolled captured result before provider side effects', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      const attempt = makeAttempt({ analytics_enabled_at_dispatch: true });
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(attempt);
+      const marker =
+        '<!-- kilo-review-analytics:v1 {"schemaVersion":1,"taxonomyVersion":1,"change":{"type":"feature","impact":"medium","complexity":"high","confidence":"high"},"findings":[{"severity":"warning","category":"correctness","securityClass":null}]} -->';
+
+      const response = await POST(
+        makeRequest({
+          status: 'completed',
+          sessionId: 'agent-session',
+          lastAssistantMessageText: `Review complete.\n${marker}`,
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockFinalizeCompletedCodeReviewWithAnalytics).toHaveBeenCalledWith(
+        expect.objectContaining({
+          codeReviewId: REVIEW_ID,
+          capture: expect.objectContaining({
+            status: 'captured',
+            manifest: expect.objectContaining({ findings: [expect.any(Object)] }),
+          }),
+        })
+      );
+      expect(mockUpdateCodeReviewAttemptForCallback).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['missing', { lastAssistantMessageText: 'Review complete.' }],
+      ['invalid', { lastAssistantMessageText: '<!-- kilo-review-analytics:v1 {bad-json} -->' }],
+      [
+        'omitted',
+        {
+          lastAssistantMessageTextTruncation: {
+            originalUtf8ByteLength: 200000,
+            retainedUtf8ByteLength: 0,
+          },
+        },
+      ],
+    ] as const)('maps assistant output to %s coverage', async (expectedStatus, payload) => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ analytics_enabled_at_dispatch: true })
+      );
+
+      await POST(makeRequest({ status: 'completed', ...payload }), makeParams(REVIEW_ID));
+
+      expect(mockFinalizeCompletedCodeReviewWithAnalytics).toHaveBeenCalledWith(
+        expect.objectContaining({ capture: { status: expectedStatus } })
+      );
+    });
+
+    it('does not replay provider completion side effects for analytics repair', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview({ status: 'completed' }));
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({ status: 'completed', analytics_enabled_at_dispatch: true })
+      );
+      mockFinalizeCompletedCodeReviewWithAnalytics.mockResolvedValue({ outcome: 'repaired' });
+
+      const response = await POST(
+        makeRequest({ status: 'completed', lastAssistantMessageText: 'Review complete.' }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockGetIntegrationById).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockAddReactionToPR).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
   });
 
@@ -611,7 +711,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         12345,
         expect.objectContaining({
           conclusion: 'action_required',
-          output: expect.objectContaining({ title: 'BYOK API key needs attention' }),
+          output: expect.objectContaining({ title: 'Code Reviewer disabled: BYOK key issue' }),
         }),
         'standard'
       );
@@ -688,7 +788,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'abc123',
         'failed',
         expect.objectContaining({
-          description: 'GitLab Project Access Token required for Code Reviewer',
+          description: 'Code Reviewer disabled: GitLab token setup required',
         }),
         'https://gitlab.com'
       );
@@ -742,7 +842,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         12345,
         expect.objectContaining({
           conclusion: 'action_required',
-          output: expect.objectContaining({ title: 'Selected model unavailable' }),
+          output: expect.objectContaining({ title: 'Code Reviewer disabled: model unavailable' }),
         }),
         'standard'
       );
@@ -784,7 +884,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         12345,
         expect.objectContaining({
           conclusion: 'action_required',
-          output: expect.objectContaining({ title: 'Selected model unavailable' }),
+          output: expect.objectContaining({ title: 'Code Reviewer disabled: model unavailable' }),
         }),
         'standard'
       );
@@ -1317,6 +1417,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 100_001,
           totalTokensOut: 0,
+          tokensIn: 100_001,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 200_000,
         },
       },
@@ -1326,6 +1429,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 60_000,
           totalTokensOut: 40_000,
+          tokensIn: 60_000,
+          tokensOut: 40_000,
+          cachedTokens: 0,
           totalCostMusd: 200_000,
         },
       },
@@ -1335,6 +1441,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 100_001,
           totalTokensOut: 0,
+          tokensIn: 100_001,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 199_999,
         },
       },
@@ -1344,6 +1453,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 99_999,
           totalTokensOut: 0,
+          tokensIn: 99_999,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 200_000,
         },
       },
@@ -1575,6 +1687,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         model: 'anthropic/claude-sonnet-4.6',
         totalTokensIn: 99_999,
         totalTokensOut: 0,
+        tokensIn: 99_999,
+        tokensOut: 0,
+        cachedTokens: 0,
         totalCostMusd: 200_000,
       });
 
@@ -1614,6 +1729,9 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           model: 'anthropic/claude-sonnet-4.6',
           totalTokensIn: 99_999,
           totalTokensOut: 0,
+          tokensIn: 99_999,
+          tokensOut: 0,
+          cachedTokens: 0,
           totalCostMusd: 199_999,
         },
       },
@@ -2023,6 +2141,205 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           errorMessage: 'Unexpected backend failure after prior infra retry',
           terminalReason: 'upstream_error',
         })
+      );
+    });
+
+    it('publishes a normal failure for a below-threshold repository clone timeout', async () => {
+      const errorMessage = 'Repository clone timed out: termination hard_timeout, elapsed 300041ms';
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-clone-timeout-retry' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000451',
+          status: 'failed',
+          session_id: 'agent-clone-timeout-retry',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000450',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000451',
+          status: 'failed',
+          session_id: 'agent-clone-timeout-retry',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000450',
+        })
+      );
+      mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-clone-timeout-retry',
+          errorMessage,
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ errorMessage, terminalReason: 'sandbox_error' })
+      );
+      expect(mockDisableCodeReviewForRepeatedCloneTimeoutsToday).toHaveBeenCalledWith({
+        owner: { type: 'user', id: 'user-1', userId: 'user-1' },
+        platform: 'github',
+        reviewId: REVIEW_ID,
+        errorMessage,
+      });
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          conclusion: 'failure',
+          output: expect.objectContaining({
+            title: 'Kilo Code Review failed',
+            summary: expect.stringContaining(errorMessage),
+          }),
+        }),
+        'standard'
+      );
+    });
+
+    it('publishes action-required GitHub check output on the third repository clone timeout', async () => {
+      const errorMessage = 'Repository clone timed out: termination hard_timeout, elapsed 300041ms';
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: 'agent-third-clone-timeout' })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000461',
+          status: 'failed',
+          session_id: 'agent-third-clone-timeout',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000460',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000461',
+          status: 'failed',
+          session_id: 'agent-third-clone-timeout',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000460',
+        })
+      );
+      mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(
+        'repeated_repository_clone_timeout'
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-third-clone-timeout',
+          errorMessage,
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ errorMessage, terminalReason: 'sandbox_error' })
+      );
+      expect(mockDisableCodeReviewForRepeatedCloneTimeoutsToday).toHaveBeenCalledWith({
+        owner: { type: 'user', id: 'user-1', userId: 'user-1' },
+        platform: 'github',
+        reviewId: REVIEW_ID,
+        errorMessage,
+      });
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          status: 'completed',
+          conclusion: 'action_required',
+          output: expect.objectContaining({
+            title: 'Code Reviewer disabled: clone timeouts',
+            summary:
+              'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
+          }),
+        }),
+        'standard'
+      );
+    });
+
+    it('publishes action-required GitLab commit status on the third repository clone timeout', async () => {
+      const errorMessage = 'Repository clone timed out: termination hard_timeout, elapsed 300041ms';
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({
+          status: 'running',
+          session_id: 'agent-third-gitlab-clone-timeout',
+          platform: 'gitlab',
+          platform_project_id: 42,
+          check_run_id: null,
+        })
+      );
+      mockGetIntegrationById.mockResolvedValue(
+        makeIntegration({ platform: 'gitlab', platform_installation_id: null })
+      );
+      mockUpdateCodeReviewAttemptForCallback.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000471',
+          status: 'failed',
+          session_id: 'agent-third-gitlab-clone-timeout',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000470',
+        })
+      );
+      mockGetLatestCodeReviewAttempt.mockResolvedValue(
+        makeAttempt({
+          id: '00000000-0000-0000-0000-000000000471',
+          status: 'failed',
+          session_id: 'agent-third-gitlab-clone-timeout',
+          retry_reason: 'infra_failure',
+          retry_of_attempt_id: '00000000-0000-0000-0000-000000000470',
+        })
+      );
+      mockDisableCodeReviewForRepeatedCloneTimeoutsToday.mockResolvedValue(
+        'repeated_repository_clone_timeout'
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: 'agent-third-gitlab-clone-timeout',
+          errorMessage,
+          terminalReason: 'sandbox_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockDisableCodeReviewForRepeatedCloneTimeoutsToday).toHaveBeenCalledWith({
+        owner: { type: 'user', id: 'user-1', userId: 'user-1' },
+        platform: 'gitlab',
+        reviewId: REVIEW_ID,
+        errorMessage,
+      });
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({
+          description: 'Code Reviewer disabled: three repository clone timeouts today',
+        }),
+        'https://gitlab.com'
       );
     });
 
@@ -2762,11 +3079,22 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         repository_review_instructions_used: true,
         repository_review_instructions_ref: 'main',
         repository_review_instructions_truncated: false,
+        cli_session_id: 'ses_review_with_cache',
         model: 'anthropic/claude-sonnet-4.6',
         total_tokens_in: 1000,
         total_tokens_out: 200,
+        completed_at: '2025-01-01T00:10:00Z',
       });
       mockGetCodeReviewById.mockResolvedValue(review);
+      mockGetSessionUsageFromBilling.mockResolvedValue({
+        model: 'openai/gpt-4o',
+        totalTokensIn: 1000,
+        totalTokensOut: 200,
+        tokensIn: 200,
+        tokensOut: 200,
+        cachedTokens: 800,
+        totalCostMusd: 100,
+      });
 
       await POST(makeRequest({ status: 'completed' }), makeParams(REVIEW_ID));
 
@@ -2783,8 +3111,23 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         null,
         { maxBodyCharacters: 65_536, reservedCharacters: 8 }
       );
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_review_with_cache',
+        '2025-01-01T00:00:00Z',
+        '2025-01-01T00:10:00Z'
+      );
+      expect(mockUpdateCodeReviewUsage).toHaveBeenCalledWith(REVIEW_ID, {
+        totalTokensIn: 1000,
+        totalTokensOut: 200,
+        totalCostMusd: 100,
+      });
       expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing body', {
-        usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 1000, tokensOut: 200 },
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          tokensIn: 200,
+          tokensOut: 200,
+          cachedTokens: 800,
+        },
         reviewGuidance: { used: true, ref: 'main', truncated: false },
       });
       expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
@@ -2820,7 +3163,12 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         'https://gitlab.com'
       );
       expect(mockAppendReviewSummaryFooter).toHaveBeenCalledWith('existing note body', {
-        usage: { model: 'anthropic/claude-sonnet-4.6', tokensIn: 1000, tokensOut: 200 },
+        usage: {
+          model: 'anthropic/claude-sonnet-4.6',
+          tokensIn: 1000,
+          tokensOut: 200,
+          cachedTokens: 0,
+        },
         reviewGuidance: { used: true, ref: 'main', truncated: true },
       });
       expect(mockUpdateKiloReviewNote).toHaveBeenCalledWith(

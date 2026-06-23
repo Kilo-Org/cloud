@@ -16,6 +16,7 @@ export type EfficientDecisionParams = {
   providerHints: MirrorPayload['input']['providerHints'];
   bodyBytes: number;
   userId: string;
+  organizationId: string | null;
   sessionId: string | null;
   machineId: string | null;
   clientRequestId: string | null;
@@ -44,6 +45,7 @@ function buildDecidePayload(params: EfficientDecisionParams): MirrorPayload | nu
       ? { routingPolicy: { deniedModelIds: [...params.deniedModelIds] } }
       : {}),
     userId: params.userId,
+    organizationId: params.organizationId,
     sessionId: params.sessionId,
     machineId: params.machineId,
     clientRequestId: params.clientRequestId,

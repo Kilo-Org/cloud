@@ -14,6 +14,10 @@ export {
   type NormalizedClassifierInput,
 } from './input';
 
+export const AutoRoutingModeSchema = z.enum(['cost_per_accuracy', 'best_accuracy']);
+export type AutoRoutingMode = z.infer<typeof AutoRoutingModeSchema>;
+export const DEFAULT_AUTO_ROUTING_MODE: AutoRoutingMode = 'cost_per_accuracy';
+
 // What the gateway mirrors to the auto-routing worker per request: the
 // already-normalized classifier input plus caller identity. The gateway
 // normalizes before sending so the multi-hundred-KB request body never
@@ -28,6 +32,9 @@ export const MirrorPayloadSchema = z.object({
   // Authenticated user id, or the gateway's synthetic anonymous id
   // ('anon:<ip>'). Scopes the worker's conversation identity.
   userId: z.string().trim().min(1),
+  // Authenticated organization context for org-scoped mode overrides. Null
+  // means personal context.
+  organizationId: z.string().trim().min(1).nullable().optional().default(null),
   sessionId: z.string().trim().min(1).nullable(),
   machineId: z.string().trim().min(1).nullable(),
   // Per-message id from the kilocode client, joinable to PostHog feedback.
@@ -70,11 +77,11 @@ export const ClassifierOutputSchema = z
   });
 export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
 
-export const AutoRoutingDecisionSchema = z.object({
+const BenchmarkAutoRoutingDecisionSchema = z.object({
   model: z.string(),
   taskType: ClassifierTaskTypeSchema,
   subtaskType: ClassifierSubtaskTypeSchema,
-  source: z.enum(['benchmark']),
+  source: z.literal('benchmark'),
   tableVersion: z.string(),
   // Mirrors the effort the chosen model was benchmarked with, when set.
   reasoningEffort: ReasoningEffortSchema.nullable().optional(),
@@ -83,6 +90,21 @@ export const AutoRoutingDecisionSchema = z.object({
   // parse.
   sticky: z.boolean().default(false),
 });
+
+const CodingPlanDefaultDecisionSchema = z.object({
+  model: z.string(),
+  taskType: z.null(),
+  subtaskType: z.null(),
+  source: z.literal('coding_plan_default'),
+  tableVersion: z.string(),
+  reasoningEffort: ReasoningEffortSchema.nullable().optional(),
+  sticky: z.boolean().default(false),
+});
+
+export const AutoRoutingDecisionSchema = z.discriminatedUnion('source', [
+  BenchmarkAutoRoutingDecisionSchema,
+  CodingPlanDefaultDecisionSchema,
+]);
 export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 
 export const AutoRoutingDecisionResponseSchema = z.object({
@@ -115,6 +137,27 @@ export const AutoRoutingClassifierModelResponseSchema = z.object({
 export type AutoRoutingClassifierModelResponse = z.infer<
   typeof AutoRoutingClassifierModelResponseSchema
 >;
+
+export const AutoRoutingModeOwnerTypeSchema = z.enum(['user', 'org']);
+export type AutoRoutingModeOwnerType = z.infer<typeof AutoRoutingModeOwnerTypeSchema>;
+
+export const AutoRoutingModeOwnerQuerySchema = z.object({
+  ownerType: AutoRoutingModeOwnerTypeSchema,
+  ownerId: z.string().trim().min(1),
+});
+export type AutoRoutingModeOwnerQuery = z.infer<typeof AutoRoutingModeOwnerQuerySchema>;
+
+export const UpdateAutoRoutingModeRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({
+  mode: AutoRoutingModeSchema.nullable(),
+});
+export type UpdateAutoRoutingModeRequest = z.infer<typeof UpdateAutoRoutingModeRequestSchema>;
+
+export const AutoRoutingModeResponseSchema = AutoRoutingModeOwnerQuerySchema.extend({
+  mode: AutoRoutingModeSchema,
+  configuredMode: AutoRoutingModeSchema.nullable(),
+  defaultMode: AutoRoutingModeSchema,
+});
+export type AutoRoutingModeResponse = z.infer<typeof AutoRoutingModeResponseSchema>;
 
 export const AutoRoutingAnalyticsPeriodSchema = z.enum(['1h', '24h', '7d', '30d']);
 export type AutoRoutingAnalyticsPeriod = z.infer<typeof AutoRoutingAnalyticsPeriodSchema>;

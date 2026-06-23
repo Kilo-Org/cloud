@@ -1163,6 +1163,34 @@
       "when": 1781527420968,
       "tag": "0165_clear_golden_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 166,
+      "version": "7",
+      "when": 1781687965838,
+      "tag": "0166_open_xorn",
+      "breakpoints": true
+    },
+    {
+      "idx": 167,
+      "version": "7",
+      "when": 1782128846069,
+      "tag": "0167_flawless_true_believers",
+      "breakpoints": true
+    },
+    {
+      "idx": 168,
+      "version": "7",
+      "when": 1782129982208,
+      "tag": "0168_known_mystique",
+      "breakpoints": true
+    },
+    {
+      "idx": 169,
+      "version": "7",
+      "when": 1782131884320,
+      "tag": "0169_groovy_sphinx",
+      "breakpoints": true
     }
   ]
 }

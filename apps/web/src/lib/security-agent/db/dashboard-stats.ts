@@ -10,6 +10,7 @@ export type DashboardStats = {
   sla: {
     overall: { total: number; withinSla: number; overdue: number };
     bySeverity: Record<Severity, { total: number; withinSla: number; overdue: number }>;
+    dueSoon: { total: number; exploitable: number };
     untrackedCount: number;
   };
   severity: Record<Severity, number>;
@@ -46,15 +47,30 @@ export type DashboardStats = {
     slaDueAt: string;
     daysOverdue: number;
   }>;
+  priorityFinding: {
+    id: string;
+    severity: string;
+    title: string;
+    repoFullName: string;
+    analysisStatus: string | null;
+    isExploitable: boolean | 'unknown' | null;
+    suggestedAction: string | null;
+    slaDueAt: string | null;
+    daysOverdue: number | null;
+  } | null;
   repoHealth: Array<{
     repoFullName: string;
+    open: number;
     critical: number;
     high: number;
     medium: number;
     low: number;
     overdue: number;
+    exploitable: number;
+    needsAction: number;
     slaCompliancePercent: number;
   }>;
+  repositoryCount: number;
 };
 
 type Owner = { type: 'org'; id: string } | { type: 'user'; id: string };
@@ -86,6 +102,8 @@ type SlaRow = {
   total: string;
   within_sla: string;
   overdue: string;
+  due_soon: string;
+  due_soon_exploitable: string;
   untracked: string;
 };
 
@@ -129,19 +147,36 @@ type OverdueRow = {
   days_overdue: string;
 };
 
+type PriorityFindingRow = {
+  id: string;
+  severity: string;
+  title: string;
+  repo_full_name: string;
+  analysis_status: string | null;
+  is_exploitable: string | null;
+  suggested_action: string | null;
+  sla_due_at: string | null;
+  days_overdue: string | null;
+};
+
 type RepoHealthRow = {
   repo_full_name: string;
+  open: string;
   critical: string;
   high: string;
   medium: string;
   low: string;
   overdue: string;
+  exploitable: string;
+  needs_action: string;
   sla_compliance_percent: string;
+  repository_count: string;
 };
 
 type GetDashboardStatsParams = {
   owner: SecurityReviewOwner;
   repoFullName?: string;
+  slaEnabled: boolean;
   slaConfig: {
     slaCriticalDays: number;
     slaHighDays: number;
@@ -163,11 +198,34 @@ function emptySeverityRecord<T>(defaultValue: () => T): Record<Severity, T> {
   };
 }
 
+function parseExploitability(value: string | null): boolean | 'unknown' | null {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (value === 'unknown') return 'unknown';
+  return null;
+}
+
+function toUtcIso(value: string): string {
+  return new Date(value).toISOString();
+}
+
 export async function getDashboardStats(params: GetDashboardStatsParams): Promise<DashboardStats> {
   try {
-    const { owner, repoFullName, slaConfig } = params;
+    const { owner, repoFullName, slaEnabled, slaConfig } = params;
     const ownerConverted = toOwner(owner);
     const whereClause = buildWhereClause(ownerConverted, repoFullName);
+    const repositorySecondaryOrder = slaEnabled
+      ? sql`COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL AND ${security_findings.sla_due_at} <= now())`
+      : sql`COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.analysis_status} = 'completed' AND (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'true')`;
+    const priorityDeadlineOrder = slaEnabled
+      ? sql`CASE
+          WHEN ${security_findings.sla_due_at} IS NOT NULL AND ${security_findings.sla_due_at} <= now() THEN 0
+          ELSE 1
+        END`
+      : sql`CASE WHEN true THEN 0 END`;
+    const priorityDeadlineDateOrder = slaEnabled
+      ? sql`${security_findings.sla_due_at} ASC NULLS LAST`
+      : sql`${security_findings.first_detected_at} ASC`;
 
     const [
       slaResult,
@@ -176,6 +234,7 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
       analysisResult,
       mttrResult,
       overdueResult,
+      priorityFindingResult,
       repoHealthResult,
     ] = await Promise.all([
       // SLA query
@@ -185,6 +244,8 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
             COUNT(*) FILTER (WHERE ${security_findings.sla_due_at} IS NOT NULL) AS total,
             COUNT(*) FILTER (WHERE ${security_findings.sla_due_at} IS NOT NULL AND ${security_findings.sla_due_at} > now()) AS within_sla,
             COUNT(*) FILTER (WHERE ${security_findings.sla_due_at} IS NOT NULL AND ${security_findings.sla_due_at} <= now()) AS overdue,
+            COUNT(*) FILTER (WHERE ${security_findings.sla_due_at} > now() AND ${security_findings.sla_due_at} <= now() + interval '7 days') AS due_soon,
+            COUNT(*) FILTER (WHERE ${security_findings.sla_due_at} > now() AND ${security_findings.sla_due_at} <= now() + interval '7 days' AND ${security_findings.analysis_status} = 'completed' AND (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'true') AS due_soon_exploitable,
             COUNT(*) FILTER (WHERE ${security_findings.sla_due_at} IS NULL) AS untracked
           FROM ${security_findings}
           WHERE ${security_findings.status} = 'open' AND ${whereClause}
@@ -216,7 +277,7 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
             COUNT(*) FILTER (WHERE ${security_findings.analysis_status} = 'completed' AND (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'false') AS not_exploitable,
             COUNT(*) FILTER (WHERE ${security_findings.analysis_status} = 'completed' AND ((${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown') AND (${security_findings.analysis}->'triage'->>'suggestedAction') = 'analyze_codebase') AS triage_complete,
             COUNT(*) FILTER (WHERE ${security_findings.analysis_status} = 'completed' AND (${security_findings.analysis}->'triage'->>'suggestedAction') = 'dismiss' AND ((${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown')) AS safe_to_dismiss,
-            COUNT(*) FILTER (WHERE ${security_findings.analysis_status} = 'completed' AND (${security_findings.analysis}->'triage'->>'suggestedAction') = 'manual_review' AND ((${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown')) AS needs_review,
+            COUNT(*) FILTER (WHERE ${security_findings.analysis_status} = 'completed' AND COALESCE(${security_findings.analysis}->'sandboxAnalysis'->>'suggestedAction', ${security_findings.analysis}->'triage'->>'suggestedAction') = 'manual_review' AND ((${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') IS NULL OR (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'unknown')) AS needs_review,
             COUNT(*) FILTER (WHERE ${security_findings.analysis_status} IN ('pending', 'running')) AS analyzing,
             COUNT(*) FILTER (WHERE ${security_findings.analysis_status} IS NULL) AS not_analyzed,
             COUNT(*) FILTER (WHERE ${security_findings.analysis_status} = 'failed') AS failed
@@ -252,35 +313,100 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           FROM ${security_findings}
           WHERE ${security_findings.status} = 'open'
             AND ${security_findings.sla_due_at} IS NOT NULL
-            AND ${security_findings.sla_due_at} < now()
+            AND ${security_findings.sla_due_at} <= now()
             AND ${whereClause}
           ORDER BY ${security_findings.sla_due_at} ASC
           LIMIT 10
+        `),
+
+      // Highest-priority open finding for guided next action
+      db.execute<PriorityFindingRow>(sql`
+          SELECT
+            ${security_findings.id} AS id,
+            ${security_findings.severity} AS severity,
+            ${security_findings.title} AS title,
+            ${security_findings.repo_full_name} AS repo_full_name,
+            ${security_findings.analysis_status} AS analysis_status,
+            ${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable' AS is_exploitable,
+            COALESCE(
+              ${security_findings.analysis}->'sandboxAnalysis'->>'suggestedAction',
+              ${security_findings.analysis}->'triage'->>'suggestedAction'
+            ) AS suggested_action,
+            ${security_findings.sla_due_at} AS sla_due_at,
+            CASE
+              WHEN ${security_findings.sla_due_at} IS NOT NULL AND ${security_findings.sla_due_at} <= now()
+              THEN EXTRACT(EPOCH FROM (now() - ${security_findings.sla_due_at})) / 86400
+              ELSE NULL
+            END AS days_overdue
+          FROM ${security_findings}
+          WHERE ${security_findings.status} = 'open' AND ${whereClause}
+          ORDER BY
+            CASE ${security_findings.severity}
+              WHEN 'critical' THEN 0
+              WHEN 'high' THEN 1
+              WHEN 'medium' THEN 2
+              WHEN 'low' THEN 3
+              ELSE 4
+            END,
+            ${priorityDeadlineOrder},
+            CASE
+              WHEN ${security_findings.analysis_status} IS NULL OR ${security_findings.analysis_status} = 'failed' THEN 0
+              WHEN ${security_findings.analysis_status} IN ('pending', 'running') THEN 1
+              WHEN (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'true' THEN 2
+              WHEN COALESCE(${security_findings.analysis}->'sandboxAnalysis'->>'suggestedAction', ${security_findings.analysis}->'triage'->>'suggestedAction') IN ('analyze_codebase', 'manual_review') THEN 3
+              ELSE 4
+            END,
+            ${priorityDeadlineDateOrder},
+            ${security_findings.first_detected_at} ASC,
+            ${security_findings.id} ASC
+          LIMIT 1
         `),
 
       // Repo health query
       db.execute<RepoHealthRow>(sql`
           SELECT
             ${security_findings.repo_full_name} AS repo_full_name,
+            COUNT(*) FILTER (WHERE ${security_findings.status} = 'open') AS open,
             COUNT(*) FILTER (WHERE ${security_findings.severity} = 'critical' AND ${security_findings.status} = 'open') AS critical,
             COUNT(*) FILTER (WHERE ${security_findings.severity} = 'high' AND ${security_findings.status} = 'open') AS high,
             COUNT(*) FILTER (WHERE ${security_findings.severity} = 'medium' AND ${security_findings.status} = 'open') AS medium,
             COUNT(*) FILTER (WHERE ${security_findings.severity} = 'low' AND ${security_findings.status} = 'open') AS low,
-            COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL AND ${security_findings.sla_due_at} < now()) AS overdue,
+            COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL AND ${security_findings.sla_due_at} <= now()) AS overdue,
+            COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.analysis_status} = 'completed' AND (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'true') AS exploitable,
+            COUNT(*) FILTER (
+              WHERE ${security_findings.status} = 'open'
+                AND (
+                  ${security_findings.analysis_status} IS NULL
+                  OR ${security_findings.analysis_status} = 'failed'
+                  OR (${security_findings.analysis_status} = 'completed' AND (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'true')
+                  OR (${security_findings.analysis_status} = 'completed' AND COALESCE(${security_findings.analysis}->'sandboxAnalysis'->>'suggestedAction', ${security_findings.analysis}->'triage'->>'suggestedAction') IN ('analyze_codebase', 'manual_review'))
+                )
+            ) AS needs_action,
             CASE
               WHEN COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL) = 0 THEN 100
               ELSE ROUND(
                 COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL AND ${security_findings.sla_due_at} > now()) * 100.0 /
                 COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL), 1
               )
-            END AS sla_compliance_percent
+            END AS sla_compliance_percent,
+            COUNT(*) OVER() AS repository_count
           FROM ${security_findings}
           WHERE ${whereClause}
           GROUP BY ${security_findings.repo_full_name}
           HAVING COUNT(*) FILTER (WHERE ${security_findings.status} = 'open') > 0
           ORDER BY
             COUNT(*) FILTER (WHERE ${security_findings.severity} = 'critical' AND ${security_findings.status} = 'open') DESC,
-            COUNT(*) FILTER (WHERE ${security_findings.status} = 'open' AND ${security_findings.sla_due_at} IS NOT NULL AND ${security_findings.sla_due_at} < now()) DESC
+            ${repositorySecondaryOrder} DESC,
+            COUNT(*) FILTER (
+              WHERE ${security_findings.status} = 'open'
+                AND (
+                  ${security_findings.analysis_status} IS NULL
+                  OR ${security_findings.analysis_status} = 'failed'
+                  OR (${security_findings.analysis_status} = 'completed' AND (${security_findings.analysis}->'sandboxAnalysis'->>'isExploitable') = 'true')
+                  OR (${security_findings.analysis_status} = 'completed' AND COALESCE(${security_findings.analysis}->'sandboxAnalysis'->>'suggestedAction', ${security_findings.analysis}->'triage'->>'suggestedAction') IN ('analyze_codebase', 'manual_review'))
+                )
+            ) DESC,
+            ${security_findings.repo_full_name} ASC
           LIMIT 10
         `),
     ]);
@@ -290,6 +416,8 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
     let slaOverallTotal = 0;
     let slaOverallWithinSla = 0;
     let slaOverallOverdue = 0;
+    let dueSoonCount = 0;
+    let dueSoonExploitableCount = 0;
     let untrackedCount = 0;
 
     for (const row of slaResult.rows) {
@@ -303,6 +431,8 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
         slaOverallWithinSla += withinSla;
         slaOverallOverdue += overdue;
       }
+      dueSoonCount += Number(row.due_soon);
+      dueSoonExploitableCount += Number(row.due_soon_exploitable);
       untrackedCount += Number(row.untracked);
     }
 
@@ -387,20 +517,42 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
       title: row.title,
       repoFullName: row.repo_full_name,
       packageName: row.package_name,
-      slaDueAt: row.sla_due_at,
+      slaDueAt: toUtcIso(row.sla_due_at),
       daysOverdue: Math.max(0, Math.floor(Number(row.days_overdue))),
     }));
+
+    const priorityRow = priorityFindingResult.rows[0];
+    const priorityFinding = priorityRow
+      ? {
+          id: priorityRow.id,
+          severity: priorityRow.severity,
+          title: priorityRow.title,
+          repoFullName: priorityRow.repo_full_name,
+          analysisStatus: priorityRow.analysis_status,
+          isExploitable: parseExploitability(priorityRow.is_exploitable),
+          suggestedAction: priorityRow.suggested_action,
+          slaDueAt: priorityRow.sla_due_at ? toUtcIso(priorityRow.sla_due_at) : null,
+          daysOverdue:
+            priorityRow.days_overdue === null
+              ? null
+              : Math.max(0, Math.floor(Number(priorityRow.days_overdue))),
+        }
+      : null;
 
     // Parse repo health results
     const repoHealth = repoHealthResult.rows.map(row => ({
       repoFullName: row.repo_full_name,
+      open: Number(row.open),
       critical: Number(row.critical),
       high: Number(row.high),
       medium: Number(row.medium),
       low: Number(row.low),
       overdue: Number(row.overdue),
+      exploitable: Number(row.exploitable),
+      needsAction: Number(row.needs_action),
       slaCompliancePercent: Number(row.sla_compliance_percent),
     }));
+    const repositoryCount = Number(repoHealthResult.rows[0]?.repository_count ?? 0);
 
     return {
       sla: {
@@ -410,6 +562,7 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           overdue: slaOverallOverdue,
         },
         bySeverity: slaBySeverity,
+        dueSoon: { total: dueSoonCount, exploitable: dueSoonExploitableCount },
         untrackedCount,
       },
       severity: severityCounts,
@@ -417,7 +570,9 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
       analysis,
       mttr: { bySeverity: mttrBySeverity },
       overdue,
+      priorityFinding,
       repoHealth,
+      repositoryCount,
     };
   } catch (error) {
     captureException(error, {

@@ -35,6 +35,13 @@ import {
   getRemediationAttemptHistory,
 } from '@/lib/security-agent/db/security-remediation';
 import {
+  SecurityAgentAuditReportInputSchema,
+  SecurityAgentAuditReportQueryError,
+  getSecurityAgentAuditReport,
+  type SecurityAgentAuditReportInput,
+  type SecurityAgentAuditReportOwner,
+} from '@/lib/security-agent/db/security-audit-report';
+import {
   hasSecurityReviewPermissions,
   getReauthorizeUrl,
 } from '@/lib/security-agent/github/permissions';
@@ -51,7 +58,10 @@ import {
   countEligibleForAutoDismiss,
 } from '@/lib/security-agent/services/auto-dismiss-service';
 import type { SecurityReviewOwner } from '@/lib/security-agent/core/types';
-import type { SecurityFinding } from '@kilocode/db/schema';
+import { organizations, type SecurityFinding } from '@kilocode/db/schema';
+import { buildSecurityFindingAuditHumanActor } from '@kilocode/worker-utils/security-finding-audit';
+import { db } from '@/lib/drizzle';
+import { eq } from 'drizzle-orm';
 import {
   SaveSecurityConfigInputSchema,
   ListFindingsInputSchema,
@@ -67,6 +77,7 @@ import {
   GetCommandStatusInputSchema,
   DeleteFindingsByRepoInputSchema,
   GetDashboardStatsInputSchema,
+  TrackSecurityAgentUiInteractionInputSchema,
   type SaveSecurityConfigInput,
   type ListFindingsInput,
   type TriggerSyncInput,
@@ -81,6 +92,7 @@ import {
   type GetCommandStatusInput,
   type DeleteFindingsByRepoInput,
   type GetDashboardStatsInput,
+  type TrackSecurityAgentUiInteractionInput,
 } from '@/lib/security-agent/core/schemas';
 import {
   DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
@@ -93,8 +105,11 @@ import {
   trackSecurityAgentConfigSaved,
   trackSecurityAgentSync,
   trackSecurityAgentFindingDismissed,
+  trackSecurityAgentUiInteraction,
+  trackSecurityAgentRemediationAction,
 } from '@/lib/security-agent/posthog-tracking';
 import {
+  createSecurityAuditLog,
   logSecurityAudit,
   SecurityAuditLogAction,
 } from '@/lib/security-agent/services/audit-log-service';
@@ -118,7 +133,7 @@ type SecurityAgentDeps<TExtra = {}> = {
   resolveResourceId: (ctx: TRPCContext, input: TExtra) => string;
   verifyFindingOwnership: (finding: SecurityFinding, ctx: TRPCContext, input: TExtra) => boolean;
   getIntegration: (ctx: TRPCContext, input: TExtra) => Promise<Integration>;
-  trackingExtras: (ctx: TRPCContext, input: TExtra) => Record<string, string>;
+  trackingExtras: (ctx: TRPCContext, input: TExtra) => { organizationId?: string };
 };
 
 function getRepoFullNamesInScope(
@@ -136,6 +151,99 @@ function getRepoFullNamesInScope(
     .filter((name): name is string => !!name);
 }
 
+async function resolveAuditReportOwner(
+  ctx: TRPCContext,
+  owner: Owner
+): Promise<SecurityAgentAuditReportOwner> {
+  if (owner.type === 'user') {
+    return {
+      type: 'user',
+      id: ctx.user.id,
+      displayName: ctx.user.google_user_name || ctx.user.google_user_email || 'Personal owner',
+    };
+  }
+
+  const [organization] = await db
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, owner.id))
+    .limit(1);
+
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+
+  return {
+    type: 'organization',
+    id: owner.id,
+    displayName: organization.name,
+  };
+}
+
+async function logPlatformAdminAuditReportAccess(params: {
+  ctx: TRPCContext;
+  owner: SecurityAgentAuditReportOwner;
+  periodStart: string;
+  periodEndExclusive: string;
+}): Promise<void> {
+  if (!params.ctx.user.is_admin) return;
+
+  const securityOwner =
+    params.owner.type === 'organization'
+      ? { organizationId: params.owner.id }
+      : { userId: params.owner.id };
+
+  await createSecurityAuditLog({
+    owner: securityOwner,
+    actor_id: params.ctx.user.id,
+    actor_email: params.ctx.user.google_user_email,
+    actor_name: params.ctx.user.google_user_name,
+    action: SecurityAuditLogAction.AuditReportGenerated,
+    resource_type: 'security_agent_audit_report',
+    resource_id: `${params.owner.type}:${params.owner.id}`,
+    metadata: {
+      owner_type: params.owner.type,
+      period_start: params.periodStart,
+      period_end_exclusive: params.periodEndExclusive,
+      report_version: 1,
+    },
+  });
+}
+
+async function assembleAuditReportResponse<TExtra>(params: {
+  ctx: TRPCContext;
+  input: SecurityAgentAuditReportInput & TExtra;
+  deps: SecurityAgentDeps<TExtra>;
+}): Promise<
+  | { status: 'ok'; report: Awaited<ReturnType<typeof getSecurityAgentAuditReport>> }
+  | { status: 'query_failed'; message: 'Report query did not finish' }
+> {
+  const owner = await resolveAuditReportOwner(
+    params.ctx,
+    params.deps.resolveOwner(params.ctx, params.input)
+  );
+
+  try {
+    const report = await getSecurityAgentAuditReport({
+      owner,
+      input: params.input,
+      isRequestingUserKiloAdmin: params.ctx.user.is_admin,
+    });
+    await logPlatformAdminAuditReportAccess({
+      ctx: params.ctx,
+      owner,
+      periodStart: report.period.start,
+      periodEndExclusive: report.period.endExclusive,
+    });
+    return { status: 'ok', report };
+  } catch (error) {
+    if (error instanceof SecurityAgentAuditReportQueryError) {
+      return { status: 'query_failed', message: 'Report query did not finish' };
+    }
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
@@ -150,6 +258,26 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
   const toExtra = (input: unknown): TExtra => (input ?? {}) as any;
 
   return {
+    trackUiInteraction: {
+      inputSchema: TrackSecurityAgentUiInteractionInputSchema,
+      handler: async ({
+        ctx,
+        input,
+      }: {
+        ctx: TRPCContext;
+        input: TrackSecurityAgentUiInteractionInput & TExtra;
+      }) => {
+        trackSecurityAgentUiInteraction({
+          distinctId: ctx.user.id,
+          userId: ctx.user.id,
+          organizationId: deps.trackingExtras(ctx, input).organizationId,
+          interaction: input.interaction,
+        });
+
+        return { success: true };
+      },
+    },
+
     // -----------------------------------------------------------------------
     // 1. getPermissionStatus
     // -----------------------------------------------------------------------
@@ -195,6 +323,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
       if (!result) {
         return {
+          hasConfig: false,
           isEnabled: false,
           slaCriticalDays: 15,
           slaHighDays: 30,
@@ -245,6 +374,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL;
 
       return {
+        hasConfig: true,
         isEnabled: result.isEnabled,
         slaCriticalDays: result.config.sla_critical_days,
         slaHighDays: result.config.sla_high_days,
@@ -1065,11 +1195,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         const accepted = await submitManualFindingDismissal({
           owner: securityOwner,
-          actor: {
-            id: ctx.user.id,
-            email: ctx.user.google_user_email,
-            name: ctx.user.google_user_name,
-          },
+          actor: { id: ctx.user.id },
           findingId: input.findingId,
           installationId,
           reason: input.reason,
@@ -1122,14 +1248,22 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        // Check concurrency limit
-        const concurrencyCheck = await canStartAnalysis(securityOwner);
-
-        if (!concurrencyCheck.allowed) {
+        if (input.restartActive && finding.analysis_status !== 'running') {
           throw new TRPCError({
-            code: 'TOO_MANY_REQUESTS',
-            message: `Maximum concurrent analyses reached (${concurrencyCheck.currentCount}/${concurrencyCheck.limit}). Please wait for existing analyses to complete.`,
+            code: 'PRECONDITION_FAILED',
+            message: 'Only a running Sandbox Analysis can be restarted',
           });
+        }
+
+        if (!input.restartActive) {
+          const concurrencyCheck = await canStartAnalysis(securityOwner);
+
+          if (!concurrencyCheck.allowed) {
+            throw new TRPCError({
+              code: 'TOO_MANY_REQUESTS',
+              message: `Maximum concurrent analyses reached (${concurrencyCheck.currentCount}/${concurrencyCheck.limit}). Please wait for existing analyses to complete.`,
+            });
+          }
         }
 
         const queued = await submitManualAnalysisStart({
@@ -1143,6 +1277,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           },
           forceSandbox: input.forceSandbox,
           retrySandboxOnly: input.retrySandboxOnly,
+          restartActive: input.restartActive,
         });
 
         return { success: true, ...queued };
@@ -1183,6 +1318,14 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           findingId: input.findingId,
           owner: securityOwner,
           actorUserId: ctx.user.id,
+        });
+        if (!queued.queued) return { success: false, ...queued };
+
+        trackSecurityAgentRemediationAction({
+          distinctId: ctx.user.id,
+          userId: ctx.user.id,
+          organizationId: deps.trackingExtras(ctx, input).organizationId,
+          action: 'start',
         });
 
         return { success: true, ...queued };
@@ -1225,6 +1368,14 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           actorUserId: ctx.user.id,
           retry: true,
         });
+        if (!queued.queued) return { success: false, ...queued };
+
+        trackSecurityAgentRemediationAction({
+          distinctId: ctx.user.id,
+          userId: ctx.user.id,
+          organizationId: deps.trackingExtras(ctx, input).organizationId,
+          action: 'retry',
+        });
 
         return { success: true, ...queued };
       },
@@ -1248,6 +1399,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           attemptId: input.attemptId,
           owner: securityOwner,
           actorUserId: ctx.user.id,
+        });
+
+        trackSecurityAgentRemediationAction({
+          distinctId: ctx.user.id,
+          userId: ctx.user.id,
+          organizationId: deps.trackingExtras(ctx, input).organizationId,
+          action: 'cancel',
         });
 
         return result;
@@ -1299,6 +1457,13 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         });
 
         return {
+          findingState: {
+            status: finding.status,
+            ignoredReason: finding.ignored_reason,
+            ignoredBy: finding.ignored_by,
+            fixedAt: finding.fixed_at,
+            updatedAt: finding.updated_at,
+          },
           status: finding.analysis_status,
           startedAt: finding.analysis_started_at,
           completedAt: finding.analysis_completed_at,
@@ -1391,17 +1556,12 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const result = await deleteFindingsByRepositoryDb({
           owner: securityOwner,
           repoFullName: input.repoFullName,
-        });
-
-        logSecurityAudit({
-          owner: securityOwner,
-          actor_id: ctx.user.id,
-          actor_email: ctx.user.google_user_email,
-          actor_name: ctx.user.google_user_name,
-          action: SecurityAuditLogAction.FindingDeleted,
-          resource_type: 'security_finding',
-          resource_id: input.repoFullName,
-          metadata: { repoFullName: input.repoFullName, deletedCount: result.deletedCount },
+          actor: buildSecurityFindingAuditHumanActor({
+            id: ctx.user.id,
+            email: ctx.user.google_user_email,
+            name: ctx.user.google_user_name,
+            isAdmin: ctx.user.is_admin,
+          }),
         });
 
         return {
@@ -1431,23 +1591,15 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     autoDismissEligible: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
-      const result = await autoDismissEligibleFindings(securityOwner, ctx.user.id);
-
-      logSecurityAudit({
-        owner: securityOwner,
-        actor_id: ctx.user.id,
-        actor_email: ctx.user.google_user_email,
-        actor_name: ctx.user.google_user_name,
-        action: SecurityAuditLogAction.FindingAutoDismissed,
-        resource_type: 'security_finding',
-        resource_id: 'bulk',
-        metadata: {
-          source: 'bulk',
-          dismissed: result.dismissed,
-          skipped: result.skipped,
-          errors: result.errors,
-        },
-      });
+      const result = await autoDismissEligibleFindings(
+        securityOwner,
+        buildSecurityFindingAuditHumanActor({
+          id: ctx.user.id,
+          email: ctx.user.google_user_email,
+          name: ctx.user.google_user_name,
+          isAdmin: ctx.user.is_admin,
+        })
+      );
 
       return {
         dismissed: result.dismissed,
@@ -1457,7 +1609,27 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     },
 
     // -----------------------------------------------------------------------
-    // 18. getDashboardStats
+    // 18. getAuditReport
+    // -----------------------------------------------------------------------
+    getAuditReport: {
+      inputSchema: SecurityAgentAuditReportInputSchema,
+      handler: async ({
+        ctx,
+        input: rawInput,
+      }: {
+        ctx: TRPCContext;
+        input: SecurityAgentAuditReportInput & TExtra;
+      }) => {
+        return assembleAuditReportResponse({
+          ctx,
+          input: rawInput,
+          deps,
+        });
+      },
+    },
+
+    // -----------------------------------------------------------------------
+    // 19. getDashboardStats
     // -----------------------------------------------------------------------
     getDashboardStats: {
       inputSchema: GetDashboardStatsInputSchema,
@@ -1484,6 +1656,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         return getDashboardStats({
           owner: securityOwner,
           repoFullName: input.repoFullName,
+          slaEnabled: config?.config.sla_enabled ?? true,
           slaConfig,
         });
       },

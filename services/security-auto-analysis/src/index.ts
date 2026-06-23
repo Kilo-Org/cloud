@@ -1,4 +1,4 @@
-import { timingSafeEqual as nodeTSE } from 'crypto';
+import { randomUUID, timingSafeEqual as nodeTSE } from 'crypto';
 import {
   createSecurityAgentCommand,
   markSecurityAgentCommandQueueAdmissionFailed,
@@ -8,6 +8,7 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { verifyCallbackToken } from '@kilocode/worker-utils';
 import { consumeOwnerBatch } from './consumer.js';
 import { dispatchDueOwners } from './dispatcher.js';
+import { logger, sanitizedExceptionName } from './logger.js';
 import {
   consumeAnalysisCallbackBatch,
   SecurityAnalysisCallbackPayloadSchema,
@@ -25,16 +26,57 @@ import {
   startManualRemediation,
 } from './remediation.js';
 
-async function sendBetterStackHeartbeat(
-  heartbeatUrl: string | undefined,
-  failed: boolean
-): Promise<void> {
-  if (!heartbeatUrl) return;
-  const url = failed ? `${heartbeatUrl}/fail` : heartbeatUrl;
+const HEARTBEAT_EVENT = 'security_auto_analysis.heartbeat_delivery';
+
+async function sendBetterStackHeartbeat(options: {
+  heartbeatUrl: string | undefined;
+  dispatcherFailed: boolean;
+  dispatchId: string | undefined;
+  env: CloudflareEnv;
+}): Promise<void> {
+  const heartbeatKind = options.dispatcherFailed ? 'failure' : 'success';
+  const commonTags = {
+    event_name: HEARTBEAT_EVENT,
+    heartbeat_kind: heartbeatKind,
+    dispatch_id: options.dispatchId,
+    worker_environment: options.env.ENVIRONMENT,
+    worker_version: options.env.CF_VERSION_METADATA?.id,
+  } as const;
+
+  if (!options.heartbeatUrl) {
+    logger.withTags({ ...commonTags, outcome: 'skipped' }).warn(HEARTBEAT_EVENT);
+    return;
+  }
+
+  const startedAt = Date.now();
+  logger.withTags({ ...commonTags, outcome: 'attempted' }).info(HEARTBEAT_EVENT);
+
   try {
-    await fetch(url, { signal: AbortSignal.timeout(5000) });
-  } catch {
-    // best-effort
+    const url = options.dispatcherFailed ? `${options.heartbeatUrl}/fail` : options.heartbeatUrl;
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    const responseTags = {
+      ...commonTags,
+      elapsed_ms: Date.now() - startedAt,
+      response_status: response.status,
+      response_status_class: `${Math.floor(response.status / 100)}xx`,
+    };
+    if (response.ok) {
+      logger.withTags({ ...responseTags, outcome: 'succeeded' }).info(HEARTBEAT_EVENT);
+      return;
+    }
+
+    logger.withTags({ ...responseTags, outcome: 'failed' }).warn(HEARTBEAT_EVENT);
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === 'TimeoutError';
+    logger
+      .withTags({
+        ...commonTags,
+        outcome: timedOut ? 'timeout' : 'failed',
+        exception_name: sanitizedExceptionName(error),
+        error_message: timedOut ? 'Heartbeat delivery timed out' : 'Heartbeat network failure',
+        elapsed_ms: Date.now() - startedAt,
+      })
+      .warn(HEARTBEAT_EVENT);
   }
 }
 
@@ -356,13 +398,21 @@ export default {
     ctx: ExecutionContext
   ): Promise<void> {
     let failed = false;
+    const dispatchId = randomUUID();
     try {
-      await dispatchDueOwners(env);
+      await dispatchDueOwners(env, dispatchId);
     } catch (error) {
       failed = true;
       throw error;
     } finally {
-      ctx.waitUntil(sendBetterStackHeartbeat(env.BETTERSTACK_HEARTBEAT_URL, failed));
+      ctx.waitUntil(
+        sendBetterStackHeartbeat({
+          heartbeatUrl: env.BETTERSTACK_HEARTBEAT_URL,
+          dispatcherFailed: failed,
+          dispatchId,
+          env,
+        })
+      );
     }
   },
 

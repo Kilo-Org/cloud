@@ -105,6 +105,7 @@ describe('POST /api/auth/magic-link', () => {
     await expect(response.json()).resolves.toEqual({
       success: false,
       error: 'Sign in with your organization SSO provider.',
+      ssoOrganizationId: 'sso-organization-id',
     });
     expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
     expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();

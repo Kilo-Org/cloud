@@ -81,7 +81,11 @@ export async function POST(request: NextRequest) {
     }
     if (ssoAuthority.status === 'required') {
       return NextResponse.json(
-        { success: false, error: 'Sign in with your organization SSO provider.' },
+        {
+          success: false,
+          error: 'Sign in with your organization SSO provider.',
+          ssoOrganizationId: ssoAuthority.sourceOrganizationId,
+        },
         { status: 403 }
       );
     }

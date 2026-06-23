@@ -29,13 +29,19 @@ const server = createServer(async (request, response) => {
   }
 
   const requestUrl = new URL(request.url, `http://${host}:${port}`);
-  const filePath = await resolveStaticPath(requestUrl.pathname);
+  const fileResult = await resolveStaticPath(requestUrl.pathname);
 
-  if (!filePath) {
+  if (fileResult.status === 400) {
+    response.writeHead(400).end('Bad request');
+    return;
+  }
+
+  if (fileResult.status === 403) {
     response.writeHead(403).end('Forbidden');
     return;
   }
 
+  const { filePath } = fileResult;
   const fileStats = await stat(filePath).catch(() => null);
 
   if (!fileStats?.isFile()) {
@@ -56,23 +62,32 @@ server.listen(port, host, () => {
 });
 
 async function resolveStaticPath(pathname) {
-  const decodedPath = decodeURIComponent(pathname);
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(pathname);
+  } catch {
+    return { status: 400 };
+  }
+
   const normalizedPath = decodedPath === '/' ? '/index.html' : decodedPath;
   const candidatePath = resolve(staticRoot, `.${normalizedPath}`);
 
   if (!isInsideStaticRoot(candidatePath)) {
-    return null;
+    return { status: 403 };
   }
 
   const candidateStats = await stat(candidatePath).catch(() => null);
   if (candidateStats?.isDirectory()) {
-    return join(candidatePath, 'index.html');
+    return { status: 200, filePath: join(candidatePath, 'index.html') };
   }
   if (candidateStats?.isFile()) {
-    return candidatePath;
+    return { status: 200, filePath: candidatePath };
   }
 
-  return extname(normalizedPath) ? candidatePath : join(staticRoot, 'index.html');
+  return {
+    status: 200,
+    filePath: extname(normalizedPath) ? candidatePath : join(staticRoot, 'index.html'),
+  };
 }
 
 function isInsideStaticRoot(filePath) {

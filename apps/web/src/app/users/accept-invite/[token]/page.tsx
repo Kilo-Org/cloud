@@ -1,4 +1,5 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { authOptions, getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getServerSession } from 'next-auth';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { acceptOrganizationInvite } from '@/lib/organizations/organizations';
@@ -17,8 +18,11 @@ export default async function AcceptInvitePage({ params }: AcceptInvitePageProps
     `/users/sign_in?callbackPath=${encodeURIComponent(pathname)}`
   );
 
-  // Accept the organization invitation
-  const result = await acceptOrganizationInvite(user.id, token);
+  const session = await getServerSession(authOptions);
+  const result = await acceptOrganizationInvite(user.id, token, {
+    provider: session?.authProvider,
+    ssoSourceOrganizationId: session?.ssoSourceOrganizationId,
+  });
 
   if (result.success) {
     // we need to set user to be styched if they're not so they don't get styched since they were invited to an org

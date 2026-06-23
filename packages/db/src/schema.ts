@@ -2721,6 +2721,10 @@ export const organization_invitations = pgTable(
     token: text().notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    authentication_requirement: text().$type<'default' | 'workos'>().default('default').notNull(),
+    sso_source_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'restrict',
+    }),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull()

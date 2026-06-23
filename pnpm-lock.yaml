@@ -896,6 +896,9 @@ importers:
       stytch:
         specifier: 12.43.1
         version: 12.43.1
+      swagger-ui-dist:
+        specifier: 5.32.6
+        version: 5.32.6
       tailwind-merge:
         specifier: 3.5.0
         version: 3.5.0
@@ -7592,6 +7595,9 @@ packages:
   '@sapphire/snowflake@3.5.3':
     resolution: {integrity: sha512-jjmJywLAFoWeBi1W7994zZyiNWPIiqRRNAmSERxyg93xRGzNYvGjlZ0gR6x0F4gPRi2+0O6S71kOZYyr3cxaIQ==}
     engines: {node: '>=v14.0.0', npm: '>=7.0.0'}
+
+  '@scarf/scarf@1.4.0':
+    resolution: {integrity: sha512-xxeapPiUXdZAE3che6f3xogoJPeZgig6omHEy1rIY5WVsB3H2BHNnZH+gHG6x91SCWyQCzWGsuL2Hh3ClO5/qQ==}
 
   '@segment/analytics-core@1.7.0':
     resolution: {integrity: sha512-0DHSriS/oAB/2bIgOMv3fFV9/ivp39ibdOTTf+dDOhf+vlciBv0+MHw47k/6PRobbuls27cKkKZAKc4DDC2+gw==}
@@ -15397,6 +15403,9 @@ packages:
   svg-parser@2.0.4:
     resolution: {integrity: sha512-e4hG1hRwoOdRb37cIMSgzNsxyzKfayW6VOflrwvR+/bzrkyxY/31WkbgnQpgtrNp1SdpJvpUAGTa/ZoiPNDuRQ==}
 
+  swagger-ui-dist@5.32.6:
+    resolution: {integrity: sha512-75ttZNaYCLoFPnozPZcTUU6mS3wKT8l7WLjU5zJSHFeJa23i5vtnze6IiCl4jDMPeQTXVXIgovq4M11NNfQvSA==}
+
   synckit@0.11.12:
     resolution: {integrity: sha512-Bh7QjT8/SuKUIfObSXNHNSK6WHo6J1tHCqJsuaFDP7gP0fkzSfTxI8y85JrppZ0h8l0maIgc2tfuZQ6/t3GtnQ==}
     engines: {node: ^14.18.0 || >=16.0.0}
@@ -22229,6 +22238,8 @@ snapshots:
       lodash: 4.18.1
 
   '@sapphire/snowflake@3.5.3': {}
+
+  '@scarf/scarf@1.4.0': {}
 
   '@segment/analytics-core@1.7.0':
     dependencies:
@@ -32136,6 +32147,10 @@ snapshots:
   supports-preserve-symlinks-flag@1.0.0: {}
 
   svg-parser@2.0.4: {}
+
+  swagger-ui-dist@5.32.6:
+    dependencies:
+      '@scarf/scarf': 1.4.0
 
   synckit@0.11.12:
     dependencies:

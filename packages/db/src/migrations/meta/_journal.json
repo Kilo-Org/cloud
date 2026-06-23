@@ -1198,6 +1198,13 @@
       "when": 1782166336984,
       "tag": "0170_easy_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 171,
+      "version": "7",
+      "when": 1782208433098,
+      "tag": "0171_open_lady_vermin",
+      "breakpoints": true
     }
   ]
 }

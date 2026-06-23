@@ -8,6 +8,7 @@ import {
   credit_transactions,
   platform_integrations,
   kilo_pass_subscriptions,
+  user_auth_provider,
 } from '@kilocode/db/schema';
 import {
   ilike,
@@ -29,7 +30,7 @@ import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { AdminCreditTransactionSchema, OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { STRIPE_SUBSCRIPTION_STATUS_VALUES } from '@/lib/admin/stripe-subscription-statuses';
-import { isValidUUID, toMicrodollars } from '@/lib/utils';
+import { getLowerDomainFromEmail, isValidUUID, toMicrodollars } from '@/lib/utils';
 import { millisecondsInHour } from 'date-fns/constants';
 import {
   createOrganization,
@@ -43,6 +44,8 @@ import { TRPCError } from '@trpc/server';
 import { successResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
+import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
+import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getAdminCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
@@ -554,7 +557,7 @@ export const organizationAdminRouter = createTRPCRouter({
     };
   }),
 
-  addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input }) => {
+  addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId, userId, role } = input;
 
     const organization = await getOrganizationById(organizationId);
@@ -573,7 +576,46 @@ export const organizationAdminRouter = createTRPCRouter({
       });
     }
 
-    await addUserToOrganization(organizationId, userId, role);
+    const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organizationId);
+    if (ssoPolicy.status === 'misconfigured') {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Organization SSO policy is misconfigured',
+      });
+    }
+
+    const userDomain = getLowerDomainFromEmail(existingUser.google_user_email);
+    if (
+      !existingUser.is_bot &&
+      ssoPolicy.status === 'required' &&
+      userDomain === ssoPolicy.domain
+    ) {
+      const workosProvider = await db.query.user_auth_provider.findFirst({
+        where: and(
+          eq(user_auth_provider.kilo_user_id, userId),
+          eq(user_auth_provider.provider, 'workos'),
+          eq(user_auth_provider.hosted_domain, ssoPolicy.domain)
+        ),
+      });
+      if (!workosProvider) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'User must authenticate through the organization SSO provider first',
+        });
+      }
+    }
+
+    const added = await addUserToOrganization(organizationId, userId, role);
+    if (added) {
+      await createAuditLog({
+        organization_id: organizationId,
+        action: 'organization.member.admin_add',
+        actor_name: ctx.user.google_user_name,
+        actor_email: ctx.user.google_user_email,
+        actor_id: ctx.user.id,
+        message: `Added ${existingUser.google_user_email} as ${role}`,
+      });
+    }
 
     return successResult();
   }),

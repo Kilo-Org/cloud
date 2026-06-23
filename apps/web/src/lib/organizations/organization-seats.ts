@@ -12,7 +12,10 @@ import {
   addUserToOrganization,
   getOrganizationMembers,
   getOrganizationById,
+  isOrganizationMember,
 } from '@/lib/organizations/organizations';
+import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
+import { getLowerDomainFromEmail } from '@/lib/utils';
 import { errorExceptInTest, logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';
@@ -271,8 +274,26 @@ async function handleSubscriptionEventInternal(
       logExceptInTest(
         `Skipping membership for removed user ${meta.kiloUserId} in org ${meta.organizationId} (Subscription Lifecycle 2)`
       );
-    } else {
-      await addUserToOrganization(meta.organizationId, meta.kiloUserId, 'owner');
+    } else if (!(await isOrganizationMember(meta.organizationId, meta.kiloUserId))) {
+      const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(meta.organizationId);
+      const metadataUserDomain = getLowerDomainFromEmail(metadataUser.google_user_email);
+      const protectedHuman =
+        !metadataUser.is_bot &&
+        ssoPolicy.status === 'required' &&
+        metadataUserDomain === ssoPolicy.domain;
+
+      if (ssoPolicy.status === 'misconfigured' || protectedHuman) {
+        sentryError(
+          `Skipping subscription membership admission for SSO-protected organization ${meta.organizationId}`,
+          {
+            organization_id: meta.organizationId,
+            kilo_user_id: meta.kiloUserId,
+            policy_status: ssoPolicy.status,
+          }
+        );
+      } else {
+        await addUserToOrganization(meta.organizationId, meta.kiloUserId, 'owner');
+      }
     }
   } else {
     sentryError(

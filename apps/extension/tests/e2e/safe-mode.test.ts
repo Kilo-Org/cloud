@@ -74,6 +74,86 @@ test('safe mode conversation reads the selected tab with safe tools', async () =
   }
 });
 
+test('viewport screenshot tool output expands to a captured image preview', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      firstCompletionEvents: [
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    function: {
+                      arguments: JSON.stringify({}),
+                      name: 'get_viewport_screenshot',
+                    },
+                    id: 'call_screenshot_1',
+                    index: 0,
+                    type: 'function',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      modelInputModalities: ['text', 'image'],
+      secondCompletionEvents: [
+        {
+          choices: [
+            {
+              delta: {
+                content: 'I captured the viewport.',
+              },
+            },
+          ],
+        },
+      ],
+      toolNames: [
+        'get_page_snapshot',
+        'get_element_details',
+        'find_in_page',
+        'get_viewport_screenshot',
+      ],
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await sidePanel.getByLabel('Message agent').fill('Capture this viewport.');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+
+    const screenshotPanel = sidePanel
+      .getByText('get_viewport_screenshot completed')
+      .locator('xpath=ancestor::details[1]');
+    const preview = screenshotPanel.getByRole('img', {
+      name: 'Viewport screenshot captured by get_viewport_screenshot',
+    });
+
+    await expect(screenshotPanel).toBeVisible();
+    await expect(preview).toBeHidden();
+
+    await screenshotPanel.getByText('get_viewport_screenshot completed').click();
+
+    await expect(preview).toBeVisible();
+    await expect(preview).toHaveAttribute('src', /^data:image\/png;base64,/u);
+    await expect(sidePanel.getByText('I captured the viewport.')).toBeVisible();
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
 test('dangerous mode conversation can use safe read tools', async () => {
   const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();

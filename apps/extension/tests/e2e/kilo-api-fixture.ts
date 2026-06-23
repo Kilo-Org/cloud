@@ -61,6 +61,7 @@ export const mockKiloApi = async (
     beforeFirstCompletion?: () => Promise<void>;
     beforeModels?: (organizationId: string) => Promise<void>;
     firstCompletionEvents?: unknown[];
+    modelInputModalities?: string[];
     modelFailuresBeforeSuccessByOrganizationId?: Record<string, number>;
     modelNameByOrganizationId?: Record<string, string>;
     modelFailuresBeforeSuccess?: number;
@@ -82,12 +83,7 @@ export const mockKiloApi = async (
     })
   );
   await context.route('https://app.kilo.ai/api/organizations', route =>
-    route.fulfill({
-      json: {
-        organizations: options.organizations ?? [],
-      },
-      status: 200,
-    })
+    route.fulfill({ json: { organizations: options.organizations ?? [] }, status: 200 })
   );
   await context.route('https://app.kilo.ai/api/gateway/models', async route => {
     modelCalls += 1;
@@ -112,6 +108,9 @@ export const mockKiloApi = async (
       json: {
         data: [
           {
+            ...(options.modelInputModalities === undefined
+              ? {}
+              : { architecture: { input_modalities: options.modelInputModalities } }),
             id: 'anthropic/claude-sonnet-4',
             name:
               options.modelNameByOrganizationId?.[organizationId] ?? 'Anthropic: Claude Sonnet 4',

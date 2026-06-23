@@ -14,7 +14,7 @@ import {
   organizations,
   organization_recommendation_dismissals,
 } from '@kilocode/db/schema';
-import { eq, sum, count, sql, and, gte, lte } from 'drizzle-orm';
+import { eq, sum, count, sql, and, gte, lte, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import {
@@ -132,7 +132,7 @@ async function assertEnterprise(organizationId: string): Promise<void> {
   const rows = await readDb
     .select({ plan: organizations.plan })
     .from(organizations)
-    .where(eq(organizations.id, organizationId))
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
     .limit(1);
   if (rows[0]?.plan !== 'enterprise') {
     throw new TRPCError({

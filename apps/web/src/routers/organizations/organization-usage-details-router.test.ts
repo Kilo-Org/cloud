@@ -170,6 +170,70 @@ describe('organizations usage details trpc router', () => {
       );
     });
 
+    it('treats SSO inherited from a parent organization as configured', async () => {
+      const parentOwner = await insertTestUser();
+      const parent = await createOrganization('Parent SSO Organization', parentOwner.id);
+      await db
+        .update(organizations)
+        .set({ sso_domain: `recommendations-${crypto.randomUUID()}.example.com` })
+        .where(eq(organizations.id, parent.id));
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise', parent_organization_id: parent.id })
+        .where(eq(organizations.id, testOrganization.id));
+      const caller = await createCallerForUser(memberUser.id);
+
+      try {
+        const result = await caller.organizations.usageDetails.getRecommendations({
+          organizationId: testOrganization.id,
+        });
+
+        expect(result.recommendations.find(r => r.key === 'org-sso-not-configured')?.status).toBe(
+          'completed'
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, testOrganization.id));
+        await db.delete(organizations).where(eq(organizations.id, parent.id));
+      }
+    });
+
+    it('rejects recommendation reads and mutations for a soft-deleted organization', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise', deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, testOrganization.id));
+      const member = await createCallerForUser(memberUser.id);
+      const owner = await createCallerForUser(regularUser.id);
+
+      try {
+        await expect(
+          member.organizations.usageDetails.getRecommendations({
+            organizationId: testOrganization.id,
+          })
+        ).rejects.toThrow('Organization not found');
+        await expect(
+          owner.organizations.usageDetails.dismissRecommendation({
+            organizationId: testOrganization.id,
+            recommendationKey: 'org-sso-not-configured',
+          })
+        ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+        await expect(
+          owner.organizations.usageDetails.restoreRecommendation({
+            organizationId: testOrganization.id,
+            recommendationKey: 'org-sso-not-configured',
+          })
+        ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      } finally {
+        await db
+          .update(organizations)
+          .set({ deleted_at: null })
+          .where(eq(organizations.id, testOrganization.id));
+      }
+    });
+
     it('hides a recommendation after an owner dismisses it', async () => {
       await db
         .update(organizations)

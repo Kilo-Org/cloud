@@ -21,6 +21,7 @@ import {
   organization_user_usage,
   organization_audit_logs,
   organization_invitations,
+  organization_recommendation_dismissals,
   security_audit_log,
   free_model_usage,
   organizations,
@@ -180,6 +181,7 @@ describe('User', () => {
     await db.delete(referral_code_usages);
     await db.delete(referral_codes);
     await db.delete(organization_audit_logs);
+    await db.delete(organization_recommendation_dismissals);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
     await db.delete(model_eval_ingestions);
@@ -496,6 +498,32 @@ describe('User', () => {
   });
 
   describe('softDeleteUser', () => {
+    it('anonymizes recommendation dismissal actor references', async () => {
+      const organizationOwner = await insertTestUser();
+      const dismissingUser = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Recommendation Dismissal Cleanup Org',
+        organizationOwner.id,
+        0
+      );
+      const [dismissal] = await db
+        .insert(organization_recommendation_dismissals)
+        .values({
+          owned_by_organization_id: organization.id,
+          recommendation_key: 'org-sso-not-configured',
+          dismissed_by_user_id: dismissingUser.id,
+        })
+        .returning();
+
+      await softDeleteUser(dismissingUser.id);
+
+      const [retainedDismissal] = await db
+        .select()
+        .from(organization_recommendation_dismissals)
+        .where(eq(organization_recommendation_dismissals.id, dismissal.id));
+      expect(retainedDismissal?.dismissed_by_user_id).toBeNull();
+    });
+
     it('deletes personal Security Agent notifications through finding cleanup', async () => {
       const user = await insertTestUser();
       const [finding] = await db

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
   const existingUser = await findUserByEmail(email);
   const primaryEmail = existingUser?.google_user_email ?? email;
   const primaryDomain = getLowerDomainFromEmail(primaryEmail);
-  if (primaryDomain && primaryDomain !== 'gmail.com') {
+  if (primaryDomain) {
     const ssoAuthority = await resolveSsoAuthorityForDomain(primaryDomain);
     if (ssoAuthority.status === 'misconfigured') {
       return NextResponse.json(

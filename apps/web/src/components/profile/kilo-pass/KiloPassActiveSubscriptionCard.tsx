@@ -153,7 +153,7 @@ function HeaderRow() {
       </CardTitle>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <KiloPassReferralButton />
+        <KiloPassReferralButton source="kilo_pass_active_subscription_card" />
         {providerManagement.externalManagementAction ? (
           <Button asChild variant="outline" size="icon" className="h-9 w-9">
             <a

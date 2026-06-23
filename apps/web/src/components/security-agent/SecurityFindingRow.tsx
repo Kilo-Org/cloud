@@ -1,177 +1,109 @@
 'use client';
 
-import { differenceInDays, differenceInHours, differenceInMinutes, isPast } from 'date-fns';
 import {
   Brain,
-  CheckCircle2,
   ChevronRight,
   Eye,
+  ExternalLink,
+  GitPullRequest,
   Loader2,
-  Package,
-  Shield,
-  ShieldAlert,
-  ShieldCheck,
-  ShieldX,
+  RotateCw,
   XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { SecurityFinding } from '@kilocode/db/schema';
+import type { SecurityFindingWithRemediation } from '@/lib/security-agent/db/security-remediation';
 import { cn } from '@/lib/utils';
 import { SeverityBadge } from './SeverityBadge';
-import { manualAnalysisAdmissionCopy } from './manual-analysis-admission-copy';
-
-type Outcome = {
-  icon: typeof CheckCircle2;
-  label: string;
-  className: string;
-  spin: boolean;
-  tooltip: string | null;
-};
-
-function getOutcome(finding: SecurityFinding): Outcome | null {
-  // Resolved findings: the finding status takes precedence over analysis results
-  if (finding.status === 'fixed') {
-    const fixedAgo = finding.fixed_at
-      ? `Fixed ${formatCompactDistance(new Date(finding.fixed_at))} ago`
-      : null;
-    return {
-      icon: CheckCircle2,
-      label: 'Fixed',
-      className: 'text-green-400',
-      spin: false,
-      tooltip: fixedAgo,
-    };
-  }
-  if (finding.status === 'ignored') {
-    const reason = finding.ignored_reason ? finding.ignored_reason.replace(/_/g, ' ') : null;
-    return {
-      icon: XCircle,
-      label: 'Dismissed',
-      className: 'text-muted-foreground',
-      spin: false,
-      tooltip: reason,
-    };
-  }
-
-  // In-progress / failed analysis
-  if (finding.analysis_status === 'pending') {
-    return {
-      icon: Loader2,
-      label: 'Analyzing',
-      className: 'text-yellow-400',
-      spin: true,
-      tooltip: 'Analysis is queued',
-    };
-  }
-  if (finding.analysis_status === 'running') {
-    return {
-      icon: Loader2,
-      label: 'Analyzing',
-      className: 'text-yellow-400',
-      spin: true,
-      tooltip: 'Analysis is running',
-    };
-  }
-  if (finding.analysis_status === 'failed') {
-    return {
-      icon: XCircle,
-      label: 'Analysis Failed',
-      className: 'text-red-400',
-      spin: false,
-      tooltip: finding.analysis_error || 'Unknown error',
-    };
-  }
-
-  // Completed analysis — show the result
-  if (finding.analysis_status === 'completed') {
-    const sandbox = finding.analysis?.sandboxAnalysis;
-    const triage = finding.analysis?.triage;
-    if (sandbox?.isExploitable === true) {
-      return {
-        icon: ShieldAlert,
-        label: 'Exploitable',
-        className: 'text-red-400',
-        spin: false,
-        tooltip: sandbox.summary || 'Codebase analysis confirmed this vulnerability is exploitable',
-      };
-    }
-    if (sandbox?.isExploitable === false) {
-      return {
-        icon: ShieldCheck,
-        label: 'Not Exploitable',
-        className: 'text-green-400',
-        spin: false,
-        tooltip: sandbox.summary || 'Codebase analysis determined this is not exploitable',
-      };
-    }
-    if (triage?.suggestedAction === 'dismiss') {
-      return {
-        icon: ShieldX,
-        label: 'Safe to Dismiss',
-        className: 'text-green-400',
-        spin: false,
-        tooltip: triage.needsSandboxReasoning || 'Triage determined this can be safely dismissed',
-      };
-    }
-    if (triage?.suggestedAction === 'manual_review') {
-      return {
-        icon: Eye,
-        label: 'Needs Review',
-        className: 'text-yellow-400',
-        spin: false,
-        tooltip: triage.needsSandboxReasoning || 'Triage flagged this for manual review',
-      };
-    }
-    return {
-      icon: Shield,
-      label: triage ? 'Triage Complete' : 'Analyzed',
-      className: 'text-muted-foreground',
-      spin: false,
-      tooltip: triage?.needsSandboxReasoning || null,
-    };
-  }
-  return null;
-}
-
-function OutcomeLabel({ outcome }: { outcome: Outcome }) {
-  const content = (
-    <span className={cn('flex items-center gap-1.5', outcome.className)}>
-      <outcome.icon className={cn('h-3.5 w-3.5', outcome.spin && 'animate-spin')} />
-      {outcome.label}
-    </span>
-  );
-  if (!outcome.tooltip) return content;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{content}</TooltipTrigger>
-      <TooltipContent side="top" sideOffset={4} className="max-w-xs">
-        {outcome.tooltip}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
+import {
+  isAwaitingManualAnalysisAdmission,
+  manualAnalysisAdmissionCopy,
+  manualAnalysisCapacityFullCopy,
+} from './manual-analysis-admission-copy';
+import {
+  getAnalysisPresentation,
+  getDeadlinePresentation,
+  getFindingListGridClass,
+  type FindingStatusPresentation,
+  type FindingTone,
+} from './security-finding-list-presentation';
 
 type Severity = 'critical' | 'high' | 'medium' | 'low';
+
+type SecurityFindingRowProps = {
+  finding: SecurityFindingWithRemediation;
+  onClick: () => void;
+  onStartAnalysis?: (
+    findingId: string,
+    options?: { forceSandbox?: boolean; retrySandboxOnly?: boolean }
+  ) => void;
+  isStartingAnalysis?: boolean;
+  analysisAtCapacity?: boolean;
+  onStartRemediation?: (findingId: string) => void;
+  onRetryRemediation?: (findingId: string) => void;
+  onCancelRemediation?: (attemptId: string, findingId?: string) => void;
+  isStartingRemediation?: boolean;
+  isCancellingRemediation?: boolean;
+  slaDisplay?: 'visible' | 'hidden';
+};
+
+const toneStyles: Record<FindingTone, { status: string; text: string }> = {
+  success: {
+    status: 'border-status-success-border bg-status-success-surface text-status-success',
+    text: 'text-status-success',
+  },
+  warning: {
+    status: 'border-status-warning-border bg-status-warning-surface text-status-warning',
+    text: 'text-status-warning',
+  },
+  destructive: {
+    status:
+      'border-status-destructive-border bg-status-destructive-surface text-status-destructive',
+    text: 'text-status-destructive',
+  },
+  neutral: {
+    status: 'border-status-neutral-border bg-status-neutral-surface text-status-neutral',
+    text: 'text-status-neutral',
+  },
+};
+
 function isSeverity(value: string): value is Severity {
   return ['critical', 'high', 'medium', 'low'].includes(value);
 }
 
-type SecurityFindingRowProps = {
-  finding: SecurityFinding;
-  onClick: () => void;
-  onStartAnalysis?: (findingId: string, options?: { retrySandboxOnly?: boolean }) => void;
-  isStartingAnalysis?: boolean;
-};
+function FindingStatusCell({
+  label,
+  children,
+  className,
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn('relative z-10 min-w-0 pointer-events-none', className)}>
+      <div className="text-muted-foreground type-label mb-2 xl:hidden">{label}</div>
+      {children}
+    </div>
+  );
+}
 
-function formatCompactDistance(date: Date) {
-  const now = new Date();
-  const days = Math.abs(differenceInDays(now, date));
-  if (days >= 1) return `${days}d`;
-  const hours = Math.abs(differenceInHours(now, date));
-  if (hours >= 1) return `${hours}h`;
-  const minutes = Math.abs(differenceInMinutes(now, date));
-  return `${minutes}m`;
+function StatusPill({ status }: { status: FindingStatusPresentation }) {
+  const Icon = status.icon;
+  return (
+    <span
+      className={cn(
+        'type-label inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1',
+        toneStyles[status.tone].status
+      )}
+      title={status.tooltip ?? undefined}
+    >
+      <Icon
+        className={cn('size-3.5', status.spinning && 'animate-spin motion-reduce:animate-none')}
+        aria-hidden="true"
+      />
+      {status.label}
+    </span>
+  );
 }
 
 export function SecurityFindingRow({
@@ -179,132 +111,180 @@ export function SecurityFindingRow({
   onClick,
   onStartAnalysis,
   isStartingAnalysis,
+  analysisAtCapacity = false,
+  onStartRemediation,
+  onRetryRemediation,
+  onCancelRemediation,
+  isStartingRemediation,
+  isCancellingRemediation,
+  slaDisplay = 'visible',
 }: SecurityFindingRowProps) {
   const severity: Severity = isSeverity(finding.severity) ? finding.severity : 'medium';
-
-  const canStartAnalysis =
+  const showAnalysisAction =
     finding.status === 'open' &&
     (!finding.analysis_status || finding.analysis_status === 'failed') &&
-    onStartAnalysis &&
+    Boolean(onStartAnalysis) &&
     !isStartingAnalysis;
+  const isAwaitingAnalysisAdmission = isAwaitingManualAnalysisAdmission(
+    Boolean(isStartingAnalysis),
+    finding.analysis_status
+  );
+  const analysis = getAnalysisPresentation(finding);
+  const deadline = getDeadlinePresentation(finding);
+  const remediation = finding.remediationSummary;
+  const capability = finding.remediationCapability;
+  const remediationStatus = remediation?.status ?? null;
+  const remediationAttemptId = capability.cancelAttemptId ?? remediation?.latestAttemptId;
+  const openRemediationPrUrl =
+    remediationStatus === 'pr_opened' && remediation?.prUrl ? remediation.prUrl : null;
+  const showSla = slaDisplay === 'visible';
 
-  const handleStartAnalysis = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (onStartAnalysis) {
-      const retrySandboxOnly = !!finding.analysis?.triage && finding.analysis_status === 'failed';
-      onStartAnalysis(finding.id, { retrySandboxOnly });
-    }
+  const startAnalysis = () => {
+    const retrySandboxOnly =
+      Boolean(finding.analysis?.triage) && finding.analysis_status === 'failed';
+    onStartAnalysis?.(finding.id, { retrySandboxOnly });
+  };
+  const cancelRemediation = () => {
+    if (remediationAttemptId) onCancelRemediation?.(remediationAttemptId, finding.id);
   };
 
-  const outcome = getOutcome(finding);
-  const isHighlighted =
-    finding.status === 'open' && !!finding.sla_due_at && isPast(new Date(finding.sla_due_at));
-
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-        }
-      }}
+    <li
       className={cn(
-        'hover:bg-muted/50 grid w-full cursor-pointer grid-cols-[72px_1fr_140px_80px_16px] items-center gap-x-1.5 px-4 py-3 text-left transition-colors',
-        isHighlighted ? 'bg-red-500/5' : ''
+        'hover:bg-surface-hover relative grid gap-4 px-4 py-4 transition-colors sm:grid-cols-2 sm:px-5 xl:items-center',
+        getFindingListGridClass(showSla)
       )}
     >
-      {/* Severity */}
-      <div>
-        <SeverityBadge severity={severity} size="sm" />
+      <button
+        type="button"
+        onClick={onClick}
+        className="focus-visible:ring-ring absolute inset-0 z-0 cursor-pointer rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-inset"
+        aria-label={`View ${finding.title}`}
+      />
+
+      <div className="relative z-10 min-w-0 pointer-events-none sm:col-span-2 xl:col-span-1">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex w-20 shrink-0 items-center">
+            <SeverityBadge severity={severity} size="sm" />
+          </div>
+          <span className="type-body min-w-0 font-medium text-pretty">{finding.title}</span>
+        </div>
       </div>
 
-      {/* Title + package */}
-      <div className="min-w-0">
-        <h4 className="truncate text-sm font-medium">{finding.title}</h4>
-        <span className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
-          <Package className="h-3 w-3" />
-          {finding.package_name}
-        </span>
-      </div>
+      <FindingStatusCell label="Analysis">
+        <StatusPill status={analysis} />
+      </FindingStatusCell>
 
-      {/* Outcome */}
-      <div className="text-xs">
-        {outcome ? (
-          <OutcomeLabel outcome={outcome} />
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="text-muted-foreground/50 flex items-center gap-1.5">
-                <Shield className="h-3.5 w-3.5" />
-                Not Analyzed
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={4}>
-              Click Analyze to assess this vulnerability
-            </TooltipContent>
-          </Tooltip>
-        )}
-      </div>
+      {showSla && (
+        <FindingStatusCell label="SLA Deadline">
+          <div className={cn('type-label flex items-start gap-2', toneStyles[deadline.tone].text)}>
+            <deadline.icon className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+            <div>
+              <div className="font-medium">{deadline.label}</div>
+              <div className="text-muted-foreground mt-0.5 tabular-nums">{deadline.detail}</div>
+            </div>
+          </div>
+        </FindingStatusCell>
+      )}
 
-      {/* Action */}
-      <div className="flex items-center justify-end">
-        {canStartAnalysis ? (
-          finding.analysis_status === 'failed' ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleStartAnalysis}
-                  disabled={isStartingAnalysis}
-                  className="gap-1"
-                >
-                  <Brain className="h-3 w-3" />
-                  Retry
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" sideOffset={4}>
-                {finding.analysis_error ||
-                  finding.analysis?.triage?.needsSandboxReasoning ||
-                  'Analysis failed'}
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleStartAnalysis}
-              disabled={isStartingAnalysis}
-              className="gap-1"
-            >
-              <Brain className="h-3 w-3" />
-              Analyze
-            </Button>
-          )
-        ) : isStartingAnalysis ? (
-          <Button variant="outline" size="sm" disabled className="gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
+      <div className="relative z-10 flex items-center justify-end gap-2 pointer-events-auto sm:col-span-2 xl:col-span-2 xl:grid xl:grid-cols-[minmax(9rem,auto)_2.25rem]">
+        {openRemediationPrUrl ? (
+          <Button
+            variant="outline"
+            asChild
+            className="min-h-control-touch w-full sm:h-control-default sm:min-h-0 sm:w-auto xl:justify-self-end"
+          >
+            <a href={openRemediationPrUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink aria-hidden="true" />
+              View PR
+            </a>
+          </Button>
+        ) : isStartingRemediation ? (
+          <Button
+            variant="outline"
+            disabled
+            className="min-h-control-touch w-full sm:h-control-default sm:min-h-0 sm:w-auto xl:justify-self-end"
+          >
+            <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            Queueing
+          </Button>
+        ) : capability.canCancel && remediationAttemptId && onCancelRemediation ? (
+          <Button
+            variant="outline"
+            onClick={cancelRemediation}
+            disabled={isCancellingRemediation}
+            className="min-h-control-touch w-full sm:h-control-default sm:min-h-0 sm:w-auto xl:justify-self-end"
+          >
+            {isCancellingRemediation ? (
+              <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+            ) : (
+              <XCircle aria-hidden="true" />
+            )}
+            Cancel
+          </Button>
+        ) : capability.canRetry && onRetryRemediation ? (
+          <Button
+            variant="outline"
+            onClick={() => onRetryRemediation(finding.id)}
+            className="min-h-control-touch w-full sm:h-control-default sm:min-h-0 sm:w-auto xl:justify-self-end"
+          >
+            <RotateCw aria-hidden="true" />
+            Retry fix
+          </Button>
+        ) : capability.canStart && onStartRemediation ? (
+          <Button
+            variant="outline"
+            onClick={() => onStartRemediation(finding.id)}
+            className="min-h-control-touch w-full sm:h-control-default sm:min-h-0 sm:w-auto xl:justify-self-end"
+          >
+            <GitPullRequest aria-hidden="true" />
+            Fix
+          </Button>
+        ) : showAnalysisAction ? (
+          <Button
+            variant="outline"
+            onClick={startAnalysis}
+            disabled={analysisAtCapacity}
+            title={analysisAtCapacity ? manualAnalysisCapacityFullCopy : undefined}
+            className="min-h-control-touch w-full sm:h-control-default sm:min-h-0 sm:w-auto xl:justify-self-end"
+          >
+            <Brain aria-hidden="true" />
+            {finding.analysis_status === 'failed' ? 'Retry' : 'Analyze'}
+          </Button>
+        ) : isAwaitingAnalysisAdmission ? (
+          <Button
+            variant="outline"
+            disabled
+            className="min-h-control-touch w-full sm:h-control-default sm:min-h-0 sm:w-auto xl:justify-self-end"
+          >
+            <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
             {manualAnalysisAdmissionCopy.pendingLabel}
           </Button>
         ) : finding.analysis?.triage?.suggestedAction === 'manual_review' &&
           finding.status === 'open' ? (
-          <Button variant="outline" size="sm" onClick={onClick} className="gap-1">
-            <Eye className="h-3 w-3" />
+          <Button
+            variant="outline"
+            onClick={onClick}
+            className="min-h-control-touch w-full sm:h-control-default sm:min-h-0 sm:w-auto xl:justify-self-end"
+          >
+            <Eye aria-hidden="true" />
             Review
           </Button>
         ) : finding.status === 'fixed' || finding.status === 'ignored' ? (
-          <Button variant="outline" size="sm" onClick={onClick} className="gap-1">
-            <Eye className="h-3 w-3" />
-            View Details
+          <Button
+            variant="outline"
+            onClick={onClick}
+            className="min-h-control-touch w-full sm:h-control-default sm:min-h-0 sm:w-auto xl:justify-self-end"
+          >
+            <Eye aria-hidden="true" />
+            View details
           </Button>
         ) : null}
+        <ChevronRight
+          className="text-muted-foreground size-4 shrink-0 xl:col-start-2 xl:justify-self-center"
+          aria-hidden="true"
+        />
       </div>
-
-      {/* Detail chevron */}
-      <ChevronRight className="text-muted-foreground h-4 w-4" />
-    </div>
+    </li>
   );
 }

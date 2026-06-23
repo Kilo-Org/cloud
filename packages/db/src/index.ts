@@ -1,6 +1,12 @@
 export * from './schema';
 export * from './schema-types';
 export * from './kiloclaw-pricing-catalog';
+export * from './kiloclaw-commit-retirement';
+export {
+  findLatestPreCutoffUserCommitSwitchQualification,
+  type CommitSwitchQualificationRepository,
+  type KiloClawCommitSwitchQualification,
+} from './kiloclaw-commit-switch-qualification-repository';
 export {
   createDrizzleClient,
   type CreateDrizzleClientOptions,
@@ -35,12 +41,17 @@ export {
   createSecurityAgentCommand,
   deleteRetainedSecurityAgentCommands,
   getSecurityAgentCommandForOwner,
+  isTerminalSecurityAgentCommandTransitionOutcome,
   listActiveSecurityAgentCommandsForOwner,
   markSecurityAgentCommandQueueAdmissionFailed,
+  markSecurityAgentCommandRetriesExhausted,
   reconcileStaleSecurityAgentCommands,
+  requireSecurityAgentCommandTransitionOrTerminal,
   transitionSecurityAgentCommand,
+  transitionSecurityAgentCommandWithCurrentState,
   type CreateSecurityAgentCommandInput,
   type SecurityAgentCommandOwner,
+  type SecurityAgentCommandTransitionOutcome,
   type TransitionSecurityAgentCommandInput,
 } from './security-agent-command-repository';
 export {

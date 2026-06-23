@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { signIn } from 'next-auth/react';
 import { Button } from '../Button';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
-import { captureException } from '@sentry/nextjs';
 
 export type FakeSignInButtonProps = {
   searchParams: NextAppSearchParams;
@@ -46,14 +45,6 @@ export function FakeLoginForm({ searchParams }: FakeSignInButtonProps) {
         });
       } catch (error) {
         console.error('Fake login error:', error);
-        captureException(error, {
-          tags: { source: 'fake_login' },
-          extra: {
-            email: submissionEmail,
-            callbackUrl,
-          },
-          level: 'warning',
-        });
       } finally {
         setIsLoading(false);
       }

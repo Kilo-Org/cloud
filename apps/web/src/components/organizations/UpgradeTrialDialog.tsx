@@ -227,7 +227,7 @@ export function UpgradeTrialDialog({
             <Button
               onClick={handlePurchase}
               disabled={isPurchasing || !seatUsage}
-              className="w-full max-w-md bg-blue-600 py-4 text-lg font-semibold text-white hover:bg-blue-700"
+              className="w-full max-w-md py-4 text-lg font-semibold"
             >
               {isPurchasing ? 'Processing...' : `Purchase ${planName} Plan`}
             </Button>

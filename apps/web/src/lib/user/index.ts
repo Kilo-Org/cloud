@@ -7,6 +7,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import type { User } from '@kilocode/db/schema';
+import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   payment_methods,
@@ -31,6 +32,7 @@ import {
   organization_invitations,
   organization_membership_removals,
   organization_audit_logs,
+  organization_recommendation_dismissals,
   magic_link_tokens,
   device_auth_requests,
   auto_top_up_configs,
@@ -40,12 +42,17 @@ import {
   webhook_events,
   agent_environment_profiles,
   security_findings,
+  security_finding_notifications,
+  security_remediation_attempts,
+  security_remediations,
   security_audit_log,
   auto_triage_tickets,
   auto_fix_tickets,
   slack_bot_requests,
   bot_requests,
   cloud_agent_code_reviews,
+  code_review_feedback_events,
+  code_review_memory_proposals,
   kiloclaw_instances,
   kiloclaw_google_oauth_connections,
   kiloclaw_inbound_email_aliases,
@@ -85,6 +92,7 @@ import {
   stripe_early_fraud_warning_cases,
   coding_plan_availability_intents,
   coding_plan_subscriptions,
+  deployments_ephemeral,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
@@ -98,6 +106,7 @@ import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import {
+  generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
@@ -542,18 +551,38 @@ export async function createOrUpdateUser(
       (onlyHasFakeLogin || (autoLinkToExistingUser && (hasNoProviders || isUpgradeProvider)));
 
     if (shouldLink) {
-      // WorkOS SSO: Remove existing OAuth providers to enforce single sign-on
-      if (args.provider === 'workos' && !hasNoProviders) {
-        await db
-          .delete(user_auth_provider)
-          .where(eq(user_auth_provider.kilo_user_id, userByEmail.id));
+      let linkedUser = userByEmail;
+      if (args.provider === 'workos') {
+        linkedUser = await db.transaction(async tx => {
+          await tx
+            .delete(user_auth_provider)
+            .where(eq(user_auth_provider.kilo_user_id, userByEmail.id));
+          await tx.insert(user_auth_provider).values({
+            kilo_user_id: userByEmail.id,
+            provider: args.provider,
+            provider_account_id: args.provider_account_id,
+            email: args.google_user_email,
+            avatar_url: args.google_user_image_url,
+            display_name: args.display_name ?? null,
+            hosted_domain: args.hosted_domain,
+          });
+          const [updatedUser] = await tx
+            .update(kilocode_users)
+            .set({
+              web_session_pepper: randomUUID(),
+            })
+            .where(eq(kilocode_users.id, userByEmail.id))
+            .returning();
+          if (!updatedUser) throw new Error('Failed to rotate web sessions for WorkOS user');
+          return updatedUser;
+        });
+      } else {
+        const linkResult = await linkAccountToExistingUser(userByEmail.id, args);
+        if (!linkResult.success) {
+          return { success: false, error: linkResult.error };
+        }
       }
-
-      const linkResult = await linkAccountToExistingUser(userByEmail.id, args);
-      if (!linkResult.success) {
-        return { success: false, error: linkResult.error };
-      }
-      void fireAuthEvent(userByEmail, 'signin', args.provider, requestHeaders);
+      void fireAuthEvent(linkedUser, 'signin', args.provider, requestHeaders);
       // Successfully linked account, return the existing user
       posthogClient.capture({
         distinctId: userByEmail.google_user_email,
@@ -570,7 +599,7 @@ export async function createOrUpdateUser(
           new_hosted_domain: args.hosted_domain,
         },
       });
-      return successResult({ user: userByEmail, isNew: false });
+      return successResult({ user: linkedUser, isNew: false });
     } else {
       // User signed in with a different ID, but same email
       posthogClient.capture({
@@ -618,6 +647,8 @@ export async function createOrUpdateUser(
     stripe_customer_id: stripeCustomer.id,
     signup_ip: signupIp,
     openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
+    openrouter_downstream_safety_identifier:
+      generateOpenRouterDownstreamSafetyIdentifier(newUserId),
     vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
     normalized_email: normalizeEmail(args.google_user_email),
     email_domain: extractEmailDomain(args.google_user_email),
@@ -793,7 +824,7 @@ export class SoftDeletePreconditionError extends Error {
  * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
  * - cli_sessions, shared_cli_sessions, cli_sessions_v2 (session history)
  * - deployments, app_builder_projects (user assets)
- * - stytch_fingerprints (abuse detection)
+ * - stytch_fingerprints and provider safety identifiers (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
  * - model_experiment_request (experiment attribution and prompt hashes retained
@@ -824,14 +855,20 @@ export class SoftDeletePreconditionError extends Error {
  * - App Store account token and retained Kilo Pass store purchase/event token fields
  * - user_feedback / app_builder_feedback / free_model_usage (FK nulled)
  * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
+ * - deployments_ephemeral ownership link and cleanup claims (FK nulled;
+ *   immediate cleanup scheduled)
+ * - Recommendation dismissal actor references (nulled)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
- *   security_agent_repository_sync_state,
+ *   security_agent_repository_sync_state, security_remediations,
+ *   security_remediation_attempts actor references,
+ *   security_finding_notifications addressed to the user,
  *   security_analysis_queue (via cascade when security_findings are deleted),
  *   auto_triage/fix_tickets, slack_bot_requests, bot_requests,
- *   cloud_agent_code_reviews, device_auth_requests, auto_top_up_configs,
+ *   cloud_agent_code_reviews, review memory feedback/proposals,
+ *   device_auth_requests, auto_top_up_configs,
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents)
  * - kiloclaw_instances.admin_size_override JSONB (contains admin actorEmail
@@ -914,6 +951,12 @@ export async function softDeleteUser(userId: string) {
     // ── Gateway cleanup ───────────────────────────────────────────────────
     await revokeGatewayStateForUser(tx, userId);
 
+    // Remove recipient-addressed Security Agent notifications before user
+    // anonymization and org membership removal. Org-owned findings can remain.
+    await tx
+      .delete(security_finding_notifications)
+      .where(eq(security_finding_notifications.recipient_user_id, userId));
+
     // ── 1. Anonymize the user row ────────────────────────────────────────
     await tx
       .update(kilocode_users)
@@ -931,13 +974,14 @@ export async function softDeleteUser(userId: string) {
         web_session_pepper: randomUUID(),
         app_store_account_token: randomUUID(),
         default_model: null,
-        blocked_reason: `soft-deleted at ${new Date().toISOString()}`,
+        blocked_reason: createSoftDeletedBlockedReason(),
         blocked_at: null,
         blocked_by_kilo_user_id: null,
         auto_top_up_enabled: false,
         completed_welcome_form: false,
         cohorts: {},
         is_admin: false,
+        can_manage_credits: false,
         customer_source: null,
         signup_ip: null,
       })
@@ -1011,6 +1055,10 @@ export async function softDeleteUser(userId: string) {
       .update(organization_membership_removals)
       .set({ removed_by: null })
       .where(eq(organization_membership_removals.removed_by, userId));
+    await tx
+      .update(organization_recommendation_dismissals)
+      .set({ dismissed_by_user_id: null })
+      .where(eq(organization_recommendation_dismissals.dismissed_by_user_id, userId));
     // Delete invitations sent BY this user and invitations sent TO this user's email
     await tx
       .delete(organization_invitations)
@@ -1090,6 +1138,21 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(security_agent_repository_sync_state)
       .where(eq(security_agent_repository_sync_state.owned_by_user_id, userId));
+    await tx
+      .update(security_remediation_attempts)
+      .set({
+        requested_by_user_id: null,
+        cancellation_requested_by_user_id: null,
+      })
+      .where(
+        or(
+          eq(security_remediation_attempts.requested_by_user_id, userId),
+          eq(security_remediation_attempts.cancellation_requested_by_user_id, userId)
+        )
+      );
+    await tx
+      .delete(security_remediations)
+      .where(eq(security_remediations.owned_by_user_id, userId));
     await tx.delete(security_findings).where(eq(security_findings.owned_by_user_id, userId));
     await tx.delete(auto_fix_tickets).where(eq(auto_fix_tickets.owned_by_user_id, userId));
     await tx.delete(auto_triage_tickets).where(eq(auto_triage_tickets.owned_by_user_id, userId));
@@ -1098,6 +1161,12 @@ export async function softDeleteUser(userId: string) {
     await tx
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_memory_proposals)
+      .where(eq(code_review_memory_proposals.owned_by_user_id, userId));
+    await tx
+      .delete(code_review_feedback_events)
+      .where(eq(code_review_feedback_events.owned_by_user_id, userId));
     await tx.delete(device_auth_requests).where(eq(device_auth_requests.kilo_user_id, userId));
     await tx.delete(auto_top_up_configs).where(eq(auto_top_up_configs.owned_by_user_id, userId));
     await tx.delete(kiloclaw_access_codes).where(eq(kiloclaw_access_codes.kilo_user_id, userId));
@@ -1350,6 +1419,17 @@ export async function softDeleteUser(userId: string) {
       .set({ accepted_by_kilo_user_id: null })
       .where(eq(stripe_dispute_cases.accepted_by_kilo_user_id, userId));
     await tx
+      .update(deployments_ephemeral)
+      .set({
+        owned_by_user_id: null,
+        status: 'cleanup_retry',
+        next_cleanup_at: sql`now()`,
+        cleanup_claim_token: null,
+        cleanup_claimed_until: null,
+        updated_at: sql`now()`,
+      })
+      .where(eq(deployments_ephemeral.owned_by_user_id, userId));
+    await tx
       .update(security_advisor_scans)
       .set({ kilo_user_id: 'deleted', public_ip: null })
       .where(eq(security_advisor_scans.kilo_user_id, userId));
@@ -1462,8 +1542,8 @@ export async function getAllUserProviders(email: string): Promise<{
 
 /**
  * Look up WorkOS organization by domain.
- * Returns the organization if exactly one is found, or the first one if multiple exist.
- * Logs warnings for edge cases (multiple orgs, zero orgs).
+ * Returns the organization only when exactly one is found.
+ * Multiple organizations are an ambiguous security configuration and fail closed.
  *
  * @param domain - The domain to look up
  * @returns The WorkOS organization, or null if not found
@@ -1479,10 +1559,10 @@ export async function getWorkOSOrganization(domain: string) {
 
   if (orgResult.data.length > 1) {
     captureMessage(
-      `Multiple WorkOS organizations found for domain, using first one: ${domain} (count: ${orgResult.data.length})`,
+      `Multiple WorkOS organizations found for domain: ${domain} (count: ${orgResult.data.length})`,
       'warning'
     );
-    return orgResult.data[0];
+    return null;
   }
 
   return null;

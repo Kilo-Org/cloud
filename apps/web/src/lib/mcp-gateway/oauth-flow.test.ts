@@ -24,7 +24,7 @@ import { revokeGatewayStateForOrganizationMember } from './lifecycle-service';
 import type { GatewayAppConfig } from './config';
 import { createHash, generateKeyPairSync, createPublicKey } from 'node:crypto';
 import { OAuthAuthorizationQuerySchema, parseScopedConnectPath } from '@kilocode/mcp-gateway';
-import { pkceChallenge } from './crypto';
+import { hashToken, pkceChallenge } from './crypto';
 import { eq } from 'drizzle-orm';
 
 function createTestConfig(): Promise<GatewayAppConfig> {
@@ -51,7 +51,14 @@ function createTestConfig(): Promise<GatewayAppConfig> {
     jwtKeyset: {
       issuer: 'https://app.kilo.ai',
       activeKeyId: 'jwt-active',
-      keys: [{ keyId: 'jwt-active', publicJwk, privateKeyPem: jwtKeys.privateKey }],
+      keys: [
+        {
+          keyId: 'jwt-active',
+          publicJwk,
+          publicKeyPem: jwtKeys.publicKey,
+          privateKeyPem: jwtKeys.privateKey,
+        },
+      ],
     },
     credentialKeyset: {
       active: { keyId: 'credential-active', publicKeyPem: credentialKeys.publicKey },
@@ -62,9 +69,24 @@ function createTestConfig(): Promise<GatewayAppConfig> {
 
 function providerDiscoveryResponse(url: string): Response | null {
   if (url === 'https://example.com/.well-known/oauth-protected-resource') {
-    return new Response(JSON.stringify({ authorization_servers: ['https://example.com'] }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
+    return new Response(
+      JSON.stringify({
+        resource: 'https://example.com/mcp',
+        authorization_servers: ['https://example.com'],
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
+  if (url === 'https://example.com/mcp') {
+    return new Response(null, {
+      status: 401,
+      headers: {
+        'WWW-Authenticate':
+          'Bearer authorization_uri="https://example.com", scope="openid email", resource_metadata="https://example.com/.well-known/oauth-protected-resource"',
+      },
     });
   }
   if (
@@ -145,6 +167,117 @@ describe('MCP gateway app OAuth flow', () => {
         headers,
       })
     ).rejects.toMatchObject({ code: 'invalid_client_metadata' });
+    await expect(
+      services.clientService.registerClient({
+        metadata: {
+          redirect_uris: ['http://localhost:3000/callback'],
+          token_endpoint_auth_method: 'none',
+          grant_types: ['authorization_code'],
+          response_types: ['code'],
+          scope: 'profile',
+        },
+        headers,
+      })
+    ).rejects.toMatchObject({ code: 'invalid_client_metadata' });
+  });
+
+  it('previews truthful consent details for a personal connection', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'Production GitHub',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['https://client.example/callback'],
+        token_endpoint_auth_method: 'client_secret_basic',
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        scope: 'mcp:access',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.44' }),
+    });
+
+    await expect(
+      services.authorizationService.previewAuthorization({
+        query: OAuthAuthorizationQuerySchema.parse({
+          client_id: registration.clientId,
+          redirect_uri: 'https://client.example/callback',
+          response_type: 'code',
+          scope: 'mcp:access',
+          resource: created.route.canonical_url,
+        }),
+        userId: user.id,
+        executionContext: { type: 'personal' },
+      })
+    ).resolves.toMatchObject({
+      clientId: registration.clientId,
+      redirectUri: 'https://client.example/callback',
+      connectionName: 'Production GitHub',
+      endpointHost: 'example.com',
+      ownerScope: 'personal',
+      contextName: 'Personal',
+      resource: created.route.canonical_url,
+      scopes: ['mcp:access'],
+    });
+  });
+
+  it('rejects profile-only authorization for an MCP resource', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'Profile-only test MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['https://client.example/callback'],
+        token_endpoint_auth_method: 'client_secret_basic',
+        grant_types: ['authorization_code'],
+        response_types: ['code'],
+        scope: 'mcp:access profile',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.46' }),
+    });
+
+    await expect(
+      services.authorizationService.authorize({
+        query: OAuthAuthorizationQuerySchema.parse({
+          client_id: registration.clientId,
+          redirect_uri: 'https://client.example/callback',
+          response_type: 'code',
+          scope: 'profile',
+          resource: created.route.canonical_url,
+        }),
+        userId: user.id,
+        executionContext: { type: 'personal' },
+      })
+    ).rejects.toMatchObject({ code: 'invalid_scope' });
+
+    await db
+      .update(mcp_gateway_oauth_clients)
+      .set({ declared_scopes: ['profile'] })
+      .where(eq(mcp_gateway_oauth_clients.client_id, registration.clientId));
+    await expect(
+      services.authorizationService.authorize({
+        query: OAuthAuthorizationQuerySchema.parse({
+          client_id: registration.clientId,
+          redirect_uri: 'https://client.example/callback',
+          response_type: 'code',
+          scope: 'mcp:access',
+          resource: created.route.canonical_url,
+        }),
+        userId: user.id,
+        executionContext: { type: 'personal' },
+      })
+    ).rejects.toMatchObject({ code: 'unauthorized_client' });
   });
 
   it('issues an authorization code and rotates refresh tokens', async () => {
@@ -164,7 +297,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access profile',
       },
       headers: new Headers({ 'x-forwarded-for': '203.0.113.15' }),
     });
@@ -177,7 +310,7 @@ describe('MCP gateway app OAuth flow', () => {
       client_id: registration.clientId,
       redirect_uri: 'http://localhost:3000/callback',
       response_type: 'code',
-      scope: 'profile',
+      scope: 'mcp:access profile',
       state: 'client-state',
       resource: created.route.canonical_url,
       code_challenge: pkceChallenge(verifier),
@@ -209,6 +342,8 @@ describe('MCP gateway app OAuth flow', () => {
     const claims = await services.tokenService.verifyUserInfoToken(tokenResponse.access_token);
     expect(claims.sub).toBe(user.id);
     expect(claims.aud).toBe(created.route.canonical_url);
+    expect(claims.scope).toBe('mcp:access profile');
+    expect(tokenResponse.scope).toBe('mcp:access profile');
     await expect(services.tokenService.userInfo(tokenResponse.access_token)).resolves.toEqual({
       sub: user.id,
       name: user.google_user_name,
@@ -216,6 +351,16 @@ describe('MCP gateway app OAuth flow', () => {
       picture: user.google_user_image_url,
       updated_at: expect.any(String),
       email: user.google_user_email,
+    });
+    const derivedToken = await services.tokenService.mintDerivedConnectToken({
+      route,
+      userId: user.id,
+      executionContext: { type: 'personal' },
+    });
+    const derivedClaims = await services.tokenService.verifyUserInfoToken(derivedToken.token);
+    expect(derivedClaims.scope).toBe('mcp:access');
+    await expect(services.tokenService.userInfo(derivedToken.token)).rejects.toMatchObject({
+      code: 'invalid_scope',
     });
 
     const refreshed = await services.tokenService.exchangeToken({
@@ -237,6 +382,26 @@ describe('MCP gateway app OAuth flow', () => {
         headers: new Headers(),
       })
     ).rejects.toMatchObject({ code: 'invalid_grant' });
+
+    await db
+      .update(mcp_gateway_refresh_tokens)
+      .set({ granted_scopes: ['profile'] })
+      .where(eq(mcp_gateway_refresh_tokens.token_hash, hashToken(refreshed.refresh_token)));
+    await expect(
+      services.tokenService.exchangeToken({
+        request: {
+          grant_type: 'refresh_token',
+          refresh_token: refreshed.refresh_token,
+          client_id: registration.clientId,
+        },
+        headers: new Headers(),
+      })
+    ).rejects.toMatchObject({ code: 'invalid_grant' });
+    const [legacyRefreshToken] = await db
+      .select()
+      .from(mcp_gateway_refresh_tokens)
+      .where(eq(mcp_gateway_refresh_tokens.token_hash, hashToken(refreshed.refresh_token)));
+    expect(legacyRefreshToken?.consumed_at).toBeNull();
   });
 
   it('redeems client_secret_basic credentials with namespace client IDs', async () => {
@@ -255,7 +420,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'client_secret_basic',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.31' }),
     });
@@ -265,6 +430,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'https://client.example/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
       }),
       userId: user.id,
@@ -287,6 +453,40 @@ describe('MCP gateway app OAuth flow', () => {
     expect(tokenResponse.access_token).toBeTruthy();
   });
 
+  it('rejects changes to a registered client authentication method', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'mcp:access',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.32' }),
+    });
+
+    await expect(
+      services.clientService.updateClient({
+        clientId: registration.clientId,
+        metadata: {
+          redirect_uris: ['http://localhost:3000/callback'],
+          token_endpoint_auth_method: 'client_secret_post',
+          grant_types: ['authorization_code', 'refresh_token'],
+          response_types: ['code'],
+          scope: 'mcp:access',
+        },
+      })
+    ).rejects.toMatchObject({ code: 'invalid_client_metadata' });
+    await expect(
+      services.clientService.findClientById(registration.clientId)
+    ).resolves.toMatchObject({
+      token_endpoint_auth_method: 'none',
+      client_secret_hash: null,
+    });
+  });
+
   it('does not redeem an authorization code after it expires', async () => {
     const config = await createTestConfig();
     const services = createGatewayServices({ config });
@@ -303,7 +503,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.29' }),
     });
@@ -314,6 +514,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(verifier),
         code_challenge_method: 'S256',
@@ -324,15 +525,36 @@ describe('MCP gateway app OAuth flow', () => {
     if (authorization.kind !== 'redirect') return;
     const code = new URL(authorization.redirectUrl).searchParams.get('code');
     if (!code) return;
+    const codeHash = createHash('sha256').update(code).digest('hex');
     await db
       .update(mcp_gateway_authorization_codes)
-      .set({ expires_at: new Date(Date.now() - 1_000).toISOString() })
-      .where(
-        eq(
-          mcp_gateway_authorization_codes.code_hash,
-          createHash('sha256').update(code).digest('hex')
-        )
-      );
+      .set({ granted_scopes: ['profile'] })
+      .where(eq(mcp_gateway_authorization_codes.code_hash, codeHash));
+    await expect(
+      services.tokenService.exchangeToken({
+        request: {
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: 'http://localhost:3000/callback',
+          client_id: registration.clientId,
+          code_verifier: verifier,
+        },
+        headers: new Headers(),
+      })
+    ).rejects.toMatchObject({ code: 'invalid_grant' });
+    const [legacyCode] = await db
+      .select()
+      .from(mcp_gateway_authorization_codes)
+      .where(eq(mcp_gateway_authorization_codes.code_hash, codeHash));
+    expect(legacyCode?.consumed_at).toBeNull();
+
+    await db
+      .update(mcp_gateway_authorization_codes)
+      .set({
+        expires_at: new Date(Date.now() - 1_000).toISOString(),
+        granted_scopes: ['mcp:access'],
+      })
+      .where(eq(mcp_gateway_authorization_codes.code_hash, codeHash));
     await expect(
       services.tokenService.exchangeToken({
         request: {
@@ -363,7 +585,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-forwarded-for': '203.0.113.19' }),
     });
@@ -374,6 +596,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(verifier),
         code_challenge_method: 'S256',
@@ -418,6 +641,102 @@ describe('MCP gateway app OAuth flow', () => {
       authorization_endpoint: 'https://example.com/authorize',
       token_endpoint: 'https://example.com/token',
     });
+    expect(created.config.provider_scopes).toEqual(['email', 'openid']);
+    expect(created.config.provider_scope_source).toBe('discovered');
+    expect(created.config.provider_resource).toBe('https://example.com/mcp');
+  });
+
+  it('prefers explicit provider scopes over discovered challenge scopes', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_static',
+      providerScopes: ['repo'],
+    });
+    expect(created.config.provider_scopes).toEqual(['repo']);
+    expect(created.config.provider_scope_source).toBe('override');
+  });
+
+  it('revokes existing grants when provider scopes change', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_static',
+    });
+    const instance = await services.repository.ensureConnectionInstance({
+      ownerScope: 'personal',
+      ownerId: user.id,
+      configId: created.config.config_id,
+      userId: user.id,
+    });
+    await services.grantService.replaceGrant({
+      instanceId: instance.instance_id,
+      bundle: { accessToken: 'provider-access', expiresAt: null, tokenType: 'bearer' },
+    });
+
+    const updated = await services.configService.updateProviderScopes({
+      configId: created.config.config_id,
+      providerScopes: ['repo', 'read'],
+    });
+    const reordered = await services.configService.updateProviderScopes({
+      configId: created.config.config_id,
+      providerScopes: ['read', 'repo'],
+    });
+    const grant = await services.repository.findActiveGrant(instance.instance_id);
+
+    expect(updated.provider_scopes).toEqual(['read', 'repo']);
+    expect(updated.provider_scope_source).toBe('override');
+    expect(updated.config_version).toBe(2);
+    expect(reordered.config_version).toBe(2);
+    expect(grant).toBeNull();
+  });
+
+  it('persists initial static provider credentials atomically without a version rotation', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'Static OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_static',
+      staticProviderClientId: 'provider-client',
+      staticProviderClientSecret: 'provider-secret',
+    });
+
+    const persistedConfig = await db
+      .select()
+      .from(mcp_gateway_configs)
+      .where(eq(mcp_gateway_configs.config_id, created.config.config_id))
+      .then(rows => rows[0]);
+    expect(persistedConfig?.config_version).toBe(1);
+    await expect(
+      services.repository.findActiveSecret(created.config.config_id, 'static_provider_credentials')
+    ).resolves.toBeTruthy();
+  });
+
+  it('rejects partial initial static provider credentials', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+
+    await expect(
+      services.configService.createPersonalConfig({
+        userId: user.id,
+        name: 'Static OAuth MCP',
+        remoteUrl: 'https://example.com/mcp',
+        authMode: 'oauth_static',
+        staticProviderClientId: 'provider-client',
+      })
+    ).rejects.toMatchObject({ code: 'invalid_request' });
   });
 
   it('rejects oauth_dynamic configs when the provider has no registration endpoint', async () => {
@@ -429,6 +748,9 @@ describe('MCP gateway app OAuth flow', () => {
         return new Response(JSON.stringify({ authorization_servers: ['https://example.com'] }), {
           status: 200,
         });
+      }
+      if (url === 'https://example.com/mcp') {
+        return new Response(null, { status: 401 });
       }
       if (url === 'https://example.com/.well-known/oauth-authorization-server') {
         return new Response(
@@ -452,6 +774,106 @@ describe('MCP gateway app OAuth flow', () => {
         authMode: 'oauth_dynamic',
       })
     ).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
+  it('identifies Kilo when dynamically registering with a provider', async () => {
+    const config = await createTestConfig();
+    let registrationBody: unknown = null;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const url =
+        typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      const discovery = providerDiscoveryResponse(url);
+      if (discovery) return discovery;
+      if (url === 'https://example.com/register') {
+        registrationBody = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({ client_id: 'provider-client', client_secret: 'provider-secret' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    };
+    const services = createGatewayServices({ config, fetchImpl });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_dynamic',
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'mcp:access',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.32' }),
+    });
+    const verifier =
+      'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk';
+    const authorization = await services.authorizationService.authorize({
+      query: OAuthAuthorizationQuerySchema.parse({
+        client_id: registration.clientId,
+        redirect_uri: 'http://localhost:3000/callback',
+        response_type: 'code',
+        scope: 'mcp:access',
+        resource: created.route.canonical_url,
+        code_challenge: pkceChallenge(verifier),
+        code_challenge_method: 'S256',
+      }),
+      userId: user.id,
+      executionContext: { type: 'personal' },
+    });
+
+    expect(authorization.kind).toBe('provider_redirect');
+    if (authorization.kind !== 'provider_redirect') return;
+    const providerAuthorizationUrl = new URL(authorization.authorizationUrl);
+    expect(providerAuthorizationUrl.searchParams.get('scope')).toBe('email openid');
+    expect(providerAuthorizationUrl.searchParams.get('resource')).toBe('https://example.com/mcp');
+    expect(registrationBody).toMatchObject({
+      client_name: 'Kilo MCP Gateway',
+      redirect_uris: ['https://app.kilo.ai/api/mcp-gateway/oauth/mcp/callback'],
+      grant_types: ['authorization_code', 'refresh_token'],
+      response_types: ['code'],
+      token_endpoint_auth_method: 'client_secret_post',
+    });
+  });
+
+  it('uses resolved provider scopes for dashboard sign-in', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config, fetchImpl: providerDiscoveryFetch });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const created = await services.configService.createPersonalConfig({
+      userId: user.id,
+      name: 'OAuth MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'oauth_static',
+    });
+    await services.configService.upsertSecret({
+      configId: created.config.config_id,
+      kind: 'static_provider_credentials',
+      value: { clientId: 'provider-client', clientSecret: 'provider-secret' },
+    });
+    const resolved = await services.repository.findActiveRouteByRoute({
+      ownerScope: 'personal',
+      ownerId: user.id,
+      configId: created.config.config_id,
+      routeKey: created.route.route_key,
+    });
+    if (!resolved) throw new Error('Expected resolved route');
+    const route = parseScopedConnectPath(new URL(created.route.canonical_url).pathname);
+    if (!route) throw new Error('Expected parsed route');
+    const authorization = await services.providerOAuthService.startDashboardProviderSignIn({
+      resolved,
+      route,
+      userId: user.id,
+      executionContext: { type: 'personal' },
+    });
+    const providerAuthorizationUrl = new URL(authorization.authorizationUrl);
+    expect(providerAuthorizationUrl.searchParams.get('scope')).toBe('email openid');
+    expect(providerAuthorizationUrl.searchParams.get('resource')).toBe('https://example.com/mcp');
   });
 
   it('consumes provider state when the provider returns an error', async () => {
@@ -505,7 +927,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-forwarded-for': '203.0.113.17' }),
     });
@@ -516,7 +938,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
-        scope: 'profile',
+        scope: 'mcp:access',
         state: 'client-state',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(verifier),
@@ -597,7 +1019,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.30' }),
     });
@@ -606,6 +1028,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(
           'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
@@ -629,12 +1052,14 @@ describe('MCP gateway app OAuth flow', () => {
 
   it('persists a provider grant before final authorization code issuance', async () => {
     const config = await createTestConfig();
-    const fetchImpl: typeof fetch = async input => {
+    let tokenRequestBody = '';
+    const fetchImpl: typeof fetch = async (input, init) => {
       const url =
         typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const discovery = providerDiscoveryResponse(url);
       if (discovery) return discovery;
       if (url === 'https://example.com/token') {
+        tokenRequestBody = String(init?.body);
         return new Response(
           JSON.stringify({
             access_token: 'provider-access',
@@ -679,7 +1104,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-forwarded-for': '203.0.113.16' }),
     });
@@ -690,7 +1115,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
-        scope: 'profile',
+        scope: 'mcp:access',
         state: 'client-state',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(verifier),
@@ -711,11 +1136,19 @@ describe('MCP gateway app OAuth flow', () => {
       userId: user.id,
     });
     expect(callback.grant.grant_status).toBe('active');
+    expect(new URLSearchParams(tokenRequestBody).get('resource')).toBe('https://example.com/mcp');
+    expect(
+      services.grantService.decryptGrant(
+        callback.grant.encrypted_grant,
+        callback.instance.instance_id
+      ).scope
+    ).toBe('email openid');
     const grants = await db
       .select()
       .from(mcp_gateway_provider_grants)
       .where(eq(mcp_gateway_provider_grants.instance_id, callback.instance.instance_id));
     expect(grants).toHaveLength(1);
+    if (!callback.authorizationRequest) throw new Error('Expected authorization request');
     const finalized = await services.authorizationService.completeProviderAuthorization({
       authorizationRequest: callback.authorizationRequest,
     });
@@ -826,7 +1259,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-forwarded-for': '203.0.113.18' }),
     });
@@ -835,6 +1268,7 @@ describe('MCP gateway app OAuth flow', () => {
         client_id: registration.clientId,
         redirect_uri: 'http://localhost:3000/callback',
         response_type: 'code',
+        scope: 'mcp:access',
         resource: created.route.canonical_url,
         code_challenge: pkceChallenge(
           'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
@@ -879,6 +1313,62 @@ describe('MCP gateway app OAuth flow', () => {
     ).rejects.toThrow();
   });
 
+  it('allows an authorized browser org resource without an explicit org header', async () => {
+    const config = await createTestConfig();
+    const services = createGatewayServices({ config });
+    const user = await insertTestUser({ id: `gateway-user-${crypto.randomUUID()}` });
+    const organizationId = crypto.randomUUID();
+    await db.insert(organizations).values({ id: organizationId, name: 'Gateway Org' });
+    await db.insert(organization_memberships).values({
+      organization_id: organizationId,
+      kilo_user_id: user.id,
+      role: 'owner',
+    });
+    const created = await services.configService.createOrganizationConfig({
+      organizationId,
+      actorUserId: user.id,
+      name: 'Org MCP',
+      remoteUrl: 'https://example.com/mcp',
+      authMode: 'none',
+      sharingMode: 'single_user',
+      initialAssignedUserId: user.id,
+    });
+    const registration = await services.clientService.registerClient({
+      metadata: {
+        redirect_uris: ['http://localhost:3000/callback'],
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        scope: 'mcp:access',
+      },
+      headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.17' }),
+    });
+    const query = OAuthAuthorizationQuerySchema.parse({
+      client_id: registration.clientId,
+      redirect_uri: 'http://localhost:3000/callback',
+      response_type: 'code',
+      scope: 'mcp:access',
+      resource: created.route.canonical_url,
+      code_challenge: pkceChallenge(
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
+      ),
+      code_challenge_method: 'S256',
+    });
+    const authorization = await services.authorizationService.authorize({
+      query,
+      userId: user.id,
+      executionContext: { type: 'personal' },
+      allowBrowserOrgResourceContext: true,
+    });
+    expect(authorization.kind).toBe('redirect');
+    const [request] = await db
+      .select()
+      .from(mcp_gateway_authorization_requests)
+      .where(eq(mcp_gateway_authorization_requests.config_id, created.config.config_id));
+
+    expect(request?.execution_context).toEqual({ type: 'organization', organizationId });
+  });
+
   it('rejects an org resource when the authenticated execution context is personal', async () => {
     const config = await createTestConfig();
     const services = createGatewayServices({ config });
@@ -905,7 +1395,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.18' }),
     });
@@ -913,6 +1403,7 @@ describe('MCP gateway app OAuth flow', () => {
       client_id: registration.clientId,
       redirect_uri: 'http://localhost:3000/callback',
       response_type: 'code',
+      scope: 'mcp:access',
       resource: created.route.canonical_url,
       code_challenge: pkceChallenge(
         'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk'
@@ -961,7 +1452,7 @@ describe('MCP gateway app OAuth flow', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
       headers: new Headers({ 'x-vercel-forwarded-for': '203.0.113.22' }),
     });
@@ -979,8 +1470,8 @@ describe('MCP gateway app OAuth flow', () => {
         route_key: created.route.route_key,
         canonical_resource_url: created.route.canonical_url,
         redirect_uri: 'http://localhost:3000/callback',
-        requested_scopes: ['profile'],
-        granted_scopes: ['profile'],
+        requested_scopes: ['mcp:access'],
+        granted_scopes: ['mcp:access'],
         execution_context: { type: 'organization', organizationId },
         kilo_user_id: user.id,
         instance_id: instance.instance_id,
@@ -999,7 +1490,7 @@ describe('MCP gateway app OAuth flow', () => {
       route_key: created.route.route_key,
       canonical_resource_url: created.route.canonical_url,
       redirect_uri: 'http://localhost:3000/callback',
-      granted_scopes: ['profile'],
+      granted_scopes: ['mcp:access'],
       execution_context: { type: 'organization', organizationId },
       kilo_user_id: user.id,
       instance_id: instance.instance_id,
@@ -1014,7 +1505,7 @@ describe('MCP gateway app OAuth flow', () => {
       config_id: created.config.config_id,
       route_key: created.route.route_key,
       canonical_resource_url: created.route.canonical_url,
-      granted_scopes: ['profile'],
+      granted_scopes: ['mcp:access'],
       execution_context: { type: 'organization', organizationId },
       kilo_user_id: user.id,
       instance_id: instance.instance_id,

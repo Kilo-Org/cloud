@@ -26,6 +26,7 @@ export function createGatewayServices(
   const auditService = createAuditService(repository);
   const clientService = createOAuthClientService({ repository, config });
   const grantService = createGrantService({ repository, config });
+  const discoveryService = createDiscoveryService({ fetchImpl: params.fetchImpl });
   const providerOAuthService = createProviderOAuthService({
     repository,
     routeService,
@@ -41,7 +42,6 @@ export function createGatewayServices(
     config,
   });
   const tokenService = createTokenService({ repository, routeService, clientService, config });
-  const discoveryService = createDiscoveryService({ fetchImpl: params.fetchImpl });
   const configService = createConfigService({ repository, config, discoveryService });
   const availableService = createAvailableService(repository);
 

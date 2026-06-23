@@ -554,6 +554,12 @@ export type AgentSettingsSummary = {
   fastModeDefault: boolean | null;
 };
 
+export type AgentBindingSummary = {
+  channel: string;
+  accountId: string | null;
+  advanced: boolean;
+};
+
 export type AgentSummary = {
   id: string;
   name: string | null;
@@ -563,6 +569,7 @@ export type AgentSummary = {
   model: AgentModelSummary & { source: 'agent' | 'defaults' | null };
   rawModel: string | { primary?: string; fallbacks?: string[] } | null;
   settings: AgentSettingsSummary;
+  bindings: AgentBindingSummary[];
 };
 
 export type AgentDefaultsSummary = {

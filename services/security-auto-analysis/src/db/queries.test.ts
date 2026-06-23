@@ -9,6 +9,7 @@ describe('parseSecurityConfig', () => {
     expect(resolveSecurityAgentModels(config)).toEqual({
       triageModel: 'legacy/model',
       analysisModel: 'legacy/model',
+      remediationModel: 'legacy/model',
     });
   });
 });

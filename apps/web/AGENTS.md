@@ -1,11 +1,9 @@
 # AGENTS.md
 
-## UI Design Requirements
+## UI Work
 
-When doing UI work in `apps/web` — including React components, routes/pages, layouts, styling, Storybook stories, visual polish, UX copy, interaction states, responsive behavior, theming, or accessibility — you must:
+When editing UI files in `apps/web` — React components, pages, layouts, or styles (`.tsx`/`.css`) — use the `/kilo-design` skill.
 
-1. Read `../../DESIGN.md` before changing or reviewing UI.
-2. Load and follow the `kilo-design` skill at `../../.agents/skills/kilo-design/SKILL.md`.
-3. Prefer existing Kilo tokens, components, and utilities before adding new visual primitives.
+## Web Environment Variables
 
-This applies even when the prompt does not explicitly mention design. Skip only for backend-only or non-visual logic changes.
+When a shared web env var needs to be added or rotated across tracked dotenv files and Vercel deployments, tell the user to run `pnpm web:env set <VARIABLE>`. Agents must not run that command themselves because it prompts for secret values and writes to external systems.

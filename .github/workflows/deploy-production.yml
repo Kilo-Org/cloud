@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: deploy-production
@@ -13,12 +14,17 @@ concurrency:
 
 env:
   VERCEL_VERSION: '53.3.1'
+  VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
 
 jobs:
   check-production-db-startup:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
+
+    env:
+      DATABASE_CA: ${{ secrets.DATABASE_CA }}
+      POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
 
     steps:
       - name: Checkout code
@@ -37,10 +43,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      # Setup Vercel ENV — link from repo root; Vercel rootDirectory (apps/web) is set on the dashboard
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Check production DB startup path
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
@@ -50,6 +52,10 @@ jobs:
     timeout-minutes: 15
     environment: production
 
+    env:
+      DATABASE_CA: ${{ secrets.DATABASE_CA }}
+      POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
+
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -67,115 +73,91 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      # Setup Vercel ENV — link from repo root; Vercel rootDirectory (apps/web) is set on the dashboard
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} env pull .env.local --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Run Drizzle migrations
         run: NODE_ENV=production pnpm run drizzle migrate
 
-  deploy-app:
-    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
-    timeout-minutes: 30
-    needs: [check-production-db-startup, run-migrations]
-    environment: production
+  stage-app:
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      target_environment: production
+      vercel_project_id_var: VERCEL_PROJECT_ID_APP
+    secrets: inherit
 
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_APP }}
+  stage-global-app:
+    uses: ./.github/workflows/stage-vercel-deployment.yml
+    with:
+      target_environment: production
+      vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
+    secrets: inherit
 
-    steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
+  promote-app:
+    needs: [stage-app, check-production-db-startup, run-migrations]
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
+    secrets: inherit
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+  promote-global-app:
+    needs: [stage-global-app, check-production-db-startup, run-migrations]
+    uses: ./.github/workflows/promote-vercel-deployment.yml
+    with:
+      deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
+    secrets: inherit
 
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Cache Next.js build
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: |
-            ~/.npm
-            ${{ github.workspace }}/apps/web/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
-
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-
-      - name: Pull Vercel Environment Information
-        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build Project Artifacts
-        env:
-          NODE_OPTIONS: '--max-old-space-size=8192'
-        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy Project Artifacts to Vercel
-        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-  deploy-global-app:
-    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
-    timeout-minutes: 30
-    needs: [check-production-db-startup, run-migrations]
-    environment: production
-
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_GLOBAL_APP }}
+  resolve-worker-base:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      base_sha: ${{ steps.base.outputs.sha }}
 
     steps:
-      - name: Checkout code
-        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Cache Next.js build
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
-        with:
-          path: |
-            ~/.npm
-            ${{ github.workspace }}/apps/web/.next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
-          restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
-
-      - run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} link --project=kilocode-global-app --token=${{ secrets.VERCEL_TOKEN }} --yes
-
-      - name: Pull Vercel Environment Information
-        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build Project Artifacts
+      - name: Resolve last successful production SHA
+        id: base
         env:
-          NODE_OPTIONS: '--max-old-space-size=8192'
-        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha=$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow deploy-production.yml \
+            --branch main \
+            --status success \
+            --json headSha \
+            --limit 1 \
+            --jq '.[0].headSha')
 
-      - name: Deploy Project Artifacts to Vercel
-        run: pnpm dlx vercel@${{ env.VERCEL_VERSION }} deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+          if [ -z "$sha" ] || [ "$sha" = "null" ]; then
+            sha="${{ github.event.before }}"
+          fi
+
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+  deploy-workers:
+    needs:
+      [
+        check-production-db-startup,
+        run-migrations,
+        resolve-worker-base,
+        stage-app,
+        stage-global-app,
+        promote-app,
+        promote-global-app,
+      ]
+    if: >-
+      ${{
+        !cancelled() &&
+        needs.check-production-db-startup.result == 'success' &&
+        needs.run-migrations.result == 'success' &&
+        needs.resolve-worker-base.result == 'success' &&
+        contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.promote-global-app.result)
+      }}
+    uses: ./.github/workflows/deploy-workers.yml
+    with:
+      base_sha: ${{ needs.resolve-worker-base.outputs.base_sha }}
+    secrets: inherit
 
   deploy-kiloclaw:
     needs: [check-production-db-startup, run-migrations]

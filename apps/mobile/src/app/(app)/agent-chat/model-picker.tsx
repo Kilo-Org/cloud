@@ -7,10 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/text';
 import {
+  BYOK_MODEL_LABEL,
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
-  getFreeModelDataAccessibilityLabel,
+  hasUserByokAvailable,
   isFreeModelOption,
+  mayTrainOnYourPrompts,
 } from '@/lib/free-model-data-disclosure';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
@@ -202,8 +204,18 @@ export default function ModelPickerScreen() {
         const modelOption = item.model;
         const selected = modelOption.id === selectedModel;
         const free = isFreeModelOption(modelOption);
-        const collectsData = isFreeModelOption(modelOption);
+        const byok = hasUserByokAvailable(modelOption);
+        const collectsData = mayTrainOnYourPrompts(modelOption);
         const hasVariants = modelOption.variants.length > 1;
+        const accessibilityLabel = [
+          modelOption.name,
+          byok ? BYOK_MODEL_LABEL : undefined,
+          free && !byok ? FREE_MODEL_FREE_LABEL : undefined,
+          collectsData ? FREE_MODEL_DATA_LABEL : undefined,
+          selected ? 'selected' : undefined,
+        ]
+          .filter(Boolean)
+          .join(', ');
 
         return (
           <View className="border-b border-border">
@@ -213,21 +225,30 @@ export default function ModelPickerScreen() {
                 handleSelectModel(modelOption.id);
               }}
               accessibilityRole="button"
-              accessibilityLabel={`${collectsData ? getFreeModelDataAccessibilityLabel(modelOption.name) : modelOption.name}${selected ? ', selected' : ''}`}
+              accessibilityLabel={accessibilityLabel}
             >
               <View className="flex-1">
                 <Text className="text-base text-foreground">{modelOption.name}</Text>
                 <Text className="text-xs text-muted-foreground">{modelOption.id}</Text>
-                {free ? (
+                {free || byok || collectsData ? (
                   <View className="mt-1 flex-row items-center gap-1 self-start">
-                    <View
-                      className="rounded-full px-2 py-0.5"
-                      style={{ backgroundColor: colors.good }}
-                    >
-                      <Text className="text-[11px] font-medium text-white" numberOfLines={1}>
-                        {FREE_MODEL_FREE_LABEL}
-                      </Text>
-                    </View>
+                    {free && !byok ? (
+                      <View
+                        className="rounded-full px-2 py-0.5"
+                        style={{ backgroundColor: colors.good }}
+                      >
+                        <Text className="text-[11px] font-medium text-white" numberOfLines={1}>
+                          {FREE_MODEL_FREE_LABEL}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {byok ? (
+                      <View className="rounded-full bg-neutral-200 px-2 py-0.5 dark:bg-neutral-700">
+                        <Text className="text-[11px] font-medium text-foreground" numberOfLines={1}>
+                          {BYOK_MODEL_LABEL}
+                        </Text>
+                      </View>
+                    ) : null}
                     {collectsData ? (
                       <BookOpenCheck
                         accessibilityLabel={FREE_MODEL_DATA_LABEL}

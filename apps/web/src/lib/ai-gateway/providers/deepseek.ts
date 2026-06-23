@@ -1,7 +1,4 @@
-import {
-  calculateSimpleCost_mUsd,
-  type KiloExclusiveModel,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export function isDeepseekModel(model: string) {
   return model.includes('deepseek');
@@ -16,15 +13,19 @@ const deepseek_v4_pro_discounted_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1048576,
   max_completion_tokens: 384000,
-  gateway: 'vercel', // openrouter seems to be affected by: https://kilo-code.slack.com/archives/C08P0HYC9S4/p1779874852296019
-  flags: ['reasoning', 'vision', 'requires-data-collection'],
-  pricing: {
-    prompt_per_million: 0.435,
-    completion_per_million: 0.87,
-    input_cache_read_per_million: 0.003625,
-    input_cache_write_per_million: null,
-    calculate_mUsd: calculateSimpleCost_mUsd,
-  },
+  gateway: 'openrouter',
+  flags: ['reasoning', 'vision', 'requires-data-collection', 'vercel-routing'],
+  pricing: [
+    {
+      start_context_length: 0,
+      pricing: {
+        prompt_per_million: 0.435,
+        completion_per_million: 0.87,
+        input_cache_read_per_million: 0.003625,
+        input_cache_write_per_million: null,
+      },
+    },
+  ],
   exclusive_to: [],
   inference_provider_restriction: ['deepseek'],
 };
@@ -38,15 +39,19 @@ const deepseek_v4_flash_discounted_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1048576,
   max_completion_tokens: 384000,
-  gateway: 'vercel',
-  flags: ['reasoning', 'vision', 'requires-data-collection'],
-  pricing: {
-    prompt_per_million: 0.14,
-    completion_per_million: 0.28,
-    input_cache_read_per_million: 0.0028,
-    input_cache_write_per_million: null,
-    calculate_mUsd: calculateSimpleCost_mUsd,
-  },
+  gateway: 'openrouter',
+  flags: ['reasoning', 'vision', 'requires-data-collection', 'vercel-routing'],
+  pricing: [
+    {
+      start_context_length: 0,
+      pricing: {
+        prompt_per_million: 0.14,
+        completion_per_million: 0.28,
+        input_cache_read_per_million: 0.0028,
+        input_cache_write_per_million: null,
+      },
+    },
+  ],
   exclusive_to: [],
   inference_provider_restriction: ['deepseek'],
 };

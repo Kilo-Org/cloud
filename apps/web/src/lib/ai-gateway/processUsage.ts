@@ -64,7 +64,11 @@ import {
   drainSseStream,
   extractVercelIsByok,
 } from '@/lib/ai-gateway/processUsage.shared';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  calculateCost_mUsd,
+  type KiloExclusiveModel,
+} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
 
 const posthogClient = PostHogClient();
 
@@ -948,7 +952,7 @@ export function calculateKiloExclusiveCost_mUsd(
     });
   }
   return Math.round(
-    pricing.calculate_mUsd(
+    calculateCost_mUsd(
       {
         uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
         totalOutputTokens: usage.outputTokens,
@@ -1025,8 +1029,11 @@ export async function processTokenData(
 
   const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
   if (kiloExclusiveModel?.pricing) {
+    usageStats.market_cost = usageStats.cost_mUsd;
     usageStats.cost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
   }
+
+  const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);
 
   // Report upstream cost to abuse service BEFORE zeroing for free/BYOK
   // (abuse service needs actual spend for heuristics like free_tier_exhausted)
@@ -1035,7 +1042,8 @@ export async function processTokenData(
   });
 
   // Preserve the real cost before zeroing for free/BYOK
-  usageStats.market_cost = usageStats.cost_mUsd;
+  usageStats.market_cost ??= usageStats.cost_mUsd;
+  usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
 
   if ((await isFreeModel(usageContext.requested_model)) || usageContext.user_byok) {
     usageStats.cost_mUsd = 0;
@@ -1052,17 +1060,28 @@ async function useGenerationLookup(
   const isGatewayProvider =
     usageContext.provider === 'openrouter' || usageContext.provider === 'vercel';
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
+  if (!isGatewayProvider || !isSuccessStatusCode) {
+    return false;
+  }
   const hasOutputTokens = (usageStats?.outputTokens ?? 0) > 0;
   const hasCostWhenPaid =
     (await isFreeModel(usageContext.requested_model)) ||
     usageContext.user_byok ||
     (usageStats?.cost_mUsd ?? 0) > 0;
   const hasInferenceProvider = Boolean(usageStats?.inference_provider);
-  return (
-    isGatewayProvider &&
-    isSuccessStatusCode &&
-    (!hasOutputTokens || !hasCostWhenPaid || !hasInferenceProvider)
-  );
+  if (!hasOutputTokens) {
+    console.debug('[useGenerationLookup] token stats are missing');
+    return true;
+  }
+  if (!hasCostWhenPaid) {
+    console.debug('[useGenerationLookup] cost is missing');
+    return true;
+  }
+  if (!hasInferenceProvider) {
+    console.debug('[useGenerationLookup] inference provider is missing');
+    return true;
+  }
+  return false;
 }
 
 export const mapToUsageStats = (

@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  CloudAgentFailureCodeSchema,
+  CloudAgentFailureStageSchema,
+} from './cloud-agent-failure.js';
 
 export const CloudAgentRunStatuses = [
   'queued',
@@ -37,35 +41,6 @@ export const DIAGNOSTIC_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const IsoTimestampSchema = z.string().datetime({ offset: true });
 const OperationalIdentifierSchema = z.string().min(1).max(MAX_OPERATIONAL_IDENTIFIER_LENGTH);
 const WrapperRunIdentifierSchema = OperationalIdentifierSchema.regex(/^wr_[A-Za-z0-9_-]+$/);
-const CloudAgentFailureStageSchema = z.enum([
-  'pre_dispatch',
-  'post_dispatch_no_activity',
-  'agent_activity',
-  'interruption',
-  'unknown',
-]);
-const CloudAgentFailureCodeSchema = z.enum([
-  'sandbox_connect_failed',
-  'workspace_setup_failed',
-  'kilo_server_failed',
-  'wrapper_start_failed',
-  'invalid_delivery_request',
-  'session_metadata_missing',
-  'model_missing',
-  'delivery_failure_unknown',
-  'wrapper_disconnected',
-  'wrapper_no_output',
-  'wrapper_ping_timeout',
-  'wrapper_error_before_activity',
-  'assistant_error',
-  'wrapper_error_after_activity',
-  'missing_assistant_reply',
-  'user_interrupt',
-  'container_shutdown',
-  'system_interrupt',
-  'unclassified',
-]);
-
 const validFailureClassifications = new Set(
   CloudAgentRunFailureClassifications.map(
     classification => `${classification.failureStage}:${classification.failureCode}`

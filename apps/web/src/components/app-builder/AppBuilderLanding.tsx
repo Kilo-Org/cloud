@@ -633,7 +633,14 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
         const inputModalities = m.architecture?.input_modalities || [];
         const supportsVision =
           inputModalities.includes('image') || inputModalities.includes('image_url');
-        return { id: m.id, name: m.name, supportsVision, isFree: m.isFree };
+        return {
+          id: m.id,
+          name: m.name,
+          supportsVision,
+          isFree: m.isFree,
+          mayTrainOnYourPrompts: m.mayTrainOnYourPrompts,
+          hasUserByokAvailable: m.hasUserByokAvailable,
+        };
       }),
     [availableModels]
   );

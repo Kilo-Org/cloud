@@ -11,6 +11,7 @@ import {
   listAgents,
   runMorningBriefing,
   updateAgent,
+  updateAgentBindings,
   updateAgentDefaults,
   waitForHealthy,
   writeOpenclawConfigFile,
@@ -183,7 +184,7 @@ describe('gateway controller routing', () => {
     expect(result).toEqual({
       ok: true,
       reconcileState: 'in_progress',
-      error: 'Gateway warming up, retrying shortly.',
+      error: 'Morning Briefing is starting up, retrying shortly.',
       code: 'gateway_warming_up',
       retryAfterSec: 2,
     });
@@ -338,11 +339,135 @@ describe('gateway controller routing', () => {
     expect(result).toEqual({
       ok: true,
       reconcileState: 'in_progress',
-      error: 'Gateway warming up, retrying shortly.',
+      error: 'Morning Briefing is starting up, retrying shortly.',
       code: 'gateway_warming_up',
       retryAfterSec: 2,
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('treats a controller-reported plugin_unavailable as warm-up, not too-old', async () => {
+    // The controller image carries the routes but the in-container plugin has
+    // not finished loading: it replies 503 with `morning_briefing_plugin_unavailable`.
+    // This must surface as warm-up, never the terminal "Upgrade Required".
+    const state = createMutableState();
+    state.provider = 'fly';
+    state.status = 'running';
+    state.sandboxId = 'sandbox-1';
+    state.flyAppName = 'test-app';
+    state.flyMachineId = 'machine-1';
+
+    const fetchMock: FetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          code: 'morning_briefing_plugin_unavailable',
+          error: 'Morning Briefing plugin is still loading',
+        }),
+        { status: 503, headers: { 'content-type': 'application/json' } }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await getMorningBriefingStatus(state, {
+      GATEWAY_TOKEN_SECRET: 'gateway-secret',
+      FLY_APP_NAME: 'fallback-app',
+    } as never);
+
+    expect(result).toEqual({
+      ok: true,
+      reconcileState: 'in_progress',
+      error: 'Morning Briefing is starting up, retrying shortly.',
+      code: 'gateway_warming_up',
+      retryAfterSec: 2,
+    });
+    // Only the status route is hit — the capability fallback is unnecessary
+    // because the controller already told us the image is capable.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null (too-old) when the route is missing AND the image lacks the capability', async () => {
+    const state = createMutableState();
+    state.provider = 'fly';
+    state.status = 'running';
+    state.sandboxId = 'sandbox-1';
+    state.flyAppName = 'test-app';
+    state.flyMachineId = 'machine-1';
+
+    // Status route 404s (no code), then the version route reports an image
+    // that does NOT advertise morning-briefing → genuinely too old.
+    const fetchMock: FetchMock = vi.fn().mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/_kilo/version')) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ version: '2026.1.1.0900', commit: 'abc1234' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          })
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: 'Not Found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await getMorningBriefingStatus(state, {
+      GATEWAY_TOKEN_SECRET: 'gateway-secret',
+      FLY_APP_NAME: 'fallback-app',
+    } as never);
+
+    expect(result).toBeNull();
+  });
+
+  it('returns warm-up (not too-old) when the route is missing but the image is capable', async () => {
+    // A capable image hitting a transient route blip must NOT be told to
+    // upgrade — the capability list is the authoritative "is the feature
+    // present" signal.
+    const state = createMutableState();
+    state.provider = 'fly';
+    state.status = 'running';
+    state.sandboxId = 'sandbox-1';
+    state.flyAppName = 'test-app';
+    state.flyMachineId = 'machine-1';
+
+    const fetchMock: FetchMock = vi.fn().mockImplementation((input: string | URL | Request) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/_kilo/version')) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              version: '2026.5.20.0900',
+              commit: 'def5678',
+              capabilities: ['morning-briefing.status'],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } }
+          )
+        );
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ error: 'Not Found' }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await getMorningBriefingStatus(state, {
+      GATEWAY_TOKEN_SECRET: 'gateway-secret',
+      FLY_APP_NAME: 'fallback-app',
+    } as never);
+
+    expect(result).toEqual({
+      ok: true,
+      reconcileState: 'in_progress',
+      error: 'Morning Briefing is starting up, retrying shortly.',
+      code: 'gateway_warming_up',
+      retryAfterSec: 2,
+    });
   });
 });
 
@@ -495,6 +620,46 @@ describe('agent config mutation timeouts', () => {
     expect(timeoutSpy).toHaveBeenCalledWith(DEFAULT_TIMEOUT_MS);
   });
 
+  it('preserves agent bindings through the cloud read schema', async () => {
+    const fetchMock: FetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(versionResponse(['config.agents.read']))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          etag: 'etag-1',
+          defaults: DEFAULTS_SUMMARY,
+          agents: [
+            {
+              ...AGENT_SUMMARY,
+              bindings: [{ channel: 'slack', accountId: null, advanced: false }],
+            },
+          ],
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await listAgents(runningState(), ENV);
+
+    expect(result).toMatchObject({
+      agents: [{ id: 'work', bindings: [{ channel: 'slack', accountId: null, advanced: false }] }],
+    });
+  });
+
+  it('defaults bindings to [] when an older controller omits them', async () => {
+    const fetchMock: FetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(versionResponse(['config.agents.read']))
+      .mockResolvedValueOnce(
+        // AGENT_SUMMARY has no bindings field — the schema default fills it in.
+        jsonResponse({ etag: 'etag-1', defaults: DEFAULTS_SUMMARY, agents: [AGENT_SUMMARY] })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await listAgents(runningState(), ENV);
+
+    expect(result).toMatchObject({ agents: [{ id: 'work', bindings: [] }] });
+  });
+
   // Typed errors must be RETURNED as an envelope (not thrown), because .status/.code
   // are stripped crossing the DO RPC boundary. These assert the real conversion.
 
@@ -555,5 +720,38 @@ describe('agent config mutation timeouts', () => {
     expect(result).toEqual({
       agentError: { status: 409, code: 'config_etag_conflict', message: 'Config changed' },
     });
+  });
+
+  it('updateAgentBindings returns an agent_binding_conflict envelope when the controller 409s', async () => {
+    const fetchMock: FetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(versionResponse(['config.agents.bindings.update']))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ code: 'agent_binding_conflict', error: 'Channel routed elsewhere' }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await updateAgentBindings(runningState(), ENV, 'work', { channels: ['slack'] });
+
+    expect(result).toEqual({
+      agentError: {
+        status: 409,
+        code: 'agent_binding_conflict',
+        message: 'Channel routed elsewhere',
+      },
+    });
+  });
+
+  it('updateAgentBindings fails closed when the controller lacks the capability', async () => {
+    const fetchMock: FetchMock = vi.fn().mockResolvedValueOnce(versionResponse([]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await updateAgentBindings(runningState(), ENV, 'work', { channels: ['slack'] });
+
+    expect(result).toMatchObject({ agentError: { status: 501, code: 'capability_unavailable' } });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

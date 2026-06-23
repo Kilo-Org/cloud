@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
+import { buildSecurityFindingAnalysisInput } from '@kilocode/worker-utils/security-remediation-policy';
 import {
   clearAnalysisStatus,
   getSecurityFindingById,
@@ -114,6 +115,7 @@ type StartSecurityAnalysisParams = {
   nextAuthSecret: string;
   internalApiSecret: string;
   callbackTokenSecret: string;
+  forceSandbox?: boolean;
   retrySandboxOnly?: boolean;
   lifecycleClaim: AnalysisStartLifecycleClaim;
 };
@@ -170,6 +172,7 @@ export async function startSecurityAnalysis(
   if (!finding) {
     return { started: false, error: `Finding not found: ${params.findingId}` };
   }
+  const findingDataSnapshot = buildSecurityFindingAnalysisInput(finding);
 
   const leaseAcquired = await tryAcquireAnalysisStartLease(params.db, params.findingId);
   if (!leaseAcquired) {
@@ -205,6 +208,7 @@ export async function startSecurityAnalysis(
         });
 
     const runSandbox =
+      params.forceSandbox === true ||
       skipTriage ||
       params.analysisMode === 'deep' ||
       (params.analysisMode === 'auto' && triage.needsSandboxAnalysis);
@@ -212,6 +216,7 @@ export async function startSecurityAnalysis(
     if (!runSandbox) {
       const triageOnlyAnalysis: SecurityFindingAnalysis = {
         triage,
+        findingDataSnapshot,
         analyzedAt: new Date().toISOString(),
         modelUsed: params.triageModel,
         triageModel: params.triageModel,
@@ -239,6 +244,7 @@ export async function startSecurityAnalysis(
 
     const partialAnalysis: SecurityFindingAnalysis = {
       triage,
+      findingDataSnapshot,
       analyzedAt: new Date().toISOString(),
       modelUsed: params.analysisModel,
       triageModel: params.triageModel,

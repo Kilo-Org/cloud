@@ -7,7 +7,7 @@ import type {
   WorkspaceReady,
 } from '../execution/types.js';
 import { WrapperFinalizingError } from '../kilo/wrapper-client.js';
-import { createAgentRuntime } from './agent-runtime.js';
+import { createAgentRuntime, WRAPPER_NO_OUTPUT_TIMEOUT_MS } from './agent-runtime.js';
 import { getWrapperLease, getWrapperRuntimeState } from './wrapper-runtime-state.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 
@@ -186,8 +186,11 @@ describe('AgentRuntime', () => {
     ]);
     expect(wrapperState.wrapperRunId).toBe(result.wrapperRunId);
     expect(wrapperState.wrapperIdleDeadlineAt).toBeUndefined();
-    expect(wrapperState.noOutputDeadlineAt).toEqual(expect.any(Number));
-    expect(wrapperState.nextPingAt).toEqual(expect.any(Number));
+    const [{ acceptedAt }] = accepted;
+    expect(acceptedAt).toEqual(expect.any(Number));
+    if (acceptedAt === undefined) throw new Error('Expected accepted delivery timestamp');
+    expect(wrapperState.noOutputDeadlineAt).toBe(acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS);
+    expect(wrapperState.nextPingAt).toBe(acceptedAt + 60_000);
   });
 
   it('fences the dispatching message until acceptance bookkeeping completes', async () => {
@@ -682,49 +685,80 @@ describe('AgentRuntime', () => {
     });
   });
 
-  it.each([
-    {
-      observation: { status: 'inspection-failed', error: 'provider unavailable' },
-      reason: 'observation-failed',
-    },
-    { observation: { status: 'present', observed: [] }, reason: 'unexpected-wrapper' },
-  ])(
-    'blocks cold launch after unsafe physical preflight ($reason)',
-    async ({ observation, reason }) => {
-      const storage = createMemoryStorage();
-      const execute = vi.fn();
-      const requestAlarmAtOrBefore = vi.fn();
-      const sandbox = {
-        discoverSessionWrappers: vi.fn().mockResolvedValue(observation),
-      } as unknown as AgentSandbox;
-      const runtime = createAgentRuntime({
-        storage,
-        env: {} as Env,
-        getMetadata: async () => createMetadata(),
-        getOrchestratorOverride: () => ({ execute }),
-        getSessionIdForLogs: () => 'agent_runtime',
-        sendToWrapper: () => false,
-        createAgentSandbox: () => sandbox,
-        requestAlarmAtOrBefore,
-      });
+  it('classifies failed cold wrapper inspection as a pre-dispatch sandbox connection failure', async () => {
+    const storage = createMemoryStorage();
+    const execute = vi.fn();
+    const requestAlarmAtOrBefore = vi.fn();
+    const sandbox = {
+      discoverSessionWrappers: vi
+        .fn()
+        .mockResolvedValue({ status: 'inspection-failed', error: 'provider unavailable' }),
+    } as unknown as AgentSandbox;
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({ execute }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      createAgentSandbox: () => sandbox,
+      requestAlarmAtOrBefore,
+    });
 
-      const now = 10_000;
-      const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
-      try {
-        await expect(runtime.send(createPlan())).rejects.toThrow(/cleanup is required/i);
-      } finally {
-        clock.mockRestore();
-      }
-      expect(execute).not.toHaveBeenCalled();
-      expect(requestAlarmAtOrBefore).toHaveBeenCalledOnce();
-      expect(requestAlarmAtOrBefore).toHaveBeenCalledWith(now);
-      await expect(getWrapperLease(storage)).resolves.toMatchObject({
-        state: 'stop_needed',
-        target: { kind: 'session' },
-        reason,
+    const now = 10_000;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      await expect(runtime.send(createPlan())).rejects.toMatchObject({
+        name: 'ExecutionError',
+        code: 'SANDBOX_CONNECT_FAILED',
+        retryable: true,
       });
+    } finally {
+      clock.mockRestore();
     }
-  );
+    expect(execute).not.toHaveBeenCalled();
+    expect(requestAlarmAtOrBefore).toHaveBeenCalledWith(now);
+    await expect(getWrapperLease(storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      target: { kind: 'session' },
+      reason: 'observation-failed',
+    });
+    await expect(getWrapperRuntimeState(storage)).resolves.not.toHaveProperty('wrapperRunId');
+  });
+
+  it('blocks cold launch when an unexpected physical wrapper is present', async () => {
+    const storage = createMemoryStorage();
+    const execute = vi.fn();
+    const requestAlarmAtOrBefore = vi.fn();
+    const sandbox = {
+      discoverSessionWrappers: vi.fn().mockResolvedValue({ status: 'present', observed: [] }),
+    } as unknown as AgentSandbox;
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({ execute }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      createAgentSandbox: () => sandbox,
+      requestAlarmAtOrBefore,
+    });
+
+    const now = 10_000;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      await expect(runtime.send(createPlan())).rejects.toThrow(/cleanup is required/i);
+    } finally {
+      clock.mockRestore();
+    }
+    expect(execute).not.toHaveBeenCalled();
+    expect(requestAlarmAtOrBefore).toHaveBeenCalledWith(now);
+    await expect(getWrapperLease(storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      target: { kind: 'session' },
+      reason: 'unexpected-wrapper',
+    });
+  });
 
   it('does not overwrite cleanup requested while physical wrapper observation is in flight', async () => {
     const storage = createMemoryStorage();

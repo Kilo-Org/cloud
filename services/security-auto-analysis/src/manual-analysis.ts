@@ -1,6 +1,12 @@
 import { randomUUID } from 'crypto';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
-import { transitionSecurityAgentCommand } from '@kilocode/db';
+import {
+  isTerminalSecurityAgentCommandTransitionOutcome,
+  markSecurityAgentCommandRetriesExhausted,
+  requireSecurityAgentCommandTransitionOrTerminal,
+  transitionSecurityAgentCommandWithCurrentState,
+  type SecurityAgentCommandTransitionOutcome,
+} from '@kilocode/db';
 import { security_audit_log } from '@kilocode/db/schema';
 import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
 import { z } from 'zod';
@@ -10,11 +16,13 @@ import {
   getAnalysisActorById,
   getSecurityAgentConfigForOwner,
   getSecurityFindingById,
+  prepareActiveAnalysisRestart,
   transitionManualAnalysisQueueFromStart,
   type SecurityFindingRecord,
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
+import { generateApiToken } from './token.js';
 import {
   resolveSecurityAgentModels,
   SECURITY_ANALYSIS_OWNER_CAP,
@@ -43,7 +51,9 @@ export const ManualAnalysisStartCommandSchema = z.object({
       analysisModel: z.string().optional(),
     })
     .optional(),
+  forceSandbox: z.boolean().optional(),
   retrySandboxOnly: z.boolean().optional(),
+  restartActive: z.boolean().optional(),
 });
 
 export const ManualAnalysisStartRequestSchema = ManualAnalysisStartCommandSchema.omit({
@@ -51,6 +61,8 @@ export const ManualAnalysisStartRequestSchema = ManualAnalysisStartCommandSchema
 });
 
 export type ManualAnalysisStartCommand = z.infer<typeof ManualAnalysisStartCommandSchema>;
+
+const MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS = 4;
 
 function commandOwner(command: ManualAnalysisStartCommand): QueueOwner {
   return command.owner.organizationId
@@ -65,6 +77,36 @@ function findingMatchesOwner(
   return owner.type === 'org'
     ? finding.owned_by_organization_id === owner.id
     : finding.owned_by_user_id === owner.id;
+}
+
+async function interruptActiveAnalysisSession(params: {
+  env: CloudflareEnv;
+  authToken: string;
+  cloudAgentSessionId: string;
+  commandId: string;
+}): Promise<void> {
+  try {
+    const response = await params.env.CLOUD_AGENT_NEXT.fetch(
+      new Request('https://cloud-agent-next/trpc/interruptSession', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${params.authToken}`,
+        },
+        body: JSON.stringify({ sessionId: params.cloudAgentSessionId }),
+      })
+    );
+    if (!response.ok) {
+      console.warn('Cloud Agent analysis restart interrupt returned non-OK status', {
+        command_id: params.commandId,
+        status: response.status,
+      });
+    }
+  } catch {
+    console.warn('Cloud Agent analysis restart interrupt failed', {
+      command_id: params.commandId,
+    });
+  }
 }
 
 export async function processManualAnalysisStart(params: {
@@ -87,34 +129,89 @@ export async function processManualAnalysisStart(params: {
   if (!finding || !findingMatchesOwner(finding, owner)) {
     return { status: 'finding-missing' };
   }
-  const inflight = await countOwnerInflightAnalyses(params.db, owner);
-  if (inflight >= SECURITY_ANALYSIS_OWNER_CAP) return { status: 'owner-cap' };
+  const isActiveRestart = params.command.restartActive === true;
+  if (!isActiveRestart) {
+    const inflight = await countOwnerInflightAnalyses(params.db, owner);
+    if (inflight >= SECURITY_ANALYSIS_OWNER_CAP) return { status: 'owner-cap' };
+  }
+
   const actor = await getAnalysisActorById(params.db, params.command.actorUserId);
   if (!actor) return { status: 'actor-missing' };
 
-  const claimToken = randomUUID();
-  const jobId = `manual:${claimToken}`;
-  if (!(await ensureManualAnalysisQueueRow(params.db, { finding, claimToken, jobId }))) {
-    return { status: 'duplicate' };
-  }
+  let claimToken: string;
+  let tokenResult: GitTokenForRepoResult;
+  let config: Awaited<ReturnType<typeof getSecurityAgentConfigForOwner>>;
+  let nextAuthSecret: string;
+  let internalApiSecret: string;
+  let callbackTokenSecret: string;
 
-  const tokenResult = await params.env.GIT_TOKEN_SERVICE.getTokenForRepo({
-    githubRepo: finding.repo_full_name,
-    userId: actor.id,
-    orgId: owner.type === 'org' ? owner.id : undefined,
-  });
-  if (!tokenResult.success) {
-    await transitionManualAnalysisQueueFromStart(params.db, {
+  if (isActiveRestart) {
+    [tokenResult, config, nextAuthSecret, internalApiSecret, callbackTokenSecret] =
+      await Promise.all([
+        params.env.GIT_TOKEN_SERVICE.getTokenForRepo({
+          githubRepo: finding.repo_full_name,
+          userId: actor.id,
+          orgId: owner.type === 'org' ? owner.id : undefined,
+        }),
+        getSecurityAgentConfigForOwner(params.db, owner),
+        params.env.NEXTAUTH_SECRET.get(),
+        params.env.INTERNAL_API_SECRET.get(),
+        params.env.CALLBACK_TOKEN_SECRET.get(),
+      ]);
+    if (!tokenResult.success) return { status: 'token-missing' };
+
+    const authToken = await generateApiToken(
+      actor,
+      nextAuthSecret,
+      params.env.ENVIRONMENT === 'production' ? 'production' : 'development'
+    );
+    const restart = await prepareActiveAnalysisRestart(params.db, {
       findingId: finding.id,
-      claimToken,
-      status: 'failed',
-      failureCode: 'GITHUB_TOKEN_UNAVAILABLE',
-      errorMessage: 'GitHub token unavailable',
+      owner,
+      commandId: params.command.commandId,
     });
-    return { status: 'token-missing' };
+    if (restart.status !== 'ready') return { status: 'duplicate' };
+
+    claimToken = restart.claimToken;
+    if (restart.oldCloudAgentSessionId) {
+      await interruptActiveAnalysisSession({
+        env: params.env,
+        authToken,
+        cloudAgentSessionId: restart.oldCloudAgentSessionId,
+        commandId: params.command.commandId,
+      });
+    }
+  } else {
+    claimToken = randomUUID();
+    const jobId = `manual:${claimToken}`;
+    if (!(await ensureManualAnalysisQueueRow(params.db, { finding, claimToken, jobId }))) {
+      return { status: 'duplicate' };
+    }
+
+    tokenResult = await params.env.GIT_TOKEN_SERVICE.getTokenForRepo({
+      githubRepo: finding.repo_full_name,
+      userId: actor.id,
+      orgId: owner.type === 'org' ? owner.id : undefined,
+    });
+    if (!tokenResult.success) {
+      await transitionManualAnalysisQueueFromStart(params.db, {
+        findingId: finding.id,
+        claimToken,
+        status: 'failed',
+        failureCode: 'GITHUB_TOKEN_UNAVAILABLE',
+        errorMessage: 'GitHub token unavailable',
+      });
+      return { status: 'token-missing' };
+    }
+
+    config = await getSecurityAgentConfigForOwner(params.db, owner);
+    [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
+      params.env.NEXTAUTH_SECRET.get(),
+      params.env.INTERNAL_API_SECRET.get(),
+      params.env.CALLBACK_TOKEN_SECRET.get(),
+    ]);
   }
 
-  const config = await getSecurityAgentConfigForOwner(params.db, owner);
   const resolvedModels = resolveSecurityAgentModels(config);
   const triageModel =
     params.command.requestedModels?.triageModel ??
@@ -124,11 +221,6 @@ export async function processManualAnalysisStart(params: {
     params.command.requestedModels?.analysisModel ??
     params.command.requestedModels?.model ??
     resolvedModels.analysisModel;
-  const [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
-    params.env.NEXTAUTH_SECRET.get(),
-    params.env.INTERNAL_API_SECRET.get(),
-    params.env.CALLBACK_TOKEN_SECRET.get(),
-  ]);
   let result: Awaited<ReturnType<typeof startSecurityAnalysis>>;
   try {
     result = await startSecurityAnalysis({
@@ -144,7 +236,8 @@ export async function processManualAnalysisStart(params: {
       nextAuthSecret,
       internalApiSecret,
       callbackTokenSecret,
-      retrySandboxOnly: params.command.retrySandboxOnly,
+      forceSandbox: isActiveRestart ? true : params.command.forceSandbox,
+      retrySandboxOnly: isActiveRestart ? true : params.command.retrySandboxOnly,
       lifecycleClaim: {
         source: 'manual',
         findingId: finding.id,
@@ -216,9 +309,13 @@ export async function processManualAnalysisStart(params: {
       analysisModel,
       analysisMode: config.analysis_mode,
       triageOnly: result.triageOnly ?? false,
+      ...(isActiveRestart ? { restartActive: true } : {}),
     },
   });
-  return { status: 'started' };
+  return {
+    status: 'started',
+    resultCode: isActiveRestart ? 'ANALYSIS_RESTART_STARTED' : undefined,
+  };
 }
 
 function manualAnalysisCommandTerminalState(result: {
@@ -234,7 +331,10 @@ function manualAnalysisCommandTerminalState(result: {
 }): { status: 'succeeded' | 'failed' | 'no_op'; resultCode: string } {
   switch (result.status) {
     case 'started':
-      return { status: 'succeeded', resultCode: 'ANALYSIS_LAUNCH_STARTED' };
+      return {
+        status: 'succeeded',
+        resultCode: result.resultCode ?? 'ANALYSIS_LAUNCH_STARTED',
+      };
     case 'duplicate':
       return { status: 'no_op', resultCode: 'ALREADY_IN_PROGRESS' };
     case 'owner-cap':
@@ -263,33 +363,79 @@ export async function consumeManualAnalysisBatch(
       continue;
     }
     try {
-      await transitionSecurityAgentCommand(db, {
+      const running = await transitionSecurityAgentCommandWithCurrentState(db, {
         commandId: parsed.data.commandId,
         fromStatuses: ['accepted', 'running'],
         status: 'running',
       });
+      if (requireSecurityAgentCommandTransitionOrTerminal(running, 'running') === 'terminal') {
+        console.info('Manual security analysis command delivery already terminal', {
+          command_id: parsed.data.commandId,
+          command_type: 'start_analysis',
+          owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+          result_code: running.command?.result_code,
+          attempts: message.attempts,
+        });
+        message.ack();
+        continue;
+      }
+
       const result = await processManualAnalysisStart({ db, env, command: parsed.data });
       const terminal = manualAnalysisCommandTerminalState(result);
-      await transitionSecurityAgentCommand(db, {
+      const terminalTransition = await transitionSecurityAgentCommandWithCurrentState(db, {
         commandId: parsed.data.commandId,
-        fromStatuses: ['accepted', 'running'],
+        fromStatuses: ['running'],
         status: terminal.status,
         resultCode: terminal.resultCode,
       });
+      requireSecurityAgentCommandTransitionOrTerminal(terminalTransition, 'terminal');
       console.info('Manual security analysis command completed', {
         command_id: parsed.data.commandId,
         command_type: 'start_analysis',
         owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
         result_code: terminal.resultCode,
+        attempts: message.attempts,
       });
       message.ack();
     } catch (error) {
+      let exhaustionOutcome: SecurityAgentCommandTransitionOutcome | undefined;
+      if (message.attempts >= MANUAL_ANALYSIS_COMMAND_MAX_ATTEMPTS) {
+        try {
+          exhaustionOutcome = await markSecurityAgentCommandRetriesExhausted(
+            db,
+            parsed.data.commandId
+          );
+          if (isTerminalSecurityAgentCommandTransitionOutcome(exhaustionOutcome)) {
+            console.info(
+              'Manual security analysis command delivery already terminal after failure',
+              {
+                command_id: parsed.data.commandId,
+                command_type: 'start_analysis',
+                owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+                result_code: exhaustionOutcome.command?.result_code,
+                attempts: message.attempts,
+              }
+            );
+            message.ack();
+            continue;
+          }
+        } catch {
+          console.error('Failed to record exhausted manual security analysis command', {
+            command_id: parsed.data.commandId,
+            command_type: 'start_analysis',
+            owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
+            attempts: message.attempts,
+          });
+        }
+      }
+
       console.error('Manual security analysis start failed', {
         command_id: parsed.data.commandId,
         command_type: 'start_analysis',
         owner_type: parsed.data.owner.organizationId ? 'org' : 'user',
-        findingId: parsed.data.findingId,
-        error: error instanceof Error ? error.message : String(error),
+        attempts: message.attempts,
+        result_code: exhaustionOutcome?.transitioned ? 'QUEUE_RETRIES_EXHAUSTED' : undefined,
+        error_type: error instanceof Error ? error.name : 'UnknownError',
       });
       message.retry();
     }

@@ -9,9 +9,10 @@ export const WELCOME_CREDIT_EXPIRY_HRS = 30 * 24; // 30 days in hours
 export const OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS = 48; // 2 days in hours
 
 export const allow_fake_login =
-  !!process.env.DEBUG_SHOW_DEV_UI &&
-  process.env.NODE_ENV !== 'production' &&
-  !process.env.VERCEL_ENV;
+  (!!process.env.DEBUG_SHOW_DEV_UI &&
+    process.env.NODE_ENV !== 'production' &&
+    !process.env.VERCEL_ENV) ||
+  process.env.VERCEL_TARGET_ENV === 'staging';
 
 export const MINIMUM_TOP_UP_AMOUNT = 10;
 export const MAXIMUM_TOP_UP_AMOUNT = 10_000;
@@ -20,16 +21,43 @@ export const ORGANIZATION_ID_HEADER = 'x-kilocode-organizationid'; // We pass X-
 export const LANDING_URL =
   process.env.NODE_ENV === 'production' ? 'https://kilo.ai' : 'http://localhost:3001';
 
-// In development, APP_URL derives from the PORT env var (set by scripts/dev.sh).
-// APP_URL_OVERRIDE takes precedence for tunnels (e.g. ngrok).
-export const APP_URL =
-  process.env.NODE_ENV === 'production'
-    ? 'https://app.kilo.ai'
-    : (process.env.APP_URL_OVERRIDE ?? `http://localhost:${process.env.PORT || '3000'}`);
+type AppUrlEnvironment = {
+  appUrlOverride?: string;
+  nodeEnv?: string;
+  port?: string;
+  vercelTargetEnv?: string;
+};
+
+export function resolveAppUrl({
+  appUrlOverride,
+  nodeEnv,
+  port,
+  vercelTargetEnv,
+}: AppUrlEnvironment): string {
+  if (appUrlOverride) {
+    return new URL(appUrlOverride).origin;
+  }
+  if (vercelTargetEnv === 'staging') {
+    return 'https://staging-app.kilo.ai';
+  }
+  if (nodeEnv === 'production') {
+    return 'https://app.kilo.ai';
+  }
+  return `http://localhost:${port || '3000'}`;
+}
+
+export const APP_URL = resolveAppUrl({
+  appUrlOverride: process.env.APP_URL_OVERRIDE,
+  nodeEnv: process.env.NODE_ENV,
+  port: process.env.PORT,
+  vercelTargetEnv: process.env.VERCEL_TARGET_ENV,
+});
 
 export const TRIAL_DURATION_DAYS = 14;
 
 export const AUTOCOMPLETE_MODEL = 'codestral-2508';
+export const INCEPTION_PROMO_MODEL = 'inception/mercury-edit-2';
+export const INCEPTION_PROMO_RUNNING = true;
 
 export const ENABLE_DEPLOY_FEATURE = true;
 

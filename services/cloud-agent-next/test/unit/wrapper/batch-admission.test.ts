@@ -10,6 +10,11 @@ import {
 } from '../../../wrapper/src/server.js';
 import { WrapperState } from '../../../wrapper/src/state.js';
 
+vi.mock('../../../wrapper/src/utils.js', () => ({
+  getCurrentBranch: vi.fn().mockResolvedValue('main'),
+  logToFile: vi.fn(),
+}));
+
 const config: ServerConfig = {
   port: 5000,
   workspacePath: '/workspace',

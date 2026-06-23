@@ -9,7 +9,11 @@ import { z } from 'zod';
 const JWKSchema = z
   .object({
     kid: z.string().min(1),
-    kty: z.string().min(1),
+    kty: z.literal('RSA'),
+    n: z.string().min(1),
+    e: z.string().min(1),
+    alg: z.literal('RS256').optional(),
+    use: z.literal('sig').optional(),
   })
   .passthrough();
 

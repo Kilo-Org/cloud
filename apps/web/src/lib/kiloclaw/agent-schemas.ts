@@ -14,7 +14,9 @@ import { z } from 'zod';
 // Agent ids normalize to <=64 chars on the controller.
 export const AgentIdSchema = z.string().trim().min(1).max(64);
 
-const ThinkingDefaultSchema = z.enum([
+// Single source of truth for the per-agent setting option values, shared by the
+// Zod enums below and the editor UI (AgentEditDialog) so they can't drift.
+export const THINKING_OPTIONS = [
   'off',
   'minimal',
   'low',
@@ -23,9 +25,13 @@ const ThinkingDefaultSchema = z.enum([
   'xhigh',
   'adaptive',
   'max',
-]);
-const VerboseDefaultSchema = z.enum(['off', 'on', 'full']);
-const ReasoningDefaultSchema = z.enum(['on', 'off', 'stream']);
+] as const;
+export const VERBOSE_OPTIONS = ['off', 'on', 'full'] as const;
+export const REASONING_OPTIONS = ['on', 'off', 'stream'] as const;
+
+const ThinkingDefaultSchema = z.enum(THINKING_OPTIONS);
+const VerboseDefaultSchema = z.enum(VERBOSE_OPTIONS);
+const ReasoningDefaultSchema = z.enum(REASONING_OPTIONS);
 
 // A model value to write: primary and/or fallbacks (at least one).
 const ModelInputSchema = z
@@ -117,6 +123,34 @@ const AbsolutePathSchema = z
   .min(1)
   .max(1024)
   .refine(value => value.startsWith('/'), { message: 'Path must be absolute' });
+
+// Declarative channel-route set (PUT /_kilo/config/agents/:id/bindings).
+// `channels` is the agent's full channel-level route set (single-account cloud).
+export const AgentBindingsInputSchema = z
+  .object({
+    etag: z.string().min(1).max(128).optional(),
+    // Guards mirror the controller's AgentBindingsPutBodySchema so invalid
+    // channels are rejected here with a clear message instead of a generic
+    // controller 400: no leading dash (flag-like) and no `:` account specifier
+    // (this endpoint manages only channel-level default-account routes).
+    channels: z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1)
+          .max(64)
+          .refine(value => !value.startsWith('-'), {
+            message: 'Channel must not begin with a dash',
+          })
+          .refine(value => !value.includes(':'), {
+            message: 'Channel must not include an account specifier',
+          })
+      )
+      .max(50),
+  })
+  .strict();
+export type AgentBindingsInput = z.infer<typeof AgentBindingsInputSchema>;
 
 // Create body (POST /_kilo/config/agents).
 export const AgentCreateInputSchema = z

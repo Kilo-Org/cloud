@@ -12,10 +12,7 @@ import {
 } from '@/lib/agent-config/db/agent-configs';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
-import {
-  fetchGitLabRepositoriesForUser,
-  searchGitLabRepositoriesForUser,
-} from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -28,6 +25,7 @@ import {
   clearCodeReviewActionRequiredState,
   getCodeReviewActionRequiredState,
 } from '@/lib/code-reviews/action-required';
+import { getReviewMemoryEnabledFromConfig } from '@/lib/code-reviews/review-memory/settings';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -135,16 +133,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
     }),
 
   /**
-   * Search GitLab repositories by query string
-   * Used when users have 100+ repositories and need to find specific ones
-   */
-  searchGitLabRepositories: baseProcedure
-    .input(z.object({ query: z.string().min(2) }))
-    .query(async ({ ctx, input }) => {
-      return await searchGitLabRepositoriesForUser(ctx.user.id, input.query);
-    }),
-
-  /**
    * Gets the review agent configuration for personal user
    */
   getReviewConfig: baseProcedure
@@ -168,6 +156,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           disableReviewMd: true,
+          reviewMemoryEnabled: false,
           actionRequired: null,
         };
       }
@@ -185,6 +174,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
         selectedRepositoryIds: cfg.selected_repository_ids || [],
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
         disableReviewMd: cfg.disable_review_md ?? true,
+        reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
         actionRequired: getCodeReviewActionRequiredState(config),
       };
     }),
@@ -222,7 +212,10 @@ export const personalReviewAgentRouter = createTRPCRouter({
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
             disable_review_md: input.disableReviewMd ?? true,
+            review_memory_enabled: false,
+            review_analytics_enabled: false,
           },
+          preserveCodeReviewFeatureSettings: true,
           createdBy: ctx.user.id,
         });
 

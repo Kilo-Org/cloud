@@ -4,15 +4,19 @@ import {
   type MagicLinkTokenWithPlaintext,
 } from '@/lib/auth/magic-link-tokens';
 import { sendMagicLinkEmail } from '@/lib/email';
-import { findUserByEmail } from '@/lib/user';
+import { findUserByEmail, getWorkOSOrganization } from '@/lib/user';
 import { MAGIC_LINK_EMAIL_ERRORS } from '@/lib/schemas/email';
+import { checkRateLimit } from '@vercel/firewall';
 import { NextResponse } from 'next/server';
 import { NextRequest } from 'next/server';
+import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 
+jest.mock('@vercel/firewall');
 jest.mock('@/lib/auth/verify-turnstile-jwt');
 jest.mock('@/lib/auth/magic-link-tokens');
 jest.mock('@/lib/email');
 jest.mock('@/lib/user');
+jest.mock('@/lib/organizations/organization-sso-policy');
 
 import { POST } from './route';
 
@@ -20,6 +24,9 @@ const mockVerifyTurnstileJWT = jest.mocked(verifyTurnstileJWT);
 const mockCreateMagicLinkToken = jest.mocked(createMagicLinkToken);
 const mockSendMagicLinkEmail = jest.mocked(sendMagicLinkEmail);
 const mockFindUserByEmail = jest.mocked(findUserByEmail);
+const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
+const mockCheckRateLimit = jest.mocked(checkRateLimit);
+const mockResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
 
 describe('POST /api/auth/magic-link', () => {
   const createRequest = (body: unknown) =>
@@ -58,10 +65,20 @@ describe('POST /api/auth/magic-link', () => {
 
     // Default: User does not exist (new user signup)
     mockFindUserByEmail.mockResolvedValue(undefined);
+
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
+    mockResolveSsoAuthorityForDomain.mockImplementation(async domain => ({
+      status: 'not_required',
+      domain,
+    }));
+    mockGetWorkOSOrganization.mockResolvedValue({ id: 'workos-organization-id' } as Awaited<
+      ReturnType<typeof getWorkOSOrganization>
+    >);
   });
 
   it('should send magic link for valid email with valid JWT', async () => {
-    const response = await POST(createRequest({ email: 'user@example.com' }));
+    const request = createRequest({ email: 'user@example.com' });
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -71,8 +88,113 @@ describe('POST /api/auth/magic-link', () => {
     });
 
     expect(mockVerifyTurnstileJWT).toHaveBeenCalledWith('magic-link');
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('magic-link-email', {
+      request,
+      rateLimitKey: expect.stringMatching(/^magic-link-email:[A-Za-z0-9_-]+$/),
+    });
     expect(mockCreateMagicLinkToken).toHaveBeenCalledWith('user@example.com');
     expect(mockSendMagicLinkEmail).toHaveBeenCalledWith(mockMagicLinkToken, undefined);
+  });
+
+  it('rejects magic links for an SSO-protected domain before creating a token', async () => {
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: 'sso-organization-id',
+    });
+
+    const response = await POST(createRequest({ email: 'user@example.com' }));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'Sign in with your organization SSO provider.',
+      ssoOrganizationId: 'workos-organization-id',
+    });
+    expect(mockGetWorkOSOrganization).toHaveBeenCalledWith('example.com');
+    expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+    expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when WorkOS is missing for an SSO-protected domain', async () => {
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: 'sso-organization-id',
+    });
+    mockGetWorkOSOrganization.mockResolvedValue(null);
+
+    const response = await POST(createRequest({ email: 'user@example.com' }));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'SSO configuration error. Contact your administrator.',
+    });
+    expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+    expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
+  });
+
+  it('uses an existing account primary domain for SSO enforcement', async () => {
+    mockFindUserByEmail.mockResolvedValue({
+      id: 'existing-user-id',
+      google_user_email: 'user@company.com',
+    } as Awaited<ReturnType<typeof findUserByEmail>>);
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'required',
+      domain: 'company.com',
+      sourceOrganizationId: 'sso-organization-id',
+    });
+
+    const response = await POST(createRequest({ email: 'user@personal.example' }));
+
+    expect(response.status).toBe(403);
+    expect(mockResolveSsoAuthorityForDomain).toHaveBeenCalledWith('company.com');
+    expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the SSO authority is misconfigured', async () => {
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'misconfigured',
+      domain: 'example.com',
+      reason: 'ambiguous_domain',
+    });
+
+    const response = await POST(createRequest({ email: 'user@example.com' }));
+
+    expect(response.status).toBe(503);
+    expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+  });
+
+  it('should return 429 when the email address is rate limited', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: true });
+
+    const response = await POST(createRequest({ email: 'user@example.com' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data).toEqual({
+      success: false,
+      error: 'Rate limit exceeded. Please try again later.',
+    });
+    expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+    expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
+  });
+
+  it('should use the same rate limit key for different email casing', async () => {
+    mockFindUserByEmail.mockResolvedValue({
+      id: 'existing-user-id',
+      google_user_email: 'user@example.com',
+    } as Awaited<ReturnType<typeof findUserByEmail>>);
+
+    await POST(createRequest({ email: 'User@Example.com' }));
+    await POST(createRequest({ email: 'user@example.com' }));
+
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
+    expect(firstKey).toEqual(expect.stringMatching(/^magic-link-email:[A-Za-z0-9_-]+$/));
+    expect(secondKey).toBe(firstKey);
   });
 
   it('should reject request with invalid Turnstile JWT', async () => {
@@ -91,6 +213,7 @@ describe('POST /api/auth/magic-link', () => {
 
     expect(response.status).toBe(401);
     expect(data).toEqual({ error: 'Security verification required' });
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
     expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
     expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
   });

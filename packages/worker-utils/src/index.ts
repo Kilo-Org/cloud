@@ -25,7 +25,11 @@ export { createNotFoundHandler } from './not-found-handler.js';
 
 export type { Owner, MCPServerConfig } from './types.js';
 
-export { createCloudAgentNextFetchClient } from './cloud-agent-next-client.js';
+export {
+  CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS,
+  createCloudAgentNextFetchClient,
+  isCloudAgentNextBillingErrorBody,
+} from './cloud-agent-next-client.js';
 export type {
   CloudAgentNextFetchClient,
   CallbackTarget,
@@ -95,6 +99,9 @@ export type { RepoCoordinates } from './git-url.js';
 
 export { KILO_MODEL_PREFIX, unprefixKiloGatewayModelId } from './kilo-model-id.js';
 
+export { ttlCached } from './ttl-cache.js';
+export type { TtlCache } from './ttl-cache.js';
+
 export {
   CloudAgentQueueReportSchema,
   CloudAgentRunStatuses,
@@ -105,3 +112,33 @@ export type {
   CloudAgentQueueReport,
   CloudAgentRunStateReport,
 } from './cloud-agent-queue-report.js';
+
+export {
+  REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
+  SECURITY_FINDING_AUDIT_EVENT_KEY_PREFIX,
+  SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  SecurityFindingAuditActorSchema,
+  SecurityFindingAuditEventSchema,
+  SecurityFindingAuditHumanActorSchema,
+  SecurityFindingAuditOwnerSchema,
+  SecurityFindingAuditSnapshotSchema,
+  buildSecurityFindingAuditHumanActor,
+  buildSecurityFindingAuditLogValues,
+  buildSecurityFindingAuditSnapshot,
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+} from './security-finding-audit.js';
+export type {
+  NewSecurityFindingAuditLogValues,
+  SecurityFindingAuditActor,
+  SecurityFindingAuditEventFinding,
+  SecurityFindingAuditEventInput,
+  SecurityFindingAuditHumanActor,
+  SecurityFindingAuditLogEntry,
+  SecurityFindingAuditOwner,
+  SecurityFindingAuditSnapshot,
+  SecurityFindingAuditSnapshotExtras,
+  SecurityFindingAuditSnapshotSource,
+  SecurityFindingAuditWriterDb,
+} from './security-finding-audit.js';

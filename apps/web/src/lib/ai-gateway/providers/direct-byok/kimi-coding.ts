@@ -17,6 +17,12 @@ export default {
     context.request.body.thinking = {
       type: reasoningDisabled ? 'disabled' : 'enabled',
     };
+    if (
+      context.request.kind === 'chat_completions' &&
+      context.request.body.reasoning_effort === 'none'
+    ) {
+      delete context.request.body.reasoning_effort;
+    }
     context.extraHeaders['user-agent'] = COMPATIBLE_USER_AGENT;
   },
   models: () =>

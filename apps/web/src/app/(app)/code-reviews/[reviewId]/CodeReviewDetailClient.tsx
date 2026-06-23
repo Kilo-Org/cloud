@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { CodeReviewStreamView } from '@/components/code-reviews/CodeReviewStreamView';
+import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
 import {
   ExternalLink,
   GitPullRequest,
@@ -156,7 +157,6 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
           : 'border-destructive/30 bg-destructive/10 text-destructive',
       }
     : null;
-
   return (
     <PageContainer>
       {/* Back link */}
@@ -268,15 +268,14 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
                 <dd>${(review.total_cost_musd / 1_000_000).toFixed(4)}</dd>
               </div>
             )}
-            {(review.total_tokens_in != null || review.total_tokens_out != null) && (
-              <div>
-                <dt className="text-muted-foreground">Tokens</dt>
-                <dd>
-                  {review.total_tokens_in?.toLocaleString() ?? '—'} in /{' '}
-                  {review.total_tokens_out?.toLocaleString() ?? '—'} out
-                </dd>
-              </div>
-            )}
+            <div>
+              <dt className="text-muted-foreground">Tokens</dt>
+              <dd className="tabular-nums">
+                Input {formatTokenCount(data.tokenUsage.input)} / Output{' '}
+                {formatTokenCount(data.tokenUsage.output)} / Cached{' '}
+                {formatTokenCount(data.tokenUsage.cached)}
+              </dd>
+            </div>
           </dl>
 
           {reviewMessage && (

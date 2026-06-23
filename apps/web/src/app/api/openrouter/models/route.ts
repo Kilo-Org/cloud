@@ -9,6 +9,8 @@ import { getAvailableModelsForOrganization } from '@/lib/organizations/organizat
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/ai-gateway/models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
+import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
+import { readDb } from '@/lib/drizzle';
 
 async function tryGetUserFromAuth() {
   try {
@@ -43,10 +45,27 @@ export async function GET(
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }
-    const byokModels = auth?.user ? await getDirectByokModelsForUser(auth.user.id) : [];
-    const experimentModels = await listAvailableExperimentModels();
+    if (!auth?.user) {
+      const experimentModels = await listAvailableExperimentModels();
+      return NextResponse.json({
+        data: filterByFeature(data.data.concat(experimentModels), feature),
+      });
+    }
+
+    const [byokModels, experimentModels, enabledByokProviderIds] = await Promise.all([
+      getDirectByokModelsForUser(auth.user.id),
+      listAvailableExperimentModels(),
+      getUserByokProviderIds(readDb, auth.user.id),
+    ]);
+    const modelsWithByokAvailability = await addUserByokAvailability(
+      data.data,
+      enabledByokProviderIds
+    );
     return NextResponse.json({
-      data: filterByFeature(data.data.concat(byokModels, experimentModels), feature),
+      data: filterByFeature(
+        modelsWithByokAvailability.concat(byokModels, experimentModels),
+        feature
+      ),
     });
   } catch (error) {
     captureException(error, {

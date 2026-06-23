@@ -10,6 +10,7 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   martian: 'Martian',
   neuralwatt: 'Neuralwatt',
   'ollama-cloud': 'Ollama Cloud',
+  'opencode-go': 'OpenCode Go',
   orcarouter: 'OrcaRouter',
   synthetic: 'Synthetic',
   'xiaomi-token-plan-ams': 'Xiaomi Token Plan (Europe)',

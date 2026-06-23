@@ -6,3 +6,15 @@ export function unprefixKiloGatewayModelId(model: string): string | undefined {
   const unprefixedModel = model.slice(KILO_MODEL_PREFIX.length);
   return unprefixedModel.includes('/') ? unprefixedModel : undefined;
 }
+
+export function deriveModelStatsIdentity(model: string) {
+  const modelCreator = model.includes('/') ? model.split('/')[0] : 'unknown';
+  return {
+    slug: model
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, ''),
+    modelCreator,
+    creatorSlug: modelCreator.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+  };
+}

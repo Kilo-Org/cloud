@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import type { BotType } from './types';
 import { generateBotUserId, generateBotUserEmail, getBotDisplayName } from './types';
 import {
+  generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
@@ -62,6 +63,7 @@ async function createBotUser(organizationId: string, botType: BotType): Promise<
       is_admin: false,
       auto_top_up_enabled: false,
       openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(botId),
+      openrouter_downstream_safety_identifier: generateOpenRouterDownstreamSafetyIdentifier(botId),
       vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(botId),
     })
     .returning();

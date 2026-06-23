@@ -19,10 +19,13 @@ import { preferredModels } from '@/lib/ai-gateway/models';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import {
+  BYOK_MODEL_LABEL,
   FREE_MODEL_DATA_LABEL,
   FREE_MODEL_FREE_LABEL,
   getFreeModelDataTooltip,
+  hasUserByokAvailable,
   isFreeModelOption,
+  mayTrainOnYourPrompts,
 } from '@/components/shared/free-model-data-disclosure';
 
 export type ModelOption = {
@@ -30,6 +33,8 @@ export type ModelOption = {
   name: string; // e.g., "Claude Sonnet 4.5"
   supportsVision?: boolean;
   isFree?: boolean;
+  mayTrainOnYourPrompts?: boolean;
+  hasUserByokAvailable?: boolean;
   /** Ordered list of variant key names (e.g., ["none","low","medium","high","max"]) */
   variants?: string[];
 };
@@ -118,7 +123,7 @@ export function ModelCombobox({
   const selectedModel = models.find(model => model.id === value);
   const isCompact = variant === 'compact';
   const showLabel = !isCompact && label;
-  const selectedCollectsData = isFreeModelOption(selectedModel);
+  const selectedCollectsData = mayTrainOnYourPrompts(selectedModel);
 
   if (isLoading) {
     if (isCompact) {
@@ -255,7 +260,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
-                          {isFreeModelOption(model) && <FreeModelDataBadge />}
+                          <ModelMetadataBadges model={model} />
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -293,7 +298,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
-                          {isFreeModelOption(model) && <FreeModelDataBadge />}
+                          <ModelMetadataBadges model={model} />
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -379,7 +384,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
-                          {isFreeModelOption(model) && <FreeModelDataBadge />}
+                          <ModelMetadataBadges model={model} />
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -417,7 +422,7 @@ export function ModelCombobox({
                               <TooltipContent>Supports vision</TooltipContent>
                             </Tooltip>
                           )}
-                          {isFreeModelOption(model) && <FreeModelDataBadge />}
+                          <ModelMetadataBadges model={model} />
                         </div>
                         <span className="text-muted-foreground truncate text-xs">{model.id}</span>
                       </div>
@@ -440,7 +445,7 @@ export function ModelCombobox({
   );
 }
 
-function FreeModelDataIcon() {
+function FreeModelDataIcon({ compact = false }: { compact?: boolean }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -450,7 +455,7 @@ function FreeModelDataIcon() {
           role="img"
           tabIndex={0}
         >
-          <BookOpenCheck className="h-3.5 w-3.5" />
+          <BookOpenCheck className={compact ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
         </span>
       </TooltipTrigger>
       <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
@@ -458,25 +463,26 @@ function FreeModelDataIcon() {
   );
 }
 
-function FreeModelDataBadge() {
+function ModelMetadataBadges({ model }: { model: ModelOption }) {
+  const free = isFreeModelOption(model);
+  const byok = hasUserByokAvailable(model);
+  const collectsData = mayTrainOnYourPrompts(model);
+
+  if (!free && !byok && !collectsData) return null;
+
   return (
     <span className="inline-flex shrink-0 items-center gap-1">
-      <span className="inline-flex shrink-0 items-center rounded-full bg-green-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
-        {FREE_MODEL_FREE_LABEL}
-      </span>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            aria-label={FREE_MODEL_DATA_LABEL}
-            className="inline-flex shrink-0 items-center rounded-sm text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-            role="img"
-            tabIndex={0}
-          >
-            <BookOpenCheck className="h-3 w-3" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{getFreeModelDataTooltip()}</TooltipContent>
-      </Tooltip>
+      {free && !byok && (
+        <span className="inline-flex shrink-0 items-center rounded-full bg-green-500/20 px-1.5 py-0.5 text-[10px] font-medium text-green-400 ring-1 ring-green-500/20">
+          {FREE_MODEL_FREE_LABEL}
+        </span>
+      )}
+      {byok && (
+        <span className="bg-muted text-muted-foreground ring-border inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ring-1">
+          {BYOK_MODEL_LABEL}
+        </span>
+      )}
+      {collectsData && <FreeModelDataIcon compact />}
     </span>
   );
 }

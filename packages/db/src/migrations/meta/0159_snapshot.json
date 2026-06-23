@@ -1,5 +1,5 @@
 {
-  "id": "7bb0c23c-6f78-4188-97d3-5f364ebd0da1",
+  "id": "92456552-7609-4470-bb7c-85950eb1bfd9",
   "prevId": "e1783b2f-cc3c-464e-bb15-c328decaa79e",
   "version": "7",
   "dialect": "postgresql",
@@ -6224,6 +6224,479 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.code_review_feedback_events": {
+      "name": "code_review_feedback_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repo_full_name": {
+          "name": "repo_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pr_number": {
+          "name": "pr_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kilo_comment_id": {
+          "name": "kilo_comment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reply_excerpt": {
+          "name": "reply_excerpt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_comment_excerpt": {
+          "name": "kilo_comment_excerpt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dedupe_hash": {
+          "name": "dedupe_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_code_review_feedback_events_owned_by_org_id": {
+          "name": "idx_code_review_feedback_events_owned_by_org_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_code_review_feedback_events_owned_by_user_id": {
+          "name": "idx_code_review_feedback_events_owned_by_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_code_review_feedback_events_platform_repo": {
+          "name": "idx_code_review_feedback_events_platform_repo",
+          "columns": [
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_code_review_feedback_events_created_at": {
+          "name": "idx_code_review_feedback_events_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "code_review_feedback_events_owned_by_organization_id_organizations_id_fk": {
+          "name": "code_review_feedback_events_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "code_review_feedback_events",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "code_review_feedback_events_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "code_review_feedback_events_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "code_review_feedback_events",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_code_review_feedback_events_dedupe_hash": {
+          "name": "UQ_code_review_feedback_events_dedupe_hash",
+          "nullsNotDistinct": false,
+          "columns": [
+            "dedupe_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "code_review_feedback_events_owner_check": {
+          "name": "code_review_feedback_events_owner_check",
+          "value": "(\n        (\"code_review_feedback_events\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_feedback_events\".\"owned_by_organization_id\" IS NULL) OR\n        (\"code_review_feedback_events\".\"owned_by_user_id\" IS NULL AND \"code_review_feedback_events\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.code_review_memory_proposals": {
+      "name": "code_review_memory_proposals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repo_full_name": {
+          "name": "repo_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'open'"
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rationale": {
+          "name": "rationale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proposed_markdown": {
+          "name": "proposed_markdown",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidence": {
+          "name": "evidence",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "positive_count": {
+          "name": "positive_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "negative_count": {
+          "name": "negative_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "neutral_count": {
+          "name": "neutral_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "change_request_url": {
+          "name": "change_request_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_code_review_memory_proposals_owned_by_org_id": {
+          "name": "idx_code_review_memory_proposals_owned_by_org_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_code_review_memory_proposals_owned_by_user_id": {
+          "name": "idx_code_review_memory_proposals_owned_by_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_code_review_memory_proposals_platform_repo_status": {
+          "name": "idx_code_review_memory_proposals_platform_repo_status",
+          "columns": [
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_code_review_memory_proposals_updated_at": {
+          "name": "idx_code_review_memory_proposals_updated_at",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_code_review_memory_proposals_org_active_scope": {
+          "name": "UQ_code_review_memory_proposals_org_active_scope",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"code_review_memory_proposals\".\"owned_by_organization_id\" IS NOT NULL AND \"code_review_memory_proposals\".\"status\" IN ('open', 'edited', 'opening_change_request')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_code_review_memory_proposals_user_active_scope": {
+          "name": "UQ_code_review_memory_proposals_user_active_scope",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"code_review_memory_proposals\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_memory_proposals\".\"status\" IN ('open', 'edited', 'opening_change_request')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "code_review_memory_proposals_owned_by_organization_id_organizations_id_fk": {
+          "name": "code_review_memory_proposals_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "code_review_memory_proposals",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "code_review_memory_proposals_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "code_review_memory_proposals_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "code_review_memory_proposals",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "code_review_memory_proposals_owner_check": {
+          "name": "code_review_memory_proposals_owner_check",
+          "value": "(\n        (\"code_review_memory_proposals\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_memory_proposals\".\"owned_by_organization_id\" IS NULL) OR\n        (\"code_review_memory_proposals\".\"owned_by_user_id\" IS NULL AND \"code_review_memory_proposals\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.coding_plan_availability_intents": {
@@ -13396,166 +13869,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.kiloclaw_agentcard_oauth_connections": {
-      "name": "kiloclaw_agentcard_oauth_connections",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "instance_id": {
-          "name": "instance_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "provider": {
-          "name": "provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'agentcard'"
-        },
-        "account_email": {
-          "name": "account_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "oauth_client_id": {
-          "name": "oauth_client_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "access_token_encrypted": {
-          "name": "access_token_encrypted",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "refresh_token_encrypted": {
-          "name": "refresh_token_encrypted",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "token_expires_at": {
-          "name": "token_expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "scopes": {
-          "name": "scopes",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'active'"
-        },
-        "last_error": {
-          "name": "last_error",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "last_error_at": {
-          "name": "last_error_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "connected_at": {
-          "name": "connected_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_kiloclaw_agentcard_oauth_connections_instance": {
-          "name": "UQ_kiloclaw_agentcard_oauth_connections_instance",
-          "columns": [
-            {
-              "expression": "instance_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_kiloclaw_agentcard_oauth_connections_status": {
-          "name": "IDX_kiloclaw_agentcard_oauth_connections_status",
-          "columns": [
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "kiloclaw_agentcard_oauth_connections_instance_id_kiloclaw_instances_id_fk": {
-          "name": "kiloclaw_agentcard_oauth_connections_instance_id_kiloclaw_instances_id_fk",
-          "tableFrom": "kiloclaw_agentcard_oauth_connections",
-          "tableTo": "kiloclaw_instances",
-          "columnsFrom": [
-            "instance_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "kiloclaw_agentcard_oauth_connections_status_check": {
-          "name": "kiloclaw_agentcard_oauth_connections_status_check",
-          "value": "\"kiloclaw_agentcard_oauth_connections\".\"status\" IN ('active', 'action_required', 'disconnected')"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.kiloclaw_cli_runs": {

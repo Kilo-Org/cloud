@@ -6,6 +6,7 @@ import {
   buildScopedConnectRootPath,
   buildUpstreamHeaders,
   parseScopedConnectPath,
+  parseStaticHeaders,
   isPublicIp,
   ProviderGrantBundleSchema,
   OAuthClientMetadataSchema,
@@ -68,6 +69,32 @@ describe('provider grant schema', () => {
   });
 });
 
+describe('static headers', () => {
+  test('allows authorization but rejects transport identity headers', () => {
+    expect(parseStaticHeaders({ Authorization: 'Bearer test' })).toEqual({
+      Authorization: 'Bearer test',
+    });
+    expect(() => parseStaticHeaders({ Host: 'example.com' })).toThrow(
+      'Static header cannot be transport identity metadata'
+    );
+    expect(() => parseStaticHeaders({ 'X-Forwarded-Host': 'example.com' })).toThrow(
+      'Static header cannot be transport identity metadata'
+    );
+    expect(() => parseStaticHeaders({ 'CF-Connecting-IP': '203.0.113.1' })).toThrow(
+      'Static header cannot be transport identity metadata'
+    );
+    expect(
+      parseStaticHeaders({
+        'CF-Access-Client-Id': 'client-id',
+        'CF-Access-Client-Secret': 'client-secret',
+      })
+    ).toEqual({
+      'CF-Access-Client-Id': 'client-id',
+      'CF-Access-Client-Secret': 'client-secret',
+    });
+  });
+});
+
 describe('OAuth client metadata', () => {
   test('ignores unsupported RFC metadata fields', () => {
     const parsed = OAuthClientMetadataSchema.parse({
@@ -76,7 +103,7 @@ describe('OAuth client metadata', () => {
       token_endpoint_auth_method: 'none',
       grant_types: ['authorization_code'],
       response_types: ['code'],
-      scope: 'profile',
+      scope: 'mcp:access',
       client_uri: 'https://client.example',
       logo_uri: 'https://client.example/logo.svg',
       software_id: 'codex',
@@ -88,7 +115,7 @@ describe('OAuth client metadata', () => {
       token_endpoint_auth_method: 'none',
       grant_types: ['authorization_code'],
       response_types: ['code'],
-      scope: 'profile',
+      scope: 'mcp:access',
     });
   });
 
@@ -113,7 +140,7 @@ describe('OAuth redirect URI policy', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       }).success
     ).toBe(true);
     expect(
@@ -122,7 +149,7 @@ describe('OAuth redirect URI policy', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       }).success
     ).toBe(true);
     expect(

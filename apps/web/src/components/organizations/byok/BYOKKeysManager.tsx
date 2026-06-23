@@ -70,7 +70,7 @@ const VERCEL_BYOK_PROVIDER_NAMES = {
   fireworks: 'Fireworks',
   google: 'Google AI Studio',
   minimax: 'MiniMax',
-  mistral: 'Mistral AI (other models)',
+  mistral: 'Mistral AI',
   moonshotai: 'Moonshot AI',
   novita: 'Novita',
   perplexity: 'Perplexity',
@@ -81,7 +81,7 @@ const VERCEL_BYOK_PROVIDER_NAMES = {
 
 const VERCEL_BYOK_PROVIDERS = [
   ...Object.entries(VERCEL_BYOK_PROVIDER_NAMES).map(([id, name]) => ({ id, name })),
-  { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Mistral AI (Codestral)' },
+  { id: DirectUserByokInferenceProviderIdSchema.enum.codestral, name: 'Legacy Codestral-only key' },
 ];
 
 const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).map(([id, name]) => ({
@@ -91,6 +91,9 @@ const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).ma
 
 const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
   a.name.localeCompare(b.name)
+);
+const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
+  provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
 );
 
 function BYOKDescription({ showsCodingPlanKey = false }: { showsCodingPlanKey?: boolean }) {
@@ -604,7 +607,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
-                    {BYOK_PROVIDERS.map(provider => {
+                    {(editingKeyId ? BYOK_PROVIDERS : ADD_BYOK_PROVIDERS).map(provider => {
                       const isDisabled = !editingKeyId && hasExistingKey(provider.id);
                       return (
                         <SelectItem
@@ -753,6 +756,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             you may need to wait a few minutes and restart your client for this
                             entry to appear.
                           </p>
+                          {organizationId ? (
+                            <p className="mt-2">
+                              This provider is considered trusted in the context of organization
+                              restrictions.
+                            </p>
+                          ) : null}
                         </AlertDescription>
                       </Alert>
                     );
@@ -761,9 +770,17 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <Alert>
                       <Info className="size-4" />
                       <AlertDescription>
-                        Once saved, your key will automatically be used whenever your client
-                        requests one of the supported models above. If multiple keys apply to the
-                        same model, they are tried in unspecified order until one succeeds.
+                        <p>
+                          Once saved, your key will automatically be used whenever your client
+                          requests one of the supported models above. If multiple keys apply to the
+                          same model, they are tried in unspecified order until one succeeds.
+                        </p>
+                        {organizationId ? (
+                          <p className="mt-2">
+                            Models of this provider are subject to organization-configured model
+                            restrictions, but the provider itself is considered trusted.
+                          </p>
+                        ) : null}
                       </AlertDescription>
                     </Alert>
                   );

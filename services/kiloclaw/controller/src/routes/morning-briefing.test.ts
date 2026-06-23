@@ -71,6 +71,75 @@ describe('morning briefing controller routes', () => {
     );
   });
 
+  it('rewrites a plugin 404 on /status to controller-owned plugin_unavailable', async () => {
+    // The controller registered this route, so a 404 from the in-container
+    // plugin means the plugin has not loaded yet — NOT that the image is too
+    // old. Cloud must see a distinct code so it does not show "Upgrade
+    // Required" for a capable image whose plugin is still warming up.
+    const app = new Hono();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ error: 'Not Found' }), { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    registerMorningBriefingRoutes(app, createRunningSupervisor(), 'expected-token');
+
+    const response = await app.request('/_kilo/morning-briefing/status', {
+      headers: { authorization: 'Bearer expected-token' },
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      code: 'morning_briefing_plugin_unavailable',
+      error: 'Morning Briefing plugin is still loading',
+    });
+  });
+
+  it('passes a plugin 404 on a mutation route through verbatim (cloud maps bare 404 to null)', async () => {
+    // Mutation routes must NOT get the plugin_unavailable rewrite: cloud's
+    // mutation wrappers only special-case a bare 404 (→ null), and the typed
+    // 503 code would be stripped crossing the DO RPC boundary and surface as
+    // a generic 500. Keeping the verbatim 404 preserves the existing typed path.
+    const app = new Hono();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify({ error: 'Not Found' }), { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    registerMorningBriefingRoutes(app, createRunningSupervisor(), 'expected-token');
+
+    const response = await app.request('/_kilo/morning-briefing/enable', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer expected-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ cron: '0 7 * * *', timezone: 'America/Chicago' }),
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'Not Found' });
+  });
+
+  it('passes a plugin 404 on a read route through verbatim (semantic "no briefing")', async () => {
+    const app = new Hono();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ error: 'No briefing for today' }), { status: 404 })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    registerMorningBriefingRoutes(app, createRunningSupervisor(), 'expected-token');
+
+    const response = await app.request('/_kilo/morning-briefing/read/today', {
+      headers: { authorization: 'Bearer expected-token' },
+    });
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'No briefing for today' });
+  });
+
   it('proxies the interests route with the request body', async () => {
     const app = new Hono();
     const fetchMock = vi.fn().mockResolvedValue(

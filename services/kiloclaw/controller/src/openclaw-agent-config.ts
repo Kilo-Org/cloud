@@ -149,6 +149,15 @@ type NormalizedModel = {
   fallbacks: string[];
 };
 
+export type AgentBindingSummary = {
+  channel: string;
+  accountId: string | null;
+  // True when the binding is more specific than a channel(/account) route
+  // (peer/guild/team/roles match, or a non-route binding type). The simple
+  // channel-level editor surfaces these but must not clobber them.
+  advanced: boolean;
+};
+
 export type AgentSummary = {
   id: string;
   name: string | null;
@@ -163,6 +172,7 @@ export type AgentSummary = {
     reasoningDefault: string | null;
     fastModeDefault: boolean | null;
   };
+  bindings: AgentBindingSummary[];
 };
 
 export type AgentConfigSummary = {
@@ -201,6 +211,12 @@ export function computeConfigEtag(raw: string): string {
   return crypto.createHash('md5').update(raw).digest('hex');
 }
 
+// AUTHORITATIVE agent-id normalization. The web app re-declares this (the
+// architecture wall blocks importing controller code into apps/web) in
+// apps/web/src/lib/kiloclaw/agent-id.ts, where the create-timeout reconcile
+// predicts the assigned id from the typed name. If you change the rule here,
+// update that mirror + its agent-id.test.ts in the same change, or a timed-out
+// create can report a false success/failure.
 export function normalizeAgentId(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
@@ -341,6 +357,11 @@ export function summarizeAgentConfig(config: OpenClawAgentConfig): AgentConfigSu
         },
         rawModel: entry.model ?? null,
         settings: settingsOf(entry),
+        // Bindings come from the OpenClaw CLI, not the config summary. Routes
+        // attach the CLI's view to every response that returns AgentSummary
+        // (list, read, create, settings-update, bindings-update); this empty
+        // placeholder must never reach a caller.
+        bindings: [],
       };
     }),
   };

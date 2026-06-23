@@ -24,6 +24,8 @@ import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -51,6 +53,21 @@ export async function shouldRouteToVercel(
   if ((request.body.provider?.ignore?.length ?? 0) > 0) {
     console.debug(
       `[shouldRouteToVercel] not routing to Vercel because provider.ignore is not supported`
+    );
+    return false;
+  }
+
+  if (isFableModel(requestedModel)) {
+    console.debug(
+      "[shouldRouteToVercel] not routing to Vercel because the Fable->Opus fallback doesn't seem to work"
+    );
+    return false;
+  }
+
+  if (isDeepseekModel(requestedModel)) {
+    // https://kilo-code.slack.com/archives/C0A4SA041DE/p1781743079721409
+    console.debug(
+      '[shouldRouteToVercel] not routing to Vercel because some of its DeepSeek providers have tool call issues'
     );
     return false;
   }

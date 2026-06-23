@@ -72,6 +72,8 @@ export interface CodeReview {
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
   sandboxRetryAttempted?: boolean;
+  /** Provider-reported repository storage size, formatted for log correlation. */
+  repositorySize?: string | null;
 }
 
 export interface CodeReviewStatusResponse {
@@ -96,28 +98,33 @@ export interface CodeReviewStatusResponse {
 
 export type CodeReviewStatusResult = CodeReviewStatusResponse | null;
 
+const InternalStatusTerminalReasonSchema = z
+  .enum([
+    'billing',
+    'model_not_found',
+    'github_installation_required',
+    'github_ip_allow_list',
+    'gitlab_project_access_required',
+    'byok_invalid_key',
+    'selected_model_unavailable',
+    'repeated_repository_clone_timeout',
+    'user_cancelled',
+    'superseded',
+    'interrupted',
+    'timeout',
+    'upstream_error',
+    'sandbox_error',
+    'unknown',
+  ])
+  .nullable()
+  .optional()
+  .catch(undefined);
+
 export const InternalStatusResponseSchema = z.object({
   success: z.boolean().optional(),
   message: z.string().optional(),
   currentStatus: z.enum(['completed', 'failed', 'cancelled']).optional(),
-  terminalReason: z
-    .enum([
-      'billing',
-      'model_not_found',
-      'github_installation_required',
-      'github_ip_allow_list',
-      'byok_invalid_key',
-      'selected_model_unavailable',
-      'user_cancelled',
-      'superseded',
-      'interrupted',
-      'timeout',
-      'upstream_error',
-      'sandbox_error',
-      'unknown',
-    ])
-    .nullable()
-    .optional(),
+  terminalReason: InternalStatusTerminalReasonSchema,
   error: z.string().optional(),
 });
 
@@ -134,6 +141,8 @@ export interface CodeReviewRequest {
   agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
+  /** Provider-reported repository storage size, formatted for log correlation. */
+  repositorySize?: string | null;
 }
 
 export interface CodeReviewResponse {

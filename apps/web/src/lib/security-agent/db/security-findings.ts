@@ -4,6 +4,16 @@ import { security_findings, agent_configs } from '@kilocode/db/schema';
 import { eq, and, desc, count, sql, max, or, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { SecurityFinding, NewSecurityFinding } from '@kilocode/db/schema';
+import {
+  SecurityAuditLogAction,
+  SecurityFindingAuditSourceContext,
+} from '@kilocode/db/schema-types';
+import {
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+  type SecurityFindingAuditHumanActor,
+  type SecurityFindingAuditOwner,
+} from '@kilocode/worker-utils/security-finding-audit';
 import type {
   SecurityReviewOwner,
   SecurityFindingStatus,
@@ -23,6 +33,28 @@ function toOwner(owner: SecurityReviewOwner): Owner {
     return { type: 'user', id: owner.userId };
   }
   throw new Error('Invalid owner: must have either organizationId or userId');
+}
+
+function ownerFindingPredicate(owner: Owner): SQL {
+  return owner.type === 'org'
+    ? eq(security_findings.owned_by_organization_id, owner.id)
+    : eq(security_findings.owned_by_user_id, owner.id);
+}
+
+function ownerConflictTarget(owner: Owner): SQL {
+  return owner.type === 'org'
+    ? sql`(${sql.identifier(security_findings.owned_by_organization_id.name)}, ${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) WHERE ${sql.identifier(security_findings.owned_by_organization_id.name)} IS NOT NULL`
+    : sql`(${sql.identifier(security_findings.owned_by_user_id.name)}, ${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) WHERE ${sql.identifier(security_findings.owned_by_user_id.name)} IS NOT NULL`;
+}
+
+function toSecurityFindingAuditOwner(owner: Owner): SecurityFindingAuditOwner {
+  return owner.type === 'org'
+    ? { type: 'organization', organizationId: owner.id }
+    : { type: 'user', userId: owner.id };
+}
+
+function ownerAuditKeyPart(owner: Owner): string {
+  return owner.type === 'org' ? `organization:${owner.id}` : `user:${owner.id}`;
 }
 
 type CreateFindingParams = ParsedSecurityFinding & {
@@ -89,7 +121,7 @@ export type UpsertSecurityFindingResult = {
   findingCreatedAt: string;
 };
 
-/** Upsert using repo_full_name + source + source_id as the unique key. */
+/** Upsert using owner + repo_full_name + source + source_id as the unique key. */
 export async function upsertSecurityFinding(
   params: CreateFindingParams
 ): Promise<UpsertSecurityFindingResult> {
@@ -110,6 +142,7 @@ export async function upsertSecurityFinding(
         WHERE ${security_findings.repo_full_name} = ${params.repoFullName}
           AND ${security_findings.source} = ${params.source}
           AND ${security_findings.source_id} = ${params.source_id}
+          AND ${ownerFindingPredicate(owner)}
         FOR UPDATE
       ),
       upserted AS (
@@ -172,13 +205,16 @@ export async function upsertSecurityFinding(
           ${params.dependency_scope}
         FROM (SELECT 1) AS input
         LEFT JOIN existing_match ON true
-        ON CONFLICT (${sql.identifier(security_findings.repo_full_name.name)}, ${sql.identifier(security_findings.source.name)}, ${sql.identifier(security_findings.source_id.name)}) DO UPDATE
+        ON CONFLICT ${ownerConflictTarget(owner)} DO UPDATE
         SET
           ${sql.identifier(security_findings.severity.name)} = EXCLUDED.${sql.identifier(security_findings.severity.name)},
           ${sql.identifier(security_findings.ghsa_id.name)} = EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)},
           ${sql.identifier(security_findings.cve_id.name)} = EXCLUDED.${sql.identifier(security_findings.cve_id.name)},
+          ${sql.identifier(security_findings.package_name.name)} = EXCLUDED.${sql.identifier(security_findings.package_name.name)},
+          ${sql.identifier(security_findings.package_ecosystem.name)} = EXCLUDED.${sql.identifier(security_findings.package_ecosystem.name)},
           ${sql.identifier(security_findings.vulnerable_version_range.name)} = EXCLUDED.${sql.identifier(security_findings.vulnerable_version_range.name)},
           ${sql.identifier(security_findings.patched_version.name)} = EXCLUDED.${sql.identifier(security_findings.patched_version.name)},
+          ${sql.identifier(security_findings.manifest_path.name)} = EXCLUDED.${sql.identifier(security_findings.manifest_path.name)},
           ${sql.identifier(security_findings.title.name)} = EXCLUDED.${sql.identifier(security_findings.title.name)},
           ${sql.identifier(security_findings.description.name)} = EXCLUDED.${sql.identifier(security_findings.description.name)},
           ${sql.identifier(security_findings.status.name)} = CASE
@@ -246,6 +282,7 @@ export async function upsertSecurityFinding(
         WHERE ${security_findings.repo_full_name} = ${params.repoFullName}
           AND ${security_findings.source} = ${params.source}
           AND ${security_findings.source_id} = ${params.source_id}
+          AND ${ownerFindingPredicate(owner)}
         LIMIT 1
       `);
       finding = fallback.rows[0];
@@ -272,14 +309,23 @@ export async function upsertSecurityFinding(
  */
 export type SupersedeResult = { count: number; supersededFindingIds: string[] };
 
-export async function supersedeDuplicateFindings(repoFullName: string): Promise<SupersedeResult> {
+export async function supersedeDuplicateFindings(
+  repoFullName: string,
+  securityOwner: SecurityReviewOwner
+): Promise<SupersedeResult> {
   try {
+    const owner = toOwner(securityOwner);
+    const ownerPartitionColumn =
+      owner.type === 'org'
+        ? security_findings.owned_by_organization_id
+        : security_findings.owned_by_user_id;
     const { rows } = await db.execute<{ id: string }>(sql`
     WITH ranked AS (
       SELECT
         ${security_findings.id} AS id,
         ROW_NUMBER() OVER (
-          PARTITION BY ${security_findings.repo_full_name},
+          PARTITION BY ${ownerPartitionColumn},
+                       ${security_findings.repo_full_name},
                        ${security_findings.source},
                        ${security_findings.ghsa_id},
                        ${security_findings.package_name},
@@ -287,7 +333,8 @@ export async function supersedeDuplicateFindings(repoFullName: string): Promise<
           ORDER BY CASE WHEN ${security_findings.source_id} ~ '^[0-9]+$' THEN ${security_findings.source_id}::int ELSE 0 END DESC
         ) AS rn,
         FIRST_VALUE(${security_findings.id}) OVER (
-          PARTITION BY ${security_findings.repo_full_name},
+          PARTITION BY ${ownerPartitionColumn},
+                       ${security_findings.repo_full_name},
                        ${security_findings.source},
                        ${security_findings.ghsa_id},
                        ${security_findings.package_name},
@@ -296,6 +343,7 @@ export async function supersedeDuplicateFindings(repoFullName: string): Promise<
         ) AS canonical_id
       FROM ${security_findings}
       WHERE ${security_findings.repo_full_name} = ${repoFullName}
+        AND ${ownerFindingPredicate(owner)}
         AND ${security_findings.source} = 'dependabot'
         AND ${security_findings.ghsa_id} IS NOT NULL
         AND ${security_findings.status} = 'open'
@@ -320,7 +368,7 @@ export async function supersedeDuplicateFindings(repoFullName: string): Promise<
   } catch (error) {
     captureException(error, {
       tags: { operation: 'supersedeDuplicateFindings' },
-      extra: { repoFullName },
+      extra: { repoFullName, securityOwner },
     });
     throw error;
   }
@@ -388,7 +436,7 @@ export async function listSecurityFindings(
     } = params;
     const ownerConverted = toOwner(owner);
 
-    const conditions = [];
+    const conditions: Array<SQL | undefined> = [];
 
     if (ownerConverted.type === 'org') {
       conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
@@ -559,7 +607,7 @@ export async function countSecurityFindings(params: {
     const { owner, status, severity, repoFullName } = params;
     const ownerConverted = toOwner(owner);
 
-    const conditions = [];
+    const conditions: Array<SQL | undefined> = [];
 
     // Owner condition
     if (ownerConverted.type === 'org') {
@@ -849,7 +897,7 @@ export async function getOrphanedRepositoriesWithFindingCounts(params: {
     const { owner, accessibleRepoFullNames } = params;
     const ownerConverted = toOwner(owner);
 
-    const conditions = [];
+    const conditions: SQL[] = [];
 
     // Owner condition
     if (ownerConverted.type === 'org') {
@@ -884,12 +932,13 @@ export async function getOrphanedRepositoriesWithFindingCounts(params: {
 export async function deleteFindingsByRepository(params: {
   owner: SecurityReviewOwner;
   repoFullName: string;
+  actor: SecurityFindingAuditHumanActor;
 }): Promise<{ deletedCount: number }> {
   try {
     const { owner, repoFullName } = params;
     const ownerConverted = toOwner(owner);
 
-    const conditions = [];
+    const conditions: SQL[] = [];
 
     // Owner condition
     if (ownerConverted.type === 'org') {
@@ -901,13 +950,44 @@ export async function deleteFindingsByRepository(params: {
     // Repository condition
     conditions.push(eq(security_findings.repo_full_name, repoFullName));
 
-    // Delete findings and get count
-    const result = await db
-      .delete(security_findings)
-      .where(and(...conditions))
-      .returning({ id: security_findings.id });
+    const ownerForAudit = toSecurityFindingAuditOwner(ownerConverted);
+    const ownerKeyPart = ownerAuditKeyPart(ownerConverted);
 
-    return { deletedCount: result.length };
+    const deletedCount = await db.transaction(async tx => {
+      const findings = await tx
+        .select()
+        .from(security_findings)
+        .where(and(...conditions));
+      const occurredAt = new Date().toISOString();
+
+      for (const finding of findings) {
+        await insertSecurityFindingAuditEvent(tx, {
+          owner: ownerForAudit,
+          finding,
+          actor: params.actor,
+          action: SecurityAuditLogAction.FindingDeleted,
+          occurredAt,
+          eventKey: deriveSecurityFindingAuditEventKey([
+            ownerKeyPart,
+            finding.id,
+            SecurityAuditLogAction.FindingDeleted,
+          ]),
+          sourceContext: SecurityFindingAuditSourceContext.Web,
+          beforeState: { status: finding.status },
+          afterState: { deleted: true },
+          metadata: { repo_full_name: repoFullName },
+        });
+      }
+
+      const deleted = await tx
+        .delete(security_findings)
+        .where(and(...conditions))
+        .returning({ id: security_findings.id });
+
+      return deleted.length;
+    });
+
+    return { deletedCount };
   } catch (error) {
     captureException(error, {
       tags: { operation: 'deleteFindingsByRepository' },

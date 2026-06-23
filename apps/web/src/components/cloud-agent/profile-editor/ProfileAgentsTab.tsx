@@ -327,6 +327,8 @@ function AgentForm({
         id: m.id,
         name: m.name,
         isFree: m.isFree,
+        mayTrainOnYourPrompts: m.mayTrainOnYourPrompts,
+        hasUserByokAvailable: m.hasUserByokAvailable,
         variants: m.opencode?.variants ? Object.keys(m.opencode.variants) : undefined,
       })),
     [modelsData]

@@ -1,134 +1,147 @@
 ---
-version: alpha
+version: 0.2.0
 name: Kilo Cloud
-description: Dark-first, utilitarian developer surface for Kilo Code — the open-source AI coding agent. Near-black backgrounds, white-at-low-alpha borders. The Kilo yellow-green is the primary action color — it's the brand and the CTA at once. Blue is a legacy link/inline-accent role only.
-colors:
-  # Foundations — the near-black ladder
-  background: '#121212'
-  surface: '#2B2B2B'
-  surface-raised: '#333333'
-  muted: '#3D3D3D'
+description: Dark-first, utilitarian developer surface for Kilo Code. Near-black layered surfaces and low-alpha white borders carry hierarchy. Kilo yellow-green is both brand and primary action color. Blue is reserved for links and the Cloud status domain.
+color:
+  brand:
+    primary: '#F7F586'
+    primaryHover: '#E6E475'
+    primaryRing: '#F7F58659'
+    foreground: '#1F1F1F'
 
-  # Foreground — the white ladder
-  foreground: '#FAFAFA'
-  foreground-muted: '#A3A3A3'
-  foreground-subtle: '#7A7A7A'
-  foreground-on-red: '#FFFFFF'
+  status:
+    blue300: '#93C5FD'
+    blue400: '#60A5FA'
+    blue500: '#3B82F6'
+    blue600: '#2563EB'
+    purple300: '#D8B4FE'
+    purple400: '#C084FC'
+    purple500: '#A855F7'
+    purple600: '#9333EA'
+    teal300: '#4CE7D7'
+    teal400: '#00D4C2'
+    teal500: '#00BAA9'
+    teal600: '#009689'
+    gray300: '#D4D4D8'
+    gray400: '#A1A1AA'
+    gray500: '#71717A'
+    gray600: '#52525B'
+    orange300: '#FDBA74'
+    orange400: '#FB923C'
+    orange500: '#F97316'
+    orange600: '#EA580C'
+    green300: '#86EFAC'
+    green400: '#4ADE80'
+    green500: '#22C55E'
+    green600: '#16A34A'
+    yellow300: '#FDD94A'
+    yellow400: '#FBC51C'
+    yellow500: '#F0A900'
+    yellow600: '#D28100'
+    red300: '#FCA5A5'
+    red400: '#F87171'
+    red500: '#EF4444'
+    red600: '#DC2626'
 
-  # Borders — the most characteristic move (white at low alpha)
-  border: '#FFFFFF1A' # 10% — default
-  border-strong: '#FFFFFF2E' # 18% — inputs, focused chrome
-  input-bg: '#FFFFFF0A'
+  surface:
+    inset: '#101010'
+    background: '#151515'
+    raised: '#202020'
+    overlay: '#333333'
+    hover: '#3A3A3A'
+    selected: '#454545'
 
-  # Primary action — the Kilo yellow-green. Brand and CTA in one.
-  primary: '#EDFF00'
-  primary-hover: '#D6E600'
-  primary-ring: '#EDFF0059' # 35% alpha brand glow
-  on-primary: '#1F1F1F' # near-black for AA contrast on yellow
+  foreground:
+    default: '#FAFAFA'
+    muted: '#A3A3A3'
+    subtle: '#7A7A7A'
+    onSecondary: '#FAFAFA'
+    onDestructive: '#FFFFFF'
 
-  # Secondary action — dark-gray, quiet, the workhorse against cards.
-  secondary: '#3D3D3D'
-  secondary-hover: '#4D4D4D'
-  on-secondary: '#FAFAFA'
+  border:
+    default: '#FFFFFF1A'
+    strong: '#FFFFFF2E'
+    inputBg: '#FFFFFF0A'
 
-  # Brand accent — alias of primary. Same swatch, used in atmospheric roles
-  # (logo tile, focus rings, text selection, agent glow, status lights).
-  brand: '#EDFF00'
-  brand-dim: '#B8C800'
-  on-brand: '#1F1F1F'
+  syntax:
+    plain: '#E8E8E8'
+    comment: '#7A7A7A'
+    keyword: '#FF9AE2'
+    string: '#ECF58C'
+    number: '#F2B36B'
+    function: '#93E9F6'
+    type: '#00CEB9'
+    property: '#9CDCFE'
+    constant: '#C792EA'
+    operator: '#A3A3A3'
 
-  # Link / inline-accent blue — legacy role only. Never a button background.
-  link: '#3B82F6'
-  link-hover: '#60A5FA'
+  diff:
+    addText: '#9BCD97'
+    addSurface: '#1A2919'
+    deleteText: '#FC533A'
+    deleteSurface: '#42120B'
 
-  # Status palette — every status follows the same translucent /20 pattern.
-  # The 500-step is the swatch; consumers compose with /20 bg + /20 ring + 400 text.
-  blue-500: '#3B82F6' # Cloud / neutral default / link role
-  blue-400: '#60A5FA'
-  purple-500: '#A855F7' # VS Code Extension
-  purple-400: '#C084FC'
-  emerald-500: '#10B981' # Slack
-  emerald-400: '#34D399'
-  zinc-500: '#71717A' # CLI
-  zinc-400: '#A1A1AA'
-  orange-500: '#F97316' # Agent Manager
-  orange-400: '#FB923C'
-  green-500: '#22C55E' # Success / "new"
-  green-400: '#4ADE80'
-  yellow-500: '#EAB308' # Warnings
-  yellow-400: '#FACC15'
-  red-500: '#EF4444' # Destructive
-  red-400: '#F87171'
+statusDomain:
+  cloud: blue
+  vscode: purple
+  cli: gray
+  slack: teal
+  agentManager: orange
+  success: green
+  warning: yellow
+  destructive: red
 
 typography:
-  display:
-    fontFamily: Inter
-    fontSize: 3rem
-    fontWeight: 700
-    lineHeight: 1.15
-    letterSpacing: '-0.015em'
-  h1:
-    fontFamily: Inter
-    fontSize: 1.875rem
-    fontWeight: 700
-    lineHeight: 1.15
-    letterSpacing: '-0.015em'
-  h2:
+  title:
     fontFamily: Inter
     fontSize: 1.5rem
     fontWeight: 600
-    lineHeight: 1.3
+    lineHeight: 1.2
     letterSpacing: '-0.015em'
-  h3:
+  heading:
     fontFamily: Inter
-    fontSize: 1.25rem
+    fontSize: 1.125rem
     fontWeight: 600
-    lineHeight: 1.3
+    lineHeight: 1.25
+    letterSpacing: '-0.01em'
+  bodyLg:
+    fontFamily: Inter
+    fontSize: 1rem
+    fontWeight: 400
+    lineHeight: 1.5
   body:
     fontFamily: Inter
     fontSize: 0.875rem
     fontWeight: 400
     lineHeight: 1.5
-  body-strong:
-    fontFamily: Inter
-    fontSize: 0.875rem
-    fontWeight: 500
-    lineHeight: 1.5
   label:
     fontFamily: Inter
     fontSize: 0.75rem
     fontWeight: 500
-    lineHeight: 1.3
+    lineHeight: 1.4
   eyebrow:
     fontFamily: Inter
     fontSize: 0.6875rem
-    fontWeight: 600
-    lineHeight: 1.3
-    letterSpacing: '0.06em'
+    fontWeight: 500
+    lineHeight: 1.2
+    letterSpacing: '0.08em'
+    textTransform: uppercase
   code:
     fontFamily: Roboto Mono
-    fontSize: 0.8125rem
+    fontSize: 0.875rem
     fontWeight: 400
     lineHeight: 1.5
-  terminal:
-    fontFamily: Roboto Mono
-    fontSize: 0.8125rem
-    fontWeight: 400
-    lineHeight: 1.5
-    fontFeature: '"calt", "ss01"'
 
-rounded:
-  none: 0
-  sm: 6px
+radius:
+  none: '0'
+  sm: 4px
   md: 8px
   lg: 10px
   xl: 14px
   full: 9999px
 
 spacing:
-  '0-5': 2px
   '1': 4px
-  '1-5': 6px
   '2': 8px
   '3': 12px
   '4': 16px
@@ -137,254 +150,280 @@ spacing:
   '8': 32px
   '10': 40px
   '12': 48px
+  '0_5': 2px
+  '1_5': 6px
 
 components:
-  # Primary action — the yellow button. Brand and CTA in one. Earned, used once per surface.
-  button-primary:
-    backgroundColor: '{colors.primary}'
-    textColor: '{colors.on-primary}'
-    typography: '{typography.body-strong}'
-    rounded: '{rounded.sm}'
+  buttonPrimary:
+    backgroundColor: '{color.brand.primary}'
+    textColor: '{color.brand.foreground}'
+    typography: '{typography.label}'
+    radius: '{radius.md}'
     height: 36px
     padding: '0 14px'
-  button-primary-hover:
-    backgroundColor: '{colors.primary-hover}'
+  buttonPrimaryHover:
+    backgroundColor: '{color.brand.primaryHover}'
+  buttonPrimaryFocus:
+    ringColor: '{color.brand.primaryRing}'
 
-  # Secondary — dark-gray with white text + 10%-white border. The workhorse.
-  button-secondary:
-    backgroundColor: '{colors.secondary}'
-    textColor: '{colors.on-secondary}'
-    typography: '{typography.body-strong}'
-    rounded: '{rounded.sm}'
+  buttonSecondary:
+    backgroundColor: '{color.surface.overlay}'
+    textColor: '{color.foreground.onSecondary}'
+    borderColor: '{color.border.default}'
+    typography: '{typography.label}'
+    radius: '{radius.md}'
     height: 36px
     padding: '0 14px'
-  button-secondary-hover:
-    backgroundColor: '{colors.secondary-hover}'
+  buttonSecondaryHover:
+    backgroundColor: '{color.surface.hover}'
 
-  # Ghost — underlined white text, no chrome at rest. For inline links and table-row affordances.
-  button-ghost:
-    backgroundColor: 'transparent'
-    textColor: '{colors.foreground}'
-    rounded: '{rounded.sm}'
+  buttonGhost:
+    backgroundColor: transparent
+    textColor: '{color.foreground.default}'
+    typography: '{typography.label}'
+    radius: '{radius.md}'
     height: 36px
-    padding: '0 4px'
+    padding: '0 8px'
+  buttonGhostHover:
+    backgroundColor: '{color.surface.hover}'
 
-  # Destructive — red, only inside dialogs and confirms.
-  button-destructive:
-    backgroundColor: '{colors.red-500}'
-    textColor: '{colors.foreground-on-red}'
-    typography: '{typography.body-strong}'
-    rounded: '{rounded.sm}'
+  buttonDestructive:
+    backgroundColor: '{color.status.red500}'
+    textColor: '{color.foreground.onDestructive}'
+    typography: '{typography.label}'
+    radius: '{radius.md}'
     height: 36px
     padding: '0 14px'
+  buttonDestructiveHover:
+    backgroundColor: '{color.status.red600}'
 
-  # Card — the containing surface for almost everything in the dashboard.
   card:
-    backgroundColor: '{colors.surface}'
-    borderColor: '{colors.border}'
-    rounded: '{rounded.xl}'
+    backgroundColor: '{color.surface.raised}'
+    borderColor: '{color.border.default}'
+    radius: '{radius.xl}'
     padding: 24px
 
-  # Input — text fields, search, composer.
   input:
-    backgroundColor: '{colors.input-bg}'
-    textColor: '{colors.foreground}'
-    rounded: '{rounded.sm}'
+    backgroundColor: '{color.border.inputBg}'
+    textColor: '{color.foreground.default}'
+    borderColor: '{color.border.strong}'
+    radius: '{radius.md}'
     height: 36px
     padding: '0 12px'
 
-  # Status badge — the most characteristic micro-pattern in the system.
-  # Translucent fill + matching ring + brighter foreground text.
-  badge-status:
-    backgroundColor: '{colors.blue-500}'
-    textColor: '{colors.blue-400}'
+  badgeStatus:
     typography: '{typography.label}'
-    rounded: '{rounded.sm}'
+    radius: '{radius.full}'
     padding: '2px 8px'
 
-  # Brand badge — for the logo lockup and earned highlights.
-  badge-brand:
-    backgroundColor: '{colors.brand}'
-    textColor: '{colors.on-brand}'
+  badgeBrand:
+    backgroundColor: '{color.brand.primary}'
+    textColor: '{color.brand.foreground}'
     typography: '{typography.label}'
-    rounded: '{rounded.sm}'
+    radius: '{radius.full}'
     padding: '2px 8px'
 
-  # Sidebar — fixed-width, dense nav.
   sidebar:
-    backgroundColor: '{colors.surface}'
-    textColor: '{colors.foreground-muted}'
+    backgroundColor: '{color.surface.raised}'
+    textColor: '{color.foreground.muted}'
     width: 256px
     padding: '12px 8px'
 
-  # Topbar — sticky, single-breadcrumb chrome.
   topbar:
-    backgroundColor: '{colors.background}'
-    textColor: '{colors.foreground}'
+    backgroundColor: '{color.surface.background}'
+    textColor: '{color.foreground.default}'
+    borderColor: '{color.border.default}'
     height: 56px
     padding: '0 16px'
 
-  # Tooltip / popover.
   popover:
-    backgroundColor: '{colors.surface-raised}'
-    textColor: '{colors.foreground}'
-    rounded: '{rounded.md}'
+    backgroundColor: '{color.surface.overlay}'
+    textColor: '{color.foreground.default}'
+    radius: '{radius.lg}'
     padding: 12px
 
-  # Dialog / modal.
   dialog:
-    backgroundColor: '{colors.surface}'
-    textColor: '{colors.foreground}'
-    rounded: '{rounded.xl}'
+    backgroundColor: '{color.surface.raised}'
+    textColor: '{color.foreground.default}'
+    radius: '{radius.xl}'
     padding: 24px
 
-  # Terminal / agent atmospheric surface.
   terminal:
-    backgroundColor: '{colors.background}'
-    textColor: '{colors.foreground}'
-    typography: '{typography.terminal}'
-    rounded: '{rounded.lg}'
+    backgroundColor: '{color.surface.inset}'
+    textColor: '{color.syntax.plain}'
+    typography: '{typography.code}'
+    radius: '{radius.lg}'
     padding: 16px
 ---
 
 ## Overview
 
-**Trustworthy infra tool, not a marketing site.** Kilo Cloud is the developer-facing web product around Kilo Code, an open-source AI coding agent that lives primarily as a VS Code / JetBrains extension. The cloud surface manages organizations, usage and billing, headless agent sessions, and developer ops. The aesthetic is **dark-first, near-black, utilitarian** — dense tables, calm chrome, low ornamentation. Speak to developers in second person, plain English, with concrete nouns.
+**Trustworthy infrastructure tool, not a generic SaaS dashboard.** Kilo Cloud is the developer-facing product around Kilo Code. It manages organizations, usage and billing, agent sessions, and developer operations. Product UI is dark-first, compact, and utilitarian: dense tables, calm chrome, low ornamentation, and concrete language.
 
-The single concession to atmosphere is the cloud-agent chat surface — terminal-styled mono, a thin yellow-green focus glow, glass on sticky chrome. Everywhere else: utility over delight.
+The cloud-agent surface may use terminal typography, syntax color, a restrained brand focus glow, and inset surfaces. Elsewhere, utility takes precedence over decoration.
 
-**Three rules to ground every screen.**
+**Three rules ground every screen.**
 
-1. **Never pure black, never a gradient.** Background is `#121212`. Cards step up to `#2B2B2B`. The lift comes from a one-step background change plus a 10%-white border, not from drop shadows or blur.
-2. **Borders are white at low alpha.** This is the single most characteristic move. `#FFFFFF1A` on every card, `#FFFFFF2E` on every input. No solid grey borders.
-3. **Yellow acts. Greys carry everything else.** The Kilo yellow-green (`#EDFF00`) is the primary action color — brand and CTA collapsed into one swatch. Use it exactly once per surface for the thing the user is here to do, and again atmospherically for the logo tile, focus ring, text selection, and agent-surface glow. Secondary actions are dark gray. Blue is a legacy link role only — never a button background.
+1. **Build depth with the surface ladder.** Use `surface.background` for the app canvas, `surface.raised` for cards and shell chrome, `surface.overlay` for floating UI, and `surface.inset` for terminal or recessed regions. Use `surface.hover` and `surface.selected` only for interaction states.
+2. **Use low-alpha white borders.** `border.default` is standard chrome; `border.strong` distinguishes inputs and emphasized boundaries. Do not introduce solid gray borders.
+3. **Yellow acts; neutrals carry everything else.** `brand.primary` is both brand and primary action color. Use one primary action per surface. Blue is for inline links and the Cloud status domain, not button backgrounds.
 
-## Colors
+## Color
 
-**Foundations are a four-step near-black ladder.** `background → surface → surface-raised → muted`. Compose UI by stacking surfaces against background; the visual hierarchy is built from value steps, not color shifts. Cards sit on background. Popovers sit on cards. Inputs sit inside cards but drop _down_ into translucency (`input-bg` is white-on-card at 4% — a recess, not a lift).
+### Surfaces
 
-- **`background` (`#121212`)** — the app canvas. Always behind everything. Never gradient, never patterned.
-- **`surface` (`#2B2B2B`)** — cards, sidebar, dialogs, sticky chrome. The default container.
-- **`surface-raised` (`#333333`)** — popovers, tooltips, menus. One step above cards.
-- **`muted` (`#3D3D3D`)** — hover states on rows and ghost buttons. Inactive tab backgrounds.
+The six surface tokens have fixed roles:
 
-**Foreground is a three-step white ladder.** Body text is near-white (`#FAFAFA`), not pure white — pure white vibrates against `#121212`. Use `foreground-muted` (`#A3A3A3`) for secondary text, captions, and metadata. `foreground-subtle` (`#7A7A7A`) is for disabled and tertiary copy only.
+| Token | Value | Role |
+|---|---|---|
+| `surface.inset` | `#101010` | Terminal, code, and recessed regions |
+| `surface.background` | `#151515` | App canvas |
+| `surface.raised` | `#202020` | Cards, sidebar, dialogs, persistent chrome |
+| `surface.overlay` | `#333333` | Popovers, dropdowns, tooltips |
+| `surface.hover` | `#3A3A3A` | Pointer and ghost-control hover |
+| `surface.selected` | `#454545` | Selected rows, active neutral controls |
 
-**Borders carry the elevation.** White at 10% alpha for the default border, 18% for inputs and focused chrome. Because borders are translucent, they read correctly on every surface step without needing per-context overrides. Never use a solid grey for borders.
+Stack surfaces by role. Do not substitute arbitrary grays, gradients, or per-component surface colors. Floating UI may use a restrained shadow, but normal hierarchy comes from surface changes and borders.
 
-**Action hierarchy is colored, not sized.**
+### Foreground and borders
 
-- **`primary` (`#EDFF00`)** — the Kilo yellow-green. The primary action color _and_ the brand mark — they're the same swatch. Used exactly once per surface for the thing the user is here to do (Create session, Save, Install, Continue). Hover darkens to `#D6E600` (not lighter, not translucent). The on-color is near-black (`#1F1F1F`); white text on yellow fails AA.
-- **`secondary` (`#3D3D3D`)** — dark-gray with white text and a 10%-white border. The workhorse. Use freely.
-- **`ghost`** — underlined white text, no chrome at rest. The decoration is the affordance: `text-decoration-color: rgba(255,255,255,0.35)` at rest, opaque on hover. For inline links, table-row actions, and dialog Cancel buttons.
-- **`destructive` (`red-500`)** — red fill, white text. Only inside dialogs and confirm flows. Never on a primary listing screen.
-- **`link` (`#3B82F6`)** — legacy blue, inline only. Used for links inside running prose. Never a button background, never a section accent.
+- `foreground.default` is default text.
+- `foreground.muted` is secondary copy and metadata.
+- `foreground.subtle` is tertiary or disabled copy. Confirm contrast before using it for essential information.
+- `foreground.onSecondary` is text on neutral action surfaces.
+- `foreground.onDestructive` is text on destructive fills.
+- `border.default` is the standard 10%-white boundary.
+- `border.strong` is the 18%-white emphasized boundary.
+- `border.inputBg` is a recessed input fill, not a border color.
 
-**Status colors follow one rigid pattern.** Every status badge is `bg-{color}-500/20 text-{color}-400 ring-1 ring-{color}-500/20`. The translucent fill + matching ring + brighter foreground is the system's most recognizable micro-pattern. Color assignments are fixed by domain, not by mood:
+Never use color alone to communicate state. Pair status color with labels, icons, or other visible structure.
 
-| Color | Domain |
+### Brand and actions
+
+`brand.primary` (`#F7F586`) is scarce and load-bearing. Reserve it for the logo, one primary CTA per surface, and deliberate brand moments. Use `brand.foreground` (`#1F1F1F`) on primary fills. Hover darkens to `brand.primaryHover` (`#E6E475`). Keyboard focus uses `brand.primaryRing` (`#F7F58659`) or the semantic focus-ring token supplied by the implementation.
+
+Secondary actions use neutral surfaces and `foreground.onSecondary`. Ghost actions have no fill at rest and use `surface.hover` on hover. Destructive actions use red only when semantics are destructive; prefer reversible undo flows over confirmation dialogs when possible.
+
+### Status domains
+
+Status colors are assigned by domain, never by mood:
+
+| Domain | Family |
 |---|---|
-| Blue | Cloud sessions (neutral default) |
-| Purple | VS Code Extension |
-| Zinc | CLI |
-| Emerald | Slack |
-| Orange | Agent Manager |
-| Green | Success, "new" badges |
-| Yellow | Warnings |
-| Red | Destructive, errors |
+| Cloud | Blue |
+| VS Code | Purple |
+| CLI | Gray |
+| Slack | Teal |
+| Agent Manager | Orange |
+| Success | Green |
+| Warning | Yellow |
+| Destructive | Red |
 
-Do not invent new status hues. Do not use status colors outside this badge pattern (e.g. don't use `red-500` as a button background — use `destructive` semantics through the dialog system).
+Use the 500 step as the base swatch, 400 for dark-surface foreground emphasis, 300 for lighter emphasis, and 600 for darker interaction or high-emphasis states. Status badges may compose a low-alpha 500 background and border with 400 text. Preserve a non-color cue and verify contrast in context.
+
+Do not invent status hues or substitute `emerald` for teal or `zinc` for gray. Blue remains acceptable for inline links, but not primary action fills.
+
+### Syntax and diffs
+
+Use syntax tokens only in code, terminal, and editor-like surfaces:
+
+- `syntax.plain` for unclassified source text.
+- `syntax.comment` for comments and de-emphasized code.
+- `syntax.keyword`, `syntax.string`, `syntax.number`, `syntax.function`, `syntax.type`, `syntax.property`, `syntax.constant`, and `syntax.operator` for their matching grammar scopes.
+
+Diffs use `diff.addText` on `diff.addSurface` and `diff.deleteText` on `diff.deleteSurface`. Always retain `+`/`-` markers or equivalent structure so additions and deletions do not depend on color alone.
 
 ## Typography
 
-**Two faces, with discipline.** Inter for all UI. Roboto Mono for code, terminal output, agent tool readouts, dollar amounts in dense tables, and timestamps. Never mix mono into prose UI for emphasis — emphasis is weight (`500`/`600`), not face.
+Use Inter for UI and Roboto Mono for code, identifiers, terminal output, timestamps, and dense numerical data. Do not introduce another family. JetBrains Mono may remain on existing editor-specific surfaces, but it is not part of this token contract.
 
-**Default body is `14px / 1.5`.** This is the floor for everything that isn't a heading or a label. Page titles use `tracking-tight` (`-0.015em`) — Inter at 24px+ is too wide-set without it. Eyebrows are uppercase + `tracking-wide` (`0.06em`).
+The product scale is intentionally compact:
 
-**Heading scale is compact.** This is a dashboard, not a marketing page. Page-level h1 is `30px / 700`. The `display` size (`48px`) is reserved for empty-state hero moments and onboarding — not normal app chrome.
+- `title`: page titles, `24px / 600 / 1.2`.
+- `heading`: section and card headings, `18px / 600 / 1.25`.
+- `bodyLg`: lead or emphasized prose, `16px / 400 / 1.5`.
+- `body`: default product copy, `14px / 400 / 1.5`.
+- `label`: controls, compact metadata, and badges, `12px / 500 / 1.4`.
+- `eyebrow`: short uppercase category labels, `11px / 500 / 1.2`, with `0.08em` tracking.
+- `code`: code and terminal text, `14px / 400 / 1.5`.
 
-**Casing is sentence case for everything user-visible.** Buttons, nav, section titles, badges. Title Case is wrong. The exceptions are the eyebrow style (uppercase tracking-wide) and the rare role badge (`KILO ADMIN`).
+Use sentence case for user-visible copy. Eyebrows are the exception because the token explicitly transforms them to uppercase. Use `tabular-nums` for values aligned in columns. Do not use monospace as prose emphasis.
 
-**Numbers in dense data lean mono.** Dollar amounts, latencies, token counts, timestamps in the audit log — all Roboto Mono. This is functional, not decorative: mono digits align across rows.
+## Layout and spacing
 
-## Layout
+Use the supplied 4px-based spacing ladder. `spacing.2`, `spacing.3`, `spacing.4`, and `spacing.6` cover most product layout. `spacing.8`, `spacing.10`, and `spacing.12` create section separation. `spacing.0_5` and `spacing.1_5` are for tight optical adjustments and compact component internals, not general page layout.
 
-**Shell is sidebar + main, both dark, with a sticky topbar.** Sidebar is fixed `256px` expanded, `48px` icon-only collapsed. The toggle is `cmd/ctrl+B`. State persists via cookie.
+- Topbar height is `56px`; use `border.default` along its lower edge.
+- Expanded sidebar width is `256px`; use the existing sidebar primitive for responsive collapse.
+- Default page padding and card padding are `24px`.
+- Default controls are `36px` tall; small and large variants may use `32px` and `40px`.
+- Table rows target `48px` in dense desktop UI.
+- Prefer `gap` over ad hoc margins.
+- Never nest cards. Use spacing, dividers, headings, or inset regions for internal grouping.
 
-- **Topbar** — `56px` tall, `border-b` (the 10%-white border), single breadcrumb on the left, sidebar toggle on the right. Sticky.
-- **Page content** — `w-full flex-1` under the topbar. Page-level padding is `24px`.
-- **Card stacks** — dashboards are vertical stacks of `Card` components with `gap-y-6` (`24px`). No multi-column page-level grids; multi-column lives _inside_ a card.
+Product UI must reflow at narrow widths. Test around 375px, 768–1024px, and 1440px. Required actions cannot depend on hover. On touch surfaces, preserve at least a 44px target even when the visual control is compact.
 
-**Spacing is a 4px ladder.** Pull from the `spacing` scale; do not invent intermediate values. `2/3/4/6` (8/12/16/24px) covers ~90% of layout decisions. `8/10/12` (32/40/48px) is for section gaps and empty-state breathing room. Anything tighter than `2` is a bug — except for `0-5` (2px) which exists for icon-text optical alignment.
+## Shape
 
-**Density is compact.** Buttons are `36px` tall by default, `32px` for the small variant. Inputs match buttons at `36px`. Table rows are `48px`. Cards get `24px` of inner padding. This is a tool that admins live in for hours; sparseness wastes their time.
+Use radius by role:
 
-## Elevation & Depth
+- `radius.none` for edge-to-edge or intentionally square regions.
+- `radius.sm` (`4px`) for tight chips and compact inline elements.
+- `radius.md` (`8px`) for buttons and inputs.
+- `radius.lg` (`10px`) for popovers and medium containers.
+- `radius.xl` (`14px`) for cards and dialogs.
+- `radius.full` for badges, avatars, and status pills.
 
-**Lift is a value step, not a shadow.** Cards aren't elevated by drop-shadow — they're elevated by being one step lighter than background plus a 10%-white border. This is the system's signature. Reach for shadows only when an element genuinely floats above the page (popover, tooltip, dialog).
+Do not introduce one-off radii. Follow existing shadcn primitives when their semantic radius already matches these roles.
 
-- **`shadow-xs`** — used on inputs to suggest a recessed depth. Whisper-soft.
-- **`shadow`** — used on default cards in rare cases (focus, drag).
-- **`shadow-md`** — popovers, tooltips, dropdowns.
-- **`shadow-lg`** — dialogs over the `bg-black/80` overlay.
+## Components and interaction
 
-**Glass is reserved for sticky chrome.** `backdrop-blur-xl` only on the topbar lockup or persistent overlays. Never on cards or content surfaces — translucent content surfaces become unreadable in dense tables.
+**Buttons.** Primary uses `brand.primary` with `brand.foreground`, once per surface. Secondary uses `surface.overlay`, `foreground.onSecondary`, and `border.default`. Ghost uses no fill at rest and `surface.hover` on hover. Destructive uses `status.red500`, darkening to `status.red600`. Do not scale buttons on press.
 
-**The agent surface gets one extra move: the brand glow.** A thin yellow-green inner shadow on focused composers and live-streaming chrome (`0 0 24px {colors.brand}/35%`). Does not appear in dashboards, billing, or admin.
+**Cards.** Use `surface.raised`, `border.default`, `radius.xl`, and `24px` padding. Cards represent distinct content or interaction boundaries, not every grouping.
 
-## Shapes
+**Inputs.** Use `border.inputBg`, `border.strong`, `radius.md`, and visible labels. Focus must remain visible. Errors pair a red boundary or icon with explanatory text connected through `aria-describedby`.
 
-**Five radii, applied by role.**
+**Status badges.** Use the fixed domain mapping, a full radius, and `typography.label`. Include text or an icon so meaning survives color-vision differences.
 
-- **`rounded.sm` (6px)** — controls. Buttons, inputs, badges, status pills, menu items.
-- **`rounded.md` (8px)** — popovers, dropdowns, secondary surfaces.
-- **`rounded.lg` (10px)** — cards in non-dashboard contexts (auth, marketing).
-- **`rounded.xl` (14px)** — the dashboard `Card`. The most common surface.
-- **`rounded.full`** — avatars and the rare pill nav.
+**Sidebar.** Use `surface.raised`, sidebar semantic tokens where available, and `foreground.muted` for inactive items. Active rows use `surface.selected`; hover uses `surface.hover`. Use the existing responsive sidebar or Sheet behavior instead of creating another mobile navigation tree.
 
-Never round above `xl` for a card; never round below `sm` for a control. The system gets its calm cohesion from radius consistency.
+**Topbar.** Use `surface.background`, `border.default`, and a 56px height. Keep primary page actions in page content rather than persistent chrome.
 
-## Components
+**Overlays.** Popovers and menus use `surface.overlay`; dialogs use `surface.raised`. Build them with existing Radix and shadcn primitives for focus trapping, keyboard navigation, dismissal, portals, and stacking.
 
-The token table above defines the canonical surface. Notes on application:
+**Terminal and code.** Use `surface.inset`, `typography.code`, and the syntax palette. Disable ligatures where exact glyph representation matters. Diff views use the dedicated diff tokens.
 
-**Buttons.** `button-primary` is the yellow CTA with near-black text — one per surface. `button-secondary` is the dark-gray workhorse on cards. `button-ghost` is underlined white text with no chrome at rest — for inline links, table-row actions, and dialog Cancel. `button-destructive` is red, only inside dialogs. Press states are not represented by transforms — buttons don't shrink or scale. Disabled is `opacity-50 + pointer-events-none`. Focus is the brand-glow ring (`#EDFF00` at 35% alpha) on `:focus-visible` only — never on hover.
+Every interactive component must account for default, hover, focus-visible, active, disabled, loading, error, and success states where relevant. Hover is supplementary. Focus indicators need at least 3:1 contrast against adjacent colors and must not be removed without a replacement.
 
-**Card.** Always `surface` background, always 10%-white border, always `rounded.xl`, always `24px` padding. The header gets `pb-2` (less bottom padding) so the title sits closer to its content.
+## Motion
 
-**Input.** Translucent fill (`input-bg`), 18%-white border, `rounded.sm`, `36px` tall. Focus state adds the brand yellow-green halo via `:focus-visible` — never via hover. Errors flip the border to `destructive` and surface a description below.
+Product motion is short and functional. Use opacity and transform transitions around 100–200ms for direct feedback and 200–300ms for overlays or state changes. Reuse the established strong ease-out curve. Avoid bounce, elastic motion, and casual animation of layout properties.
 
-**Status badges.** The translucent /20 pattern is non-negotiable. Layout: `gap-1` between icon and label, label in sentence case, icon in `size-3` (12px) — smaller than other inline icons because the badge itself is small.
+Brand flourishes belong only in deliberate brand moments. Respect `prefers-reduced-motion`; preserve function while removing nonessential movement. Use existing Radix/shadcn transitions for dialogs, dropdowns, sheets, and tooltips.
 
-**Sidebar.** Fixed `256px`. Section headers are eyebrow-style uppercase + tracking-wide. Active row gets `accent` background, inactive rows get `accent` only on hover. Icon at `size-4`, label at `body-strong`. The Kilo logo lives at the top in a `40×40` brand tile.
+## Voice
 
-**Topbar.** Single breadcrumb, no logo (the logo lives in the sidebar). Right side gets the sidebar toggle, a search omnibox, and an avatar. Never put primary actions in the topbar — those belong in the page body.
+Kilo voice is clear, technical, calm, and direct. Use concrete verbs and specific nouns. Buttons use verb + object (`Save changes`, `Create workspace`, `Delete project`) rather than `Submit`, `OK`, or `Yes`. Error copy states what happened and what the user can do next. Do not use hype, jokes in errors, emoji in product chrome, or inconsistent terminology.
 
-**Dialog.** `bg-black/80` overlay, centered card, max width `28rem` for confirms / `40rem` for forms. Close button is a ghost icon button in the top-right. Primary action is on the right of the footer, secondary on the left of _that_; cancel is a ghost button on the left of the footer.
-
-**Terminal / agent.** `background` color (not `surface` — terminals stay flush with the canvas), Roboto Mono, `text-sm`. Streaming output is rendered with a blinking caret. Tool-call cards inside the chat are `surface` cards with a 12-px icon + tool name eyebrow + a one-line summary.
-
-## Do's and Don'ts
+## Do and don't
 
 **Do**
 
-- **Stack value, not color.** Build hierarchy by stepping `background → surface → surface-raised`, not by tinting.
-- **Use the brand yellow for the primary action.** One per surface. Earn it.
-- **Use translucent borders everywhere.** White at 10% / 18% — never solid grey.
-- **Use Roboto Mono for numbers in dense data.** Tables, billing, audit logs, latencies.
-- **Stick to sentence case for all user-visible copy.** Including buttons.
-- **Use Lucide for every icon.** 1.5–2px stroke, 16px in buttons / badges, 16–20px elsewhere.
-- **Apply the translucent /20 pattern for every status badge.** No exceptions.
-- **Let cards lift via border + value step.** Reach for shadows only for floating chrome.
+- Use semantic implementation tokens that map to this contract before raw hex values.
+- Build hierarchy with the six-role surface ladder and low-alpha borders.
+- Keep brand yellow-green scarce and reserve it for primary action and brand roles.
+- Use fixed domain mappings for statuses.
+- Use syntax and diff colors only on code-oriented surfaces.
+- Use Inter for UI, Roboto Mono for code and aligned technical data.
+- Preserve keyboard, screen-reader, reduced-motion, touch, and responsive behavior.
 
 **Don't**
 
-- **Don't use pure black or gradients for backgrounds.** Always `#121212`, always flat.
-- **Don't put more than one yellow button on a screen.** If you feel the urge, the second one is a `button-secondary`. The yellow has to stay scarce to keep its meaning.
-- **Don't use blue as a button background.** Blue is reserved for inline links inside running prose. The primary action is yellow.
-- **Don't introduce new status hues.** The eight assigned colors cover the entire taxonomy.
-- **Don't use emoji in product chrome.** Lucide only. Emoji are reserved for user-authored content.
-- **Don't add per-element drop shadows to cards.** The border + value step does the lift.
-- **Don't mix Inter and Roboto Mono in the same line of running text.** Mono in tables, code, terminals — never as inline emphasis.
-- **Don't use Title Case anywhere user-facing.** Sentence case throughout.
-- **Don't tint borders to convey state.** State changes background (`muted` on hover), not the border color.
+- Use pure black, gradients, or arbitrary surface grays.
+- Put multiple yellow primary buttons on one surface.
+- Use blue as a primary button background.
+- Rename teal to emerald or gray to zinc in the token contract.
+- Invent status colors, spacing values, radii, or typography roles.
+- Nest cards or use shadows as the default source of depth.
+- Depend on color, hover, placeholders, or icon shape alone to convey meaning.

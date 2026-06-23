@@ -12,8 +12,10 @@ import {
   discoverDueOwners,
   ensureManualAnalysisQueueRow,
   getSecurityFindingById,
+  prepareActiveAnalysisRestart,
   reconcileStaleAnalysisQueueRows,
 } from './queries.js';
+import { transitionAnalysisCallbackLifecycle } from '../analysis-start-lifecycle.js';
 
 const connectionString =
   process.env.POSTGRES_URL ?? 'postgres://postgres:postgres@localhost:5432/postgres';
@@ -48,6 +50,44 @@ describe('security analysis durable database invariants', () => {
   afterAll(async () => {
     await client.db.delete(kilocode_users).where(eq(kilocode_users.id, testUserId));
     await client.pool.end();
+  });
+
+  it('loads complete finding evidence for audit snapshots', async () => {
+    const findingId = await insertFinding('audit-snapshot-evidence');
+    await client.db
+      .update(security_findings)
+      .set({
+        cwe_ids: ['CWE-1321'],
+        cvss_score: '9.8',
+        dependabot_html_url:
+          'https://github.com/kilo/audit-snapshot-evidence/security/dependabot/42',
+        first_detected_at: '2026-03-04T12:00:00.000Z',
+        fixed_at: null,
+        sla_due_at: '2026-03-19T12:00:00.000Z',
+        last_synced_at: '2026-03-06T12:00:00.000Z',
+        analysis_completed_at: '2026-03-05T12:00:00.000Z',
+      })
+      .where(eq(security_findings.id, findingId));
+
+    const finding = await getSecurityFindingById(client.db as never, findingId);
+    expect(finding).toMatchObject({
+      cwe_ids: ['CWE-1321'],
+      cvss_score: '9.8',
+      dependabot_html_url: 'https://github.com/kilo/audit-snapshot-evidence/security/dependabot/42',
+      fixed_at: null,
+    });
+    expect(finding?.first_detected_at && new Date(finding.first_detected_at).toISOString()).toBe(
+      '2026-03-04T12:00:00.000Z'
+    );
+    expect(finding?.sla_due_at && new Date(finding.sla_due_at).toISOString()).toBe(
+      '2026-03-19T12:00:00.000Z'
+    );
+    expect(finding?.last_synced_at && new Date(finding.last_synced_at).toISOString()).toBe(
+      '2026-03-06T12:00:00.000Z'
+    );
+    expect(
+      finding?.analysis_completed_at && new Date(finding.analysis_completed_at).toISOString()
+    ).toBe('2026-03-05T12:00:00.000Z');
   });
 
   it('enforces one manual queue row per finding against Postgres constraints', async () => {
@@ -186,6 +226,189 @@ describe('security analysis durable database invariants', () => {
         nextRetryAt: null,
       },
     ]);
+  });
+
+  it('atomically fences an active run and preserves triage for restart', async () => {
+    const findingId = await insertFinding('active-restart', 'running');
+    const priorAnalysis = {
+      analyzedAt: '2026-05-18T07:55:00.000Z',
+      triage: {
+        needsSandboxAnalysis: true,
+        needsSandboxReasoning: 'Repository inspection required',
+        suggestedAction: 'analyze_codebase' as const,
+        confidence: 'high' as const,
+        triageAt: '2026-05-18T07:55:00.000Z',
+      },
+    };
+    await client.db
+      .update(security_findings)
+      .set({
+        analysis: priorAnalysis,
+        analysis_error: 'prior transient error',
+        analysis_started_at: '2026-05-18T08:00:00.000Z',
+        analysis_completed_at: '2026-05-18T08:05:00.000Z',
+        session_id: 'agent-old-session',
+        cli_session_id: 'ses-old-session',
+      })
+      .where(eq(security_findings.id, findingId));
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: findingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'running',
+      severity_rank: 1,
+      queued_at: '2026-05-18T08:00:00.000Z',
+      claimed_at: '2026-05-18T08:00:00.000Z',
+      claimed_by_job_id: 'old-job',
+      claim_token: 'old-attempt-token',
+      attempt_count: 3,
+      reopen_requeue_count: 2,
+      next_retry_at: '2026-05-18T09:00:00.000Z',
+      failure_code: 'NETWORK_TIMEOUT',
+      last_error_redacted: 'prior failure',
+    });
+
+    const commandId = randomUUID();
+    const claimToken = `manual-restart:${commandId}`;
+    await expect(
+      prepareActiveAnalysisRestart(client.db as never, {
+        findingId,
+        owner: { type: 'user', id: testUserId },
+        commandId,
+      })
+    ).resolves.toEqual({
+      status: 'ready',
+      claimToken,
+      oldCloudAgentSessionId: 'agent-old-session',
+    });
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        claimToken: security_analysis_queue.claim_token,
+        claimedByJobId: security_analysis_queue.claimed_by_job_id,
+        attemptCount: security_analysis_queue.attempt_count,
+        reopenRequeueCount: security_analysis_queue.reopen_requeue_count,
+        nextRetryAt: security_analysis_queue.next_retry_at,
+        failureCode: security_analysis_queue.failure_code,
+        lastErrorRedacted: security_analysis_queue.last_error_redacted,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, findingId));
+    expect(queueRows).toEqual([
+      {
+        status: 'pending',
+        claimToken,
+        claimedByJobId: claimToken,
+        attemptCount: 0,
+        reopenRequeueCount: 0,
+        nextRetryAt: null,
+        failureCode: null,
+        lastErrorRedacted: null,
+      },
+    ]);
+
+    const findingRows = await client.db
+      .select({
+        analysisStatus: security_findings.analysis_status,
+        analysis: security_findings.analysis,
+        analysisError: security_findings.analysis_error,
+        analysisStartedAt: security_findings.analysis_started_at,
+        analysisCompletedAt: security_findings.analysis_completed_at,
+        sessionId: security_findings.session_id,
+        cliSessionId: security_findings.cli_session_id,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, findingId));
+    expect(findingRows).toEqual([
+      {
+        analysisStatus: null,
+        analysis: priorAnalysis,
+        analysisError: null,
+        analysisStartedAt: null,
+        analysisCompletedAt: null,
+        sessionId: null,
+        cliSessionId: null,
+      },
+    ]);
+
+    await expect(
+      transitionAnalysisCallbackLifecycle(client.db as never, {
+        findingId,
+        attemptToken: 'old-attempt-token',
+        outcome: {
+          type: 'failed',
+          errorMessage: 'late old callback',
+          failureCode: 'STATE_GUARD_REJECTED',
+        },
+      })
+    ).resolves.toEqual({ status: 'stale-attempt' });
+
+    await expect(
+      prepareActiveAnalysisRestart(client.db as never, {
+        findingId,
+        owner: { type: 'user', id: testUserId },
+        commandId,
+      })
+    ).resolves.toEqual({
+      status: 'ready',
+      claimToken,
+      oldCloudAgentSessionId: null,
+    });
+  });
+
+  it('no-ops when callback terminal state wins before active restart takeover', async () => {
+    const findingId = await insertFinding('active-restart-callback-won', 'completed');
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: findingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'completed',
+      severity_rank: 1,
+      queued_at: '2026-05-18T08:00:00.000Z',
+      claimed_at: '2026-05-18T08:00:00.000Z',
+      claimed_by_job_id: 'completed-job',
+      claim_token: 'completed-attempt-token',
+    });
+
+    await expect(
+      prepareActiveAnalysisRestart(client.db as never, {
+        findingId,
+        owner: { type: 'user', id: testUserId },
+        commandId: randomUUID(),
+      })
+    ).resolves.toEqual({ status: 'no-op' });
+
+    const queueRows = await client.db
+      .select({
+        status: security_analysis_queue.queue_status,
+        claimToken: security_analysis_queue.claim_token,
+      })
+      .from(security_analysis_queue)
+      .where(eq(security_analysis_queue.finding_id, findingId));
+    expect(queueRows).toEqual([{ status: 'completed', claimToken: 'completed-attempt-token' }]);
+  });
+
+  it('treats same-command running redelivery as already launched', async () => {
+    const findingId = await insertFinding('active-restart-redelivery', 'running');
+    const commandId = randomUUID();
+    const claimToken = `manual-restart:${commandId}`;
+    await client.db.insert(security_analysis_queue).values({
+      finding_id: findingId,
+      owned_by_user_id: testUserId,
+      queue_status: 'running',
+      severity_rank: 1,
+      queued_at: '2026-05-18T08:00:00.000Z',
+      claimed_at: '2026-05-18T08:00:00.000Z',
+      claimed_by_job_id: claimToken,
+      claim_token: claimToken,
+    });
+
+    await expect(
+      prepareActiveAnalysisRestart(client.db as never, {
+        findingId,
+        owner: { type: 'user', id: testUserId },
+        commandId,
+      })
+    ).resolves.toEqual({ status: 'launch-started' });
   });
 
   it('requeues stale pending rows and terminalizes stale running rows in real SQL', async () => {

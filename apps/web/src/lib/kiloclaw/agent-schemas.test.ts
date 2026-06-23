@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  AgentBindingsInputSchema,
   AgentCreateInputSchema,
   AgentDefaultsUpdateInputSchema,
   AgentIdSchema,
@@ -140,5 +141,32 @@ describe('AgentDefaultsUpdateInputSchema', () => {
 
   it('rejects a no-op patch', () => {
     expect(AgentDefaultsUpdateInputSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('AgentBindingsInputSchema', () => {
+  it('accepts a channel list (and an empty list to clear routes)', () => {
+    expect(AgentBindingsInputSchema.safeParse({ channels: ['slack', 'discord'] }).success).toBe(
+      true
+    );
+    expect(AgentBindingsInputSchema.safeParse({ channels: [] }).success).toBe(true);
+    expect(AgentBindingsInputSchema.safeParse({ etag: 'e1', channels: ['slack'] }).success).toBe(
+      true
+    );
+  });
+
+  it('rejects an empty channel value', () => {
+    expect(AgentBindingsInputSchema.safeParse({ channels: ['  '] }).success).toBe(false);
+  });
+
+  it('rejects channels with controller-guarded formats (dash prefix, account specifier)', () => {
+    expect(AgentBindingsInputSchema.safeParse({ channels: ['-foo'] }).success).toBe(false);
+    expect(AgentBindingsInputSchema.safeParse({ channels: ['slack:team'] }).success).toBe(false);
+  });
+
+  it('rejects unknown keys (strict)', () => {
+    expect(AgentBindingsInputSchema.safeParse({ channels: ['slack'], nope: true }).success).toBe(
+      false
+    );
   });
 });

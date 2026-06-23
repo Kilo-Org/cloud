@@ -1,13 +1,14 @@
 import 'server-only';
 
-import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
 
 import { db } from '@/lib/drizzle';
 import {
-  CURRENT_KILOCLAW_PRICE_VERSION,
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
+  isKiloClawPriceVersion,
+  resolveKiloClawEnrollmentPriceVersion,
   insertKiloClawSubscriptionChangeLog,
   type KiloClawPriceVersion,
   type KiloClawSubscriptionChangeAction,
@@ -50,6 +51,14 @@ import {
   CurrentPersonalSubscriptionResolutionError,
   resolveCurrentPersonalSubscriptionRow,
 } from '@/lib/kiloclaw/current-personal-subscription';
+import {
+  assertKiloClawCommitAdmission,
+  findPendingCommitSwitchQualification,
+  getStripeFundedRetirementSettlementDecision,
+  makeKiloClawStripeSubscriptionNonRenewing,
+  reportKiloClawCommitRetirementAnomaly,
+  type KiloClawCommitEnrollmentQualification,
+} from '@/lib/kiloclaw/commit-retirement';
 
 const logInfo = sentryLogger('kiloclaw-credit-billing', 'info');
 const logWarning = sentryLogger('kiloclaw-credit-billing', 'warning');
@@ -88,6 +97,30 @@ class CreditSettlementResolutionError extends Error {
     this.name = 'CreditSettlementResolutionError';
     this.reason = reason;
     this.details = details;
+  }
+}
+
+export type CreditEnrollmentErrorReason =
+  | 'commit_unavailable'
+  | 'user_not_found'
+  | 'instance_not_found'
+  | 'instance_destroyed'
+  | 'active_subscription_exists'
+  | 'unknown_price_version'
+  | 'price_version_mismatch'
+  | 'insufficient_credits'
+  | 'target_unavailable'
+  | 'target_changed'
+  | 'requires_reprovision'
+  | 'duplicate_enrollment';
+
+export class CreditEnrollmentError extends Error {
+  readonly reason: CreditEnrollmentErrorReason;
+
+  constructor(reason: CreditEnrollmentErrorReason, message: string) {
+    super(message);
+    this.name = 'CreditEnrollmentError';
+    this.reason = reason;
   }
 }
 
@@ -420,17 +453,24 @@ export async function getEffectiveCreditBalancePreview(params: {
  * stripe_subscription_id preserved), and advances the billing period from
  * invoice-derived boundaries.
  */
-export async function applyStripeFundedKiloClawPeriod(params: {
-  userId: string;
-  metadataInstanceId?: string;
-  stripeSubscriptionId: string;
-  stripePaymentId: string;
-  plan: 'commit' | 'standard';
-  priceVersion: KiloClawPriceVersion;
-  amountMicrodollars: number;
-  periodStart: string;
-  periodEnd: string;
-}): Promise<boolean> {
+export async function applyStripeFundedKiloClawPeriod(
+  params: {
+    userId: string;
+    metadataInstanceId?: string;
+    stripeSubscriptionId: string;
+    stripePaymentId: string;
+    plan: 'commit' | 'standard';
+    priceVersion: KiloClawPriceVersion;
+    amountMicrodollars: number;
+    periodStart: string;
+    periodEnd: string;
+    stripeEventId?: string;
+    checkoutConfirmedAt?: string;
+  },
+  dependencies: {
+    makeStripeSubscriptionNonRenewing?: (stripeSubscriptionId: string) => Promise<void>;
+  } = {}
+): Promise<boolean> {
   const {
     userId,
     metadataInstanceId,
@@ -444,7 +484,6 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   } = params;
 
   const amountCents = Math.round(amountMicrodollars / 10_000);
-  const periodStartDate = periodStart.slice(0, 10); // YYYY-MM-DD
 
   let wasSuspended = false;
   let resolvedInstanceId: string | undefined;
@@ -456,9 +495,9 @@ export async function applyStripeFundedKiloClawPeriod(params: {
   // not send the "subscription started" email. See
   // shouldSendSubscriptionStartedEmailForActivation.
   let shouldSendSubscriptionStartedEmailForNewSettlement = false;
-  // Set when the primary settlement insert was a duplicate (processTopUp
-  // returned false). In that case the downstream email side effect may not
-  // have run yet and we attempt best-effort recovery after commit.
+  let requiresProviderNonRenewal = false;
+  // Tracks only a duplicate deposit from processTopUp so post-commit email
+  // recovery can run. A deduction conflict aborts and rolls back settlement.
   let settlementWasDuplicate = false;
 
   await db.transaction(async tx => {
@@ -563,6 +602,30 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     resolvedInstanceId = targetRow.instance_id ?? undefined;
     resolvedSubscriptionId = targetRow.id;
 
+    const switchQualification =
+      plan === 'commit' ? await findPendingCommitSwitchQualification(targetRow.id, tx) : null;
+    const retirementDecision = getStripeFundedRetirementSettlementDecision({
+      subscription: targetRow,
+      plan,
+      periodStart,
+      periodEnd,
+      checkoutConfirmedAt: params.checkoutConfirmedAt,
+      switchQualification: switchQualification ?? undefined,
+    });
+    requiresProviderNonRenewal ||= retirementDecision.anomalyReason !== null;
+    if (retirementDecision.anomalyReason) {
+      reportKiloClawCommitRetirementAnomaly({
+        reason: retirementDecision.anomalyReason,
+        subscriptionId: targetRow.id,
+        stripeSubscriptionId,
+        stripeEventId: params.stripeEventId,
+        summary:
+          plan === 'commit'
+            ? 'Paid Commit invoice is ambiguous; paid access is preserved and renewal is blocked.'
+            : 'Standard invoice lacks verified explicit retirement continuation consent.',
+      });
+    }
+
     const shouldClearSchedule = targetRow.scheduled_plan === plan;
     if (targetRow.plan !== plan && !shouldClearSchedule) {
       logWarning('Stripe-funded settlement invoice plan differs from local subscription plan', {
@@ -573,8 +636,9 @@ export async function applyStripeFundedKiloClawPeriod(params: {
         invoice_plan: plan,
       });
     }
-    const commitEndsAt = plan === 'commit' ? periodEnd : null;
+    const commitEndsAt = plan === 'commit' ? targetRow.commit_ends_at : null;
 
+    const deductionCategory = `kiloclaw-settlement:${stripeSubscriptionId}:payment:${stripePaymentId}`;
     const deposited = await processTopUp(
       user,
       amountCents,
@@ -587,42 +651,101 @@ export async function applyStripeFundedKiloClawPeriod(params: {
     );
 
     if (!deposited) {
-      logInfo('Duplicate settlement credit skipped', {
+      const [matchingPaymentDeduction] = await tx
+        .select({ id: credit_transactions.id })
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.kilo_user_id, userId),
+            eq(credit_transactions.credit_category, deductionCategory)
+          )
+        )
+        .limit(1);
+      const [legacyPeriodDeduction] = matchingPaymentDeduction
+        ? []
+        : await tx
+            .select({ id: credit_transactions.id })
+            .from(credit_transactions)
+            .where(
+              and(
+                eq(credit_transactions.kilo_user_id, userId),
+                eq(
+                  credit_transactions.credit_category,
+                  `kiloclaw-settlement:${stripeSubscriptionId}:${periodStart.slice(0, 10)}`
+                )
+              )
+            )
+            .limit(1);
+      const [settledSamePeriod] = matchingPaymentDeduction
+        ? []
+        : await tx
+            .select({ id: kiloclaw_subscription_change_log.id })
+            .from(kiloclaw_subscription_change_log)
+            .where(
+              and(
+                eq(kiloclaw_subscription_change_log.subscription_id, targetRow.id),
+                eq(kiloclaw_subscription_change_log.action, 'period_advanced'),
+                eq(kiloclaw_subscription_change_log.reason, 'stripe_invoice_settlement'),
+                sql`${kiloclaw_subscription_change_log.after_state}->>'current_period_start' = ${periodStart}`,
+                sql`${kiloclaw_subscription_change_log.after_state}->>'current_period_end' = ${periodEnd}`
+              )
+            )
+            .limit(1);
+      const shouldReconcilePaymentDeduction =
+        !matchingPaymentDeduction && !legacyPeriodDeduction && !settledSamePeriod;
+
+      if (shouldReconcilePaymentDeduction) {
+        await tx.insert(credit_transactions).values({
+          id: crypto.randomUUID(),
+          kilo_user_id: userId,
+          amount_microdollars: -amountMicrodollars,
+          is_free: false,
+          description: `KiloClaw ${plan} period deduction`,
+          credit_category: deductionCategory,
+          check_category_uniqueness: true,
+          original_baseline_microdollars_used: user.microdollars_used,
+        });
+        await tx
+          .update(kilocode_users)
+          .set({
+            total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${amountMicrodollars}`,
+          })
+          .where(eq(kilocode_users.id, userId));
+      }
+
+      logInfo('Duplicate settlement credit reconciled', {
         user_id: userId,
         stripe_payment_id: stripePaymentId,
+        reconciled_payment_deduction: shouldReconcilePaymentDeduction,
       });
-      applied = true;
       settlementWasDuplicate = true;
-      return;
-    }
+    } else {
+      const deductionResult = await tx
+        .insert(credit_transactions)
+        .values({
+          id: crypto.randomUUID(),
+          kilo_user_id: userId,
+          amount_microdollars: -amountMicrodollars,
+          is_free: false,
+          description: `KiloClaw ${plan} period deduction`,
+          credit_category: deductionCategory,
+          check_category_uniqueness: true,
+          original_baseline_microdollars_used: user.microdollars_used,
+        })
+        .onConflictDoNothing();
 
-    const deductionCategory = `kiloclaw-settlement:${stripeSubscriptionId}:${periodStartDate}`;
-    const deductionResult = await tx
-      .insert(credit_transactions)
-      .values({
-        id: crypto.randomUUID(),
-        kilo_user_id: userId,
-        amount_microdollars: -amountMicrodollars,
-        is_free: false,
-        description: `KiloClaw ${plan} period deduction`,
-        credit_category: deductionCategory,
-        check_category_uniqueness: true,
-        original_baseline_microdollars_used: user.microdollars_used,
-      })
-      .onConflictDoNothing();
+      if ((deductionResult.rowCount ?? 0) === 0) {
+        throw new Error(
+          `Stripe-funded KiloClaw settlement deduction conflict for payment ${stripePaymentId}`
+        );
+      }
 
-    if ((deductionResult.rowCount ?? 0) > 0) {
       await tx
         .update(kilocode_users)
         .set({
           total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${amountMicrodollars}`,
         })
         .where(eq(kilocode_users.id, userId));
-    } else {
-      logInfo('Duplicate deduction skipped, proceeding with subscription update', {
-        user_id: userId,
-        deductionCategory,
-      });
     }
 
     const updateSet = {
@@ -635,6 +758,7 @@ export async function applyStripeFundedKiloClawPeriod(params: {
       current_period_end: periodEnd,
       credit_renewal_at: periodEnd,
       commit_ends_at: commitEndsAt,
+      ...retirementDecision.subscriptionUpdate,
       past_due_since: null,
       auto_top_up_triggered_for_period: null,
       ...PAID_ACTIVATION_LIFECYCLE_CLEAR_SET,
@@ -680,6 +804,49 @@ export async function applyStripeFundedKiloClawPeriod(params: {
 
   if (!applied) {
     return false;
+  }
+
+  if (requiresProviderNonRenewal) {
+    try {
+      await (
+        dependencies.makeStripeSubscriptionNonRenewing ?? makeKiloClawStripeSubscriptionNonRenewing
+      )(stripeSubscriptionId);
+      if (resolvedSubscriptionId) {
+        const subscriptionId = resolvedSubscriptionId;
+        await db.transaction(async tx => {
+          const [before] = await tx
+            .select()
+            .from(kiloclaw_subscriptions)
+            .where(eq(kiloclaw_subscriptions.id, subscriptionId))
+            .for('update')
+            .limit(1);
+          if (!before || before.stripe_subscription_id !== stripeSubscriptionId) return;
+          const [after] = await tx
+            .update(kiloclaw_subscriptions)
+            .set({ cancel_at_period_end: true })
+            .where(eq(kiloclaw_subscriptions.id, subscriptionId))
+            .returning();
+          if (!after || before.cancel_at_period_end === after.cancel_at_period_end) return;
+          await insertKiloClawSubscriptionChangeLog(tx, {
+            subscriptionId: after.id,
+            actor: CREDIT_BILLING_ACTOR,
+            action: 'schedule_changed',
+            reason: 'stripe_invoice_settlement_nonrenewal_confirmed',
+            before,
+            after,
+          });
+        });
+      }
+    } catch (error) {
+      reportKiloClawCommitRetirementAnomaly({
+        reason: 'provider_outcome_unknown',
+        summary: 'Paid retirement settlement could not confirm provider non-renewal.',
+        subscriptionId: resolvedSubscriptionId,
+        stripeSubscriptionId,
+        stripeEventId: params.stripeEventId,
+      });
+      throw error;
+    }
   }
 
   if (wasSuspended) {
@@ -1117,24 +1284,41 @@ export async function enrollWithCredits(params: {
   instanceId: string;
   plan: 'commit' | 'standard';
   hadPaidSubscription: boolean;
+  expectedPriceVersion?: KiloClawPriceVersion;
   actor?: KiloClawSubscriptionChangeActor;
+  commitQualification?: KiloClawCommitEnrollmentQualification;
 }): Promise<void> {
-  const { userId, instanceId, plan, hadPaidSubscription } = params;
+  const { userId, instanceId, plan } = params;
+  try {
+    assertKiloClawCommitAdmission({ plan, qualification: params.commitQualification });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Commit enrollment is unavailable.';
+    throw new CreditEnrollmentError('commit_unavailable', message);
+  }
 
-  // Step 1: Read current state
-  const [user] = await db
+  // Step 1: Read current target state
+  const [targetInstance] = await db
     .select({
-      total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
-      microdollars_used: kilocode_users.microdollars_used,
-      kilo_pass_threshold: kilocode_users.kilo_pass_threshold,
+      id: kiloclaw_instances.id,
+      destroyedAt: kiloclaw_instances.destroyed_at,
     })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, userId))
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.id, instanceId),
+        eq(kiloclaw_instances.user_id, userId),
+        isNull(kiloclaw_instances.organization_id)
+      )
+    )
     .limit(1);
-
-  if (!user) {
-    logError('Credit enrollment failed: user not found', { user_id: userId, instanceId });
-    throw new Error('User not found');
+  if (!targetInstance) {
+    throw new CreditEnrollmentError('instance_not_found', 'KiloClaw personal instance not found');
+  }
+  if (targetInstance.destroyedAt) {
+    throw new CreditEnrollmentError(
+      'instance_destroyed',
+      'Cannot enroll a destroyed KiloClaw instance. Reprovision first.'
+    );
   }
 
   const [existingSub] = await db
@@ -1159,60 +1343,13 @@ export async function enrollWithCredits(params: {
 
   // Reject if subscription is active, past_due, or unpaid (spec rule 1)
   if (existingSub && existingSub.status !== 'trialing' && existingSub.status !== 'canceled') {
-    throw new Error('Cannot enroll: an active subscription already exists. Cancel it first.');
-  }
-
-  const isLiveTrialLineage = existingSub?.status === 'trialing';
-  const kiloclawPriceVersion = isLiveTrialLineage
-    ? existingSub.kiloclaw_price_version
-    : CURRENT_KILOCLAW_PRICE_VERSION;
-  const kiloclawPricing = getKiloClawPricingCatalogEntry(kiloclawPriceVersion);
-
-  // First-time standard-plan subscribers in an eligible live pre-rollout lineage
-  // get that version's intro price. Current and canceled-history enrollments use
-  // recurring pricing from the first paid period. Commit has no intro discount.
-  // See spec Credit Enrollment rule 3.
-  const useStandardIntro =
-    isLiveTrialLineage &&
-    plan === 'standard' &&
-    kiloclawPricing.standardIntroMicrodollars !== undefined &&
-    !hadPaidSubscription;
-  const costMicrodollars = getKiloClawPlanCostMicrodollars({
-    priceVersion: kiloclawPriceVersion,
-    plan,
-    useStandardIntro,
-  });
-  const saleItemSku = useStandardIntro
-    ? getStripePriceIdForClawPlanIntro('standard', { priceVersion: kiloclawPriceVersion })
-    : getStripePriceIdForClawPlan(plan, { priceVersion: kiloclawPriceVersion });
-
-  // Save suspension state for post-transaction auto-resume (spec rule 4)
-  const wasSuspended = !!existingSub?.suspended_at;
-
-  // Step 2: Check effective balance (spec rule 3)
-  // Effective balance = raw balance + projected Kilo Pass bonus that would
-  // be awarded after the deduction by maybeIssueKiloPassBonusFromUsageThreshold.
-  // The deduction increments microdollars_used, so project the post-deduction
-  // value to correctly evaluate whether the spend crosses the bonus threshold.
-  const balance = user.total_microdollars_acquired - user.microdollars_used;
-  const { effectiveBalanceMicrodollars: effectiveBalance } = await getEffectiveCreditBalancePreview(
-    {
-      userId,
-      balanceMicrodollars: balance,
-      microdollarsUsed: user.microdollars_used,
-      kiloPassThreshold: user.kilo_pass_threshold,
-      costMicrodollars,
-    }
-  );
-
-  if (effectiveBalance < costMicrodollars) {
-    const shortfall = costMicrodollars - effectiveBalance;
-    throw new Error(
-      `Insufficient credit balance. You need ${shortfall} more microdollars to enroll.`
+    throw new CreditEnrollmentError(
+      'active_subscription_exists',
+      'Cannot enroll: an active subscription already exists. Cancel it first.'
     );
   }
 
-  // Step 3: Single DB transaction (spec rule 5)
+  // Step 2: Serialize the pricing, balance decision, and enrollment mutation.
   const now = new Date();
   const periodMonths = plan === 'commit' ? 6 : 1;
   const periodEnd = addMonths(now, periodMonths);
@@ -1227,10 +1364,150 @@ export async function enrollWithCredits(params: {
   const saleDedupeKeyEntityId = deductionCategory;
 
   let deductionWasDuplicate = false;
-  const trialEndEntityId = existingSub?.status === 'trialing' ? existingSub.id : undefined;
+  let costMicrodollars = 0;
+  let kiloclawPriceVersion: KiloClawPriceVersion | undefined;
+  let saleItemSku: string | undefined;
+  let trialEndEntityId: string | undefined;
+  let transitionedFromTrial = false;
+  let wasSuspended = false;
 
   await db.transaction(async tx => {
-    // 5a: Insert negative credit transaction with period-encoded idempotency key
+    const [user] = await tx
+      .select({
+        total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
+        microdollars_used: kilocode_users.microdollars_used,
+        kilo_pass_threshold: kilocode_users.kilo_pass_threshold,
+      })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, userId))
+      .for('update')
+      .limit(1);
+
+    if (!user) {
+      logError('Credit enrollment failed: user not found', { user_id: userId, instanceId });
+      throw new CreditEnrollmentError('user_not_found', 'User not found');
+    }
+
+    const [transactionTargetInstance] = await tx
+      .select({ destroyedAt: kiloclaw_instances.destroyed_at })
+      .from(kiloclaw_instances)
+      .where(
+        and(
+          eq(kiloclaw_instances.id, instanceId),
+          eq(kiloclaw_instances.user_id, userId),
+          isNull(kiloclaw_instances.organization_id)
+        )
+      )
+      .limit(1);
+    if (!transactionTargetInstance || transactionTargetInstance.destroyedAt) {
+      throw new CreditEnrollmentError(
+        'target_unavailable',
+        'Credit enrollment target is no longer an active personal instance.'
+      );
+    }
+
+    const [currentSubscription] = await tx
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(
+          eq(kiloclaw_subscriptions.user_id, userId),
+          eq(kiloclaw_subscriptions.instance_id, instanceId),
+          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
+        )
+      )
+      .for('update')
+      .limit(1);
+
+    if (
+      currentSubscription &&
+      currentSubscription.status !== 'trialing' &&
+      currentSubscription.status !== 'canceled'
+    ) {
+      throw new CreditEnrollmentError(
+        'active_subscription_exists',
+        'Cannot enroll: an active subscription already exists. Cancel it first.'
+      );
+    }
+    if (
+      currentSubscription?.status === 'trialing' &&
+      !isKiloClawPriceVersion(currentSubscription.kiloclaw_price_version)
+    ) {
+      throw new CreditEnrollmentError(
+        'unknown_price_version',
+        `Unknown KiloClaw price version: ${currentSubscription.kiloclaw_price_version}`
+      );
+    }
+
+    kiloclawPriceVersion = resolveKiloClawEnrollmentPriceVersion(
+      currentSubscription
+        ? {
+            status: currentSubscription.status,
+            kiloclawPriceVersion: currentSubscription.kiloclaw_price_version,
+          }
+        : null
+    );
+    if (params.expectedPriceVersion && params.expectedPriceVersion !== kiloclawPriceVersion) {
+      throw new CreditEnrollmentError(
+        'price_version_mismatch',
+        `Credit enrollment intent price version no longer matches target: intended=${params.expectedPriceVersion} expected=${kiloclawPriceVersion}`
+      );
+    }
+
+    const [paidSubscription] = await tx
+      .select({ id: kiloclaw_subscriptions.id })
+      .from(kiloclaw_subscriptions)
+      .where(
+        and(eq(kiloclaw_subscriptions.user_id, userId), ne(kiloclaw_subscriptions.plan, 'trial'))
+      )
+      .limit(1);
+    const currentHadPaidSubscription = paidSubscription !== undefined;
+    const kiloclawPricing = getKiloClawPricingCatalogEntry(kiloclawPriceVersion);
+    const useStandardIntro =
+      currentSubscription?.status === 'trialing' &&
+      plan === 'standard' &&
+      kiloclawPricing.standardIntroMicrodollars !== undefined &&
+      !currentHadPaidSubscription;
+    costMicrodollars = getKiloClawPlanCostMicrodollars({
+      priceVersion: kiloclawPriceVersion,
+      plan,
+      useStandardIntro,
+    });
+    saleItemSku = useStandardIntro
+      ? getStripePriceIdForClawPlanIntro('standard', { priceVersion: kiloclawPriceVersion })
+      : getStripePriceIdForClawPlan(plan, { priceVersion: kiloclawPriceVersion });
+    transitionedFromTrial =
+      currentSubscription?.status === 'trialing' && currentSubscription.plan === 'trial';
+    trialEndEntityId =
+      currentSubscription?.status === 'trialing' ? currentSubscription.id : undefined;
+    wasSuspended = !!currentSubscription?.suspended_at;
+
+    const projectedUsage = user.microdollars_used + costMicrodollars;
+    const effectiveThreshold = getEffectiveKiloPassThreshold(user.kilo_pass_threshold);
+    const kiloPassSubscription =
+      effectiveThreshold !== null && projectedUsage >= effectiveThreshold
+        ? await getKiloPassStateForUser(tx, userId, { forUpdate: true })
+        : null;
+    const balance = user.total_microdollars_acquired - user.microdollars_used;
+    const { effectiveBalanceMicrodollars: effectiveBalance } =
+      await getEffectiveCreditBalancePreview({
+        userId,
+        balanceMicrodollars: balance,
+        microdollarsUsed: user.microdollars_used,
+        kiloPassThreshold: user.kilo_pass_threshold,
+        costMicrodollars,
+        subscription: kiloPassSubscription,
+      });
+
+    if (effectiveBalance < costMicrodollars) {
+      const shortfall = costMicrodollars - effectiveBalance;
+      throw new CreditEnrollmentError(
+        'insufficient_credits',
+        `Insufficient credit balance. You need ${shortfall} more microdollars to enroll.`
+      );
+    }
+
+    // Insert negative credit transaction with period-encoded idempotency key.
     const deductionResult = await tx
       .insert(credit_transactions)
       .values({
@@ -1258,8 +1535,18 @@ export async function enrollWithCredits(params: {
       return;
     }
 
-    // 5b: Atomically increment microdollars_used so the deduction counts
-    //     as spend toward the Kilo Pass bonus unlock threshold.
+    if (
+      currentSubscription?.status === 'canceled' &&
+      currentSubscription.kiloclaw_price_version !== kiloclawPriceVersion
+    ) {
+      throw new CreditEnrollmentError(
+        'requires_reprovision',
+        'Canceled legacy KiloClaw history requires reprovisioning before credit enrollment.'
+      );
+    }
+
+    // Increment microdollars_used so the deduction counts as spend toward
+    // the Kilo Pass bonus unlock threshold.
     await tx
       .update(kilocode_users)
       .set({
@@ -1267,19 +1554,7 @@ export async function enrollWithCredits(params: {
       })
       .where(eq(kilocode_users.id, userId));
 
-    const [currentSubscription] = await tx
-      .select()
-      .from(kiloclaw_subscriptions)
-      .where(
-        and(
-          eq(kiloclaw_subscriptions.user_id, userId),
-          eq(kiloclaw_subscriptions.instance_id, instanceId),
-          isNull(kiloclaw_subscriptions.transferred_to_subscription_id)
-        )
-      )
-      .limit(1);
-
-    // 5c: Upsert subscription row as pure credit
+    // Upsert subscription row as pure credit.
     const commitEndsAt = plan === 'commit' ? periodEndIso : null;
     const [mutatedSubscription] = await tx
       .insert(kiloclaw_subscriptions)
@@ -1324,9 +1599,12 @@ export async function enrollWithCredits(params: {
       .returning();
 
     if (mutatedSubscription) {
-      const action: KiloClawSubscriptionChangeAction = currentSubscription
-        ? 'payment_source_changed'
-        : 'created';
+      const action: KiloClawSubscriptionChangeAction =
+        currentSubscription?.status === 'canceled'
+          ? 'reactivated'
+          : currentSubscription
+            ? 'payment_source_changed'
+            : 'created';
       await insertKiloClawSubscriptionChangeLog(tx, {
         subscriptionId: mutatedSubscription.id,
         actor: params.actor ?? CREDIT_BILLING_ACTOR,
@@ -1337,6 +1615,10 @@ export async function enrollWithCredits(params: {
       });
     }
   });
+
+  if (!kiloclawPriceVersion || !saleItemSku) {
+    throw new Error('Credit enrollment completed without resolved pricing');
+  }
 
   if (deductionWasDuplicate) {
     try {
@@ -1360,7 +1642,10 @@ export async function enrollWithCredits(params: {
       });
     }
 
-    throw new Error('Enrollment already processed for this billing period.');
+    throw new CreditEnrollmentError(
+      'duplicate_enrollment',
+      'Enrollment already processed for this billing period.'
+    );
   }
 
   try {
@@ -1398,7 +1683,7 @@ export async function enrollWithCredits(params: {
   }
 
   // Step 5: Auto-resume if suspended (spec rule 7)
-  if (existingSub?.plan === 'trial' && existingSub.status === 'trialing') {
+  if (transitionedFromTrial) {
     try {
       await clearTrialInactivityStopAfterTrialTransition({
         kiloUserId: userId,

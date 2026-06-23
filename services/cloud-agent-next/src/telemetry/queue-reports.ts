@@ -5,7 +5,9 @@ import {
   type CloudAgentRunStateReport,
 } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { logger } from '../logger.js';
+import { workspaceFailureMessage } from '../session/safe-failure-projection.js';
 import type { SessionMessageState } from '../session/session-message-state.js';
+import { isWorkspaceFailureSubtype } from '@kilocode/worker-utils/cloud-agent-failure';
 
 type ReportQueue = {
   send(report: CloudAgentQueueReport): Promise<unknown>;
@@ -49,6 +51,15 @@ function timestamp(value: number): string {
   return new Date(value).toISOString();
 }
 
+function persistedFailureCode(state: SessionMessageState): SessionMessageState['failureCode'] {
+  if (state.failureCode !== 'model_missing' && state.failureCode !== 'payment_required') {
+    return state.failureCode;
+  }
+  if (state.failureStage === 'agent_activity') return 'assistant_error';
+  if (state.failureStage === 'post_dispatch_no_activity') return 'wrapper_error_before_activity';
+  return state.failureCode;
+}
+
 function isKnownInsufficientCreditFailure(state: SessionMessageState): boolean {
   if (
     state.failureCode !== 'assistant_error' &&
@@ -68,11 +79,10 @@ function diagnosticForFailedRun(
 
   let errorMessageRedacted =
     state.failureCode === undefined ? undefined : FAILED_RUN_DIAGNOSTIC_MESSAGES[state.failureCode];
-  if (
-    state.failureCode === 'workspace_setup_failed' &&
-    state.error?.toLowerCase().includes('no space left on device')
-  ) {
-    errorMessageRedacted = 'Workspace setup failed: sandbox storage full';
+  if (state.failureCode === 'workspace_setup_failed') {
+    errorMessageRedacted = isWorkspaceFailureSubtype(state.failureSubtype)
+      ? workspaceFailureMessage(state.failureSubtype)
+      : 'Workspace setup failed';
   } else if (isKnownInsufficientCreditFailure(state)) {
     errorMessageRedacted = 'Model request failed: insufficient credits';
   }
@@ -123,7 +133,8 @@ export async function emitRunStateReport(params: {
   const { state } = params;
   const observedDispatchAcceptedAt =
     state.dispatchAcceptanceKind === 'observed' ? state.acceptedAt : undefined;
-  const diagnostic = diagnosticForFailedRun(state);
+  const failureCode = persistedFailureCode(state);
+  const diagnostic = diagnosticForFailedRun({ ...state, failureCode });
   const report: CloudAgentRunStateReport = {
     version: 1,
     type: 'run.state',
@@ -142,7 +153,7 @@ export async function emitRunStateReport(params: {
         : { agentActivityObservedAt: timestamp(state.agentActivityObservedAt) }),
       ...(state.terminalAt === undefined ? {} : { terminalAt: timestamp(state.terminalAt) }),
       ...(state.failureStage === undefined ? {} : { failureStage: state.failureStage }),
-      ...(state.failureCode === undefined ? {} : { failureCode: state.failureCode }),
+      ...(failureCode === undefined ? {} : { failureCode }),
       ...(diagnostic === undefined ? {} : { diagnostic }),
     },
   };

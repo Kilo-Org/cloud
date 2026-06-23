@@ -18,6 +18,7 @@ import {
   fetchPRInlineComments,
   getPRHeadCommit,
   fetchGitHubRootTextFileAtRef,
+  fetchGitHubRepositorySize,
 } from '@/lib/integrations/platforms/github/adapter';
 import type { GitHubAppType } from '@/lib/integrations/platforms/github/app-selector';
 import {
@@ -27,6 +28,7 @@ import {
   getMRDiffRefs,
   GitLabProjectAccessTokenPermissionError,
   fetchGitLabRootTextFileAtRef,
+  fetchGitLabRepositorySize,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   getOrCreateProjectAccessToken,
@@ -41,6 +43,7 @@ import { getIntegrationById } from '@/lib/integrations/db/platform-integrations'
 import {
   getCodeReviewById,
   findPreviousCompletedReview,
+  updatePreviousReviewSummary,
   updateRepositoryReviewInstructionsMetadata,
   type ReviewContinuationScope,
 } from '../db/code-reviews';
@@ -54,6 +57,7 @@ import {
   normalizeRepositoryReviewInstructions,
   REVIEW_INSTRUCTIONS_FILE,
 } from '../prompts/repository-review-instructions';
+import { getCurrentReviewSummaryForContext } from '../summary/history';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 
@@ -101,6 +105,8 @@ export type CodeReviewPayload = {
   agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
+  /** Provider-reported repository storage size, formatted for log correlation. */
+  repositorySize?: string | null;
 };
 
 /**
@@ -158,6 +164,7 @@ export async function prepareReviewPayload(
     let existingReviewState: ExistingReviewState | null = null;
     let gitlabContext: GitLabDiffContext | undefined;
     let repositoryReviewInstructionsLookup = unusedRepositoryReviewInstructionsLookup();
+    let repositorySize: string | null = null;
 
     if (review.platform_integration_id) {
       const integration = await getIntegrationById(review.platform_integration_id);
@@ -174,6 +181,26 @@ export async function prepareReviewPayload(
         const installationToken = tokenData.token;
         githubToken = installationToken;
         const [repoOwner, repoName] = review.repo_full_name.split('/');
+
+        try {
+          repositorySize = await fetchGitHubRepositorySize({
+            token: installationToken,
+            owner: repoOwner,
+            repo: repoName,
+          });
+          logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
+            platform,
+            repoFullName: review.repo_full_name,
+            repositorySize,
+            repositorySizeKnown: repositorySize !== null,
+          });
+        } catch (error) {
+          warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
+            platform,
+            repoFullName: review.repo_full_name,
+            error: getReviewInstructionsFetchErrorMetadata(error),
+          });
+        }
 
         const repositoryReviewInstructionsPromise =
           shouldUseReviewMd && repoOwner && repoName
@@ -288,6 +315,26 @@ export async function prepareReviewPayload(
           );
         }
         const projectAccessToken = gitlabToken;
+
+        try {
+          repositorySize = await fetchGitLabRepositorySize(
+            projectAccessToken,
+            review.repo_full_name,
+            instanceUrl
+          );
+          logExceptInTest('[prepareReviewPayload] Repository size lookup complete', {
+            platform,
+            repoFullName: review.repo_full_name,
+            repositorySize,
+            repositorySizeKnown: repositorySize !== null,
+          });
+        } catch (error) {
+          warnExceptInTest('[prepareReviewPayload] Repository size lookup failed; continuing', {
+            platform,
+            repoFullName: review.repo_full_name,
+            error: getReviewInstructionsFetchErrorMetadata(error),
+          });
+        }
 
         const repositoryReviewInstructionsPromise = shouldUseReviewMd
           ? fetchRepositoryReviewInstructions({
@@ -429,17 +476,23 @@ export async function prepareReviewPayload(
       );
     }
 
-    await updateRepositoryReviewInstructionsMetadata(reviewId, {
-      used: repositoryReviewInstructionsLookup.used,
-      ref: repositoryReviewInstructionsLookup.ref,
-      truncated: repositoryReviewInstructionsLookup.truncated,
-    });
+    await Promise.all([
+      updatePreviousReviewSummary(reviewId, {
+        body: existingReviewState?.summaryComment?.body ?? null,
+        headSha: existingReviewState?.summaryComment ? previousHeadSha : null,
+      }),
+      updateRepositoryReviewInstructionsMetadata(reviewId, {
+        used: repositoryReviewInstructionsLookup.used,
+        ref: repositoryReviewInstructionsLookup.ref,
+        truncated: repositoryReviewInstructionsLookup.truncated,
+      }),
+    ]);
 
     // 5. Generate auth token for cloud agent with bot identifier
     const authToken = generateApiToken(user, { botId: 'reviewer' });
 
     // 6. Generate dynamic review prompt
-    const { prompt, version, source } = await generateReviewPrompt(
+    const { prompt, version } = await generateReviewPrompt(
       config,
       review.repo_full_name,
       review.pr_number,
@@ -457,7 +510,6 @@ export async function prepareReviewPayload(
       reviewId,
       platform,
       version,
-      source,
       promptLength: prompt.length,
       hasRepositoryReviewInstructions: repositoryReviewInstructionsLookup.used,
     });
@@ -523,12 +575,14 @@ export async function prepareReviewPayload(
       sessionInput,
       owner,
       previousCloudAgentSessionId,
+      repositorySize,
     };
 
     logExceptInTest('[prepareReviewPayload] Prepared payload', {
       reviewId,
       platform,
       owner,
+      repositorySize,
       sessionInput: {
         ...sessionInput,
         githubToken: sessionInput.githubToken ? '***' : undefined, // Redact token
@@ -638,15 +692,13 @@ function buildReviewState(
   // Determine previous status from summary body
   let previousStatus: PreviousReviewStatus = 'no-review';
   if (summaryComment) {
-    if (
-      summaryComment.body.includes('No Issues Found') ||
-      summaryComment.body.includes('No New Issues')
-    ) {
+    const currentSummary = getCurrentReviewSummaryForContext(summaryComment.body);
+    if (currentSummary.includes('No Issues Found') || currentSummary.includes('No New Issues')) {
       previousStatus = 'no-issues';
     } else if (
-      summaryComment.body.includes('Issues Found') ||
-      summaryComment.body.includes('WARNING') ||
-      summaryComment.body.includes('CRITICAL')
+      currentSummary.includes('Issues Found') ||
+      currentSummary.includes('WARNING') ||
+      currentSummary.includes('CRITICAL')
     ) {
       previousStatus = 'issues-found';
     }

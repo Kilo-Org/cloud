@@ -21,6 +21,7 @@ import {
   organization_user_usage,
   organization_audit_logs,
   organization_invitations,
+  organization_recommendation_dismissals,
   security_audit_log,
   free_model_usage,
   organizations,
@@ -36,6 +37,9 @@ import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
   security_findings,
+  security_finding_notifications,
+  security_remediation_attempts,
+  security_remediations,
   security_analysis_queue,
   security_analysis_owner_state,
   security_agent_commands,
@@ -69,6 +73,8 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  code_review_feedback_events,
+  code_review_memory_proposals,
   user_github_app_tokens,
   model_eval_ingestions,
   microdollar_usage,
@@ -93,6 +99,7 @@ import {
   mcp_gateway_provider_grants,
   mcp_gateway_pending_provider_authorizations,
   mcp_gateway_oauth_clients,
+  deployments_ephemeral,
 } from '@kilocode/db/schema';
 
 import { eq, count, sql } from 'drizzle-orm';
@@ -104,8 +111,10 @@ import {
   createOrUpdateUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
+import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { randomUUID } from 'crypto';
 import {
@@ -118,6 +127,11 @@ import {
 } from '@/lib/kilo-pass/enums';
 import { SecurityAuditLogAction } from '@/lib/security-agent/core/enums';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
+import {
+  SecurityAuditLogActorType,
+  SecurityFindingNotificationKind,
+  SecurityFindingNotificationStatus,
+} from '@kilocode/db/schema-types';
 
 jest.mock('@/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
@@ -137,6 +151,7 @@ const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
 describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
+    await db.delete(deployments_ephemeral);
     await db.delete(user_auth_provider);
     await db.delete(user_affiliate_attributions);
     await db.delete(user_affiliate_events);
@@ -166,6 +181,7 @@ describe('User', () => {
     await db.delete(referral_code_usages);
     await db.delete(referral_codes);
     await db.delete(organization_audit_logs);
+    await db.delete(organization_recommendation_dismissals);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
     await db.delete(model_eval_ingestions);
@@ -176,8 +192,11 @@ describe('User', () => {
     await db.delete(kiloclaw_google_oauth_connections);
     await db.delete(kiloclaw_inbound_email_aliases);
     await db.delete(security_analysis_queue);
+    await db.delete(security_remediation_attempts);
+    await db.delete(security_remediations);
     await db.delete(security_agent_commands);
     await db.delete(security_agent_repository_sync_state);
+    await db.delete(security_finding_notifications);
     await db.delete(security_findings);
     await db.delete(security_analysis_owner_state);
     await db.delete(organization_invitations);
@@ -221,6 +240,8 @@ describe('User', () => {
     await db.delete(mcp_gateway_connect_resources);
     await db.delete(mcp_gateway_configs);
     await db.delete(github_branch_pull_requests);
+    await db.delete(code_review_memory_proposals);
+    await db.delete(code_review_feedback_events);
     await db.delete(user_github_app_tokens);
     await db.delete(organizations);
     await db.delete(kilocode_users);
@@ -251,6 +272,9 @@ describe('User', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.user.signup_ip).toBe('203.0.113.25');
+      expect(result.user.openrouter_downstream_safety_identifier).toBe(
+        generateOpenRouterDownstreamSafetyIdentifier(result.user.id)
+      );
     });
 
     it('rejects new signups after the per-IP burst threshold (100/24h)', async () => {
@@ -442,9 +466,150 @@ describe('User', () => {
       );
       consoleError.mockRestore();
     });
+
+    it('preserves API token pepper when upgrading an existing user to WorkOS', async () => {
+      const existingUser = await insertTestUser({
+        google_user_email: 'workos-upgrade@example.com',
+        api_token_pepper: 'api-pepper-before-workos',
+        web_session_pepper: 'web-pepper-before-workos',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'workos-upgrade@example.com',
+          google_user_name: 'WorkOS Upgrade',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-upgrade-provider-id',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, existingUser.id),
+      });
+      expect(updatedUser?.api_token_pepper).toBe('api-pepper-before-workos');
+      expect(updatedUser?.web_session_pepper).toEqual(expect.any(String));
+      expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
+    });
   });
 
   describe('softDeleteUser', () => {
+    it('anonymizes recommendation dismissal actor references', async () => {
+      const organizationOwner = await insertTestUser();
+      const dismissingUser = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Recommendation Dismissal Cleanup Org',
+        organizationOwner.id,
+        0
+      );
+      const [dismissal] = await db
+        .insert(organization_recommendation_dismissals)
+        .values({
+          owned_by_organization_id: organization.id,
+          recommendation_key: 'org-sso-not-configured',
+          dismissed_by_user_id: dismissingUser.id,
+        })
+        .returning();
+
+      await softDeleteUser(dismissingUser.id);
+
+      const [retainedDismissal] = await db
+        .select()
+        .from(organization_recommendation_dismissals)
+        .where(eq(organization_recommendation_dismissals.id, dismissal.id));
+      expect(retainedDismissal?.dismissed_by_user_id).toBeNull();
+    });
+
+    it('deletes personal Security Agent notifications through finding cleanup', async () => {
+      const user = await insertTestUser();
+      const [finding] = await db
+        .insert(security_findings)
+        .values({
+          owned_by_user_id: user.id,
+          repo_full_name: 'test-org/security-notification-personal',
+          source: 'dependabot',
+          source_id: '1',
+          severity: 'high',
+          package_name: 'lodash',
+          package_ecosystem: 'npm',
+          title: 'Prototype Pollution in lodash',
+        })
+        .returning();
+      const [notification] = await db
+        .insert(security_finding_notifications)
+        .values({
+          finding_id: finding.id,
+          recipient_user_id: user.id,
+          kind: SecurityFindingNotificationKind.NewFinding,
+          status: SecurityFindingNotificationStatus.Pending,
+        })
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      const notificationRows = await db
+        .select()
+        .from(security_finding_notifications)
+        .where(eq(security_finding_notifications.id, notification.id));
+      const findingRows = await db
+        .select()
+        .from(security_findings)
+        .where(eq(security_findings.id, finding.id));
+      expect(notificationRows).toHaveLength(0);
+      expect(findingRows).toHaveLength(0);
+    });
+
+    it('deletes org-owned Security Agent notifications addressed to the user', async () => {
+      const orgOwner = await insertTestUser({ id: 'org-notification-owner' });
+      const recipient = await insertTestUser({ id: 'org-notification-recipient' });
+      const organization = await createTestOrganization('Notification Cleanup Org', orgOwner.id, 0);
+      await db.insert(organization_memberships).values({
+        organization_id: organization.id,
+        kilo_user_id: recipient.id,
+        role: 'owner',
+      });
+      const [finding] = await db
+        .insert(security_findings)
+        .values({
+          owned_by_organization_id: organization.id,
+          repo_full_name: 'test-org/security-notification-org',
+          source: 'dependabot',
+          source_id: '2',
+          severity: 'critical',
+          package_name: 'express',
+          package_ecosystem: 'npm',
+          title: 'Unauthenticated admin token exchange',
+        })
+        .returning();
+      const [notification] = await db
+        .insert(security_finding_notifications)
+        .values({
+          finding_id: finding.id,
+          recipient_user_id: recipient.id,
+          kind: SecurityFindingNotificationKind.SlaBreach,
+          status: SecurityFindingNotificationStatus.Pending,
+        })
+        .returning();
+
+      await softDeleteUser(recipient.id);
+
+      const notificationRows = await db
+        .select()
+        .from(security_finding_notifications)
+        .where(eq(security_finding_notifications.id, notification.id));
+      const findingRows = await db
+        .select()
+        .from(security_findings)
+        .where(eq(security_findings.id, finding.id));
+      expect(notificationRows).toHaveLength(0);
+      expect(findingRows).toHaveLength(1);
+      expect(findingRows[0]?.owned_by_organization_id).toBe(organization.id);
+    });
+
     it('deletes gateway provider grants and pending provider state', async () => {
       const user = await insertTestUser();
       const [config] = await db
@@ -499,7 +664,7 @@ describe('User', () => {
           redirect_uris: ['https://client.example/callback'],
           grant_types: ['authorization_code'],
           response_types: ['code'],
-          declared_scopes: ['profile'],
+          declared_scopes: ['mcp:access'],
         })
         .returning();
       const [authorizationRequest] = await db
@@ -514,8 +679,8 @@ describe('User', () => {
           route_key: route.route_key,
           canonical_resource_url: route.canonical_url,
           redirect_uri: 'https://client.example/callback',
-          requested_scopes: ['profile'],
-          granted_scopes: ['profile'],
+          requested_scopes: ['mcp:access'],
+          granted_scopes: ['mcp:access'],
           code_challenge: 'challenge',
           code_challenge_method: 'S256',
           execution_context: { type: 'personal' },
@@ -536,7 +701,7 @@ describe('User', () => {
         route_key: route.route_key,
         canonical_resource_url: route.canonical_url,
         redirect_uri: authorizationRequest.redirect_uri,
-        granted_scopes: ['profile'],
+        granted_scopes: ['mcp:access'],
         code_challenge: 'challenge',
         code_challenge_method: 'S256',
         execution_context: { type: 'personal' },
@@ -603,6 +768,7 @@ describe('User', () => {
         linkedin_url: 'https://linkedin.com/in/testuser',
         github_url: 'https://github.com/testuser',
         openrouter_upstream_safety_identifier: 'openrouter_upstream_safety_identifier',
+        openrouter_downstream_safety_identifier: 'openrouter_downstream_safety_identifier',
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
@@ -611,6 +777,7 @@ describe('User', () => {
         blocked_at: '2026-01-15T12:00:00.000Z',
         blocked_by_kilo_user_id: 'admin-user-id',
         is_admin: true,
+        can_manage_credits: true,
       });
 
       await softDeleteUser(user.id);
@@ -629,6 +796,9 @@ describe('User', () => {
       expect(softDeleted!.openrouter_upstream_safety_identifier).toBe(
         'openrouter_upstream_safety_identifier'
       );
+      expect(softDeleted!.openrouter_downstream_safety_identifier).toBe(
+        'openrouter_downstream_safety_identifier'
+      );
       expect(softDeleted!.vercel_downstream_safety_identifier).toBe(
         'vercel_downstream_safety_identifier'
       );
@@ -645,8 +815,152 @@ describe('User', () => {
       expect(softDeleted!.auto_top_up_enabled).toBe(false);
       expect(softDeleted!.completed_welcome_form).toBe(false);
       expect(softDeleted!.is_admin).toBe(false);
+      expect(softDeleted!.can_manage_credits).toBe(false);
       // Stripe customer ID should be preserved
       expect(softDeleted!.stripe_customer_id).toBe(user.stripe_customer_id);
+    });
+
+    it('deletes user-owned review memory and retains org-owned proposals', async () => {
+      const user = await insertTestUser({ google_user_email: 'review-memory-delete@example.com' });
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Review memory org' })
+        .returning({ id: organizations.id });
+      if (!organization) throw new Error('Failed to create review memory test organization');
+
+      await db.insert(code_review_feedback_events).values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        repo_full_name: 'acme/widgets',
+        pr_number: 12,
+        kilo_comment_id: '1001',
+        reply_excerpt: 'This comment is a false positive for our generated fixtures.',
+        kilo_comment_excerpt: 'Generated fixtures should be simplified.',
+        dedupe_hash: `review-memory-delete-${user.id}`,
+      });
+      await db.insert(code_review_memory_proposals).values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        repo_full_name: 'acme/widgets',
+        title: 'Generated fixtures',
+        rationale: 'Maintainers corrected repeated generated fixture comments.',
+        proposed_markdown:
+          '## Generated fixtures\n\nDo not flag generated fixtures unless behavior changes.',
+        evidence: [{ excerpt: 'False positive for generated fixtures.', prNumber: 12 }],
+      });
+      const [orgProposal] = await db
+        .insert(code_review_memory_proposals)
+        .values({
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+          title: 'Org-owned guidance',
+          rationale: 'Org-owned proposals are not owned by the deleted user.',
+          proposed_markdown: '## Org guidance\n\nKeep this org-owned guidance.',
+          evidence: [{ excerpt: 'Org evidence excerpt.', prNumber: 14 }],
+        })
+        .returning({ id: code_review_memory_proposals.id });
+      if (!orgProposal) throw new Error('Failed to create org-owned review memory proposal');
+
+      await softDeleteUser(user.id);
+
+      const [userFeedbackCount] = await db
+        .select({ value: count() })
+        .from(code_review_feedback_events)
+        .where(eq(code_review_feedback_events.owned_by_user_id, user.id));
+      const [userProposalCount] = await db
+        .select({ value: count() })
+        .from(code_review_memory_proposals)
+        .where(eq(code_review_memory_proposals.owned_by_user_id, user.id));
+      const [orgProposalCount] = await db
+        .select({ value: count() })
+        .from(code_review_memory_proposals)
+        .where(eq(code_review_memory_proposals.id, orgProposal.id));
+
+      expect(userFeedbackCount?.value).toBe(0);
+      expect(userProposalCount?.value).toBe(0);
+      expect(orgProposalCount?.value).toBe(1);
+    });
+
+    it('should scrub ephemeral deployment ownership and schedule immediate cleanup', async () => {
+      const user = await insertTestUser({
+        google_user_email: 'ephemeral-deployment-delete@example.com',
+      });
+      const otherUser = await insertTestUser({
+        google_user_email: 'ephemeral-deployment-delete-other@example.com',
+      });
+      const cleanupClaimToken = randomUUID();
+      const claimedUntil = '2026-06-03T18:00:00.000Z';
+      const originalCleanupAt = '2026-06-04T18:00:00.000Z';
+      const originalUpdatedAt = '2026-06-02T18:00:00.000Z';
+
+      await db.insert(deployments_ephemeral).values([
+        {
+          owned_by_user_id: user.id,
+          source_type: 'html',
+          internal_worker_name: `qdpl-${randomUUID()}`,
+          deployment_slug: 'soft-delete-ephemeral',
+          status: 'active',
+          expires_at: originalCleanupAt,
+          next_cleanup_at: originalCleanupAt,
+          cleanup_claim_token: cleanupClaimToken,
+          cleanup_claimed_until: claimedUntil,
+          updated_at: originalUpdatedAt,
+        },
+        {
+          owned_by_user_id: otherUser.id,
+          source_type: 'html',
+          internal_worker_name: `qdpl-${randomUUID()}`,
+          deployment_slug: 'soft-delete-ephemeral-other',
+          status: 'active',
+          expires_at: originalCleanupAt,
+          next_cleanup_at: originalCleanupAt,
+          cleanup_claim_token: cleanupClaimToken,
+          cleanup_claimed_until: claimedUntil,
+          updated_at: originalUpdatedAt,
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+      const afterSoftDelete = Date.now();
+
+      const rows = await db
+        .select()
+        .from(deployments_ephemeral)
+        .orderBy(deployments_ephemeral.deployment_slug);
+      const otherDeployment = rows.find(row => row.owned_by_user_id === otherUser.id);
+      const scrubbedDeployment = rows.find(row => row.deployment_slug === 'soft-delete-ephemeral');
+
+      expect(scrubbedDeployment).toEqual(
+        expect.objectContaining({
+          owned_by_user_id: null,
+          status: 'cleanup_retry',
+          cleanup_claim_token: null,
+          cleanup_claimed_until: null,
+        })
+      );
+      if (!scrubbedDeployment) throw new Error('Expected scrubbed ephemeral deployment');
+      const nextCleanupAt = new Date(scrubbedDeployment.next_cleanup_at).getTime();
+      expect(nextCleanupAt).toBeGreaterThan(afterSoftDelete - 5_000);
+      expect(nextCleanupAt).toBeLessThanOrEqual(afterSoftDelete);
+      expect(new Date(scrubbedDeployment.updated_at).getTime()).toBe(nextCleanupAt);
+      expect(otherDeployment).toEqual(
+        expect.objectContaining({
+          owned_by_user_id: otherUser.id,
+          status: 'active',
+          cleanup_claim_token: cleanupClaimToken,
+        })
+      );
+      if (!otherDeployment) throw new Error('Expected untouched ephemeral deployment');
+      expect(new Date(otherDeployment.next_cleanup_at).getTime()).toBe(
+        new Date(originalCleanupAt).getTime()
+      );
+      expect(new Date(otherDeployment.cleanup_claimed_until ?? '').getTime()).toBe(
+        new Date(claimedUntil).getTime()
+      );
+      expect(new Date(otherDeployment.updated_at).getTime()).toBe(
+        new Date(originalUpdatedAt).getTime()
+      );
     });
 
     it('should rotate and scrub App Store account-linked Kilo Pass data', async () => {
@@ -1384,6 +1698,7 @@ describe('User', () => {
         actor_id: user.id,
         actor_email: user.google_user_email,
         actor_name: user.google_user_name,
+        actor_type: SecurityAuditLogActorType.CustomerUser,
         action: SecurityAuditLogAction.FindingDismissed,
         resource_type: 'security_finding',
         resource_id: randomUUID(),
@@ -1399,6 +1714,7 @@ describe('User', () => {
       expect(logs[0].actor_email).toBeNull();
       expect(logs[0].actor_name).toBeNull();
       expect(logs[0].actor_id).toBe(user.id); // actor_id preserved
+      expect(logs[0].actor_type).toBe(SecurityAuditLogActorType.CustomerUser);
       expect(logs[0].action).toBe(SecurityAuditLogAction.FindingDismissed); // action preserved
     });
 
@@ -1858,6 +2174,141 @@ describe('User', () => {
           .select({ count: count() })
           .from(security_analysis_queue)
           .where(eq(security_analysis_queue.finding_id, finding2.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+    });
+
+    it('should delete user-owned remediations and scrub retained remediation actor references', async () => {
+      const user1 = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Security remediation GDPR org' })
+        .returning({ id: organizations.id });
+      if (!organization) throw new Error('Failed to create security remediation GDPR org');
+
+      const [userFinding] = await db
+        .insert(security_findings)
+        .values({
+          owned_by_user_id: user1.id,
+          repo_full_name: 'kilo-org/remediation-user',
+          source: 'dependabot',
+          source_id: `user-source-${randomUUID()}`,
+          severity: 'high',
+          package_name: 'zod',
+          package_ecosystem: 'npm',
+          title: 'User remediation finding',
+          analysis_status: 'completed',
+          analysis_completed_at: new Date().toISOString(),
+        })
+        .returning();
+      const [orgFinding] = await db
+        .insert(security_findings)
+        .values({
+          owned_by_organization_id: organization.id,
+          repo_full_name: 'kilo-org/remediation-org',
+          source: 'dependabot',
+          source_id: `org-source-${randomUUID()}`,
+          severity: 'critical',
+          package_name: 'drizzle-orm',
+          package_ecosystem: 'npm',
+          title: 'Org remediation finding',
+          analysis_status: 'completed',
+          analysis_completed_at: new Date().toISOString(),
+        })
+        .returning();
+      if (!userFinding || !orgFinding) throw new Error('Failed to create remediation findings');
+
+      const [userRemediation] = await db
+        .insert(security_remediations)
+        .values({
+          owned_by_user_id: user1.id,
+          finding_id: userFinding.id,
+          repo_full_name: userFinding.repo_full_name,
+          status: 'queued',
+        })
+        .returning({ id: security_remediations.id });
+      const [orgRemediation] = await db
+        .insert(security_remediations)
+        .values({
+          owned_by_organization_id: organization.id,
+          finding_id: orgFinding.id,
+          repo_full_name: orgFinding.repo_full_name,
+          status: 'running',
+        })
+        .returning({ id: security_remediations.id });
+      if (!userRemediation || !orgRemediation) {
+        throw new Error('Failed to create security remediations');
+      }
+
+      await db.insert(security_remediation_attempts).values([
+        {
+          remediation_id: userRemediation.id,
+          finding_id: userFinding.id,
+          owned_by_user_id: user1.id,
+          repo_full_name: userFinding.repo_full_name,
+          origin: 'manual',
+          status: 'queued',
+          attempt_number: 1,
+          requested_by_user_id: user1.id,
+          analysis_fingerprint: 'user-fingerprint',
+          analysis_completed_at: new Date().toISOString(),
+          remediation_model_slug: 'claude-sonnet-4-20250514',
+          branch_name: 'security/remediation-user',
+        },
+        {
+          remediation_id: orgRemediation.id,
+          finding_id: orgFinding.id,
+          owned_by_organization_id: organization.id,
+          repo_full_name: orgFinding.repo_full_name,
+          origin: 'manual',
+          status: 'running',
+          attempt_number: 1,
+          requested_by_user_id: user1.id,
+          cancellation_requested_by_user_id: user1.id,
+          analysis_fingerprint: 'org-fingerprint',
+          analysis_completed_at: new Date().toISOString(),
+          remediation_model_slug: 'claude-sonnet-4-20250514',
+          branch_name: 'security/remediation-org',
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_remediations)
+          .where(eq(security_remediations.owned_by_user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_remediation_attempts)
+          .where(eq(security_remediation_attempts.owned_by_user_id, user1.id))
+          .then(r => r[0].count)
+      ).toBe(0);
+
+      const retainedAttempts = await db
+        .select()
+        .from(security_remediation_attempts)
+        .where(eq(security_remediation_attempts.remediation_id, orgRemediation.id));
+      expect(retainedAttempts).toHaveLength(1);
+      expect(retainedAttempts[0].requested_by_user_id).toBeNull();
+      expect(retainedAttempts[0].cancellation_requested_by_user_id).toBeNull();
+
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_remediations)
+          .where(eq(security_remediations.id, orgRemediation.id))
+          .then(r => r[0].count)
+      ).toBe(1);
+      expect(
+        await db
+          .select({ count: count() })
+          .from(security_findings)
+          .where(eq(security_findings.id, orgFinding.id))
           .then(r => r[0].count)
       ).toBe(1);
     });
@@ -2388,24 +2839,40 @@ describe('User', () => {
       expect(scans[0].findings_critical).toBe(1);
     });
 
-    it('should preserve credit transactions', async () => {
-      const user = await insertTestUser();
-      await db.insert(credit_transactions).values({
-        kilo_user_id: user.id,
-        amount_microdollars: 5_000_000,
-        is_free: false,
-        description: 'Test credits',
+    it('should preserve credit transactions and creator attribution', async () => {
+      const creator = await insertTestUser({ is_admin: true, can_manage_credits: true });
+      const recipient = await insertTestUser();
+      const [transaction] = await db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: recipient.id,
+          created_by_kilo_user_id: creator.id,
+          amount_microdollars: 5_000_000,
+          is_free: false,
+          description: 'Test credits',
+        })
+        .returning({ id: credit_transactions.id });
+      if (!transaction) throw new Error('Failed to create credit transaction');
+
+      await softDeleteUser(creator.id);
+
+      const [preservedTransaction] = await db
+        .select({
+          kilo_user_id: credit_transactions.kilo_user_id,
+          created_by_kilo_user_id: credit_transactions.created_by_kilo_user_id,
+        })
+        .from(credit_transactions)
+        .where(eq(credit_transactions.id, transaction.id));
+      const softDeletedCreator = await findUserById(creator.id);
+
+      expect(preservedTransaction).toEqual({
+        kilo_user_id: recipient.id,
+        created_by_kilo_user_id: creator.id,
       });
-
-      await softDeleteUser(user.id);
-
-      expect(
-        await db
-          .select({ count: count() })
-          .from(credit_transactions)
-          .where(eq(credit_transactions.kilo_user_id, user.id))
-          .then(r => r[0].count)
-      ).toBe(1);
+      expect(softDeletedCreator?.id).toBe(creator.id);
+      expect(softDeletedCreator?.google_user_name).toBe('Deleted User');
+      expect(softDeletedCreator?.is_admin).toBe(false);
+      expect(softDeletedCreator?.can_manage_credits).toBe(false);
     });
 
     it('should preserve model experiment attribution and prompt hashes', async () => {

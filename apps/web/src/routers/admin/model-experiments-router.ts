@@ -12,8 +12,9 @@ import {
 } from '@kilocode/db/schema';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { ExperimentUpstreamSchema } from '@/lib/ai-gateway/experiments/upstream-schema';
+import { deepStrict } from '@/lib/zod/deep-strict';
 import { EXPERIMENTED_PUBLIC_IDS_REDIS_KEY } from '@/lib/redis-keys';
+import { CustomLlmApiConfigSchema, CustomLlmMetadataSchema } from '@kilocode/db/schema-types';
 import {
   CUSTOM_LLM_PREFIX,
   KILOCLAW_KILO_PROVIDER_PREFIX,
@@ -21,7 +22,7 @@ import {
 } from '@/lib/ai-gateway/model-utils';
 import { redisClient } from '@/lib/redis';
 import { TRPCError } from '@trpc/server';
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 type TrpcErrorCode = ConstructorParameters<typeof TRPCError>[0]['code'];
@@ -250,15 +251,19 @@ async function assertActivatable(experimentId: string, publicModelId: string) {
 
 // ---- Router -------------------------------------------------------------
 
+const StrictCustomLlmMetadataSchema = deepStrict(CustomLlmMetadataSchema);
+
 const CreateExperimentSchema = z.object({
   public_model_id: publicModelIdSchema,
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
+  metadata: StrictCustomLlmMetadataSchema.nullable().optional(),
 });
 
 const UpdateExperimentSchema = idSchema.extend({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).nullable().optional(),
+  metadata: StrictCustomLlmMetadataSchema.nullable().optional(),
   // public_model_id is editable only on draft.
   public_model_id: publicModelIdSchema.optional(),
 });
@@ -275,7 +280,7 @@ const UpdateVariantLabelSchema = z.object({
 
 const SwapVariantVersionSchema = z.object({
   variantId: z.string().uuid(),
-  upstream: ExperimentUpstreamSchema,
+  upstream: deepStrict(CustomLlmApiConfigSchema),
   // Optional: if omitted, the prior version's encrypted_api_key is reused
   // (so admins can hot-swap the upstream config without retyping the key).
   // Required when the variant has no prior version.
@@ -464,6 +469,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
         public_model_id: input.public_model_id,
         name: input.name,
         description: input.description ?? null,
+        metadata: input.metadata ?? null,
         status: 'draft',
         created_by_user_id: ctx.user.id,
       })
@@ -476,16 +482,26 @@ export const adminModelExperimentsRouter = createTRPCRouter({
     const next: Partial<typeof model_experiment.$inferInsert> = {};
     if (input.name !== undefined) next.name = input.name;
     if (input.description !== undefined) next.description = input.description;
+    if (input.metadata !== undefined) {
+      assertNonTerminal(existing.status as Status, 'Changing metadata');
+      next.metadata = input.metadata;
+    }
     if (input.public_model_id !== undefined) {
       assertDraft(existing.status as Status, 'Changing public_model_id');
       next.public_model_id = input.public_model_id;
     }
     if (Object.keys(next).length === 0) return existing;
-    const [updated] = await db
-      .update(model_experiment)
-      .set(next)
-      .where(eq(model_experiment.id, input.id))
-      .returning();
+    const updateFilter =
+      input.metadata === undefined
+        ? eq(model_experiment.id, input.id)
+        : and(eq(model_experiment.id, input.id), ne(model_experiment.status, 'completed'));
+    const [updated] = await db.update(model_experiment).set(next).where(updateFilter).returning();
+    if (!updated) {
+      if (input.metadata !== undefined) {
+        badRequest('Changing metadata is not allowed on completed experiments');
+      }
+      notFound('Experiment');
+    }
     // Only routing-relevant edits touch the experimented-public-id cache;
     // cosmetic name/description-only changes don't refresh it.
     if (existing.public_model_id !== updated.public_model_id) {
@@ -659,7 +675,7 @@ export const adminModelExperimentsRouter = createTRPCRouter({
       );
     }
 
-    const validated = ExperimentUpstreamSchema.safeParse(previousUpstream);
+    const validated = CustomLlmApiConfigSchema.safeParse(previousUpstream);
     if (!validated.success) {
       trpcThrow('INTERNAL_SERVER_ERROR', 'Latest variant version has an invalid upstream blob');
     }

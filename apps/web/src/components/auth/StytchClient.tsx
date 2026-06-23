@@ -2,7 +2,6 @@
 
 import Script from 'next/script';
 import { useEffect, useState } from 'react';
-import { captureException } from '@sentry/nextjs';
 
 const telemetryJsUri =
   process.env.NEXT_PUBLIC_STYTCH_PROJECT_ENV === 'test'
@@ -41,7 +40,7 @@ export const StytchClient = ({ children }: React.PropsWithChildren) => {
               submitURL: 'https://auth.kilo.ai/submit',
             })
             .then(setFreshTelemetryId)
-            .catch(err => captureException(err));
+            .catch(error => console.error('Failed to get Stytch telemetry ID:', error));
         }}
       />
       {children}

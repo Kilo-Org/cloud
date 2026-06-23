@@ -171,6 +171,8 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
           id: model.id,
           name: model.name,
           isFree: model.isFree,
+          mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+          hasUserByokAvailable: model.hasUserByokAvailable,
           variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
         }))
       ),

@@ -145,6 +145,7 @@ vi.mock('../utils/encryption', async () => {
 
 import { KiloClawInstance } from './kiloclaw-instance';
 import { buildChannelConfigPatch } from './kiloclaw-instance/channel-config';
+import { destroyRetryDelay } from './kiloclaw-instance/log';
 import * as flyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
 import * as db from '../db';
@@ -1394,7 +1395,17 @@ describe('destroy error tracking', () => {
   });
 });
 
-describe('destroy volume: max-retry abandon', () => {
+describe('destroy volume: retry backoff and abandon', () => {
+  it('uses tiered proportional jitter and caps at the daily tier', () => {
+    expect(destroyRetryDelay(1, 0.5)).toBe(60 * 1000);
+    expect(destroyRetryDelay(2, 0.5)).toBe(5 * 60 * 1000);
+    expect(destroyRetryDelay(3, 0.5)).toBe(15 * 60 * 1000);
+    expect(destroyRetryDelay(4, 0.5)).toBe(60 * 60 * 1000);
+    expect(destroyRetryDelay(5, 0.5)).toBe(6 * 60 * 60 * 1000);
+    expect(destroyRetryDelay(6, 0.5)).toBe(24 * 60 * 60 * 1000);
+    expect(destroyRetryDelay(100, 0)).toBe(12 * 60 * 60 * 1000);
+    expect(destroyRetryDelay(100, 1)).toBe(36 * 60 * 60 * 1000);
+  });
   // vi.clearAllMocks() in the global beforeEach clears call history but not
   // implementations. Without this reset, a previous test in the file that
   // used `.mockResolvedValue([volumes...])` on listVolumes would leak its
@@ -1442,6 +1453,34 @@ describe('destroy volume: max-retry abandon', () => {
     expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-1');
   });
 
+  it('emits retry escalation telemetry before reaching the cap', async () => {
+    const env = createFakeEnv();
+    const { storage } = createInstance(createFakeStorage(), env);
+    await seedProvisioned(storage, {
+      status: 'destroying',
+      flyMachineId: null,
+      flyVolumeId: 'vol-1',
+      pendingDestroyMachineId: null,
+      pendingDestroyVolumeId: 'vol-1',
+      destroyVolumeAttempts: 5,
+    });
+    (flyClient.getVolume as Mock).mockResolvedValue({
+      id: 'vol-1',
+      attached_machine_id: null,
+      state: 'detached',
+    });
+    (flyClient.deleteVolume as Mock).mockRejectedValue(
+      new FlyApiError('persistent failure', 503, '{}')
+    );
+
+    const { instance } = createInstance(storage, env);
+    await instance.alarm();
+
+    expect(storage._store.get('destroyVolumeAttempts')).toBe(6);
+    expect(storage._store.get('pendingDestroyVolumeId')).toBe('vol-1');
+    expect(analyticsEventsByName(env, 'reconcile.destroy_volume_retry_escalated')).toHaveLength(1);
+  });
+
   it('emits destroy_volume_abandoned_after_max_retries and clears state at the cap', async () => {
     const env = createFakeEnv();
     const { storage } = createInstance(createFakeStorage(), env);
@@ -1452,7 +1491,7 @@ describe('destroy volume: max-retry abandon', () => {
       flyVolumeId: 'vol-1',
       pendingDestroyMachineId: null,
       pendingDestroyVolumeId: 'vol-1',
-      destroyVolumeAttempts: 49,
+      destroyVolumeAttempts: 99,
     });
 
     (flyClient.getVolume as Mock).mockResolvedValue({
@@ -1500,7 +1539,7 @@ describe('destroy volume: max-retry abandon', () => {
       flyVolumeId: 'vol-1',
       pendingDestroyMachineId: null,
       pendingDestroyVolumeId: 'vol-1',
-      destroyVolumeAttempts: 49,
+      destroyVolumeAttempts: 99,
     });
 
     (flyClient.getVolume as Mock).mockResolvedValue({

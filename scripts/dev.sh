@@ -42,41 +42,14 @@ for envfile in .env.local .env.development.local; do
   fi
 done
 
-read_env_value() {
-  local key="$1"
-  local file
-  local value
-
-  for file in .env.development.local .env.local "$REPO_ROOT/.env.development.local" "$REPO_ROOT/.env.local"; do
-    if [ -f "$file" ]; then
-      value=$(awk -F= -v key="$key" '
-        $1 == key {
-          value = substr($0, length(key) + 2)
-          gsub(/^["'\'']|["'\'']$/, "", value)
-          print value
-          exit
-        }
-      ' "$file")
-      if [ -n "$value" ]; then
-        echo "$value"
-        return
-      fi
-    fi
-  done
-}
-
 export PORT
 export REDIS_URL="${REDIS_URL:-redis://localhost:6379}"
 export UPSTASH_REDIS_REST_URL="${UPSTASH_REDIS_REST_URL:-http://localhost:8079}"
 export UPSTASH_REDIS_REST_TOKEN="${UPSTASH_REDIS_REST_TOKEN:-example_token}"
-APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-$(read_env_value APP_URL_OVERRIDE)}"
-NEXTAUTH_URL="${NEXTAUTH_URL:-$(read_env_value NEXTAUTH_URL)}"
 NEXT_DEV_HOSTNAME="${NEXT_DEV_HOSTNAME:-0.0.0.0}"
-# Only export APP_URL_OVERRIDE when set; an empty export becomes "" in
-# process.env and defeats the `??` fallback in apps/web/src/lib/constants.ts.
-if [ -n "$APP_URL_OVERRIDE" ]; then
-  export APP_URL_OVERRIDE
-fi
+APP_URL_OVERRIDE="${APP_URL_OVERRIDE:-http://localhost:$PORT}"
+NEXTAUTH_URL="${NEXTAUTH_URL:-$APP_URL_OVERRIDE}"
+export APP_URL_OVERRIDE
 export NEXT_DEV_HOSTNAME
-export NEXTAUTH_URL="${NEXTAUTH_URL:-${APP_URL_OVERRIDE:-http://localhost:$PORT}}"
+export NEXTAUTH_URL
 exec next dev -H "$NEXT_DEV_HOSTNAME" -p "$PORT" "$@"

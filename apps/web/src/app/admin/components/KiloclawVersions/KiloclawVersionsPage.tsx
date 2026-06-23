@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Badge } from '@/components/ui/badge';
@@ -68,6 +68,8 @@ import {
   Minus,
   Ban,
   Info,
+  BarChart2,
+  RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { toastPinMutationResult } from '@/lib/kiloclaw/pin-sync-toast';
@@ -217,7 +219,7 @@ function RolloutStatusPanel({
               </Button>
               <Button
                 size="sm"
-                className="h-7 bg-blue-600 text-xs hover:bg-blue-700"
+                className="h-7 text-xs"
                 onClick={() => {
                   if (
                     window.confirm(
@@ -374,6 +376,276 @@ function StartRolloutButton({
   );
 }
 
+/**
+ * Shows how the live fleet is distributed across image tags.
+ * Data comes from the denormalized `tracked_image_tag` column on kiloclaw_instances,
+ * which is written by the DO alarm reconciler and may lag ~30 min for idle instances.
+ */
+// Surface only the headline buckets in the legend; collapse the rest below
+// this share into one "Other" segment. Without a cap, a slow fleet-wide
+// upgrade spreads instances across dozens of image tags and turns the legend
+// into an unreadable rainbow wall of `0% (n)` chips.
+const DISTRIBUTION_MAX_LEGEND_ROWS = 8;
+const DISTRIBUTION_MIN_SHARE_PCT = 2;
+
+type DistributionSegment = {
+  key: string;
+  color: string;
+  label: string;
+  pct: number;
+  count: number;
+  pinnedCount: number;
+  isLatest: boolean;
+  isUnknown: boolean;
+  isCandidate: boolean;
+  rolloutPercent: number | null;
+};
+
+/** One legend row — a color swatch, label, optional candidate badge, share %,
+ *  instance count, and pinned-anchor count. Shared by the top-level legend and
+ *  the expanded "Other" drawer so both render identically. */
+function DistributionLegendEntry({ seg }: { seg: DistributionSegment }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`inline-block h-2.5 w-2.5 shrink-0 rounded-sm ${seg.color}`} />
+      <span className={seg.isUnknown ? 'text-muted-foreground italic' : ''} title={seg.label}>
+        {seg.label.length > 22 ? `${seg.label.slice(0, 22)}…` : seg.label}
+      </span>
+      {seg.isCandidate && (
+        <Badge className="bg-purple-600 px-1 py-0 text-[10px] text-white">
+          <Rocket className="mr-0.5 h-2.5 w-2.5" />
+          {seg.rolloutPercent}%
+        </Badge>
+      )}
+      <span className="font-medium tabular-nums">{Math.round(seg.pct)}%</span>
+      <span className="text-muted-foreground tabular-nums">({seg.count})</span>
+      {seg.pinnedCount > 0 && (
+        <span className="text-muted-foreground inline-flex items-center gap-0.5">
+          <Anchor className="h-3 w-3" />
+          {seg.pinnedCount}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function InstanceDistributionPanel() {
+  const trpc = useTRPC();
+  const { data, isLoading, isError, refetch, isFetching, dataUpdatedAt } = useQuery(
+    trpc.admin.kiloclawVersions.getVersionDistribution.queryOptions()
+  );
+  const [othersExpanded, setOthersExpanded] = useState(false);
+
+  const total = data?.total ?? 0;
+  const rows = data?.rows ?? [];
+
+  // Classify each bucket for color + label. Mirrors the catalog table accents:
+  // blue = :latest, purple = candidate, red = disabled, amber = old/superseded,
+  // muted = "no tag yet" (DO hasn't reconciled). `pct` is unrounded so the bar
+  // segments stay proportional; the legend rounds for display.
+  const segments: DistributionSegment[] = rows.map((row, i) => {
+    const isLatest = row.is_latest === true;
+    const isDisabled = row.status === 'disabled';
+    // Match the catalog table's predicate: a disabled row may retain a nonzero
+    // rollout_percent, so gate on status === 'available' before calling it a
+    // candidate — otherwise the panel would badge a disabled image purple.
+    const isCandidate = !isLatest && row.status === 'available' && (row.rollout_percent ?? 0) > 0;
+    const isUnknown = row.tracked_image_tag == null;
+    const color = isLatest
+      ? 'bg-blue-600'
+      : isCandidate
+        ? 'bg-purple-600'
+        : isDisabled
+          ? 'bg-red-800'
+          : isUnknown
+            ? 'bg-muted-foreground/40'
+            : 'bg-amber-600';
+    const label = isUnknown ? 'no tag yet' : (row.openclaw_version ?? row.tracked_image_tag ?? '');
+    const pct = total > 0 ? (row.count / total) * 100 : 0;
+    return {
+      key: row.tracked_image_tag ?? `__unknown__${i}`,
+      color,
+      label,
+      pct,
+      count: row.count,
+      pinnedCount: row.pinned_count,
+      isLatest,
+      isUnknown,
+      isCandidate,
+      rolloutPercent: row.rollout_percent,
+    };
+  });
+
+  // :latest and the active candidate always stay visible — they're the buckets
+  // ops is steering a rollout toward, regardless of how small their share is.
+  // Everything else is ranked by share; the biggest fill the remaining legend
+  // slots and the rest fold into "Other".
+  const latestAndCandidate = segments.filter(s => s.isLatest || s.isCandidate);
+  const tail = segments
+    .filter(s => !s.isLatest && !s.isCandidate)
+    .sort((a, b) => b.count - a.count);
+
+  const visibleTail: DistributionSegment[] = [];
+  const collapsedTail: DistributionSegment[] = [];
+  for (const seg of tail) {
+    const hasRoom = latestAndCandidate.length + visibleTail.length < DISTRIBUTION_MAX_LEGEND_ROWS;
+    if (hasRoom && seg.pct >= DISTRIBUTION_MIN_SHARE_PCT) {
+      visibleTail.push(seg);
+    } else {
+      collapsedTail.push(seg);
+    }
+  }
+  // Collapsing a lone straggler into "Other (1 version)" hides nothing and just
+  // costs a click — show it inline instead.
+  if (collapsedTail.length === 1) {
+    const only = collapsedTail.pop();
+    if (only) visibleTail.push(only);
+  }
+
+  const otherCount = collapsedTail.reduce((sum, s) => sum + s.count, 0);
+  const otherPinned = collapsedTail.reduce((sum, s) => sum + s.pinnedCount, 0);
+  const otherPct = collapsedTail.reduce((sum, s) => sum + s.pct, 0);
+  const hasOther = collapsedTail.length > 0;
+  // Count only real versions for the "N versions" label — the "no tag yet"
+  // bucket is unreconciled instances, not a version, so folding it into the
+  // tally would overstate how many image tags "Other" represents. Its
+  // instances still contribute to otherCount / otherPct.
+  const otherVersions = collapsedTail.filter(s => !s.isUnknown).length;
+
+  // Bar order mirrors the legend: headline buckets, then the biggest shares,
+  // then the single aggregated "Other" segment.
+  const visibleSegments = [...latestAndCandidate, ...visibleTail];
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-base">
+          <div className="flex items-center gap-2">
+            <BarChart2 className="h-4 w-4" />
+            Instance Distribution
+          </div>
+          <div className="flex items-center gap-2">
+            {dataUpdatedAt > 0 && (
+              <span className="text-muted-foreground text-xs">
+                updated {formatDistanceToNow(new Date(dataUpdatedAt), { addSuffix: true })}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+              aria-label="Refresh distribution"
+            >
+              <RefreshCw className={`h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex justify-center py-4">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </div>
+        ) : isError ? (
+          // Distinguish a load failure from a genuinely empty fleet — rendering
+          // "No active instances" on error would hide an outage as valid
+          // zero-fleet data and could mislead rollout decisions.
+          <div className="flex items-center justify-between gap-3 rounded-md border border-red-800/50 bg-red-950/20 px-3 py-2.5 text-sm">
+            <span className="flex items-center gap-2 text-red-300">
+              <AlertTriangle className="h-4 w-4" />
+              Couldn't load distribution — counts unavailable.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => void refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCw className={`mr-1 h-3 w-3 ${isFetching ? 'animate-spin' : ''}`} />
+              Retry
+            </Button>
+          </div>
+        ) : rows.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No active instances.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {/* Single stacked bar — fixed height regardless of how many versions
+                are in the fleet, so it never pushes the catalog table down. The
+                long tail is one aggregated "Other" segment. */}
+            <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+              {visibleSegments.map(seg => (
+                <div
+                  key={seg.key}
+                  className={seg.color}
+                  style={{ width: `${seg.pct}%`, minWidth: seg.count > 0 ? '3px' : 0 }}
+                  title={`${seg.label}: ${seg.count} (${Math.round(seg.pct)}%)`}
+                />
+              ))}
+              {hasOther && (
+                <div
+                  className="bg-zinc-500"
+                  style={{ width: `${otherPct}%`, minWidth: otherCount > 0 ? '3px' : 0 }}
+                  title={`Other (${otherVersions} version${otherVersions === 1 ? '' : 's'}): ${otherCount} (${Math.round(otherPct)}%)`}
+                />
+              )}
+            </div>
+            {/* Compact wrapping legend — grows far slower than a row-per-version
+                table, and the long tail stays folded behind "Other". */}
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs">
+              {visibleSegments.map(seg => (
+                <DistributionLegendEntry key={seg.key} seg={seg} />
+              ))}
+              {hasOther && (
+                <button
+                  type="button"
+                  className="hover:text-foreground text-muted-foreground flex items-center gap-1.5 transition-colors"
+                  onClick={() => setOthersExpanded(v => !v)}
+                  aria-expanded={othersExpanded}
+                >
+                  <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-zinc-500" />
+                  <span>
+                    Other ({otherVersions} version{otherVersions === 1 ? '' : 's'})
+                  </span>
+                  <span className="font-medium tabular-nums">{Math.round(otherPct)}%</span>
+                  <span className="tabular-nums">({otherCount})</span>
+                  {otherPinned > 0 && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <Anchor className="h-3 w-3" />
+                      {otherPinned}
+                    </span>
+                  )}
+                  {othersExpanded ? (
+                    <ChevronUp className="h-3 w-3" />
+                  ) : (
+                    <ChevronDown className="h-3 w-3" />
+                  )}
+                </button>
+              )}
+            </div>
+            {/* Expanded "Other" drawer — the folded long tail, indented. */}
+            {hasOther && othersExpanded && (
+              <div className="border-muted ml-1 flex flex-wrap gap-x-4 gap-y-1.5 border-l-2 pl-3 text-xs">
+                {collapsedTail.map(seg => (
+                  <DistributionLegendEntry key={seg.key} seg={seg} />
+                ))}
+              </div>
+            )}
+            <p className="text-muted-foreground text-xs">
+              {total} active instance{total === 1 ? '' : 's'} · grouped by each instance's{' '}
+              <span className="font-medium">target</span> image tag (applied on next
+              provision/restart/redeploy — an instance may still be running its previous image until
+              then). Denormalized from the DO; may lag ~30 min for idle instances.
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 type SortColumn = 'openclaw_version' | 'image_tag' | 'status' | 'published_at';
 type SortDir = 'asc' | 'desc';
 
@@ -431,6 +703,21 @@ export function VersionsTab() {
     })
   );
 
+  // Live fleet distribution by image tag, powering the per-row "Fleet" column.
+  // This is the SAME query the InstanceDistributionPanel uses, so React Query
+  // dedupes it — no extra network round-trip.
+  const { data: distribution, isError: distributionError } = useQuery(
+    trpc.admin.kiloclawVersions.getVersionDistribution.queryOptions()
+  );
+  const fleetTotal = distribution?.total ?? 0;
+  const fleetByTag = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of distribution?.rows ?? []) {
+      if (row.tracked_image_tag != null) map.set(row.tracked_image_tag, row.count);
+    }
+    return map;
+  }, [distribution]);
+
   // Rows that are eligible for bulk disable on the current page. Excludes
   // :latest (kiloclaw service refuses to disable it) and already-disabled
   // rows (idempotent). Active candidates ARE eligible — disabling clears
@@ -439,14 +726,18 @@ export function VersionsTab() {
   const allEligibleSelected =
     eligibleRows.length > 0 && eligibleRows.every(v => selectedTags.has(v.image_tag));
 
-  // After any mutation that changes catalog state, invalidate both the
-  // paginated list (table view) AND the active rollout query (hero panel).
+  // After any mutation that changes catalog state, invalidate the paginated
+  // list (table view), the active rollout query (hero panel), and the instance
+  // distribution panel so counts stay in sync after promotions/rollout changes.
   const invalidateRolloutState = () => {
     void queryClient.invalidateQueries({
       queryKey: trpc.admin.kiloclawVersions.listVersions.queryKey(),
     });
     void queryClient.invalidateQueries({
       queryKey: trpc.admin.kiloclawVersions.getActiveRollout.queryKey(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.admin.kiloclawVersions.getVersionDistribution.queryKey(),
     });
   };
 
@@ -588,6 +879,9 @@ export function VersionsTab() {
         }}
       />
 
+      {/* Fleet distribution: how many instances are on each image tag */}
+      <InstanceDistributionPanel />
+
       {/* Reminder when newly-published images are sitting dormant. */}
       {unpromotedImages.length > 0 && (
         <div className="flex items-start gap-3 rounded-md border border-amber-700/50 bg-amber-950/20 px-3 py-2.5 text-sm">
@@ -715,6 +1009,7 @@ export function VersionsTab() {
                 activeDir={sortDir}
                 onSort={handleSort}
               />
+              <TableHead className="w-[110px]">Instances</TableHead>
               <SortableHeader
                 column="published_at"
                 label="Published"
@@ -728,13 +1023,13 @@ export function VersionsTab() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center">
+                <TableCell colSpan={8} className="text-center">
                   <Loader2 className="mx-auto h-4 w-4 animate-spin" />
                 </TableCell>
               </TableRow>
             ) : data?.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-muted-foreground text-center">
+                <TableCell colSpan={8} className="text-muted-foreground text-center">
                   No versions found
                 </TableCell>
               </TableRow>
@@ -752,6 +1047,8 @@ export function VersionsTab() {
                   : isCandidate
                     ? 'border-l-4 border-l-purple-600'
                     : 'border-l-4 border-l-transparent';
+                const fleetCount = fleetByTag.get(version.image_tag) ?? 0;
+                const fleetPct = fleetTotal > 0 ? Math.round((fleetCount / fleetTotal) * 100) : 0;
                 return (
                   <TableRow key={version.id} className={accent}>
                     <TableCell className="py-2">
@@ -811,6 +1108,33 @@ export function VersionsTab() {
                         </Badge>
                       )}
                     </TableCell>
+                    <TableCell className="text-sm tabular-nums">
+                      {distributionError ? (
+                        // Counts failed to load — don't render "—", which would
+                        // imply a confirmed zero instances on this version.
+                        <span className="text-muted-foreground italic" title="Counts unavailable">
+                          n/a
+                        </span>
+                      ) : fleetTotal > 0 && fleetCount > 0 ? (
+                        <div
+                          className="flex items-center gap-2"
+                          title={`${fleetCount} of ${fleetTotal} active instances target this version`}
+                        >
+                          <div className="h-1.5 w-12 overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={`h-full rounded-full ${isLatest ? 'bg-blue-600' : isCandidate ? 'bg-purple-600' : 'bg-amber-600'}`}
+                              style={{ width: `${fleetPct}%` }}
+                            />
+                          </div>
+                          <span>
+                            {fleetPct}%{' '}
+                            <span className="text-muted-foreground">({fleetCount})</span>
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       <span title={new Date(version.published_at).toLocaleString()}>
                         {formatDistanceToNow(new Date(version.published_at), { addSuffix: true })}
@@ -855,8 +1179,9 @@ export function VersionsTab() {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
+                                  variant="outline"
                                   size="sm"
-                                  className="h-8 w-8 bg-blue-600 p-0 text-white hover:bg-blue-700"
+                                  className="h-8 w-8 p-0"
                                   aria-label="Make :latest"
                                   onClick={() => {
                                     if (

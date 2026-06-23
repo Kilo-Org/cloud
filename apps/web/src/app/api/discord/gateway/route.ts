@@ -8,14 +8,14 @@ import { db, sql } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { discord_gateway_listener } from '@kilocode/db';
 
-export const maxDuration = 800;
+export const maxDuration = 1800;
 
 /**
  * Maximum duration for the Gateway listener (in ms).
  * On Vercel, this should be less than the function's maxDuration.
  * The cron job should run more frequently than this duration to ensure overlap.
  */
-const GATEWAY_DURATION_MS = 600 * 1000; // 10 minutes
+const GATEWAY_DURATION_MS = 1770 * 1000; // 29.5 minutes (30s buffer before 1800s maxDuration)
 
 /**
  * How often the listener checks if it's been superseded (in ms).

@@ -2215,6 +2215,8 @@ export function SettingsTab({
           id: model.id,
           name: model.name,
           isFree: model.isFree,
+          mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+          hasUserByokAvailable: model.hasUserByokAvailable,
         })),
         trackedOpenClawVersion: trackedVersion,
         runningOpenClawVersion: runningVersion,
@@ -2447,7 +2449,17 @@ export function SettingsTab({
           <div className="mt-4 space-y-6 border-t pt-4">
             <VersionPinCard
               trackedImageTag={status.trackedImageTag}
+              // Pair the tracked image with the version baked into THAT image
+              // (trackedVersion), not the live controller version. They diverge
+              // when OpenClaw self-updates (the "Modified" state above), and
+              // attributing the runtime version to the tracked image tag would
+              // be inaccurate — and could falsely trigger the "same version,
+              // different image" tooltip on the Latest row.
+              trackedOpenClawVersion={trackedVersion}
               latestImageTag={variantsMatch ? (latestVersion?.imageTag ?? null) : null}
+              latestOpenClawVersion={
+                variantsMatch ? cleanVersion(latestVersion?.openclawVersion) : null
+              }
               mutations={mutations}
             />
             <EarlyAccessCard />

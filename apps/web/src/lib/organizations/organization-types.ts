@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
 import type { Result } from '@/lib/maybe-result';
-import { CompanyDomainSchema } from './company-domain';
+import { CompanyDomainSchema, isValidDomain } from './company-domain';
 
 // Re-export base types that don't depend on schema.ts
 export type {
@@ -69,6 +69,7 @@ export const OrganizationSchema = z.object({
   created_by_kilo_user_id: z.string().nullable(),
   deleted_at: z.string().nullable(),
   sso_domain: z.string().nullable(),
+  parent_organization_id: z.string().nullable(),
   plan: z.enum(['teams', 'enterprise']),
   free_trial_end_at: z.string().nullable(),
   company_domain: z.string().nullable(),
@@ -114,8 +115,16 @@ type ActiveMember = {
 
 export type OrganizationMember = InvitedMember | ActiveMember;
 
+export type OrganizationSsoPolicyView = {
+  required: boolean;
+  source: 'self' | 'direct_parent' | null;
+  domain: string | null;
+  configurationError: boolean;
+};
+
 export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
   members: OrganizationMember[];
+  effectiveSsoPolicy: OrganizationSsoPolicyView;
 };
 
 export type AcceptInviteResult = Result<
@@ -199,6 +208,14 @@ const OpenRouterModelSchema = z.object({
   // kilocode additions:
   preferredIndex: z.number().optional(),
   isFree: z.boolean().optional(),
+  mayTrainOnYourPrompts: z.boolean().optional(),
+  hasUserByokAvailable: z.boolean().optional(),
+  terminalBench: z
+    .object({
+      overallScore: z.number(),
+      avgAttemptCostUsd: z.number(),
+    })
+    .optional(),
   opencode: OpenCodeSettingsSchema.optional(),
 
   id: z.string(),
@@ -206,6 +223,7 @@ const OpenRouterModelSchema = z.object({
   created: z.number(),
   description: z.string(),
   architecture: z.object({
+    modality: z.string().nullable().optional(),
     input_modalities: z.array(z.string()),
     output_modalities: z.array(z.string()),
     tokenizer: z.string(),
@@ -242,9 +260,9 @@ export type OpenRouterModelsResponse = z.infer<typeof OpenRouterModelsResponseSc
 
 export const OrganizationSSODomainSchema = z
   .string()
-  .min(1, 'Domain cannot be empty')
-  .lowercase()
-  .trim();
+  .trim()
+  .toLowerCase()
+  .refine(isValidDomain, { message: 'Please enter a valid domain (e.g. acme.com)' });
 
 export type OrgTrialStatus =
   | 'subscribed' // Has active paid subscription

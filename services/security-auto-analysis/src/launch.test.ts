@@ -50,6 +50,12 @@ const finding = {
   vulnerable_version_range: '<1.0.0',
   patched_version: '1.0.0',
   manifest_path: 'package.json',
+  cwe_ids: null,
+  cvss_score: null,
+  dependabot_html_url: null,
+  first_detected_at: '2026-05-18T08:00:00.000Z',
+  fixed_at: null,
+  sla_due_at: null,
   raw_data: null,
   analysis_status: 'failed',
   analysis_started_at: null,
@@ -71,6 +77,7 @@ const existingTriage = {
 function createAutoDismissDb() {
   const updates: unknown[] = [];
   const auditRows: unknown[] = [];
+  let currentFinding = finding;
   const db = {
     select: () => ({
       from: () => ({
@@ -79,18 +86,39 @@ function createAutoDismissDb() {
         }),
       }),
     }),
-    update: () => ({
-      set: (values: unknown) => ({
-        where: async () => {
-          updates.push(values);
-        },
-      }),
-    }),
-    insert: () => ({
-      values: async (values: unknown) => {
-        auditRows.push(values);
-      },
-    }),
+    transaction: async (callback: (tx: unknown) => Promise<unknown>) => {
+      const tx = {
+        select: () => ({
+          from: () => ({
+            where: () => ({
+              for: () => ({ limit: async () => [currentFinding] }),
+            }),
+          }),
+        }),
+        update: () => ({
+          set: (values: Record<string, unknown>) => ({
+            where: () => ({
+              returning: async () => {
+                updates.push(values);
+                currentFinding = { ...currentFinding, ...values };
+                return [currentFinding];
+              },
+            }),
+          }),
+        }),
+        insert: () => ({
+          values: (values: unknown) => ({
+            onConflictDoNothing: () => ({
+              returning: async () => {
+                auditRows.push(values);
+                return [{ id: 'audit-row-1' }];
+              },
+            }),
+          }),
+        }),
+      };
+      return callback(tx);
+    },
   };
   return { db, updates, auditRows };
 }
@@ -284,7 +312,16 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       2,
       {},
       finding.id,
-      expect.objectContaining({ triage: existingTriage })
+      expect.objectContaining({
+        triage: existingTriage,
+        findingDataSnapshot: expect.objectContaining({
+          schemaVersion: 1,
+          source: 'dependabot',
+          sourceId: '42',
+          repoFullName: 'kilo/repo',
+          packageName: 'package-name',
+        }),
+      })
     );
     expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
       {},
@@ -318,10 +355,68 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
       {},
       expect.objectContaining({
         claim: expect.objectContaining({ source: 'manual', claimToken: 'manual-claim-token' }),
-        outcome: expect.objectContaining({ type: 'triage-only-completed' }),
+        outcome: expect.objectContaining({
+          type: 'triage-only-completed',
+          analysis: expect.objectContaining({
+            findingDataSnapshot: expect.objectContaining({
+              schemaVersion: 1,
+              sourceId: '42',
+              packageName: 'package-name',
+            }),
+          }),
+        }),
       })
     );
     expect(clearAnalysisStatus).not.toHaveBeenCalled();
+  });
+
+  it('launches sandbox analysis when explicitly forced by remediation', async () => {
+    vi.mocked(getSecurityFindingById).mockResolvedValue({ ...finding, analysis: null } as never);
+    vi.mocked(triageSecurityFinding).mockResolvedValue({
+      ...existingTriage,
+      needsSandboxAnalysis: false,
+      needsSandboxReasoning: 'No relevant runtime path.',
+      suggestedAction: 'manual_review',
+    });
+    const cloudAgentFetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            result: { data: { cloudAgentSessionId: 'agent-session', kiloSessionId: 'ses-123' } },
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ result: { data: { executionId: 'exec-123', status: 'running' } } }),
+          { status: 200 }
+        )
+      );
+
+    await expect(
+      startSecurityAnalysis({
+        ...createParams(false, cloudAgentFetch as never),
+        forceSandbox: true,
+      })
+    ).resolves.toEqual({
+      started: true,
+      triageOnly: false,
+    });
+
+    expect(cloudAgentFetch).toHaveBeenCalledTimes(2);
+    expect(transitionAnalysisStartLifecycle).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({
+        claim: expect.objectContaining({ source: 'manual', claimToken: 'manual-claim-token' }),
+        outcome: {
+          type: 'sandbox-running',
+          cloudAgentSessionId: 'agent-session',
+          kiloSessionId: 'ses-123',
+        },
+      })
+    );
   });
 
   it('auto-dismisses triage-only dismiss recommendations after durable Worker completion', async () => {
@@ -357,8 +452,18 @@ describe('startSecurityAnalysis retrySandboxOnly', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(auditRows[0]).toMatchObject({
       action: 'security.finding.auto_dismissed',
+      finding_id: finding.id,
       resource_id: finding.id,
-      metadata: { dismissSource: 'triage', confidence: 'high' },
+      occurred_at: expect.any(String),
+      schema_version: 1,
+      source_context: 'analysis_worker',
+      metadata: {
+        reason_code: 'not_used',
+        trigger: 'auto_dismiss_policy',
+        dismiss_source: 'triage',
+        confidence: 'high',
+        correlation_id: expect.any(String),
+      },
     });
   });
 

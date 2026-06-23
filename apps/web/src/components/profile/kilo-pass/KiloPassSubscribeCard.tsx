@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Check, Crown, Loader2 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +24,7 @@ export function KiloPassSubscribeCard(props: {
   showFirstMonthPromo?: boolean;
   showSecondMonthPromo: boolean;
   showHeader?: boolean;
+  headerAction?: ReactNode;
   unframed?: boolean;
   className?: string;
   contentClassName?: string;
@@ -36,6 +38,7 @@ export function KiloPassSubscribeCard(props: {
     showFirstMonthPromo = false,
     showSecondMonthPromo,
     showHeader = true,
+    headerAction,
     unframed = false,
     className,
     contentClassName,
@@ -130,7 +133,7 @@ export function KiloPassSubscribeCard(props: {
     <Card className={cn('border-border/60 w-full overflow-hidden rounded-xl shadow-sm', className)}>
       {showHeader ? (
         <CardHeader>
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <CardTitle className="flex items-center gap-2">
               <span className="bg-muted/40 ring-border/60 grid size-9 place-items-center rounded-lg ring-1">
                 <Crown className="size-5" />
@@ -145,14 +148,17 @@ export function KiloPassSubscribeCard(props: {
               </span>
             </CardTitle>
 
-            {pending ? (
-              <Badge variant="secondary" className="gap-1.5">
-                <Loader2 className="size-3.5 animate-spin" />
-                Processing
-              </Badge>
-            ) : (
-              <Badge variant="secondary">Subscribe</Badge>
-            )}
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+              {headerAction}
+              {pending ? (
+                <Badge variant="secondary" className="gap-1.5">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Processing
+                </Badge>
+              ) : (
+                <Badge variant="secondary">Subscribe</Badge>
+              )}
+            </div>
           </div>
         </CardHeader>
       ) : null}

@@ -17,7 +17,14 @@ scripts/          CI and one-off scripts
 - **Database schema**: `packages/db/src/schema.ts`
 - **Migrations**: `packages/db/src/migrations/`
 - **tRPC routers**: `apps/web/src/routers/`
-- **Env vars**: `.env.local` at repo root (pulled via `vercel env pull`)
+- **Env vars**: `.env.local` at repo root (pulled via `vercel env pull`). When a shared web env var needs to be added or rotated across tracked dotenv files and Vercel deployments, tell the user to run `pnpm web:env set <VARIABLE>`; agents must not run that command themselves because it prompts for secret values and writes to external systems.
+
+## Domain Context
+
+Before changing domain behavior, read `CONTEXT.md`.
+Use canonical terms from `CONTEXT.md` in code, docs, task descriptions, tests, and agent outputs.
+Do not introduce synonyms for existing concepts unless updating `CONTEXT.md` first.
+Do not duplicate the full context contract inside `AGENTS.md`.
 
 ## Verification
 
@@ -37,7 +44,7 @@ Target a specific test file: `pnpm test -- <path>`. Run tests for a specific ser
 
 ## apps/web UI Work
 
-Before making or reviewing UI changes under `apps/web` — components, routes/pages, layouts, styling, Storybook, visual polish, UX copy, interaction states, responsive behavior, theming, or accessibility — read `DESIGN.md` and use `.agents/skills/kilo-design/SKILL.md`. This applies even when the prompt does not explicitly mention design. Skip only for backend-only or non-visual logic changes.
+When editing UI files in `apps/web` — React components, pages, layouts, or styles (`.tsx`/`.css`) — use the `kilo-design` skill.
 
 ## Coding Standards
 
@@ -76,7 +83,7 @@ Schema is in `packages/db/src/schema.ts`. Migrations live in `packages/db/src/mi
 
 ## GDPR & PII
 
-When adding PII (email, name, IP address, etc.) to the database — whether as a new table or a new column — you **must** also update the GDPR soft-delete flow in `softDeleteUser` (`apps/web/src/lib/user.ts`) and add a corresponding test in `apps/web/src/lib/user.test.ts`.
+When adding PII (email, name, IP address, etc.) to the database — whether as a new table or a new column — you **must** also update the GDPR soft delete flow in `softDeleteUser` (`apps/web/src/lib/user/index.ts`) and add a corresponding test in `apps/web/src/lib/user/index.test.ts`.
 
 ## Logging & Sensitive Data
 
@@ -127,6 +134,7 @@ Business-rule specs live in `.specs/`. Before making **any** changes to a domain
 | `.specs/kiloclaw-controller.md` | KiloClaw controller/machine lifecycle, bootstrap, Docker image |
 | `.specs/kiloclaw-datamodel.md` | KiloClaw data model — instance/subscription tables, invariants |
 | `.specs/model-experiments.md` | Model experiment routing, bucketing, lifecycle, prompt retention, and reporting rules |
+| `.specs/security-agent.md` | Security Agent Auto Remediation and finding/SLA notification guarantees |
 | `.specs/subscription-center.md` | Subscription Center ownership, states, and user-facing behavior |
 | `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management |
 | `.specs/impact-affiliate-tracking.md` | Impact.com affiliate conversion tracking |

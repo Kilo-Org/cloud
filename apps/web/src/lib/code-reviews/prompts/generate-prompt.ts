@@ -1,30 +1,22 @@
 /**
- * Code Review Prompt Generation (v5.5.0)
+ * Code Review Prompt Generation
  *
- * Prompt generation with per-style overrides. Most content lives in the JSON template.
- * This file handles:
- * 1. Loading template from PostHog (remote) or falling back to local JSON
- * 2. Assembling template sections in order
- * 3. Replacing placeholders ({REPO}, {PR}, {COMMENT_ID}, {FIX_LINK})
- * 4. Adding dynamic context (existing comments table)
- * 5. Selecting CREATE vs UPDATE summary command
- * 6. Platform-specific template selection (GitHub vs GitLab)
- * 7. Injecting style guidance, custom instructions, and focus areas from config
- * 8. Applying per-style comment format and summary format overrides
+ * Prompt generation with per-style overrides. Immutable prompt content lives in the checked-in JSON
+ * templates. This file selects the platform template, replaces placeholders, adds dynamic review
+ * context, and applies checked-in style and summary format overrides.
  */
 
 import { z } from 'zod';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import { getFeatureFlagPayload } from '@/lib/posthog-feature-flags';
 import DEFAULT_PROMPT_TEMPLATE_GITHUB from '@/lib/code-reviews/prompts/default-prompt-template.json';
 import DEFAULT_PROMPT_TEMPLATE_GITLAB from '@/lib/code-reviews/prompts/default-prompt-template-gitlab.json';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';
-import { getPromptTemplateFeatureFlag, getPlatformConfig } from './platform-helpers';
+import { getPlatformConfig } from './platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { sanitizeUserInput } from './prompt-utils';
 import { formatRepositoryReviewInstructions } from './repository-review-instructions';
-import { stripReviewSummaryFooter } from '../summary/usage-footer';
+import { getCurrentReviewSummaryForContext } from '../summary/history';
 
 /**
  * Inline comment info for duplicate detection
@@ -52,120 +44,55 @@ export type ExistingReviewState = {
   headCommitSha: string;
 };
 
-// Zod schema for validating prompt template structure
-const PromptTemplateSchema = z.object({
-  version: z.string(),
-  systemRole: z.string(),
-  hardConstraints: z.string(),
-  workflow: z.string(),
-  whatToReview: z.string(),
-  commentFormat: z.string(),
-  summaryFormatIssuesFound: z.string(),
-  summaryFormatNoIssues: z.string(),
-  summaryMarkerNote: z.string(),
-  summaryCommandCreate: z.string(),
-  summaryCommandUpdate: z.string(),
-  inlineCommentsApi: z.string(),
-  fixLinkTemplate: z.string(),
-  // Incremental review workflow (used instead of `workflow` when a previous review exists)
-  incrementalReviewWorkflow: z.string().optional(),
-  // Per-style overrides (optional — only needed for non-default styles like roast)
-  styleGuidance: z.record(z.string(), z.string()).optional(),
-  commentFormatOverrides: z.record(z.string(), z.string()).optional(),
-  summaryFormatOverrides: z
-    .record(z.string(), z.object({ issuesFound: z.string(), noIssues: z.string() }))
-    .optional(),
-});
+export const PromptTemplateSchema = z
+  .object({
+    version: z.string(),
+    systemRole: z.string(),
+    hardConstraints: z.string(),
+    diffLineGuidance: z.string().optional(),
+    subAgentGuidance: z.string().optional(),
+    workflow: z.string(),
+    whatToReview: z.string(),
+    commentFormat: z.string(),
+    inlineCommentFooter: z.string().optional(),
+    summaryFormatIssuesFound: z.string(),
+    summaryFormatNoIssues: z.string(),
+    summaryMarkerNote: z.string(),
+    summaryCommandCreate: z.string(),
+    summaryCommandUpdate: z.string(),
+    inlineCommentsApi: z.string(),
+    fixLinkTemplate: z.string(),
+    // Incremental review workflow (used instead of `workflow` when a previous review exists)
+    incrementalReviewWorkflow: z.string().optional(),
+    // Per-style overrides (optional — only needed for non-default styles like roast)
+    styleGuidance: z.record(z.string(), z.string()).optional(),
+    commentFormatOverrides: z.record(z.string(), z.string()).optional(),
+    summaryFormatOverrides: z
+      .record(z.string(), z.object({ issuesFound: z.string(), noIssues: z.string() }))
+      .optional(),
+  })
+  .strict();
 
-// Template type derived from schema
-export type PromptTemplate = z.infer<typeof PromptTemplateSchema>;
+type PromptTemplate = z.infer<typeof PromptTemplateSchema>;
 
-/**
- * Get the default local template for a platform
- */
-function getDefaultTemplate(platform: CodeReviewPlatform): PromptTemplate {
+const githubPromptTemplate = PromptTemplateSchema.parse(DEFAULT_PROMPT_TEMPLATE_GITHUB);
+const gitlabPromptTemplate = PromptTemplateSchema.parse(DEFAULT_PROMPT_TEMPLATE_GITLAB);
+
+function getPromptTemplate(platform: CodeReviewPlatform): PromptTemplate {
   switch (platform) {
-    case 'github':
-      return DEFAULT_PROMPT_TEMPLATE_GITHUB as PromptTemplate;
+    case PLATFORM.GITHUB:
+      return githubPromptTemplate;
     case PLATFORM.GITLAB:
-      return DEFAULT_PROMPT_TEMPLATE_GITLAB as PromptTemplate;
+      return gitlabPromptTemplate;
     default: {
-      const _exhaustive: never = platform;
-      throw new Error(`Unknown platform: ${_exhaustive}`);
+      const exhaustivePlatform: never = platform;
+      throw new Error(`Unknown platform: ${exhaustivePlatform}`);
     }
   }
 }
 
-/**
- * Merges style override records: { ...local, ...remote }.
- * Remote keys win when both define the same key.
- * When remote is undefined the local values pass through unchanged.
- */
-function mergeStyleOverrides<V>(
-  local: Record<string, V> | undefined,
-  remote: Record<string, V> | undefined
-): Record<string, V> | undefined {
-  if (!local && !remote) return undefined;
-  return { ...local, ...remote };
-}
-
-/**
- * Merges a remote (PostHog) template with the local template.
- * Remote wins for all base prompt sections and for style override
- * keys that it explicitly provides. Local style overrides fill in
- * any keys the remote template doesn't define.
- */
-export function resolveTemplate(
-  remoteTemplate: PromptTemplate | undefined,
-  localTemplate: PromptTemplate
-): { template: PromptTemplate; source: 'posthog' | 'local' } {
-  if (!remoteTemplate) {
-    return { template: localTemplate, source: 'local' };
-  }
-
-  return {
-    template: {
-      ...remoteTemplate,
-      incrementalReviewWorkflow:
-        remoteTemplate.incrementalReviewWorkflow ?? localTemplate.incrementalReviewWorkflow,
-      styleGuidance: mergeStyleOverrides(localTemplate.styleGuidance, remoteTemplate.styleGuidance),
-      commentFormatOverrides: mergeStyleOverrides(
-        localTemplate.commentFormatOverrides,
-        remoteTemplate.commentFormatOverrides
-      ),
-      summaryFormatOverrides: mergeStyleOverrides(
-        localTemplate.summaryFormatOverrides,
-        remoteTemplate.summaryFormatOverrides
-      ),
-    },
-    source: 'posthog',
-  };
-}
-
-/**
- * Load prompt template from PostHog or fall back to local
- * @param platform The platform to load template for
- * @returns Template and source indicator
- */
-async function loadPromptTemplate(platform: CodeReviewPlatform): Promise<{
-  template: PromptTemplate;
-  source: 'posthog' | 'local';
-}> {
-  const featureFlagName = getPromptTemplateFeatureFlag(platform);
-  const defaultTemplate = getDefaultTemplate(platform);
-
-  // Try to load from PostHog first
-  const remoteTemplate = await getFeatureFlagPayload(PromptTemplateSchema, featureFlagName);
-
-  const { template, source } = resolveTemplate(remoteTemplate, defaultTemplate);
-
-  logExceptInTest('[loadPromptTemplate] Template resolved', {
-    platform,
-    version: template.version,
-    source,
-  });
-
-  return { template, source };
+function escapeMarkdownTableCell(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
 }
 
 /**
@@ -201,14 +128,14 @@ export type GenerateReviewPromptOptions = {
  * @param repository Repository in format "owner/repo" (GitHub) or "namespace/project" (GitLab)
  * @param prNumber Pull request number (GitHub) or merge request IID (GitLab)
  * @param options Optional parameters for review context, platform, and incremental mode
- * @returns Generated prompt with version and source info
+ * @returns Generated prompt and checked-in template version
  */
 export async function generateReviewPrompt(
   config: CodeReviewAgentConfig,
   repository: string,
   prNumber?: number,
   options: GenerateReviewPromptOptions = {}
-): Promise<{ prompt: string; version: string; source: 'posthog' | 'local' }> {
+): Promise<{ prompt: string; version: string }> {
   const {
     reviewId,
     existingReviewState,
@@ -217,8 +144,7 @@ export async function generateReviewPrompt(
     previousHeadSha,
     repositoryReviewInstructions,
   } = options;
-  // Load template from PostHog (remote) or local fallback
-  const { template, source } = await loadPromptTemplate(platform);
+  const template = getPromptTemplate(platform);
   const platformConfig = getPlatformConfig(platform);
   const pr = prNumber || `{${platformConfig.prTerm}_NUMBER}`;
   const reviewStyle = config.review_style;
@@ -265,6 +191,14 @@ export async function generateReviewPrompt(
   // 4. Hard constraints (MOST IMPORTANT - always included)
   prompt += template.hardConstraints + '\n\n';
 
+  if (template.diffLineGuidance) {
+    prompt += replacePlaceholders(template.diffLineGuidance) + '\n\n';
+  }
+
+  if (template.subAgentGuidance) {
+    prompt += template.subAgentGuidance + '\n\n';
+  }
+
   // 5. Workflow with placeholders replaced
   // Use incremental workflow when we have a previous completed review SHA and a summary comment
   if (
@@ -273,7 +207,9 @@ export async function generateReviewPrompt(
     existingReviewState?.summaryComment
   ) {
     const activeCount = existingReviewState.inlineComments?.filter(c => !c.isOutdated).length ?? 0;
-    const previousSummary = stripReviewSummaryFooter(existingReviewState.summaryComment.body);
+    const previousSummary = getCurrentReviewSummaryForContext(
+      existingReviewState.summaryComment.body
+    );
     const incrementalWorkflow = template.incrementalReviewWorkflow
       .replace(/{PREVIOUS_SHA}/g, previousHeadSha)
       .replace(/{PREVIOUS_SUMMARY}/g, previousSummary)
@@ -313,6 +249,10 @@ export async function generateReviewPrompt(
   const commentFormat = template.commentFormatOverrides?.[reviewStyle] ?? template.commentFormat;
   prompt += commentFormat + '\n\n';
 
+  if (platform === 'github' && template.inlineCommentFooter) {
+    prompt += template.inlineCommentFooter + '\n\n';
+  }
+
   // 9. Dynamic context section (separator)
   prompt += '---\n\n# CONTEXT FOR THIS ' + platformConfig.prTerm + '\n\n';
   prompt += `**${platform === PLATFORM.GITLAB ? 'Project' : 'Repository'}:** ${repository}\n`;
@@ -335,7 +275,7 @@ export async function generateReviewPrompt(
     prompt += '| File | Line | Issue |\n|------|------|-------|\n';
 
     for (const c of active.slice(0, 20)) {
-      const firstLine = c.body.split('\n')[0].substring(0, 60).replace(/\|/g, '\\|');
+      const firstLine = escapeMarkdownTableCell(c.body.split('\n')[0].substring(0, 60));
       prompt += `| \`${c.path}\` | ${c.line ?? 'N/A'} | ${firstLine} |\n`;
     }
 
@@ -375,6 +315,5 @@ export async function generateReviewPrompt(
   return {
     prompt,
     version: template.version,
-    source,
   };
 }

@@ -1,6 +1,7 @@
 import 'server-only';
 import {
   GatewayOAuthClientAuthMethod,
+  GatewayMcpAccessScope,
   OAuthClientMetadataSchema,
   filterSupportedScopes,
   parseScopeString,
@@ -75,6 +76,13 @@ export function createOAuthClientService(params: {
     const declaredScopes = filterSupportedScopes(requestedScopes);
     if (declaredScopes.length !== requestedScopes.length) {
       throw createGatewayError(GatewayErrorCode.InvalidClientMetadata, 'Unsupported scopes', 400);
+    }
+    if (!declaredScopes.includes(GatewayMcpAccessScope)) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidClientMetadata,
+        `${GatewayMcpAccessScope} scope is required`,
+        400
+      );
     }
     return declaredScopes;
   }
@@ -172,6 +180,15 @@ export function createOAuthClientService(params: {
       throw createGatewayError(
         GatewayErrorCode.InvalidClientMetadata,
         'Invalid client metadata',
+        400
+      );
+    }
+    const existing = await findClientById(input.clientId);
+    if (!existing) return null;
+    if (existing.token_endpoint_auth_method !== metadata.data.token_endpoint_auth_method) {
+      throw createGatewayError(
+        GatewayErrorCode.InvalidClientMetadata,
+        'Token endpoint authentication method cannot be changed after registration',
         400
       );
     }

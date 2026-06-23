@@ -1,6 +1,6 @@
-import { captureException } from '@sentry/nextjs';
-
-export type SendMagicLinkResult = { success: true } | { success: false; error: string };
+export type SendMagicLinkResult =
+  | { success: true }
+  | { success: false; error: string; ssoOrganizationId?: string };
 
 /**
  * Sends a magic link email to the specified address.
@@ -30,10 +30,11 @@ export async function sendMagicLink(
     return {
       success: false,
       error: result.error || 'Failed to send magic link',
+      ssoOrganizationId:
+        typeof result.ssoOrganizationId === 'string' ? result.ssoOrganizationId : undefined,
     };
   } catch (error) {
     console.error('Magic link request error:', error);
-    captureException(error, { tags: { source: 'magic_link_request' } });
     return {
       success: false,
       error: 'Failed to send magic link. Please try again.',

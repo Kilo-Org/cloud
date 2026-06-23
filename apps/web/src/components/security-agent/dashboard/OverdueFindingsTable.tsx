@@ -46,9 +46,9 @@ export function OverdueFindingsTable({
   extraParams = '',
 }: OverdueFindingsTableProps) {
   return (
-    <Card className="border border-gray-800 bg-gray-900/50">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-sm font-medium">Overdue Findings</CardTitle>
+        <CardTitle className="text-sm font-medium">Overdue findings</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -69,18 +69,18 @@ export function OverdueFindingsTable({
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-gray-800 hover:bg-transparent">
+                  <TableRow className="border-border hover:bg-transparent">
                     <TableHead>Severity</TableHead>
                     <TableHead>Title</TableHead>
                     <TableHead>Repository</TableHead>
                     <TableHead>Package</TableHead>
-                    <TableHead className="text-right">Days Overdue</TableHead>
-                    <TableHead className="text-right">SLA Due Date</TableHead>
+                    <TableHead className="text-right">Days overdue</TableHead>
+                    <TableHead className="text-right">SLA due date</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {findings.map(finding => (
-                    <TableRow key={finding.id} className="border-gray-800">
+                    <TableRow key={finding.id} className="border-border">
                       <TableCell>
                         <Link
                           href={`${basePath}/findings?status=open&overdue=true&findingId=${finding.id}${extraParams}`}
@@ -91,7 +91,7 @@ export function OverdueFindingsTable({
                       <TableCell className="max-w-[200px]">
                         <Link
                           href={`${basePath}/findings?status=open&overdue=true&findingId=${finding.id}${extraParams}`}
-                          className="truncate text-sm text-gray-300 hover:text-white"
+                          className="focus-visible:ring-ring block truncate rounded-sm text-sm text-foreground underline decoration-foreground/30 underline-offset-4 hover:decoration-foreground focus-visible:ring-2 focus-visible:outline-none"
                           title={finding.title}
                         >
                           <span className="block truncate">{finding.title}</span>
@@ -106,7 +106,9 @@ export function OverdueFindingsTable({
                         <span className="text-muted-foreground text-xs">{finding.packageName}</span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <span className="font-medium text-red-400">{finding.daysOverdue}d</span>
+                        <span className="font-mono font-medium text-red-400 tabular-nums">
+                          {finding.daysOverdue}d
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
                         <span className="text-muted-foreground text-xs">
@@ -121,9 +123,9 @@ export function OverdueFindingsTable({
             <div className="mt-3 text-right">
               <Link
                 href={`${basePath}/findings?status=open&overdue=true${extraParams}`}
-                className="text-xs text-blue-400 hover:text-blue-300"
+                className="focus-visible:ring-ring rounded-sm text-xs text-blue-400 underline decoration-blue-400/40 underline-offset-4 hover:text-blue-300 focus-visible:ring-2 focus-visible:outline-none"
               >
-                View all overdue &rarr;
+                View all overdue findings
               </Link>
             </div>
           </>

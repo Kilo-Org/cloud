@@ -1,36 +1,30 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { redirect } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useSecurityAgent } from '@/components/security-agent/SecurityAgentContext';
 import { SecurityDashboard } from '@/components/security-agent/SecurityDashboard';
 
 export default function SecurityAgentDashboardPage() {
-  const { hasIntegration, isEnabled, isLoadingConfig } = useSecurityAgent();
-  const router = useRouter();
+  const { hasIntegration, isEnabled, isLoadingConfig, isLoadingPermission } = useSecurityAgent();
 
   // Redirect per truth table:
-  // No integration -> show dashboard with install CTA (handled by SecurityDashboard)
+  // No integration -> redirect to settings with install CTA
   // Installed + disabled -> redirect to config
   // Installed + enabled -> show dashboard
   // isEnabled is undefined while config is loading — wait before deciding
-  const shouldRedirectToConfig = hasIntegration && isEnabled === false;
-
-  useEffect(() => {
-    if (shouldRedirectToConfig) {
-      router.replace('/security-agent/config');
-    }
-  }, [shouldRedirectToConfig, router]);
+  const shouldRedirectToConfig =
+    (!isLoadingPermission && !hasIntegration) || (hasIntegration && isEnabled === false);
 
   if (shouldRedirectToConfig) {
-    return null;
+    redirect('/security-agent/config');
   }
 
-  if (hasIntegration && isLoadingConfig) {
+  if (isLoadingPermission || (hasIntegration && isLoadingConfig)) {
     return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+      <div className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
+        <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        Loading Security Agent...
       </div>
     );
   }

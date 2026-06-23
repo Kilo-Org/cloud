@@ -19,10 +19,7 @@ import {
 
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
-import {
-  fetchGitLabRepositoriesForOrganization,
-  searchGitLabRepositoriesForOrganization,
-} from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -35,6 +32,7 @@ import {
   clearCodeReviewActionRequiredState,
   getCodeReviewActionRequiredState,
 } from '@/lib/code-reviews/action-required';
+import { getReviewMemoryEnabledFromConfig } from '@/lib/code-reviews/review-memory/settings';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -149,20 +147,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     }),
 
   /**
-   * Search GitLab repositories by query string
-   * Used when organizations have 100+ repositories and need to find specific ones
-   */
-  searchGitLabRepositories: organizationMemberProcedure
-    .input(
-      OrganizationIdInputSchema.extend({
-        query: z.string().min(2),
-      })
-    )
-    .query(async ({ input }) => {
-      return await searchGitLabRepositoriesForOrganization(input.organizationId, input.query);
-    }),
-
-  /**
    * Gets the review agent configuration
    */
   getReviewConfig: organizationMemberProcedure
@@ -185,6 +169,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           disableReviewMd: true,
+          reviewMemoryEnabled: false,
           actionRequired: null,
         };
       }
@@ -202,6 +187,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         selectedRepositoryIds: cfg.selected_repository_ids || [],
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
         disableReviewMd: cfg.disable_review_md ?? true,
+        reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
         actionRequired: getCodeReviewActionRequiredState(config),
       };
     }),
@@ -238,7 +224,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             selected_repository_ids: input.selectedRepositoryIds || [],
             manually_added_repositories: input.manuallyAddedRepositories || [],
             disable_review_md: input.disableReviewMd ?? true,
+            review_memory_enabled: false,
+            review_analytics_enabled: false,
           },
+          preserveCodeReviewFeatureSettings: true,
           createdBy: ctx.user.id,
         });
 

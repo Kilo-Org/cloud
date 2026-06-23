@@ -27,6 +27,7 @@ const OpenAICompatibleModelsResponseSchema = z.object({
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
+  status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
   limit: z
     .object({
       context: z.number().optional(),
@@ -70,7 +71,7 @@ function shortenDisplayName(id: string): string;
 function shortenDisplayName(id: string | undefined): string | undefined;
 function shortenDisplayName(id: string | undefined) {
   if (!id) return undefined;
-  const slash = Math.max(id.lastIndexOf(':'), id.lastIndexOf('/'));
+  const slash = id.lastIndexOf('/');
   return slash >= 0 ? id.slice(slash + 1).trim() : id;
 }
 
@@ -100,6 +101,19 @@ function openAICompatibleFetcher(options: {
   };
 }
 
+export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
+  const provider = ModelsDevProviderSchema.parse(entry);
+  return Object.values(provider.models)
+    .filter(model => model.status !== 'deprecated')
+    .map(model => ({
+      id: model.id,
+      name: shortenDisplayName(model.name),
+      context_length: model.limit?.context,
+      max_completion_tokens: model.limit?.output,
+      input_modalities: model.modalities?.input,
+    }));
+}
+
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
   catalogKey: string
@@ -112,14 +126,7 @@ function modelsDevFetcher(
       if (!entry) {
         throw new Error(`models.dev catalog missing ${catalogKey} entry`);
       }
-      const provider = ModelsDevProviderSchema.parse(entry);
-      return Object.values(provider.models).map(model => ({
-        id: model.id,
-        name: shortenDisplayName(model.name),
-        context_length: model.limit?.context,
-        max_completion_tokens: model.limit?.output,
-        input_modalities: model.modalities?.input,
-      }));
+      return parseModelsDevProviderModels(entry);
     },
   };
 }
@@ -172,6 +179,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   }),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud'),
+  modelsDevFetcher('opencode-go', 'opencode-go'),
   modelsDevFetcher('xiaomi-token-plan-ams', 'xiaomi-token-plan-ams'),
   modelsDevFetcher('xiaomi-token-plan-sgp', 'xiaomi-token-plan-sgp'),
 ];

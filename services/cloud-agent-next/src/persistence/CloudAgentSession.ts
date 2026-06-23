@@ -13,7 +13,9 @@ import {
   type SessionMetadata,
 } from './session-metadata.js';
 import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
+import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
+import { projectTerminalClientError } from '../session/terminal-error-projector.js';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { logger } from '../logger.js';
 import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
@@ -131,7 +133,11 @@ import {
   type AgentRuntimeAcceptedDelivery,
   type AgentRuntimeOrchestrator,
 } from '../session/agent-runtime.js';
-import { createWrapperSupervisor, type WrapperSupervisor } from '../session/wrapper-supervisor.js';
+import {
+  createWrapperSupervisor,
+  type WrapperSupervisor,
+  type WrapperTerminalEvent,
+} from '../session/wrapper-supervisor.js';
 import { emitRunStateReport } from '../telemetry/queue-reports.js';
 import { createAgentSandbox } from '../agent-sandbox/factory.js';
 import type {
@@ -340,6 +346,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       executionId: execution.executionId,
       status,
       errorMessage: error,
+      ...(status === 'completed'
+        ? {}
+        : { clientError: projectTerminalClientError({ status, error }) }),
       lastSeenBranch: metadata.repository?.upstreamBranch,
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,
@@ -355,9 +364,21 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       target: callbackTarget,
       payload,
     };
+    const fittedCallbackJob = fitCallbackJobToQueueLimit(callbackJob);
+    if (fittedCallbackJob.status === 'too-large') {
+      logger
+        .withFields({
+          sessionId,
+          messageId,
+          serializedByteLength: fittedCallbackJob.serializedByteLength,
+          maximumByteLength: fittedCallbackJob.maximumByteLength,
+        })
+        .error('Skipped legacy callback job that cannot fit queue size limit');
+      return;
+    }
 
     try {
-      await callbackQueue.send(callbackJob);
+      await callbackQueue.send(fittedCallbackJob.job);
       logger
         .withFields({
           sessionId,
@@ -1913,10 +1934,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    */
   async alarm(): Promise<void> {
     const now = Date.now();
+    await this.scheduleAlarmAtOrBefore(now + PENDING_FLUSH_DEBOUNCE_MS);
     const alarmAtStart = await this.ctx.storage.getAlarm();
 
     let pendingFlushRetryAt: number | undefined;
     let remainingPendingCount: number | undefined;
+    let terminalEffectRepairRetryAt: number | undefined;
     let alarmWorkFailed = false;
 
     try {
@@ -1951,6 +1974,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       try {
         await this.getMessageSettlementOutbox().repairTerminalEffects();
       } catch (error) {
+        terminalEffectRepairRetryAt = Date.now() + PENDING_FLUSH_DEBOUNCE_MS;
         logger
           .withFields({
             sessionId: this.sessionId,
@@ -1995,6 +2019,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       if (alarmWorkFailed) {
         deadlines.push(currentTime + PENDING_FLUSH_DEBOUNCE_MS);
       }
+      if (terminalEffectRepairRetryAt !== undefined) {
+        deadlines.push(terminalEffectRepairRetryAt);
+      }
       if (pendingFlushRetryAt !== undefined) {
         deadlines.push(pendingFlushRetryAt);
       }
@@ -2033,7 +2060,21 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       // reaper retries soon rather than sleeping for an hour.
       nextAlarmAt = Date.now() + REAPER_INTERVAL_MS_DEFAULT;
     }
-    await this.ctx.storage.setAlarm(nextAlarmAt);
+    try {
+      await this.ctx.storage.setAlarm(nextAlarmAt);
+    } catch (error) {
+      logger
+        .withFields({
+          doId: this.ctx.id.toString(),
+          sessionId: this.sessionId,
+          nextAlarmAt,
+          alarmWorkFailed,
+          remainingPendingCount,
+          error: error instanceof Error ? error.message : String(error),
+        })
+        .error('Failed to schedule next alarm reaper run');
+      throw error;
+    }
   }
 
   /**
@@ -2041,10 +2082,15 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
    * Called during initialization and when session is first created.
    */
   private async ensureAlarmScheduled(): Promise<void> {
+    if (await this.getSessionMessageQueue().requestPendingDrainIfNeeded()) {
+      logger
+        .withFields({ sessionId: this.sessionId })
+        .info('Rearmed pending session message drain during initialization');
+      return;
+    }
     const alarm = await this.ctx.storage.getAlarm();
     if (alarm === null) {
       await this.ctx.storage.setAlarm(Date.now() + this.getReaperIntervalMs());
-      return;
     }
   }
 
@@ -2921,13 +2967,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     logger.withFields({ sessionId, executionId }).info('Execution complete - session is idle');
   }
 
-  async handleWrapperTerminalEvent(params: {
-    wrapperRunId: string;
-    status: 'completed' | 'failed' | 'interrupted';
-    error?: string;
-    gateResult?: 'pass' | 'fail';
-    messageIds?: string[];
-  }): Promise<void> {
+  async handleWrapperTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
     await this.resolveSessionId();
     await this.getWrapperSupervisor().onTerminalEvent(params);
   }

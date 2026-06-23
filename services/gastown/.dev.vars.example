@@ -1,0 +1,7 @@
+# Shared secret for JWT token validation (same as NextAuth.js secret)
+# @from NEXTAUTH_SECRET
+NEXTAUTH_SECRET=your-nextauth-secret-here
+
+# Secret for Gastown JWT signing (town access tokens, container tokens, etc.)
+# @from GASTOWN_JWT_SECRET
+GASTOWN_JWT_SECRET=your-gastown-jwt-secret-here

@@ -1,6 +1,7 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { CallbackJob } from './callbacks/index.js';
 import type { NotificationsBinding } from './notifications-binding.js';
@@ -187,7 +188,7 @@ export type GitTokenService = {
 
 export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for per-session sandbox containers (standard-2) */
+  /** Durable Object namespace for per-session sandbox containers (standard-3) */
   SandboxSmall: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for Docker-in-Docker per-session sandbox containers (standard-3) */
   SandboxDIND: DurableObjectNamespace<Sandbox>;
@@ -258,6 +259,11 @@ export type Env = {
   HYPERDRIVE: Hyperdrive;
 };
 
+export type ValidatedSessionAccess = AccessibleCloudAgentSession & {
+  kiloUserId: string;
+  cloudAgentSessionId: string;
+};
+
 /** tRPC context passed to all procedures */
 export type TRPCContext = {
   env: Env;
@@ -265,6 +271,7 @@ export type TRPCContext = {
   request: Request;
   authToken: string;
   botId?: string;
+  validatedSessionAccess?: ValidatedSessionAccess;
 };
 
 export type SystemSandboxUsageEvent = {

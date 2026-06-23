@@ -215,12 +215,26 @@ function createInternalApiContext(options: {
 }
 
 describe('effective session profile policy', () => {
-  it('selects web-default resolution explicitly at the platform adaptation boundary', () => {
-    expect(profileResolutionPolicyForSessionCreateOrigin('cloud-agent-web')).toEqual({
-      defaultProfileResolution: 'include-web-defaults',
-    });
-    expect(profileResolutionPolicyForSessionCreateOrigin('code-review')).toEqual({
-      defaultProfileResolution: 'explicit-profile-only',
+  it.each([
+    { origin: 'cloud-agent-web', expected: 'include-web-defaults' },
+    { origin: 'slack', expected: 'include-web-defaults' },
+    { origin: 'github', expected: 'include-web-defaults' },
+    { origin: 'linear', expected: 'include-web-defaults' },
+    { origin: 'discord', expected: 'include-web-defaults' },
+    { origin: 'app-builder', expected: 'include-web-defaults' },
+    { origin: 'webhook', expected: 'include-web-defaults' },
+    { origin: 'scheduled', expected: 'include-web-defaults' },
+    { origin: undefined, expected: 'explicit-profile-only' },
+    { origin: '', expected: 'explicit-profile-only' },
+    { origin: 'unknown', expected: 'explicit-profile-only' },
+    { origin: 'Slack', expected: 'explicit-profile-only' },
+    { origin: 'code-review', expected: 'explicit-profile-only' },
+    { origin: 'security-agent', expected: 'explicit-profile-only' },
+    { origin: 'autofix', expected: 'explicit-profile-only' },
+    { origin: 'auto-triage', expected: 'explicit-profile-only' },
+  ])('selects $expected for origin $origin', ({ origin, expected }) => {
+    expect(profileResolutionPolicyForSessionCreateOrigin(origin)).toEqual({
+      defaultProfileResolution: expected,
     });
   });
 });
@@ -308,40 +322,78 @@ describe('prepareSession endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
-  it('resolves web defaults when no explicit profile is selected', async () => {
-    const caller = appRouter.createCaller(createInternalApiContext({}));
+  it.each([
+    {
+      origin: 'cloud-agent-web',
+      repository: { githubRepo: 'acme/github-repo' },
+      expectedRepoFullName: 'acme/github-repo',
+      expectedPlatform: 'github',
+    },
+    {
+      origin: 'slack',
+      repository: { githubRepo: 'acme/slack-repo' },
+      expectedRepoFullName: 'acme/slack-repo',
+      expectedPlatform: 'github',
+    },
+    {
+      origin: 'linear',
+      repository: {
+        gitUrl: 'https://gitlab.com/acme/linear-repo.git',
+        platform: 'gitlab' as const,
+      },
+      expectedRepoFullName: 'acme/linear-repo',
+      expectedPlatform: 'gitlab',
+    },
+    {
+      origin: 'slack',
+      repository: {
+        gitUrl: 'https://gitlab.example.com/acme/subgroup/slack-repo.git',
+        platform: 'gitlab' as const,
+      },
+      expectedRepoFullName: 'acme/subgroup/slack-repo',
+      expectedPlatform: 'gitlab',
+    },
+  ])(
+    'resolves implicit profiles for approved $origin creation',
+    async ({ origin, repository, expectedRepoFullName, expectedPlatform }) => {
+      const caller = appRouter.createCaller(createInternalApiContext({}));
 
-    await caller.prepareSession({
-      prompt: 'Web default profile',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      createdOnPlatform: 'cloud-agent-web',
-    });
+      await caller.prepareSession({
+        prompt: 'Implicit profile',
+        mode: 'code',
+        model: 'claude-3',
+        ...repository,
+        createdOnPlatform: origin,
+      });
 
-    expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        profileId: undefined,
-        repoFullName: 'acme/repo',
-        platform: 'github',
-      })
-    );
-  });
+      expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          profileId: undefined,
+          owner: { type: 'user', id: 'test-user-123' },
+          repoFullName: expectedRepoFullName,
+          platform: expectedPlatform,
+        })
+      );
+    }
+  );
 
-  it('does not resolve web defaults for non-web creation without an explicit profile', async () => {
-    const caller = appRouter.createCaller(createInternalApiContext({}));
+  it.each([{ origin: undefined }, { origin: 'unknown' }])(
+    'does not resolve implicit profiles for non-approved origin $origin',
+    async ({ origin }) => {
+      const caller = appRouter.createCaller(createInternalApiContext({}));
 
-    await caller.prepareSession({
-      prompt: 'Other platform',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      createdOnPlatform: 'code-review',
-    });
+      await caller.prepareSession({
+        prompt: 'Other platform',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        createdOnPlatform: origin,
+      });
 
-    expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
-  });
+      expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+    }
+  );
 
   it('resolves an explicit profile for non-web creation and passes inline overrides', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
@@ -946,25 +998,29 @@ describe('start endpoint', () => {
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
   });
 
-  it('resolves web defaults for grouped start without an explicit profile', async () => {
-    const caller = appRouter.createCaller(createInternalApiContext({}));
+  it.each(['cloud-agent-web', 'slack'])(
+    'resolves implicit profiles for approved grouped %s start',
+    async origin => {
+      const caller = appRouter.createCaller(createInternalApiContext({}));
 
-    await caller.start({
-      message: { prompt: 'Web start' },
-      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
-      repository: { type: 'github', repo: 'acme/repo' },
-      options: { createdOnPlatform: 'cloud-agent-web' },
-    });
+      await caller.start({
+        message: { prompt: 'Approved start' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+        repository: { type: 'github', repo: 'acme/repo' },
+        options: { createdOnPlatform: origin },
+      });
 
-    expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        profileId: undefined,
-        repoFullName: 'acme/repo',
-        platform: 'github',
-      })
-    );
-  });
+      expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          profileId: undefined,
+          owner: { type: 'user', id: 'test-user-123' },
+          repoFullName: 'acme/repo',
+          platform: 'github',
+        })
+      );
+    }
+  );
 
   it('returns an admitted session without persisting setup success milestones', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
@@ -1037,14 +1093,34 @@ describe('start endpoint', () => {
     expect(createCliSessionMock).toHaveBeenCalled();
   });
 
-  it('does not resolve web defaults for grouped non-web start without a profile', async () => {
+  it('resolves implicit profiles for grouped App Builder starts', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));
 
     await caller.start({
-      message: { prompt: 'Other start' },
+      message: { prompt: 'App Builder start' },
       agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
       repository: { type: 'github', repo: 'acme/repo' },
       options: { createdOnPlatform: 'app-builder' },
+    });
+
+    expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: undefined,
+        repoFullName: 'acme/repo',
+        platform: 'github',
+      })
+    );
+  });
+
+  it('does not resolve implicit profiles for grouped non-approved starts', async () => {
+    const caller = appRouter.createCaller(createInternalApiContext({}));
+
+    await caller.start({
+      message: { prompt: 'Automated start' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { createdOnPlatform: 'code-review' },
     });
 
     expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();

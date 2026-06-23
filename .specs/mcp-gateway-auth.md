@@ -50,6 +50,9 @@ when they appear in all capitals.
 - **Execution context**: The caller's current Kilo context: personal or one
   specific organization. Authorization, refresh, token issuance, and runtime
   proxying MUST use authoritative execution context, not route inference alone.
+  Browser OAuth entry points that do not carry an organization header may establish
+  org context from an org resource only after authoritative membership and assignment
+  authorization against that exact resolved route.
 - **Connection instance**: A per-user record associated with one config. In v1,
   there is at most one non-terminal instance for each
   `(owner_scope, owner_id, user_id, config_id)` tuple.
@@ -111,7 +114,7 @@ when they appear in all capitals.
 | `GET /.well-known/oauth-authorization-server/oauth/authorize` | App canonical route, Worker discovery alias | Metadata alias for clients that discover from the authorization route. The Worker alias redirects to the app canonical route. |
 | `GET /.well-known/oauth-authorization-server/mcp-connect/...` | Worker discovery alias | Path-aware compatibility alias for clients that start discovery from one scoped connect URL; redirects to app canonical metadata. |
 | `POST /api/mcp-gateway/oauth/register` | App | Dynamic client registration. |
-| `POST /api/mcp-gateway/oauth/register/{scope}/{owner_id}/{config_id}/{route_key}` | App | Resource-specific registration after route eligibility discovery. |
+| `POST /api/mcp-gateway/oauth/register/resource/{scope}/{owner_id}/{config_id}/{route_key}` | App | Resource-specific registration after route eligibility discovery. |
 | `GET|PUT|DELETE /api/mcp-gateway/oauth/register/{client_id}` | App | Registration management authorized by registration token. |
 | `GET /api/mcp-gateway/oauth/authorize` | App | Generic authorization-code flow; requires `resource`. |
 | `GET /api/mcp-gateway/oauth/authorize/{scope}/{owner_id}/{config_id}/{route_key}` | App | Route-specific authorization-code flow. |
@@ -204,13 +207,20 @@ when they appear in all capitals.
 5. Registration metadata MUST require at least one redirect URI, supported grant
    types, supported response types, supported token endpoint auth method, and
    scopes from the gateway vocabulary.
-6. Unsupported declared scopes MUST be rejected, not silently broadened.
-7. Resource-specific registration MUST validate that the referenced scoped route
+6. The gateway scope vocabulary is `mcp:access` for use of the exact scoped MCP
+   resource and `profile` for basic `/userinfo` claims. Every registered MCP client
+   MUST declare `mcp:access`; `profile` is optional.
+7. Unsupported declared scopes or declarations without `mcp:access` MUST be
+   rejected, not silently broadened.
+8. Resource-specific registration MUST validate that the referenced scoped route
    exists and is discoverable, but discovery MUST NOT imply runtime authorization.
-8. Public clients using `token_endpoint_auth_method=none` MUST use PKCE.
-9. Confidential clients MAY use `client_secret_basic` or `client_secret_post`.
-10. The token endpoint MUST enforce the registered auth method exactly and reject
+9. Public clients using `token_endpoint_auth_method=none` MUST use PKCE.
+10. Confidential clients MAY use `client_secret_basic` or `client_secret_post`.
+11. The token endpoint MUST enforce the registered auth method exactly and reject
     mismatched secret transport.
+12. Historical clients that declared only `profile` MUST receive
+    `unauthorized_client` during authorization so standards-aware clients can discard
+    the stale registration and dynamically register again with `mcp:access`.
 
 ## First-Level Authorization And Tokens
 
@@ -221,28 +231,55 @@ when they appear in all capitals.
 3. The app MUST validate current execution context, route, owner, membership,
    assignment, config status, user eligibility, and instance state before issuing
    an authorization code.
-4. Authorization requests expire within 30 minutes.
-5. Authorization codes expire within 10 minutes, are opaque, and MUST be consumed
-   atomically with expiry enforced in the conditional update.
-6. Authorization codes bind client ID, redirect URI, canonical route URL, route
-   key, scopes, PKCE challenge, execution context, user, and instance.
-7. Refresh tokens bind the same identity and route context as the original code.
-8. Refresh tokens rotate on use and MUST be consumed atomically.
-9. Before issuing any access token from a code or refresh token, the app MUST
-   re-resolve current route, eligibility, config status, assignment, instance,
-   and execution context.
-10. Gateway access tokens are RS256 JWTs with a 15-minute lifetime.
-11. Gateway JWT claims MUST include `sub`, `aud`, `exp`, `iat`, `scope`, `MCPID`,
+4. Interactive authorization MUST present dynamically registered client identity as
+   unverified and MUST NOT present the self-asserted client name as verified identity.
+5. Before approval, the consent screen MUST display the exact validated redirect URI,
+   client ID, connection name, configured endpoint host, owner context, granting Kilo
+   account, and a truthful description of the effective MCP access.
+6. Consent MUST describe the effective MCP access independently of protocol scope
+   labels.
+7. Consent MUST provide explicit allow and deny actions. Denial MUST return
+   `access_denied` only through the validated redirect URI, preserve OAuth `state`,
+   and MUST NOT create authorization, provider, grant, or token state.
+8. Browser approval MUST be bound to the granting user, exact redirect URI, client,
+   resource, scopes, OAuth state, PKCE challenge, and execution context, and MUST
+   expire under server-side validation within 5 minutes.
+9. Consent responses MUST be non-cacheable, prevent framing, restrict form submission
+   and redirects to the app origin, HTTPS destinations, and the exact validated HTTP
+   loopback callback origin, suppress referrer disclosure, and avoid loading
+   client-controlled remote assets.
+10. Authorization requests expire within 30 minutes.
+11. Authorization codes expire within 10 minutes, are opaque, and MUST be consumed
+    atomically with expiry enforced in the conditional update.
+12. Authorization codes bind client ID, redirect URI, canonical route URL, route
+    key, scopes, PKCE challenge, execution context, user, and instance.
+13. Refresh tokens bind the same identity and route context as the original code.
+14. Refresh tokens rotate on use and MUST be consumed atomically.
+15. Before issuing any access token from a code or refresh token, the app MUST
+    re-resolve current route, eligibility, config status, assignment, instance,
+    and execution context.
+16. Gateway access tokens are RS256 JWTs with a 15-minute lifetime.
+17. Gateway JWT claims MUST include `sub`, `aud`, `exp`, `iat`, `scope`, `MCPID`,
     `owner_scope`, `owner_id`, `config_id`, `route_key`, `instance_id`,
     `execution_context`, and `config_version`.
-12. `aud` MUST equal the exact canonical scoped route URL.
-13. `MCPID` MUST equal `{owner_scope}:{owner_id}:{config_id}:{route_key}`.
-14. The Worker MUST verify signature, algorithm, issuer, audience, expiry, route
+18. `aud` MUST equal the exact canonical scoped route URL.
+19. `MCPID` MUST equal `{owner_scope}:{owner_id}:{config_id}:{route_key}`.
+20. The Worker MUST verify signature, algorithm, issuer, audience, expiry, route
     identity, owner tuple, instance ID, and execution context before proxying.
-15. Derived connect tokens use the same JWT contract and lifetime but do not
+21. Derived connect tokens use the same JWT contract and lifetime but do not
     issue refresh tokens.
-16. Raw Kilo session/user tokens MUST NOT be accepted as runtime bearer tokens
+22. Raw Kilo session/user tokens MUST NOT be accepted as runtime bearer tokens
     on `/mcp-connect/...` and MUST NEVER be forwarded upstream.
+23. Authorization for a scoped MCP resource MUST request and grant `mcp:access`.
+    `profile` alone and an omitted scope MUST return `invalid_scope`.
+24. Authorization-code exchange MUST fail with `invalid_grant` if the persisted code
+    does not contain `mcp:access`.
+25. Refresh-token exchange MUST fail with `invalid_grant` before route or eligibility
+    work and MUST NOT rotate a historical grant that lacks `mcp:access`.
+26. Derived connect tokens MUST contain `mcp:access`; they do not implicitly receive
+    `profile`.
+27. `/userinfo` MUST require `profile`; possession of `mcp:access` alone MUST NOT
+    disclose profile claims.
 
 ## Provider Authorization And Grants
 
@@ -250,72 +287,89 @@ when they appear in all capitals.
    configs.
 2. `none` and `static_headers` configs complete first-level authorization without
    provider OAuth.
-3. A provider grant belongs to exactly one connection instance and MUST NOT be
+3. Gateway client scopes and upstream provider scopes are separate scope systems.
+   Gateway client scopes come from the Kilo gateway vocabulary; upstream provider
+   scopes come from explicit admin override or the remote MCP server's
+   `WWW-Authenticate` challenge.
+4. Upstream provider scopes MUST NOT be derived from `scopes_supported`.
+5. When no upstream provider scope is known, the provider authorization request
+   MUST omit `scope` rather than inventing a gateway scope such as `profile`.
+6. The remote protected-resource `resource` value, when available, MUST be
+   preserved in upstream provider authorization and token exchange requests.
+7. A provider grant belongs to exactly one connection instance and MUST NOT be
    shared across users, configs, owners, or scopes.
-4. Provider access tokens, refresh tokens, provider client IDs, client secrets,
+8. Provider access tokens, refresh tokens, provider client IDs, client secrets,
    static header secrets, pending state, authorization codes, refresh tokens,
    and PKCE verifiers are sensitive material.
-5. Provider grants and pending provider authorization state MUST be encrypted at
+9. Provider grants and pending provider authorization state MUST be encrypted at
    rest.
-6. Pending provider authorization MUST bind owner scope, owner ID, user ID,
-   config ID, config version, instance ID, canonical route, remote URL, auth
-   mode, provider credentials, authorization endpoint, token endpoint, redirect
-   URI, scopes, PKCE verifier, execution context, and first-level authorization
-   request ID when applicable.
-7. Sensitive provider credentials, including provider client ID, MUST be inside
-   encrypted pending state rather than stored as plaintext pending columns.
-8. Pending state is opaque, one-time, expires within 30 minutes, and MUST be
-   consumed atomically on success, provider error, expiry, or invalid callback.
-9. Provider error callbacks MUST consume pending state and MUST NOT create a grant.
-10. Provider callback success MUST persist the grant before the app issues a final
+10. Pending provider authorization MUST bind owner scope, owner ID, user ID,
+    config ID, config version, instance ID, canonical route, remote URL, auth
+    mode, provider credentials, authorization endpoint, token endpoint, redirect
+    URI, upstream provider scopes, upstream provider resource when present, PKCE
+    verifier, execution context, and first-level authorization request ID when
+    applicable.
+11. Sensitive provider credentials, including provider client ID, MUST be inside
+    encrypted pending state rather than stored as plaintext pending columns.
+12. Pending state is opaque, one-time, expires within 30 minutes, and MUST be
+    consumed atomically on success, provider error, expiry, or invalid callback.
+13. Provider error callbacks MUST consume pending state and MUST NOT create a grant.
+14. Provider callback success MUST persist the grant before the app issues a final
     authorization code.
-11. Provider responses MUST be size-capped before JSON parsing and validated with
+15. Provider responses MUST be size-capped before JSON parsing and validated with
     the relevant schema.
-12. Only bearer provider tokens are supported in v1. Non-bearer provider token
+16. Only bearer provider tokens are supported in v1. Non-bearer provider token
     types MUST be rejected.
-13. Grant versioning is monotonic per instance. Creating, replacing, revoking, or
+17. Grant versioning is monotonic per instance. Creating, replacing, revoking, or
     deleting a grant MUST advance the version; replacement MUST NOT reset it.
-14. Provider refresh is lazy and happens only during runtime proxying.
-15. Refresh failure MUST move the instance to `needs_reauth` without overwriting a
+18. Provider refresh is lazy and happens only during runtime proxying.
+19. Refresh failure MUST move the instance to `needs_reauth` without overwriting a
     newer app-side revoke/replacement.
-16. A provider grant may be restored only by a successful provider authorization
+20. A provider grant may be restored only by a successful provider authorization
     for the same non-terminal instance.
+21. Changing upstream provider scopes, provider scope source, provider resource,
+    provider authorization endpoint, provider token endpoint, or provider credentials
+    is a material config change and MUST revoke pending provider authorization state,
+    revoke active grants, and advance config version.
 
 ## Worker Runtime Proxy
 
 1. The Worker is the only upstream credential injection boundary.
 2. On every authenticated runtime request, the Worker MUST verify the gateway JWT
    and fresh Postgres state before proxying.
-3. The Worker MUST reject stale route keys, disabled/deleted configs, wrong owner
+3. After JWT verification and before fresh runtime-state resolution, credential
+   loading, provider refresh, or upstream access, the Worker MUST require
+   `mcp:access`.
+4. The Worker MUST reject stale route keys, disabled/deleted configs, wrong owner
    scope, wrong execution context, missing membership, missing assignment,
    ineligible users, removed instances, missing grants, and version conflicts.
-4. The client `Authorization` header is only for gateway authentication and MUST
+5. The client `Authorization` header is only for gateway authentication and MUST
    NOT be forwarded upstream.
-5. The Worker MUST use an explicit allowlist for transient client headers and
+6. The Worker MUST use an explicit allowlist for transient client headers and
    strip credential-like headers including `Authorization`, `Proxy-Authorization`,
    `Cookie`, `X-API-Key`, `X-Auth-*`, `X-Token-*`, and configured static
    credential names.
-6. Static headers and auxiliary headers MUST have valid header names/values and
+7. Static headers and auxiliary headers MUST have valid header names/values and
    MUST NOT be hop-by-hop or credential-confusing.
-7. At most one auth source may own upstream `Authorization`.
-8. In OAuth modes, the Worker injects the requesting user's bearer provider token.
-9. In static-header mode, the Worker injects only the config's static credential
-   headers and allowed auxiliary headers.
-10. The Worker MUST validate any incoming `Origin` header before credential
+8. At most one auth source may own upstream `Authorization`.
+9. In OAuth modes, the Worker injects the requesting user's bearer provider token.
+10. In static-header mode, the Worker injects only the config's static credential
+    headers and allowed auxiliary headers.
+11. The Worker MUST validate any incoming `Origin` header before credential
     injection. Origin-less non-browser clients are allowed; supplied origins MUST
     match a configured gateway/app origin or be rejected.
-11. The Worker MUST stream request and response bodies and MUST NOT buffer unknown
+12. The Worker MUST stream request and response bodies and MUST NOT buffer unknown
     proxy bodies.
-12. The Worker MUST reject non-public HTTPS upstream destinations, including
+13. The Worker MUST reject non-public HTTPS upstream destinations, including
     loopback, private, link-local, reserved, and non-public IPv4/IPv6 results.
-13. DNS validation MUST consider both A and AAAA answers and fail closed when the
+14. DNS validation MUST consider both A and AAAA answers and fail closed when the
     destination cannot be safely validated. Because Workers cannot pin arbitrary
     third-party DNS answers across zones, this is a best-effort defense rather than
     a complete DNS-rebinding guarantee for untrusted external origins.
-14. The Worker MUST NOT follow upstream redirects in v1. It may return 3xx
+15. The Worker MUST NOT follow upstream redirects in v1. It may return 3xx
     responses to clients, but it must not forward injected credentials to a
     redirect target.
-14. The Worker MUST NOT expose a provider token-exchange API.
+16. The Worker MUST NOT expose a provider token-exchange API.
 
 ## Audit, Privacy, And Cleanup
 
@@ -342,23 +396,26 @@ when they appear in all capitals.
 
 1. Missing or invalid runtime credentials MUST return a challengeable `401` and
    MUST NOT proxy traffic.
-2. A valid JWT whose current route, owner, context, assignment, config, user,
+2. A valid audience-bound JWT without `mcp:access` MUST return `403` with a
+   `WWW-Authenticate` challenge containing `error="insufficient_scope"` and
+   `scope="mcp:access"`, and MUST NOT resolve runtime state or proxy traffic.
+3. A valid JWT whose current route, owner, context, assignment, config, user,
    instance, or grant state is no longer eligible MUST return a generic forbidden
    response and MUST NOT proxy traffic.
-3. Unknown, revoked, rotated, or deleted routes MUST fail closed without revealing
+4. Unknown, revoked, rotated, or deleted routes MUST fail closed without revealing
    owner details.
-4. Invalid registration metadata MUST return a stable client error.
-5. Invalid authorization requests before redirect URI trust is established MUST
+5. Invalid registration metadata MUST return a stable client error.
+6. Invalid authorization requests before redirect URI trust is established MUST
    return direct bad-request responses.
-6. Invalid authorization requests after redirect URI validation MUST return an
+7. Invalid authorization requests after redirect URI validation MUST return an
    OAuth error through the trusted redirect.
-7. Unknown, expired, or consumed authorization codes and refresh tokens MUST NOT
+8. Unknown, expired, or consumed authorization codes and refresh tokens MUST NOT
    issue tokens.
-8. Unknown, expired, consumed, or context-mismatched provider state MUST NOT
+9. Unknown, expired, consumed, or context-mismatched provider state MUST NOT
    create grants.
-9. Provider refresh failure MUST return a bounded auth failure and MUST NOT expose
-   provider secrets or raw provider payloads.
-10. Retries and concurrency MUST NOT allow duplicate code consumption, refresh
+10. Provider refresh failure MUST return a bounded auth failure and MUST NOT expose
+    provider secrets or raw provider payloads.
+11. Retries and concurrency MUST NOT allow duplicate code consumption, refresh
     token consumption, pending-state use, or cross-user grant effects.
 
 ## Out Of Scope For V1
@@ -371,4 +428,3 @@ when they appear in all capitals.
 - Group/team assignment.
 - External `/v0.1/servers` registry projection.
 - A Worker-side provider token-exchange API.
-- Dashboard UI or feature-flagged management pages.

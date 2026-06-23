@@ -10,6 +10,7 @@ import {
   AgentCreateInputSchema,
   AgentUpdateInputSchema,
   AgentDefaultsUpdateInputSchema,
+  AgentBindingsInputSchema,
 } from '@/lib/kiloclaw/agent-schemas';
 import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
@@ -145,12 +146,15 @@ function handleFileOperationError(err: unknown, operation: string): never {
       cause: code ? new UpstreamApiError(code) : undefined,
     });
   }
+  const payload = err instanceof KiloClawApiError ? getKiloClawApiErrorPayload(err) : {};
   throw new TRPCError({
     code: 'INTERNAL_SERVER_ERROR',
-    message:
-      err instanceof KiloClawApiError
-        ? (getKiloClawApiErrorPayload(err).message ?? `Failed to ${operation}`)
-        : `Failed to ${operation}`,
+    message: payload.message ?? `Failed to ${operation}`,
+    // Surface the controller's code so the client can tell a genuine timeout
+    // (openclaw_cli_timeout — may have applied) from an explicit failure
+    // (agent_binding_rollback_failed, openclaw_cli_failed) that must NOT be
+    // reconciled into a false success.
+    cause: payload.code ? new UpstreamApiError(payload.code) : undefined,
   });
 }
 
@@ -1703,6 +1707,29 @@ export const organizationKiloclawRouter = createTRPCRouter({
         return await client.deleteAgent(ctx.user.id, input.agentId, workerInstanceId(instance));
       } catch (err) {
         handleFileOperationError(err, 'delete agent');
+      }
+    }),
+
+  updateAgentBindings: organizationMemberMutationProcedure
+    .input(
+      z.object({
+        organizationId: z.uuid(),
+        agentId: AgentIdSchema,
+        bindings: AgentBindingsInputSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const instance = await requireOrgInstance(ctx.user.id, input.organizationId);
+        const client = new KiloClawInternalClient();
+        return await client.updateAgentBindings(
+          ctx.user.id,
+          input.agentId,
+          input.bindings,
+          workerInstanceId(instance)
+        );
+      } catch (err) {
+        handleFileOperationError(err, 'update agent bindings');
       }
     }),
 

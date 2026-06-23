@@ -11,6 +11,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTRPC } from '@/lib/trpc/utils';
+import {
+  getKiloPassHostingRecoveryCopy,
+  type KiloPassHostingRecoveryReason,
+} from '@/app/(app)/claw/components/billing/billing-types';
 
 const POLL_INTERVAL_MS = 1000;
 const TIMEOUT_MS = 90_000;
@@ -59,20 +63,26 @@ export function KiloPassAwardingCreditsClient() {
   const [redirectSecondsRemaining, setRedirectSecondsRemaining] = useState<number | null>(null);
 
   const checkoutSessionId = searchParams.get('session_id') ?? '';
-  const clawHostingPlan = searchParams.get('clawHostingPlan');
-  const clawInstanceId = searchParams.get('clawInstanceId');
-  const isClawAutoActivation = !!clawHostingPlan;
 
   const [activationStep, setActivationStep] = useState<ActivationStep>('payment');
-  const [enrollmentError, setEnrollmentError] = useState<string | null>(null);
+  const [activationFailureReason, setActivationFailureReason] =
+    useState<KiloPassHostingRecoveryReason | null>(null);
 
-  const enrollWithCredits = useMutation(
-    trpc.kiloclaw.enrollWithCredits.mutationOptions({
-      onSuccess: () => {
-        setActivationStep('done');
+  const activateCheckoutHosting = useMutation(
+    trpc.kiloPass.activateCheckoutHosting.mutationOptions({
+      onSuccess: result => {
+        if (result.outcome === 'activated') {
+          setActivationStep('done');
+          return;
+        }
+        if (result.outcome === 'not_requested') {
+          setActivationFailureReason('invalid_intent');
+          return;
+        }
+        setActivationFailureReason(result.reason);
       },
-      onError: error => {
-        setEnrollmentError(error.message);
+      onError: () => {
+        setActivationFailureReason('unexpected_error');
       },
     })
   );
@@ -90,7 +100,7 @@ export function KiloPassAwardingCreditsClient() {
     };
   }, []);
 
-  const query = useQuery({
+  const { data: checkoutState, isError: checkoutStateIsError } = useQuery({
     ...trpc.kiloPass.getCheckoutReturnState.queryOptions({ sessionId: checkoutSessionId }),
     enabled: checkoutSessionId.length > 0,
     refetchInterval: query => {
@@ -103,41 +113,25 @@ export function KiloPassAwardingCreditsClient() {
     retry: false,
   });
 
-  const isReady = query.data?.creditsAwarded === true;
-  const hasSubscription = query.data?.subscription != null;
+  const isReady = checkoutState?.creditsAwarded === true;
+  const isClawAutoActivation =
+    checkoutState?.hostingIntent !== 'none' && checkoutState?.hostingIntent != null;
+  const hasSubscription = checkoutState?.subscription != null;
   const showWelcomePromoIneligibleNotice =
-    query.data?.welcomePromoIneligibleDueToReusedFingerprint === true;
-
-  // For KiloClaw auto-activation: advance step when credits are awarded, then enroll
-  useEffect(() => {
-    if (!isClawAutoActivation || !isReady) return;
-    if (activationStep === 'payment') {
-      setActivationStep('credits');
-    }
-  }, [isClawAutoActivation, isReady, activationStep]);
+    checkoutState?.welcomePromoIneligibleDueToReusedFingerprint === true;
+  const visibleActivationStep =
+    activationStep === 'done'
+      ? activationStep
+      : isClawAutoActivation && isReady
+        ? 'hosting'
+        : activationStep;
 
   useEffect(() => {
-    if (!isClawAutoActivation || activationStep !== 'credits') return;
+    if (!isClawAutoActivation || !isReady || enrollmentTriggered.current) return;
 
-    // Credits awarded — trigger enrollment
-    setActivationStep('hosting');
-    if (
-      !enrollmentTriggered.current &&
-      (clawHostingPlan === 'standard' || clawHostingPlan === 'commit')
-    ) {
-      enrollmentTriggered.current = true;
-      enrollWithCredits.mutate({
-        plan: clawHostingPlan,
-        ...(clawInstanceId ? { instanceId: clawInstanceId } : {}),
-      });
-    }
-  }, [
-    isClawAutoActivation,
-    activationStep,
-    clawHostingPlan,
-    clawInstanceId,
-    enrollWithCredits.mutate,
-  ]);
+    enrollmentTriggered.current = true;
+    activateCheckoutHosting.mutate({ sessionId: checkoutSessionId });
+  }, [isClawAutoActivation, isReady, activateCheckoutHosting.mutate, checkoutSessionId]);
 
   // Standard (non-KiloClaw) flow: redirect to /profile when ready
   useEffect(() => {
@@ -190,8 +184,16 @@ export function KiloPassAwardingCreditsClient() {
 
   const fallbackDestination = isClawAutoActivation ? '/claw' : '/profile';
   const fallbackLabel = isClawAutoActivation ? 'Go to KiloClaw' : 'Go to profile';
+  const hostingRecovery = activationFailureReason
+    ? getKiloPassHostingRecoveryCopy(activationFailureReason)
+    : null;
 
-  if (query.isError) {
+  function retryCreditFundedHostingActivation() {
+    setActivationFailureReason(null);
+    activateCheckoutHosting.mutate({ sessionId: checkoutSessionId });
+  }
+
+  if (checkoutStateIsError) {
     return (
       <PageContainer>
         <div className="flex min-h-[70vh] items-center justify-center">
@@ -275,7 +277,7 @@ export function KiloPassAwardingCreditsClient() {
   // KiloClaw auto-activation: show progress steps
   if (isClawAutoActivation) {
     // Enrollment error: show fallback with manual activation option
-    if (enrollmentError) {
+    if (hostingRecovery) {
       return (
         <PageContainer>
           <div className="flex min-h-[70vh] items-center justify-center">
@@ -283,23 +285,47 @@ export function KiloPassAwardingCreditsClient() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5" />
-                  Hosting activation failed
+                  {hostingRecovery.title}
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4">
-                <div className="text-muted-foreground text-sm">
-                  Your credits were added successfully, but we couldn't activate hosting
-                  automatically: {enrollmentError}
-                </div>
-                <div className="text-muted-foreground text-sm">
-                  You can activate hosting manually from the KiloClaw dashboard.
-                </div>
+                <div className="text-muted-foreground text-sm">{hostingRecovery.description}</div>
                 {showWelcomePromoIneligibleNotice ? <WelcomePromoIneligibleNotice /> : null}
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" onClick={() => router.replace('/claw')}>
-                    Go to KiloClaw
-                  </Button>
+                  {hostingRecovery.canRetry ? (
+                    <Button
+                      type="button"
+                      disabled={activateCheckoutHosting.isPending}
+                      onClick={retryCreditFundedHostingActivation}
+                    >
+                      {activateCheckoutHosting.isPending
+                        ? 'Retrying credit activation…'
+                        : 'Retry credit-funded activation'}
+                    </Button>
+                  ) : null}
+                  {hostingRecovery.destination && hostingRecovery.destinationLabel ? (
+                    <Button
+                      type="button"
+                      variant={hostingRecovery.canRetry ? 'outline' : 'default'}
+                      onClick={() => {
+                        if (hostingRecovery.destination) {
+                          router.replace(hostingRecovery.destination);
+                        }
+                      }}
+                    >
+                      {hostingRecovery.destinationLabel}
+                    </Button>
+                  ) : null}
                 </div>
+                {hostingRecovery.showSupport ? (
+                  <div className="text-muted-foreground text-sm">
+                    If this keeps happening, contact support at{' '}
+                    <a href="https://kilo.ai/support" className="text-primary underline">
+                      https://kilo.ai/support
+                    </a>
+                    .
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           </div>
@@ -347,7 +373,7 @@ export function KiloPassAwardingCreditsClient() {
               <CardTitle>Setting up your hosting</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4">
-              <ActivationSteps current={activationStep} />
+              <ActivationSteps current={visibleActivationStep} />
               <div className="text-muted-foreground text-sm">
                 This can take a few seconds while we finalize your setup.
               </div>

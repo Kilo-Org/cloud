@@ -293,6 +293,10 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
     async getRequesterInfo({ message, platformIntegration, displayName }) {
       return await getSlackRequesterInfo(message, platformIntegration, displayName);
     },
+    async startProcessingIndicator({ thread, status }) {
+      await thread.startTyping(status);
+      return async () => {};
+    },
     // When the user clicks the "Link Account" LinkButton, Slack fires a
     // block_actions event *in addition to* opening the URL in the browser.
     // For ephemeral messages the adapter encodes the response_url into the

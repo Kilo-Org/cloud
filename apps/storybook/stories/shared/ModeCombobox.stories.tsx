@@ -30,7 +30,7 @@ function ModeComboboxStory({ value = 'code', ...props }: StoryProps) {
 }
 
 const meta: Meta<typeof ModeComboboxStory> = {
-  title: 'Shared/ModeCombobox',
+  title: 'Components/App Controls/ModeCombobox',
   component: ModeComboboxStory,
   tags: ['autodocs'],
   argTypes: {

@@ -19,7 +19,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
+import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -29,7 +29,7 @@ import { useRefreshRepositories } from '@/hooks/useRefreshRepositories';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { cn } from '@/lib/utils';
-import { RepositoryMultiSelect, type Repository } from './RepositoryMultiSelect';
+import { RepositoryMultiSelect } from './RepositoryMultiSelect';
 import { CodeReviewActionRequiredAlert } from './CodeReviewActionRequiredAlert';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import {
@@ -101,7 +101,6 @@ export function ReviewConfigForm({
   gitlabStatusData,
 }: ReviewConfigFormProps) {
   const trpc = useTRPC();
-  const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
   const isGitLab = platform === 'gitlab';
   const platformLabel = isGitLab ? 'GitLab' : 'GitHub';
@@ -211,8 +210,6 @@ export function ReviewConfigForm({
   const [repositorySelectionMode, setRepositorySelectionMode] = useState<'all' | 'selected'>('all');
   const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>([]);
   const [useReviewMd, setUseReviewMd] = useState(true);
-  // Repositories added from search results (for GitLab where pagination limits initial results)
-  const [searchAddedRepos, setSearchAddedRepos] = useState<Repository[]>([]);
   // GitLab-specific: auto-configure webhooks
   const [autoConfigureWebhooks, setAutoConfigureWebhooks] = useState(true);
   // Webhook sync result from last save
@@ -239,6 +236,21 @@ export function ReviewConfigForm({
     () => getAvailableThinkingEfforts(selectedModel),
     [selectedModel]
   );
+
+  const selectableRepositories = useMemo(() => {
+    const cachedRepositories = (repositoriesData?.repositories ?? []).map(repo => ({
+      id: repo.id,
+      name: repo.name,
+      full_name: repo.fullName,
+      private: repo.private,
+    }));
+    const cachedRepositoryIds = new Set(cachedRepositories.map(repo => repo.id));
+    const legacyRepositories = (configData?.manuallyAddedRepositories ?? []).filter(
+      repo => !cachedRepositoryIds.has(repo.id)
+    );
+
+    return [...cachedRepositories, ...legacyRepositories];
+  }, [configData?.manuallyAddedRepositories, repositoriesData?.repositories]);
 
   // Reset thinking effort when the model changes and the current selection is invalid
   useEffect(() => {
@@ -312,17 +324,6 @@ export function ReviewConfigForm({
       setRepositorySelectionMode(isGitLab ? 'selected' : repoMode);
       setSelectedRepositoryIds(configData.selectedRepositoryIds || []);
       setUseReviewMd(!(configData.disableReviewMd ?? false));
-      // Load repositories that were added from search results
-      if (configData.manuallyAddedRepositories) {
-        setSearchAddedRepos(
-          configData.manuallyAddedRepositories.map(repo => ({
-            id: repo.id,
-            name: repo.name,
-            full_name: repo.full_name,
-            private: repo.private,
-          }))
-        );
-      }
     }
   }, [configData, isGitLab]);
 
@@ -439,14 +440,11 @@ export function ReviewConfigForm({
     // Clear previous webhook sync result
     setWebhookSyncResult(null);
 
-    // Convert search-added repos to the format expected by the API
-    // Note: The API field is still called manuallyAddedRepositories for backwards compatibility
-    const manuallyAddedRepositories = searchAddedRepos.map(repo => ({
-      id: repo.id,
-      name: repo.name,
-      full_name: repo.full_name,
-      private: repo.private,
-    }));
+    // Preserve selected legacy live-search entries until their persisted contract is migrated.
+    const selectedRepositoryIdSet = new Set(selectedRepositoryIds);
+    const manuallyAddedRepositories = (configData?.manuallyAddedRepositories ?? []).filter(repo =>
+      selectedRepositoryIdSet.has(repo.id)
+    );
 
     if (organizationId) {
       orgSaveMutation.mutate({
@@ -703,7 +701,7 @@ export function ReviewConfigForm({
                       `${platformLabel} integration is not connected. Please connect ${platformLabel} in the Integrations page to configure repository selection.`}
                   </p>
                 </div>
-              ) : repositoriesData.repositories.length === 0 ? (
+              ) : selectableRepositories.length === 0 ? (
                 <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
                   <p className="text-sm text-yellow-200">
                     No repositories found. Please ensure the {platformLabel}{' '}
@@ -740,59 +738,9 @@ export function ReviewConfigForm({
                   {(isGitLab || repositorySelectionMode === 'selected') && (
                     <div className="mt-4">
                       <RepositoryMultiSelect
-                        repositories={
-                          [
-                            ...repositoriesData.repositories.map(repo => ({
-                              id: repo.id,
-                              name: repo.name,
-                              full_name: repo.fullName,
-                              private: repo.private,
-                            })),
-                            ...searchAddedRepos,
-                          ] as Repository[]
-                        }
+                        repositories={selectableRepositories}
                         selectedIds={selectedRepositoryIds}
                         onSelectionChange={setSelectedRepositoryIds}
-                        onAddFromSearch={(repo: Repository) => {
-                          // Add to search-added repos and auto-select it
-                          setSearchAddedRepos(prev => [...prev, repo]);
-                          setSelectedRepositoryIds(prev => [...prev, repo.id]);
-                        }}
-                        onSearch={
-                          isGitLab
-                            ? async (query: string) => {
-                                // Call the appropriate search endpoint based on context
-                                if (organizationId) {
-                                  const result =
-                                    await trpcClient.organizations.reviewAgent.searchGitLabRepositories.query(
-                                      {
-                                        organizationId,
-                                        query,
-                                      }
-                                    );
-                                  return result.repositories.map(repo => ({
-                                    id: repo.id,
-                                    name: repo.name,
-                                    full_name: repo.fullName,
-                                    private: repo.private,
-                                  }));
-                                } else {
-                                  const result =
-                                    await trpcClient.personalReviewAgent.searchGitLabRepositories.query(
-                                      {
-                                        query,
-                                      }
-                                    );
-                                  return result.repositories.map(repo => ({
-                                    id: repo.id,
-                                    name: repo.name,
-                                    full_name: repo.fullName,
-                                    private: repo.private,
-                                  }));
-                                }
-                              }
-                            : undefined
-                        }
                       />
                     </div>
                   )}

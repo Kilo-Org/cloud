@@ -5,10 +5,12 @@ import {
   getSecurityAgentCommandForOwner,
   getSecurityAgentRepositorySyncState,
   listActiveSecurityAgentCommandsForOwner,
+  markSecurityAgentCommandRetriesExhausted,
   reconcileStaleSecurityAgentCommands,
   recordSecurityAgentRepositorySyncFailure,
   recordSecurityAgentRepositorySyncSuccess,
   transitionSecurityAgentCommand,
+  transitionSecurityAgentCommandWithCurrentState,
 } from '@kilocode/db';
 import { kilocode_users, security_agent_commands } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -54,6 +56,73 @@ describe('Security Agent command ledger', () => {
     await expect(
       getSecurityAgentCommandForOwner(db, { type: 'user', id: otherOwner.id }, command.id)
     ).resolves.toBeNull();
+  });
+
+  it('distinguishes rejected terminal and missing command transitions', async () => {
+    const owner = await insertTestUser();
+    const command = await createSecurityAgentCommand(db, {
+      commandType: 'sync',
+      origin: 'manual',
+      owner: { type: 'user', id: owner.id },
+    });
+    await transitionSecurityAgentCommand(db, {
+      commandId: command.id,
+      fromStatuses: ['accepted'],
+      status: 'succeeded',
+      resultCode: 'SYNC_COMPLETED',
+    });
+
+    await expect(
+      transitionSecurityAgentCommandWithCurrentState(db, {
+        commandId: command.id,
+        fromStatuses: ['accepted', 'running'],
+        status: 'running',
+      })
+    ).resolves.toMatchObject({
+      transitioned: false,
+      command: { status: 'succeeded', result_code: 'SYNC_COMPLETED' },
+    });
+    await expect(
+      transitionSecurityAgentCommandWithCurrentState(db, {
+        commandId: '00000000-0000-4000-8000-000000000000',
+        fromStatuses: ['accepted'],
+        status: 'running',
+      })
+    ).resolves.toEqual({ transitioned: false, command: null });
+  });
+
+  it('records exhausted retries without overwriting terminal commands', async () => {
+    const owner = await insertTestUser();
+    const running = await createSecurityAgentCommand(db, {
+      commandType: 'start_analysis',
+      origin: 'manual',
+      owner: { type: 'user', id: owner.id },
+    });
+    const terminal = await createSecurityAgentCommand(db, {
+      commandType: 'dismiss_finding',
+      origin: 'manual',
+      owner: { type: 'user', id: owner.id },
+    });
+    await transitionSecurityAgentCommand(db, {
+      commandId: running.id,
+      fromStatuses: ['accepted'],
+      status: 'running',
+    });
+    await transitionSecurityAgentCommand(db, {
+      commandId: terminal.id,
+      fromStatuses: ['accepted'],
+      status: 'no_op',
+      resultCode: 'ALREADY_IGNORED',
+    });
+
+    await expect(markSecurityAgentCommandRetriesExhausted(db, running.id)).resolves.toMatchObject({
+      transitioned: true,
+      command: { status: 'failed', result_code: 'QUEUE_RETRIES_EXHAUSTED' },
+    });
+    await expect(markSecurityAgentCommandRetriesExhausted(db, terminal.id)).resolves.toMatchObject({
+      transitioned: false,
+      command: { status: 'no_op', result_code: 'ALREADY_IGNORED' },
+    });
   });
 
   it('enforces exactly one owner', async () => {
@@ -118,6 +187,11 @@ describe('Security Agent command ledger', () => {
     });
     await recordSecurityAgentRepositorySyncFailure(db, {
       owner: { type: 'user', id: owner.id },
+      repoFullName: 'kilo/clean-repository',
+      failureCode: 'SYNC_FAILED',
+    });
+    await recordSecurityAgentRepositorySyncFailure(db, {
+      owner: { type: 'user', id: owner.id },
       repoFullName: 'kilo/failed-repository',
       failureCode: 'SYNC_FAILED',
     });
@@ -134,7 +208,10 @@ describe('Security Agent command ledger', () => {
         { type: 'user', id: owner.id },
         'kilo/clean-repository'
       )
-    ).resolves.toMatchObject({ last_failure_code: null, last_succeeded_at: expect.any(String) });
+    ).resolves.toMatchObject({
+      last_failure_code: 'SYNC_FAILED',
+      last_succeeded_at: expect.any(String),
+    });
     await expect(
       getSecurityAgentRepositorySyncState(
         db,

@@ -1,6 +1,7 @@
 import type { Context } from 'hono';
 import {
   buildScopedConnectCanonicalUrl,
+  GatewayMcpAccessScope,
   parseScopedConnectPath,
   OrgConnectRouteParamsSchema,
   UserConnectRouteParamsSchema,
@@ -14,7 +15,7 @@ function metadata(c: Context<MCPGatewayEnv>, resource: string) {
   return c.json({
     resource,
     authorization_servers: [c.env.APP_BASE_URL],
-    scopes_supported: ['profile'],
+    scopes_supported: [GatewayMcpAccessScope],
   });
 }
 
@@ -26,7 +27,9 @@ export async function handleUserProtectedResourceMetadata(
   c: Context<MCPGatewayEnv>,
   params: UserConnectRouteParams
 ) {
-  const validatedParams = UserConnectRouteParamsSchema.parse(params);
+  const parsedParams = UserConnectRouteParamsSchema.safeParse(params);
+  if (!parsedParams.success) return c.json({ error: 'not_found' }, 404);
+  const validatedParams = parsedParams.data;
   const route = parseScopedConnectPath(
     `/mcp-connect/user/${validatedParams.userId}/${validatedParams.configId}/${validatedParams.routeKey}`
   );
@@ -46,7 +49,9 @@ export async function handleOrgProtectedResourceMetadata(
   c: Context<MCPGatewayEnv>,
   params: OrgConnectRouteParams
 ) {
-  const validatedParams = OrgConnectRouteParamsSchema.parse(params);
+  const parsedParams = OrgConnectRouteParamsSchema.safeParse(params);
+  if (!parsedParams.success) return c.json({ error: 'not_found' }, 404);
+  const validatedParams = parsedParams.data;
   const route = parseScopedConnectPath(
     `/mcp-connect/org/${validatedParams.orgId}/${validatedParams.configId}/${validatedParams.routeKey}`
   );

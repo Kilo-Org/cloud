@@ -7,7 +7,7 @@
   "name": "cloud-agent-next",
   "account_id": "e115e769bcdd4c3d66af59d3332cb394",
   "main": "src/index.ts",
-  "compatibility_date": "2025-09-15",
+  "compatibility_date": "2026-06-03",
   "compatibility_flags": ["nodejs_compat"],
   "preview_urls": false,
   "rules": [{ "type": "Text", "globs": ["**/*.sql"], "fallthrough": true }],
@@ -27,7 +27,7 @@
       "invocation_logs": true,
     },
     "traces": {
-      "enabled": true,
+      "enabled": false,
       "persist": true,
       "head_sampling_rate": 1,
     },
@@ -39,6 +39,7 @@
   "routes": [
     {
       "pattern": "cloud-agent-next.kilosessions.ai",
+      "zone_name": "kilosessions.ai",
       "custom_domain": true,
     },
   ],
@@ -146,19 +147,19 @@
       "image": "./Dockerfile",
       "instance_type": "standard-4",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.12",
+        "KILOCODE_CLI_VERSION": "7.3.21",
       },
-      "max_instances": 250,
+      "max_instances": 400,
       "rollout_active_grace_period": 1800,
     },
     {
       "class_name": "SandboxSmall",
       "image": "./Dockerfile",
-      "instance_type": "standard-2",
+      "instance_type": "standard-4",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.12",
+        "KILOCODE_CLI_VERSION": "7.3.21",
       },
-      "max_instances": 400,
+      "max_instances": 300,
       "rollout_active_grace_period": 1800,
     },
     {
@@ -166,7 +167,7 @@
       "image": "./Dockerfile.dind",
       "instance_type": "standard-3",
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.12",
+        "KILOCODE_CLI_VERSION": "7.3.21",
       },
       "max_instances": 20,
       "rollout_active_grace_period": 1800,
@@ -327,7 +328,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.12",
+            "KILOCODE_CLI_VERSION": "7.3.21",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -335,9 +336,9 @@
         {
           "class_name": "SandboxSmall",
           "image": "./Dockerfile.dev",
-          "instance_type": "standard-2",
+          "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.12",
+            "KILOCODE_CLI_VERSION": "7.3.21",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -347,7 +348,7 @@
           "image": "./Dockerfile.dind",
           "instance_type": "standard-3",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.12",
+            "KILOCODE_CLI_VERSION": "7.3.21",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,

@@ -1,4 +1,11 @@
 import { z } from 'zod';
+import {
+  CloudAgentFailureCodeSchema,
+  CloudAgentFailureStageSchema,
+  WorkspaceFailureSubtypeSchema,
+  type CloudAgentFailureCode,
+  type CloudAgentFailureStage,
+} from '@kilocode/worker-utils/cloud-agent-failure';
 import type { CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
@@ -6,12 +13,25 @@ import { renderExecutionTurnContent } from '../execution/types.js';
 import { AttachmentsSchema } from '../persistence/schemas.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 import {
+  WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH,
+  type WorkspaceFailureSubtype,
+} from '../shared/wrapper-bootstrap.js';
+import {
   getWrapperRuntimeState,
   hasCompleteWrapperRunMessageIndex,
 } from './wrapper-runtime-state.js';
+import {
+  parseModelNotFoundRuntimeDiagnostics,
+  type ModelNotFoundRuntimeDiagnostics,
+} from '../shared/runtime-model-diagnostics.js';
 
 const SESSION_MESSAGE_STATE_PREFIX = 'session_message:';
 const WRAPPER_RUN_MESSAGE_INDEX_PREFIX = 'session_message_wrapper_run:';
+
+const ModelNotFoundRuntimeDiagnosticsSchema = z.custom<ModelNotFoundRuntimeDiagnostics>(
+  value => parseModelNotFoundRuntimeDiagnostics(value).success,
+  'Invalid model-not-found runtime diagnostics'
+);
 
 export type SessionMessageStatus = 'queued' | 'accepted' | 'completed' | 'failed' | 'interrupted';
 
@@ -28,50 +48,22 @@ export type SessionMessageCompletionSource = z.infer<typeof SessionMessageComple
 type AssertTrue<T extends true> = T;
 type CloudAgentRunFailureStage = NonNullable<CloudAgentRunStateReport['run']['failureStage']>;
 type CloudAgentRunFailureCode = NonNullable<CloudAgentRunStateReport['run']['failureCode']>;
+type StageContractMatchesReport = AssertTrue<
+  CloudAgentRunFailureStage extends CloudAgentFailureStage ? true : false
+>;
+type CodeContractMatchesReport = AssertTrue<
+  CloudAgentRunFailureCode extends CloudAgentFailureCode ? true : false
+>;
 
-export const SessionMessageFailureStageSchema = z.enum([
-  'pre_dispatch',
-  'post_dispatch_no_activity',
-  'agent_activity',
-  'interruption',
-  'unknown',
-] as const satisfies readonly CloudAgentRunFailureStage[]);
-export type SessionMessageFailureStage =
-  AssertTrue<
-    CloudAgentRunFailureStage extends z.infer<typeof SessionMessageFailureStageSchema>
-      ? true
-      : false
-  > extends true
-    ? z.infer<typeof SessionMessageFailureStageSchema>
-    : never;
+export const SessionMessageFailureStageSchema = CloudAgentFailureStageSchema;
+export type SessionMessageFailureStage = StageContractMatchesReport extends true
+  ? CloudAgentFailureStage
+  : never;
 
-export const SessionMessageFailureCodeSchema = z.enum([
-  'sandbox_connect_failed',
-  'workspace_setup_failed',
-  'kilo_server_failed',
-  'wrapper_start_failed',
-  'invalid_delivery_request',
-  'session_metadata_missing',
-  'model_missing',
-  'delivery_failure_unknown',
-  'wrapper_disconnected',
-  'wrapper_no_output',
-  'wrapper_ping_timeout',
-  'wrapper_error_before_activity',
-  'assistant_error',
-  'wrapper_error_after_activity',
-  'missing_assistant_reply',
-  'user_interrupt',
-  'container_shutdown',
-  'system_interrupt',
-  'unclassified',
-] as const satisfies readonly CloudAgentRunFailureCode[]);
-export type SessionMessageFailureCode =
-  AssertTrue<
-    CloudAgentRunFailureCode extends z.infer<typeof SessionMessageFailureCodeSchema> ? true : false
-  > extends true
-    ? z.infer<typeof SessionMessageFailureCodeSchema>
-    : never;
+export const SessionMessageFailureCodeSchema = CloudAgentFailureCodeSchema;
+export type SessionMessageFailureCode = CodeContractMatchesReport extends true
+  ? CloudAgentFailureCode
+  : never;
 export type SessionMessageDispatchAcceptanceKind = 'observed' | 'inferred_from_terminal';
 
 export type LegacyAdmissionConstraints = {
@@ -116,6 +108,9 @@ export type SessionMessageState = {
   completionSource?: SessionMessageCompletionSource;
   failureStage?: SessionMessageFailureStage;
   failureCode?: SessionMessageFailureCode;
+  failureSubtype?: WorkspaceFailureSubtype;
+  safeFailureMessage?: string;
+  modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
   error?: string;
   failureReason?: string;
   attempts?: number;
@@ -123,6 +118,7 @@ export type SessionMessageState = {
   callbackRequired?: boolean;
   callbackTarget?: CallbackTarget;
   callbackEnqueuedAt?: number;
+  callbackAbandonedAt?: number;
   callbackLastError?: string;
   callbackAttempts?: number;
   callbackRetryAt?: number;
@@ -218,6 +214,9 @@ export const SessionMessageStateSchema = z
     completionSource: SessionMessageCompletionSourceSchema.optional(),
     failureStage: SessionMessageFailureStageSchema.optional(),
     failureCode: SessionMessageFailureCodeSchema.optional(),
+    failureSubtype: WorkspaceFailureSubtypeSchema.optional(),
+    safeFailureMessage: z.string().max(WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH).optional(),
+    modelNotFoundRuntimeDiagnostics: ModelNotFoundRuntimeDiagnosticsSchema.optional(),
     error: z.string().optional(),
     failureReason: z.string().optional(),
     attempts: z.number().int().nonnegative().optional(),
@@ -230,6 +229,7 @@ export const SessionMessageStateSchema = z
       })
       .optional(),
     callbackEnqueuedAt: z.number().optional(),
+    callbackAbandonedAt: z.number().optional(),
     callbackLastError: z.string().optional(),
     callbackAttempts: z.number().int().nonnegative().optional(),
     callbackRetryAt: z.number().optional(),
@@ -262,7 +262,14 @@ export const SessionMessageStateSchema = z
       })
       .optional(),
   })
-  .passthrough();
+  .passthrough()
+  .refine(
+    state => state.failureSubtype === undefined || state.failureCode === 'workspace_setup_failed',
+    {
+      message: 'Workspace failure subtype requires workspace_setup_failed failure code',
+      path: ['failureSubtype'],
+    }
+  );
 
 export type SessionMessageStorage = {
   get<T = unknown>(key: string): Promise<T | undefined>;
@@ -512,6 +519,9 @@ export type MarkMessageFailedParams = {
   completionSource: SessionMessageCompletionSource;
   failureStage?: SessionMessageFailureStage;
   failureCode?: SessionMessageFailureCode;
+  failureSubtype?: WorkspaceFailureSubtype;
+  safeFailureMessage?: string;
+  modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
   attempts?: number;
 };
 
@@ -533,6 +543,9 @@ export async function markMessageFailed(
     completionSource: params.completionSource,
     failureStage: params.failureStage,
     failureCode: params.failureCode,
+    failureSubtype: params.failureSubtype,
+    safeFailureMessage: params.safeFailureMessage,
+    modelNotFoundRuntimeDiagnostics: params.modelNotFoundRuntimeDiagnostics,
     attempts: params.attempts,
   };
   await putSessionMessageState(storage, updated);
@@ -646,7 +659,11 @@ export async function listMessagesWithPendingCallbacks(
 ): Promise<SessionMessageState[]> {
   const entries = await listSessionMessageStates(storage);
   return entries.filter(
-    state => isTerminalStatus(state.status) && state.callbackRequired && !state.callbackEnqueuedAt
+    state =>
+      isTerminalStatus(state.status) &&
+      state.callbackRequired &&
+      !state.callbackEnqueuedAt &&
+      !state.callbackAbandonedAt
   );
 }
 
@@ -658,7 +675,10 @@ export async function listTerminalMessagesWithPendingEffects(
     .flatMap(state => {
       if (!isTerminalStatus(state.status)) return [];
       const normalized =
-        state.terminalEffects || !state.callbackRequired || state.callbackEnqueuedAt
+        state.terminalEffects ||
+        !state.callbackRequired ||
+        state.callbackEnqueuedAt ||
+        state.callbackAbandonedAt
           ? state
           : {
               ...state,
@@ -713,6 +733,9 @@ export type TerminalizeParams =
       completionSource: SessionMessageCompletionSource;
       failureStage?: SessionMessageFailureStage;
       failureCode?: SessionMessageFailureCode;
+      failureSubtype?: WorkspaceFailureSubtype;
+      safeFailureMessage?: string;
+      modelNotFoundRuntimeDiagnostics?: ModelNotFoundRuntimeDiagnostics;
       attempts?: number;
     }
   | {
@@ -773,6 +796,9 @@ export async function terminalizeMessageOnce(
       completionSource: params.completionSource,
       failureStage: params.failureStage,
       failureCode: params.failureCode,
+      failureSubtype: params.failureSubtype,
+      safeFailureMessage: params.safeFailureMessage,
+      modelNotFoundRuntimeDiagnostics: params.modelNotFoundRuntimeDiagnostics,
       attempts: params.attempts,
       terminalEffects,
     };

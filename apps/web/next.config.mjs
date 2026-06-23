@@ -132,6 +132,15 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: '/api-docs/swagger-ui/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
         // Apply to all routes
         source: '/(.*)',
         headers: [
@@ -188,8 +197,6 @@ const nextConfig = {
 
   // This is required to support PostHog trailing slash API requests
   skipTrailingSlashRedirect: true,
-  // Maximize chance of decent client-side stack traces
-  productionBrowserSourceMaps: true,
   // Configure `pageExtensions` to include markdown and MDX files
   pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
 
@@ -247,9 +254,6 @@ const sentryConfig = {
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
-
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
 
   // Tree-shake Sentry debug statements to reduce bundle size
   bundleSizeOptimizations: {

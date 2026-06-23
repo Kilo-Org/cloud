@@ -66,9 +66,13 @@ declare type ExecutionContext = {
 
 declare type CloudflareEnv = {
   HYPERDRIVE: Hyperdrive;
+  CF_VERSION_METADATA: { id: string; tag: string; timestamp: string } | undefined;
   OWNER_QUEUE: Queue<import('./src/types').AutoAnalysisOwnerMessage>;
   CALLBACK_QUEUE: Queue<import('./src/callbacks').SecurityAnalysisCallbackMessage>;
   MANUAL_ANALYSIS_QUEUE: Queue<import('./src/manual-analysis').ManualAnalysisStartCommand>;
+  REMEDIATION_ATTEMPT_QUEUE: Queue<import('./src/remediation').RemediationAttemptQueueMessage>;
+  REMEDIATION_COMMAND_QUEUE: Queue<import('./src/remediation').ApplyAutoRemediationCommand>;
+  REMEDIATION_CALLBACK_QUEUE: Queue<import('./src/remediation').SecurityRemediationCallbackMessage>;
   CLOUD_AGENT_NEXT: { fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> };
   GIT_TOKEN_SERVICE: GitTokenService;
   NEXTAUTH_SECRET: SecretBinding;

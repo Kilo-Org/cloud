@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
+import { GatewaySupportedScopes } from '@kilocode/mcp-gateway';
 
 function authorizationServerMetadata() {
   const { config } = createGatewayServices();
@@ -18,7 +19,7 @@ function authorizationServerMetadata() {
     grant_types_supported: ['authorization_code', 'refresh_token'],
     token_endpoint_auth_methods_supported: ['none', 'client_secret_post', 'client_secret_basic'],
     code_challenge_methods_supported: ['S256'],
-    scopes_supported: ['profile'],
+    scopes_supported: GatewaySupportedScopes,
   };
 }
 

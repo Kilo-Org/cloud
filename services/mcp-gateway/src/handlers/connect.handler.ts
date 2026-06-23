@@ -1,7 +1,10 @@
 import type { Context } from 'hono';
+import { z } from 'zod';
 import {
   buildMCPID,
   buildScopedConnectCanonicalUrl,
+  GatewayMcpAccessScope,
+  parseScopeString,
   parseScopedConnectPath,
   parseAuxiliaryHeaders,
   type ScopedConnectRoute,
@@ -26,7 +29,7 @@ import {
 import { resolveProviderAuthorization } from '../lib/provider-refresh';
 import { loadStaticHeaders } from '../lib/credentials';
 import { proxyUpstream } from '../lib/upstream-proxy';
-import { challengeResponse, forbiddenResponse } from '../lib/responses';
+import { challengeResponse, forbiddenResponse, insufficientScopeResponse } from '../lib/responses';
 import { validateIncomingOrigin } from '../lib/origin';
 
 function bearerToken(header: string | undefined): string | null {
@@ -99,9 +102,29 @@ function logUpstreamServerError(params: {
   );
 }
 
-function requestRoute(c: Context<MCPGatewayEnv>): ScopedConnectRoute {
+function requestRoute(
+  c: Context<MCPGatewayEnv>,
+  params: UserConnectRouteParams | OrgConnectRouteParams
+): ScopedConnectRoute {
   const route = parseScopedConnectPath(c.req.path);
   if (!route) {
+    throw createGatewayError(GatewayErrorCode.InvalidRequest, 'Invalid scoped route', 400);
+  }
+  const expectedRoute =
+    'userId' in params
+      ? parseScopedConnectPath(
+          `/mcp-connect/user/${params.userId}/${params.configId}/${params.routeKey}`
+        )
+      : parseScopedConnectPath(
+          `/mcp-connect/org/${params.orgId}/${params.configId}/${params.routeKey}`
+        );
+  if (
+    !expectedRoute ||
+    route.ownerScope !== expectedRoute.ownerScope ||
+    route.ownerId !== expectedRoute.ownerId ||
+    route.configId !== expectedRoute.configId ||
+    route.routeKey !== expectedRoute.routeKey
+  ) {
     throw createGatewayError(GatewayErrorCode.InvalidRequest, 'Invalid scoped route', 400);
   }
   return route;
@@ -109,14 +132,14 @@ function requestRoute(c: Context<MCPGatewayEnv>): ScopedConnectRoute {
 
 async function handleConnect(
   c: Context<MCPGatewayEnv>,
-  _params: UserConnectRouteParams | OrgConnectRouteParams
+  params: UserConnectRouteParams | OrgConnectRouteParams
 ) {
   let phase: RuntimePhase = 'parse_route';
   let loggedRoute: ScopedConnectRoute | null = null;
   let hasBearerToken = false;
   let authMode: GatewayAuthMode | undefined;
   try {
-    const route = requestRoute(c);
+    const route = requestRoute(c, params);
     loggedRoute = route;
     const canonicalUrl = buildScopedConnectCanonicalUrl(c.env.MCP_GATEWAY_BASE_URL, {
       ownerScope: route.ownerScope,
@@ -125,14 +148,14 @@ async function handleConnect(
       routeKey: route.routeKey,
     });
     validateIncomingOrigin({ request: c.req.raw, env: c.env });
-    phase = 'load_route';
-    const activeRoute = await resolveActiveRoute({ env: c.env, route });
-    if (!activeRoute) {
-      return c.json({ error: 'not_found' }, 404);
-    }
     const token = bearerToken(c.req.header('authorization'));
     hasBearerToken = Boolean(token);
     if (!token) {
+      phase = 'load_route';
+      const activeRoute = await resolveActiveRoute({ env: c.env, route });
+      if (!activeRoute) {
+        return c.json({ error: 'not_found' }, 404);
+      }
       return challengeResponse(c, canonicalUrl);
     }
     phase = 'load_jwt_keyset';
@@ -159,6 +182,9 @@ async function handleConnect(
     } catch {
       return challengeResponse(c, canonicalUrl);
     }
+    if (!parseScopeString(claims.scope).includes(GatewayMcpAccessScope)) {
+      return insufficientScopeResponse(c, canonicalUrl);
+    }
     if (
       claims.sub.length === 0 ||
       claims.owner_scope !== route.ownerScope ||
@@ -178,6 +204,11 @@ async function handleConnect(
         })
     ) {
       return forbiddenResponse(c);
+    }
+    phase = 'load_route';
+    const activeRoute = await resolveActiveRoute({ env: c.env, route });
+    if (!activeRoute) {
+      return c.json({ error: 'not_found' }, 404);
     }
     phase = 'load_runtime_state';
     let resolution = await resolveRuntimeState({ env: c.env, route, userId: claims.sub });
@@ -297,6 +328,7 @@ export async function handleUserConnect(c: Context<MCPGatewayEnv>, params: UserC
     return await handleConnect(c, validatedParams);
   } catch (error) {
     if (error instanceof GatewayError) return gatewayHandlerError(c, error);
+    if (error instanceof z.ZodError) return c.json({ error: 'not_found' }, 404);
     return c.json({ error: 'server_error' }, 500);
   }
 }
@@ -307,6 +339,7 @@ export async function handleOrgConnect(c: Context<MCPGatewayEnv>, params: OrgCon
     return await handleConnect(c, validatedParams);
   } catch (error) {
     if (error instanceof GatewayError) return gatewayHandlerError(c, error);
+    if (error instanceof z.ZodError) return c.json({ error: 'not_found' }, 404);
     return c.json({ error: 'server_error' }, 500);
   }
 }

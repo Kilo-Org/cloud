@@ -4,14 +4,30 @@ import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationMemberProcedure,
+  organizationOwnerMutationProcedure,
 } from '@/routers/organizations/utils';
-import { readDb } from '@/lib/drizzle';
+import { db, readDb } from '@/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
-import { microdollar_usage, kilocode_users } from '@kilocode/db/schema';
-import { eq, sum, count, sql, and, gte, lte } from 'drizzle-orm';
+import {
+  microdollar_usage,
+  kilocode_users,
+  organizations,
+  organization_recommendation_dismissals,
+} from '@kilocode/db/schema';
+import { eq, sum, count, sql, and, gte, lte, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
+import {
+  FEATURE_ADOPTION_KEYS,
+  getOrganizationFeatureAdoption,
+} from '@/lib/organizations/feature-adoption';
+import {
+  RECOMMENDATION_FEATURES,
+  RECOMMENDATION_KEYS,
+  getOrganizationRecommendations,
+} from '@/lib/organizations/recommendations';
 import { getOrganizationMembers } from '@/lib/organizations/organizations';
+import { TRPCError } from '@trpc/server';
 import {
   getAgentInteractionsPerDay,
   getCloudAgentSessionsPerDay,
@@ -77,6 +93,55 @@ const AutocompleteMetricsOutputSchema = z.object({
   tokens: z.number(),
 });
 
+const FeatureAdoptionOutputSchema = z.object({
+  checks: z.array(
+    z.object({
+      key: z.enum(FEATURE_ADOPTION_KEYS),
+      title: z.string(),
+      description: z.string(),
+      adopted: z.boolean(),
+      adoptedLabel: z.string(),
+      notAdoptedLabel: z.string(),
+      actionLabel: z.string(),
+      actionUrl: z.string(),
+    })
+  ),
+});
+
+const RecommendationsOutputSchema = z.object({
+  checks: FeatureAdoptionOutputSchema.shape.checks,
+  recommendations: z.array(
+    z.object({
+      key: z.enum(RECOMMENDATION_KEYS),
+      feature: z.enum(RECOMMENDATION_FEATURES),
+      status: z.enum(['open', 'completed', 'dismissed']),
+      title: z.string(),
+      description: z.string(),
+      actionLabel: z.string(),
+      actionUrl: z.string(),
+      severity: z.enum(['attention', 'suggestion']),
+    })
+  ),
+});
+
+const DismissRecommendationInputSchema = OrganizationIdInputSchema.extend({
+  recommendationKey: z.enum(RECOMMENDATION_KEYS),
+});
+
+async function assertEnterprise(organizationId: string): Promise<void> {
+  const rows = await readDb
+    .select({ plan: organizations.plan })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  if (rows[0]?.plan !== 'enterprise') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Feature adoption reporting is available on the Enterprise plan.',
+    });
+  }
+}
+
 const AIAdoptionTimeseriesOutputSchema = z.object({
   timeseries: z.array(
     z.object({
@@ -138,6 +203,68 @@ function getDateThreshold(period: string): string | null {
 }
 
 export const organizationsUsageDetailsRouter = createTRPCRouter({
+  getFeatureAdoption: organizationMemberProcedure
+    .input(OrganizationIdInputSchema)
+    .output(FeatureAdoptionOutputSchema)
+    .query(async ({ input }) => {
+      const adoption = await getOrganizationFeatureAdoption(input.organizationId);
+      if (adoption.plan !== 'enterprise') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Feature adoption reporting is available on the Enterprise plan.',
+        });
+      }
+      return { checks: adoption.checks };
+    }),
+  getRecommendations: organizationMemberProcedure
+    .input(OrganizationIdInputSchema)
+    .output(RecommendationsOutputSchema)
+    .query(async ({ input }) => {
+      const result = await getOrganizationRecommendations(input.organizationId);
+      if (result.plan !== 'enterprise') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Feature adoption reporting is available on the Enterprise plan.',
+        });
+      }
+      return { checks: result.checks, recommendations: result.recommendations };
+    }),
+  dismissRecommendation: organizationOwnerMutationProcedure
+    .input(DismissRecommendationInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertEnterprise(input.organizationId);
+      await db
+        .insert(organization_recommendation_dismissals)
+        .values({
+          owned_by_organization_id: input.organizationId,
+          recommendation_key: input.recommendationKey,
+          dismissed_by_user_id: ctx.user.id,
+        })
+        .onConflictDoNothing({
+          target: [
+            organization_recommendation_dismissals.owned_by_organization_id,
+            organization_recommendation_dismissals.recommendation_key,
+          ],
+        });
+      return { dismissed: true };
+    }),
+  restoreRecommendation: organizationOwnerMutationProcedure
+    .input(DismissRecommendationInputSchema)
+    .mutation(async ({ input }) => {
+      await assertEnterprise(input.organizationId);
+      await db
+        .delete(organization_recommendation_dismissals)
+        .where(
+          and(
+            eq(
+              organization_recommendation_dismissals.owned_by_organization_id,
+              input.organizationId
+            ),
+            eq(organization_recommendation_dismissals.recommendation_key, input.recommendationKey)
+          )
+        );
+      return { restored: true };
+    }),
   getTimeSeries: organizationMemberProcedure
     .input(UsageTimeseriesInputSchema)
     .output(UsageTimeseriesOutputSchema)

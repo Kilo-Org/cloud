@@ -118,7 +118,7 @@ type RawDeduction = {
  *
  * Pure-credit categories:  `kiloclaw-subscription:{instanceId}:YYYY-MM`
  *                          `kiloclaw-subscription-commit:{instanceId}:YYYY-MM`
- * Settlement categories:   `kiloclaw-settlement:{stripeSubId}:YYYY-MM-DD`
+ * Settlement categories:   `kiloclaw-settlement:{stripeSubId}:payment:{stripePaymentId}`
  *
  * Returns the instance UUID for pure-credit categories, or null for
  * settlement categories (which embed the Stripe subscription ID instead).

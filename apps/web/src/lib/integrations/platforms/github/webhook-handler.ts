@@ -32,6 +32,7 @@ import {
   upsertCliSessionPullRequestReviewFromWebhook,
 } from '@/lib/integrations/platforms/github/webhook-handlers';
 import { PLATFORM, GITHUB_EVENT, GITHUB_ACTION } from '@/lib/integrations/core/constants';
+import { handleGitHubReviewCommentReply } from '@/lib/code-reviews/review-memory/github-feedback';
 import { logExceptInTest } from '@/lib/utils.server';
 import { logWebhookEvent, updateWebhookEvent } from '@/lib/integrations/db/webhook-events';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -648,13 +649,27 @@ export async function handleGitHubWebhook(
 
       // Process asynchronously to return 200 within GitHub's timeout
       after(async () => {
+        const handlersTriggered = ['pr_review_comment_fix'];
         try {
           await handlePRReviewComment(parseResult.data, integration);
+          try {
+            const reviewMemoryResult = await handleGitHubReviewCommentReply({
+              payload: parseResult.data,
+              integration,
+              deliveryId: eventSignature,
+            });
+            if (reviewMemoryResult.recorded) handlersTriggered.push('review_memory_feedback');
+          } catch (error) {
+            logExceptInTest(`Error handling review memory feedback${logSuffix}:`, error);
+            captureException(error, {
+              tags: { source: `${sentryPrefix}webhook_review_memory_feedback` },
+            });
+          }
           if (logResult.webhookEventId) {
             await updateWebhookEvent(logResult.webhookEventId, {
               processed: true,
               processed_at: new Date().toISOString(),
-              handlers_triggered: ['pr_review_comment_fix'],
+              handlers_triggered: handlersTriggered,
               errors: null,
             });
           }
@@ -668,7 +683,7 @@ export async function handleGitHubWebhook(
               await updateWebhookEvent(logResult.webhookEventId, {
                 processed: true,
                 processed_at: new Date().toISOString(),
-                handlers_triggered: ['pr_review_comment_fix'],
+                handlers_triggered: handlersTriggered,
                 errors: [
                   {
                     message: error instanceof Error ? error.message : String(error),

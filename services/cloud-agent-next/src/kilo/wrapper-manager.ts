@@ -12,10 +12,7 @@ import { withTimeout } from '@kilocode/worker-utils';
 import type { SandboxInstance } from '../types.js';
 import type { ObservedWrapper, WrapperObservation } from '../agent-sandbox/protocol.js';
 import { logger } from '../logger.js';
-import {
-  FAST_SANDBOX_COMMAND_TIMEOUT_MS,
-  logSandboxOperationTimeout,
-} from '../sandbox-timeout-logging.js';
+import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { KILO_AGENT_SESSION_LABEL, KILO_WRAPPER_PORT_LABEL } from './devcontainer.js';
 import { dockerSocketEnv, resolveDockerSocketPath } from './sandbox-runtime.js';
 import { shellQuote } from './utils.js';
@@ -29,6 +26,7 @@ const KILO_WRAPPER_INSTANCE_FLAG = '--wrapper-instance-id';
 const KILO_WRAPPER_INSTANCE_GENERATION_FLAG = '--wrapper-instance-generation';
 const KILO_WRAPPER_INSTANCE_ENV = 'WRAPPER_INSTANCE_ID=';
 const KILO_WRAPPER_INSTANCE_GENERATION_ENV = 'WRAPPER_INSTANCE_GENERATION=';
+export const WRAPPER_DISCOVERY_TIMEOUT_MS = 10_000;
 
 /**
  * Information about a running wrapper.
@@ -296,7 +294,7 @@ export async function discoverSessionWrappers(
 ): Promise<WrapperObservation> {
   let processes: Process[];
   try {
-    const timeoutMs = FAST_SANDBOX_COMMAND_TIMEOUT_MS;
+    const timeoutMs = WRAPPER_DISCOVERY_TIMEOUT_MS;
     processes = await withTimeout(
       sandbox.listProcesses(),
       timeoutMs,

@@ -1,102 +1,71 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import {
-  Save,
-  Clock,
-  AlertTriangle,
-  AlertCircle,
-  Info,
-  Settings,
-  Loader2,
-  RefreshCw,
-  Bot,
-  ScanSearch,
-} from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
-import { cn } from '@/lib/utils';
-import {
-  RepositoryMultiSelect,
-  type Repository,
-} from '@/components/code-reviews/RepositoryMultiSelect';
-import { ModelCombobox } from '@/components/shared/ModelCombobox';
+import { type SetStateAction, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Bell, Bot, Clock, Loader2, RotateCcw, Save, SlidersHorizontal } from 'lucide-react';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
+import type { ModelOption } from '@/components/shared/ModelCombobox';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
+import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import {
   DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
+  DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
   DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
+  SECURITY_AGENT_MODELS,
 } from '@/lib/security-agent/core/constants';
-
-type SlaConfig = {
-  critical: number;
-  high: number;
-  medium: number;
-  low: number;
-};
-
-type AnalysisMode = 'auto' | 'shallow' | 'deep';
-
-type AutoDismissConfidenceThreshold = 'high' | 'medium' | 'low';
-
-type AutoAnalysisMinSeverity = 'critical' | 'high' | 'medium' | 'all';
-
-type RepositoryData = {
-  id: number;
-  fullName: string;
-  name: string;
-  private: boolean;
-};
+import {
+  AgentStatusSection,
+  AnalysisModeSection,
+  AutoAnalysisSection,
+  AutoDismissSection,
+  AutoRemediationSection,
+  ModelSection,
+  NotificationSection,
+  RepositorySection,
+  SlaSection,
+} from './SecurityConfigSections';
+import type {
+  SecurityConfigFormState,
+  SecurityConfigSavePayload,
+  SecurityRepository,
+  SlaConfig,
+} from './security-config-types';
+import { useSecurityAgent } from './SecurityAgentContext';
+import { SecurityAgentActionBar } from './SecurityAgentActionBar';
 
 type SecurityConfigFormProps = {
   organizationId?: string;
-  enabled: boolean;
-  slaConfig: SlaConfig;
-  repositorySelectionMode: 'all' | 'selected';
-  selectedRepositoryIds: number[];
-  modelSlug?: string;
-  triageModelSlug?: string;
-  analysisModelSlug?: string;
-  analysisMode: AnalysisMode;
-  autoDismissEnabled: boolean;
-  autoDismissConfidenceThreshold: AutoDismissConfidenceThreshold;
-  autoAnalysisEnabled: boolean;
-  autoAnalysisMinSeverity: AutoAnalysisMinSeverity;
-  autoAnalysisIncludeExisting: boolean;
-  repositories: RepositoryData[];
-  repositoriesSyncedAt?: string | null;
-  isLoadingRepositories?: boolean;
+  initialConfig: SecurityConfigFormState;
+  repositories: SecurityRepository[];
+  viewState: {
+    enabled: boolean;
+    isLoadingRepositories?: boolean;
+    isSaving: boolean;
+    isToggling: boolean;
+  };
   onSave: (
-    config: SlaConfig & {
-      repositorySelectionMode: 'all' | 'selected';
-      selectedRepositoryIds: number[];
-      triageModelSlug: string;
-      analysisModelSlug: string;
-      modelSlug?: string;
-      analysisMode: AnalysisMode;
-      autoDismissEnabled: boolean;
-      autoDismissConfidenceThreshold: AutoDismissConfidenceThreshold;
-      autoAnalysisEnabled: boolean;
-      autoAnalysisMinSeverity: AutoAnalysisMinSeverity;
-      autoAnalysisIncludeExisting: boolean;
-    }
+    config: SecurityConfigSavePayload,
+    options?: { onSuccess?: () => void; onError?: () => void }
   ) => void;
   onToggleEnabled: (
     enabled: boolean,
-    repositorySelection: {
-      repositorySelectionMode: 'all' | 'selected';
-      selectedRepositoryIds: number[];
-    }
+    repositorySelection: Pick<
+      SecurityConfigFormState,
+      'repositorySelectionMode' | 'selectedRepositoryIds'
+    >
   ) => void;
-  onRefreshRepositories?: () => void;
-  onHasChangesChange?: (hasChanges: boolean) => void;
-  isSaving: boolean;
-  isToggling: boolean;
-  isRefreshingRepositories?: boolean;
 };
 
 const DEFAULT_SLA_CONFIG: SlaConfig = {
@@ -106,794 +75,457 @@ const DEFAULT_SLA_CONFIG: SlaConfig = {
   low: 90,
 };
 
-const ANALYSIS_MODE_OPTIONS = [
-  {
-    value: 'auto' as const,
-    label: 'Auto',
-    description:
-      'Triage runs first; sandbox analysis runs only if triage determines it is needed (default)',
-  },
-  {
-    value: 'shallow' as const,
-    label: 'Shallow (triage only)',
-    description:
-      'Only the quick triage step runs. No sandbox analysis is performed, saving time and credits',
-  },
-  {
-    value: 'deep' as const,
-    label: 'Deep (always sandbox)',
-    description:
-      'Always runs full sandbox analysis for every finding, providing the most thorough results',
-  },
-];
+const DEFAULT_NOTIFICATION_CONFIG = {
+  slaNotificationsEnabled: false,
+  slaNotificationMinSeverity: 'high',
+  slaNotificationWarningDays: 3,
+  newFindingNotificationsEnabled: false,
+  newFindingNotificationMinSeverity: 'high',
+} as const;
 
-const CONFIDENCE_THRESHOLD_OPTIONS = [
-  {
-    value: 'high' as const,
-    label: 'High confidence only',
-    description: 'Only auto-dismiss when the AI is highly confident the finding is not exploitable',
-  },
-  {
-    value: 'medium' as const,
-    label: 'Medium or higher',
-    description: 'Auto-dismiss when the AI has medium or high confidence',
-  },
-  {
-    value: 'low' as const,
-    label: 'Any confidence',
-    description: 'Auto-dismiss all findings the AI recommends dismissing (use with caution)',
-  },
-];
+const DEFAULT_FORM_CONFIG: SecurityConfigFormState = {
+  slaConfig: DEFAULT_SLA_CONFIG,
+  slaEnabled: true,
+  repositorySelectionMode: 'selected',
+  selectedRepositoryIds: [],
+  triageModelSlug: DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
+  analysisModelSlug: DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
+  analysisMode: 'auto',
+  autoDismissEnabled: false,
+  autoDismissConfidenceThreshold: 'high',
+  autoAnalysisEnabled: false,
+  autoAnalysisMinSeverity: 'high',
+  autoAnalysisIncludeExisting: false,
+  autoRemediationEnabled: false,
+  autoRemediationMinSeverity: 'high',
+  autoRemediationIncludeExisting: false,
+  remediationModelSlug: DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
+  ...DEFAULT_NOTIFICATION_CONFIG,
+};
 
-const AUTO_ANALYSIS_MIN_SEVERITY_OPTIONS = [
-  {
-    value: 'critical' as const,
-    label: 'Critical only',
-    description: 'Only auto-analyse findings with critical severity',
-  },
-  {
-    value: 'high' as const,
-    label: 'High and above',
-    description: 'Auto-analyse findings with high or critical severity',
-  },
-  {
-    value: 'medium' as const,
-    label: 'Medium and above',
-    description: 'Auto-analyse findings with medium, high, or critical severity',
-  },
-  {
-    value: 'all' as const,
-    label: 'All severities',
-    description: 'Auto-analyse all findings regardless of severity',
-  },
-];
+function sortedIds(ids: number[]) {
+  return ids.toSorted((left, right) => left - right);
+}
 
-const SEVERITY_INFO = [
-  {
-    key: 'critical' as const,
-    label: 'Critical',
-    description: 'Vulnerabilities that can be exploited remotely with no authentication',
-    icon: AlertTriangle,
-    color: 'text-red-500',
-  },
-  {
-    key: 'high' as const,
-    label: 'High',
-    description: 'Vulnerabilities that could lead to significant data exposure',
-    icon: AlertCircle,
-    color: 'text-orange-500',
-  },
-  {
-    key: 'medium' as const,
-    label: 'Medium',
-    description: 'Vulnerabilities with limited impact or requiring specific conditions',
-    icon: Info,
-    color: 'text-yellow-500',
-  },
-  {
-    key: 'low' as const,
-    label: 'Low',
-    description: 'Minor vulnerabilities with minimal security impact',
-    icon: Info,
-    color: 'text-blue-500',
-  },
-];
+function configFingerprint(config: SecurityConfigFormState) {
+  return JSON.stringify([
+    config.slaConfig.critical,
+    config.slaConfig.high,
+    config.slaConfig.medium,
+    config.slaConfig.low,
+    config.slaEnabled,
+    config.repositorySelectionMode,
+    sortedIds(config.selectedRepositoryIds),
+    config.triageModelSlug,
+    config.analysisModelSlug,
+    config.analysisMode,
+    config.autoDismissEnabled,
+    config.autoDismissConfidenceThreshold,
+    config.autoAnalysisEnabled,
+    config.autoAnalysisMinSeverity,
+    config.autoAnalysisIncludeExisting,
+    config.autoRemediationEnabled,
+    config.autoRemediationMinSeverity,
+    config.autoRemediationIncludeExisting,
+    config.remediationModelSlug,
+    config.slaNotificationsEnabled,
+    config.slaNotificationMinSeverity,
+    config.slaNotificationWarningDays,
+    config.newFindingNotificationsEnabled,
+    config.newFindingNotificationMinSeverity,
+  ]);
+}
+
+function configsMatch(left: SecurityConfigFormState, right: SecurityConfigFormState) {
+  return configFingerprint(left) === configFingerprint(right);
+}
+
+const SETTINGS_TAB_TRIGGER_CLASS =
+  'min-h-9 gap-2 border-0 px-3 text-muted-foreground shadow-none hover:bg-surface-hover hover:text-foreground data-[state=active]:border-0 data-[state=active]:bg-surface-selected data-[state=active]:text-foreground data-[state=active]:shadow-none';
+const SETTINGS_TABS = ['config', 'automation', 'notifications', 'sla'] as const;
+
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+const SETTINGS_TAB_INTERACTIONS = {
+  config: 'settings_config_viewed',
+  automation: 'settings_automation_viewed',
+  notifications: 'settings_notifications_viewed',
+  sla: 'settings_sla_viewed',
+} satisfies Record<SettingsTab, SecurityAgentUiInteraction>;
+
+function settingsTabFromParam(tab: string | null): SettingsTab {
+  return SETTINGS_TABS.find(value => value === tab) ?? 'config';
+}
+
+function useSettingsTabTracking(enabled: boolean, initialTab: SettingsTab) {
+  const { trackUiInteraction } = useSecurityAgent();
+  const trackedInitialTabRef = useRef(false);
+
+  useEffect(() => {
+    if (!enabled) {
+      trackedInitialTabRef.current = false;
+      return;
+    }
+    if (trackedInitialTabRef.current) return;
+
+    trackedInitialTabRef.current = true;
+    trackUiInteraction(SETTINGS_TAB_INTERACTIONS[initialTab]);
+  }, [enabled, initialTab, trackUiInteraction]);
+
+  return (value: string) => {
+    const tab = SETTINGS_TABS.find(settingsTab => settingsTab === value);
+    if (tab) trackUiInteraction(SETTINGS_TAB_INTERACTIONS[tab]);
+  };
+}
+
+const SECURITY_AGENT_DEFAULT_MODEL_OPTIONS: ModelOption[] = SECURITY_AGENT_MODELS.map(model => ({
+  id: model.id,
+  name: model.name,
+  isFree: model.free,
+}));
+
+function withSecurityAgentDefaultModels(models: ModelOption[]) {
+  const seenModelIds = new Set<string>();
+  return [...SECURITY_AGENT_DEFAULT_MODEL_OPTIONS, ...models].filter(model => {
+    if (seenModelIds.has(model.id)) return false;
+    seenModelIds.add(model.id);
+    return true;
+  });
+}
+
+type LocalConfigState = {
+  draft: SecurityConfigFormState;
+  serverBaseline: SecurityConfigFormState;
+  serverBaselineFingerprint: string;
+};
 
 export function SecurityConfigForm({
   organizationId,
-  enabled,
-  slaConfig,
-  repositorySelectionMode: initialSelectionMode,
-  selectedRepositoryIds: initialSelectedIds,
-  modelSlug: initialModelSlug,
-  triageModelSlug: initialTriageModelSlug,
-  analysisModelSlug: initialAnalysisModelSlug,
-  analysisMode: initialAnalysisMode,
-  autoDismissEnabled: initialAutoDismissEnabled,
-  autoDismissConfidenceThreshold: initialAutoDismissThreshold,
-  autoAnalysisEnabled: initialAutoAnalysisEnabled,
-  autoAnalysisMinSeverity: initialAutoAnalysisMinSeverity,
-  autoAnalysisIncludeExisting: initialAutoAnalysisIncludeExisting,
+  initialConfig,
   repositories,
-  repositoriesSyncedAt,
-  isLoadingRepositories,
+  viewState,
   onSave,
   onToggleEnabled,
-  onRefreshRepositories,
-  onHasChangesChange,
-  isSaving,
-  isToggling,
-  isRefreshingRepositories,
 }: SecurityConfigFormProps) {
+  const { enabled, isLoadingRepositories, isSaving, isToggling } = viewState;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const defaultSettingsTab = enabled ? settingsTabFromParam(searchParams.get('tab')) : 'config';
+  const handleSettingsTabChange = useSettingsTabTracking(enabled, defaultSettingsTab);
+  const initialConfigFingerprint = configFingerprint(initialConfig);
+  const [pendingNavigationHref, setPendingNavigationHref] = useState<string | null>(null);
+  const [savingBeforeNavigation, setSavingBeforeNavigation] = useState(false);
+  const [localConfig, setLocalConfig] = useState<LocalConfigState>(() => ({
+    draft: initialConfig,
+    serverBaseline: initialConfig,
+    serverBaselineFingerprint: initialConfigFingerprint,
+  }));
+  const serverBaselineChanged = localConfig.serverBaselineFingerprint !== initialConfigFingerprint;
+  const state =
+    serverBaselineChanged && configsMatch(localConfig.draft, localConfig.serverBaseline)
+      ? initialConfig
+      : localConfig.draft;
+
+  if (serverBaselineChanged) {
+    setLocalConfig({
+      draft: state,
+      serverBaseline: initialConfig,
+      serverBaselineFingerprint: initialConfigFingerprint,
+    });
+  }
+
+  const setState = (update: SetStateAction<SecurityConfigFormState>) => {
+    setLocalConfig(current => ({
+      ...current,
+      draft: typeof update === 'function' ? update(current.draft) : update,
+    }));
+  };
   const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
+  const securityAgentModelOptions = withSecurityAgentDefaultModels(modelOptions);
+  const hasChanges = !configsMatch(state, initialConfig);
+  const saveDisabled = !hasChanges || isSaving;
+  const repositoryCount =
+    state.repositorySelectionMode === 'all'
+      ? repositories.length
+      : state.selectedRepositoryIds.length;
+  const stateProps = { state, setState };
 
-  const initialTriageModel =
-    initialTriageModelSlug || initialModelSlug || DEFAULT_SECURITY_AGENT_TRIAGE_MODEL;
-  const initialAnalysisModel =
-    initialAnalysisModelSlug || initialModelSlug || DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL;
+  const handleSave = (options?: { onSuccess?: () => void; onError?: () => void }) => {
+    if (saveDisabled) return;
 
-  const [localConfig, setLocalConfig] = useState<SlaConfig>(slaConfig);
-  const [repositorySelectionMode, setRepositorySelectionMode] = useState<'all' | 'selected'>(
-    initialSelectionMode
-  );
-  const [selectedRepositoryIds, setSelectedRepositoryIds] = useState<number[]>(initialSelectedIds);
-  const [selectedTriageModel, setSelectedTriageModel] = useState<string>(initialTriageModel);
-  const [selectedAnalysisModel, setSelectedAnalysisModel] = useState<string>(initialAnalysisModel);
-  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>(initialAnalysisMode);
-  const [autoDismissEnabled, setAutoDismissEnabled] = useState(initialAutoDismissEnabled);
-  const [autoDismissConfidenceThreshold, setAutoDismissConfidenceThreshold] =
-    useState<AutoDismissConfidenceThreshold>(initialAutoDismissThreshold);
-  const [autoAnalysisEnabled, setAutoAnalysisEnabled] = useState(initialAutoAnalysisEnabled);
-  const [autoAnalysisMinSeverity, setAutoAnalysisMinSeverity] = useState<AutoAnalysisMinSeverity>(
-    initialAutoAnalysisMinSeverity
-  );
-  const [autoAnalysisIncludeExisting, setAutoAnalysisIncludeExisting] = useState(
-    initialAutoAnalysisIncludeExisting
-  );
-  const [hasChanges, setHasChanges] = useState(false);
-
-  useEffect(() => {
-    onHasChangesChange?.(hasChanges);
-  }, [hasChanges, onHasChangesChange]);
-
-  useEffect(() => {
-    setLocalConfig(slaConfig);
-    setRepositorySelectionMode(initialSelectionMode);
-    setSelectedRepositoryIds(initialSelectedIds);
-    setSelectedTriageModel(initialTriageModel);
-    setSelectedAnalysisModel(initialAnalysisModel);
-    setAnalysisMode(initialAnalysisMode);
-    setAutoDismissEnabled(initialAutoDismissEnabled);
-    setAutoDismissConfidenceThreshold(initialAutoDismissThreshold);
-    setAutoAnalysisEnabled(initialAutoAnalysisEnabled);
-    setAutoAnalysisMinSeverity(initialAutoAnalysisMinSeverity);
-    setAutoAnalysisIncludeExisting(initialAutoAnalysisIncludeExisting);
-    setHasChanges(false);
-  }, [
-    slaConfig,
-    initialSelectionMode,
-    initialSelectedIds,
-    initialTriageModel,
-    initialAnalysisModel,
-    initialAnalysisMode,
-    initialAutoDismissEnabled,
-    initialAutoDismissThreshold,
-    initialAutoAnalysisEnabled,
-    initialAutoAnalysisMinSeverity,
-    initialAutoAnalysisIncludeExisting,
-  ]);
-
-  type FormState = {
-    config: SlaConfig;
-    repositorySelectionMode: 'all' | 'selected';
-    selectedRepositoryIds: number[];
-    triageModel: string;
-    analysisModel: string;
-    analysisMode: AnalysisMode;
-    autoDismissEnabled: boolean;
-    autoDismissConfidenceThreshold: AutoDismissConfidenceThreshold;
-    autoAnalysisEnabled: boolean;
-    autoAnalysisMinSeverity: AutoAnalysisMinSeverity;
-    autoAnalysisIncludeExisting: boolean;
+    onSave(
+      {
+        ...state.slaConfig,
+        slaEnabled: state.slaEnabled,
+        repositorySelectionMode: state.repositorySelectionMode,
+        selectedRepositoryIds: state.selectedRepositoryIds,
+        triageModelSlug: state.triageModelSlug,
+        analysisModelSlug: state.analysisModelSlug,
+        modelSlug: state.analysisModelSlug,
+        analysisMode: state.analysisMode,
+        autoDismissEnabled: state.autoDismissEnabled,
+        autoDismissConfidenceThreshold: state.autoDismissConfidenceThreshold,
+        autoAnalysisEnabled: state.autoAnalysisEnabled,
+        autoAnalysisMinSeverity: state.autoAnalysisMinSeverity,
+        autoAnalysisIncludeExisting: state.autoAnalysisIncludeExisting,
+        autoRemediationEnabled: state.autoRemediationEnabled,
+        autoRemediationMinSeverity: state.autoRemediationMinSeverity,
+        autoRemediationIncludeExisting: state.autoRemediationIncludeExisting,
+        remediationModelSlug: state.remediationModelSlug,
+        slaNotificationsEnabled: state.slaNotificationsEnabled,
+        slaNotificationMinSeverity: state.slaNotificationMinSeverity,
+        slaNotificationWarningDays: state.slaNotificationWarningDays,
+        newFindingNotificationsEnabled: state.newFindingNotificationsEnabled,
+        newFindingNotificationMinSeverity: state.newFindingNotificationMinSeverity,
+      },
+      options
+    );
   };
 
-  const currentFormState = (): FormState => ({
-    config: localConfig,
-    repositorySelectionMode,
-    selectedRepositoryIds,
-    triageModel: selectedTriageModel,
-    analysisModel: selectedAnalysisModel,
-    analysisMode,
-    autoDismissEnabled,
-    autoDismissConfidenceThreshold,
-    autoAnalysisEnabled,
-    autoAnalysisMinSeverity,
-    autoAnalysisIncludeExisting,
-  });
-
-  const checkForChanges = useCallback(
-    (s: FormState) => {
-      const changed =
-        s.config.critical !== slaConfig.critical ||
-        s.config.high !== slaConfig.high ||
-        s.config.medium !== slaConfig.medium ||
-        s.config.low !== slaConfig.low ||
-        s.repositorySelectionMode !== initialSelectionMode ||
-        JSON.stringify([...s.selectedRepositoryIds].sort()) !==
-          JSON.stringify([...initialSelectedIds].sort()) ||
-        s.triageModel !== initialTriageModel ||
-        s.analysisModel !== initialAnalysisModel ||
-        s.analysisMode !== initialAnalysisMode ||
-        s.autoDismissEnabled !== initialAutoDismissEnabled ||
-        s.autoDismissConfidenceThreshold !== initialAutoDismissThreshold ||
-        s.autoAnalysisEnabled !== initialAutoAnalysisEnabled ||
-        s.autoAnalysisMinSeverity !== initialAutoAnalysisMinSeverity ||
-        s.autoAnalysisIncludeExisting !== initialAutoAnalysisIncludeExisting;
-
-      setHasChanges(changed);
-    },
-    [
-      slaConfig,
-      initialSelectionMode,
-      initialSelectedIds,
-      initialTriageModel,
-      initialAnalysisModel,
-      initialAnalysisMode,
-      initialAutoDismissEnabled,
-      initialAutoDismissThreshold,
-      initialAutoAnalysisEnabled,
-      initialAutoAnalysisMinSeverity,
-      initialAutoAnalysisIncludeExisting,
-    ]
-  );
-
-  const handleChange = (key: keyof SlaConfig, value: string) => {
-    const numValue = parseInt(value, 10);
-    if (isNaN(numValue) || numValue < 1) return;
-
-    const newConfig = { ...localConfig, [key]: numValue };
-    setLocalConfig(newConfig);
-    checkForChanges({ ...currentFormState(), config: newConfig });
+  const clearPendingNavigation = () => {
+    setPendingNavigationHref(null);
+    setSavingBeforeNavigation(false);
   };
 
-  const handleSelectionModeChange = (mode: 'all' | 'selected') => {
-    setRepositorySelectionMode(mode);
-    checkForChanges({ ...currentFormState(), repositorySelectionMode: mode });
+  const discardChangesAndNavigate = () => {
+    if (!pendingNavigationHref) return;
+    const href = pendingNavigationHref;
+    setLocalConfig({
+      draft: initialConfig,
+      serverBaseline: initialConfig,
+      serverBaselineFingerprint: initialConfigFingerprint,
+    });
+    clearPendingNavigation();
+    router.push(href);
   };
 
-  const handleSelectedIdsChange = (ids: number[]) => {
-    setSelectedRepositoryIds(ids);
-    checkForChanges({ ...currentFormState(), selectedRepositoryIds: ids });
-  };
-
-  const handleTriageModelChange = (model: string) => {
-    setSelectedTriageModel(model);
-    checkForChanges({ ...currentFormState(), triageModel: model });
-  };
-
-  const handleAnalysisModelChange = (model: string) => {
-    setSelectedAnalysisModel(model);
-    checkForChanges({ ...currentFormState(), analysisModel: model });
-  };
-
-  const handleAnalysisModeChange = (mode: AnalysisMode) => {
-    setAnalysisMode(mode);
-    checkForChanges({ ...currentFormState(), analysisMode: mode });
-  };
-
-  const handleAutoDismissEnabledChange = (newEnabled: boolean) => {
-    setAutoDismissEnabled(newEnabled);
-    checkForChanges({ ...currentFormState(), autoDismissEnabled: newEnabled });
-  };
-
-  const handleAutoDismissThresholdChange = (threshold: AutoDismissConfidenceThreshold) => {
-    setAutoDismissConfidenceThreshold(threshold);
-    checkForChanges({ ...currentFormState(), autoDismissConfidenceThreshold: threshold });
-  };
-
-  const handleAutoAnalysisEnabledChange = (newEnabled: boolean) => {
-    setAutoAnalysisEnabled(newEnabled);
-    checkForChanges({ ...currentFormState(), autoAnalysisEnabled: newEnabled });
-  };
-
-  const handleAutoAnalysisMinSeverityChange = (severity: AutoAnalysisMinSeverity) => {
-    setAutoAnalysisMinSeverity(severity);
-    checkForChanges({ ...currentFormState(), autoAnalysisMinSeverity: severity });
-  };
-
-  const handleAutoAnalysisIncludeExistingChange = (newIncludeExisting: boolean) => {
-    setAutoAnalysisIncludeExisting(newIncludeExisting);
-    checkForChanges({ ...currentFormState(), autoAnalysisIncludeExisting: newIncludeExisting });
-  };
-
-  const handleSave = () => {
-    onSave({
-      ...localConfig,
-      repositorySelectionMode,
-      selectedRepositoryIds,
-      triageModelSlug: selectedTriageModel,
-      analysisModelSlug: selectedAnalysisModel,
-      modelSlug: selectedAnalysisModel,
-      analysisMode,
-      autoDismissEnabled,
-      autoDismissConfidenceThreshold,
-      autoAnalysisEnabled,
-      autoAnalysisMinSeverity,
-      autoAnalysisIncludeExisting,
+  const saveChangesAndNavigate = () => {
+    if (!pendingNavigationHref || saveDisabled) return;
+    const href = pendingNavigationHref;
+    setSavingBeforeNavigation(true);
+    handleSave({
+      onSuccess: () => {
+        clearPendingNavigation();
+        router.push(href);
+      },
+      onError: () => setSavingBeforeNavigation(false),
     });
   };
 
-  const handleReset = () => {
-    setLocalConfig(DEFAULT_SLA_CONFIG);
-    checkForChanges({ ...currentFormState(), config: DEFAULT_SLA_CONFIG });
-  };
+  useEffect(() => {
+    if (!hasChanges) return;
 
-  // Map repositories to the format expected by RepositoryMultiSelect
-  const mappedRepositories: Repository[] = repositories.map(repo => ({
-    id: repo.id,
-    name: repo.name,
-    full_name: repo.fullName,
-    private: repo.private,
-  }));
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
 
-  // Calculate the number of repositories that will be monitored
-  const monitoredRepoCount =
-    repositorySelectionMode === 'all' ? repositories.length : selectedRepositoryIds.length;
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasChanges]);
+
+  useEffect(() => {
+    if (!hasChanges) return;
+
+    const handleClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const anchor = target.closest('a[href]');
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      if (anchor.target && anchor.target !== '_self') return;
+      if (anchor.hasAttribute('download')) return;
+
+      const url = new URL(anchor.href);
+      if (url.origin !== window.location.origin) return;
+      const href = `${url.pathname}${url.search}${url.hash}`;
+      const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      if (href === currentHref) return;
+
+      event.preventDefault();
+      setPendingNavigationHref(href);
+    };
+
+    document.addEventListener('click', handleClick, true);
+    return () => document.removeEventListener('click', handleClick, true);
+  }, [hasChanges]);
 
   return (
     <div className="space-y-6">
-      {/* Repository Selection Card - shown first so users know what they're enabling */}
-      <Card className="w-full">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-500/20">
-                <Settings className="h-5 w-5 text-purple-400" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-bold">Repository Selection</CardTitle>
-                <p className="text-muted-foreground text-xs">
-                  Choose which repositories should be monitored for security alerts
-                </p>
-              </div>
+      <Tabs
+        defaultValue={defaultSettingsTab}
+        className="space-y-6"
+        onValueChange={handleSettingsTabChange}
+      >
+        <SecurityAgentActionBar label="Settings controls">
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+            <div className="min-w-0">
+              <TabsList
+                aria-label="Security Agent settings sections"
+                className="border-input bg-input-background h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg border p-1 sm:w-max sm:max-w-full"
+              >
+                <TabsTrigger value="config" className={SETTINGS_TAB_TRIGGER_CLASS}>
+                  <SlidersHorizontal className="size-4" aria-hidden="true" />
+                  General
+                </TabsTrigger>
+                <TabsTrigger
+                  value="automation"
+                  className={SETTINGS_TAB_TRIGGER_CLASS}
+                  disabled={!enabled}
+                >
+                  <Bot className="size-4" aria-hidden="true" />
+                  Automation
+                </TabsTrigger>
+                <TabsTrigger
+                  value="notifications"
+                  className={SETTINGS_TAB_TRIGGER_CLASS}
+                  disabled={!enabled}
+                >
+                  <Bell className="size-4" aria-hidden="true" />
+                  Notifications
+                </TabsTrigger>
+                <TabsTrigger value="sla" className={SETTINGS_TAB_TRIGGER_CLASS} disabled={!enabled}>
+                  <Clock className="size-4" aria-hidden="true" />
+                  SLA
+                </TabsTrigger>
+              </TabsList>
             </div>
-            {onRefreshRepositories && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground text-xs">
-                  Last synced:{' '}
-                  {repositoriesSyncedAt
-                    ? formatDistanceToNow(new Date(repositoriesSyncedAt), {
-                        addSuffix: true,
-                      })
-                    : 'Never'}
+
+            {enabled && (
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
+                <span
+                  aria-live="polite"
+                  className={cn(
+                    'flex min-h-8 items-center text-xs whitespace-nowrap',
+                    isSaving || hasChanges ? 'text-status-warning' : 'text-muted-foreground'
+                  )}
+                >
+                  {isSaving
+                    ? 'Saving changes...'
+                    : hasChanges
+                      ? 'Unsaved changes'
+                      : 'All changes saved'}
                 </span>
                 <Button
+                  type="button"
                   variant="outline"
-                  size="sm"
-                  onClick={onRefreshRepositories}
-                  disabled={isRefreshingRepositories || isLoadingRepositories}
+                  className="min-h-11 w-full sm:min-h-9 sm:w-auto"
+                  onClick={() =>
+                    setState({
+                      ...DEFAULT_FORM_CONFIG,
+                      slaConfig: { ...DEFAULT_FORM_CONFIG.slaConfig },
+                      selectedRepositoryIds: [],
+                    })
+                  }
+                  disabled={isSaving}
                 >
-                  <RefreshCw
-                    className={cn('h-4 w-4', isRefreshingRepositories && 'animate-spin')}
-                  />
+                  <RotateCcw aria-hidden="true" />
+                  Reset defaults
+                </Button>
+                <Button
+                  type="button"
+                  className="min-h-11 w-full sm:min-h-9 sm:w-auto"
+                  onClick={() => handleSave()}
+                  disabled={saveDisabled}
+                >
+                  {isSaving ? (
+                    <Loader2
+                      className="animate-spin motion-reduce:animate-none"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <Save aria-hidden="true" />
+                  )}
+                  {isSaving ? 'Saving changes...' : 'Save changes'}
                 </Button>
               </div>
             )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isLoadingRepositories ? (
-            <div className="rounded-md border border-gray-600 bg-gray-800/50 p-3">
-              <p className="text-sm text-gray-400">Loading repositories...</p>
-            </div>
-          ) : repositories.length === 0 ? (
-            <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
-              <p className="text-sm text-yellow-200">
-                No repositories found. Please ensure the GitHub App has access to your repositories.
-              </p>
-            </div>
-          ) : (
-            <>
-              <RadioGroup
-                value={repositorySelectionMode}
-                onValueChange={value => handleSelectionModeChange(value as 'all' | 'selected')}
-                className="space-y-3"
-              >
-                <div className="flex items-center space-x-3">
-                  <RadioGroupItem value="all" id="all-repos" />
-                  <Label htmlFor="all-repos" className="cursor-pointer font-normal">
-                    All repositories ({repositories.length})
-                  </Label>
-                </div>
-                <div className="flex items-start space-x-3">
-                  <RadioGroupItem value="selected" id="selected-repos" className="mt-1" />
-                  <Label htmlFor="selected-repos" className="cursor-pointer font-normal">
-                    Selected repositories
-                  </Label>
-                </div>
-              </RadioGroup>
+        </SecurityAgentActionBar>
 
-              {repositorySelectionMode === 'selected' && (
-                <div className="mt-4">
-                  <RepositoryMultiSelect
-                    repositories={mappedRepositories}
-                    selectedIds={selectedRepositoryIds}
-                    onSelectionChange={handleSelectedIdsChange}
-                  />
-                </div>
-              )}
+        <TabsContent value="config" className="mt-0 space-y-6">
+          <AgentStatusSection
+            enabled={enabled}
+            isToggling={isToggling}
+            availableRepositoryCount={repositories.length}
+            repositoryCount={repositoryCount}
+            slaEnabled={state.slaEnabled}
+            onToggle={nextEnabled =>
+              onToggleEnabled(nextEnabled, {
+                repositorySelectionMode: state.repositorySelectionMode,
+                selectedRepositoryIds: state.selectedRepositoryIds,
+              })
+            }
+          />
+          {enabled && (
+            <>
+              <RepositorySection
+                {...stateProps}
+                repositories={repositories}
+                isLoading={isLoadingRepositories}
+              />
+              <ModelSection
+                {...stateProps}
+                models={securityAgentModelOptions}
+                isLoading={isLoadingModels}
+              />
+              <AnalysisModeSection {...stateProps} />
             </>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      {/* Enable/Disable Card - now shows which repos will be monitored */}
-      <Card className="w-full">
-        <CardHeader className="pb-3">
-          <div className="flex items-center space-x-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-500/20">
-              <Settings className="h-5 w-5 text-green-400" />
-            </div>
-            <div>
-              <CardTitle className="text-lg font-bold">Security Agent</CardTitle>
-              <p className="text-muted-foreground text-xs">
-                Enable automatic syncing of Dependabot alerts and SLA tracking
-              </p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-            <div className="space-y-1">
-              <Label htmlFor="enabled" className="font-medium">
-                Enable Security Agent
-              </Label>
-              <p className="text-muted-foreground text-sm">
-                {monitoredRepoCount > 0
-                  ? `Dependabot alerts will be synced every 6 hours for ${monitoredRepoCount} ${monitoredRepoCount === 1 ? 'repository' : 'repositories'}`
-                  : 'Select repositories above to enable Security Agent'}
-              </p>
-            </div>
-            <Switch
-              id="enabled"
-              checked={enabled}
-              onCheckedChange={newEnabled =>
-                onToggleEnabled(newEnabled, {
-                  repositorySelectionMode,
-                  selectedRepositoryIds,
-                })
-              }
-              disabled={isToggling || monitoredRepoCount === 0}
-            />
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="automation" className="mt-0 space-y-6">
+          <AutoAnalysisSection {...stateProps} />
+          <AutoRemediationSection {...stateProps} />
+          <AutoDismissSection {...stateProps} />
+        </TabsContent>
 
-      {/* AI Model Selection Card - only show when enabled */}
-      {enabled && (
-        <Card className="w-full">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-500/20">
-                <Bot className="h-5 w-5 text-cyan-400" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-bold">AI Models</CardTitle>
-                <p className="text-muted-foreground text-xs">
-                  Configure dedicated models for quick triage and deep analysis
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <div className="flex flex-col justify-between rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-                <ModelCombobox
-                  label="Triage Model"
-                  models={modelOptions}
-                  value={selectedTriageModel}
-                  onValueChange={handleTriageModelChange}
-                  isLoading={isLoadingModels}
-                  helperText="Used for initial triage and exploitability recommendation"
-                />
-              </div>
+        <TabsContent value="notifications" className="mt-0 space-y-6">
+          <NotificationSection
+            {...stateProps}
+            isOrganization={Boolean(organizationId)}
+            disabled={isSaving}
+          />
+        </TabsContent>
 
-              <div className="flex flex-col justify-between rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-                <ModelCombobox
-                  label="Analysis Model"
-                  models={modelOptions}
-                  value={selectedAnalysisModel}
-                  onValueChange={handleAnalysisModelChange}
-                  isLoading={isLoadingModels}
-                  helperText="Used for sandbox/codebase analysis and final extraction"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Analysis Mode Card - only show when enabled */}
-      {enabled && (
-        <Card className="w-full">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/20">
-                <ScanSearch className="h-5 w-5 text-indigo-400" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-bold">Analysis Mode</CardTitle>
-                <p className="text-muted-foreground text-xs">
-                  Control the depth of vulnerability analysis
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <RadioGroup
-              value={analysisMode}
-              onValueChange={value => handleAnalysisModeChange(value as AnalysisMode)}
-              className="grid grid-cols-1 gap-3 md:grid-cols-3"
+        <TabsContent value="sla" className="mt-0 space-y-6">
+          <SlaSection
+            {...stateProps}
+            isOrganization={Boolean(organizationId)}
+            disabled={isSaving}
+          />
+        </TabsContent>
+      </Tabs>
+      <AlertDialog
+        open={Boolean(pendingNavigationHref)}
+        onOpenChange={open => !open && clearPendingNavigation()}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save settings changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved Security Agent settings. Save changes before leaving, or discard
+              them.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSaving}>Keep editing</AlertDialogCancel>
+            <Button variant="outline" onClick={discardChangesAndNavigate} disabled={isSaving}>
+              Discard changes
+            </Button>
+            <AlertDialogAction
+              onClick={saveChangesAndNavigate}
+              disabled={saveDisabled || savingBeforeNavigation}
+              className="bg-brand-primary text-primary-foreground hover:bg-brand-primary/90"
             >
-              {ANALYSIS_MODE_OPTIONS.map(option => (
-                <Label
-                  key={option.value}
-                  htmlFor={`analysis-mode-${option.value}`}
-                  className={cn(
-                    'flex cursor-pointer items-start space-x-3 rounded-lg border p-4 transition-colors',
-                    analysisMode === option.value
-                      ? 'border-indigo-500 bg-indigo-500/10'
-                      : 'border-gray-800 bg-gray-900/50 hover:border-gray-700'
-                  )}
-                >
-                  <RadioGroupItem
-                    value={option.value}
-                    id={`analysis-mode-${option.value}`}
-                    className="mt-0.5"
-                  />
-                  <div className="space-y-1">
-                    <span className="font-medium">{option.label}</span>
-                    <p className="text-muted-foreground text-xs">{option.description}</p>
-                  </div>
-                </Label>
-              ))}
-            </RadioGroup>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Auto-Analysis Configuration Card - only show when enabled */}
-      {enabled && (
-        <Card className="w-full">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-500/20">
-                <ScanSearch className="h-5 w-5 text-teal-400" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-bold">Auto-Analysis</CardTitle>
-                <p className="text-muted-foreground text-xs">
-                  Automatically analyse new findings as they are synced
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-              <div className="space-y-1">
-                <Label htmlFor="auto-analysis-enabled" className="font-medium">
-                  Enable Auto-Analysis
-                </Label>
-                <p className="text-muted-foreground text-sm">
-                  When enabled, new findings will be automatically triaged and analysed based on the
-                  analysis mode configured above
-                </p>
-              </div>
-              <Switch
-                id="auto-analysis-enabled"
-                checked={autoAnalysisEnabled}
-                onCheckedChange={handleAutoAnalysisEnabledChange}
-              />
-            </div>
-
-            {autoAnalysisEnabled && (
-              <div className="space-y-3">
-                <Label>Minimum Severity</Label>
-                <RadioGroup
-                  value={autoAnalysisMinSeverity}
-                  onValueChange={value =>
-                    handleAutoAnalysisMinSeverityChange(value as AutoAnalysisMinSeverity)
-                  }
-                  className="grid grid-cols-1 gap-3 md:grid-cols-4"
-                >
-                  {AUTO_ANALYSIS_MIN_SEVERITY_OPTIONS.map(option => (
-                    <Label
-                      key={option.value}
-                      htmlFor={`auto-analysis-severity-${option.value}`}
-                      className={cn(
-                        'flex cursor-pointer items-start space-x-3 rounded-lg border p-4 transition-colors',
-                        autoAnalysisMinSeverity === option.value
-                          ? 'border-teal-500 bg-teal-500/10'
-                          : 'border-gray-800 bg-gray-900/50 hover:border-gray-700'
-                      )}
-                    >
-                      <RadioGroupItem
-                        value={option.value}
-                        id={`auto-analysis-severity-${option.value}`}
-                        className="mt-0.5"
-                      />
-                      <div className="space-y-1">
-                        <span className="font-medium">{option.label}</span>
-                        <p className="text-muted-foreground text-xs">{option.description}</p>
-                      </div>
-                    </Label>
-                  ))}
-                </RadioGroup>
-              </div>
-            )}
-
-            {autoAnalysisEnabled && (
-              <div className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-                <div className="space-y-1">
-                  <Label htmlFor="auto-analysis-include-existing" className="font-medium">
-                    Include Existing Findings
-                  </Label>
-                  <p className="text-muted-foreground text-sm">
-                    Also analyse findings that were synced before auto-analysis was enabled. This
-                    may use additional credits if there are many existing findings.
-                  </p>
-                </div>
-                <Switch
-                  id="auto-analysis-include-existing"
-                  checked={autoAnalysisIncludeExisting}
-                  onCheckedChange={handleAutoAnalysisIncludeExistingChange}
-                />
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Auto-Dismiss Configuration Card - only show when enabled */}
-      {enabled && (
-        <Card className="w-full">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/20">
-                <AlertTriangle className="h-5 w-5 text-amber-400" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-bold">Auto-Dismiss</CardTitle>
-                <p className="text-muted-foreground text-xs">
-                  Automatically dismiss findings that the AI determines are not exploitable
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-              <div className="space-y-1">
-                <Label htmlFor="auto-dismiss-enabled" className="font-medium">
-                  Enable Auto-Dismiss
-                </Label>
-                <p className="text-muted-foreground text-sm">
-                  When enabled, findings recommended for dismissal by the AI will be automatically
-                  dismissed
-                </p>
-              </div>
-              <Switch
-                id="auto-dismiss-enabled"
-                checked={autoDismissEnabled}
-                onCheckedChange={handleAutoDismissEnabledChange}
-              />
-            </div>
-
-            {autoDismissEnabled && (
-              <div className="space-y-3">
-                <Label>Confidence Threshold</Label>
-                <RadioGroup
-                  value={autoDismissConfidenceThreshold}
-                  onValueChange={value =>
-                    handleAutoDismissThresholdChange(value as AutoDismissConfidenceThreshold)
-                  }
-                  className="grid grid-cols-1 gap-3 md:grid-cols-3"
-                >
-                  {CONFIDENCE_THRESHOLD_OPTIONS.map(option => (
-                    <Label
-                      key={option.value}
-                      htmlFor={`threshold-${option.value}`}
-                      className={cn(
-                        'flex cursor-pointer items-start space-x-3 rounded-lg border p-4 transition-colors',
-                        autoDismissConfidenceThreshold === option.value
-                          ? 'border-amber-500 bg-amber-500/10'
-                          : 'border-gray-800 bg-gray-900/50 hover:border-gray-700'
-                      )}
-                    >
-                      <RadioGroupItem
-                        value={option.value}
-                        id={`threshold-${option.value}`}
-                        className="mt-0.5"
-                      />
-                      <div className="space-y-1">
-                        <span className="font-medium">{option.label}</span>
-                        <p className="text-muted-foreground text-xs">{option.description}</p>
-                      </div>
-                    </Label>
-                  ))}
-                </RadioGroup>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* SLA Configuration Card - only show when enabled */}
-      {enabled && (
-        <Card className="w-full">
-          <CardHeader className="pb-3">
-            <div className="flex items-center space-x-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20">
-                <Clock className="h-5 w-5 text-blue-400" />
-              </div>
-              <div>
-                <CardTitle className="text-lg font-bold">SLA Configuration</CardTitle>
-                <p className="text-muted-foreground text-xs">
-                  Set the number of days to remediate vulnerabilities by severity level
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-              {SEVERITY_INFO.map(({ key, label, description, icon: Icon, color }) => (
-                <div
-                  key={key}
-                  className="flex flex-col justify-between rounded-lg border border-gray-800 bg-gray-900/50 p-4"
-                >
-                  <div className="flex items-start gap-3">
-                    <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${color}`} />
-                    <div>
-                      <Label htmlFor={`sla-${key}`} className="font-medium">
-                        {label}
-                      </Label>
-                      <p className="text-muted-foreground text-xs">{description}</p>
-                    </div>
-                  </div>
-                  <div className="mt-3 flex items-center gap-2 pl-8">
-                    <Input
-                      id={`sla-${key}`}
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={localConfig[key]}
-                      onChange={e => handleChange(key, e.target.value)}
-                      className="w-20 text-center"
-                      disabled={!enabled}
-                    />
-                    <span className="text-muted-foreground text-sm">days</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex justify-between border-t border-gray-800 pt-4">
-              <Button variant="outline" onClick={handleReset} disabled={!enabled || isSaving}>
-                Reset to Defaults
-              </Button>
-              <Button onClick={handleSave} disabled={!enabled || !hasChanges || isSaving}>
-                {isSaving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="mr-2 h-4 w-4" />
-                )}
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              {isSaving || savingBeforeNavigation ? 'Saving...' : 'Save and leave'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
 
-export type { SlaConfig };
+export type { SlaConfig } from './security-config-types';

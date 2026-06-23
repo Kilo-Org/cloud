@@ -1,0 +1,89 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "name": "auto-routing",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "logpush": true,
+  "routes": [
+    {
+      "pattern": "auto-routing.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "dev": {
+    "port": 8810,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "624ec80650dd414199349f4e217ddb10",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  "vars": {
+    "O11Y_CF_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUTO_ROUTING_DECISION_CACHE",
+        "class_name": "AutoRoutingDecisionCacheDO",
+      },
+      {
+        "name": "AUTO_ROUTING_MODE_CONFIG",
+        "class_name": "AutoRoutingModeConfigDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AutoRoutingDecisionCacheDO"],
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["AutoRoutingModeConfigDO"],
+    },
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "AUTO_ROUTING_CLASSIFIER_METRICS_V2",
+      "dataset": "auto_routing_classifier_metrics_v2",
+    },
+  ],
+  "services": [{ "binding": "BENCHMARK_SERVICE", "service": "auto-routing-benchmark" }],
+
+  "kv_namespaces": [
+    {
+      "binding": "AUTO_ROUTING_CONFIG",
+      "id": "4316b8db31e347e19cfadad1b6386ad5",
+    },
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "INTERNAL_API_SECRET_PROD",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+    {
+      "binding": "OPENROUTER_API_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "OPENROUTER_API_KEY",
+    },
+    {
+      "binding": "O11Y_CF_AE_API_TOKEN",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "O11Y_CF_AE_API_TOKEN",
+    },
+  ],
+}

@@ -5,7 +5,7 @@ let instance: PostHog | null = null;
 
 export default function PostHogClient(): Pick<
   PostHog,
-  'capture' | 'isFeatureEnabled' | 'getFeatureFlag' | 'debug' | 'getFeatureFlagPayload' | 'alias'
+  'capture' | 'isFeatureEnabled' | 'getFeatureFlag' | 'debug' | 'alias'
 > {
   if (instance) return instance;
 
@@ -17,7 +17,6 @@ export default function PostHogClient(): Pick<
       isFeatureEnabled: async () => false,
       getFeatureFlag: async () => undefined,
       debug: () => {},
-      getFeatureFlagPayload: async () => undefined,
       alias: () => {},
     };
   }

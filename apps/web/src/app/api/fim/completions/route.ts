@@ -6,6 +6,7 @@ import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { INCEPTION_PROMO_MODEL, INCEPTION_PROMO_RUNNING } from '@/lib/constants';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user/server';
 import {
@@ -25,6 +26,7 @@ import { readDb } from '@/lib/drizzle';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { sentryLogger } from '@/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
+import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 // Mistral exposes FIM on two separate, key-incompatible endpoints:
 //   - https://api.mistral.ai          (La Plateforme, paid tier keys)
@@ -153,11 +155,12 @@ export async function POST(request: NextRequest) {
   // Extract properties for usage context
   const promptInfo = extractFimPromptInfo(requestBody);
 
-  const byokProviderKey = fimProvider === 'mistral' ? 'codestral' : 'inception';
+  const byokProviderKeys: UserByokProviderId[] =
+    fimProvider === 'mistral' ? ['codestral', 'mistral'] : ['inception'];
 
   const userByok = organizationId
-    ? await getBYOKforOrganization(readDb, organizationId, [byokProviderKey])
-    : await getBYOKforUser(readDb, user.id, [byokProviderKey]);
+    ? await getBYOKforOrganization(readDb, organizationId, byokProviderKeys)
+    : await getBYOKforUser(readDb, user.id, byokProviderKeys);
 
   const usageContext: MicrodollarUsageContext = {
     api_kind: 'fim_completions',
@@ -190,7 +193,15 @@ export async function POST(request: NextRequest) {
   // slight replication lag, and provides lower latency for US users
   const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
-  if (balance <= 0 && !(await isFreeModel(requestBody.model)) && !userByok) {
+  const isInceptionPromoRequest =
+    INCEPTION_PROMO_RUNNING && requestBody.model === INCEPTION_PROMO_MODEL;
+
+  if (
+    !isInceptionPromoRequest &&
+    balance <= 0 &&
+    !(await isFreeModel(requestBody.model)) &&
+    !userByok
+  ) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },
@@ -232,7 +243,9 @@ export async function POST(request: NextRequest) {
   }
 
   const systemKey = getSystemApiKey(fimProvider);
-  const userByokEntry = userByok?.at(0);
+  const userByokEntry = byokProviderKeys
+    .map(providerId => userByok?.find(entry => entry.providerId === providerId))
+    .find(entry => entry !== undefined);
   const apiKey = userByokEntry?.decryptedAPIKey ?? systemKey;
   const upstreamUrl = resolveFimUpstreamUrl(fimProvider, userByokEntry?.providerId === 'codestral');
 

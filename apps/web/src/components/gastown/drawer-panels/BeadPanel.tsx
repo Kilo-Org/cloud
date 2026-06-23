@@ -59,6 +59,15 @@ const PRIORITY_STYLES: Record<string, string> = {
   low: 'text-white/50',
 };
 
+function isGitHubUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === 'github.com' || hostname.endsWith('.github.com');
+  } catch {
+    return false;
+  }
+}
+
 type EditState = {
   title: string;
   body: string;
@@ -512,7 +521,7 @@ export function BeadPanel({
             className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-[color:oklch(95%_0.15_108)] transition-colors hover:bg-white/[0.06]"
           >
             <ExternalLink className="size-3" />
-            {prUrl.includes('github.com') ? 'View Pull Request' : 'View Merge Request'}
+            {isGitHubUrl(prUrl) ? 'View Pull Request' : 'View Merge Request'}
           </a>
         </div>
       )}

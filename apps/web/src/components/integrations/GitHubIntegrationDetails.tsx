@@ -15,12 +15,15 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
 import { DevAddGitHubInstallationCard } from './DevAddGitHubInstallationCard';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
+import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { buildGitHubInstallState } from './github-install-state';
 
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
@@ -29,6 +32,7 @@ type GitHubIntegrationDetailsProps = {
   error?: string;
   pendingApproval?: boolean;
   existingPendingOrg?: string;
+  appReturnPath?: string;
 };
 
 export function GitHubIntegrationDetails({
@@ -38,6 +42,7 @@ export function GitHubIntegrationDetails({
   error,
   pendingApproval,
   existingPendingOrg,
+  appReturnPath,
 }: GitHubIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -47,6 +52,25 @@ export function GitHubIntegrationDetails({
   const { data: organizationData } = useOrganizationWithMembers(organizationId ?? '', {
     enabled: !!organizationId,
   });
+
+  // Fetch models for the model selector
+  const { data: openRouterModels, isLoading: isLoadingModels } =
+    useModelSelectorList(organizationId);
+
+  const modelOptions = useMemo<ModelOption[]>(() => {
+    return (
+      openRouterModels?.data.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+        mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+        hasUserByokAvailable: model.hasUserByokAvailable,
+      })) ?? []
+    );
+  }, [openRouterModels]);
+
+  // Track selected model
+  const [selectedModel, setSelectedModel] = useState<string>('');
 
   // Determine which GitHub App to use based on organization settings
   const githubAppName = useMemo(() => {
@@ -132,6 +156,23 @@ export function GitHubIntegrationDetails({
     })
   );
 
+  const updateModel = useMutation(
+    trpc.githubApps.updateModel.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.githubApps.getInstallation.queryKey(input),
+        });
+      },
+    })
+  );
+
+  // Initialize selected model from installation data
+  useEffect(() => {
+    if (installationData?.installation?.modelSlug) {
+      setSelectedModel(installationData.installation.modelSlug);
+    }
+  }, [installationData?.installation?.modelSlug]);
+
   // Show success/error/pending toasts
   useEffect(() => {
     if (success) {
@@ -159,9 +200,32 @@ export function GitHubIntegrationDetails({
 
   const { data: user } = useUser();
 
+  const handleModelChange = (modelSlug: string) => {
+    setSelectedModel(modelSlug);
+    updateModel.mutate(
+      { modelSlug, organizationId },
+      {
+        onSuccess: result => {
+          if (result.success) {
+            toast.success('Model updated successfully');
+          } else {
+            toast.error('Failed to update model', {
+              description: result.error,
+            });
+          }
+        },
+        onError: err => {
+          toast.error('Failed to update model', {
+            description: err.message,
+          });
+        },
+      }
+    );
+  };
+
   const handleInstall = () => {
     const state = organizationId ? `org_${organizationId}` : `user_${user?.id}`;
-    const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${state}`;
+    const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(state, appReturnPath))}`;
     window.location.href = installUrl;
   };
 
@@ -359,6 +423,19 @@ export function GitHubIntegrationDetails({
                 </div>
               </div>
 
+              {/* Model Selection */}
+              <div className="space-y-3 rounded-lg border p-4">
+                <ModelCombobox
+                  label="AI Model"
+                  helperText="Select the AI model to use when responding to GitHub bot mentions"
+                  models={modelOptions}
+                  value={selectedModel}
+                  onValueChange={handleModelChange}
+                  isLoading={isLoadingModels}
+                  placeholder="Select a model"
+                />
+              </div>
+
               {/* Actions */}
               <div className="flex flex-wrap gap-3">
                 <Button
@@ -521,29 +598,31 @@ export function GitHubIntegrationDetails({
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader>
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="flex items-center gap-2">
-                  <UserRound className="h-5 w-5" />
-                  Use your GitHub identity
-                </CardTitle>
-                <Badge variant="outline">Optional</Badge>
+        !appReturnPath && (
+          <Card>
+            <CardHeader>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <UserRound className="h-5 w-5" />
+                    Use your GitHub identity
+                  </CardTitle>
+                  <Badge variant="outline">Optional</Badge>
+                </div>
+                <CardDescription>
+                  Your GitHub identity is personal, not owned by this organization. Manage it from
+                  your personal integration to let eligible Cloud Agent sessions act as you where
+                  supported repository access is available.
+                </CardDescription>
               </div>
-              <CardDescription>
-                Your GitHub identity is personal, not owned by this organization. Manage it from
-                your personal integration to let eligible Cloud Agent sessions act as you where
-                supported repository access is available.
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline">
-              <Link href="/integrations/github#github-identity">Manage GitHub identity</Link>
-            </Button>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline">
+                <Link href="/integrations/github#github-identity">Manage GitHub identity</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )
       )}
 
       {/* Dev-only card for adding existing installations - only show when no app is installed */}

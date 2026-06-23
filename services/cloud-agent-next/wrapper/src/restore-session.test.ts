@@ -22,6 +22,30 @@ function makeSnapshot(diffs: Array<{ file: string; after: string; status: string
   });
 }
 
+function makeSessionDiffSnapshot(patch: string): string {
+  return JSON.stringify({
+    info: snapshotInfo(),
+    sessionDiff: [
+      {
+        file: 'src/index.ts',
+        patch,
+        additions: 1,
+        deletions: 0,
+        status: 'modified',
+      },
+    ],
+    messages: [
+      {
+        info: {
+          summary: {
+            diffs: [{ file: 'legacy.txt', after: 'legacy content', status: 'modified' }],
+          },
+        },
+      },
+    ],
+  });
+}
+
 function makeMultiMessageSnapshot(
   ...messageDiffs: Array<Array<{ file: string; after: string; status: string }>>
 ): string {
@@ -233,13 +257,14 @@ describe('restoreSession', () => {
     }
   });
 
-  it('returns download error when fetch throws', async () => {
-    globalThis.fetch = asFetch(() => Promise.reject(new Error('network failure')));
+  it('returns a fixed download error when fetch throws', async () => {
+    globalThis.fetch = asFetch(() => Promise.reject(new Error('network token secret')));
     const result = await restoreSession(SESSION_ID, workspace);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error).toContain('network failure');
+      expect(result.error).toBe('snapshot download failed');
+      expect(result.error).not.toContain('network token secret');
       expect(result.code).toBeNull();
       expect(result.step).toBe('download');
     }
@@ -322,7 +347,9 @@ describe('restoreSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.step).toBe('import');
+      expect(result.subtype).toBe('kilo_import_failed');
       expect(result.error).toContain('kilo import failed');
+      expect(result.detail).toContain('exit code 1');
     }
   });
 
@@ -335,8 +362,33 @@ describe('restoreSession', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.step).toBe('import');
+      expect(result.subtype).toBe('kilo_import_timeout');
       expect(result.error).toContain('kilo import timed out');
+      expect(result.detail).toContain('timeout');
     }
+    expect(fs.existsSync(TMP_PATH)).toBe(false);
+  });
+
+  it('terminates kilo import when the workspace deadline is aborted', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeSlowMockKilo(binDir);
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 50);
+    const startedAt = Date.now();
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      importTimeoutMs: 5_000,
+      importTerminationGraceMs: 50,
+      signal: controller.signal,
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.step).toBe('import');
+      expect(result.error).toContain('kilo import failed');
+    }
+    expect(elapsedMs).toBeLessThan(800);
     expect(fs.existsSync(TMP_PATH)).toBe(false);
   });
 
@@ -401,6 +453,68 @@ describe('restoreSession', () => {
 
     // Verify deleted file was removed
     expect(fs.existsSync(path.join(workspace, 'old-file.txt'))).toBe(false);
+  });
+
+  it('prefers top-level patch session diffs over legacy message summaries', async () => {
+    const repo = path.join(tmpDir, 'repo');
+    fs.mkdirSync(path.join(repo, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    Bun.spawnSync(['git', 'config', 'user.name', 'Test User'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    fs.writeFileSync(path.join(repo, 'src/index.ts'), 'before\n');
+    Bun.spawnSync(['git', 'add', '.'], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'commit', '-m', 'initial'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    fs.writeFileSync(path.join(repo, 'src/index.ts'), 'after\n');
+    const proc = Bun.spawnSync(['git', 'diff', '--src-prefix=a/', '--dst-prefix=b/'], {
+      cwd: repo,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    const patch = new TextDecoder().decode(proc.stdout);
+
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    Bun.spawnSync(['git', 'config', 'user.name', 'Test User'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    fs.writeFileSync(path.join(workspace, 'src/index.ts'), 'before\n');
+    Bun.spawnSync(['git', 'add', '.'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    Bun.spawnSync(['git', 'commit', '-m', 'initial'], {
+      cwd: workspace,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    });
+    mockFetchOk(makeSessionDiffSnapshot(patch));
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    });
+    expect(fs.readFileSync(path.join(workspace, 'src/index.ts'), 'utf-8')).toBe('after\n');
+    expect(fs.existsSync(path.join(workspace, 'legacy.txt'))).toBe(false);
   });
 
   it('succeeds with zero diffs when messages array is empty', async () => {
@@ -666,6 +780,23 @@ describe('extractDiffs', () => {
 
     const diffs = await extractDiffs(filePath);
     expect(diffs).toEqual([]);
+  });
+
+  it('does not start diff extraction after the workspace deadline expires', async () => {
+    const filePath = path.join(tmpDir, 'snapshot.json');
+    fs.writeFileSync(filePath, JSON.stringify({ messages: [] }));
+    const controller = new AbortController();
+    const deadlineError = new Error('workspace deadline reached');
+    controller.abort(deadlineError);
+    let caughtError: unknown;
+
+    try {
+      await extractDiffs(filePath, controller.signal);
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(caughtError).toBe(deadlineError);
   });
 
   it('returns null on invalid JSON', async () => {

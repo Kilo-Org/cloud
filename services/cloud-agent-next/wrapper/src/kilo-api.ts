@@ -20,6 +20,63 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+function providerIdFromRecord(provider: Record<string, unknown>): string | undefined {
+  const id = provider.id ?? provider.providerID ?? provider.providerId;
+  return typeof id === 'string' ? id : undefined;
+}
+
+function modelIdFromRecord(model: Record<string, unknown>): string | undefined {
+  const id = model.id ?? model.modelID ?? model.modelId;
+  return typeof id === 'string' ? id : undefined;
+}
+
+function modelKeysFromModels(models: unknown): string[] {
+  if (isRecord(models)) return Object.keys(models);
+  if (!Array.isArray(models)) return [];
+  return models.flatMap(model => {
+    if (typeof model === 'string') return [model];
+    if (isRecord(model)) {
+      const modelID = modelIdFromRecord(model);
+      return modelID ? [modelID] : [];
+    }
+    return [];
+  });
+}
+
+function modelKeysFromProvider(provider: unknown): string[] {
+  if (!isRecord(provider)) return [];
+  return modelKeysFromModels(provider.models);
+}
+
+function findProviderEntries(data: unknown, providerID: string): unknown[] {
+  if (Array.isArray(data)) {
+    return data.filter(
+      provider => isRecord(provider) && providerIdFromRecord(provider) === providerID
+    );
+  }
+
+  if (!isRecord(data)) return [];
+
+  const providers = data.providers;
+  if (Array.isArray(providers)) {
+    const matchingProviders = providers.filter(
+      entry => isRecord(entry) && providerIdFromRecord(entry) === providerID
+    );
+    if (matchingProviders.length > 0) return matchingProviders;
+  }
+
+  const directProvider = data[providerID];
+  if (directProvider !== undefined) return [directProvider];
+
+  return providerIdFromRecord(data) === providerID ? [data] : [];
+}
+
+function exactDedupedModelKeys(data: unknown, providerID: string): string[] {
+  return [...new Set(findProviderEntries(data, providerID).flatMap(modelKeysFromProvider))].sort(
+    (left, right) => left.localeCompare(right)
+  );
+}
+
 function formatSdkError(error: unknown): string {
   if (error instanceof Error) return error.message;
 
@@ -113,6 +170,7 @@ export type WrapperKiloClient = {
     model?: { providerID?: string; modelID: string };
     system?: string;
     tools?: Record<string, boolean>;
+    snapshotInitialization?: 'wait';
   }) => Promise<void>;
   abortSession: (opts: { sessionId: string }) => Promise<boolean>;
   summarizeSession: (opts: {
@@ -125,6 +183,7 @@ export type WrapperKiloClient = {
     command: string;
     args?: string;
     messageId?: string;
+    snapshotInitialization?: 'wait';
   }) => Promise<unknown>;
   /** Fetch the full slash command catalog from kilo, trimmed to wire shape. */
   listCommands: () => Promise<SlashCommandInfo[]>;
@@ -152,6 +211,7 @@ export type WrapperKiloClient = {
   >;
   getNetworkWaits: () => Promise<NetworkWait[]>;
   resumeNetworkWait: (requestID: string) => Promise<boolean>;
+  listEffectiveModels: (providerID: string) => Promise<string[]>;
   generateCommitMessage: (opts: { path: string }) => Promise<{ message: string }>;
   createPty: (opts: {
     cwd: string;
@@ -248,6 +308,9 @@ export function createWrapperKiloClient(
         ...(opts.system ? { system: opts.system } : {}),
         ...(opts.tools ? { tools: opts.tools } : {}),
         ...(opts.agent ? { agent: opts.agent } : {}),
+        ...(opts.snapshotInitialization
+          ? { snapshotInitialization: opts.snapshotInitialization }
+          : {}),
       });
       if (result.error !== undefined) {
         throw new Error(
@@ -277,13 +340,14 @@ export function createWrapperKiloClient(
     },
 
     sendCommand: async opts => {
-      const result = await sdkClient.session.command({
-        path: { id: opts.sessionId },
-        body: {
-          command: opts.command,
-          arguments: opts.args ?? '',
-          ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
-        },
+      const result = await v2Client.session.command({
+        sessionID: opts.sessionId,
+        command: opts.command,
+        arguments: opts.args ?? '',
+        ...(opts.messageId !== undefined ? { messageID: opts.messageId } : {}),
+        ...(opts.snapshotInitialization
+          ? { snapshotInitialization: opts.snapshotInitialization }
+          : {}),
       });
       if (result.error !== undefined) {
         throw new Error(
@@ -354,6 +418,15 @@ export function createWrapperKiloClient(
     resumeNetworkWait: async requestID => {
       const result = await v2Client.network.reply({ requestID });
       return requireSdkData(result, `Network reply ${requestID}`);
+    },
+
+    listEffectiveModels: async providerID => {
+      const result = await v2Client.config.providers({
+        directory: workspacePath,
+        workspace: workspacePath,
+      });
+      const data = requireSdkData<unknown>(result, 'Config providers');
+      return exactDedupedModelKeys(data, providerID);
     },
 
     generateCommitMessage: async opts => {

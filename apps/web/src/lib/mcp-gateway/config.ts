@@ -1,14 +1,41 @@
 import 'server-only';
+import { Buffer } from 'node:buffer';
+import { APP_URL } from '@/lib/constants';
 import { getEnvVariable } from '@/lib/dotenvx';
-import type { JsonWebKey } from 'node:crypto';
 import { z } from 'zod';
+
+type GatewayPublicJwk = Pick<
+  JsonWebKey,
+  | 'alg'
+  | 'crv'
+  | 'd'
+  | 'dp'
+  | 'dq'
+  | 'e'
+  | 'ext'
+  | 'k'
+  | 'key_ops'
+  | 'kty'
+  | 'n'
+  | 'oth'
+  | 'p'
+  | 'q'
+  | 'qi'
+  | 'use'
+  | 'x'
+  | 'y'
+>;
+
+const PublicJwkSchema = z
+  .object({
+    kty: z.string().min(1),
+  })
+  .passthrough();
 
 const JWTKeySchema = z.object({
   keyId: z.string().min(1),
-  publicJwk: z.custom<JsonWebKey>(
-    value => value !== null && typeof value === 'object',
-    'publicJwk must be an object'
-  ),
+  publicJwk: PublicJwkSchema,
+  publicKeyPem: z.string().min(1).optional(),
   privateKeyPem: z.string().min(1).optional(),
 });
 
@@ -35,7 +62,8 @@ const CredentialKeysetSchema = z.object({
 
 export type GatewayJWTKey = {
   keyId: string;
-  publicJwk: JsonWebKey;
+  publicJwk: GatewayPublicJwk;
+  publicKeyPem?: string;
   privateKeyPem?: string;
 };
 
@@ -60,27 +88,36 @@ export type GatewayAppConfig = {
   credentialKeyset: GatewayCredentialKeyset;
 };
 
-function parseJsonEnv(value: string | undefined, name: string): unknown {
+const Base64Schema = z
+  .string()
+  .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/);
+
+function parseJsonOrBase64JsonEnv(value: string | undefined, name: string): unknown {
   if (!value) {
     throw new Error(`${name} is required for MCP gateway`);
   }
 
   try {
     return JSON.parse(value);
-  } catch (error) {
-    throw new Error(`${name} must contain valid JSON`, { cause: error });
+  } catch {
+    try {
+      Base64Schema.parse(value);
+      return JSON.parse(Buffer.from(value, 'base64').toString('utf8'));
+    } catch (error) {
+      throw new Error(`${name} must contain valid JSON or base64-encoded JSON`, { cause: error });
+    }
   }
 }
 
 export function getGatewayAppConfig(): GatewayAppConfig {
   const jwtKeyset = JWTKeysetSchema.parse(
-    parseJsonEnv(
+    parseJsonOrBase64JsonEnv(
       getEnvVariable('MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON'),
       'MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON'
     )
   );
   const credentialKeyset = CredentialKeysetSchema.parse(
-    parseJsonEnv(
+    parseJsonOrBase64JsonEnv(
       getEnvVariable('MCP_GATEWAY_CREDENTIAL_KEYSET_JSON'),
       'MCP_GATEWAY_CREDENTIAL_KEYSET_JSON'
     )
@@ -96,7 +133,7 @@ export function getGatewayAppConfig(): GatewayAppConfig {
   }
 
   return {
-    appBaseUrl: getEnvVariable('MCP_GATEWAY_APP_BASE_URL') || 'https://app.kilo.ai',
+    appBaseUrl: getEnvVariable('MCP_GATEWAY_APP_BASE_URL') || APP_URL,
     gatewayBaseUrl: getEnvVariable('MCP_GATEWAY_BASE_URL') || 'https://mcp.kilosessions.ai',
     issuer: jwtKeyset.issuer,
     accessTokenTtlSeconds: Number(getEnvVariable('MCP_GATEWAY_ACCESS_TOKEN_TTL_SECONDS') || '900'),

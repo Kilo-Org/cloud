@@ -1,4 +1,5 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
+import * as z from 'zod';
 import { FEATURE_HEADER, type FeatureValue } from '@/lib/feature-detection';
 import {
   countAndStoreUsage,
@@ -6,7 +7,12 @@ import {
   processTokenData,
 } from '@/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
-import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
+import {
+  APP_URL,
+  FIRST_TOPUP_BONUS_AMOUNT,
+  INCEPTION_PROMO_MODEL,
+  INCEPTION_PROMO_RUNNING,
+} from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
@@ -177,6 +183,49 @@ function byokErrorMessage(status: number): string | undefined {
   return byokErrorMessages[status];
 }
 
+const noAllowedProvidersErrorSchema = z.object({
+  message: z.literal('No allowed providers are available for the selected model.'),
+  code: z.literal(404),
+  metadata: z.object({
+    available_providers: z.array(z.string()),
+    requested_providers: z.array(z.string()),
+  }),
+});
+
+const openRouterErrorResponseSchema = z.object({
+  error: noAllowedProvidersErrorSchema.optional(),
+  message: z.string().optional(),
+  code: z.number().optional(),
+  metadata: z.unknown().optional(),
+});
+
+async function providerNotAllowedResponse(providerId: ProviderId, response: Response) {
+  if (providerId !== 'openrouter' || response.status !== 404) return undefined;
+
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return undefined;
+  }
+
+  const parsedBody = openRouterErrorResponseSchema.safeParse(body);
+  if (!parsedBody.success) return undefined;
+
+  const upstreamError = parsedBody.data.error ?? parsedBody.data;
+  if (!noAllowedProvidersErrorSchema.safeParse(upstreamError).success) return undefined;
+
+  const error = 'No eligible provider can serve the selected model.';
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.provider_not_allowed,
+      message: `${error} Select another model or update the provider routing settings.`,
+    },
+    { status: response.status }
+  );
+}
+
 export async function makeErrorReadable({
   providerId,
   requestedModel,
@@ -208,6 +257,9 @@ export async function makeErrorReadable({
       );
     }
   }
+
+  const providerErrorResponse = await providerNotAllowedResponse(providerId, response);
+  if (providerErrorResponse) return providerErrorResponse;
 
   const overflowResponse = await detectContextOverflow({ requestedModel, request, response });
   if (overflowResponse) return overflowResponse;
@@ -686,8 +738,12 @@ export function countAndStoreFimUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      if (usageContext.user_byok) {
+      const isInceptionPromoRequest =
+        INCEPTION_PROMO_RUNNING && usageContext.requested_model === INCEPTION_PROMO_MODEL;
+
+      if (isInceptionPromoRequest || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
+        usageStats.cacheDiscount_mUsd = 0;
       }
 
       // Use the same logMicrodollarUsage as OpenRouter!
@@ -823,11 +879,14 @@ export function countAndStoreEditUsage(
       usageStats.market_cost = usageStats.cost_mUsd;
 
       // Mirror the canonical chat path in `processOpenRouterUsage`: when the
-      // request is BYOK we don't bill the user, so the cache discount we
-      // would otherwise have given them must be zeroed too. Otherwise the
-      // usage row would claim a discount on spend that never happened and
-      // distort "money saved by caching" reporting.
-      if (usageContext.user_byok) {
+      // promotion is running or the request is BYOK we don't bill the user, so
+      // the cache discount we would otherwise have given them must be zeroed
+      // too. Otherwise the usage row would claim a discount on spend that never
+      // happened and distort "money saved by caching" reporting.
+      const isInceptionPromoRequest =
+        INCEPTION_PROMO_RUNNING && usageContext.requested_model === INCEPTION_PROMO_MODEL;
+
+      if (isInceptionPromoRequest || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }

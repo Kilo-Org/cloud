@@ -4,7 +4,7 @@ import { AlertTriangle, Info, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/Button';
 import { cn } from '@/lib/utils';
 import { setReturnUrlAndRedirect } from './InsufficientBalanceBanner.actions';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 /** Minimum balance required to use features that require credits (in dollars) */
 export const MIN_BALANCE_DOLLARS_DEFAULT = 1;
@@ -17,8 +17,7 @@ type ColorSchemeConfig = {
   text: string;
   iconColor: string;
   Icon: LucideIcon;
-  buttonVariant: 'warning' | 'secondary';
-  buttonClassName?: string;
+  buttonVariant: 'primary' | 'warning';
 };
 
 const colorSchemes: Record<ColorScheme, ColorSchemeConfig> = {
@@ -36,8 +35,7 @@ const colorSchemes: Record<ColorScheme, ColorSchemeConfig> = {
     text: 'text-blue-100',
     iconColor: 'text-blue-400',
     Icon: Info,
-    buttonVariant: 'secondary',
-    buttonClassName: 'border-blue-500/50 bg-blue-500/20 hover:bg-blue-500/30',
+    buttonVariant: 'primary',
   },
 };
 
@@ -84,12 +82,15 @@ export function InsufficientBalanceBanner({
   content,
 }: InsufficientBalanceBannerProps) {
   const pathname = usePathname();
-  const creditsUrl = organizationId ? `/organizations/${organizationId}` : '/credits';
+  const router = useRouter();
+  const creditsUrl = organizationId
+    ? `/organizations/${encodeURIComponent(organizationId)}`
+    : '/credits';
 
   const handleAddCreditsClick = async () => {
     // Set the return URL cookie before redirecting
-    const redirectUrl = await setReturnUrlAndRedirect(pathname, creditsUrl);
-    window.location.href = redirectUrl;
+    await setReturnUrlAndRedirect(pathname);
+    router.push(creditsUrl);
   };
 
   const formattedBalance = balance.toLocaleString('en-US', {
@@ -159,7 +160,7 @@ export function InsufficientBalanceBanner({
           <Button
             variant={scheme.buttonVariant}
             size="sm"
-            className={cn('shrink-0', scheme.buttonClassName)}
+            className="shrink-0"
             onClick={handleAddCreditsClick}
           >
             Add Credits
@@ -198,11 +199,7 @@ export function InsufficientBalanceBanner({
       </div>
 
       {/* Add Credits button */}
-      <Button
-        variant={scheme.buttonVariant}
-        className={cn('shrink-0', scheme.buttonClassName)}
-        onClick={handleAddCreditsClick}
-      >
+      <Button variant={scheme.buttonVariant} className="shrink-0" onClick={handleAddCreditsClick}>
         Add Credits
       </Button>
     </div>

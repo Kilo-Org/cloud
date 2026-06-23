@@ -6,17 +6,25 @@ jest.mock('@/lib/email', () => ({
 
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { agent_configs, kilocode_users, type User } from '@kilocode/db/schema';
+import {
+  agent_configs,
+  cloud_agent_code_reviews,
+  kilocode_users,
+  type User,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import {
   classifyCodeReviewActionRequiredFailure,
   disableCodeReviewForActionRequiredFailure,
+  disableCodeReviewForRepeatedCloneTimeoutsToday,
+  getCodeReviewActionRequiredCopy,
   getCodeReviewActionRequiredRecoveryHref,
   getCodeReviewActionRequiredState,
 } from './action-required';
+import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from './action-required-shared';
 
 describe('classifyCodeReviewActionRequiredFailure', () => {
-  it('classifies GitHub installation, GitHub IP allow-list, BYOK invalid key, and selected model failures', () => {
+  it('classifies GitHub installation, GitHub IP allow-list, BYOK, GitLab, and selected model failures', () => {
     expect(
       classifyCodeReviewActionRequiredFailure(
         'GitHub token or active app installation required for this repository (no_installation_found)'
@@ -31,9 +39,33 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
 
     expect(
       classifyCodeReviewActionRequiredFailure(
+        'GitHub token or active app installation required for this repository (repository_not_installed)'
+      )
+    ).toBe('github_installation_required');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
         '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.'
       )
     ).toBe('byok_invalid_key');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Forbidden: [BYOK] Your API key does not have permission to access this resource. Please check your API key permissions.'
+      )
+    ).toBe('byok_invalid_key');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Dispatch failed: Failed to create Project Access Token for GitLab code review on owner/repo. Error: GitLab create Project Access Token failed: 400 - {"message":"400 Bad request - User does not have permission"}'
+      )
+    ).toBe('gitlab_project_access_required');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Cannot create Project Access Token for GitLab code review. You need Maintainer role or higher on project owner/repo. Error: Insufficient permissions to create Project Access Token for project 123. Requires Maintainer role or higher.'
+      )
+    ).toBe('gitlab_project_access_required');
 
     expect(
       classifyCodeReviewActionRequiredFailure(
@@ -64,6 +96,28 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
         'prepareSession failed (400): {"error":{"message":"Not Found: The requested model is not allowed for your team.","code":-32600,"data":{"code":"BAD_REQUEST","httpStatus":400,"path":"prepareSession"}}}'
       )
     ).toBe('selected_model_unavailable');
+
+    expect(classifyCodeReviewActionRequiredFailure('No allowed providers are specified.')).toBe(
+      'selected_model_unavailable'
+    );
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'No allowed providers are available for the selected model.'
+      )
+    ).toBe('selected_model_unavailable');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Not Found: {"error":"No eligible provider can serve the selected model.","error_type":"provider_not_allowed","message":"No eligible provider can serve the selected model. Select another model or update the provider routing settings."}'
+      )
+    ).toBe('selected_model_unavailable');
+
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'No endpoints found matching your data policy (Free model training). Configure: https://openrouter.ai/settings/privacy'
+      )
+    ).toBe('selected_model_unavailable');
   });
 
   it('does not classify unrelated auth, rate-limit, or BYOK quota failures', () => {
@@ -73,6 +127,30 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
     expect(
       classifyCodeReviewActionRequiredFailure('[BYOK] Your account quota is exhausted.')
     ).toBeNull();
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        '[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider.'
+      )
+    ).toBeNull();
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.'
+      )
+    ).toBeNull();
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'Repository clone timed out: termination hard_timeout, elapsed 300041ms'
+      )
+    ).toBeNull();
+  });
+
+  it('routes GitLab project access recovery to GitLab integrations', () => {
+    expect(getCodeReviewActionRequiredRecoveryHref('gitlab_project_access_required')).toBe(
+      '/integrations/gitlab'
+    );
+    expect(getCodeReviewActionRequiredRecoveryHref('gitlab_project_access_required', 'org-1')).toBe(
+      '/organizations/org-1/integrations/gitlab'
+    );
   });
 
   it('routes selected model recovery to Code Reviewer settings', () => {
@@ -83,16 +161,38 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
       '/organizations/org-1/code-reviews'
     );
   });
+
+  it('routes repeated repository clone timeout recovery to support email', () => {
+    expect(getCodeReviewActionRequiredRecoveryHref('repeated_repository_clone_timeout')).toBe(
+      'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
+    );
+  });
+
+  it.each(CODE_REVIEW_ACTION_REQUIRED_REASONS)(
+    'uses disabled-state copy for %s',
+    actionRequiredReason => {
+      const copy = getCodeReviewActionRequiredCopy(actionRequiredReason);
+
+      expect(copy.emailReason).toMatch(/Code Reviewer was disabled/);
+      expect(copy.checkSummary).toMatch(/Code Reviewer was disabled/);
+      expect(copy.recoveryLabel.trim()).not.toBe('');
+      expect(copy.checkTitle.trim()).not.toBe('');
+      expect(copy.gitlabDescription.trim()).not.toBe('');
+      expect(copy.gitlabDescription.length).toBeLessThanOrEqual(255);
+    }
+  );
 });
 
 describe('disableCodeReviewForActionRequiredFailure', () => {
   let testUser: User;
+  let extraUserIds: string[] = [];
 
   beforeAll(async () => {
     testUser = await insertTestUser();
   });
 
   beforeEach(async () => {
+    extraUserIds = [];
     mockSendCodeReviewDisabledEmail.mockResolvedValue({ sent: true });
     await db.insert(agent_configs).values({
       owned_by_user_id: testUser.id,
@@ -105,6 +205,11 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
   });
 
   afterEach(async () => {
+    for (const userId of [testUser.id, ...extraUserIds]) {
+      await db
+        .delete(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+    }
     await db
       .delete(agent_configs)
       .where(
@@ -113,6 +218,9 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
           eq(agent_configs.agent_type, 'code_review')
         )
       );
+    for (const userId of extraUserIds) {
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
+    }
     mockSendCodeReviewDisabledEmail.mockReset();
   });
 
@@ -133,6 +241,33 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
       )
       .limit(1);
     return config;
+  }
+
+  async function seedFailedReview(params: {
+    ownerId?: string;
+    platform?: 'github' | 'gitlab';
+    errorMessage: string;
+    completedAt?: Date;
+  }): Promise<string> {
+    const id = crypto.randomUUID();
+    await db.insert(cloud_agent_code_reviews).values({
+      id,
+      owned_by_user_id: params.ownerId ?? testUser.id,
+      repo_full_name: `clone-timeout-test/repo-${id}`,
+      pr_number: 1,
+      pr_url: `https://example.com/clone-timeout-test/repo-${id}/pull/1`,
+      pr_title: 'Test PR',
+      pr_author: 'author',
+      base_ref: 'main',
+      head_ref: `feature-${id}`,
+      head_sha: id,
+      platform: params.platform ?? 'github',
+      status: 'failed',
+      error_message: params.errorMessage,
+      terminal_reason: 'sandbox_error',
+      completed_at: (params.completedAt ?? new Date()).toISOString(),
+    });
+    return id;
   }
 
   it('throws when the agent config is missing', async () => {
@@ -243,5 +378,85 @@ describe('disableCodeReviewForActionRequiredFailure', () => {
 
     expect(state?.reason).toBe('github_ip_allow_list');
     expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not disable when fewer than three repository clone timeouts completed today', async () => {
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+    const errorMessage = 'Repository clone timed out';
+    await seedFailedReview({ errorMessage });
+    const triggeringReviewId = await seedFailedReview({ errorMessage });
+
+    const result = await disableCodeReviewForRepeatedCloneTimeoutsToday({
+      owner,
+      platform: 'github',
+      reviewId: triggeringReviewId,
+      errorMessage,
+    });
+
+    const config = await getStoredConfig();
+    const [triggeringReview] = await db
+      .select({ terminalReason: cloud_agent_code_reviews.terminal_reason })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, triggeringReviewId))
+      .limit(1);
+
+    expect(result).toBeNull();
+    expect(config?.is_enabled).toBe(true);
+    expect(getCodeReviewActionRequiredState(config)).toBeNull();
+    expect(triggeringReview?.terminalReason).toBe('sandbox_error');
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
+  });
+
+  it('keeps Code Reviewer enabled on the third repository clone timeout while auto-disable is paused', async () => {
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+    await seedFailedReview({ errorMessage: 'repository clone timed out' });
+    await seedFailedReview({ errorMessage: 'Repository clone timed out' });
+    const errorMessage = 'Repository Clone Timed Out: termination hard_timeout, elapsed 300041ms';
+    const triggeringReviewId = await seedFailedReview({ errorMessage });
+
+    const result = await disableCodeReviewForRepeatedCloneTimeoutsToday({
+      owner,
+      platform: 'github',
+      reviewId: triggeringReviewId,
+      errorMessage,
+    });
+
+    const config = await getStoredConfig();
+    const [triggeringReview] = await db
+      .select({ terminalReason: cloud_agent_code_reviews.terminal_reason })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, triggeringReviewId))
+      .limit(1);
+
+    expect(result).toBeNull();
+    expect(config?.is_enabled).toBe(true);
+    expect(getCodeReviewActionRequiredState(config)).toBeNull();
+    expect(triggeringReview?.terminalReason).toBe('sandbox_error');
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
+  });
+
+  it('does not count other owners, other platforms, or yesterday for clone timeout threshold', async () => {
+    const owner = { type: 'user' as const, id: testUser.id, userId: testUser.id };
+    const otherUser = await insertTestUser();
+    extraUserIds.push(otherUser.id);
+    const errorMessage = 'Repository clone timed out';
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const triggeringReviewId = await seedFailedReview({ errorMessage });
+    await seedFailedReview({ ownerId: otherUser.id, errorMessage });
+    await seedFailedReview({ platform: 'gitlab', errorMessage });
+    await seedFailedReview({ errorMessage, completedAt: yesterday });
+
+    const result = await disableCodeReviewForRepeatedCloneTimeoutsToday({
+      owner,
+      platform: 'github',
+      reviewId: triggeringReviewId,
+      errorMessage,
+    });
+
+    const config = await getStoredConfig();
+    expect(result).toBeNull();
+    expect(config?.is_enabled).toBe(true);
+    expect(mockSendCodeReviewDisabledEmail).not.toHaveBeenCalled();
   });
 });

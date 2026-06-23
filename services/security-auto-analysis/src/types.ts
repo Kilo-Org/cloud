@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { SecurityFindingAnalysisInput } from '@kilocode/db/schema-types';
 
 export const AUTO_ANALYSIS_OWNER_CAP = 2;
 export const SECURITY_ANALYSIS_OWNER_CAP = 3;
@@ -15,12 +16,18 @@ export const SecurityAgentConfigSchema = z
     auto_analysis_enabled: z.boolean().default(false),
     auto_analysis_min_severity: z.enum(['critical', 'high', 'medium', 'all']).default('high'),
     auto_analysis_include_existing: z.boolean().default(false),
+    auto_remediation_enabled: z.boolean().default(false),
+    auto_remediation_min_severity: z.enum(['critical', 'high', 'medium', 'all']).default('high'),
+    auto_remediation_include_existing: z.boolean().default(false),
+    auto_remediation_enabled_at: z.string().nullable().default(null),
+    remediation_model_slug: z.string().optional(),
   })
   .passthrough();
 
 export type SecurityAgentConfig = z.infer<typeof SecurityAgentConfigSchema>;
 export type AnalysisMode = SecurityAgentConfig['analysis_mode'];
 export type AutoAnalysisMinSeverity = SecurityAgentConfig['auto_analysis_min_severity'];
+export type AutoRemediationMinSeverity = SecurityAgentConfig['auto_remediation_min_severity'];
 
 export const DEFAULT_SECURITY_AGENT_CONFIG: SecurityAgentConfig = {
   model_slug: 'anthropic/claude-opus-4.6',
@@ -32,21 +39,35 @@ export const DEFAULT_SECURITY_AGENT_CONFIG: SecurityAgentConfig = {
   auto_analysis_enabled: false,
   auto_analysis_min_severity: 'high',
   auto_analysis_include_existing: false,
+  auto_remediation_enabled: false,
+  auto_remediation_min_severity: 'high',
+  auto_remediation_include_existing: false,
+  auto_remediation_enabled_at: null,
+  remediation_model_slug: 'anthropic/claude-opus-4.6',
 };
 
 export function resolveSecurityAgentModels(
-  config: Pick<SecurityAgentConfig, 'model_slug' | 'triage_model_slug' | 'analysis_model_slug'>
-): { triageModel: string; analysisModel: string } {
+  config: Pick<
+    SecurityAgentConfig,
+    'model_slug' | 'triage_model_slug' | 'analysis_model_slug' | 'remediation_model_slug'
+  >
+): { triageModel: string; analysisModel: string; remediationModel: string } {
+  const analysisModel =
+    config.analysis_model_slug ??
+    config.model_slug ??
+    DEFAULT_SECURITY_AGENT_CONFIG.analysis_model_slug ??
+    'anthropic/claude-opus-4.6';
   return {
     triageModel:
       config.triage_model_slug ??
       config.model_slug ??
       DEFAULT_SECURITY_AGENT_CONFIG.triage_model_slug ??
       'anthropic/claude-opus-4.6',
-    analysisModel:
-      config.analysis_model_slug ??
-      config.model_slug ??
-      DEFAULT_SECURITY_AGENT_CONFIG.analysis_model_slug ??
+    analysisModel,
+    remediationModel:
+      config.remediation_model_slug ??
+      analysisModel ??
+      DEFAULT_SECURITY_AGENT_CONFIG.remediation_model_slug ??
       'anthropic/claude-opus-4.6',
   };
 }
@@ -95,6 +116,7 @@ export type SecurityFindingTriage = {
 
 export type SecurityFindingSandboxAnalysis = {
   isExploitable: boolean | 'unknown';
+  extractionStatus?: 'succeeded' | 'failed';
   exploitabilityReasoning: string;
   usageLocations: string[];
   suggestedFix: string;
@@ -108,6 +130,7 @@ export type SecurityFindingSandboxAnalysis = {
 export type SecurityFindingAnalysis = {
   triage?: SecurityFindingTriage;
   sandboxAnalysis?: SecurityFindingSandboxAnalysis;
+  findingDataSnapshot?: SecurityFindingAnalysisInput;
   rawMarkdown?: string;
   analyzedAt: string;
   modelUsed?: string;

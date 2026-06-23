@@ -23,6 +23,7 @@ describe('getControllerEndpointCapabilities', () => {
         'config.agents.create.basic.cli',
         'config.agents.update',
         'config.agents.delete.cli',
+        'config.agents.bindings.update',
         'config.agent-defaults.update',
       ])
     );

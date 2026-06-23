@@ -107,6 +107,7 @@ describe('tryDispatchPendingReviews', () => {
     });
     mockPrepareReviewPayload.mockImplementation((params: { reviewId: string }) => ({
       reviewId: params.reviewId,
+      sessionInput: { prompt: 'Review this change.' },
     }));
     mockSendCodeReviewDisabledEmail.mockResolvedValue({ sent: true });
     mockGetIntegrationById.mockResolvedValue(null);
@@ -592,7 +593,7 @@ describe('tryDispatchPendingReviews', () => {
     mockPrepareReviewPayload.mockImplementationOnce(async (params: { reviewId: string }) => {
       preparationStarted.resolve(undefined);
       await releasePreparation.promise;
-      return { reviewId: params.reviewId };
+      return { reviewId: params.reviewId, sessionInput: { prompt: 'Review this change.' } };
     });
 
     const firstDispatch = tryDispatchPendingReviews({
@@ -636,7 +637,7 @@ describe('tryDispatchPendingReviews', () => {
         ref: null,
         truncated: false,
       });
-      return { reviewId: params.reviewId };
+      return { reviewId: params.reviewId, sessionInput: { prompt: 'Review this change.' } };
     });
 
     const [review] = await db
@@ -1050,7 +1051,7 @@ describe('tryDispatchPendingReviews', () => {
       queueMicrotask(() => {
         void cancelSupersededReviewsForPR(REPO, 100, 'sha-race-new');
       });
-      return { reviewId: params.reviewId };
+      return { reviewId: params.reviewId, sessionInput: { prompt: 'Review this change.' } };
     });
 
     const result = await tryDispatchPendingReviews({
@@ -1336,6 +1337,151 @@ describe('tryDispatchPendingReviews', () => {
     expect(mockDispatchReview).toHaveBeenCalledWith(
       expect.objectContaining({ reviewId: review.id, attemptId: attempt?.id })
     );
+  });
+
+  it('snapshots analytics enrollment and appends the protocol only when enabled', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      id: 'test-agent-config',
+      config: { review_analytics_enabled: true },
+      is_enabled: true,
+      runtime_state: {},
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await tryDispatchPendingReviews({
+      type: 'org',
+      id: testOrganizationId,
+      userId: testUser.id,
+    });
+
+    const [attempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+    const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
+
+    expect(attempt?.analytics_enabled_at_dispatch).toBe(true);
+    expect(dispatchedPayload.sessionInput.prompt).toContain('kilo-review-analytics:v1');
+    expect(dispatchedPayload.sessionInput.prompt.match(/kilo-review-analytics:v1/g)).toHaveLength(
+      1
+    );
+  });
+
+  it('ignores enabled analytics config for personal reviews', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      id: 'test-agent-config',
+      config: { review_analytics_enabled: true },
+      is_enabled: true,
+      runtime_state: {},
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const [attempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+    const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
+
+    expect(attempt?.analytics_enabled_at_dispatch).toBe(false);
+    expect(dispatchedPayload.sessionInput.prompt).toBe('Review this change.');
+  });
+
+  it('ignores a legacy enabled analytics snapshot for personal reviews', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'pending',
+      analytics_enabled_at_dispatch: true,
+    });
+
+    await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
+    expect(dispatchedPayload.sessionInput.prompt).toBe('Review this change.');
+  });
+
+  it('keeps an existing organization analytics snapshot after collection is disabled', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: review.id,
+      attempt_number: 1,
+      status: 'pending',
+      analytics_enabled_at_dispatch: true,
+    });
+
+    await tryDispatchPendingReviews({
+      type: 'org',
+      id: testOrganizationId,
+      userId: testUser.id,
+    });
+
+    const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
+    expect(dispatchedPayload.sessionInput.prompt).toContain('kilo-review-analytics:v1');
   });
 
   it('mirrors terminal worker dispatch responses', async () => {

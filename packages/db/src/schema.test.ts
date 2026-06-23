@@ -102,6 +102,63 @@ async function expectStorePurchaseConstraintViolation(
   });
 }
 
+type EphemeralDeploymentInsert = typeof schema.deployments_ephemeral.$inferInsert;
+
+async function withEphemeralTestUser(
+  testFn: (params: { userId: string }) => Promise<void>
+): Promise<void> {
+  const userId = `schema-ephemeral-${crypto.randomUUID()}`;
+
+  await schemaTestDb.db.insert(schema.kilocode_users).values({
+    id: userId,
+    google_user_email: `${userId}@example.com`,
+    google_user_name: 'Schema Test User',
+    google_user_image_url: 'https://example.com/avatar.png',
+    stripe_customer_id: `cus_${crypto.randomUUID()}`,
+  });
+
+  try {
+    await testFn({ userId });
+  } finally {
+    await schemaTestDb.db
+      .delete(schema.deployments_ephemeral)
+      .where(eq(schema.deployments_ephemeral.owned_by_user_id, userId));
+    await schemaTestDb.db.delete(schema.kilocode_users).where(eq(schema.kilocode_users.id, userId));
+  }
+}
+
+async function insertEphemeralDeployment(
+  overrides: Partial<EphemeralDeploymentInsert> = {}
+): Promise<typeof schema.deployments_ephemeral.$inferSelect> {
+  const [deployment] = await schemaTestDb.db
+    .insert(schema.deployments_ephemeral)
+    .values({
+      source_type: 'html',
+      internal_worker_name: `qdpl-${crypto.randomUUID()}`,
+      status: 'pending',
+      next_cleanup_at: '2026-06-03T00:00:00.000Z',
+      ...overrides,
+    })
+    .returning();
+
+  if (!deployment) {
+    throw new Error('Failed to insert ephemeral deployment');
+  }
+
+  return deployment;
+}
+
+async function expectEphemeralConstraintViolation(
+  insertPromise: Promise<unknown>,
+  constraint: string
+): Promise<void> {
+  await expect(insertPromise).rejects.toMatchObject({
+    cause: {
+      constraint,
+    },
+  });
+}
+
 describe('database schema', () => {
   it("should be up to date with migrations (run 'pnpm drizzle generate' if this fails)", async () => {
     const migrationsDir = path.join(__dirname, 'migrations');
@@ -210,11 +267,22 @@ describe('database schema', () => {
       CliSessionSharedState: ['public', 'organization'],
       SecurityAuditLogAction: [
         'security.finding.created',
+        'security.finding.severity_changed',
         'security.finding.status_change',
         'security.finding.dismissed',
         'security.finding.auto_dismissed',
+        'security.finding.superseded',
         'security.finding.analysis_started',
         'security.finding.analysis_completed',
+        'security.finding.analysis_failed',
+        'security.remediation.queued',
+        'security.remediation.started',
+        'security.remediation.pr_opened',
+        'security.remediation.failed',
+        'security.remediation.blocked',
+        'security.remediation.no_changes_needed',
+        'security.remediation.cancelled',
+        'security.remediation.retried',
         'security.finding.deleted',
         'security.config.enabled',
         'security.config.disabled',
@@ -222,6 +290,15 @@ describe('database schema', () => {
         'security.sync.triggered',
         'security.sync.completed',
         'security.audit_log.exported',
+        'security.audit_report.generated',
+      ],
+      SecurityAuditLogActorType: ['customer_user', 'kilo_admin', 'system'],
+      SecurityFindingAuditSourceContext: [
+        'security_sync',
+        'web',
+        'analysis_worker',
+        'remediation_callback',
+        'rollout_baseline',
       ],
       KiloClawPlan: ['trial', 'commit', 'standard'],
       KiloClawScheduledPlan: ['commit', 'standard'],
@@ -289,6 +366,26 @@ describe('database schema', () => {
         'review_required',
         'dismissed',
       ],
+      StripeDisputeOwnerClassification: ['personal', 'organization', 'ambiguous', 'unmatched'],
+      StripeDisputeCaseStatus: [
+        'needs_action',
+        'processing',
+        'accepted',
+        'acceptance_failed',
+        'enforcement_failed',
+        'review_required',
+        'closed',
+      ],
+      StripeDisputeActionType: [
+        'stripe_acceptance',
+        'user_block',
+        'auto_top_up_disable',
+        'credit_balance_reset',
+        'subscription_cancellation',
+        'access_termination',
+        'kiloclaw_suspension',
+      ],
+      StripeDisputeActionStatus: ['queued', 'processing', 'completed', 'failed', 'skipped'],
       AffiliateProvider: ['impact'],
       AffiliateEventType: ['signup', 'trial_start', 'trial_end', 'sale', 'sale_reversal'],
       AffiliateEventDeliveryState: ['queued', 'blocked', 'sending', 'delivered', 'failed'],
@@ -314,6 +411,83 @@ describe('database schema', () => {
       ImpactReferralPaymentProvider: ['stripe', 'credits', 'app_store', 'google_play'],
       ImpactConversionReportState: ['queued', 'retrying', 'delivered', 'failed'],
       ImpactAdvocateRewardRedemptionState: ['queued', 'retrying', 'redeemed', 'failed'],
+      BYOKManagementSource: ['user', 'coding_plan'],
+      CodingPlanCredentialStatus: [
+        'available',
+        'assigned',
+        'revocation_pending',
+        'revoked',
+        'revocation_failed',
+      ],
+      CodingPlanSubscriptionStatus: ['active', 'past_due', 'canceled'],
+      CodingPlanTermKind: ['activation', 'extension', 'renewal'],
+      CodeReviewAnalyticsCaptureStatus: ['captured', 'missing', 'invalid', 'omitted'],
+      CodeReviewAnalyticsChangeType: [
+        'bug_fix',
+        'feature',
+        'refactor',
+        'maintenance',
+        'dependency',
+        'test',
+        'documentation',
+        'mixed',
+        'other',
+      ],
+      CodeReviewAnalyticsImpactLevel: ['low', 'medium', 'high'],
+      CodeReviewAnalyticsComplexityLevel: ['low', 'medium', 'high'],
+      CodeReviewAnalyticsClassificationConfidence: ['low', 'medium', 'high'],
+      CodeReviewFindingSeverity: ['critical', 'warning', 'suggestion'],
+      CodeReviewFindingCategory: [
+        'security',
+        'correctness',
+        'reliability',
+        'data_integrity',
+        'performance',
+        'compatibility',
+        'maintainability',
+        'test_quality',
+        'documentation',
+        'accessibility',
+        'other',
+      ],
+      CodeReviewFindingSecurityClass: [
+        'auth_access',
+        'injection',
+        'data_protection',
+        'request_resource_boundary',
+        'deserialization_object_integrity',
+        'dependency_supply_chain',
+        'memory_safety',
+        'availability',
+        'concurrency',
+        'security_configuration',
+        'other',
+      ],
+      MCPGatewayOwnerScope: ['personal', 'organization'],
+      MCPGatewayAuthMode: ['none', 'static_headers', 'oauth_dynamic', 'oauth_static'],
+      MCPGatewaySharingMode: ['single_user', 'multi_user'],
+      MCPGatewayProviderScopeSource: ['none', 'discovered', 'override'],
+      MCPGatewayRouteStatus: ['active', 'rotated', 'revoked'],
+      MCPGatewayInstanceStatus: ['active', 'needs_reauth', 'revoked', 'removed'],
+      MCPGatewayProviderGrantStatus: ['active', 'revoked'],
+      MCPGatewaySecretKind: [
+        'static_provider_credentials',
+        'dynamic_registration',
+        'static_headers',
+      ],
+      MCPGatewayOAuthClientAuthMethod: ['none', 'client_secret_post', 'client_secret_basic'],
+      MCPGatewayAuthorizationRequestStatus: ['pending', 'completed', 'error'],
+      MCPGatewayPendingProviderAuthorizationStatus: ['pending', 'completed', 'error'],
+      MCPGatewayAuditOutcome: ['success', 'failure', 'blocked'],
+      SecurityFindingNotificationKind: ['new_finding', 'sla_warning', 'sla_breach'],
+      SecurityFindingNotificationStatus: [
+        'staged',
+        'pending',
+        'sending',
+        'sent',
+        'failed',
+        'cancelled',
+      ],
     };
 
     const actualEnumValues: Record<string, string[]> = {};
@@ -365,6 +539,107 @@ describe('database schema', () => {
   it('exposes provider-aware Kilo Pass store tables', () => {
     expect(Object.hasOwn(schema, 'kilo_pass_store_events')).toBe(true);
     expect(Object.hasOwn(schema, 'kilo_pass_store_purchases')).toBe(true);
+  });
+
+  describe('ephemeral deployments', () => {
+    it('allows pending rows with null slug and expiry', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        const deployment = await insertEphemeralDeployment({ owned_by_user_id: userId });
+
+        expect(deployment.deployment_slug).toBeNull();
+        expect(deployment.expires_at).toBeNull();
+      });
+    });
+
+    it.each([
+      { deployment_slug: null, expires_at: '2026-06-04T00:00:00.000Z' },
+      { deployment_slug: `schema-${crypto.randomUUID()}`, expires_at: null },
+    ])('rejects active rows without both slug and expiry', async values => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, status: 'active', ...values }),
+          'deployments_ephemeral_active_fields_check'
+        );
+      });
+    });
+
+    it('allows active rows with both slug and expiry', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await insertEphemeralDeployment({
+          owned_by_user_id: userId,
+          status: 'active',
+          deployment_slug: `schema-${crypto.randomUUID()}`,
+          expires_at: '2026-06-04T00:00:00.000Z',
+        });
+      });
+    });
+
+    it.each([
+      { cleanup_claim_token: crypto.randomUUID(), cleanup_claimed_until: null },
+      { cleanup_claim_token: null, cleanup_claimed_until: '2026-06-03T00:01:00.000Z' },
+    ])('rejects rows with only one claim field', async values => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, ...values }),
+          'deployments_ephemeral_claim_fields_check'
+        );
+      });
+    });
+
+    it('allows rows with both claim fields present', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await insertEphemeralDeployment({
+          owned_by_user_id: userId,
+          cleanup_claim_token: crypto.randomUUID(),
+          cleanup_claimed_until: '2026-06-03T00:01:00.000Z',
+        });
+      });
+    });
+
+    it('rejects unsupported source types', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, source_type: 'git' as 'html' }),
+          'deployments_ephemeral_source_type_check'
+        );
+      });
+    });
+
+    it('rejects unsupported statuses', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, status: 'completed' as 'pending' }),
+          'deployments_ephemeral_status_check'
+        );
+      });
+    });
+
+    it('rejects duplicate internal worker names', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        const internal_worker_name = `qdpl-${crypto.randomUUID()}`;
+        await insertEphemeralDeployment({ owned_by_user_id: userId, internal_worker_name });
+
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, internal_worker_name }),
+          'UQ_deployments_ephemeral_internal_worker_name'
+        );
+      });
+    });
+
+    it('rejects duplicate non-null slugs while allowing multiple null slugs', async () => {
+      await withEphemeralTestUser(async ({ userId }) => {
+        await insertEphemeralDeployment({ owned_by_user_id: userId });
+        await insertEphemeralDeployment({ owned_by_user_id: userId });
+
+        const deployment_slug = `schema-${crypto.randomUUID()}`;
+        await insertEphemeralDeployment({ owned_by_user_id: userId, deployment_slug });
+
+        await expectEphemeralConstraintViolation(
+          insertEphemeralDeployment({ owned_by_user_id: userId, deployment_slug }),
+          'UQ_deployments_ephemeral_deployment_slug'
+        );
+      });
+    });
   });
 
   describe('Kilo Pass subscription provider IDs', () => {

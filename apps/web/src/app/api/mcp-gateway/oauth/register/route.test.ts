@@ -47,9 +47,9 @@ describe('POST /api/mcp-gateway/oauth/register', () => {
         token_endpoint_auth_method: 'none',
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
-      declaredScopes: ['profile'],
+      declaredScopes: ['mcp:access'],
     });
     const { POST } = await import('./route');
     const response = await POST(request({ token_endpoint_auth_method: 'none' }));
@@ -63,7 +63,7 @@ describe('POST /api/mcp-gateway/oauth/register', () => {
       token_endpoint_auth_method: 'none',
       grant_types: ['authorization_code', 'refresh_token'],
       response_types: ['code'],
-      scope: 'profile',
+      scope: 'mcp:access',
       registration_access_token: 'registration-token',
       registration_access_token_expires_at: '2026-06-04T20:00:00.000Z',
       registration_client_uri:
@@ -105,9 +105,9 @@ describe('POST /api/mcp-gateway/oauth/register', () => {
         token_endpoint_auth_method: tokenEndpointAuthMethod,
         grant_types: ['authorization_code'],
         response_types: ['code'],
-        scope: 'profile',
+        scope: 'mcp:access',
       },
-      declaredScopes: ['profile'],
+      declaredScopes: ['mcp:access'],
     });
     const { POST } = await import('./route');
     const response = await POST(request({ token_endpoint_auth_method: tokenEndpointAuthMethod }));

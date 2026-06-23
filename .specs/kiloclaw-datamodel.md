@@ -23,6 +23,7 @@ Draft -- created 2026-04-15.
 Updated 2026-05-12 -- required KiloClaw price-version lineage invariants.
 Updated 2026-05-27 -- required durable fresh-provision admission reservations.
 Updated 2026-05-28 -- fraud-enforcement subscription mutation invariants.
+Updated 2026-06-08 -- Commit retirement uses existing schema and canonical change history.
 
 ## Conventions
 
@@ -178,6 +179,19 @@ Canceled historical rows MUST retain their recorded
 seed legacy eligibility for later fresh subscription rows. Fresh rows
 after fully canceled history use the current price version defined by
 KiloClaw billing.
+
+### Commit Retirement State
+
+Commit retirement MUST use only existing subscription fields, source-specific evidence, and the existing subscription change log. It MUST NOT add a review table, retirement fields, a replacement subscription status, a new change-log action, an index, or a migration.
+
+1. `commit_ends_at` is the canonical final Commit boundary. It includes approved referral extensions and MUST NOT advance for another Commit renewal.
+2. `plan`, `scheduled_plan`, `scheduled_by`, and `cancel_at_period_end` describe current operational state. `scheduled_plan = 'standard'` with `scheduled_by = 'user'` is explicit Standard continuation. Provider schedule shape alone MUST NOT establish consent. Removing continuation MUST clear the scheduled Standard state and restore final-boundary cancellation.
+3. Qualification MUST be derived from the canonical authority for each source: the subscription change log entry for a pending Standard-to-Commit switch; the current billing period for a Commit term active at cutoff; the Stripe subscription creation timestamp for completed checkout; or the invoice or renewal boundary for payment recovery. Qualification timestamps and source labels MUST NOT be copied into subscription columns.
+4. Missing, conflicting, misaligned, or forbidden qualification, boundary, provider, schedule, or lineage evidence MUST fail closed. Runtime MUST prevent another Commit renewal, attempt provider non-renewal when possible, report non-sensitive context through logs and Sentry, and retry or recompute from canonical state. It MUST NOT persist a separate review lifecycle or wait for operator resolution.
+5. Runtime MUST NOT bulk-populate Commit behavior state at the cutoff, run a qualification backfill, or dual-write retirement classifications. Classification alone MUST NOT mutate plan, period, cancellation, or provider schedule state.
+6. Reprovision transfer MUST proceed only when canonical subscription and change-log history identify one current lineage and billing period and provider ownership remain consistent. Any ambiguity MUST abort transfer; runtime MUST NOT choose a successor heuristically or grant a fresh Commit term.
+7. Canceled and transferred-out predecessor rows retain their operational and change-log history but MUST NOT authorize or seed another Commit term.
+8. Every retirement-related subscription mutation MUST use an existing documented change-log action and record non-sensitive before/after state and reason. No retirement-specific action is permitted.
 
 ### Multi-Instance Support
 
@@ -394,6 +408,16 @@ not yet enforced in the current codebase:
    complete cross-service coverage remains the intended invariant.
 
 ## Changelog
+
+### 2026-06-08 -- Commit retirement without schema changes
+
+- Kept `commit_ends_at`, existing operational fields, and source-specific change-log evidence canonical.
+- Removed review-case persistence and operator-resolution requirements; anomalies now fail closed, force provider non-renewal when possible, report through logs/Sentry, and retry or recompute.
+- Required reprovision ambiguity to abort transfer.
+
+### 2026-06-05 -- Commit retirement state
+
+- Defined the field-free retirement model: `commit_ends_at` as final boundary, existing operational fields as current state, and source-specific qualification evidence.
 
 ### 2026-05-28 -- Fraud-enforcement subscription mutations
 

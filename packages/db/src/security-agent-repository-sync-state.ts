@@ -35,9 +35,9 @@ async function upsertSecurityAgentRepositorySyncState(
   };
   const set = {
     last_attempted_at: values.last_attempted_at,
-    last_succeeded_at: values.last_succeeded_at,
     last_failure_code: values.last_failure_code,
     updated_at: values.updated_at,
+    ...(input.succeededAt !== undefined ? { last_succeeded_at: values.last_succeeded_at } : {}),
   };
 
   if (input.owner.type === 'org') {

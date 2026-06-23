@@ -1,6 +1,13 @@
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { logToFile, runProcess } from './utils.js';
+import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
+import {
+  createSafeProcessDiagnostic,
+  isTimeoutTermination,
+  logToFile,
+  runProcess,
+} from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,17 +20,26 @@ export type RestoreResult =
       imported: true;
       diffs: { applied: number; skipped: number; total: number };
     }
-  | { ok: false; error: string; code: number | null; step: 'download' | 'import' | 'diffs' };
+  | {
+      ok: false;
+      error: string;
+      code: number | null;
+      step: 'download' | 'import' | 'diffs';
+      subtype?: WorkspaceFailureSubtype;
+      detail?: string;
+    };
 
 type SnapshotDiff = {
   file: string;
-  after: string;
+  after?: string;
+  patch?: string;
   status: string;
 };
 
 export type RestoreSessionOptions = {
   importTimeoutMs?: number;
   importTerminationGraceMs?: number;
+  signal?: AbortSignal;
 };
 
 const KILO_IMPORT_TIMEOUT_MS = 120_000;
@@ -41,9 +57,18 @@ function log(msg: string): void {
 function fail(
   error: string,
   code: number | null,
-  step: Extract<RestoreResult, { ok: false }>['step']
+  step: Extract<RestoreResult, { ok: false }>['step'],
+  subtype?: WorkspaceFailureSubtype,
+  detail?: string
 ): RestoreResult {
-  return { ok: false, error, code, step };
+  return {
+    ok: false,
+    error,
+    code,
+    step,
+    ...(subtype ? { subtype } : {}),
+    ...(detail ? { detail } : {}),
+  };
 }
 
 function tryUnlink(filePath: string): void {
@@ -89,7 +114,7 @@ function isStreamChunkResult(value: unknown): value is StreamChunkResult {
   return typeof value === 'object' && value !== null;
 }
 
-function createJsonCharReader(snapshotPath: string): JsonCharReader {
+function createJsonCharReader(snapshotPath: string, signal?: AbortSignal): JsonCharReader {
   const stream = fs.createReadStream(snapshotPath, { encoding: 'utf8' });
   const iterator = stream[Symbol.asyncIterator]();
   let buffer = '';
@@ -98,6 +123,7 @@ function createJsonCharReader(snapshotPath: string): JsonCharReader {
 
   return {
     async next(): Promise<string | null> {
+      signal?.throwIfAborted();
       if (unreadChar !== undefined) {
         const char = unreadChar;
         unreadChar = undefined;
@@ -288,8 +314,11 @@ async function validateInfoObject(reader: JsonCharReader): Promise<InfoObjectVal
   }
 }
 
-async function validateSnapshotInfoId(snapshotPath: string): Promise<SnapshotInfoValidationResult> {
-  const reader = createJsonCharReader(snapshotPath);
+async function validateSnapshotInfoId(
+  snapshotPath: string,
+  signal?: AbortSignal
+): Promise<SnapshotInfoValidationResult> {
+  const reader = createJsonCharReader(snapshotPath, signal);
   try {
     if ((await nextNonWhitespace(reader)) !== '{') return { validation: 'invalid' };
 
@@ -345,7 +374,7 @@ async function validateSnapshotInfoId(snapshotPath: string): Promise<SnapshotInf
 // ~half the memory of a V8 heap.
 // `objects` filters out non-object .summary values (e.g. compaction messages set summary=true)
 const JQ_EXTRACT_DIFFS_FILTER =
-  'reduce (.messages[]?.info.summary | objects | .diffs[]? // empty) as $d ({}; .[$d.file] = $d) | [.[]]';
+  'reduce (if ((.sessionDiff? // []) | length) > 0 then .sessionDiff[] else (.messages[]?.info.summary | objects | .diffs[]? // empty) end) as $d ({}; if (($d.file? | type) == "string") then .[$d.file] = $d else . end) | [.[]]';
 
 /**
  * Extract last-write-wins diffs from a snapshot file. Prefers a jq subprocess
@@ -354,30 +383,35 @@ const JQ_EXTRACT_DIFFS_FILTER =
  * the devcontainer flow: the user's image is only required to ship `node` +
  * `bun`, so `jq` may be missing.
  */
-export async function extractDiffs(snapshotPath: string): Promise<SnapshotDiff[] | null> {
+export async function extractDiffs(
+  snapshotPath: string,
+  signal?: AbortSignal
+): Promise<SnapshotDiff[] | null> {
+  signal?.throwIfAborted();
   try {
     const proc = Bun.spawn(['jq', '-c', JQ_EXTRACT_DIFFS_FILTER, snapshotPath], {
       stdout: 'pipe',
-      stderr: 'pipe',
+      stderr: 'ignore',
+      signal,
     });
     const exitCode = await proc.exited;
+    signal?.throwIfAborted();
     if (exitCode === 0) {
       const stdout = await new Response(proc.stdout).text();
       try {
         return JSON.parse(stdout) as SnapshotDiff[];
-      } catch (err) {
-        log(`jq output parse failed: ${err instanceof Error ? err.message : String(err)}`);
+      } catch {
+        log('jq_output_invalid');
         return null;
       }
     }
-    const stderr = await new Response(proc.stderr).text();
-    log(`jq failed exitCode=${exitCode} stderr=${stderr.trim()}; falling back to bun parser`);
-  } catch (err) {
-    // `Bun.spawn` rejects with ENOENT when jq isn't installed.
-    log(`jq not available (${err instanceof Error ? err.message : String(err)}); using bun parser`);
+    log(`jq_unavailable exitCode=${exitCode}`);
+  } catch {
+    signal?.throwIfAborted();
+    log('jq_unavailable');
   }
 
-  return extractDiffsWithBun(snapshotPath);
+  return extractDiffsWithBun(snapshotPath, signal);
 }
 
 /**
@@ -385,8 +419,12 @@ export async function extractDiffs(snapshotPath: string): Promise<SnapshotDiff[]
  * into the V8 heap and applies the same last-write-wins dedup the jq filter
  * does. Higher peak memory than jq but avoids a hard dependency.
  */
-async function extractDiffsWithBun(snapshotPath: string): Promise<SnapshotDiff[] | null> {
+async function extractDiffsWithBun(
+  snapshotPath: string,
+  signal?: AbortSignal
+): Promise<SnapshotDiff[] | null> {
   type SnapshotShape = {
+    sessionDiff?: SnapshotDiff[];
     messages?: Array<{
       info?: {
         summary?: { diffs?: SnapshotDiff[] };
@@ -395,12 +433,21 @@ async function extractDiffsWithBun(snapshotPath: string): Promise<SnapshotDiff[]
   };
   let parsed: SnapshotShape;
   try {
+    signal?.throwIfAborted();
     parsed = (await Bun.file(snapshotPath).json()) as SnapshotShape;
-  } catch (err) {
-    log(`bun snapshot parse failed: ${err instanceof Error ? err.message : String(err)}`);
+    signal?.throwIfAborted();
+  } catch {
+    signal?.throwIfAborted();
+    log('snapshot_parse_failed');
     return null;
   }
   const dedup = new Map<string, SnapshotDiff>();
+  if (Array.isArray(parsed.sessionDiff) && parsed.sessionDiff.length > 0) {
+    for (const diff of parsed.sessionDiff) {
+      if (diff && typeof diff.file === 'string') dedup.set(diff.file, diff);
+    }
+    return Array.from(dedup.values());
+  }
   for (const message of parsed.messages ?? []) {
     const summary = message?.info?.summary;
     if (!summary || typeof summary !== 'object') continue;
@@ -409,6 +456,33 @@ async function extractDiffsWithBun(snapshotPath: string): Promise<SnapshotDiff[]
     }
   }
   return Array.from(dedup.values());
+}
+
+async function applyPatch(
+  workspacePath: string,
+  diff: SnapshotDiff,
+  signal?: AbortSignal
+): Promise<boolean> {
+  if (!diff.patch) return false;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-session-diff-'));
+  const file = path.join(dir, 'change.patch');
+  try {
+    signal?.throwIfAborted();
+    fs.writeFileSync(file, diff.patch);
+    const proc = Bun.spawn(['git', 'apply', '--3way', '--whitespace=nowarn', file], {
+      cwd: workspacePath,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      signal,
+    });
+    const exitCode = await proc.exited;
+    signal?.throwIfAborted();
+    if (exitCode === 0) return true;
+    log(`git apply failed file=${diff.file} exitCode=${exitCode}`);
+    return false;
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -434,9 +508,8 @@ export async function restoreSession(
     let token: string | undefined;
     try {
       token = resolveKilocodeToken();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return fail(`failed to read KILOCODE_TOKEN_FILE: ${message}`, null, 'download');
+    } catch {
+      return fail('failed to read KILOCODE_TOKEN_FILE', null, 'download');
     }
 
     if (!ingestUrl || !token) {
@@ -452,9 +525,13 @@ export async function restoreSession(
     log('downloading snapshot');
     try {
       const url = `${ingestUrl}/api/session/${encodeURIComponent(kiloSessionId)}/export`;
+      const downloadTimeoutSignal = AbortSignal.timeout(300_000);
+      const downloadSignal = options.signal
+        ? AbortSignal.any([options.signal, downloadTimeoutSignal])
+        : downloadTimeoutSignal;
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(300_000),
+        signal: downloadSignal,
       });
 
       if (!res.ok) {
@@ -474,7 +551,7 @@ export async function restoreSession(
       // kilo with a cryptic `undefined is not an object (evaluating 'info2.id')`
       // and exit 1. Stream only the top-level metadata guardrail instead of
       // materializing the full export in the wrapper heap.
-      const snapshotInfoValidation = await validateSnapshotInfoId(tmpPath);
+      const snapshotInfoValidation = await validateSnapshotInfoId(tmpPath, options.signal);
       log(
         `snapshot metadata validated status=${snapshotInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${snapshotInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${snapshotInfoValidation.infoId === kiloSessionId} bytes=${bytesWritten}`
       );
@@ -490,22 +567,20 @@ export async function restoreSession(
           'download'
         );
       }
-    } catch (err) {
+    } catch {
       tryUnlink(tmpPath);
-      const message = err instanceof Error ? err.message : String(err);
-      return fail(message, null, 'download');
+      return fail('snapshot download failed', null, 'download');
     }
   } else {
     log(`using provided file=${filePath}`);
     try {
-      const providedInfoValidation = await validateSnapshotInfoId(tmpPath);
+      const providedInfoValidation = await validateSnapshotInfoId(tmpPath, options.signal);
       log(
         `provided snapshot metadata inspected status=${providedInfoValidation.validation} expectedKiloSessionId=${kiloSessionId} snapshotInfoId=${providedInfoValidation.infoId ?? '(missing)'} idMatchesExpected=${providedInfoValidation.infoId === kiloSessionId}`
       );
-    } catch (err) {
-      log(
-        `provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId} error=${err instanceof Error ? err.message : String(err)}`
-      );
+    } catch {
+      options.signal?.throwIfAborted();
+      log(`provided snapshot metadata inspection failed expectedKiloSessionId=${kiloSessionId}`);
     }
   }
 
@@ -518,22 +593,35 @@ export async function restoreSession(
     const importResult = await runProcess('kilo', ['import', tmpPath], {
       cwd: workspacePath,
       timeoutMs: importTimeoutMs,
+      signal: options.signal,
       terminationGraceMs: options.importTerminationGraceMs,
     });
     const importElapsedMs = Date.now() - importStartedAt;
 
-    if (importResult.terminationReason === 'timeout') {
+    if (isTimeoutTermination(importResult)) {
       log(
         `kilo import finished outcome=timeout kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs} timeoutMs=${importTimeoutMs}`
       );
-      return fail(`kilo import timed out after ${importTimeoutMs}ms`, null, 'import');
+      return fail(
+        `kilo import timed out after ${importTimeoutMs}ms`,
+        null,
+        'import',
+        'kilo_import_timeout',
+        createSafeProcessDiagnostic(importResult)
+      );
     }
 
     if (importResult.exitCode !== 0) {
       log(
         `kilo import finished outcome=error exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
       );
-      return fail(`kilo import failed exitCode=${importResult.exitCode}`, null, 'import');
+      return fail(
+        `kilo import failed exitCode=${importResult.exitCode}`,
+        null,
+        'import',
+        'kilo_import_failed',
+        createSafeProcessDiagnostic(importResult)
+      );
     }
     log(
       `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
@@ -542,7 +630,7 @@ export async function restoreSession(
     // ---- Step 3: Apply diffs ----
     // Extract diffs in a subprocess so the full snapshot JSON is never loaded
     // into this process's heap — only the small diff array crosses the boundary.
-    const uniqueDiffs = await extractDiffs(tmpPath);
+    const uniqueDiffs = await extractDiffs(tmpPath, options.signal);
     if (uniqueDiffs === null) {
       return fail('failed to parse snapshot JSON', null, 'diffs');
     }
@@ -565,6 +653,16 @@ export async function restoreSession(
     let skipped = 0;
 
     for (const diff of uniqueDiffs) {
+      options.signal?.throwIfAborted();
+      if (diff.patch) {
+        if (await applyPatch(workspacePath, diff, options.signal)) {
+          applied++;
+        } else {
+          skipped++;
+        }
+        continue;
+      }
+
       const fp = path.resolve(resolvedWorkspace, diff.file);
 
       if (!fp.startsWith(resolvedWorkspace + '/')) {

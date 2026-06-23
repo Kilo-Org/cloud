@@ -1,9 +1,40 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  markSecurityAgentCommandRetriesExhausted,
+  transitionSecurityAgentCommandWithCurrentState,
+} from '@kilocode/db';
+import type * as DbModule from '@kilocode/db';
+import { getWorkerDb } from '@kilocode/db/client';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
-import { ensureManualAnalysisQueueRow } from './db/queries.js';
+import { ensureManualAnalysisQueueRow, prepareActiveAnalysisRestart } from './db/queries.js';
+import type * as QueriesModule from './db/queries.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
-import { processManualAnalysisStart, type ManualAnalysisStartCommand } from './manual-analysis.js';
+import {
+  consumeManualAnalysisBatch,
+  processManualAnalysisStart,
+  type ManualAnalysisStartCommand,
+} from './manual-analysis.js';
 
+vi.mock('@kilocode/db', async importOriginal => {
+  const {
+    isTerminalSecurityAgentCommandTransitionOutcome,
+    requireSecurityAgentCommandTransitionOrTerminal,
+  } = await importOriginal<typeof DbModule>();
+  return {
+    isTerminalSecurityAgentCommandTransitionOutcome,
+    markSecurityAgentCommandRetriesExhausted: vi.fn(),
+    requireSecurityAgentCommandTransitionOrTerminal,
+    transitionSecurityAgentCommandWithCurrentState: vi.fn(),
+  };
+});
+vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
+vi.mock('./db/queries.js', async importOriginal => {
+  const actual = await importOriginal<typeof QueriesModule>();
+  return {
+    ...actual,
+    prepareActiveAnalysisRestart: vi.fn(),
+  };
+});
 vi.mock('./analysis-start-lifecycle.js', () => ({
   transitionAnalysisStartLifecycle: vi.fn(),
 }));
@@ -32,8 +63,18 @@ const finding = {
 
 beforeEach(() => {
   vi.mocked(startSecurityAnalysis).mockReset();
+  vi.mocked(prepareActiveAnalysisRestart).mockReset();
   vi.mocked(transitionAnalysisStartLifecycle).mockReset();
   vi.mocked(transitionAnalysisStartLifecycle).mockResolvedValue({ transitioned: true });
+  vi.mocked(getWorkerDb).mockReturnValue({} as never);
+  vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValue({
+    transitioned: true,
+    command: {},
+  } as never);
+  vi.mocked(markSecurityAgentCommandRetriesExhausted).mockResolvedValue({
+    transitioned: true,
+    command: {},
+  } as never);
 });
 
 describe('processManualAnalysisStart', () => {
@@ -248,6 +289,7 @@ describe('processManualAnalysisStart', () => {
         command: {
           ...command,
           requestedModels: { triageModel: 'request/triage', analysisModel: 'request/analysis' },
+          forceSandbox: true,
           retrySandboxOnly: true,
         },
       })
@@ -260,6 +302,7 @@ describe('processManualAnalysisStart', () => {
         analysisModel: 'request/analysis',
         analysisMode: 'deep',
         callbackTokenSecret: 'callback-token-secret',
+        forceSandbox: true,
         retrySandboxOnly: true,
         lifecycleClaim: expect.objectContaining({
           source: 'manual',
@@ -278,6 +321,209 @@ describe('processManualAnalysisStart', () => {
       },
     });
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('restarts an active run without owner capacity and keeps interruption best-effort', async () => {
+    let selectCount = 0;
+    const auditRows: unknown[] = [];
+    const db = {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return {
+            from: () => ({
+              where: () => ({
+                limit: async () => [
+                  {
+                    ...finding,
+                    status: 'open',
+                    analysis_status: 'running',
+                    session_id: 'agent-old-session',
+                  },
+                ],
+              }),
+            }),
+          };
+        }
+        if (selectCount === 2) {
+          return {
+            from: () => ({
+              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => ({
+              limit: async () => [
+                {
+                  config: {
+                    analysis_mode: 'shallow',
+                    triage_model_slug: 'config/triage',
+                    analysis_model_slug: 'config/analysis',
+                  },
+                },
+              ],
+            }),
+          }),
+        };
+      },
+      insert: () => ({
+        values: async (values: unknown) => {
+          auditRows.push(values);
+        },
+      }),
+    };
+    const cloudAgentFetch = vi.fn().mockRejectedValue(new Error('interrupt unavailable'));
+    vi.mocked(prepareActiveAnalysisRestart).mockResolvedValue({
+      status: 'ready',
+      claimToken: `manual-restart:${command.commandId}`,
+      oldCloudAgentSessionId: 'agent-old-session',
+    });
+    vi.mocked(startSecurityAnalysis).mockResolvedValue({ started: true, triageOnly: false });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({
+              success: true,
+              token: 'github-token',
+              installationId: 'installation-123',
+              accountLogin: 'kilo',
+              appType: 'standard',
+            }),
+          },
+          NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+          INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+          CLOUD_AGENT_NEXT: { fetch: cloudAgentFetch },
+          ENVIRONMENT: 'development',
+        } as unknown as CloudflareEnv,
+        command: { ...command, restartActive: true },
+      })
+    ).resolves.toEqual({ status: 'started', resultCode: 'ANALYSIS_RESTART_STARTED' });
+
+    expect(selectCount).toBe(3);
+    expect(prepareActiveAnalysisRestart).toHaveBeenCalledWith(db, {
+      findingId: command.findingId,
+      owner: { type: 'org', id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      commandId: command.commandId,
+    });
+    expect(cloudAgentFetch).toHaveBeenCalledTimes(1);
+    const interruptRequest = cloudAgentFetch.mock.calls[0]?.[0];
+    expect(interruptRequest).toBeInstanceOf(Request);
+    if (!(interruptRequest instanceof Request)) throw new Error('Expected interrupt request');
+    await expect(interruptRequest.json()).resolves.toEqual({ sessionId: 'agent-old-session' });
+    expect(startSecurityAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({
+        forceSandbox: true,
+        retrySandboxOnly: true,
+        lifecycleClaim: {
+          source: 'manual',
+          findingId: command.findingId,
+          claimToken: `manual-restart:${command.commandId}`,
+        },
+      })
+    );
+    expect(auditRows[0]).toMatchObject({
+      metadata: {
+        restartActive: true,
+        triageOnly: false,
+      },
+    });
+  });
+
+  it('leaves active run untouched when restart prerequisites fail', async () => {
+    let selectCount = 0;
+    const db = {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
+        }
+        if (selectCount === 2) {
+          return {
+            from: () => ({
+              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => ({ limit: async () => [{ config: { analysis_mode: 'auto' } }] }),
+          }),
+        };
+      },
+    };
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({ success: false, reason: 'no_installation_found' }),
+          },
+          NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+          INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+        } as unknown as CloudflareEnv,
+        command: { ...command, restartActive: true },
+      })
+    ).resolves.toEqual({ status: 'token-missing' });
+
+    expect(prepareActiveAnalysisRestart).not.toHaveBeenCalled();
+    expect(startSecurityAnalysis).not.toHaveBeenCalled();
+  });
+
+  it('safely no-ops active restart after callback or redelivery wins', async () => {
+    let selectCount = 0;
+    const db = {
+      select: () => {
+        selectCount += 1;
+        if (selectCount === 1) {
+          return { from: () => ({ where: () => ({ limit: async () => [finding] }) }) };
+        }
+        if (selectCount === 2) {
+          return {
+            from: () => ({
+              where: () => ({ limit: async () => [{ id: 'user-123', api_token_pepper: null }] }),
+            }),
+          };
+        }
+        return {
+          from: () => ({
+            where: () => ({ limit: async () => [{ config: { analysis_mode: 'auto' } }] }),
+          }),
+        };
+      },
+    };
+    vi.mocked(prepareActiveAnalysisRestart).mockResolvedValue({ status: 'launch-started' });
+
+    await expect(
+      processManualAnalysisStart({
+        db: db as never,
+        env: {
+          GIT_TOKEN_SERVICE: {
+            getTokenForRepo: async () => ({
+              success: true,
+              token: 'github-token',
+              installationId: 'installation-123',
+              accountLogin: 'kilo',
+              appType: 'standard',
+            }),
+          },
+          NEXTAUTH_SECRET: { get: async () => 'next-auth-secret' },
+          INTERNAL_API_SECRET: { get: async () => 'internal-secret' },
+          CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
+          ENVIRONMENT: 'development',
+        } as unknown as CloudflareEnv,
+        command: { ...command, restartActive: true },
+      })
+    ).resolves.toEqual({ status: 'duplicate' });
+
+    expect(startSecurityAnalysis).not.toHaveBeenCalled();
   });
 
   it('settles post-lease manual start failures through the lifecycle transition', async () => {
@@ -433,6 +679,117 @@ describe('processManualAnalysisStart', () => {
         },
       })
     );
+  });
+});
+
+describe('consumeManualAnalysisBatch', () => {
+  function queueMessage(attempts = 1) {
+    return { body: command, attempts, ack: vi.fn(), retry: vi.fn() };
+  }
+
+  it('persists running and terminal state before acknowledging', async () => {
+    const message = queueMessage();
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: async () => [
+              { ...finding, owned_by_organization_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd' },
+            ],
+          }),
+        }),
+      }),
+    };
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    await consumeManualAnalysisBatch(
+      { messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+      } as CloudflareEnv
+    );
+
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
+      1,
+      db,
+      expect.objectContaining({ status: 'running' })
+    );
+    expect(transitionSecurityAgentCommandWithCurrentState).toHaveBeenNthCalledWith(
+      2,
+      db,
+      expect.objectContaining({ status: 'failed', resultCode: 'FINDING_UNAVAILABLE' })
+    );
+    expect(
+      vi.mocked(transitionSecurityAgentCommandWithCurrentState).mock.invocationCallOrder[1]
+    ).toBeLessThan(message.ack.mock.invocationCallOrder[0] ?? Infinity);
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('acknowledges terminal duplicate delivery without performing work', async () => {
+    const message = queueMessage();
+    const select = vi.fn(() => {
+      throw new Error('work must not run');
+    });
+    vi.mocked(getWorkerDb).mockReturnValue({ select } as never);
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: { status: 'succeeded', result_code: 'ANALYSIS_LAUNCH_STARTED' },
+    } as never);
+
+    await consumeManualAnalysisBatch(
+      { messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+      } as CloudflareEnv
+    );
+
+    expect(select).not.toHaveBeenCalled();
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(message.retry).not.toHaveBeenCalled();
+  });
+
+  it('retries without work when running transition is rejected without terminal state', async () => {
+    const message = queueMessage();
+    const select = vi.fn();
+    vi.mocked(getWorkerDb).mockReturnValue({ select } as never);
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: null,
+    });
+
+    await consumeManualAnalysisBatch(
+      { messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+      } as CloudflareEnv
+    );
+
+    expect(select).not.toHaveBeenCalled();
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(message.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('records exhausted retries before retrying final delivery to the DLQ', async () => {
+    const message = queueMessage(4);
+    vi.mocked(transitionSecurityAgentCommandWithCurrentState).mockResolvedValueOnce({
+      transitioned: false,
+      command: null,
+    });
+
+    await consumeManualAnalysisBatch(
+      { messages: [message] } as never,
+      {
+        HYPERDRIVE: { connectionString: 'postgres://worker' },
+      } as CloudflareEnv
+    );
+
+    expect(markSecurityAgentCommandRetriesExhausted).toHaveBeenCalledWith({}, command.commandId);
+    expect(
+      vi.mocked(markSecurityAgentCommandRetriesExhausted).mock.invocationCallOrder[0]
+    ).toBeLessThan(message.retry.mock.invocationCallOrder[0] ?? Infinity);
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(message.retry).toHaveBeenCalledTimes(1);
   });
 });
 

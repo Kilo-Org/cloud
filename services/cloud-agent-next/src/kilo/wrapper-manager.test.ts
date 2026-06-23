@@ -16,9 +16,9 @@ const { mockTimeoutWithFields, mockWarn, mockLogger } = vi.hoisted(() => {
 
 vi.mock('../logger.js', () => ({ logger: mockLogger }));
 
-import { FAST_SANDBOX_COMMAND_TIMEOUT_MS } from '../sandbox-timeout-logging.js';
 import {
   discoverSessionWrappers,
+  WRAPPER_DISCOVERY_TIMEOUT_MS,
   extractPublishedWrapperPort,
   findWrapperContainerForSession,
   isWrapperLiveInProcessesOrContainers,
@@ -177,17 +177,17 @@ describe('discoverSessionWrappers', () => {
       return result;
     });
 
-    await vi.advanceTimersByTimeAsync(FAST_SANDBOX_COMMAND_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(WRAPPER_DISCOVERY_TIMEOUT_MS);
 
     expect(settled).toBe(true);
     await expect(observedResult).resolves.toEqual({
       status: 'inspection-failed',
-      error: `Wrapper process discovery timed out after ${FAST_SANDBOX_COMMAND_TIMEOUT_MS}ms`,
+      error: `Wrapper process discovery timed out after ${WRAPPER_DISCOVERY_TIMEOUT_MS}ms`,
     });
     expect(mockLogger.withTags).toHaveBeenCalledWith({ logTag: 'sandbox-operation-timeout' });
     expect(mockTimeoutWithFields).toHaveBeenCalledWith({
       operation: 'wrapper.discovery.listProcesses',
-      timeoutMs: FAST_SANDBOX_COMMAND_TIMEOUT_MS,
+      timeoutMs: WRAPPER_DISCOVERY_TIMEOUT_MS,
       timeoutLayer: 'outer',
     });
     expect(mockWarn).toHaveBeenCalledOnce();

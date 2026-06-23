@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationPlan, OrganizationRole } from '@/lib/organizations/organization-types';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -45,18 +45,16 @@ const ROLE_LABELS = {
 } as const;
 
 // Business rules for inviting members:
-// - Owners can invite anyone (owner, admin, member)
-// - Admins can only invite admin or member (not owner)
-// - Members cannot invite anyone (handled at component level)
+// - Owners and Kilo admins can invite anyone
+// - Billing managers can invite members only
+// - Members cannot invite anyone
 const getAvailableInviteRoles = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean
 ): OrganizationRole[] => {
-  // Kilo admin can invite anyone
-  if (isKiloAdmin || currentUserRole === 'owner' || currentUserRole === 'billing_manager')
-    return ['owner', 'member', 'billing_manager'];
+  if (isKiloAdmin || currentUserRole === 'owner') return ['owner', 'member', 'billing_manager'];
+  if (currentUserRole === 'billing_manager') return ['member'];
 
-  // Members cannot invite anyone
   return [];
 };
 
@@ -67,6 +65,22 @@ type InviteMemberDialogProps = {
   onMemberInvited: () => void;
   blockClose?: boolean; // If true, prevents closing the dialog (hides close button and disables cancel)
 };
+
+type InviteSeatCapacity = {
+  plan: OrganizationPlan | undefined;
+  requireSeats: boolean | undefined;
+  usedSeats: number;
+  totalSeats: number;
+};
+
+export function hasInviteSeatCapacity({
+  plan,
+  requireSeats,
+  usedSeats,
+  totalSeats,
+}: InviteSeatCapacity): boolean {
+  return requireSeats === false || plan === 'enterprise' || totalSeats - usedSeats > 0;
+}
 
 export function InviteMemberDialog({
   open,
@@ -88,19 +102,23 @@ export function InviteMemberDialog({
   const availableRoles = useMemo(() => {
     return getAvailableInviteRoles(currentUserRole, isKiloAdmin);
   }, [currentUserRole, isKiloAdmin]);
+  const canInviteMembers = availableRoles.length > 0;
 
   const isEmailValid = useMemo(() => {
     if (!email.trim()) return false;
     return emailSchema.safeParse(email.trim()).success;
   }, [email]);
 
-  const emailDomainMatchesSSODomain = useMemo(() => {
-    if (!email.trim() || !organizationData?.sso_domain) return false;
+  const emailDomainMatchesDirectSSODomain = useMemo(() => {
+    const policy = organizationData?.effectiveSsoPolicy;
+    if (!email.trim() || !policy?.required || policy.source !== 'self' || !policy.domain) {
+      return false;
+    }
     const emailDomain = getLowerDomainFromEmail(email.trim());
-    return emailDomain === organizationData.sso_domain.toLowerCase();
-  }, [email, organizationData?.sso_domain]);
+    return emailDomain === policy.domain;
+  }, [email, organizationData?.effectiveSsoPolicy]);
 
-  const ssoErrorText = `Members of your enterprise domain (@${organizationData?.sso_domain}) should sign in to Kilo Code via your SSO IdP to be automatically added to this organization.`;
+  const ssoErrorText = `Members of your enterprise domain (@${organizationData?.effectiveSsoPolicy.domain}) should sign in through your SSO provider to join this organization.`;
 
   const shouldShowEmailError = useMemo(() => {
     return email.trim() && !isEmailFocused && !isEmailValid;
@@ -111,15 +129,23 @@ export function InviteMemberDialog({
   // Calculate remaining seats
   const usedSeats = seatUsage?.usedSeats || 0;
   const totalSeats = seatUsage?.totalSeats || 0;
-  const remainingSeats = totalSeats - usedSeats;
   const isOrgEnterprise = organizationData?.plan === 'enterprise';
-  // Enterprise orgs have no seat-based invitation restrictions.
-  // For Teams orgs, seat capacity only gates seat-consuming roles (not billing_manager).
-  const seatCapacityAvailable = isOrgEnterprise || remainingSeats > 0;
+  // Seat capacity only gates seat-consuming roles when seat requirements apply.
+  const seatCapacityAvailable = hasInviteSeatCapacity({
+    plan: organizationData?.plan,
+    requireSeats: organizationData?.require_seats,
+    usedSeats,
+    totalSeats,
+  });
   const isSeatConsumingRole = role !== 'billing_manager';
   const hasSeatsAvailable = seatCapacityAvailable || !isSeatConsumingRole;
 
   const handleInviteMember = () => {
+    if (!canInviteMembers) {
+      toast.error('Only organization owners and billing managers can invite members');
+      return;
+    }
+
     if (!email.trim()) {
       toast.error('Please enter an email address');
       return;
@@ -130,7 +156,7 @@ export function InviteMemberDialog({
       return;
     }
 
-    if (emailDomainMatchesSSODomain) {
+    if (emailDomainMatchesDirectSSODomain) {
       toast.error(ssoErrorText);
       return;
     }
@@ -205,7 +231,7 @@ export function InviteMemberDialog({
                       }
                     }}
                     className={
-                      shouldShowEmailError || emailDomainMatchesSSODomain
+                      shouldShowEmailError || emailDomainMatchesDirectSSODomain
                         ? 'border-red-500 focus:border-red-500'
                         : ''
                     }
@@ -255,7 +281,7 @@ export function InviteMemberDialog({
               </div>
             </div>
 
-            {(shouldShowEmailError || emailDomainMatchesSSODomain) && (
+            {(shouldShowEmailError || emailDomainMatchesDirectSSODomain) && (
               <div className="rounded-md border border-red-800 bg-red-950/30 p-3">
                 <div className="flex items-center gap-2">
                   <svg
@@ -271,7 +297,7 @@ export function InviteMemberDialog({
                   </svg>
                   <p className="text-sm text-red-300" role="alert">
                     {shouldShowEmailError && 'Please enter a valid email address'}
-                    {emailDomainMatchesSSODomain && ssoErrorText}
+                    {emailDomainMatchesDirectSSODomain && ssoErrorText}
                   </p>
                 </div>
               </div>
@@ -280,8 +306,9 @@ export function InviteMemberDialog({
             {!seatCapacityAvailable && !isOrgEnterprise && (
               <div className="rounded-md border border-amber-800 bg-amber-950/30 p-3">
                 <p className="text-sm text-amber-300">
-                  All seats are in use ({usedSeats}/{totalSeats}). You can still invite billing
-                  managers, who don&apos;t consume a seat.
+                  {availableRoles.includes('billing_manager')
+                    ? `All seats are in use (${usedSeats}/${totalSeats}). You can still invite billing managers, who don't consume a seat.`
+                    : `All seats are in use (${usedSeats}/${totalSeats}). Ask an organization owner to add seats before inviting more members.`}
                 </p>
               </div>
             )}
@@ -318,8 +345,9 @@ export function InviteMemberDialog({
               onClick={handleInviteMember}
               disabled={
                 !isEmailValid ||
-                emailDomainMatchesSSODomain ||
+                emailDomainMatchesDirectSSODomain ||
                 inviteMemberMutation.isPending ||
+                !canInviteMembers ||
                 !hasSeatsAvailable
               }
             >

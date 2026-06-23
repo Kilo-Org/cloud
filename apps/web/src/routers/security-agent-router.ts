@@ -21,6 +21,9 @@ const handlers = createSecurityAgentHandlers({
 });
 
 export const securityAgentRouter = createTRPCRouter({
+  trackUiInteraction: baseProcedure
+    .input(handlers.trackUiInteraction.inputSchema)
+    .mutation(handlers.trackUiInteraction.handler),
   getPermissionStatus: baseProcedure.query(handlers.getPermissionStatus),
   getConfig: baseProcedure.query(handlers.getConfig),
   saveConfig: baseProcedure
@@ -52,6 +55,15 @@ export const securityAgentRouter = createTRPCRouter({
   startAnalysis: baseProcedure
     .input(handlers.startAnalysis.inputSchema)
     .mutation(handlers.startAnalysis.handler),
+  startRemediation: baseProcedure
+    .input(handlers.startRemediation.inputSchema)
+    .mutation(handlers.startRemediation.handler),
+  retryRemediation: baseProcedure
+    .input(handlers.retryRemediation.inputSchema)
+    .mutation(handlers.retryRemediation.handler),
+  cancelRemediation: baseProcedure
+    .input(handlers.cancelRemediation.inputSchema)
+    .mutation(handlers.cancelRemediation.handler),
   getAnalysis: baseProcedure
     .input(handlers.getAnalysis.inputSchema)
     .query(handlers.getAnalysis.handler),
@@ -65,4 +77,7 @@ export const securityAgentRouter = createTRPCRouter({
     .mutation(handlers.deleteFindingsByRepository.handler),
   getAutoDismissEligible: baseProcedure.query(handlers.getAutoDismissEligible),
   autoDismissEligible: baseProcedure.mutation(handlers.autoDismissEligible),
+  getAuditReport: baseProcedure
+    .input(handlers.getAuditReport.inputSchema)
+    .query(handlers.getAuditReport.handler),
 });

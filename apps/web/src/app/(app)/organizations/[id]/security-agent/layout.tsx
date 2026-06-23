@@ -1,11 +1,10 @@
-import { PageContainer } from '@/components/layouts/PageContainer';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { SecurityAgentLayout } from '@/components/security-agent/SecurityAgentLayout';
 import { SecurityAgentProvider } from '@/components/security-agent/SecurityAgentContext';
 
 export const metadata = {
   title: 'Security Agent | Kilo Code',
-  description: 'Monitor and manage Dependabot security alerts',
+  description: 'Monitor and manage Security Findings synced from Dependabot',
 };
 
 type LayoutProps = {
@@ -17,12 +16,11 @@ export default async function OrgSecurityAgentLayout({ params, children }: Layou
   return (
     <OrganizationByPageLayout
       params={params}
+      fullBleed
       render={({ organization }) => (
-        <PageContainer>
-          <SecurityAgentProvider organizationId={organization.id}>
-            <SecurityAgentLayout>{children}</SecurityAgentLayout>
-          </SecurityAgentProvider>
-        </PageContainer>
+        <SecurityAgentProvider organizationId={organization.id}>
+          <SecurityAgentLayout>{children}</SecurityAgentLayout>
+        </SecurityAgentProvider>
       )}
     />
   );

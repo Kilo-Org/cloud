@@ -64,6 +64,7 @@ describe('escapeSqlLike', () => {
     expect(escapeSqlLike('100%')).toBe('100\\%');
     expect(escapeSqlLike('a_b')).toBe('a\\_b');
     expect(escapeSqlLike("o'_malley%")).toBe("o''\\_malley\\%");
+    expect(escapeSqlLike('%_%')).toBe('\\%\\_\\%');
   });
 
   it('passes plain text through unchanged', () => {

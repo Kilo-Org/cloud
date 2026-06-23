@@ -16,9 +16,11 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 ## App (apps/web)
 
+Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-global-app` Vercel deployments, and 1Password storage for sensitive Production values. See `DEVELOPMENT.md` for the full workflow.
+
 ### Configuration & Constant URLs
 
-- `APP_URL_OVERRIDE` - Override for the base application URL; used in `apps/web/src/lib/constants.ts` and `next.config.mjs`. [SERVER]
+- `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `apps/web/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
 - `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for KiloClaw instances; used in `apps/web/src/lib/config.server.ts`. [SERVER]
 - `NEXTAUTH_URL` - Base URL for NextAuth.js; used across many auth-related files. [SERVER]
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption; used across many auth-related files. `[SECRET]`
@@ -28,6 +30,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 - `JEST_SILENT` - When `false`, shows verbose Jest output; read in `apps/web/jest.config.ts` and `apps/web/.env.test`. [SERVER]
 - `JEST_WORKER_ID` - Set by Jest to identify the current worker thread; used by db connection pooling and libraries to handle worker-specific state. [SERVER]
 - `IS_SCRIPT` - Set to `'true'` by `apps/web/src/scripts/index.ts` to indicate a script-mode run (bypasses web server logic). Used by Drizzle in `packages/db/src/database-url.ts`. [SERVER]
+- `SECURITY_AGENT_AUDIT_RELIABLE_COVERAGE_START` - Earliest ISO timestamp from which Security Agent Audit Report event coverage is reliable. [SERVER]
 
 ### Analytics & Monitoring
 
@@ -36,7 +39,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 - `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
-- `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for client-side error reporting; used in `apps/web/instrumentation-client.ts`, `sentry.edge.config.ts`, `sentry.server.config.ts`. `[PUBLIC]`
+- `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for server and Edge runtime error reporting; used in `apps/web/sentry.edge.config.ts` and `apps/web/sentry.server.config.ts`. `[PUBLIC]`
 
 ### Marketing Tags
 
@@ -46,6 +49,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 ### Vercel & Build Info
 
 - `VERCEL_ENV` - Vercel environment (`development`, `preview`, `production`); used in `apps/web/next.config.mjs`, `apps/web/src/lib/constants.ts`, and `apps/web/.env.test`. [SERVER]
+- `VERCEL_TARGET_ENV` - Vercel system or custom deployment environment (`development`, `preview`, `production`, `staging`, etc.); used in `apps/web/src/app/layout.tsx` to identify staging UI. [SERVER]
 - `VERCEL_URL` - Auto-injected by Vercel; current deployment URL. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `VERCEL_GIT_COMMIT_SHA` - Auto-injected by Vercel; Git commit SHA of the current deployment. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `NEXT_PUBLIC_VERCEL_URL` - Client-exposed Vercel deployment URL from build info. [PUBLIC]
@@ -188,9 +192,10 @@ This document lists all environment variables used in the Kilo Code cloud monore
 - `APP_BUILDER_URL` - URL for the App Builder worker. [SERVER]
 - `APP_BUILDER_AUTH_TOKEN` - Auth token for the App Builder worker. `[SECRET]`
 - `KILOCLAW_API_URL` - Base URL for KiloClaw API; used heavily by `apps/web/src/routers/kiloclaw-router.ts` and tests. [SERVER]
-- `USER_DEPLOYMENTS_API_BASE_URL` - Base URL for user deployments dispatcher. [SERVER]
-- `USER_DEPLOYMENTS_API_AUTH_KEY` - Auth key for user deployments API. `[SECRET]`
+- `USER_DEPLOYMENTS_API_BASE_URL` - Base URL for the user deployments builder. [SERVER]
+- `USER_DEPLOYMENTS_API_AUTH_KEY` - Auth key for the user deployments builder. `[SECRET]`
 - `USER_DEPLOYMENTS_DISPATCHER_URL` - URL for the deployments dispatcher (local dev). [SERVER]
+- `USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY` - Auth key for the deployments dispatcher. `[SECRET]`
 - `USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY` - Public key for encrypting user deployment env vars. [SERVER]
 - `USER_DEPLOYMENTS_ENV_VARS_PRIVATE_KEY` - Private key counterpart for decrypting user deployment env vars. `[SECRET]`
 - `CLOUD_AGENT_API_URL` - URL for Cloud Agent Next API; used by App Builder chat and other clients. [SERVER]
@@ -232,9 +237,12 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 ### Email & Notifications
 
-- `MAILGUN_API_KEY` - Mailgun API key for transactional email. `[SECRET]`
-- `MAILGUN_DOMAIN` - Mailgun sending domain. [SERVER]
-- `NEVERBOUNCE_API_KEY` - NeverBounce API key for email verification. `[SECRET]`
+- `MAILGUN_API_KEY` - Mailgun API key for transactional email. Used only when `VERCEL_TARGET_ENV` is `production` or `staging`. `[SECRET]`
+- `MAILGUN_DOMAIN` - Mailgun sending domain. Used only when `VERCEL_TARGET_ENV` is `production` or `staging`. [SERVER]
+- `NEVERBOUNCE_API_KEY` - NeverBounce API key for email verification. In staging, only the effective internal sink is verified. `[SECRET]`
+- `STAGING_EMAIL_REDIRECT_TO` - Required when `VERCEL_TARGET_ENV=staging`. Must contain exactly one valid address in the `kilocode.ai` domain; every staging message is redirected there with a staging subject prefix and safe Reply-To. [SERVER]
+
+When `VERCEL_TARGET_ENV` is absent in local development or a script process, transactional messages are captured as owner-only clickable HTML under `dev/logs/emails/` instead of being sent. Automated tests (including `IS_IN_AUTOMATED_TEST`) and non-production Vercel targets suppress provider delivery and report successful no-op delivery. A production-mode process without `VERCEL_TARGET_ENV` fails delivery as a configuration error so retryable email markers are not consumed as successful sends.
 
 ### Slack
 

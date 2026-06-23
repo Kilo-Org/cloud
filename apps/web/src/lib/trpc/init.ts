@@ -2,8 +2,11 @@ import 'server-only';
 import { getUserFromAuth } from '@/lib/user/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
-import * as z from 'zod';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
+import { userCanManageCredits } from '@/lib/admin/credit-management';
+import { trpcErrorFormatter } from '@/lib/trpc/transport';
+
+export { UpstreamApiError } from '@/lib/trpc/transport';
 // Define the context type
 export type TRPCContext = {
   user: User;
@@ -43,29 +46,8 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
  *
  * The client then sees `err.data.upstreamCode === 'etag_mismatch'`.
  */
-export class UpstreamApiError extends Error {
-  constructor(public readonly upstreamCode: string) {
-    super(upstreamCode);
-    this.name = 'UpstreamApiError';
-  }
-}
-
 const t = initTRPC.context<TRPCContext>().create({
-  errorFormatter(opts) {
-    const { shape, error } = opts;
-    return {
-      ...shape,
-      data: {
-        ...shape.data,
-        zodError:
-          error.code === 'BAD_REQUEST' && error.cause instanceof z.ZodError
-            ? z.flattenError(error.cause)
-            : null,
-        upstreamCode:
-          error.cause instanceof UpstreamApiError ? error.cause.upstreamCode : undefined,
-      },
-    };
-  },
+  errorFormatter: trpcErrorFormatter,
 });
 
 const sentryMiddleware = t.middleware(
@@ -106,5 +88,16 @@ export const adminProcedure = baseProcedure.use(async ({ ctx, next }) => {
       message: 'Admin access required',
     });
   }
+  return next();
+});
+
+export const creditManagerProcedure = adminProcedure.use(async ({ ctx, next }) => {
+  if (!userCanManageCredits(ctx.user)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Credit management access required',
+    });
+  }
+
   return next();
 });

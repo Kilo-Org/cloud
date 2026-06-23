@@ -45,7 +45,19 @@ describe('configureKilocode', () => {
     };
 
     expect(config.autoApproval?.execute?.allowed).toContain('sed');
-    for (const command of ['wc', 'sort', 'uniq', 'cut', 'tr', 'nl', 'jq', 'stat', 'file']) {
+    for (const command of [
+      'wc',
+      'sort',
+      'uniq',
+      'cut',
+      'tr',
+      'nl',
+      'jq',
+      'stat',
+      'file',
+      'awk',
+      'rg',
+    ]) {
       expect(config.autoApproval?.execute?.allowed).toContain(command);
     }
     expect(config.autoApproval?.execute?.denied).toContain('git commit');
@@ -54,6 +66,9 @@ describe('configureKilocode', () => {
     expect(config.autoApproval?.execute?.denied).toContain('sed -*i');
     expect(config.autoApproval?.execute?.denied).toContain('sed --in-place');
     expect(config.autoApproval?.execute?.denied).toContain('sed --in-place*');
+    expect(config.autoApproval?.execute?.denied).toContain('awk * -i*');
+    expect(config.autoApproval?.execute?.denied).toContain('awk * --in-place*');
+    expect(config.autoApproval?.execute?.denied).toContain('awk *system(*');
     expect(config.autoApproval?.execute?.denied).toContain('sort -o');
     expect(config.autoApproval?.execute?.denied).toContain('sort --output');
     expect(config.autoApproval?.execute?.denied).toContain('uniq * *');

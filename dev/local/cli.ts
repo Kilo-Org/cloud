@@ -192,7 +192,7 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   const logDir = path.join(repoRoot, 'dev', 'logs');
   fs.mkdirSync(logDir, { recursive: true });
   for (const entry of fs.readdirSync(logDir)) {
-    fs.unlinkSync(path.join(logDir, entry));
+    fs.rmSync(path.join(logDir, entry), { recursive: true, force: true });
   }
 
   // --- Create tmux session ---

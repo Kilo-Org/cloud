@@ -1,6 +1,7 @@
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import { createSafeToolDefinitions } from '@/src/shared/agent-llm-harness';
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
+import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
 import type { FetchLike } from '@/src/shared/auth';
 import { executeSafeToolCall } from './agent-safe-tool-runtime';
 import { toSafeToolCallEvents } from './agent-tool-call-events';
@@ -21,8 +22,6 @@ interface RunSafeLlmTurnOptions {
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
 }
 
-const maxSafeToolRounds = 4;
-
 export const runSafeLlmTurn = ({
   selectedTabId,
   supportsImages = false,
@@ -32,7 +31,7 @@ export const runSafeLlmTurn = ({
     ...options,
     executeToolCall: executeSafeToolCall,
     failureMessage: error => (error instanceof Error ? error.message : 'Failed to run safe mode.'),
-    maxToolRounds: maxSafeToolRounds,
+    maxToolRounds: maxAgentToolRounds,
     noResponseMessage: 'The model did not return a response.',
     supportsImages,
     toToolCallEvents: toolCalls => toSafeToolCallEvents(toolCalls, selectedTabId),

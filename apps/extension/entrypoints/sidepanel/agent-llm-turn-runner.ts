@@ -4,6 +4,7 @@ import {
   createSafeToolDefinitions,
 } from '@/src/shared/agent-llm-harness';
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
+import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
 import type { FetchLike } from '@/src/shared/auth';
 import { executeEvalToolCall } from './agent-eval-runtime';
 import { executeSafeToolCall } from './agent-safe-tool-runtime';
@@ -25,8 +26,6 @@ interface RunDangerousLlmTurnOptions {
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
 }
 
-const maxEvalRounds = 4;
-
 export const runDangerousLlmTurn = ({
   selectedTabId,
   supportsImages = false,
@@ -38,7 +37,7 @@ export const runDangerousLlmTurn = ({
       toolCall.name === 'eval' ? executeEvalToolCall(toolCall) : executeSafeToolCall(toolCall),
     failureMessage: error =>
       `LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-    maxToolRounds: maxEvalRounds,
+    maxToolRounds: maxAgentToolRounds,
     noResponseMessage: 'The model did not return a response.',
     supportsImages,
     toToolCallEvents: toolCalls => toDangerousToolCallEvents(toolCalls, selectedTabId),

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createSafeToolCall, createUserMessage } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
 import type { FetchLike } from './auth';
+import { maxAgentToolRounds } from './agent-tool-round-limit';
 import type { KiloGatewayToolCallRequest } from './kilo-api-client';
 import { runLlmTurn } from './agent-llm-turn-runner-core';
 
@@ -19,6 +20,20 @@ function* createGatewayResponses(): Generator<Response, Response> {
     'data: [DONE]\n\n',
   ]);
   return streamResponse(['data: [DONE]\n\n']);
+}
+
+function* createToolOnlyGatewayResponses(rounds: number): Generator<Response, Response> {
+  for (let index = 0; index < rounds; index += 1) {
+    yield streamResponse([
+      `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_${index}","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n`,
+      'data: [DONE]\n\n',
+    ]);
+  }
+
+  return streamResponse([
+    'data: {"choices":[{"delta":{"content":"Done."}}]}\n\n',
+    'data: [DONE]\n\n',
+  ]);
 }
 
 const streamResponse = (chunks: string[]): Response => {
@@ -102,5 +117,46 @@ describe('agent LLM turn runner core', () => {
       { role: 'assistant', text: 'Done.', type: 'message' },
     ]);
     expect(fetchCalls).toHaveLength(2);
+  });
+
+  it('allows twenty tool rounds before asking the user to continue', async () => {
+    const appendedEvents: AgentConversationEvent[] = [];
+    const responses = createToolOnlyGatewayResponses(maxAgentToolRounds);
+    const fetch: FetchLike = () => responses.next().value;
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: events => {
+        appendedEvents.push(...events);
+      },
+      conversationEvents: [createUserMessage('Inspect this page')],
+      executeToolCall: () => Promise.resolve({ ok: true, value: { text: 'Page text' } }),
+      failureMessage: String,
+      fetch,
+      maxToolRounds: maxAgentToolRounds,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'The model did not return a response.',
+      signal: undefined,
+      toToolCallEvents: (toolCalls: KiloGatewayToolCallRequest[]) =>
+        toolCalls.map(toolCall =>
+          createSafeToolCall({
+            name: 'get_page_snapshot',
+            providerToolCallId: toolCall.id,
+            tabId: 123,
+          })
+        ),
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many tool rounds.',
+      tools: [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(appendedEvents.filter(event => event.type === 'tool-result')).toHaveLength(20);
+    expect(appendedEvents.at(-1)).toMatchObject({
+      role: 'assistant',
+      text: 'Too many tool rounds.',
+      type: 'message',
+    });
   });
 });

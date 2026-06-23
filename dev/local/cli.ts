@@ -473,18 +473,59 @@ function writeManifest(
     wranglerRegistryPath,
     services: serviceNames.map(name => {
       const svc = getService(name);
-      return { name, port: svc.port, group: svc.group, type: svc.type };
+      const port = name === 'nextjs' ? (readNextjsDevPort(repoRoot) ?? svc.port) : svc.port;
+      return { name, port, group: svc.group, type: svc.type };
     }),
   };
   const manifestPath = path.join(repoRoot, 'dev', 'logs', 'manifest.json');
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 }
 
+function readManifest(repoRoot: string): Manifest | undefined {
+  const manifestPath = path.join(repoRoot, 'dev', 'logs', 'manifest.json');
+  try {
+    const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
+    if (
+      typeof raw?.session !== 'string' ||
+      typeof raw?.portOffset !== 'number' ||
+      !Array.isArray(raw?.services)
+    ) {
+      return undefined;
+    }
+    return raw;
+  } catch {
+    return undefined;
+  }
+}
+
+function readNextjsDevPort(repoRoot: string): number | undefined {
+  try {
+    const raw = fs.readFileSync(path.join(repoRoot, '.dev-port'), 'utf-8').trim();
+    const port = Number(raw);
+    if (Number.isInteger(port) && port > 0 && port <= 65535) return port;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+function getManifestEntry(
+  manifest: Manifest | undefined,
+  serviceName: string
+): ManifestEntry | undefined {
+  return manifest?.services.find(entry => entry.name === serviceName);
+}
+
 async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   const sessionName = getSessionName();
+  const manifest = readManifest(repoRoot);
+  const activeManifest = manifest?.session === sessionName ? manifest : undefined;
+  const statusPortOffset = activeManifest?.portOffset ?? portOffset;
   if (!sessionExists(sessionName)) {
     if (isJson) {
-      console.log(JSON.stringify({ session: sessionName, portOffset, services: [] }));
+      console.log(
+        JSON.stringify({ session: sessionName, portOffset: statusPortOffset, services: [] })
+      );
     } else {
       console.log('No dev session running');
     }
@@ -497,7 +538,9 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   });
   if (runningServices.length === 0) {
     if (isJson) {
-      console.log(JSON.stringify({ session: sessionName, portOffset, services: [] }));
+      console.log(
+        JSON.stringify({ session: sessionName, portOffset: statusPortOffset, services: [] })
+      );
     } else {
       console.log('No services running');
     }
@@ -507,20 +550,24 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   const entries: StatusEntry[] = await Promise.all(
     runningServices.map(async ({ name, pane }): Promise<StatusEntry> => {
       const svc = getService(name);
-      const port = svc.port;
+      const manifestEntry = getManifestEntry(activeManifest, name);
+      const port =
+        name === 'nextjs'
+          ? (readNextjsDevPort(repoRoot) ?? manifestEntry?.port ?? svc.port)
+          : (manifestEntry?.port ?? svc.port);
       const isUp = port === 0 ? isPaneRunningCommand(sessionName, pane) : await probePort(port);
       const status: ServiceStatus = isUp ? 'up' : 'down';
       return {
         name,
         port,
         status,
-        group: svc.group,
+        group: manifestEntry?.group ?? svc.group,
       };
     })
   );
 
   if (isJson) {
-    const result = { session: sessionName, portOffset, services: entries };
+    const result = { session: sessionName, portOffset: statusPortOffset, services: entries };
     console.log(JSON.stringify(result));
     return;
   }

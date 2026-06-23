@@ -75,7 +75,7 @@ describe('kilo gateway chat stream client', () => {
       content: 'I will inspect.',
       toolCalls: [
         {
-          code: 'return document.title;',
+          arguments: { code: 'return document.title;' },
           id: 'call_eval_1',
           name: 'eval',
         },
@@ -85,6 +85,34 @@ describe('kilo gateway chat stream client', () => {
     expect(seen[0]?.headers.get('accept')).toBe('text/event-stream');
     expect(seen[0]?.headers.get('x-kilocode-organizationid')).toBe('org-1');
     expect(seen[0]?.body).toMatchObject({ stream: true });
+  });
+
+  it('streams safe read tool call deltas', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Read this page', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: {},
+          id: 'call_snapshot_1',
+          name: 'get_page_snapshot',
+        },
+      ],
+    });
   });
 
   it('ignores empty content deltas before visible content', async () => {

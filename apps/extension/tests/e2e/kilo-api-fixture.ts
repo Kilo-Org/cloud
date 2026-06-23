@@ -49,6 +49,7 @@ export const mockKiloApi = async (
     modelFailuresBeforeSuccess?: number;
     organizations?: { id: string; name: string }[];
     secondCompletionEvents?: unknown[];
+    toolNames?: string[];
     seenChatOrganizationIds?: string[];
     thirdCompletionEvents?: unknown[];
   } = {}
@@ -114,19 +115,20 @@ export const mockKiloApi = async (
     const body: unknown = route.request().postDataJSON();
     const messages = isRecord(body) && Array.isArray(body['messages']) ? body['messages'] : [];
 
+    const toolNames = options.toolNames ?? ['eval'];
+
     expect(body).toMatchObject({
       model: 'anthropic/claude-sonnet-4',
       stream: true,
       tool_choice: 'auto',
-      tools: [
-        {
-          function: {
-            name: 'eval',
-          },
-          type: 'function',
-        },
-      ],
     });
+    expect(
+      isRecord(body) && Array.isArray(body['tools'])
+        ? body['tools'].map(tool =>
+            isRecord(tool) && isRecord(tool['function']) ? tool['function']['name'] : undefined
+          )
+        : []
+    ).toStrictEqual(toolNames);
     const userMessages = messages.filter(
       (message): message is Record<string, unknown> =>
         isRecord(message) && message['role'] === 'user'

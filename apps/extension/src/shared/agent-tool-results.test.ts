@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEvalToolCall } from './agent-conversation';
-import { runEvalToolCalls } from './agent-tool-results';
+import { runToolCalls } from './agent-tool-results';
 
 describe('agent tool results', () => {
   it('runs eval tool calls sequentially', async () => {
@@ -8,7 +8,7 @@ describe('agent tool results', () => {
     const firstToolCall = createEvalToolCall({ code: 'first', tabId: 1 });
     const secondToolCall = createEvalToolCall({ code: 'second', tabId: 1 });
 
-    const results = await runEvalToolCalls([firstToolCall, secondToolCall], async toolCall => {
+    const results = await runToolCalls([firstToolCall, secondToolCall], async toolCall => {
       events.push(`start:${toolCall.code}`);
       await Promise.resolve();
       events.push(`end:${toolCall.code}`);

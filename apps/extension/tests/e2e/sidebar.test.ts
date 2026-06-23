@@ -185,7 +185,7 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
 
     await sidePanel.getByLabel('New conversation').click();
     await expect(sidePanel.getByText('eval completed')).toBeHidden();
-    await expect(sidePanel.getByText('Pick a tab, switch to dangerous mode')).toBeVisible();
+    await expect(sidePanel.getByText('Pick a tab and ask Kilo to inspect it.')).toBeVisible();
   } finally {
     await context.close();
     await fixture.close();
@@ -213,7 +213,9 @@ test('running conversation can be stopped', async () => {
 
     await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
     await sidePanel.getByRole('button', { name: 'Dangerous' }).click();
+    const modeButton = sidePanel.getByRole('button', { name: /Danger mode/u });
     const targetTabSelect = sidePanel.getByLabel('Target tab');
+    await expect(modeButton).toBeEnabled();
     await expect(targetTabSelect).toBeEnabled();
     await sidePanel.getByLabel('Message agent').fill('Inspect this tab');
     const sendButton = sidePanel.getByRole('button', { name: 'Send message' });
@@ -224,6 +226,7 @@ test('running conversation can be stopped', async () => {
 
     const stopButton = sidePanel.getByRole('button', { name: 'Stop' });
     await expect(stopButton).toBeVisible();
+    await expect(modeButton).toBeDisabled();
     await expect(targetTabSelect).toBeDisabled();
     const stopButtonRect = await stopButton.boundingBox();
 
@@ -231,6 +234,7 @@ test('running conversation can be stopped', async () => {
     await stopButton.click();
 
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
+    await expect(modeButton).toBeEnabled();
     await expect(targetTabSelect).toBeEnabled();
     await expect(sidePanel.getByText('Stopped.')).toBeVisible();
   } finally {
@@ -258,11 +262,9 @@ test('target tab list can be refreshed', async () => {
     await sidePanel.reload();
 
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
-
     const refreshedPage = await context.newPage();
     await refreshedPage.goto(refreshedFixture.url);
     await sidePanel.getByRole('button', { name: 'Refresh tabs' }).click();
-
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Refreshed target tab');
   } finally {
     await context.close();

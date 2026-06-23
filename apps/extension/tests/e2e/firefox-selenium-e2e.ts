@@ -21,6 +21,7 @@ const chromeWorkflowNames = [
   'settings organization picker sends org context to the gateway',
   'native side panel is outside the page DOM',
   'dangerous mode conversation can eval against a normal tab',
+  'safe mode conversation reads the selected tab with safe tools',
   'running conversation can be stopped',
   'target tab list can be refreshed',
   'conversation survives side panel reload',
@@ -917,8 +918,51 @@ const scenarios: FirefoxScenario[] = [
         await waitForTextMatch(session.driver, /The selected tab HTML length is [0-9]+\./u);
         await clickButtonByLabel(session.driver, 'New conversation');
         await waitForTextGone(session.driver, 'eval completed');
-        await waitForText(session.driver, 'Pick a tab, switch to dangerous mode');
+        await waitForText(session.driver, 'Pick a tab and ask Kilo to inspect it.');
       }),
+  },
+  {
+    name: 'safe mode conversation reads the selected tab with safe tools',
+    run: context =>
+      withSession(
+        context.api,
+        {
+          firstCompletionEvents: [
+            { choices: [{ delta: { content: 'I will read the page.' } }] },
+            {
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        function: {
+                          arguments: JSON.stringify({}),
+                          name: 'get_page_snapshot',
+                        },
+                        id: 'call_snapshot_1',
+                        index: 0,
+                        type: 'function',
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+          secondCompletionEvents: [
+            { choices: [{ delta: { content: 'The page is the Kilo extension fixture.' } }] },
+          ],
+        },
+        async session => {
+          await session.openTargetPage();
+          await openAuthenticatedPanel(session);
+          await waitForModel(session.driver);
+          await waitForTargetTab(session.driver, 'Kilo extension fixture');
+          await sendMessage(session.driver, 'What is on this page?');
+          await waitForText(session.driver, 'get_page_snapshot completed');
+          await waitForText(session.driver, 'The page is the Kilo extension fixture.');
+        }
+      ),
   },
   {
     name: 'running conversation can be stopped',

@@ -746,9 +746,11 @@ const OrganizationSettingsSchema = z.object({
   projects_ui_enabled: z.boolean().optional(),
   minimum_balance: z.number().optional(),
   minimum_balance_alert_email: z.array(z.email()).optional(),
-  // Recipients for the weekly enterprise adoption digest email. Presence of at
-  // least one address = enabled; empty/absent = off. Enterprise-only feature.
-  adoption_digest_email: z.array(z.email()).optional(),
+  // Whether the weekly enterprise recommendations digest email is enabled. When on,
+  // the digest is emailed to the organization's owners. Enterprise-only feature.
+  // Named "recommendations" (not "adoption") to avoid confusion with AI adoption
+  // usage data and the Feature adoption tab.
+  recommendations_digest_enabled: z.boolean().optional(),
   suppress_trial_messaging: z.boolean().optional(),
   // OSS Sponsorship fields
   // null/undefined = not an OSS org, values: 1, 2, or 3

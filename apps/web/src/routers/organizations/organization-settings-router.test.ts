@@ -664,74 +664,52 @@ describe('organizations settings trpc router', () => {
     });
   });
 
-  describe('updateAdoptionDigest procedure', () => {
+  describe('updateRecommendationsDigest procedure', () => {
     afterEach(async () => {
-      // Reset the digest recipients between cases so each starts from a clean slate.
+      // Reset settings between cases so each starts from a clean slate.
       await updateOrganizationSettings(testOrganization.id, {});
     });
 
-    it('should enable the adoption digest with a recipient list (enterprise org)', async () => {
+    it('should enable the recommendations digest (enterprise org)', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      const result = await caller.organizations.settings.updateAdoptionDigest({
+      const result = await caller.organizations.settings.updateRecommendationsDigest({
         organizationId: testOrganization.id,
-        adoption_digest_email: ['digest@example.com'],
+        enabled: true,
       });
 
-      expect(result.settings.adoption_digest_email).toEqual(['digest@example.com']);
+      expect(result.settings.recommendations_digest_enabled).toBe(true);
 
       const updatedOrg = await getOrganizationById(testOrganization.id);
-      expect(updatedOrg?.settings?.adoption_digest_email).toEqual(['digest@example.com']);
+      expect(updatedOrg?.settings?.recommendations_digest_enabled).toBe(true);
     });
 
-    it('should deduplicate recipients', async () => {
+    it('should disable the digest and remove the flag', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      const result = await caller.organizations.settings.updateAdoptionDigest({
+      await caller.organizations.settings.updateRecommendationsDigest({
         organizationId: testOrganization.id,
-        adoption_digest_email: ['a@example.com', 'a@example.com', 'b@example.com'],
+        enabled: true,
       });
 
-      expect(result.settings.adoption_digest_email).toEqual(['a@example.com', 'b@example.com']);
-    });
-
-    it('should disable the digest and remove the field when given an empty list', async () => {
-      const caller = await createCallerForUser(owner.id);
-
-      await caller.organizations.settings.updateAdoptionDigest({
+      const result = await caller.organizations.settings.updateRecommendationsDigest({
         organizationId: testOrganization.id,
-        adoption_digest_email: ['digest@example.com'],
+        enabled: false,
       });
 
-      const result = await caller.organizations.settings.updateAdoptionDigest({
-        organizationId: testOrganization.id,
-        adoption_digest_email: [],
-      });
-
-      expect(result.settings.adoption_digest_email).toBeUndefined();
+      expect(result.settings.recommendations_digest_enabled).toBeUndefined();
 
       const updatedOrg = await getOrganizationById(testOrganization.id);
-      expect(updatedOrg?.settings?.adoption_digest_email).toBeUndefined();
-    });
-
-    it('should reject invalid email addresses', async () => {
-      const caller = await createCallerForUser(owner.id);
-
-      await expect(
-        caller.organizations.settings.updateAdoptionDigest({
-          organizationId: testOrganization.id,
-          adoption_digest_email: ['not-an-email'],
-        })
-      ).rejects.toThrow();
+      expect(updatedOrg?.settings?.recommendations_digest_enabled).toBeUndefined();
     });
 
     it('should throw UNAUTHORIZED error for non-owner users', async () => {
       const caller = await createCallerForUser(member.id);
 
       await expect(
-        caller.organizations.settings.updateAdoptionDigest({
+        caller.organizations.settings.updateRecommendationsDigest({
           organizationId: testOrganization.id,
-          adoption_digest_email: ['digest@example.com'],
+          enabled: true,
         })
       ).rejects.toThrow('You do not have the required organizational role to access this feature');
     });
@@ -742,16 +720,16 @@ describe('organizations settings trpc router', () => {
       const caller = await createCallerForUser(owner.id);
 
       await expect(
-        caller.organizations.settings.updateAdoptionDigest({
+        caller.organizations.settings.updateRecommendationsDigest({
           organizationId: teamsOrg.id,
-          adoption_digest_email: ['digest@example.com'],
+          enabled: true,
         })
-      ).rejects.toThrow('The adoption digest is not available for this organization.');
+      ).rejects.toThrow('The recommendations digest is not available for this organization.');
 
       await db.delete(organizations).where(eq(organizations.id, teamsOrg.id));
     });
 
-    it('should preserve other settings when enabling the digest', async () => {
+    it('should preserve other settings when toggling the digest', async () => {
       const caller = await createCallerForUser(owner.id);
 
       await updateOrganizationSettings(testOrganization.id, {
@@ -760,15 +738,15 @@ describe('organizations settings trpc router', () => {
         minimum_balance_alert_email: ['alert@example.com'],
       });
 
-      const result = await caller.organizations.settings.updateAdoptionDigest({
+      const result = await caller.organizations.settings.updateRecommendationsDigest({
         organizationId: testOrganization.id,
-        adoption_digest_email: ['digest@example.com'],
+        enabled: true,
       });
 
       expect(result.settings.model_deny_list).toEqual(['gpt-4']);
       expect(result.settings.minimum_balance).toBe(100);
       expect(result.settings.minimum_balance_alert_email).toEqual(['alert@example.com']);
-      expect(result.settings.adoption_digest_email).toEqual(['digest@example.com']);
+      expect(result.settings.recommendations_digest_enabled).toBe(true);
     });
   });
 });

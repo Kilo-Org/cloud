@@ -3,11 +3,15 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Bell, ChartLine, Mail } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
+import { toast } from 'sonner';
+import {
+  useOrganizationWithMembers,
+  useUpdateRecommendationsDigest,
+} from '@/app/api/organizations/hooks';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
-import { AdoptionDigestModal } from './AdoptionDigestModal';
 
 type Props = {
   organizationId: string;
@@ -26,14 +30,14 @@ function PreferenceRow({
   description,
   stateLabel,
   isOn,
-  onConfigure,
+  control,
 }: {
   icon: LucideIcon;
   title: string;
   description: string;
-  stateLabel: string;
-  isOn: boolean;
-  onConfigure: () => void;
+  stateLabel?: string;
+  isOn?: boolean;
+  control: React.ReactNode;
 }) {
   return (
     <div className="flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0">
@@ -42,14 +46,14 @@ function PreferenceRow({
         <div className="space-y-1">
           <p className="text-sm font-medium">{title}</p>
           <p className="text-muted-foreground text-xs">{description}</p>
-          <p className="text-muted-foreground text-xs tabular-nums">
-            <span className={isOn ? 'text-foreground font-medium' : undefined}>{stateLabel}</span>
-          </p>
+          {stateLabel && (
+            <p className="text-muted-foreground text-xs tabular-nums">
+              <span className={isOn ? 'text-foreground font-medium' : undefined}>{stateLabel}</span>
+            </p>
+          )}
         </div>
       </div>
-      <Button variant="outline" size="sm" className="h-8 shrink-0" onClick={onConfigure}>
-        Configure
-      </Button>
+      <div className="shrink-0">{control}</div>
     </div>
   );
 }
@@ -57,7 +61,7 @@ function PreferenceRow({
 export function OrganizationEmailPreferencesCard({ organizationId }: Props) {
   const { data } = useOrganizationWithMembers(organizationId);
   const [isSpendingAlertsOpen, setIsSpendingAlertsOpen] = useState(false);
-  const [isDigestOpen, setIsDigestOpen] = useState(false);
+  const updateRecommendationsDigest = useUpdateRecommendationsDigest();
 
   if (!data) {
     return null;
@@ -72,7 +76,29 @@ export function OrganizationEmailPreferencesCard({ organizationId }: Props) {
     settings?.minimum_balance !== undefined
       ? (settings?.minimum_balance_alert_email?.length ?? 0)
       : 0;
-  const digestRecipientCount = settings?.adoption_digest_email?.length ?? 0;
+  const digestEnabled = settings?.recommendations_digest_enabled === true;
+
+  const handleDigestToggle = (next: boolean) => {
+    updateRecommendationsDigest.mutate(
+      { organizationId, enabled: next },
+      {
+        onSuccess: () => {
+          toast.success(
+            next
+              ? 'Weekly recommendations email enabled. Organization owners will receive it.'
+              : 'Weekly recommendations email disabled.'
+          );
+        },
+        onError: (error: unknown) => {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : 'Failed to update the recommendations digest setting'
+          );
+        },
+      }
+    );
+  };
 
   return (
     <Card>
@@ -91,16 +117,30 @@ export function OrganizationEmailPreferencesCard({ organizationId }: Props) {
             description="Notify recipients when the organization balance falls below a threshold."
             stateLabel={recipientStateLabel(spendingRecipientCount)}
             isOn={spendingRecipientCount > 0}
-            onConfigure={() => setIsSpendingAlertsOpen(true)}
+            control={
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => setIsSpendingAlertsOpen(true)}
+              >
+                Configure
+              </Button>
+            }
           />
           {isEnterprise && (
             <PreferenceRow
               icon={ChartLine}
-              title="Weekly adoption digest"
-              description="A weekly summary of adopted features and open recommendations."
-              stateLabel={recipientStateLabel(digestRecipientCount)}
-              isOn={digestRecipientCount > 0}
-              onConfigure={() => setIsDigestOpen(true)}
+              title="Weekly recommendations email"
+              description="Email the organization's owners a weekly summary of open recommendations and feature setup."
+              control={
+                <Switch
+                  checked={digestEnabled}
+                  disabled={updateRecommendationsDigest.isPending}
+                  onCheckedChange={handleDigestToggle}
+                  aria-label="Weekly recommendations email"
+                />
+              }
             />
           )}
         </div>
@@ -109,12 +149,6 @@ export function OrganizationEmailPreferencesCard({ organizationId }: Props) {
       <SpendingAlertsModal
         open={isSpendingAlertsOpen}
         onOpenChange={setIsSpendingAlertsOpen}
-        organizationId={organizationId}
-        settings={settings}
-      />
-      <AdoptionDigestModal
-        open={isDigestOpen}
-        onOpenChange={setIsDigestOpen}
         organizationId={organizationId}
         settings={settings}
       />

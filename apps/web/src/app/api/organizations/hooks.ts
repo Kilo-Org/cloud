@@ -285,12 +285,12 @@ export function useUpdateMinimumBalanceAlert() {
   );
 }
 
-export function useUpdateAdoptionDigest() {
+export function useUpdateRecommendationsDigest() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
   return useMutation(
-    trpc.organizations.settings.updateAdoptionDigest.mutationOptions({
+    trpc.organizations.settings.updateRecommendationsDigest.mutationOptions({
       onSuccess: () => {
         // Invalidate organization data to refresh settings (shared with the
         // spending-alerts surface, so both stay in sync).

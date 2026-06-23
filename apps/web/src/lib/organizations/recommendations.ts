@@ -5,7 +5,7 @@ import {
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, count, eq, inArray } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull } from 'drizzle-orm';
 import { readDb } from '@/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import {
@@ -14,6 +14,7 @@ import {
   getFeatureAdoptionState,
 } from '@/lib/organizations/feature-adoption';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
+import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
 
 // Which surface a recommendation ties back to. Per-feature recommendations reuse
 // the feature adoption key so the UI can show the same icon; organization-level
@@ -123,8 +124,11 @@ function integrationsUrl(organizationId: string): string {
 function codeReviewsUrl(organizationId: string): string {
   return `/organizations/${organizationId}/code-reviews`;
 }
-function securityAgentUrl(organizationId: string): string {
-  return `/organizations/${organizationId}/security-agent/config`;
+function securityAgentUrl(
+  organizationId: string,
+  tab: 'automation' | 'notifications' | 'sla'
+): string {
+  return `/organizations/${organizationId}/security-agent/config?tab=${tab}`;
 }
 function organizationUrl(organizationId: string): string {
   return `/organizations/${organizationId}`;
@@ -225,7 +229,7 @@ const RULES: Rule[] = [
       title: 'Set Security Agent SLA deadlines',
       description: 'Findings have no due dates. Turn on SLAs so issues get a deadline.',
       actionLabel: 'Set SLA deadlines',
-      actionUrl: securityAgentUrl(organizationId),
+      actionUrl: securityAgentUrl(organizationId, 'sla'),
     }),
   },
   {
@@ -243,7 +247,7 @@ const RULES: Rule[] = [
       description:
         'New findings are not analyzed automatically. Turn on analysis so they are triaged as they arrive.',
       actionLabel: 'Enable auto analysis',
-      actionUrl: securityAgentUrl(organizationId),
+      actionUrl: securityAgentUrl(organizationId, 'automation'),
     }),
   },
   {
@@ -379,7 +383,7 @@ function readString(config: unknown, key: string): string | undefined {
 }
 
 async function getRecommendationState(organizationId: string): Promise<RecommendationState> {
-  const [featureAdoption, agentConfigRows, integrationRows, triggerRows, seatUsage] =
+  const [featureAdoption, agentConfigRows, integrationRows, triggerRows, seatUsage, ssoPolicy] =
     await Promise.all([
       getFeatureAdoptionState(organizationId),
       readDb
@@ -418,6 +422,7 @@ async function getRecommendationState(organizationId: string): Promise<Recommend
           )
         ),
       getOrganizationSeatUsage(organizationId),
+      resolveEffectiveOrganizationSsoPolicy(organizationId),
     ]);
 
   const enabledCodeReviewConfigs = agentConfigRows.filter(
@@ -460,13 +465,6 @@ async function getRecommendationState(organizationId: string): Promise<Recommend
     row => row.platform === 'gitlab' || (row.platform === 'github' && !githubLiteApp)
   );
 
-  const orgRow = await readDb
-    .select({ sso_domain: organizations.sso_domain })
-    .from(organizations)
-    .where(eq(organizations.id, organizationId))
-    .limit(1);
-  const sso = orgRow[0]?.sso_domain ?? null;
-
   return {
     ...featureAdoption,
     codeReviewerEnabled,
@@ -493,7 +491,7 @@ async function getRecommendationState(organizationId: string): Promise<Recommend
     webhookTriggerCount: triggerRows[0]?.value ?? 0,
     githubConnected,
     githubLiteApp,
-    ssoConfigured: sso !== null && sso !== '',
+    ssoConfigured: ssoPolicy.status === 'required',
     seatCount: seatUsage.total,
     seatsUsed: seatUsage.used,
   };
@@ -507,7 +505,7 @@ export async function getOrganizationRecommendations(organizationId: string): Pr
   const orgRows = await readDb
     .select({ plan: organizations.plan })
     .from(organizations)
-    .where(eq(organizations.id, organizationId))
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
     .limit(1);
   const organization = orgRows[0];
   if (!organization) {

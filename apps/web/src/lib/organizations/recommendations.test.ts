@@ -128,6 +128,21 @@ describe('buildRecommendations', () => {
     expect(openKeys(buildState({ seatCount: 2, seatsUsed: 2 }))).not.toContain('org-unused-seats');
   });
 
+  it('deep-links Security Agent recommendations to their settings tabs', () => {
+    const state = buildState({
+      securityAgentEnabled: true,
+      securitySlaDisabled: true,
+      securityAutoAnalysisDisabled: true,
+    });
+
+    expect(find(state, 'security-agent-sla-disabled')?.actionUrl).toBe(
+      `/organizations/${organizationId}/security-agent/config?tab=sla`
+    );
+    expect(find(state, 'security-agent-auto-analysis-disabled')?.actionUrl).toBe(
+      `/organizations/${organizationId}/security-agent/config?tab=automation`
+    );
+  });
+
   it('scopes every action url to the organization', () => {
     const recommendations = buildRecommendations(
       organizationId,

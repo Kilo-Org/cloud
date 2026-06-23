@@ -477,36 +477,47 @@ const startFirefoxSession = async (): Promise<FirefoxSession> => {
     .setFirefoxOptions(options)
     .build();
 
-  if (!isFirefoxWebDriver(sessionDriver)) {
-    throw new Error('Firefox WebDriver did not expose installAddon.');
-  }
-
   const targetServers: ServerHandle[] = [];
+  let setupSucceeded = false;
 
-  await sessionDriver.installAddon(firefoxZipPath, true);
-  const manifestUrl = await findManifestUrl(sessionDriver);
-  const sidePanelUrl = manifestUrl.replace('/manifest.json', '/sidepanel.html');
+  try {
+    if (!isFirefoxWebDriver(sessionDriver)) {
+      throw new Error('Firefox WebDriver did not expose installAddon.');
+    }
 
-  return {
-    close: async () => {
+    await sessionDriver.installAddon(firefoxZipPath, true);
+    const manifestUrl = await findManifestUrl(sessionDriver);
+    const sidePanelUrl = manifestUrl.replace('/manifest.json', '/sidepanel.html');
+    setupSucceeded = true;
+
+    return {
+      close: async () => {
+        try {
+          await sessionDriver.quit();
+        } finally {
+          await Promise.all(targetServers.map(server => server.close()));
+        }
+      },
+      driver: sessionDriver,
+      openSidePanel: async () => {
+        await sessionDriver.switchTo().newWindow('tab');
+        await sessionDriver.get(sidePanelUrl);
+      },
+      openTargetPage: async (title?: string) => {
+        const server = await startTargetPageServer(title);
+
+        targetServers.push(server);
+        await sessionDriver.switchTo().newWindow('tab');
+        await sessionDriver.get(server.url);
+
+        return server;
+      },
+    };
+  } finally {
+    if (!setupSucceeded) {
       await sessionDriver.quit();
-      await Promise.all(targetServers.map(server => server.close()));
-    },
-    driver: sessionDriver,
-    openSidePanel: async () => {
-      await sessionDriver.switchTo().newWindow('tab');
-      await sessionDriver.get(sidePanelUrl);
-    },
-    openTargetPage: async (title?: string) => {
-      const server = await startTargetPageServer(title);
-
-      targetServers.push(server);
-      await sessionDriver.switchTo().newWindow('tab');
-      await sessionDriver.get(server.url);
-
-      return server;
-    },
-  };
+    }
+  }
 };
 
 const withSession = async (

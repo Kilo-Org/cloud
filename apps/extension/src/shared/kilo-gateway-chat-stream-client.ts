@@ -171,20 +171,6 @@ const applyStreamingData = (
 
   const { delta } = choice;
   const { content, reasoning, tool_calls: toolCalls } = delta;
-  const reasoningKeys = Object.keys(delta).filter(
-    key => key.includes('reason') || key.includes('thinking')
-  );
-
-  if (content === '' || reasoningKeys.length > 0) {
-    console.debug('[kilo-extension] non-visible gateway stream delta', {
-      contentLength: typeof content === 'string' ? content.length : undefined,
-      deltaKeys: Object.keys(delta),
-      finishReason:
-        typeof choice['finish_reason'] === 'string' ? choice['finish_reason'] : undefined,
-      reasoningKeys,
-      toolCallCount: Array.isArray(toolCalls) ? toolCalls.length : 0,
-    });
-  }
 
   if (typeof content === 'string' && content.length > 0) {
     accumulator.content += content;

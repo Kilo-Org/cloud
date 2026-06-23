@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { fetchKiloGatewayChatCompletionStream } from './kilo-api-client';
 import type { FetchLike } from './auth';
 
@@ -89,7 +89,6 @@ describe('kilo gateway chat stream client', () => {
 
   it('ignores empty content deltas before visible content', async () => {
     const contentDeltas: string[] = [];
-    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
     const fetch: FetchLike = () =>
       streamResponse([
         'data: {"choices":[{"delta":{"content":""}}]}\n\n',
@@ -115,18 +114,11 @@ describe('kilo gateway chat stream client', () => {
     });
 
     expect(contentDeltas).toStrictEqual(['Visible answer.']);
-    expect(debug).toHaveBeenCalledWith(
-      '[kilo-extension] non-visible gateway stream delta',
-      expect.objectContaining({ contentLength: 0, deltaKeys: ['content'] })
-    );
-
-    debug.mockRestore();
   });
 
   it('streams reasoning deltas separately from visible content', async () => {
     const contentDeltas: string[] = [];
     const reasoningDeltas: string[] = [];
-    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
     const fetch: FetchLike = () =>
       streamResponse([
         'data: {"choices":[{"delta":{"content":"","reasoning":"Think","reasoning_details":[{"type":"reasoning.text","text":"Think","format":"unknown","index":0}]}}]}\n\n',
@@ -158,8 +150,6 @@ describe('kilo gateway chat stream client', () => {
 
     expect(contentDeltas).toStrictEqual(['Visible answer.']);
     expect(reasoningDeltas).toStrictEqual(['Think', 'ing']);
-
-    debug.mockRestore();
   });
 
   it('sends selected thinking effort as gateway reasoning', async () => {

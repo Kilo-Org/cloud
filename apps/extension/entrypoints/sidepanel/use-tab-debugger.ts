@@ -1,5 +1,6 @@
 import { browser } from '#imports';
 import { useCallback, useRef, useState } from 'react';
+import { isLatestRequest } from '@/src/shared/request-order';
 import { LIST_INSPECTABLE_TABS_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
 import type {
   InspectableTab,
@@ -39,9 +40,13 @@ export const useTabDebugger = (): {
   );
   const [tabDebuggerError, setTabDebuggerError] = useState<string | undefined>();
   const hasLoadedTabsRef = useRef(false);
+  const tabLoadRequestRef = useRef(0);
 
   const loadInspectableTabs = useCallback(
     async ({ showLoading = true }: { readonly showLoading?: boolean } = {}): Promise<void> => {
+      const requestId = (tabLoadRequestRef.current += 1);
+      const isCurrentRequest = (): boolean => isLatestRequest(requestId, tabLoadRequestRef.current);
+
       if (showLoading) {
         setIsLoadingTabs(true);
       }
@@ -57,6 +62,10 @@ export const useTabDebugger = (): {
 
         if (response.type !== LIST_INSPECTABLE_TABS_MESSAGE) {
           throw new Error('Extension background returned the wrong response.');
+        }
+
+        if (!isCurrentRequest()) {
+          return;
         }
 
         const isInitialLoad = !hasLoadedTabsRef.current;
@@ -75,12 +84,16 @@ export const useTabDebugger = (): {
           return nextTabId;
         });
       } catch (error) {
+        if (!isCurrentRequest()) {
+          return;
+        }
+
         setInspectableTabs([]);
         setSelectedTabId(undefined);
         rememberedSelectedTabId = null;
         setTabDebuggerError(getErrorMessage(error, 'Failed to load tabs.'));
       } finally {
-        if (showLoading) {
+        if (showLoading && isCurrentRequest()) {
           setIsLoadingTabs(false);
         }
       }

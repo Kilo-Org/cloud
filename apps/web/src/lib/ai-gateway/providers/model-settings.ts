@@ -25,13 +25,15 @@ const REASONING_VARIANTS_THINKING_ONLY = {
   thinking: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
-const REASONING_VARIANTS_NONE_THINKING = {
-  none: { reasoning: { enabled: false, effort: 'none' } },
+const REASONING_DISABLED = { reasoning: { enabled: false, effort: 'none' } } as const;
+
+const REASONING_VARIANTS_THINKING_INSTANT = {
   ...REASONING_VARIANTS_THINKING_ONLY,
+  instant: REASONING_DISABLED,
 } as const;
 
 export const REASONING_VARIANTS_BINARY = {
-  instant: { reasoning: { enabled: false, effort: 'none' } },
+  instant: REASONING_DISABLED,
   ...REASONING_VARIANTS_THINKING_ONLY,
 } as const;
 
@@ -113,7 +115,7 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
     return REASONING_VARIANTS_THINKING_ONLY;
   }
   if (isMinimaxModel(model) && model.toLowerCase().includes('minimax-m3')) {
-    return REASONING_VARIANTS_NONE_THINKING;
+    return REASONING_VARIANTS_THINKING_INSTANT;
   }
   if (
     isMinimaxModel(model) ||

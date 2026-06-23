@@ -3,17 +3,23 @@ import { getModelVariants } from './model-settings';
 
 describe('MiniMax model variants', () => {
   it.each([MINIMAX_CURRENT_MODEL_ID, 'opencode-go/minimax-m3'])(
-    'exposes disabled and adaptive thinking for MiniMax M3 model %s',
+    'defaults to thinking while exposing instant for MiniMax M3 model %s',
     model => {
-      expect(getModelVariants(model)).toEqual({
-        none: { reasoning: { enabled: false, effort: 'none' } },
+      const variants = getModelVariants(model);
+
+      expect(Object.keys(variants ?? {})).toEqual(['thinking', 'instant']);
+      expect(variants).toEqual({
         thinking: { reasoning: { enabled: true, effort: 'high' } },
+        instant: { reasoning: { enabled: false, effort: 'none' } },
       });
     }
   );
 
-  it('keeps the reasoning toggle for older MiniMax models', () => {
-    expect(getModelVariants('minimax/minimax-m2.7')).toEqual({
+  it('keeps instant as the default for older MiniMax models', () => {
+    const variants = getModelVariants('minimax/minimax-m2.7');
+
+    expect(Object.keys(variants ?? {})).toEqual(['instant', 'thinking']);
+    expect(variants).toEqual({
       instant: { reasoning: { enabled: false, effort: 'none' } },
       thinking: { reasoning: { enabled: true, effort: 'high' } },
     });

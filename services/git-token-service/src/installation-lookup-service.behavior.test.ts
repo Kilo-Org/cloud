@@ -160,7 +160,7 @@ describe('InstallationLookupService', () => {
     });
   });
 
-  it('accepts selected repository metadata with a stale owner after account rename', async () => {
+  it('rejects selected repository metadata for a different owner', async () => {
     const service = createService([
       {
         platform_installation_id: '100',
@@ -168,7 +168,7 @@ describe('InstallationLookupService', () => {
         github_app_type: 'standard',
         owned_by_organization_id: null,
         repository_access: 'selected',
-        repositories: [{ full_name: 'pre-rename-owner/repository' }],
+        repositories: [{ full_name: 'other-owner/repository' }],
         permissions: { contents: 'write', pull_requests: 'write' },
       },
     ]);
@@ -178,14 +178,7 @@ describe('InstallationLookupService', () => {
       userId: 'user-1',
     });
 
-    expect(result).toEqual({
-      success: true,
-      installationId: '100',
-      accountLogin: 'renamed-owner',
-      githubAppType: 'standard',
-      repoName: 'repository',
-      permissions: { contents: 'write', pull_requests: 'write' },
-    });
+    expect(result).toEqual({ success: false, reason: 'repository_not_installed' });
   });
 
   it('fails closed when organization and personal installations both match the requested owner', async () => {

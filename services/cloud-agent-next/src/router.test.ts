@@ -641,6 +641,33 @@ describe('router sessionId validation', () => {
             ).rejects.toThrow('Authentication required');
           });
 
+          it('denies deletion when current access to an existing session has been removed', async () => {
+            const sessionId: SessionId = 'agent_12341234-5678-9012-3456-789012345678';
+            vi.mocked(fetchSessionMetadata).mockResolvedValue(
+              legacySessionMetadata({
+                version: 123456789,
+                sessionId,
+                orgId: 'org-123',
+                userId: 'test-user-123',
+                timestamp: 123456789,
+              })
+            );
+            requireCurrentSessionAccessMock.mockRejectedValueOnce(
+              new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+            );
+
+            await expect(caller.deleteSession({ sessionId })).rejects.toMatchObject({
+              code: 'FORBIDDEN',
+            });
+
+            expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+              env: mockContext.env,
+              kiloUserId: 'test-user-123',
+              cloudAgentSessionId: sessionId,
+            });
+            expect(cloudAgentSession.get).not.toHaveBeenCalled();
+          });
+
           it('does not delete runtime state for a guessed session belonging to another user', async () => {
             const sessionId: SessionId = 'agent_99999999-8888-7777-6666-555555555555';
             vi.mocked(fetchSessionMetadata).mockResolvedValue(null);

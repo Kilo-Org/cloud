@@ -308,15 +308,9 @@ export class InstallationLookupService {
 
     if (
       selected.repository_access === 'selected' &&
-      !selected.repositories?.some(repository => {
-        const [storedOwner, storedRepoName, ...unexpectedParts] = repository.full_name.split('/');
-        return (
-          storedOwner !== undefined &&
-          storedOwner.length > 0 &&
-          storedRepoName?.toLowerCase() === repoName.toLowerCase() &&
-          unexpectedParts.length === 0
-        );
-      })
+      !selected.repositories?.some(
+        repository => repository.full_name.toLowerCase() === params.githubRepo.toLowerCase()
+      )
     ) {
       return { success: false, reason: 'repository_not_installed' };
     }

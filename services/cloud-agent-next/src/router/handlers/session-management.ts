@@ -48,7 +48,8 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
 async function deleteSessionResources(
   sessionId: SessionId,
   userId: string,
-  env: TRPCContext['env']
+  env: TRPCContext['env'],
+  authorizeExistingSession?: () => Promise<void>
 ): Promise<{ success: true; message?: string }> {
   logger.setTags({ userId, sessionId });
   logger.info('Starting session deletion');
@@ -59,6 +60,8 @@ async function deleteSessionResources(
       logger.info('Session not found or already deleted');
       return { success: true, message: 'Session not found or already deleted' };
     }
+
+    await authorizeExistingSession?.();
 
     try {
       const doKey = `${userId}:${sessionId}`;
@@ -111,8 +114,15 @@ export function createSessionManagementHandlers() {
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const sessionId = input.sessionId as SessionId;
         return withLogTags({ source: 'deleteSession' }, () =>
-          deleteSessionResources(input.sessionId as SessionId, ctx.userId, ctx.env)
+          deleteSessionResources(sessionId, ctx.userId, ctx.env, async () => {
+            await requireCurrentSessionAccess({
+              env: ctx.env,
+              kiloUserId: ctx.userId,
+              cloudAgentSessionId: sessionId,
+            });
+          })
         );
       }),
 

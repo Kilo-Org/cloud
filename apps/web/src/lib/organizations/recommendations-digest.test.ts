@@ -1,17 +1,33 @@
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   buildOrganizationRecommendationsDigest,
   currentDigestPeriodKey,
+  dispatchEnterpriseRecommendationsDigests,
+  getOrganizationOwnerRecipients,
 } from './recommendations-digest';
+import { db } from '@/lib/drizzle';
+import {
+  kilocode_users,
+  organization_memberships,
+  organizations,
+  transactional_email_log,
+} from '@kilocode/db/schema';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@/tests/helpers/user.helper';
 
 jest.mock('./recommendations', () => ({
   getOrganizationRecommendations: jest.fn(),
 }));
 
+jest.mock('@/lib/email', () => ({
+  sendRecommendationsDigestEmail: jest.fn(),
+}));
+
+import { sendRecommendationsDigestEmail } from '@/lib/email';
 import { getOrganizationRecommendations } from './recommendations';
 
-const mockedGetRecommendations = getOrganizationRecommendations as jest.MockedFunction<
-  typeof getOrganizationRecommendations
->;
+const mockedGetRecommendations = jest.mocked(getOrganizationRecommendations);
+const mockedSendRecommendationsDigestEmail = jest.mocked(sendRecommendationsDigestEmail);
 
 type ResolvedRecommendations = Awaited<ReturnType<typeof getOrganizationRecommendations>>;
 
@@ -117,5 +133,85 @@ describe('currentDigestPeriodKey', () => {
 
   it('rolls over to the next Monday for the following week', () => {
     expect(currentDigestPeriodKey(new Date('2026-06-29T00:00:00Z'))).toBe('2026-06-29');
+  });
+});
+
+describe('recommendations digest dispatch', () => {
+  const userIds: string[] = [];
+  const organizationIds: string[] = [];
+
+  beforeEach(() => {
+    mockedGetRecommendations.mockReset();
+    mockedSendRecommendationsDigestEmail.mockReset();
+  });
+
+  afterEach(async () => {
+    if (organizationIds.length > 0) {
+      await db.delete(organizations).where(inArray(organizations.id, organizationIds.splice(0)));
+    }
+    if (userIds.length > 0) {
+      await db.delete(kilocode_users).where(inArray(kilocode_users.id, userIds.splice(0)));
+    }
+  });
+
+  async function createEnabledOrganizationWithTwoOwners() {
+    const firstOwner = await insertTestUser();
+    const secondOwner = await insertTestUser();
+    userIds.push(firstOwner.id, secondOwner.id);
+
+    const organization = await createTestOrganization('Digest dispatch org', firstOwner.id, 0, {
+      recommendations_digest_enabled: true,
+    });
+    organizationIds.push(organization.id);
+
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: secondOwner.id,
+      role: 'owner',
+    });
+
+    return { organization, firstOwner, secondOwner };
+  }
+
+  it('returns owner user IDs with email addresses for non-PII idempotency', async () => {
+    const { organization, firstOwner, secondOwner } =
+      await createEnabledOrganizationWithTwoOwners();
+
+    const recipients = await getOrganizationOwnerRecipients(organization.id);
+
+    expect(recipients).toEqual(
+      expect.arrayContaining([
+        { userId: firstOwner.id, email: firstOwner.google_user_email },
+        { userId: secondOwner.id, email: secondOwner.google_user_email },
+      ])
+    );
+  });
+
+  it('releases a failed claim and continues sending to remaining owners', async () => {
+    const { organization, firstOwner, secondOwner } =
+      await createEnabledOrganizationWithTwoOwners();
+    mockResolved('enterprise', [check(false)], [recommendation('open', 0)]);
+    mockedSendRecommendationsDigestEmail
+      .mockRejectedValueOnce(new Error('Mailgun unavailable'))
+      .mockResolvedValueOnce({ sent: true });
+
+    const summary = await dispatchEnterpriseRecommendationsDigests();
+
+    expect(summary.emailFailures).toBe(1);
+    expect(summary.emailsSent).toBe(1);
+    expect(mockedSendRecommendationsDigestEmail).toHaveBeenCalledTimes(2);
+
+    const markers = await db
+      .select({ idempotencyKey: transactional_email_log.idempotency_key })
+      .from(transactional_email_log)
+      .where(
+        and(
+          eq(transactional_email_log.organization_id, organization.id),
+          eq(transactional_email_log.email_type, 'recommendations_digest')
+        )
+      );
+    expect(markers).toHaveLength(1);
+    expect(markers[0].idempotencyKey).not.toContain(firstOwner.google_user_email);
+    expect(markers[0].idempotencyKey).not.toContain(secondOwner.google_user_email);
   });
 });

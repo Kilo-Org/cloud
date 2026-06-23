@@ -227,6 +227,42 @@ function fixtureTemplateVars(template: TemplateName): Record<string, string | Ra
         actionUrl: `${NEXTAUTH_URL}/security-agent/findings`,
         manageNotificationsUrl: `${NEXTAUTH_URL}/security-agent/config?tab=sla`,
       });
+    case 'recommendationsDigest': {
+      const recRow = (title: string, description: string, label: string, url: string) =>
+        `<tr><td style="padding: 14px 0; border-top: 1px solid #ebebea">` +
+        `<p style="margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #1a1a1a">${title}</p>` +
+        `<p style="margin: 0 0 8px; font-size: 13px; line-height: 18px; color: #555">${description}</p>` +
+        `<a href="${url}" style="font-size: 13px; color: #1a1a1a; text-decoration: underline">${label}</a>` +
+        `</td></tr>`;
+      return {
+        organization_name: 'Acme Corp',
+        adopted_summary: '4 of 6',
+        open_count: '3',
+        recommendations_section: new RawHtml(
+          `<table width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 8px">${[
+            recRow(
+              'Add a security focus to Code Reviewer',
+              'Code Reviewer is on but not reviewing for security issues.',
+              'Open Code Reviewer settings',
+              code_reviews_url
+            ),
+            recRow(
+              'Reconnect GitHub',
+              'Your GitHub integration needs to be reconnected; automation is paused.',
+              'Open integrations',
+              integrations_url
+            ),
+            recRow(
+              'Set up SSO for your organization',
+              'Require single sign-on for your team.',
+              'Open organization settings',
+              organization_url
+            ),
+          ].join('')}</table>`
+        ),
+        dashboard_url: `${NEXTAUTH_URL}/organizations/${orgId}/usage-details?view=feature-adoption`,
+      };
+    }
   }
   throw new Error(`Unknown template: ${template}`);
 }

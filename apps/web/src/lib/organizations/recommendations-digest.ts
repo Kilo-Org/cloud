@@ -30,10 +30,10 @@ export function currentDigestPeriodKey(now: Date): string {
 
 function digestIdempotencyKey(
   organizationId: string,
-  recipient: string,
+  recipientUserId: string,
   periodKey: string
 ): string {
-  return `${organizationId}:${recipient}:${periodKey}`;
+  return `${organizationId}:${recipientUserId}:${periodKey}`;
 }
 
 export type RecommendationsDigestData = {
@@ -82,11 +82,21 @@ export async function buildOrganizationRecommendationsDigest(
   };
 }
 
-// Owner email addresses for an org (excludes bot users). The digest goes to owners
-// only, mirroring the owner-only toggle and the recommendations dismiss/restore gate.
-export async function getOrganizationOwnerEmails(organizationId: string): Promise<string[]> {
-  const rows = await readDb
-    .select({ email: kilocode_users.google_user_email })
+type DigestRecipient = {
+  userId: string;
+  email: string;
+};
+
+// Resolve recipients from the primary immediately before delivery so a recent
+// membership removal cannot leak organization details through replica lag.
+export async function getOrganizationOwnerRecipients(
+  organizationId: string
+): Promise<DigestRecipient[]> {
+  const rows = await db
+    .select({
+      userId: kilocode_users.id,
+      email: kilocode_users.google_user_email,
+    })
     .from(organization_memberships)
     .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
     .where(
@@ -96,7 +106,7 @@ export async function getOrganizationOwnerEmails(organizationId: string): Promis
         eq(kilocode_users.is_bot, false)
       )
     );
-  return rows.map(row => row.email).filter((email): email is string => Boolean(email));
+  return rows.flatMap(row => (row.email ? [{ userId: row.userId, email: row.email }] : []));
 }
 
 export type RecommendationsDigestDispatchSummary = {
@@ -117,12 +127,12 @@ type RecipientSendOutcome = 'sent' | 'duplicate' | 'failed';
 // already owns this send. If the send then fails, the claim is released so a later
 // run can retry. Mirrors the kilo-pass duplicate-card email path.
 async function sendDigestToRecipientOnce(
-  recipient: string,
+  recipient: DigestRecipient,
   organizationId: string,
   periodKey: string,
   digest: RecommendationsDigestData
 ): Promise<RecipientSendOutcome> {
-  const idempotency_key = digestIdempotencyKey(organizationId, recipient, periodKey);
+  const idempotency_key = digestIdempotencyKey(organizationId, recipient.userId, periodKey);
 
   const claim = await db
     .insert(transactional_email_log)
@@ -137,9 +147,21 @@ async function sendDigestToRecipientOnce(
     return 'duplicate';
   }
 
-  const result = await sendRecommendationsDigestEmail(recipient, digest);
-  if (result.sent) {
-    return 'sent';
+  try {
+    const result = await sendRecommendationsDigestEmail(recipient.email, digest);
+    if (result.sent) {
+      return 'sent';
+    }
+
+    logExceptInTest(
+      `[recommendationsDigest] send skipped for org ${organizationId}: ${result.reason}`
+    );
+  } catch (error) {
+    errorExceptInTest('[recommendationsDigest] recipient send failed', {
+      organizationId,
+      recipientUserId: recipient.userId,
+      error,
+    });
   }
 
   // Release the claim so a future run can retry this recipient/week.
@@ -151,9 +173,6 @@ async function sendDigestToRecipientOnce(
         eq(transactional_email_log.idempotency_key, idempotency_key)
       )
     );
-  logExceptInTest(
-    `[recommendationsDigest] send skipped for org ${organizationId}: ${result.reason}`
-  );
   return 'failed';
 }
 
@@ -199,13 +218,13 @@ export async function dispatchEnterpriseRecommendationsDigests(): Promise<Recomm
             return;
           }
 
-          const owners = await getOrganizationOwnerEmails(org.id);
-          if (owners.length === 0) {
+          const recipients = await getOrganizationOwnerRecipients(org.id);
+          if (recipients.length === 0) {
             summary.orgsSkippedNoOwners++;
             return;
           }
 
-          for (const recipient of owners) {
+          for (const recipient of recipients) {
             const outcome = await sendDigestToRecipientOnce(recipient, org.id, periodKey, digest);
             if (outcome === 'sent') {
               summary.emailsSent++;

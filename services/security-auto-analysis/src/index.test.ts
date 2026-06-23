@@ -153,6 +153,11 @@ describe('scheduled dispatcher heartbeat', () => {
       'https://heartbeat.example/secret',
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
+    const dispatchId = vi.mocked(dispatchDueOwners).mock.calls[0]?.[1];
+    expect(dispatchId).toEqual(expect.any(String));
+    expect(heartbeatTags()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ dispatch_id: dispatchId })])
+    );
     expect(heartbeatOutcomes()).toEqual(['attempted', 'succeeded']);
     expect(JSON.stringify(loggerMock.withTags.mock.calls)).not.toContain('heartbeat.example');
   });
@@ -173,6 +178,11 @@ describe('scheduled dispatcher heartbeat', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       'https://heartbeat.example/secret/fail',
       expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    const dispatchId = vi.mocked(dispatchDueOwners).mock.calls[0]?.[1];
+    expect(dispatchId).toEqual(expect.any(String));
+    expect(heartbeatTags()).toEqual(
+      expect.arrayContaining([expect.objectContaining({ dispatch_id: dispatchId })])
     );
     expect(heartbeatOutcomes()).toEqual(['attempted', 'failed']);
     const failureTags = heartbeatTags().at(-1);

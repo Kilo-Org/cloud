@@ -1,4 +1,4 @@
-import { timingSafeEqual as nodeTSE } from 'crypto';
+import { randomUUID, timingSafeEqual as nodeTSE } from 'crypto';
 import {
   createSecurityAgentCommand,
   markSecurityAgentCommandQueueAdmissionFailed,
@@ -398,10 +398,9 @@ export default {
     ctx: ExecutionContext
   ): Promise<void> {
     let failed = false;
-    let dispatchId: string | undefined;
+    const dispatchId = randomUUID();
     try {
-      const result = await dispatchDueOwners(env);
-      dispatchId = result.dispatchId;
+      await dispatchDueOwners(env, dispatchId);
     } catch (error) {
       failed = true;
       throw error;

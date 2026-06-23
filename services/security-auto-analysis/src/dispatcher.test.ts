@@ -68,9 +68,10 @@ beforeEach(() => {
 
 describe('dispatchDueOwners telemetry', () => {
   it('emits structured success telemetry for every stage without sensitive identifiers', async () => {
-    const result = await dispatchDueOwners(env());
+    const result = await dispatchDueOwners(env(), 'dispatch-123');
 
     expect(result).toMatchObject({
+      dispatchId: 'dispatch-123',
       discoveredOwners: 1,
       enqueuedMessages: 1,
       discoveredRemediationAttempts: 1,

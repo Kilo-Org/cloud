@@ -56,15 +56,16 @@ async function runDispatcherStage<T>(options: {
   }
 }
 
-export async function dispatchDueOwners(env: CloudflareEnv): Promise<{
+export async function dispatchDueOwners(
+  env: CloudflareEnv,
+  dispatchId: string = randomUUID()
+): Promise<{
   dispatchId: string;
   discoveredOwners: number;
   enqueuedMessages: number;
   discoveredRemediationAttempts: number;
   enqueuedRemediationMessages: number;
 }> {
-  const dispatchId = randomUUID();
-
   const { db, reconciliation } = await runDispatcherStage({
     stage: 'stale_analysis_queue_reconciliation',
     dispatchId,

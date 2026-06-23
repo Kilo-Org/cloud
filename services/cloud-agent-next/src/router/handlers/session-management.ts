@@ -27,6 +27,7 @@ import { readProfileBundle } from '../../session-profile.js';
 import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
 import type { MessageResultRPCResponse } from '../../session/message-result.js';
+import { requireCurrentSessionAccess } from '../../session-access.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
@@ -145,6 +146,11 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ userId, sessionId });
           logger.info('Starting session interruption');
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
 
           try {
             const metadata = await fetchSessionMetadata(env, userId, sessionId);
@@ -223,6 +229,11 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ userId, sessionId });
           logger.info('Fetching session metadata');
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
 
           // Get DO stub keyed by userId:sessionId for user isolation
           const doKey = `${userId}:${sessionId}`;
@@ -336,6 +347,11 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ userId, sessionId });
           logger.info('Fetching session health');
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
 
           const doKey = `${userId}:${sessionId}`;
           const getStub = () =>
@@ -412,6 +428,11 @@ export function createSessionManagementHandlers() {
         return withLogTags({ source: 'getMessageResult' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
           const { userId, env } = ctx;
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
           const doKey = `${userId}:${sessionId}`;
           const getStub = () =>
             env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
@@ -451,6 +472,11 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ userId, sessionId });
           logger.info('Fetching latest assistant message');
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
 
           const doKey = `${userId}:${sessionId}`;
           const getStub = () =>

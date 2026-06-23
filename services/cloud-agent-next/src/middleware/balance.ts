@@ -6,9 +6,9 @@ import { buildTrpcErrorResponse } from '../trpc-error.js';
 import {
   validateBalanceOnly,
   extractProcedureName,
-  fetchOrgIdForSession,
   BALANCE_REQUIRED_MUTATIONS,
 } from '../balance-validation.js';
+import { projectSessionAccessHttpError, requireCurrentSessionAccess } from '../session-access.js';
 
 /**
  * Middleware that validates user balance for mutations that require it.
@@ -63,18 +63,30 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
       return buildTrpcErrorResponse(401, 'Missing auth token', procedureName);
     }
 
-    // For message-send procedures the caller only supplies cloudAgentSessionId;
-    // resolve the org for balance checks from the DO metadata. `start` always
-    // carries `kilocodeOrganizationId` in the body, so it is not included here.
     if (
       (procedureName === 'sendMessageV2' ||
         procedureName === 'initiateFromKilocodeSessionV2' ||
         procedureName === 'send') &&
-      !orgId &&
       sessionId &&
       userId
     ) {
-      orgId = await fetchOrgIdForSession(c.env, userId, sessionId);
+      try {
+        const access = await requireCurrentSessionAccess({
+          env: c.env,
+          kiloUserId: userId,
+          cloudAgentSessionId: sessionId,
+          expectedOrganizationId: orgId,
+        });
+        c.set('validatedSessionAccess', {
+          kiloUserId: userId,
+          cloudAgentSessionId: sessionId,
+          ...access,
+        });
+        orgId = access.organizationId ?? undefined;
+      } catch (error) {
+        const response = projectSessionAccessHttpError(error);
+        return buildTrpcErrorResponse(response.status, await response.text(), procedureName);
+      }
     }
 
     // Use balance-only validation since auth was already done by authMiddleware

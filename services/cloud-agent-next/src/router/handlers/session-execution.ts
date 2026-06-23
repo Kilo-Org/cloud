@@ -32,6 +32,7 @@ import type {
 } from '../../execution/types.js';
 import type { QueueAckResponse } from '../schemas.js';
 import { preflightPreparedInitialPromptModel } from '../../session/model-preflight.js';
+import { requireCurrentSessionAccess } from '../../session-access.js';
 
 function withLegacyExecutionId(ack: QueueAckResponse): LegacyExecutionResponse {
   return {
@@ -50,6 +51,12 @@ export function createSessionExecutionV2Handlers() {
           const sessionId = input.cloudAgentSessionId as SessionId;
           logger.setTags({ userId: ctx.userId, sessionId, preparedSession: true });
           logger.info('Initiating V2 session from prepared session');
+          await requireCurrentSessionAccess({
+            env: ctx.env,
+            kiloUserId: ctx.userId,
+            cloudAgentSessionId: input.cloudAgentSessionId,
+            validatedSessionAccess: ctx.validatedSessionAccess,
+          });
           const admissionInput = { cloudAgentSessionId: input.cloudAgentSessionId };
           const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
           const replay = await replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
@@ -78,6 +85,12 @@ export function createSessionExecutionV2Handlers() {
           const sessionId = input.cloudAgentSessionId as SessionId;
           logger.setTags({ userId: ctx.userId, sessionId });
           logger.info('Sending V2 message to existing session');
+          await requireCurrentSessionAccess({
+            env: ctx.env,
+            kiloUserId: ctx.userId,
+            cloudAgentSessionId: input.cloudAgentSessionId,
+            validatedSessionAccess: ctx.validatedSessionAccess,
+          });
 
           const commandPayload =
             'payload' in input && input.payload.type === 'command' ? input.payload : undefined;

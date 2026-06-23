@@ -1,6 +1,6 @@
 import pLimit from 'p-limit';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { db, readDb } from '@/lib/drizzle';
+import { db } from '@/lib/drizzle';
 import {
   organizations,
   organization_memberships,
@@ -181,8 +181,10 @@ async function sendDigestToRecipientOnce(
 export async function dispatchEnterpriseRecommendationsDigests(): Promise<RecommendationsDigestDispatchSummary> {
   // Filter to opted-in orgs in SQL so the read scales with actual recipients, not
   // the entire Enterprise population. The flag is only ever stored as `true` (it is
-  // removed when disabled), so a `->> = 'true'` predicate is exact.
-  const enabledOrgs = await readDb
+  // removed when disabled), so a `->> = 'true'` predicate is exact. Read from the
+  // primary, not the replica: this query is the opt-out gate, and replica lag could
+  // otherwise send one more digest to an org that just disabled it.
+  const enabledOrgs = await db
     .select({
       id: organizations.id,
       name: organizations.name,

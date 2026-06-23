@@ -425,6 +425,7 @@ export const kilocode_users = pgTable(
       mode: 'string',
     }),
     openrouter_upstream_safety_identifier: text(),
+    openrouter_downstream_safety_identifier: text(),
     vercel_downstream_safety_identifier: text(),
     customer_source: text(),
     signup_ip: text(),
@@ -447,6 +448,10 @@ export const kilocode_users = pgTable(
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
       .on(table.openrouter_upstream_safety_identifier)
       .where(sql`${table.openrouter_upstream_safety_identifier} IS NOT NULL`),
+    uniqueIndex('UQ_kilocode_users_openrouter_downstream_safety_identifier')
+      .on(table.openrouter_downstream_safety_identifier)
+      .concurrently()
+      .where(sql`${table.openrouter_downstream_safety_identifier} IS NOT NULL`),
     uniqueIndex('UQ_kilocode_users_vercel_downstream_safety_identifier')
       .on(table.vercel_downstream_safety_identifier)
       .where(sql`${table.vercel_downstream_safety_identifier} IS NOT NULL`),
@@ -2716,6 +2721,10 @@ export const organization_invitations = pgTable(
     token: text().notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    authentication_requirement: text().$type<'default' | 'workos'>().default('default').notNull(),
+    sso_source_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'restrict',
+    }),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull()

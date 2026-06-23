@@ -13,12 +13,18 @@ declare module 'next-auth' {
     version: number;
     isNewUser?: boolean;
     isAdmin: boolean;
+    authProvider?: string;
+    authenticatedAt?: number;
+    ssoSourceOrganizationId?: string;
   }
   interface Session {
     kiloUserId: string;
     webSessionPepper?: string | null;
     isNewUser: boolean;
     isAdmin: boolean; //also probably not a good idea; no reason to trust this over in-db state and we need that anyhow.
+    authProvider?: string;
+    authenticatedAt?: number;
+    ssoSourceOrganizationId?: string;
     user: {
       //This object should be removed.  All of it is derived from in-db state, and it might be out of date.
       id: string;

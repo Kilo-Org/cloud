@@ -3,7 +3,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { insertUsageWithOverrides } from '@/tests/helpers/microdollar-usage.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { db, pool } from '@/lib/drizzle';
-import { microdollar_usage } from '@kilocode/db/schema';
+import { microdollar_usage, organizations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 
@@ -50,10 +50,82 @@ describe('organizations usage details trpc router', () => {
   });
 
   afterEach(async () => {
-    // Clean up microdollar usage data after each test
-    await db
-      .delete(microdollar_usage)
-      .where(eq(microdollar_usage.organization_id, testOrganization.id));
+    // Clean up usage and feature adoption data after each test
+    await Promise.all([
+      db
+        .delete(microdollar_usage)
+        .where(eq(microdollar_usage.organization_id, testOrganization.id)),
+      db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.owned_by_organization_id, testOrganization.id)),
+    ]);
+  });
+
+  describe('getFeatureAdoption procedure', () => {
+    it('returns feature checks to a member of an Enterprise organization', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getFeatureAdoption({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result.checks).toHaveLength(6);
+      expect(result.checks.every(check => !check.adopted)).toBe(true);
+    });
+
+    it('requires a bot-enabled Linear integration for team workflow adoption', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      await db.insert(platform_integrations).values({
+        owned_by_organization_id: testOrganization.id,
+        platform: 'linear',
+        integration_type: 'app',
+        platform_installation_id: `linear-${crypto.randomUUID()}`,
+        platform_account_login: 'test-linear-workspace',
+        repository_access: 'all',
+        integration_status: 'active',
+        metadata: { bot_enabled: false },
+      });
+      const caller = await createCallerForUser(memberUser.id);
+
+      const disabledResult = await caller.organizations.usageDetails.getFeatureAdoption({
+        organizationId: testOrganization.id,
+      });
+      expect(disabledResult.checks.find(check => check.key === 'team-integration')?.adopted).toBe(
+        false
+      );
+
+      await db
+        .update(platform_integrations)
+        .set({ metadata: { bot_enabled: true } })
+        .where(eq(platform_integrations.owned_by_organization_id, testOrganization.id));
+      const enabledResult = await caller.organizations.usageDetails.getFeatureAdoption({
+        organizationId: testOrganization.id,
+      });
+      expect(enabledResult.checks.find(check => check.key === 'team-integration')?.adopted).toBe(
+        true
+      );
+    });
+
+    it('rejects feature adoption reporting for a Teams organization', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'teams' })
+        .where(eq(organizations.id, testOrganization.id));
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.usageDetails.getFeatureAdoption({
+          organizationId: testOrganization.id,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
   });
 
   describe('get procedure', () => {

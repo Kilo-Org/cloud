@@ -110,6 +110,7 @@ import {
   createOrUpdateUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
+import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -269,6 +270,9 @@ describe('User', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.user.signup_ip).toBe('203.0.113.25');
+      expect(result.user.openrouter_downstream_safety_identifier).toBe(
+        generateOpenRouterDownstreamSafetyIdentifier(result.user.id)
+      );
     });
 
     it('rejects new signups after the per-IP burst threshold (100/24h)', async () => {
@@ -459,6 +463,35 @@ describe('User', () => {
         })
       );
       consoleError.mockRestore();
+    });
+
+    it('preserves API token pepper when upgrading an existing user to WorkOS', async () => {
+      const existingUser = await insertTestUser({
+        google_user_email: 'workos-upgrade@example.com',
+        api_token_pepper: 'api-pepper-before-workos',
+        web_session_pepper: 'web-pepper-before-workos',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'workos-upgrade@example.com',
+          google_user_name: 'WorkOS Upgrade',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-upgrade-provider-id',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, existingUser.id),
+      });
+      expect(updatedUser?.api_token_pepper).toBe('api-pepper-before-workos');
+      expect(updatedUser?.web_session_pepper).toEqual(expect.any(String));
+      expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
     });
   });
 
@@ -707,6 +740,7 @@ describe('User', () => {
         linkedin_url: 'https://linkedin.com/in/testuser',
         github_url: 'https://github.com/testuser',
         openrouter_upstream_safety_identifier: 'openrouter_upstream_safety_identifier',
+        openrouter_downstream_safety_identifier: 'openrouter_downstream_safety_identifier',
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
@@ -733,6 +767,9 @@ describe('User', () => {
       expect(softDeleted!.discord_server_membership_verified_at).toBeNull();
       expect(softDeleted!.openrouter_upstream_safety_identifier).toBe(
         'openrouter_upstream_safety_identifier'
+      );
+      expect(softDeleted!.openrouter_downstream_safety_identifier).toBe(
+        'openrouter_downstream_safety_identifier'
       );
       expect(softDeleted!.vercel_downstream_safety_identifier).toBe(
         'vercel_downstream_safety_identifier'

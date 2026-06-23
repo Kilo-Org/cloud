@@ -131,6 +131,16 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
               <span className="text-muted-foreground">N/A</span>
             )}
           </Field>
+          <Field label="OpenRouter Downstream Safety ID" mono>
+            {user.openrouter_downstream_safety_identifier ? (
+              <>
+                {user.openrouter_downstream_safety_identifier}
+                <CopyTextButton text={user.openrouter_downstream_safety_identifier} />
+              </>
+            ) : (
+              <span className="text-muted-foreground">N/A</span>
+            )}
+          </Field>
           <Field label="Vercel Downstream Safety ID" mono>
             {user.vercel_downstream_safety_identifier ? (
               <>

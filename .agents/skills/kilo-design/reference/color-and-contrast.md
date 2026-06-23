@@ -5,8 +5,7 @@
 
 ## Kilo application
 
-Kilo's palette is already expressed in OKLCH CSS variables. Do not
-introduce a parallel palette.
+Kilo's exact hex palette is defined in root `DESIGN.md` and implemented as CSS variables. Do not introduce a parallel palette or derive replacement values in another color space.
 
 ### Use tokens, not hex
 
@@ -18,9 +17,7 @@ Tailwind bindings are in the `@theme inline` block.
 
 ### Primary and brand accent use
 
-`--brand-primary` / `text-brand-primary` / `bg-brand-primary` (electric
-yellow-green, `oklch(95% 0.15 108)`) is the same swatch as the semantic
-`primary` token. It is both brand and primary action color. Hold it under
+`--brand-primary` / `text-brand-primary` / `bg-brand-primary` (`#F7F586`) is the same swatch as the semantic `primary` token. It is both brand and primary action color. Hold it under
 10% of pixel weight on any given surface. Reserve for:
 
 - Logo, wordmark, and logo-adjacent affordances.
@@ -40,10 +37,10 @@ Do **not** use yellow-green as:
 
 The primary product CTA is the brand yellow-green semantic token:
 
-- Background `primary` / `--brand-primary` / `oklch(95% 0.15 108)`
-- Foreground `primary-foreground` (near-black)
-- Hover: slightly darker yellow-green
-- Focus ring: semantic `ring` or low-alpha yellow-green
+- Background `primary` / `--brand-primary`: `#F7F586`
+- Foreground `primary-foreground`: `#1F1F1F`
+- Hover `primary-hover`: `#E6E475`
+- Focus ring `ring` / `brand-primary-ring`: `#F7F58659`
 
 Hardcoded blue buttons (`#2B6AD2`, Tailwind `blue-*` fills) are legacy drift.
 Migrate them to `primary` when touching the owning component or flow. Blue is
@@ -80,40 +77,29 @@ tree actually react to theme changes.
 
 ---
 
-## Color Spaces: Use OKLCH
+## Color-space discipline
 
-OKLCH is perceptually uniform — equal steps in lightness look equal. HSL
-is not. Kilo's tokens are already OKLCH.
-
-`oklch(lightness chroma hue)` where lightness is 0–100%, chroma ~0–0.4,
-hue 0–360. Hold chroma+hue roughly constant and vary lightness to build
-variants, but **reduce chroma as lightness approaches 0 or 100** — high
-chroma at the extremes reads as garish.
+The canonical palette uses exact hex values. Do not convert tokens to OKLCH, HSL, or generated shades during feature work: conversion and interpolation can alter contract values. Color-space experiments belong in an explicit design-system change that updates `DESIGN.md` first.
 
 ## Building Functional Palettes
 
-### Tinted Neutrals
+### Neutral surfaces
 
-Pure gray is dead. Add a tiny chroma value (0.005–0.015) to neutrals,
-hued toward the brand hue. Kilo already does this: `--color-kilo-gray`
-is `oklch(0.24 0.007 1)`. Tailwind's shadcn neutral tokens carry 0
-chroma; that's acceptable for the dense product shell, but when you
-create a new branded surface, lean on `kilo-gray` rather than a pure gray.
+Use the six exact surface tokens rather than deriving tinted neutrals: inset `#101010`, background `#151515`, raised `#202020`, overlay `#333333`, hover `#3A3A3A`, and selected `#454545`. `kilo-gray` aliases exist for compatibility, not as permission to invent additional neutrals.
 
-### Palette Structure
+### Palette structure
 
-A complete system needs:
+Kilo's complete system already provides:
 
 | Role | Purpose | Example |
 |---|---|---|
 | **Brand** | Rare, voice-carrying accent | 1 color, 1–2 shades |
 | **Action** | Primary call-to-action | 1 color, 3 states |
 | **Neutral** | Text, backgrounds, borders | 9–11 shade scale |
-| **Semantic** | Success, error, warning, info | 4 colors, 2–3 shades each |
-| **Surface** | Cards, modals, overlays | 2–3 elevation levels |
+| **Semantic** | Fixed status domains | Eight families, four shades each |
+| **Surface** | Inset, canvas, cards, overlays, interaction states | Six fixed roles |
 
-Skip secondary/tertiary unless you need them. Most apps work fine with
-one accent and one action color.
+Do not extend this structure from a feature component. Update `DESIGN.md` first when a genuinely new role is required.
 
 ### The 60-30-10 Rule (Applied Correctly)
 
@@ -137,9 +123,7 @@ That shared role should still stay near 10% visual weight.
 | Large text (18px+ or 14px bold) | 3:1 | 4.5:1 |
 | UI components, icons | 3:1 | 4.5:1 |
 
-The gotcha: placeholder text still needs 4.5:1. Check Kilo's
-`placeholder:text-muted-foreground` against `bg-input/30` on real screens
-before lowering opacity further.
+Placeholder text still needs 4.5:1. Check `placeholder:text-muted-foreground` against canonical `bg-input-background`; do not apply another opacity modifier to the already translucent input background.
 
 ### Dangerous Color Combinations
 
@@ -165,10 +149,7 @@ Don't trust your eyes. Use:
 
 ### Dark Mode Is Not Inverted Light Mode
 
-Kilo is dark-first for a reason. If you design something for light mode
-first and "flip" it, you'll introduce bad shadows, under-contrast accents,
-and oversaturated hues. Design on the real `background` / `card` /
-`muted` surfaces, not on `#fff`.
+Kilo is dark-first for a reason. If you design something for light mode first and "flip" it, you'll introduce bad shadows, under-contrast accents, and oversaturated hues. Design on the exact `surface.background`, `surface.raised`, `surface.overlay`, `surface.hover`, and `surface.selected` roles, not on `#fff`.
 
 | Light mode principle | Dark mode behavior |
 |---|---|
@@ -177,23 +158,18 @@ and oversaturated hues. Design on the real `background` / `card` /
 | Vibrant accents | Desaturate accents slightly |
 | White backgrounds | Never pure black — dark gray (OKLCH 12–18%) |
 
-Depth in dark mode comes from surface lightness, not shadow. Kilo's scale
-is already: `background` → `card`/`popover` → `muted`/`secondary`/`accent`.
+Depth in dark mode comes from surface roles, not shadow: `surface.inset` → `surface.background` → `surface.raised` → `surface.overlay`, with `surface.hover` and `surface.selected` reserved for interaction states.
 
 ### Token Hierarchy
 
-Use two layers: primitive tokens (`--blue-500`) and semantic tokens
-(`--color-primary: var(--blue-500)`). In Kilo, primitives live inline in
-OKLCH; semantic tokens map through `@theme inline`. Redefine the semantic
-layer for theme changes, never the primitive layer per component.
+Use two layers: contract primitives such as `--status-blue-500` and semantic aliases such as `--primary`, `--card`, and `--popover`. Tailwind mappings live in `@theme inline`. Components consume semantic or role-specific utilities; they never redefine primitives locally.
 
 ## Alpha Is A Design Smell
 
 Heavy use of transparency (`rgba`, `hsla`) usually means an incomplete
 palette. Alpha creates unpredictable contrast, performance overhead, and
 inconsistency. Define explicit overlay colors for each context instead.
-Kilo's borders use `oklch(1 0 0 / 10%)` deliberately; that's fine. Don't
-stack five more alpha layers on top of it.
+Kilo's `border.default` (`#FFFFFF1A`) and `border.strong` (`#FFFFFF2E`) use deliberate alpha. Do not stack additional alpha layers on top.
 
 ---
 

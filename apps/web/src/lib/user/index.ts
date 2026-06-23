@@ -105,6 +105,7 @@ import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import {
+  generateOpenRouterDownstreamSafetyIdentifier,
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
@@ -549,18 +550,38 @@ export async function createOrUpdateUser(
       (onlyHasFakeLogin || (autoLinkToExistingUser && (hasNoProviders || isUpgradeProvider)));
 
     if (shouldLink) {
-      // WorkOS SSO: Remove existing OAuth providers to enforce single sign-on
-      if (args.provider === 'workos' && !hasNoProviders) {
-        await db
-          .delete(user_auth_provider)
-          .where(eq(user_auth_provider.kilo_user_id, userByEmail.id));
+      let linkedUser = userByEmail;
+      if (args.provider === 'workos') {
+        linkedUser = await db.transaction(async tx => {
+          await tx
+            .delete(user_auth_provider)
+            .where(eq(user_auth_provider.kilo_user_id, userByEmail.id));
+          await tx.insert(user_auth_provider).values({
+            kilo_user_id: userByEmail.id,
+            provider: args.provider,
+            provider_account_id: args.provider_account_id,
+            email: args.google_user_email,
+            avatar_url: args.google_user_image_url,
+            display_name: args.display_name ?? null,
+            hosted_domain: args.hosted_domain,
+          });
+          const [updatedUser] = await tx
+            .update(kilocode_users)
+            .set({
+              web_session_pepper: randomUUID(),
+            })
+            .where(eq(kilocode_users.id, userByEmail.id))
+            .returning();
+          if (!updatedUser) throw new Error('Failed to rotate web sessions for WorkOS user');
+          return updatedUser;
+        });
+      } else {
+        const linkResult = await linkAccountToExistingUser(userByEmail.id, args);
+        if (!linkResult.success) {
+          return { success: false, error: linkResult.error };
+        }
       }
-
-      const linkResult = await linkAccountToExistingUser(userByEmail.id, args);
-      if (!linkResult.success) {
-        return { success: false, error: linkResult.error };
-      }
-      void fireAuthEvent(userByEmail, 'signin', args.provider, requestHeaders);
+      void fireAuthEvent(linkedUser, 'signin', args.provider, requestHeaders);
       // Successfully linked account, return the existing user
       posthogClient.capture({
         distinctId: userByEmail.google_user_email,
@@ -577,7 +598,7 @@ export async function createOrUpdateUser(
           new_hosted_domain: args.hosted_domain,
         },
       });
-      return successResult({ user: userByEmail, isNew: false });
+      return successResult({ user: linkedUser, isNew: false });
     } else {
       // User signed in with a different ID, but same email
       posthogClient.capture({
@@ -625,6 +646,8 @@ export async function createOrUpdateUser(
     stripe_customer_id: stripeCustomer.id,
     signup_ip: signupIp,
     openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),
+    openrouter_downstream_safety_identifier:
+      generateOpenRouterDownstreamSafetyIdentifier(newUserId),
     vercel_downstream_safety_identifier: generateVercelDownstreamSafetyIdentifier(newUserId),
     normalized_email: normalizeEmail(args.google_user_email),
     email_domain: extractEmailDomain(args.google_user_email),
@@ -800,7 +823,7 @@ export class SoftDeletePreconditionError extends Error {
  * - kilo_pass_welcome_promo_payment_fingerprint_claims (minimal retained payment anti-abuse evidence)
  * - cli_sessions, shared_cli_sessions, cli_sessions_v2 (session history)
  * - deployments, app_builder_projects (user assets)
- * - stytch_fingerprints (abuse detection)
+ * - stytch_fingerprints and provider safety identifiers (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
  * - model_experiment_request (experiment attribution and prompt hashes retained
@@ -1513,8 +1536,8 @@ export async function getAllUserProviders(email: string): Promise<{
 
 /**
  * Look up WorkOS organization by domain.
- * Returns the organization if exactly one is found, or the first one if multiple exist.
- * Logs warnings for edge cases (multiple orgs, zero orgs).
+ * Returns the organization only when exactly one is found.
+ * Multiple organizations are an ambiguous security configuration and fail closed.
  *
  * @param domain - The domain to look up
  * @returns The WorkOS organization, or null if not found
@@ -1530,10 +1553,10 @@ export async function getWorkOSOrganization(domain: string) {
 
   if (orgResult.data.length > 1) {
     captureMessage(
-      `Multiple WorkOS organizations found for domain, using first one: ${domain} (count: ${orgResult.data.length})`,
+      `Multiple WorkOS organizations found for domain: ${domain} (count: ${orgResult.data.length})`,
       'warning'
     );
-    return orgResult.data[0];
+    return null;
   }
 
   return null;

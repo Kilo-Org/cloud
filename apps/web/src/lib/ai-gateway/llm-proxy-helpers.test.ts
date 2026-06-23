@@ -2,6 +2,15 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 
+let mockInceptionPromoRunning = true;
+
+jest.mock('@/lib/constants', () => ({
+  ...(jest.requireActual('@/lib/constants') as Record<string, unknown>),
+  get INCEPTION_PROMO_RUNNING() {
+    return mockInceptionPromoRunning;
+  },
+}));
+
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
 // it with an immediate invocation so the test can await the work synchronously.
@@ -457,6 +466,7 @@ describe('countAndStoreEditUsage', () => {
   }
 
   beforeEach(() => {
+    mockInceptionPromoRunning = true;
     mockedLogMicrodollarUsage.mockClear();
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
@@ -487,7 +497,32 @@ describe('countAndStoreEditUsage', () => {
     expect(stats.market_cost).toBe(4_750);
   });
 
-  it('preserves cost_mUsd and cacheDiscount_mUsd for non-BYOK requests', async () => {
+  it('preserves market cost but does not bill non-BYOK requests during the promotion', async () => {
+    const response = makeUpstreamResponse({
+      id: 'edit-paid',
+      model: 'mercury-edit-2',
+      usage: {
+        prompt_tokens: 100_000,
+        cached_input_tokens: 90_000,
+        completion_tokens: 0,
+        total_tokens: 100_000,
+      },
+      choices: [],
+    });
+
+    countAndStoreEditUsage(response, makeUsageContext({ user_byok: false }), undefined);
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(0);
+    expect(stats.cacheDiscount_mUsd).toBe(0);
+    expect(stats.market_cost).toBe(4_750);
+  });
+
+  it('bills non-BYOK requests when the promotion is disabled', async () => {
+    mockInceptionPromoRunning = false;
     const response = makeUpstreamResponse({
       id: 'edit-paid',
       model: 'mercury-edit-2',

@@ -8,6 +8,7 @@ import {
   credit_transactions,
   platform_integrations,
   kilo_pass_subscriptions,
+  user_auth_provider,
 } from '@kilocode/db/schema';
 import {
   ilike,
@@ -24,11 +25,12 @@ import {
   sql,
   type SQL,
 } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { AdminCreditTransactionSchema, OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { STRIPE_SUBSCRIPTION_STATUS_VALUES } from '@/lib/admin/stripe-subscription-statuses';
-import { isValidUUID, toMicrodollars } from '@/lib/utils';
+import { getLowerDomainFromEmail, isValidUUID, toMicrodollars } from '@/lib/utils';
 import { millisecondsInHour } from 'date-fns/constants';
 import {
   createOrganization,
@@ -42,6 +44,8 @@ import { TRPCError } from '@trpc/server';
 import { successResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
+import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
+import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getAdminCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
@@ -125,6 +129,16 @@ const AdminOrganizationDetailsSchema = z.object({
   created_by_kilo_user_id: z.string().nullable(),
   created_by_user_email: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
+});
+
+const OrganizationHierarchySummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+const AdminOrganizationHierarchySchema = z.object({
+  parent: OrganizationHierarchySummarySchema.nullable(),
+  children: z.array(OrganizationHierarchySummarySchema),
 });
 
 const GrantCreditInputSchema = z
@@ -297,6 +311,53 @@ export const organizationAdminRouter = createTRPCRouter({
       }
 
       return organizationDetails[0];
+    }),
+
+  getHierarchy: adminProcedure
+    .input(OrganizationIdInputSchema)
+    .output(AdminOrganizationHierarchySchema)
+    .query(async ({ input }) => {
+      const { organizationId } = input;
+      const parentOrganizations = alias(organizations, 'parent_organizations');
+
+      const [organizationHierarchy] = await db
+        .select({
+          parent_id: parentOrganizations.id,
+          parent_name: parentOrganizations.name,
+        })
+        .from(organizations)
+        .leftJoin(
+          parentOrganizations,
+          eq(organizations.parent_organization_id, parentOrganizations.id)
+        )
+        .where(eq(organizations.id, organizationId))
+        .limit(1);
+
+      if (!organizationHierarchy) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      const children = await db
+        .select({
+          id: organizations.id,
+          name: organizations.name,
+        })
+        .from(organizations)
+        .where(eq(organizations.parent_organization_id, organizationId))
+        .orderBy(asc(organizations.name));
+
+      return {
+        parent: organizationHierarchy.parent_id
+          ? {
+              id: organizationHierarchy.parent_id,
+              name: organizationHierarchy.parent_name ?? 'Unknown organization',
+            }
+          : null,
+        children,
+      };
     }),
 
   creditTransactions: adminProcedure
@@ -496,7 +557,7 @@ export const organizationAdminRouter = createTRPCRouter({
     };
   }),
 
-  addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input }) => {
+  addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId, userId, role } = input;
 
     const organization = await getOrganizationById(organizationId);
@@ -515,7 +576,46 @@ export const organizationAdminRouter = createTRPCRouter({
       });
     }
 
-    await addUserToOrganization(organizationId, userId, role);
+    const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organizationId);
+    if (ssoPolicy.status === 'misconfigured') {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Organization SSO policy is misconfigured',
+      });
+    }
+
+    const userDomain = getLowerDomainFromEmail(existingUser.google_user_email);
+    if (
+      !existingUser.is_bot &&
+      ssoPolicy.status === 'required' &&
+      userDomain === ssoPolicy.domain
+    ) {
+      const workosProvider = await db.query.user_auth_provider.findFirst({
+        where: and(
+          eq(user_auth_provider.kilo_user_id, userId),
+          eq(user_auth_provider.provider, 'workos'),
+          eq(user_auth_provider.hosted_domain, ssoPolicy.domain)
+        ),
+      });
+      if (!workosProvider) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'User must authenticate through the organization SSO provider first',
+        });
+      }
+    }
+
+    const added = await addUserToOrganization(organizationId, userId, role);
+    if (added) {
+      await createAuditLog({
+        organization_id: organizationId,
+        action: 'organization.member.admin_add',
+        actor_name: ctx.user.google_user_name,
+        actor_email: ctx.user.google_user_email,
+        actor_id: ctx.user.id,
+        message: `Added ${existingUser.google_user_email} as ${role}`,
+      });
+    }
 
     return successResult();
   }),

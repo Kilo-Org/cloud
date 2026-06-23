@@ -83,6 +83,8 @@ import { revalidatePath } from 'next/cache';
 import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@/lib/stripe-client';
+import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail } from '@/lib/utils';
 import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
@@ -476,20 +478,21 @@ export const adminRouter = createTRPCRouter({
     resetToMagicLinkLogin: adminProcedure
       .input(ResetToMagicLinkLoginSchema)
       .mutation(async ({ input }) => {
-        // Check if user has SSO (workos) provider - forbid reset for SSO users
-        const ssoProvider = await db.query.user_auth_provider.findFirst({
-          where: and(
-            eq(user_auth_provider.kilo_user_id, input.userId),
-            eq(user_auth_provider.provider, 'workos')
-          ),
-        });
+        const user = await findUserById(input.userId);
+        if (!user) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+        }
 
-        if (ssoProvider) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message:
-              'Cannot reset to magic link login for SSO users. The user must authenticate through their organization SSO provider.',
-          });
+        const domain = getLowerDomainFromEmail(user.google_user_email);
+        if (domain) {
+          const ssoAuthority = await resolveSsoAuthorityForDomain(domain);
+          if (ssoAuthority.status !== 'not_required') {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message:
+                'Cannot reset to magic link login for SSO users. The user must authenticate through their organization SSO provider.',
+            });
+          }
         }
 
         await db

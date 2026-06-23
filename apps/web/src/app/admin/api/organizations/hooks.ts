@@ -125,6 +125,18 @@ export function useAdminOrganizationDetails(organizationId: string) {
   );
 }
 
+export function useAdminOrganizationHierarchy(organizationId: string, enabled: boolean) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.admin.getHierarchy.queryOptions(
+      {
+        organizationId,
+      },
+      { enabled }
+    )
+  );
+}
+
 export function useAdminOrganizationCreditTransactions(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(

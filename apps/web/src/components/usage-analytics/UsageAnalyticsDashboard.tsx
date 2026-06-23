@@ -15,6 +15,7 @@ import {
   formatLargeNumber,
 } from '@/lib/utils';
 import { Download, SlidersHorizontal } from 'lucide-react';
+import type { Organization } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { SummarySection } from './SummarySection';
 import { PrimaryChart } from './PrimaryChart';
@@ -53,6 +54,9 @@ import {
 } from './types';
 import { formatDollarsFromMicrodollars, humanize } from './format';
 import { exportUsageTableToCsv } from './csvExport';
+import { AIAdoptionSummaryCard } from './AIAdoptionSummaryCard';
+import { FeatureAdoptionView } from './FeatureAdoptionView';
+import { UsageViewNavigation } from './UsageViewNavigation';
 
 type UsageAnalyticsDashboardProps = {
   context: 'personal' | 'organization';
@@ -68,6 +72,7 @@ type UsageAnalyticsDashboardProps = {
    * Ignored in personal context (role is resolved per-org via `organizations.list`).
    */
   callerRole?: OrganizationRole;
+  organizationPlan?: Organization['plan'];
   /** Page title override. */
   title?: string;
 };
@@ -106,13 +111,25 @@ export function UsageAnalyticsDashboard({
   organizationId,
   organizationName,
   callerRole,
+  organizationPlan,
   title,
 }: UsageAnalyticsDashboardProps) {
   const trpc = useTRPC();
   const { state, setState } = useUsageDashboardState();
-  const { period, granularity, costSource, chartMetric, filters, groupBy, personalView, viewAs } =
-    state;
+  const {
+    period,
+    granularity,
+    costSource,
+    chartMetric,
+    filters,
+    groupBy,
+    personalView,
+    viewAs,
+    usageView,
+  } = state;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const hasEnterpriseUsageViews = context === 'organization' && organizationPlan === 'enterprise';
+  const showDetailedUsage = !hasEnterpriseUsageViews || usageView === 'ai-usage';
 
   // `organizations.list` is always available to the caller and returns the
   // caller's role per org. We need it in both personal context (for the Scope
@@ -231,13 +248,17 @@ export function UsageAnalyticsDashboard({
     ]
   );
 
-  const { data: summary, isLoading: summaryLoading } = useUsageSummary(commonArgs);
+  const { data: summary, isLoading: summaryLoading } = useUsageSummary({
+    ...commonArgs,
+    enabled: showDetailedUsage,
+  });
 
   const splitByDimension = groupBy !== 'none' ? groupBy : undefined;
   const { data: timeseries, isLoading: timeseriesLoading } = useUsageTimeseries({
     ...commonArgs,
     metric: chartMetric,
     splitBy: splitByDimension,
+    enabled: showDetailedUsage,
   });
 
   const { data: featureBreakdown, isLoading: featureBreakdownLoading } = useUsageBreakdown({
@@ -245,25 +266,28 @@ export function UsageAnalyticsDashboard({
     dimension: 'feature',
     metric: 'cost',
     limit: 20,
+    enabled: showDetailedUsage,
   });
   const { data: modelBreakdown, isLoading: modelBreakdownLoading } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'model',
     metric: 'cost',
     limit: 10,
+    enabled: showDetailedUsage,
   });
   const { data: projectBreakdown, isLoading: projectBreakdownLoading } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'project',
     metric: 'cost',
     limit: 10,
+    enabled: showDetailedUsage,
   });
   const { data: userBreakdown, isLoading: userBreakdownLoading } = useUsageBreakdown({
     ...commonArgs,
     dimension: 'user',
     metric: 'cost',
     limit: 10,
-    enabled: isOrgWideView,
+    enabled: isOrgWideView && showDetailedUsage,
   });
 
   const tableGroupBy = useMemo<Dimension[]>(() => (groupBy === 'none' ? [] : [groupBy]), [groupBy]);
@@ -272,6 +296,7 @@ export function UsageAnalyticsDashboard({
     ...commonArgs,
     groupBy: tableGroupBy,
     limit: 500,
+    enabled: showDetailedUsage,
   });
 
   // Resolve user ID -> email for labels whenever there is an effective org
@@ -506,129 +531,176 @@ export function UsageAnalyticsDashboard({
 
   const pageTitle = title ?? 'Usage Analytics';
 
+  const showUsageControls = !hasEnterpriseUsageViews || usageView === 'ai-usage';
+
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] w-full overflow-hidden">
       {typeof pageTitle === 'string' && <SetPageTitle title={pageTitle} />}
 
-      <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-        <SheetContent side="left" className="w-80 p-0 lg:hidden">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Filters & Controls</SheetTitle>
-          </SheetHeader>
-          {sidebar}
-        </SheetContent>
-      </Sheet>
+      {showUsageControls && (
+        <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+          <SheetContent side="left" className="w-80 p-0 lg:hidden">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Filters & Controls</SheetTitle>
+            </SheetHeader>
+            {sidebar}
+          </SheetContent>
+        </Sheet>
+      )}
 
-      <div className="hidden w-80 shrink-0 border-r lg:block">{sidebar}</div>
+      {showUsageControls && <div className="hidden w-80 shrink-0 border-r lg:block">{sidebar}</div>}
 
       <div className="flex h-full flex-1 flex-col overflow-hidden">
-        <div className="bg-background/90 flex items-center gap-3 border-b px-4 py-2 backdrop-blur lg:hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setMobileSidebarOpen(true)}
-            className="gap-2"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-          </Button>
-        </div>
+        {showUsageControls && (
+          <div className="bg-background/90 flex items-center gap-3 border-b px-4 py-2 backdrop-blur lg:hidden">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMobileSidebarOpen(true)}
+              className="gap-2"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              Filters
+            </Button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto">
           <div className="m-auto flex w-full max-w-[1140px] flex-col gap-6 p-4 md:p-6">
-            <UsageWarning />
-
-            {isOrgContext && organizationId && (
-              <AIAdoptionScoreCard organizationId={organizationId} dateRange={dateRange} />
-            )}
-
-            <SummarySection
-              summary={summary}
-              loading={summaryLoading}
-              costSource={costSource}
-              showActiveUsers={isOrgWideView}
-            />
-
-            <BreakdownPieChart
-              title="Features"
-              dimension="feature"
-              data={featureBreakdown}
-              loading={featureBreakdownLoading}
-              labelFor={featureLabelFor}
-            />
-            <BreakdownBarChart
-              title="Models"
-              dimension="model"
-              data={modelBreakdown}
-              loading={modelBreakdownLoading}
-              metric="cost"
-            />
-            <BreakdownBarChart
-              title="Top Projects"
-              dimension="project"
-              data={projectBreakdown}
-              loading={projectBreakdownLoading}
-              metric="cost"
-              labelFor={projectLabelFor}
-            />
-            {isOrgWideView && (
-              <BreakdownBarChart
-                title="Users"
-                dimension="user"
-                data={userBreakdown}
-                loading={userBreakdownLoading}
-                metric="cost"
-                labelFor={userLabelFor}
-              />
-            )}
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Trends</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PrimaryChart
-                  metric={chartMetric}
-                  costSource={costSource}
-                  data={timeseries}
-                  loading={timeseriesLoading}
-                  splitByLabel={
-                    splitByDimension ? DIMENSION_LABELS[splitByDimension as Dimension] : undefined
-                  }
-                  seriesLabelFor={
-                    splitByDimension ? v => labelForDimensionValue(splitByDimension, v) : undefined
-                  }
-                  period={period}
-                  granularity={granularity}
+            {hasEnterpriseUsageViews && (
+              <div className="space-y-4">
+                <div>
+                  <h1 className="text-2xl font-bold">Usage</h1>
+                  <p className="text-muted-foreground mt-1 text-sm">
+                    Track feature adoption and AI assisted work across {organizationName}.
+                  </p>
+                </div>
+                <UsageViewNavigation
+                  value={usageView}
+                  onValueChange={nextView => setState({ usageView: nextView })}
                 />
-              </CardContent>
-            </Card>
+              </div>
+            )}
 
-            <UsageTableBase
-              title="Detailed Breakdown"
-              columns={tableColumns}
-              data={tableRows}
-              emptyMessage={tableLoading ? 'Loading…' : 'No usage data.'}
-              sortable
-              defaultSort={{ key: 'datetime', direction: 'desc' }}
-              headerActions={
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleExportCsv}
-                  disabled={tableLoading || (tableData?.rows.length ?? 0) === 0}
-                >
-                  <Download className="mr-1.5 h-3.5 w-3.5" />
-                  Download CSV
-                </Button>
-              }
-            />
+            {hasEnterpriseUsageViews && organizationId && usageView === 'overview' ? (
+              <>
+                <UsageWarning />
+                <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+                  <FeatureAdoptionView
+                    organizationId={organizationId}
+                    compact
+                    onViewDetails={() => setState({ usageView: 'feature-adoption' })}
+                  />
+                  <AIAdoptionSummaryCard
+                    organizationId={organizationId}
+                    dateRange={dateRange}
+                    onViewDetails={() => setState({ usageView: 'ai-usage' })}
+                  />
+                </div>
+              </>
+            ) : hasEnterpriseUsageViews && organizationId && usageView === 'feature-adoption' ? (
+              <FeatureAdoptionView organizationId={organizationId} />
+            ) : (
+              <>
+                <UsageWarning />
 
-            {isOrgContext &&
-              organizationId &&
-              (callerRole === 'owner' || callerRole === 'billing_manager') && (
-                <ActiveKiloclawsTable organizationId={organizationId} />
-              )}
+                {isOrgContext && organizationId && (
+                  <AIAdoptionScoreCard organizationId={organizationId} dateRange={dateRange} />
+                )}
+
+                <SummarySection
+                  summary={summary}
+                  loading={summaryLoading}
+                  costSource={costSource}
+                  showActiveUsers={isOrgWideView}
+                />
+
+                <BreakdownPieChart
+                  title="Features"
+                  dimension="feature"
+                  data={featureBreakdown}
+                  loading={featureBreakdownLoading}
+                  labelFor={featureLabelFor}
+                />
+                <BreakdownBarChart
+                  title="Models"
+                  dimension="model"
+                  data={modelBreakdown}
+                  loading={modelBreakdownLoading}
+                  metric="cost"
+                />
+                <BreakdownBarChart
+                  title="Top Projects"
+                  dimension="project"
+                  data={projectBreakdown}
+                  loading={projectBreakdownLoading}
+                  metric="cost"
+                  labelFor={projectLabelFor}
+                />
+                {isOrgWideView && (
+                  <BreakdownBarChart
+                    title="Users"
+                    dimension="user"
+                    data={userBreakdown}
+                    loading={userBreakdownLoading}
+                    metric="cost"
+                    labelFor={userLabelFor}
+                  />
+                )}
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Trends</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <PrimaryChart
+                      metric={chartMetric}
+                      costSource={costSource}
+                      data={timeseries}
+                      loading={timeseriesLoading}
+                      splitByLabel={
+                        splitByDimension
+                          ? DIMENSION_LABELS[splitByDimension as Dimension]
+                          : undefined
+                      }
+                      seriesLabelFor={
+                        splitByDimension
+                          ? value => labelForDimensionValue(splitByDimension, value)
+                          : undefined
+                      }
+                      period={period}
+                      granularity={granularity}
+                    />
+                  </CardContent>
+                </Card>
+
+                <UsageTableBase
+                  title="Detailed Breakdown"
+                  columns={tableColumns}
+                  data={tableRows}
+                  emptyMessage={tableLoading ? 'Loading…' : 'No usage data.'}
+                  sortable
+                  defaultSort={{ key: 'datetime', direction: 'desc' }}
+                  headerActions={
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleExportCsv}
+                      disabled={tableLoading || (tableData?.rows.length ?? 0) === 0}
+                    >
+                      <Download className="mr-1.5 h-3.5 w-3.5" />
+                      Download CSV
+                    </Button>
+                  }
+                />
+
+                {isOrgContext &&
+                  organizationId &&
+                  (callerRole === 'owner' || callerRole === 'billing_manager') && (
+                    <ActiveKiloclawsTable organizationId={organizationId} />
+                  )}
+              </>
+            )}
           </div>
         </div>
       </div>

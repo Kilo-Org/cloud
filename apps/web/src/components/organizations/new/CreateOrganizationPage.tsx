@@ -180,7 +180,11 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
         <div className="flex flex-col gap-6">
           <Card className="border-2">
             <CardContent className="flex min-h-[140px] items-center justify-center p-6 lg:p-8">
-              <form onSubmit={handleSubmit} className="w-full space-y-4">
+              <form
+                id="create-organization-form"
+                onSubmit={handleSubmit}
+                className="w-full space-y-4"
+              >
                 <AnimatePresence>
                   {errors.general && (
                     <motion.div
@@ -237,12 +241,12 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
           <Card className="border-2">
             <CardContent className="p-6 text-center lg:p-8">
               <Button
-                type="button"
+                type="submit"
+                form="create-organization-form"
                 variant="primary"
                 size="lg"
                 className="mb-4 h-auto px-6 py-4 text-lg"
                 disabled={!isFormValid || isSubmitting}
-                onClick={handleSubmit}
               >
                 {isSubmitting ? (
                   'Processing...'

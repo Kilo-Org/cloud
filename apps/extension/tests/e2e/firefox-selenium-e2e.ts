@@ -25,7 +25,9 @@ const chromeWorkflowNames = [
   'safe mode conversation reads the selected tab with safe tools',
   'dangerous mode conversation can use safe read tools',
   'running conversation can be stopped',
-  'target tab list can be refreshed',
+  'target tab list updates automatically',
+  'closing the selected tab clears the target tab selection',
+  'closing the selected tab aborts a running request',
   'conversation survives side panel reload',
   'model and thinking controls wait for the model catalog',
   'model catalog failures can be retried',
@@ -504,6 +506,37 @@ const seedFirefoxAuth = async (driver: WebDriver): Promise<void> => {
   assert.equal(result, 'ok');
 };
 
+const seedFirefoxConversation = async (driver: WebDriver, events: unknown[]): Promise<void> => {
+  const result = await driver.executeAsyncScript(
+    (conversationEvents: unknown[], done: (value: unknown) => void) => {
+      const browserApi = (
+        globalThis as typeof globalThis & {
+          browser?: {
+            storage?: {
+              local?: {
+                set: (items: Record<string, unknown>) => Promise<void>;
+              };
+            };
+          };
+        }
+      ).browser;
+
+      browserApi?.storage?.local
+        ?.set({ kiloAgentConversation: conversationEvents })
+        .then(() => {
+          done('ok');
+          return null;
+        })
+        .catch((error: unknown) => {
+          done(error instanceof Error ? error.message : String(error));
+        });
+    },
+    events
+  );
+
+  assert.equal(result, 'ok');
+};
+
 const startFirefoxSession = async (): Promise<FirefoxSession> => {
   const options = new firefox.Options();
 
@@ -864,12 +897,17 @@ const scenarios: FirefoxScenario[] = [
         await openAuthenticatedPanel(session);
         await waitForModel(session.driver);
         await session.driver.manage().window().setRect({ height: 420, width: 360, x: 0, y: 0 });
-
-        for (let index = 0; index < 80; index += 1) {
-          await sendMessage(session.driver, `message ${index}`);
-        }
-
-        await waitForText(session.driver, 'Pick a target tab first.');
+        await seedFirefoxConversation(
+          session.driver,
+          Array.from({ length: 80 }, (_value, index) => ({
+            id: `overflow-${index}`,
+            role: 'assistant',
+            text: `Overflow content ${index}`,
+            type: 'message',
+          }))
+        );
+        await session.driver.navigate().refresh();
+        await waitForText(session.driver, 'Overflow content 79');
 
         const scrollState = await session.driver.executeScript(() => {
           const conversation = document.querySelector('[aria-label="Agent conversation"]');
@@ -1081,7 +1119,7 @@ const scenarios: FirefoxScenario[] = [
     },
   },
   {
-    name: 'target tab list can be refreshed',
+    name: 'target tab list updates automatically',
     run: context =>
       withSession(context.api, {}, async session => {
         await session.openTargetPage();
@@ -1091,21 +1129,79 @@ const scenarios: FirefoxScenario[] = [
 
         await session.openTargetPage('Refreshed target tab');
         await session.driver.switchTo().window(sidePanelHandle);
-        await clickButtonByLabel(session.driver, 'Refresh tabs');
         await waitForTargetOption(session.driver, 'Refreshed target tab');
       }),
+  },
+  {
+    name: 'closing the selected tab clears the target tab selection',
+    run: context =>
+      withSession(context.api, {}, async session => {
+        await session.openTargetPage();
+        const targetPageHandle = await session.driver.getWindowHandle();
+
+        await openAuthenticatedPanel(session);
+        await waitForTargetTab(session.driver, 'Kilo extension fixture');
+        const sidePanelHandle = await session.driver.getWindowHandle();
+
+        await session.driver.switchTo().window(targetPageHandle);
+        await session.driver.close();
+        await session.driver.switchTo().window(sidePanelHandle);
+        await waitForTargetTab(session.driver, 'No tab selected');
+        await session.driver
+          .findElement(By.css('#agent-message'))
+          .sendKeys('Inspect the closed tab');
+        assert.equal(await isControlDisabled(session.driver, 'button[type="submit"]'), true);
+      }),
+  },
+  {
+    name: 'closing the selected tab aborts a running request',
+    run: context => {
+      const { promise: pendingCompletion, resolve: releaseCompletion } =
+        Promise.withResolvers<void>();
+      const { promise: chatAborted, resolve: markChatAborted } = Promise.withResolvers<void>();
+
+      return withSession(
+        context.api,
+        {
+          beforeFirstCompletion: () => pendingCompletion,
+          observeFirstChatAbort: markChatAborted,
+        },
+        async session => {
+          try {
+            await session.openTargetPage();
+            const targetPageHandle = await session.driver.getWindowHandle();
+
+            await openAuthenticatedPanel(session);
+            await waitForTargetTab(session.driver, 'Kilo extension fixture');
+            const sidePanelHandle = await session.driver.getWindowHandle();
+
+            await switchToDangerousMode(session.driver);
+            await sendMessage(session.driver, 'Inspect this tab');
+            await waitForText(session.driver, 'Stop');
+            await session.driver.switchTo().window(targetPageHandle);
+            await session.driver.close();
+            await session.driver.switchTo().window(sidePanelHandle);
+            await waitForTargetTab(session.driver, 'No tab selected');
+            await chatAborted;
+          } finally {
+            releaseCompletion();
+          }
+        }
+      );
+    },
   },
   {
     name: 'conversation survives side panel reload',
     run: context =>
       withSession(context.api, {}, async session => {
+        await session.openTargetPage();
         await openAuthenticatedPanel(session);
         await waitForModel(session.driver);
+        await switchToDangerousMode(session.driver);
         await sendMessage(session.driver, 'Remember this after reload');
-        await waitForText(session.driver, 'Pick a target tab first.');
+        await waitForText(session.driver, 'Remember this after reload');
         await session.driver.navigate().refresh();
         await waitForText(session.driver, 'Remember this after reload');
-        await waitForText(session.driver, 'Pick a target tab first.');
       }),
   },
   {
@@ -1179,6 +1275,7 @@ const scenarios: FirefoxScenario[] = [
         },
         async session => {
           try {
+            await session.openTargetPage();
             await openAuthenticatedPanel(session);
             await waitForModel(session.driver);
             await session.driver.findElement(By.css('#agent-message')).sendKeys('Inspect this tab');

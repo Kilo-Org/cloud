@@ -1,10 +1,11 @@
 /* eslint-disable import/no-nodejs-modules */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { mockKiloApi, readSidePanelScrollState, sendOverflowMessages } from './kilo-api-fixture';
+import { mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
+  setExtensionStorage,
   startFixtureServer,
 } from './extension-context-fixture';
 
@@ -41,10 +42,14 @@ test('new conversation keeps the selected target tab', async () => {
 });
 
 test('new conversation does not drop an immediately typed draft', async () => {
+  const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 
   try {
     await mockKiloApi(context);
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
 
     const sidePanel = await context.newPage();
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
@@ -73,6 +78,7 @@ test('new conversation does not drop an immediately typed draft', async () => {
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
   } finally {
     await context.close();
+    await fixture.close();
     await rm(userDataDir, { force: true, recursive: true });
   }
 });
@@ -134,12 +140,17 @@ test('only the message pane scrolls virtualized overflowing conversation content
     await sidePanel.setViewportSize({ height: 420, width: 360 });
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await seedExtensionAuth(sidePanel);
+    await setExtensionStorage(sidePanel, {
+      kiloAgentConversation: Array.from({ length: 80 }, (_value, index) => ({
+        id: `overflow-${index}`,
+        role: 'assistant',
+        text: `Overflow content ${index}`,
+        type: 'message',
+      })),
+    });
     await sidePanel.reload();
 
-    const messageInput = sidePanel.getByLabel('Message agent');
-    await sendOverflowMessages(messageInput, 80);
-
-    await expect(sidePanel.getByText('Pick a target tab first.').last()).toBeVisible();
+    await expect(sidePanel.getByText('Overflow content 79')).toBeVisible();
     await expect(sidePanel.getByLabel('Agent conversation')).toBeVisible();
 
     const scrollState = await sidePanel.evaluate(readSidePanelScrollState);

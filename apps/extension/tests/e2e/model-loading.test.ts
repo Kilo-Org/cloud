@@ -2,7 +2,11 @@
 import { expect, test } from '@playwright/test';
 import type { Response } from '@playwright/test';
 import { rm } from 'node:fs/promises';
-import { launchExtensionContext, seedExtensionAuth } from './extension-context-fixture';
+import {
+  launchExtensionContext,
+  seedExtensionAuth,
+  startFixtureServer,
+} from './extension-context-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
 
 const orgOneId = 'org-1';
@@ -113,6 +117,7 @@ test('model catalog failures can be retried', async () => {
 });
 
 test('switching credit accounts clears the model while the next catalog loads', async () => {
+  const fixture = await startFixtureServer();
   const { promise: pendingOrgTwoModels, resolve: releaseOrgTwoModels } =
     Promise.withResolvers<void>();
   const { promise: orgTwoModelsRequested, resolve: markOrgTwoModelsRequested } =
@@ -130,6 +135,9 @@ test('switching credit accounts clears the model while the next catalog loads', 
       },
       organizations: [{ id: orgTwoId, name: 'Beta' }],
     });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
 
     const sidePanel = await context.newPage();
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
@@ -154,6 +162,7 @@ test('switching credit accounts clears the model while the next catalog loads', 
   } finally {
     releaseOrgTwoModels();
     await context.close();
+    await fixture.close();
     await rm(userDataDir, { force: true, recursive: true });
   }
 });

@@ -1,5 +1,5 @@
 import { browser } from '#imports';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { LIST_INSPECTABLE_TABS_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
 import type {
   InspectableTab,
@@ -27,7 +27,7 @@ let rememberedSelectedTabId: number | null = null;
 export const useTabDebugger = (): {
   readonly inspectableTabs: InspectableTab[];
   readonly isLoadingTabs: boolean;
-  readonly loadInspectableTabs: () => Promise<void>;
+  readonly loadInspectableTabs: (options?: { readonly showLoading?: boolean }) => Promise<void>;
   readonly selectTab: (tabId: number) => void;
   readonly selectedTabId: number | undefined;
   readonly tabDebuggerError: string | undefined;
@@ -38,43 +38,55 @@ export const useTabDebugger = (): {
     rememberedSelectedTabId ?? undefined
   );
   const [tabDebuggerError, setTabDebuggerError] = useState<string | undefined>();
+  const hasLoadedTabsRef = useRef(false);
 
-  const loadInspectableTabs = useCallback(async (): Promise<void> => {
-    setIsLoadingTabs(true);
-    setTabDebuggerError(undefined);
-
-    try {
-      const response = await sendTabDebuggerRequest({ type: LIST_INSPECTABLE_TABS_MESSAGE });
-
-      if (!response.ok) {
-        throw new Error(response.error);
+  const loadInspectableTabs = useCallback(
+    async ({ showLoading = true }: { readonly showLoading?: boolean } = {}): Promise<void> => {
+      if (showLoading) {
+        setIsLoadingTabs(true);
       }
 
-      if (response.type !== LIST_INSPECTABLE_TABS_MESSAGE) {
-        throw new Error('Extension background returned the wrong response.');
-      }
+      setTabDebuggerError(undefined);
 
-      setInspectableTabs(response.tabs);
-      setSelectedTabId(currentTabId => {
-        if (currentTabId !== undefined && response.tabs.some(tab => tab.id === currentTabId)) {
-          rememberedSelectedTabId = currentTabId;
-          return currentTabId;
+      try {
+        const response = await sendTabDebuggerRequest({ type: LIST_INSPECTABLE_TABS_MESSAGE });
+
+        if (!response.ok) {
+          throw new Error(response.error);
         }
 
-        const nextTabId = response.tabs[0]?.id;
+        if (response.type !== LIST_INSPECTABLE_TABS_MESSAGE) {
+          throw new Error('Extension background returned the wrong response.');
+        }
 
-        rememberedSelectedTabId = nextTabId ?? null;
-        return nextTabId;
-      });
-    } catch (error) {
-      setInspectableTabs([]);
-      setSelectedTabId(undefined);
-      rememberedSelectedTabId = null;
-      setTabDebuggerError(getErrorMessage(error, 'Failed to load tabs.'));
-    } finally {
-      setIsLoadingTabs(false);
-    }
-  }, []);
+        const isInitialLoad = !hasLoadedTabsRef.current;
+
+        hasLoadedTabsRef.current = true;
+        setInspectableTabs(response.tabs);
+        setSelectedTabId(currentTabId => {
+          if (currentTabId !== undefined && response.tabs.some(tab => tab.id === currentTabId)) {
+            rememberedSelectedTabId = currentTabId;
+            return currentTabId;
+          }
+
+          const nextTabId = isInitialLoad ? response.tabs[0]?.id : undefined;
+
+          rememberedSelectedTabId = nextTabId ?? null;
+          return nextTabId;
+        });
+      } catch (error) {
+        setInspectableTabs([]);
+        setSelectedTabId(undefined);
+        rememberedSelectedTabId = null;
+        setTabDebuggerError(getErrorMessage(error, 'Failed to load tabs.'));
+      } finally {
+        if (showLoading) {
+          setIsLoadingTabs(false);
+        }
+      }
+    },
+    []
+  );
 
   const selectTab = useCallback((tabId: number): void => {
     rememberedSelectedTabId = tabId;

@@ -87,13 +87,25 @@ export const AgentChatPanel = ({
   );
   const isModelSelectDisabled = modelOptions.length === 0;
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
+  const isSendDisabled = draft.trim() === '' || model === '' || selectedTabId === undefined;
 
   useEffect(() => {
     void loadInspectableTabs();
+    const tabPollingInterval = globalThis.setInterval(() => {
+      void loadInspectableTabs({ showLoading: false });
+    }, 2000);
+
     return () => {
+      globalThis.clearInterval(tabPollingInterval);
       runAbortRef.current?.abort();
     };
   }, [loadInspectableTabs]);
+
+  useEffect(() => {
+    if (isRunning && selectedTabId === undefined) {
+      runAbortRef.current?.abort();
+    }
+  }, [isRunning, selectedTabId]);
 
   useEffect(() => {
     if (conversationResetSignalRef.current === conversationResetSignal) {
@@ -274,7 +286,7 @@ export const AgentChatPanel = ({
   const submitDraft = (): void => {
     const text = draft.trim();
 
-    if (text === '' || isRunning || model === '') {
+    if (text === '' || isRunning || model === '' || selectedTabId === undefined) {
       return;
     }
 
@@ -318,7 +330,7 @@ export const AgentChatPanel = ({
         <div className="mt-2 grid gap-2">
           <button
             className="h-9 w-full rounded-md bg-[#EDFF00] px-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-            disabled={isRunning ? false : draft.trim() === '' || model === ''}
+            disabled={isRunning ? false : isSendDisabled}
             onClick={isRunning ? stopRun : undefined}
             type={isRunning ? 'button' : 'submit'}
           >
@@ -340,7 +352,6 @@ export const AgentChatPanel = ({
           modelOptions={modelOptions}
           onModeChange={setMode}
           onModelChange={setModel}
-          onRefreshTabs={loadInspectableTabs}
           onRetryModels={() => loadModels()}
           onSelectedTabChange={selectTab}
           onThinkingEffortChange={setThinkingEffort}

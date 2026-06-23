@@ -13,22 +13,6 @@ import {
   startFixtureServer,
 } from './extension-context-fixture';
 
-interface ExtensionManifest {
-  readonly action:
-    | {
-        readonly default_popup: string | undefined;
-      }
-    | undefined;
-  readonly content_scripts: unknown[] | undefined;
-  readonly host_permissions: string[] | undefined;
-  readonly permissions: string[] | undefined;
-  readonly side_panel:
-    | {
-        readonly default_path: string | undefined;
-      }
-    | undefined;
-}
-
 const extensionManifestSchema = z.object({
   action: z.object({ default_popup: z.string().optional() }).optional(),
   content_scripts: z.array(z.unknown()).optional(),
@@ -36,6 +20,7 @@ const extensionManifestSchema = z.object({
   permissions: z.array(z.string()).optional(),
   side_panel: z.object({ default_path: z.string().optional() }).optional(),
 });
+type ExtensionManifest = z.infer<typeof extensionManifestSchema>;
 
 const requireBoundingBox = async (
   locator: Locator
@@ -78,19 +63,7 @@ const readOutputManifest = async (): Promise<ExtensionManifest> => {
     throw new TypeError('Extension manifest was not an object.');
   }
 
-  return {
-    action:
-      manifest.data.action === undefined
-        ? undefined
-        : { default_popup: manifest.data.action.default_popup },
-    content_scripts: manifest.data.content_scripts,
-    host_permissions: manifest.data.host_permissions,
-    permissions: manifest.data.permissions,
-    side_panel:
-      manifest.data.side_panel === undefined
-        ? undefined
-        : { default_path: manifest.data.side_panel.default_path },
-  };
+  return manifest.data;
 };
 
 test('native side panel is outside the page DOM', async () => {
@@ -227,7 +200,7 @@ test('running conversation can be stopped', async () => {
   }
 });
 
-test('target tab list can be refreshed', async () => {
+test('target tab list updates automatically', async () => {
   const fixture = await startFixtureServer();
   const refreshedFixture = await startFixtureServer({ title: 'Refreshed target tab' });
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -246,8 +219,9 @@ test('target tab list can be refreshed', async () => {
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
     const refreshedPage = await context.newPage();
     await refreshedPage.goto(refreshedFixture.url);
-    await sidePanel.getByRole('button', { name: 'Refresh tabs' }).click();
-    await expect(sidePanel.getByLabel('Target tab')).toContainText('Refreshed target tab');
+    await expect(
+      sidePanel.getByLabel('Target tab').locator('option', { hasText: 'Refreshed target tab' })
+    ).toHaveCount(1);
   } finally {
     await context.close();
     await fixture.close();
@@ -256,27 +230,60 @@ test('target tab list can be refreshed', async () => {
   }
 });
 
-test('conversation survives side panel reload', async () => {
+test('closing the selected tab clears the target tab selection', async () => {
+  const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 
   try {
     await mockKiloApi(context);
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
 
     const sidePanel = await context.newPage();
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await seedExtensionAuth(sidePanel);
     await sidePanel.reload();
 
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
+    await page.close();
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('No tab selected');
+    await sidePanel.getByLabel('Message agent').fill('Inspect the closed tab');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeDisabled();
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('conversation survives side panel reload', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
+    await sidePanel.getByRole('button', { name: 'Dangerous' }).click();
     await sidePanel.getByLabel('Message agent').fill('Remember this after reload');
     await sidePanel.getByLabel('Message agent').press('Enter');
-    await expect(sidePanel.getByText('Pick a target tab first.')).toBeVisible();
+    await expect(sidePanel.getByText('Remember this after reload')).toBeVisible();
 
     await sidePanel.reload();
 
     await expect(sidePanel.getByText('Remember this after reload')).toBeVisible();
-    await expect(sidePanel.getByText('Pick a target tab first.')).toBeVisible();
   } finally {
     await context.close();
+    await fixture.close();
     await rm(userDataDir, { force: true, recursive: true });
   }
 });

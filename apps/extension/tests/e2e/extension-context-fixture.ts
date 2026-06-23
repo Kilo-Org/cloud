@@ -80,9 +80,12 @@ export const launchExtensionContext = async (): Promise<{
   return { context, extensionId, userDataDir };
 };
 
-export const seedExtensionAuth = async (page: Page): Promise<void> => {
+export const setExtensionStorage = async (
+  page: Page,
+  items: Record<string, unknown>
+): Promise<void> => {
   await page.evaluate(
-    ({ token, userEmail }) =>
+    storageItems =>
       new Promise<void>((resolve, reject) => {
         const chromeApi = (
           globalThis as typeof globalThis & {
@@ -105,7 +108,7 @@ export const seedExtensionAuth = async (page: Page): Promise<void> => {
           return;
         }
 
-        storage.set({ kiloAuth: { token, userEmail } }, () => {
+        storage.set(storageItems, () => {
           const message = runtime.lastError?.message;
 
           if (message !== undefined && message !== '') {
@@ -116,6 +119,9 @@ export const seedExtensionAuth = async (page: Page): Promise<void> => {
           resolve();
         });
       }),
-    { token: 'token-1', userEmail: 'user@kilo.ai' }
+    items
   );
 };
+
+export const seedExtensionAuth = (page: Page): Promise<void> =>
+  setExtensionStorage(page, { kiloAuth: { token: 'token-1', userEmail: 'user@kilo.ai' } });

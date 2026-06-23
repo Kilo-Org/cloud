@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { RefreshCw, Shield, TriangleAlert } from 'lucide-react';
+import { Shield, TriangleAlert } from 'lucide-react';
 import { getFooterControlDisplay } from '@/src/shared/agent-chat-placeholder';
 import { thinkingEffortLabel } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
@@ -140,7 +140,6 @@ export const AgentFooterControls = ({
   modelOptions,
   onModeChange,
   onModelChange,
-  onRefreshTabs,
   onRetryModels,
   onSelectedTabChange,
   onThinkingEffortChange,
@@ -160,7 +159,6 @@ export const AgentFooterControls = ({
   modelOptions: KiloGatewayModelOption[];
   onModeChange: (mode: AgentMode) => void;
   onModelChange: (model: string) => void;
-  onRefreshTabs: () => Promise<void>;
   onRetryModels: () => Promise<void>;
   onSelectedTabChange: (tabId: number) => void;
   onThinkingEffortChange: (thinkingEffort: string) => void;
@@ -185,27 +183,18 @@ export const AgentFooterControls = ({
         value={selectedTabId === undefined ? '' : String(selectedTabId)}
       >
         {inspectableTabs.length === 0 ? (
-          <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tabs'}</option>
+          <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tab selected'}</option>
         ) : (
-          inspectableTabs.map(tab => (
-            <option key={tab.id} value={tab.id}>
-              {tab.title}
-            </option>
-          ))
+          <>
+            {selectedTabId === undefined ? <option value="">No tab selected</option> : null}
+            {inspectableTabs.map(tab => (
+              <option key={tab.id} value={tab.id}>
+                {tab.title}
+              </option>
+            ))}
+          </>
         )}
       </CompactSelectControl>
-      <button
-        aria-label="Refresh tabs"
-        className="flex size-8 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-xs font-semibold text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:text-zinc-600"
-        disabled={isLoadingTabs}
-        onClick={() => {
-          void onRefreshTabs();
-        }}
-        title="Refresh tabs"
-        type="button"
-      >
-        <RefreshCw aria-hidden="true" className="size-3.5" />
-      </button>
     </div>
     {tabDebuggerError === undefined ? null : (
       <p className="text-xs leading-4 text-red-300">{tabDebuggerError}</p>

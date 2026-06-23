@@ -132,7 +132,7 @@ export default function NewSessionScreen() {
 
   const handleOpenGitHubIntegration = useCallback(async () => {
     try {
-      await WebBrowser.openBrowserAsync(getGitHubIntegrationUrl(WEB_BASE_URL, organizationId));
+      await WebBrowser.openAuthSessionAsync(getGitHubIntegrationUrl(WEB_BASE_URL, organizationId));
       await refetchRepos();
     } catch {
       toast.error('Could not open GitHub setup. Please try again.');

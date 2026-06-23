@@ -10,6 +10,15 @@ import type {
   MicrodollarUsageStats,
 } from '@/lib/ai-gateway/processUsage.types';
 
+let mockInceptionPromoRunning = true;
+
+jest.mock('@/lib/constants', () => ({
+  ...(jest.requireActual('@/lib/constants') as Record<string, unknown>),
+  get INCEPTION_PROMO_RUNNING() {
+    return mockInceptionPromoRunning;
+  },
+}));
+
 jest.mock('@/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
 }));
@@ -146,6 +155,7 @@ async function flushAfter() {
 describe('POST /api/edit/completions', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockInceptionPromoRunning = true;
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
@@ -214,7 +224,7 @@ describe('POST /api/edit/completions', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('allows requests when balance is exhausted', async () => {
+  it('allows requests when balance is exhausted during the promotion', async () => {
     setOrganizationAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 0,
@@ -229,6 +239,25 @@ describe('POST /api/edit/completions', () => {
     expect(response.status).toBe(200);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
     await flushAfter();
+  });
+
+  it('rejects requests with exhausted balance when the promotion is disabled', async () => {
+    mockInceptionPromoRunning = false;
+    setOrganizationAuth();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: 'teams',
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeValidRequestBody()) as never);
+
+    expect(response.status).toBe(402);
+    expect(await response.json()).toMatchObject({
+      error_type: ProxyErrorType.insufficient_credits,
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 
   it('forwards a single user message to Inception', async () => {

@@ -7,7 +7,7 @@ import {
   processTokenData,
 } from '@/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
-import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
+import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT, INCEPTION_PROMO_RUNNING } from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
@@ -868,8 +868,11 @@ export function countAndStoreEditUsage(
       }
 
       usageStats.market_cost = usageStats.cost_mUsd;
-      usageStats.cost_mUsd = 0;
-      usageStats.cacheDiscount_mUsd = 0;
+
+      if (INCEPTION_PROMO_RUNNING || usageContext.user_byok) {
+        usageStats.cost_mUsd = 0;
+        usageStats.cacheDiscount_mUsd = 0;
+      }
 
       return logMicrodollarUsage(usageStats, usageContext);
     })

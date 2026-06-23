@@ -5,6 +5,8 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
+import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { INCEPTION_PROMO_RUNNING } from '@/lib/constants';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user/server';
 import {
@@ -177,7 +179,22 @@ export async function POST(request: NextRequest) {
 
   setTag('ui.ai_model', requestBody.model);
 
-  const { settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+
+  if (
+    !INCEPTION_PROMO_RUNNING &&
+    balance <= 0 &&
+    !(await isFreeModel(requestBody.model)) &&
+    !userByok
+  ) {
+    return NextResponse.json(
+      {
+        error: { message: 'Insufficient credits' },
+        error_type: ProxyErrorType.insufficient_credits,
+      },
+      { status: 402 }
+    );
+  }
 
   const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
     modelId: requestBody.model,

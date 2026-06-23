@@ -12,7 +12,7 @@ import {
   wasChatCompletionAborted,
 } from './kilo-api-fixture';
 
-test('new conversation aborts a running request', async () => {
+test('new conversation keeps the running request in its original tab', async () => {
   const fixture = await startFixtureServer();
   const { promise: pendingCompletion, resolve: releaseCompletion } = Promise.withResolvers<void>();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -20,6 +20,8 @@ test('new conversation aborts a running request', async () => {
   try {
     await mockKiloApi(context, {
       beforeFirstCompletion: () => pendingCompletion,
+      firstCompletionEvents: [{ choices: [{ delta: { content: 'Original tab completed.' } }] }],
+      toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
     });
 
     const page = await context.newPage();
@@ -31,17 +33,18 @@ test('new conversation aborts a running request', async () => {
     await sidePanel.reload();
     await installChatCompletionAbortObserver(sidePanel);
 
-    await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
-    await sidePanel.getByRole('button', { name: 'Dangerous' }).click();
-    await sidePanel.getByLabel('Message agent').fill('Inspect this tab');
+    await sidePanel.getByLabel('Message agent').fill('Original tab');
     await sidePanel.getByLabel('Message agent').press('Enter');
 
     await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
     await sidePanel.getByLabel('New conversation').click();
 
-    await expect.poll(() => wasChatCompletionAborted(sidePanel)).toBe(true);
+    await expect(sidePanel.getByText('Pick a tab and ask Kilo to inspect it.')).toBeVisible();
+    await expect.poll(() => wasChatCompletionAborted(sidePanel)).toBe(false);
+    await sidePanel.getByRole('tab', { name: /Original tab/u }).click();
+    await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
     releaseCompletion();
-    await expect(sidePanel.getByText('Stopped.')).toBeHidden();
+    await expect(sidePanel.getByText('Original tab completed.')).toBeVisible();
   } finally {
     releaseCompletion();
     await context.close();

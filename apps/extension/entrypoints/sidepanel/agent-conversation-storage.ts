@@ -4,8 +4,20 @@ import type { Dispatch, SetStateAction } from 'react';
 import { z } from 'zod';
 import { toPersistedConversationEvents } from '@/src/shared/agent-conversation-persistence';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
+import { normalizeStoredConversations } from '@/src/shared/agent-conversation-tabs';
+import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
+export {
+  closeStoredConversation,
+  createNextStoredConversation,
+  getActiveStoredConversation,
+  getStoredConversationTitle,
+  setActiveStoredConversation,
+  updateStoredConversationEvents,
+} from '@/src/shared/agent-conversation-tabs';
+export type { StoredAgentConversation } from '@/src/shared/agent-conversation-tabs';
 
-const conversationStorageKey = 'local:kiloAgentConversation';
+const legacyConversationStorageKey = 'local:kiloAgentConversation';
+const conversationStorageKey = 'local:kiloAgentConversations';
 const conversationEventSchema = z.union([
   z.object({
     id: z.string(),
@@ -52,6 +64,15 @@ const conversationEventSchema = z.union([
   }),
 ]);
 const conversationEventsSchema = z.array(conversationEventSchema);
+const storedConversationSchema = z.object({
+  events: conversationEventsSchema,
+  id: z.string(),
+  title: z.string(),
+});
+const storedConversationsSchema = z.object({
+  activeConversationId: z.string(),
+  conversations: z.array(storedConversationSchema),
+});
 
 const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] | undefined => {
   const parsed = conversationEventsSchema.safeParse(value);
@@ -126,25 +147,70 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
   return events;
 };
 
-export const useStoredAgentConversation = (
+const normalizeStoredConversationStore = (
+  value: unknown
+): StoredAgentConversationStore | undefined => {
+  const parsed = storedConversationsSchema.safeParse(value);
+
+  if (!parsed.success) {
+    return undefined;
+  }
+
+  return normalizeStoredConversations({
+    store: {
+      activeConversationId: parsed.data.activeConversationId,
+      conversations: parsed.data.conversations.map(conversation => ({
+        events: normalizeConversationEvents(conversation.events) ?? [],
+        id: conversation.id,
+        title: conversation.title,
+      })),
+    },
+  });
+};
+
+const toPersistedConversationStore = (
+  store: StoredAgentConversationStore
+): StoredAgentConversationStore => ({
+  ...store,
+  conversations: store.conversations.map(conversation => ({
+    ...conversation,
+    events: toPersistedConversationEvents(conversation.events),
+  })),
+});
+
+export const useStoredAgentConversations = (
   createDefaultEvents: () => AgentConversationEvent[]
-): readonly [AgentConversationEvent[], Dispatch<SetStateAction<AgentConversationEvent[]>>] => {
-  const [events, setEvents] = useState<AgentConversationEvent[]>(createDefaultEvents);
+): readonly [
+  StoredAgentConversationStore,
+  Dispatch<SetStateAction<StoredAgentConversationStore>>,
+] => {
+  const [store, setStore] = useState<StoredAgentConversationStore>(() =>
+    normalizeStoredConversations({ defaultEvents: createDefaultEvents() })
+  );
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     let isCurrent = true;
 
     void (async (): Promise<void> => {
-      const storedEvents = normalizeConversationEvents(
+      const storedConversations = normalizeStoredConversationStore(
         await storage.getItem(conversationStorageKey)
+      );
+      const legacyEvents = normalizeConversationEvents(
+        await storage.getItem(legacyConversationStorageKey)
       );
 
       if (!isCurrent) {
         return;
       }
 
-      setEvents(storedEvents ?? createDefaultEvents());
+      setStore(
+        normalizeStoredConversations({
+          defaultEvents: createDefaultEvents(),
+          legacyEvents,
+          store: storedConversations,
+        })
+      );
       setIsLoaded(true);
     })();
 
@@ -155,9 +221,10 @@ export const useStoredAgentConversation = (
 
   useEffect(() => {
     if (isLoaded) {
-      void storage.setItem(conversationStorageKey, toPersistedConversationEvents(events));
+      void storage.setItem(conversationStorageKey, toPersistedConversationStore(store));
+      void storage.removeItem(legacyConversationStorageKey);
     }
-  }, [events, isLoaded]);
+  }, [isLoaded, store]);
 
-  return [events, setEvents];
+  return [store, setStore];
 };

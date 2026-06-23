@@ -10,8 +10,17 @@ import type { AgentConversationEvent, AgentMode } from '@/src/shared/agent-conve
 import { defaultMode } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
+import {
+  closeStoredConversation,
+  createNextStoredConversation,
+  getActiveStoredConversation,
+  getStoredConversationTitle,
+  setActiveStoredConversation,
+  updateStoredConversationEvents,
+  useStoredAgentConversations,
+} from './agent-conversation-storage';
+import type { StoredAgentConversation } from './agent-conversation-storage';
 import { AgentFooterControls } from './agent-footer-controls';
-import { useStoredAgentConversation } from './agent-conversation-storage';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
@@ -23,6 +32,12 @@ const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =
 const createDefaultConversationEvents = (): AgentConversationEvent[] => [
   createAssistantMessage('Pick a tab and ask Kilo to inspect it.'),
 ];
+interface ConversationRunState {
+  readonly abort: AbortController;
+  readonly selectedTabId: number;
+  readonly token: number;
+}
+
 const sanitizeTabContextText = (text: string): string =>
   text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 const sanitizeTabContextUrl = (url: string): string => {
@@ -46,23 +61,104 @@ export const formatSelectedTabSystemEnvironment = ({
 }): string =>
   `<system_environment>\nSelected tab title: ${sanitizeTabContextText(title)}\nSelected tab URL: ${sanitizeTabContextUrl(url)}\nCurrent time: ${new Date().toISOString()}\nTimezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}\n</system_environment>`;
 
+const ConversationTabs = ({
+  activeConversationId,
+  conversations,
+  onCloseConversation,
+  onCreateConversation,
+  onSelectConversation,
+  runningConversationIds,
+}: {
+  activeConversationId: string;
+  conversations: StoredAgentConversation[];
+  onCloseConversation: (conversationId: string) => void;
+  onCreateConversation: () => void;
+  onSelectConversation: (conversationId: string) => void;
+  runningConversationIds: readonly string[];
+}): JSX.Element => (
+  <div className="border-b border-zinc-900 bg-zinc-950">
+    <div
+      aria-label="Conversation tabs"
+      className="agent-conversation-scrollbar flex min-w-0 items-center gap-1 overflow-x-auto px-2 py-2"
+      role="tablist"
+    >
+      {conversations.map(conversation => {
+        const title = getStoredConversationTitle(conversation);
+        const isActive = conversation.id === activeConversationId;
+        const isRunning = runningConversationIds.includes(conversation.id);
+
+        return (
+          <div
+            className={
+              isActive
+                ? 'flex h-8 max-w-44 shrink-0 items-center rounded-md border border-[#EDFF00]/70 bg-zinc-900 text-zinc-50'
+                : 'flex h-8 max-w-44 shrink-0 items-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100'
+            }
+            key={conversation.id}
+          >
+            <button
+              aria-selected={isActive}
+              className="flex h-full min-w-0 items-center gap-1.5 px-2 text-left text-xs font-medium outline-none focus:ring-2 focus:ring-[#EDFF00]/50"
+              onClick={() => {
+                onSelectConversation(conversation.id);
+              }}
+              role="tab"
+              title={title}
+              type="button"
+            >
+              {isRunning ? (
+                <span
+                  aria-hidden="true"
+                  className="size-2 shrink-0 animate-pulse rounded-full bg-[#EDFF00]"
+                />
+              ) : null}
+              <span className="truncate">{title}</span>
+            </button>
+            <button
+              aria-label={`Close ${title}`}
+              className="mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-zinc-500 outline-none transition hover:bg-zinc-800 hover:text-zinc-100 focus:ring-2 focus:ring-[#EDFF00]/50"
+              onClick={() => {
+                onCloseConversation(conversation.id);
+              }}
+              type="button"
+            >
+              <span aria-hidden="true" className="text-sm leading-none">
+                x
+              </span>
+            </button>
+          </div>
+        );
+      })}
+      <button
+        aria-label="New conversation"
+        className="flex size-8 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 outline-none transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:ring-2 focus:ring-[#EDFF00]/50"
+        onClick={onCreateConversation}
+        type="button"
+      >
+        <span aria-hidden="true" className="text-lg leading-none">
+          +
+        </span>
+      </button>
+    </div>
+  </div>
+);
+
 export const AgentChatPanel = ({
   auth,
-  conversationResetSignal,
   organizationId,
 }: {
   auth: StoredAuth;
-  conversationResetSignal: number;
   organizationId: string | undefined;
 }): JSX.Element => {
   const [draft, setDraft] = useState('');
-  const [events, setEvents] = useStoredAgentConversation(createDefaultConversationEvents);
-  const [isRunning, setIsRunning] = useState(false);
+  const [conversationStore, setConversationStore] = useStoredAgentConversations(
+    createDefaultConversationEvents
+  );
+  const [runningConversationIds, setRunningConversationIds] = useState<string[]>([]);
   const [mode, setMode] = useState<AgentMode>(defaultMode);
   const [model, setModel] = useState('');
   const [thinkingEffort, setThinkingEffort] = useState('');
-  const conversationResetSignalRef = useRef(conversationResetSignal);
-  const runAbortRef = useRef<AbortController | null>(null);
+  const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
   const { inspectableTabs, isLoadingTabs, selectTab, selectedTabId, tabDebuggerError } =
     useTabDebugger();
@@ -74,41 +170,39 @@ export const AgentChatPanel = ({
     () => modelOptions.find(option => option.id === model),
     [model, modelOptions]
   );
+  const { events, id: activeConversationId } = getActiveStoredConversation(conversationStore);
   const groupedEvents = useMemo(() => groupConversationEvents(events), [events]);
   const thinkingOptions = useMemo(
     () => (selectedModel === undefined ? [] : selectedModel.variants),
     [selectedModel]
   );
+  const isRunning = runningConversationIds.includes(activeConversationId);
   const isModelSelectDisabled = modelOptions.length === 0;
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
   const isSendDisabled = draft.trim() === '' || model === '' || selectedTabId === undefined;
 
   useEffect(
     () => () => {
-      runAbortRef.current?.abort();
+      for (const runState of runStatesRef.current.values()) {
+        runState.abort.abort();
+      }
     },
     []
   );
 
   useEffect(() => {
-    if (isRunning && selectedTabId === undefined) {
-      runAbortRef.current?.abort();
-    }
-  }, [isRunning, selectedTabId]);
-
-  useEffect(() => {
-    if (conversationResetSignalRef.current === conversationResetSignal) {
+    if (isLoadingTabs) {
       return;
     }
 
-    conversationResetSignalRef.current = conversationResetSignal;
-    runTokenRef.current += 1;
-    runAbortRef.current?.abort();
-    runAbortRef.current = null;
-    setIsRunning(false);
-    setDraft('');
-    setEvents(createDefaultConversationEvents());
-  }, [conversationResetSignal, setEvents]);
+    const inspectableTabIds = new Set(inspectableTabs.map(tab => tab.id));
+
+    for (const runState of runStatesRef.current.values()) {
+      if (!inspectableTabIds.has(runState.selectedTabId)) {
+        runState.abort.abort();
+      }
+    }
+  }, [inspectableTabs, isLoadingTabs]);
 
   useEffect(() => {
     if (modelOptions.length === 0) {
@@ -136,40 +230,51 @@ export const AgentChatPanel = ({
     }
   }, [thinkingEffort, thinkingOptions]);
 
-  const appendEvents = (nextEvents: AgentConversationEvent[]): void => {
-    setEvents(currentEvents => [...currentEvents, ...nextEvents]);
+  const appendEvents = (conversationId: string, nextEvents: AgentConversationEvent[]): void => {
+    setConversationStore(store =>
+      updateStoredConversationEvents(store, conversationId, currentEvents => [
+        ...currentEvents,
+        ...nextEvents,
+      ])
+    );
   };
 
-  const updateAssistantMessage = (eventId: string, text: string): void => {
-    setEvents(currentEvents =>
-      currentEvents.map(event =>
-        event.id === eventId && event.type === 'message' && event.role === 'assistant'
-          ? { ...event, text }
-          : event
+  const updateAssistantMessage = (conversationId: string, eventId: string, text: string): void => {
+    setConversationStore(store =>
+      updateStoredConversationEvents(store, conversationId, currentEvents =>
+        currentEvents.map(event =>
+          event.id === eventId && event.type === 'message' && event.role === 'assistant'
+            ? { ...event, text }
+            : event
+        )
       )
     );
   };
 
-  const updateThinkingBlock = (eventId: string, text: string): void => {
-    setEvents(currentEvents =>
-      currentEvents.map(event =>
-        event.id === eventId && event.type === 'thinking' ? { ...event, text } : event
+  const updateThinkingBlock = (conversationId: string, eventId: string, text: string): void => {
+    setConversationStore(store =>
+      updateStoredConversationEvents(store, conversationId, currentEvents =>
+        currentEvents.map(event =>
+          event.id === eventId && event.type === 'thinking' ? { ...event, text } : event
+        )
       )
     );
   };
 
   const submitMessage = (text: string): void => {
+    const conversationId = activeConversationId;
+    const conversationEvents = events;
     const selectedTab = inspectableTabs.find(tab => tab.id === selectedTabId);
     const userEvent = createUserMessage(
       text,
       selectedTab === undefined ? undefined : formatSelectedTabSystemEnvironment(selectedTab)
     );
-    const conversationWithUserMessage = [...events, userEvent];
+    const conversationWithUserMessage = [...conversationEvents, userEvent];
 
-    appendEvents([userEvent]);
+    appendEvents(conversationId, [userEvent]);
 
     if (selectedTabId === undefined) {
-      appendEvents([createAssistantMessage('Pick a target tab first.')]);
+      appendEvents(conversationId, [createAssistantMessage('Pick a target tab first.')]);
       return;
     }
 
@@ -177,25 +282,27 @@ export const AgentChatPanel = ({
     const abort = new AbortController();
     const runToken = (runTokenRef.current += 1);
     const isCurrentRun = (): boolean =>
-      runTokenRef.current === runToken && runAbortRef.current === abort;
+      runStatesRef.current.get(conversationId)?.token === runToken;
     const appendRunEvents = (nextEvents: AgentConversationEvent[]): void => {
       if (isCurrentRun()) {
-        appendEvents(nextEvents);
+        appendEvents(conversationId, nextEvents);
       }
     };
     const updateRunAssistantMessage = (eventId: string, messageText: string): void => {
       if (isCurrentRun()) {
-        updateAssistantMessage(eventId, messageText);
+        updateAssistantMessage(conversationId, eventId, messageText);
       }
     };
     const updateRunThinkingBlock = (eventId: string, thinkingText: string): void => {
       if (isCurrentRun()) {
-        updateThinkingBlock(eventId, thinkingText);
+        updateThinkingBlock(conversationId, eventId, thinkingText);
       }
     };
 
-    runAbortRef.current = abort;
-    setIsRunning(true);
+    runStatesRef.current.set(conversationId, { abort, selectedTabId, token: runToken });
+    setRunningConversationIds(currentIds =>
+      currentIds.includes(conversationId) ? currentIds : [...currentIds, conversationId]
+    );
 
     void (async (): Promise<void> => {
       try {
@@ -218,8 +325,10 @@ export const AgentChatPanel = ({
         });
       } finally {
         if (isCurrentRun()) {
-          runAbortRef.current = null;
-          setIsRunning(false);
+          runStatesRef.current.delete(conversationId);
+          setRunningConversationIds(currentIds =>
+            currentIds.filter(currentId => currentId !== conversationId)
+          );
         }
       }
     })();
@@ -237,11 +346,41 @@ export const AgentChatPanel = ({
   };
 
   const stopRun = (): void => {
-    runAbortRef.current?.abort();
+    runStatesRef.current.get(activeConversationId)?.abort.abort();
+  };
+
+  const createConversation = (): void => {
+    setDraft('');
+    setConversationStore(store =>
+      createNextStoredConversation(store, createDefaultConversationEvents())
+    );
+  };
+
+  const selectConversation = (conversationId: string): void => {
+    setConversationStore(store => setActiveStoredConversation(store, conversationId));
+  };
+
+  const closeConversation = (conversationId: string): void => {
+    runStatesRef.current.get(conversationId)?.abort.abort();
+    runStatesRef.current.delete(conversationId);
+    setRunningConversationIds(currentIds =>
+      currentIds.filter(currentId => currentId !== conversationId)
+    );
+    setConversationStore(store =>
+      closeStoredConversation(store, conversationId, createDefaultConversationEvents())
+    );
   };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <ConversationTabs
+        activeConversationId={activeConversationId}
+        conversations={conversationStore.conversations}
+        onCloseConversation={closeConversation}
+        onCreateConversation={createConversation}
+        onSelectConversation={selectConversation}
+        runningConversationIds={runningConversationIds}
+      />
       <ConversationList items={groupedEvents} />
 
       <form

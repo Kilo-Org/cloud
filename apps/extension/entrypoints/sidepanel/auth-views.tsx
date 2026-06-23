@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { JSX } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
 import { AgentChatPanel } from './agent-chat-panel';
@@ -134,16 +133,12 @@ export const SignedInView = ({
   auth: StoredAuth;
   onSignOut: () => void;
 }): JSX.Element => {
-  const [conversationResetSignal, setConversationResetSignal] = useState(0);
   const { organizationOptions, selectOrganization, selectedOrganizationId } =
     useOrganizationCreditAccount(auth.token);
 
   return (
     <Shell
       auth={auth}
-      onNewConversation={() => {
-        setConversationResetSignal(current => current + 1);
-      }}
       onOrganizationChange={selectOrganization}
       onSignOut={onSignOut}
       organizationOptions={organizationOptions}
@@ -151,7 +146,6 @@ export const SignedInView = ({
     >
       <AgentChatPanel
         auth={auth}
-        conversationResetSignal={conversationResetSignal}
         organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
       />
     </Shell>

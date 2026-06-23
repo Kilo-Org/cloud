@@ -17,6 +17,10 @@ const waitMs = 15_000;
 const chromeWorkflowNames = [
   'conversation automatically continues through another eval request',
   'new conversation keeps the selected target tab',
+  'conversation tabs can run in parallel',
+  'conversation tabs persist across side panel reloads',
+  'closing a conversation removes only that tab',
+  'conversation tab bar scrolls horizontally',
   'assistant messages render markdown',
   'only the message pane scrolls virtualized overflowing conversation content',
   'settings organization picker sends org context to the gateway',
@@ -33,7 +37,7 @@ const chromeWorkflowNames = [
   'model catalog failures can be retried',
   'switching credit accounts clears the model while the next catalog loads',
   'stale organization model loads cannot overwrite the current catalog',
-  'new conversation aborts a running request',
+  'new conversation keeps the running request in its original tab',
 ] as const;
 
 interface ServerHandle {
@@ -522,7 +526,18 @@ const seedFirefoxConversation = async (driver: WebDriver, events: unknown[]): Pr
       ).browser;
 
       browserApi?.storage?.local
-        ?.set({ kiloAgentConversation: conversationEvents })
+        ?.set({
+          kiloAgentConversations: {
+            activeConversationId: 'conversation-1',
+            conversations: [
+              {
+                events: conversationEvents,
+                id: 'conversation-1',
+                title: 'Conversation 1',
+              },
+            ],
+          },
+        })
         .then(() => {
           done('ok');
           return null;
@@ -551,7 +566,7 @@ const waitForStoredFirefoxConversationText = async (
               browser?: {
                 storage?: {
                   local?: {
-                    get: (key: string) => Promise<Record<string, unknown>>;
+                    get: (keys: string[]) => Promise<Record<string, unknown>>;
                   };
                 };
               };
@@ -559,9 +574,14 @@ const waitForStoredFirefoxConversationText = async (
           ).browser;
 
           browserApi?.storage?.local
-            ?.get('kiloAgentConversation')
+            ?.get(['kiloAgentConversation', 'kiloAgentConversations'])
             .then(items => {
-              done(JSON.stringify(items['kiloAgentConversation']).includes(expectedText));
+              done(
+                JSON.stringify({
+                  conversations: items['kiloAgentConversations'] ?? null,
+                  legacyConversation: items['kiloAgentConversation'] ?? null,
+                }).includes(expectedText)
+              );
               return null;
             })
             .catch((error: unknown) => {
@@ -770,6 +790,15 @@ const clickButtonByText = async (driver: WebDriver, text: string): Promise<void>
 };
 
 const clickButtonByLabel = async (driver: WebDriver, label: string): Promise<void> => {
+  await waitUntil(
+    driver,
+    async () => {
+      const elements = await driver.findElements(By.css(`button[aria-label="${label}"]`));
+
+      return elements.length > 0;
+    },
+    `Timed out waiting for button label: ${label}`
+  );
   await driver.findElement(By.css(`button[aria-label="${label}"]`)).click();
 };
 
@@ -893,6 +922,144 @@ const scenarios: FirefoxScenario[] = [
 
         await clickButtonByLabel(session.driver, 'New conversation');
         assert.match(await getSelectText(session.driver, 'Target tab'), /Second target tab/u);
+      }),
+  },
+  {
+    name: 'conversation tabs can run in parallel',
+    run: context => {
+      const { promise: pendingFirstCompletion, resolve: releaseFirstCompletion } =
+        Promise.withResolvers<void>();
+
+      return withSession(
+        context.api,
+        {
+          beforeFirstCompletion: () => pendingFirstCompletion,
+          firstCompletionEvents: [{ choices: [{ delta: { content: 'First tab finished.' } }] }],
+          secondCompletionEvents: [{ choices: [{ delta: { content: 'Second tab finished.' } }] }],
+          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+        },
+        async session => {
+          try {
+            await session.openTargetPage();
+            await openAuthenticatedPanel(session);
+            await waitForModel(session.driver);
+            await waitForTargetTab(session.driver, 'Kilo extension fixture');
+            await sendMessage(session.driver, 'First request');
+            await waitForText(session.driver, 'Stop');
+
+            await clickButtonByLabel(session.driver, 'New conversation');
+            await sendMessage(session.driver, 'Second request');
+            await waitForText(session.driver, 'Second tab finished.');
+
+            await clickButtonByText(session.driver, 'First request');
+            await waitForText(session.driver, 'Stop');
+            releaseFirstCompletion();
+            await waitForText(session.driver, 'First tab finished.');
+
+            await clickButtonByText(session.driver, 'Second request');
+            await waitForText(session.driver, 'Second tab finished.');
+          } finally {
+            releaseFirstCompletion();
+          }
+        }
+      );
+    },
+  },
+  {
+    name: 'conversation tabs persist across side panel reloads',
+    run: context =>
+      withSession(
+        context.api,
+        {
+          firstCompletionEvents: [{ choices: [{ delta: { content: 'First persisted reply.' } }] }],
+          secondCompletionEvents: [
+            { choices: [{ delta: { content: 'Second persisted reply.' } }] },
+          ],
+          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+        },
+        async session => {
+          await session.openTargetPage();
+          await openAuthenticatedPanel(session);
+          await waitForModel(session.driver);
+          await waitForTargetTab(session.driver, 'Kilo extension fixture');
+
+          await sendMessage(session.driver, 'First persisted');
+          await waitForText(session.driver, 'First persisted reply.');
+          await clickButtonByLabel(session.driver, 'New conversation');
+          await sendMessage(session.driver, 'Second persisted');
+          await waitForText(session.driver, 'Second persisted reply.');
+
+          await session.driver.navigate().refresh();
+          await waitForText(session.driver, 'Second persisted reply.');
+          await clickButtonByText(session.driver, 'First persisted');
+          await waitForText(session.driver, 'First persisted reply.');
+        }
+      ),
+  },
+  {
+    name: 'closing a conversation removes only that tab',
+    run: context =>
+      withSession(
+        context.api,
+        {
+          firstCompletionEvents: [{ choices: [{ delta: { content: 'Keep this reply.' } }] }],
+          secondCompletionEvents: [{ choices: [{ delta: { content: 'Close this reply.' } }] }],
+          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+        },
+        async session => {
+          await session.openTargetPage();
+          await openAuthenticatedPanel(session);
+          await waitForModel(session.driver);
+          await waitForTargetTab(session.driver, 'Kilo extension fixture');
+
+          await sendMessage(session.driver, 'Keep this');
+          await waitForText(session.driver, 'Keep this reply.');
+          await clickButtonByLabel(session.driver, 'New conversation');
+          await sendMessage(session.driver, 'Close this');
+          await waitForText(session.driver, 'Close this reply.');
+
+          await clickButtonByLabel(session.driver, 'Close Close this');
+          await waitForTextGone(session.driver, 'Close this reply.');
+          await waitForText(session.driver, 'Keep this reply.');
+        }
+      ),
+  },
+  {
+    name: 'conversation tab bar scrolls horizontally',
+    run: context =>
+      withSession(context.api, {}, async session => {
+        await session.openTargetPage();
+        await openAuthenticatedPanel(session);
+        await waitForModel(session.driver);
+        await session.driver.manage().window().setRect({ height: 520, width: 320, x: 0, y: 0 });
+
+        for (let index = 0; index < 14; index += 1) {
+          await clickButtonByLabel(session.driver, 'New conversation');
+        }
+
+        const tabBarState = await session.driver.executeScript(() => {
+          const tabBar = document.querySelector('[aria-label="Conversation tabs"]');
+
+          if (!(tabBar instanceof HTMLElement)) {
+            throw new Error('Conversation tab bar was not found.');
+          }
+
+          return {
+            clientWidth: tabBar.clientWidth,
+            overflowX: getComputedStyle(tabBar).overflowX,
+            scrollWidth: tabBar.scrollWidth,
+          };
+        });
+        const parsedTabBarState = z
+          .object({
+            clientWidth: z.number(),
+            overflowX: z.string(),
+            scrollWidth: z.number(),
+          })
+          .parse(tabBarState);
+
+        assert.equal(parsedTabBarState.overflowX, 'auto');
+        assert.ok(parsedTabBarState.scrollWidth > parsedTabBarState.clientWidth);
       }),
   },
   {
@@ -1396,24 +1563,32 @@ const scenarios: FirefoxScenario[] = [
     },
   },
   {
-    name: 'new conversation aborts a running request',
+    name: 'new conversation keeps the running request in its original tab',
     run: context => {
       const { promise: pendingCompletion, resolve: releaseCompletion } =
         Promise.withResolvers<void>();
-      const { promise: chatAborted, resolve: markChatAborted } = Promise.withResolvers<void>();
 
       return withSession(
         context.api,
         {
           beforeFirstCompletion: () => pendingCompletion,
-          observeFirstChatAbort: markChatAborted,
+          firstCompletionEvents: [{ choices: [{ delta: { content: 'Original tab completed.' } }] }],
+          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
         },
         async session => {
           try {
-            await submitDangerousPrompt(session, 'Inspect this tab');
+            await session.openTargetPage();
+            await openAuthenticatedPanel(session);
+            await waitForModel(session.driver);
+            await waitForTargetTab(session.driver, 'Kilo extension fixture');
+            await sendMessage(session.driver, 'Original tab');
             await waitForText(session.driver, 'Stop');
             await clickButtonByLabel(session.driver, 'New conversation');
-            await chatAborted;
+            await waitForText(session.driver, 'Pick a tab and ask Kilo to inspect it.');
+            await clickButtonByText(session.driver, 'Original tab');
+            await waitForText(session.driver, 'Stop');
+            releaseCompletion();
+            await waitForText(session.driver, 'Original tab completed.');
           } finally {
             releaseCompletion();
           }

@@ -140,7 +140,7 @@ export const waitForStoredConversationText = async (page: Page, text: string): P
                     storage?: {
                       local?: {
                         get: (
-                          key: string,
+                          keys: string[],
                           callback: (items: Record<string, unknown>) => void
                         ) => void;
                       };
@@ -157,7 +157,7 @@ export const waitForStoredConversationText = async (page: Page, text: string): P
                 return;
               }
 
-              storage.get('kiloAgentConversation', items => {
+              storage.get(['kiloAgentConversation', 'kiloAgentConversations'], items => {
                 const message = runtime.lastError?.message;
 
                 if (message !== undefined && message !== '') {
@@ -166,7 +166,10 @@ export const waitForStoredConversationText = async (page: Page, text: string): P
                 }
 
                 resolve(
-                  JSON.stringify(items['kiloAgentConversation'] ?? null).includes(expectedText)
+                  JSON.stringify({
+                    conversations: items['kiloAgentConversations'] ?? null,
+                    legacyConversation: items['kiloAgentConversation'] ?? null,
+                  }).includes(expectedText)
                 );
               });
             }),

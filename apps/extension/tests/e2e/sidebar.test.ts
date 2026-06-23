@@ -277,12 +277,16 @@ test('conversation survives side panel reload', async () => {
     await sidePanel.getByRole('button', { name: 'Dangerous' }).click();
     await sidePanel.getByLabel('Message agent').fill('Remember this after reload');
     await sidePanel.getByLabel('Message agent').press('Enter');
-    await expect(sidePanel.getByText('Remember this after reload')).toBeVisible();
+    await expect(
+      sidePanel.getByLabel('Agent conversation').getByText('Remember this after reload')
+    ).toBeVisible();
     await waitForStoredConversationText(sidePanel, 'Remember this after reload');
 
     await sidePanel.reload();
 
-    await expect(sidePanel.getByText('Remember this after reload')).toBeVisible();
+    await expect(
+      sidePanel.getByLabel('Agent conversation').getByText('Remember this after reload')
+    ).toBeVisible();
   } finally {
     await context.close();
     await fixture.close();

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { Plus, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import type { StoredAuth } from '@/src/shared/auth';
 import type { KiloOrganizationOption } from '@/src/shared/kilo-api-client';
 import { KiloLogo } from '@/src/shared/kilo-logo';
@@ -29,14 +29,12 @@ const IconButton = ({
 
 const HeaderActions = ({
   auth,
-  onNewConversation,
   onOrganizationChange,
   onSignOut,
   organizationOptions,
   selectedOrganizationId,
 }: {
   auth: StoredAuth;
-  onNewConversation: () => void;
   onOrganizationChange: (organizationId: string) => void;
   onSignOut: () => void;
   organizationOptions: KiloOrganizationOption[];
@@ -46,9 +44,6 @@ const HeaderActions = ({
 
   return (
     <div className="relative flex shrink-0 items-center justify-end gap-2">
-      <IconButton ariaLabel="New conversation" onClick={onNewConversation}>
-        <Plus aria-hidden="true" className="size-4" />
-      </IconButton>
       <IconButton
         ariaLabel="Settings"
         onClick={() => {
@@ -84,14 +79,12 @@ const HeaderActions = ({
 
 const Header = ({
   auth,
-  onNewConversation,
   onOrganizationChange,
   onSignOut,
   organizationOptions = emptyOrganizationOptions,
   selectedOrganizationId = '',
 }: {
   auth?: StoredAuth | undefined;
-  onNewConversation?: (() => void) | undefined;
   onOrganizationChange?: ((organizationId: string) => void) | undefined;
   onSignOut?: (() => void) | undefined;
   organizationOptions?: KiloOrganizationOption[] | undefined;
@@ -102,12 +95,10 @@ const Header = ({
       <KiloLogo className="size-8 shrink-0 text-[#EDFF00]" />
       <span className="sr-only">Kilo</span>
       {auth === undefined ||
-      onNewConversation === undefined ||
       onOrganizationChange === undefined ||
       onSignOut === undefined ? null : (
         <HeaderActions
           auth={auth}
-          onNewConversation={onNewConversation}
           onOrganizationChange={onOrganizationChange}
           onSignOut={onSignOut}
           organizationOptions={organizationOptions}
@@ -121,7 +112,6 @@ const Header = ({
 export const Shell = ({
   auth,
   children,
-  onNewConversation,
   onOrganizationChange,
   onSignOut,
   organizationOptions = emptyOrganizationOptions,
@@ -129,7 +119,6 @@ export const Shell = ({
 }: {
   auth?: StoredAuth | undefined;
   children: ReactNode;
-  onNewConversation?: (() => void) | undefined;
   onOrganizationChange?: ((organizationId: string) => void) | undefined;
   onSignOut?: (() => void) | undefined;
   organizationOptions?: KiloOrganizationOption[] | undefined;
@@ -138,7 +127,6 @@ export const Shell = ({
   <main className="flex h-dvh min-h-0 flex-col overflow-hidden bg-zinc-950 text-zinc-50">
     <Header
       auth={auth}
-      onNewConversation={onNewConversation}
       onOrganizationChange={onOrganizationChange}
       onSignOut={onSignOut}
       organizationOptions={organizationOptions}

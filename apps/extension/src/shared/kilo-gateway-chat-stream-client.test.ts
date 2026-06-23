@@ -118,6 +118,48 @@ describe('kilo gateway chat stream client', () => {
     });
   });
 
+  it('streams tool call deltas when the gateway sends null content', async () => {
+    const contentDeltas: string[] = [];
+    const reasoningDeltas: string[] = [];
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"content":"","reasoning":"Thinking"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"Calling the tool."}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":null,"reasoning":null,"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":""}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":null,"tool_calls":[{"index":0,"function":{"arguments":"{}"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Read this page', role: 'user' }],
+        model: 'kilo-auto/frontier',
+        onContentDelta: delta => {
+          contentDeltas.push(delta);
+        },
+        onReasoningDelta: delta => {
+          reasoningDeltas.push(delta);
+        },
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      content: 'Calling the tool.',
+      reasoning: 'Thinking',
+      toolCalls: [
+        {
+          arguments: {},
+          id: 'call_snapshot_1',
+          name: 'get_page_snapshot',
+        },
+      ],
+    });
+    expect(contentDeltas).toStrictEqual(['Calling the tool.']);
+    expect(reasoningDeltas).toStrictEqual(['Thinking']);
+  });
+
   it('rejects non-object tool call arguments from the gateway stream', async () => {
     const fetch: FetchLike = () =>
       streamResponse([

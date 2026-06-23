@@ -73,8 +73,8 @@ const streamDataSchema = z.object({
   choices: z.array(
     z.object({
       delta: z.object({
-        content: z.string().optional(),
-        reasoning: z.string().optional(),
+        content: z.string().nullable().optional(),
+        reasoning: z.string().nullable().optional(),
         tool_calls: z.array(z.unknown()).optional(),
       }),
     })

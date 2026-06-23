@@ -94,7 +94,7 @@ function OrganizationHierarchySection({ parent }: OrganizationHierarchySectionPr
         {parent ? (
           <div className="space-y-1">
             <p className="text-sm text-foreground">
-              This organization is a child of{' '}
+              Parent organization:{' '}
               <Link
                 href={`/admin/organizations/${encodeURIComponent(parent.id)}`}
                 className="text-link hover:text-link-hover inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline"

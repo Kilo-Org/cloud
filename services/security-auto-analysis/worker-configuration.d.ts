@@ -66,6 +66,7 @@ declare type ExecutionContext = {
 
 declare type CloudflareEnv = {
   HYPERDRIVE: Hyperdrive;
+  CF_VERSION_METADATA: { id: string; tag: string; timestamp: string } | undefined;
   OWNER_QUEUE: Queue<import('./src/types').AutoAnalysisOwnerMessage>;
   CALLBACK_QUEUE: Queue<import('./src/callbacks').SecurityAnalysisCallbackMessage>;
   MANUAL_ANALYSIS_QUEUE: Queue<import('./src/manual-analysis').ManualAnalysisStartCommand>;

@@ -3,8 +3,11 @@ jest.mock('@/lib/redis', () => ({ redisClient: {} }));
 import {
   CostSourceSchema,
   UsageAnalyticsFiltersSchema,
+  applySelfEmailExclusion,
+  buildScopedUserEmailMaps,
   costColumnFor,
   costSumExprSql,
+  shouldLoadFullOrgWideUserEmailMap,
 } from './usage-analytics-router';
 
 const baseFilters = {
@@ -32,5 +35,73 @@ describe('usage analytics cost source', () => {
     expect(
       CostSourceSchema.safeParse('total_cost_microdollars); DROP TABLE usage; --').success
     ).toBe(false);
+  });
+
+  it('accepts email-based user filtering and email display mode', () => {
+    const filters = UsageAnalyticsFiltersSchema.parse({
+      ...baseFilters,
+      userEmails: ['person@example.com'],
+      excludedUserEmails: ['excluded@example.com'],
+      userDisplay: 'email',
+    });
+
+    expect(filters.userEmails).toEqual(['person@example.com']);
+    expect(filters.excludedUserEmails).toEqual(['excluded@example.com']);
+    expect(filters.userDisplay).toBe('email');
+  });
+
+  it('builds scoped email maps with canonical and legacy OAuth user ids', () => {
+    const maps = buildScopedUserEmailMaps(
+      [
+        { id: 'user_1', email: 'person@example.com' },
+        { id: 'user_2', email: 'other@example.com' },
+        { id: 'user_without_email', email: null },
+      ],
+      [
+        { userId: 'user_1', provider: 'github', providerAccountId: '123' },
+        { userId: 'user_1', provider: 'google', providerAccountId: 'abc' },
+        { userId: 'missing_user', provider: 'github', providerAccountId: 'ignored' },
+      ]
+    );
+
+    expect(maps.idsByEmail.get('person@example.com')).toEqual([
+      'user_1',
+      'oauth/github:123',
+      'oauth/google:abc',
+    ]);
+    expect(maps.idsByEmail.get('other@example.com')).toEqual(['user_2']);
+    expect(maps.emailsById.get('user_1')).toBe('person@example.com');
+    expect(maps.emailsById.get('oauth/github:123')).toBe('person@example.com');
+    expect(maps.emailsById.has('oauth/github:ignored')).toBe(false);
+    expect(maps.emailsById.has('user_without_email')).toBe(false);
+  });
+
+  it('translates self-scope excluded user emails to excluded user ids', () => {
+    const filters = UsageAnalyticsFiltersSchema.parse({
+      ...baseFilters,
+      excludedUserEmails: ['person@example.com'],
+    });
+
+    expect(
+      applySelfEmailExclusion(filters, 'user_1', 'person@example.com').excludedUserIds
+    ).toEqual(['user_1']);
+    expect(applySelfEmailExclusion(filters, 'user_1', 'other@example.com').excludedUserIds).toBe(
+      undefined
+    );
+  });
+
+  it('loads full org email maps only for email display requests', () => {
+    const filters = UsageAnalyticsFiltersSchema.parse({
+      ...baseFilters,
+      organizationId: '00000000-0000-4000-8000-000000000001',
+      viewAs: 'org-wide',
+      userEmails: ['person@example.com'],
+    });
+
+    expect(shouldLoadFullOrgWideUserEmailMap(filters, false)).toBe(false);
+    expect(shouldLoadFullOrgWideUserEmailMap(filters, true)).toBe(false);
+    expect(shouldLoadFullOrgWideUserEmailMap({ ...filters, userDisplay: 'email' }, true)).toBe(
+      true
+    );
   });
 });

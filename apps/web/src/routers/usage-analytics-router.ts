@@ -197,6 +197,7 @@ class WhereBuilder {
 
 async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilters): Promise<void> {
   const userId = ctx.user.id;
+  const userEmail = ctx.user.google_user_email;
   if (filters.organizationId) {
     const requiredRoles =
       filters.viewAs === 'org-wide' ? (['owner', 'billing_manager'] as const) : undefined;
@@ -214,6 +215,16 @@ async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilter
           message: 'Self-scope analytics can only filter to own user.',
         });
       }
+      const allUserEmailFilterValues = [
+        ...(filters.userEmails ?? []),
+        ...(filters.excludedUserEmails ?? []),
+      ];
+      if (allUserEmailFilterValues.some(v => v !== userEmail)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Self-scope analytics can only filter to own user.',
+        });
+      }
     }
     return;
   }
@@ -225,6 +236,251 @@ async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilter
       message: 'Personal analytics can only filter to own user.',
     });
   }
+  const allUserEmailFilterValues = [
+    ...(filters.userEmails ?? []),
+    ...(filters.excludedUserEmails ?? []),
+  ];
+  if (allUserEmailFilterValues.some(v => v !== userEmail)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Personal analytics can only filter to own user.',
+    });
+  }
+}
+
+const NO_MATCHING_USER_EMAIL_ID = '__no_matching_kilo_user_email__';
+
+type ScopedUserEmailMaps = {
+  idsByEmail: Map<string, string[]>;
+  emailsById: Map<string, string>;
+};
+
+type ScopedUserEmailMapUser = {
+  id: string;
+  email: string | null;
+};
+
+type ScopedUserEmailMapAuthProvider = {
+  userId: string;
+  provider: AuthProviderId;
+  providerAccountId: string;
+};
+
+function uniqueStrings(values: string[]): string[] {
+  return Array.from(new Set(values));
+}
+
+function addScopedUserId(maps: ScopedUserEmailMaps, email: string, userId: string): void {
+  maps.emailsById.set(userId, email);
+  maps.idsByEmail.set(email, [...(maps.idsByEmail.get(email) ?? []), userId]);
+}
+
+export function buildScopedUserEmailMaps(
+  users: ScopedUserEmailMapUser[],
+  authProviders: ScopedUserEmailMapAuthProvider[]
+): ScopedUserEmailMaps {
+  const maps: ScopedUserEmailMaps = { idsByEmail: new Map(), emailsById: new Map() };
+
+  for (const user of users) {
+    if (!user.email) continue;
+    addScopedUserId(maps, user.email, user.id);
+  }
+
+  for (const authProvider of authProviders) {
+    const email = maps.emailsById.get(authProvider.userId);
+    if (!email) continue;
+    addScopedUserId(
+      maps,
+      email,
+      `oauth/${authProvider.provider}:${authProvider.providerAccountId}`
+    );
+  }
+
+  for (const [email, ids] of maps.idsByEmail) {
+    maps.idsByEmail.set(email, uniqueStrings(ids));
+  }
+
+  return maps;
+}
+
+async function loadOrgWideUserEmailMaps(organizationId: string): Promise<ScopedUserEmailMaps> {
+  const users = await readDb
+    .select({ id: kilocode_users.id, email: kilocode_users.google_user_email })
+    .from(kilocode_users)
+    .innerJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.kilo_user_id, kilocode_users.id),
+        eq(organization_memberships.organization_id, organizationId)
+      )
+    );
+
+  const userIds = users.map(user => user.id);
+  if (userIds.length === 0) return buildScopedUserEmailMaps(users, []);
+
+  const authProviders = await readDb
+    .select({
+      userId: user_auth_provider.kilo_user_id,
+      provider: user_auth_provider.provider,
+      providerAccountId: user_auth_provider.provider_account_id,
+    })
+    .from(user_auth_provider)
+    .where(inArray(user_auth_provider.kilo_user_id, userIds));
+
+  return buildScopedUserEmailMaps(users, authProviders);
+}
+
+async function loadOrgWideUserEmailFilterMaps(
+  organizationId: string,
+  emails: string[]
+): Promise<ScopedUserEmailMaps> {
+  const uniqueEmails = uniqueStrings(emails);
+  if (uniqueEmails.length === 0) return buildScopedUserEmailMaps([], []);
+
+  const users = await readDb
+    .select({ id: kilocode_users.id, email: kilocode_users.google_user_email })
+    .from(kilocode_users)
+    .innerJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.kilo_user_id, kilocode_users.id),
+        eq(organization_memberships.organization_id, organizationId)
+      )
+    )
+    .where(inArray(kilocode_users.google_user_email, uniqueEmails));
+
+  const userIds = users.map(user => user.id);
+  if (userIds.length === 0) return buildScopedUserEmailMaps(users, []);
+
+  const authProviders = await readDb
+    .select({
+      userId: user_auth_provider.kilo_user_id,
+      provider: user_auth_provider.provider,
+      providerAccountId: user_auth_provider.provider_account_id,
+    })
+    .from(user_auth_provider)
+    .where(inArray(user_auth_provider.kilo_user_id, userIds));
+
+  return buildScopedUserEmailMaps(users, authProviders);
+}
+
+function needsOrgWideUserEmailMaps(
+  filters: UsageAnalyticsFilters,
+  includeUserEmailDisplay: boolean
+): filters is UsageAnalyticsFilters & {
+  organizationId: string;
+  viewAs: 'org-wide';
+} {
+  return Boolean(
+    filters.organizationId &&
+    filters.viewAs === 'org-wide' &&
+    ((includeUserEmailDisplay && filters.userDisplay === 'email') ||
+      (filters.userEmails && filters.userEmails.length > 0) ||
+      (filters.excludedUserEmails && filters.excludedUserEmails.length > 0))
+  );
+}
+
+export function shouldLoadFullOrgWideUserEmailMap(
+  filters: UsageAnalyticsFilters,
+  includeUserEmailDisplay: boolean
+): boolean {
+  return Boolean(
+    filters.organizationId &&
+    filters.viewAs === 'org-wide' &&
+    includeUserEmailDisplay &&
+    filters.userDisplay === 'email'
+  );
+}
+
+function lookupScopedUserIdsByEmails(maps: ScopedUserEmailMaps, emails: string[] = []): string[] {
+  return uniqueStrings(emails.flatMap(email => maps.idsByEmail.get(email) ?? []));
+}
+
+function emailFilterValues(filters: UsageAnalyticsFilters): string[] {
+  return uniqueStrings([...(filters.userEmails ?? []), ...(filters.excludedUserEmails ?? [])]);
+}
+
+export function applySelfEmailExclusion<T extends UsageAnalyticsFilters>(
+  filters: T,
+  userId: string,
+  userEmail: string | null
+): T {
+  if (!userEmail || !filters.excludedUserEmails?.includes(userEmail)) return filters;
+  return {
+    ...filters,
+    excludedUserIds: uniqueStrings([...(filters.excludedUserIds ?? []), userId]),
+  };
+}
+
+async function loadSelfUserEmailMaps(ctx: TRPCContext): Promise<ScopedUserEmailMaps> {
+  const authProviders = await readDb
+    .select({
+      userId: user_auth_provider.kilo_user_id,
+      provider: user_auth_provider.provider,
+      providerAccountId: user_auth_provider.provider_account_id,
+    })
+    .from(user_auth_provider)
+    .where(eq(user_auth_provider.kilo_user_id, ctx.user.id));
+
+  return buildScopedUserEmailMaps(
+    [{ id: ctx.user.id, email: ctx.user.google_user_email }],
+    authProviders
+  );
+}
+
+async function prepareUsageFilters<T extends UsageAnalyticsFilters>(
+  ctx: TRPCContext,
+  filters: T,
+  includeUserEmailDisplay = false
+): Promise<{ filters: T; scopedUserEmailMaps?: ScopedUserEmailMaps }> {
+  await ensureScopeAccess(ctx, filters);
+  const needsOrgWideMaps = needsOrgWideUserEmailMaps(filters, includeUserEmailDisplay);
+  const needsUserEmailDisplay = includeUserEmailDisplay && filters.userDisplay === 'email';
+  const prepared = { ...filters };
+
+  if (needsUserEmailDisplay && !needsOrgWideMaps) {
+    return {
+      filters: applySelfEmailExclusion(prepared, ctx.user.id, ctx.user.google_user_email),
+      scopedUserEmailMaps: await loadSelfUserEmailMaps(ctx),
+    };
+  }
+
+  if (!needsOrgWideMaps) {
+    return { filters: applySelfEmailExclusion(prepared, ctx.user.id, ctx.user.google_user_email) };
+  }
+
+  const scopedUserEmailMaps = shouldLoadFullOrgWideUserEmailMap(filters, includeUserEmailDisplay)
+    ? await loadOrgWideUserEmailMaps(filters.organizationId)
+    : await loadOrgWideUserEmailFilterMaps(filters.organizationId, emailFilterValues(filters));
+  const userIdsFromEmails = lookupScopedUserIdsByEmails(scopedUserEmailMaps, filters.userEmails);
+  const excludedUserIdsFromEmails = lookupScopedUserIdsByEmails(
+    scopedUserEmailMaps,
+    filters.excludedUserEmails
+  );
+
+  if (filters.userEmails && filters.userEmails.length > 0) {
+    prepared.userIds = uniqueStrings([
+      ...(filters.userIds ?? []),
+      ...userIdsFromEmails,
+      NO_MATCHING_USER_EMAIL_ID,
+    ]);
+  }
+  if (filters.excludedUserEmails && filters.excludedUserEmails.length > 0) {
+    prepared.excludedUserIds = uniqueStrings([
+      ...(filters.excludedUserIds ?? []),
+      ...excludedUserIdsFromEmails,
+    ]);
+  }
+  return { filters: prepared, scopedUserEmailMaps };
+}
+
+function userEmailsForDisplay(
+  filters: UsageAnalyticsFilters,
+  scopedUserEmailMaps: ScopedUserEmailMaps | undefined
+): Map<string, string> {
+  return filters.userDisplay === 'email'
+    ? (scopedUserEmailMaps?.emailsById ?? new Map())
+    : new Map();
 }
 
 // ---------------------------------------------------------------------------
@@ -265,6 +521,9 @@ function buildScopeConditions(
     where.addEq('organization_id', filters.organizationId);
     if (filters.viewAs === 'self') {
       where.addEq('kilo_user_id', ctxUserId);
+      if (filters.excludedUserIds?.includes(ctxUserId)) {
+        where.addNotIn('kilo_user_id', [ctxUserId]);
+      }
     } else {
       if (filters.userIds && filters.userIds.length > 0) {
         where.addIn('kilo_user_id', filters.userIds);
@@ -275,6 +534,9 @@ function buildScopeConditions(
     }
   } else {
     where.addEq('kilo_user_id', ctxUserId);
+    if (filters.excludedUserIds?.includes(ctxUserId)) {
+      where.addNotIn('kilo_user_id', [ctxUserId]);
+    }
     if (filters.personalScope === 'personal-only') {
       // DBT coalesces personal Snowflake usage rollups to an empty-string sentinel
       // so incremental merges can match on organization_id.
@@ -530,6 +792,10 @@ function toSafeNumber(value: unknown): number {
   return n;
 }
 
+function toStringValue(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
 // ---------------------------------------------------------------------------
 // User list (for org context)
 // ---------------------------------------------------------------------------
@@ -591,10 +857,10 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(UsageAnalyticsFiltersSchema)
     .output(SummaryOutputSchema)
     .query(async ({ input, ctx }): Promise<SummaryOutput> => {
-      await ensureScopeAccess(ctx, input);
+      const { filters } = await prepareUsageFilters(ctx, input);
 
       const config = resolveSnowflakeConfig();
-      const meta = resolveTier(input.granularity, input.startDate);
+      const meta = resolveTier(filters.granularity, filters.startDate);
       if (!config) {
         return {
           costMicrodollars: 0,
@@ -624,9 +890,9 @@ export const usageAnalyticsRouter = createTRPCRouter({
         };
       }
       const table = getTableName(meta.tier);
-      const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
+      const where = buildWhereClause(meta.tier, filters, ctx.user.id, true);
       const generationTimeCountExpr = generationTimeCountExprSql(meta.tier);
-      const costSumExpr = costSumExprSql(input.costSource);
+      const costSumExpr = costSumExprSql(filters.costSource);
 
       const statement = `
         SELECT
@@ -654,8 +920,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         {
           route: 'usageAnalytics.getSummary',
           queryLabel: `summary_${meta.tier}`,
-          scope: input.organizationId ? 'org' : 'user',
-          period: `${input.startDate}/${input.endDate}`,
+          scope: filters.organizationId ? 'org' : 'user',
+          period: `${filters.startDate}/${filters.endDate}`,
         },
         signal =>
           executeSnowflakeStatement({
@@ -663,7 +929,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
-              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+              defaultTimeoutForScope(filters.organizationId ? 'org' : 'user') / 1000
             ),
             signal,
           })
@@ -720,17 +986,21 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(TimeseriesInputSchema)
     .output(TimeseriesOutputSchema)
     .query(async ({ input, ctx }) => {
-      await ensureScopeAccess(ctx, input);
+      const { filters, scopedUserEmailMaps } = await prepareUsageFilters(
+        ctx,
+        input,
+        input.splitBy === 'user'
+      );
 
       const config = resolveSnowflakeConfig();
-      const meta = resolveTier(input.granularity, input.startDate);
+      const meta = resolveTier(filters.granularity, filters.startDate);
       if (!config) {
         return { timeseries: [], effectiveGranularity: meta.effectiveGranularity };
       }
       const table = getTableName(meta.tier);
       const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
-      const metricExpr = metricExprSql(input.metric, meta.tier, input.costSource);
-      const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
+      const metricExpr = metricExprSql(filters.metric, meta.tier, filters.costSource);
+      const where = buildWhereClause(meta.tier, filters, ctx.user.id, true);
 
       let statement: string;
       if (input.splitBy) {
@@ -761,8 +1031,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         {
           route: 'usageAnalytics.getTimeseries',
           queryLabel: `timeseries_${meta.tier}${input.splitBy ? `_split_${input.splitBy}` : ''}`,
-          scope: input.organizationId ? 'org' : 'user',
-          period: `${input.startDate}/${input.endDate}`,
+          scope: filters.organizationId ? 'org' : 'user',
+          period: `${filters.startDate}/${filters.endDate}`,
         },
         signal =>
           executeSnowflakeStatement({
@@ -770,18 +1040,25 @@ export const usageAnalyticsRouter = createTRPCRouter({
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
-              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+              defaultTimeoutForScope(filters.organizationId ? 'org' : 'user') / 1000
             ),
             signal,
           })
       );
 
+      const userEmailsById = userEmailsForDisplay(filters, scopedUserEmailMaps);
+
       return {
-        timeseries: rows.map(row => ({
-          datetime: row[0] ?? '',
-          value: toSafeNumber(row[1]),
-          label: input.splitBy ? (row[2] ?? undefined) : undefined,
-        })),
+        timeseries: rows.map(row => {
+          const rawLabel = toStringValue(row[2]);
+          return {
+            datetime: toStringValue(row[0]),
+            value: toSafeNumber(row[1]),
+            label: input.splitBy
+              ? (userEmailsById.get(rawLabel) ?? rawLabel) || undefined
+              : undefined,
+          };
+        }),
         effectiveGranularity: meta.effectiveGranularity,
       };
     }),
@@ -790,17 +1067,21 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(BreakdownInputSchema)
     .output(BreakdownOutputSchema)
     .query(async ({ input, ctx }) => {
-      await ensureScopeAccess(ctx, input);
+      const { filters, scopedUserEmailMaps } = await prepareUsageFilters(
+        ctx,
+        input,
+        input.dimension === 'user'
+      );
 
       const config = resolveSnowflakeConfig();
-      const meta = resolveTier(input.granularity, input.startDate);
+      const meta = resolveTier(filters.granularity, filters.startDate);
       if (!config) {
         return { breakdown: [], totalValue: 0, effectiveGranularity: meta.effectiveGranularity };
       }
       const table = getTableName(meta.tier);
       const dimCol = dimensionColumn(input.dimension);
-      const metricExpr = metricExprSql(input.metric, meta.tier, input.costSource);
-      const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
+      const metricExpr = metricExprSql(input.metric, meta.tier, filters.costSource);
+      const where = buildWhereClause(meta.tier, filters, ctx.user.id, true);
 
       const statement = `
         SELECT
@@ -821,8 +1102,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         {
           route: 'usageAnalytics.getBreakdown',
           queryLabel: `breakdown_${meta.tier}_by_${input.dimension}`,
-          scope: input.organizationId ? 'org' : 'user',
-          period: `${input.startDate}/${input.endDate}`,
+          scope: filters.organizationId ? 'org' : 'user',
+          period: `${filters.startDate}/${filters.endDate}`,
         },
         signal =>
           executeSnowflakeStatement({
@@ -830,13 +1111,14 @@ export const usageAnalyticsRouter = createTRPCRouter({
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
-              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+              defaultTimeoutForScope(filters.organizationId ? 'org' : 'user') / 1000
             ),
             signal,
           })
       );
 
-      const values = rows.map(row => ({ key: row[0] ?? '', value: toSafeNumber(row[1]) }));
+      const values = rows.map(row => ({ key: toStringValue(row[0]), value: toSafeNumber(row[1]) }));
+      const userEmailsById = userEmailsForDisplay(filters, scopedUserEmailMaps);
       // Percentages are relative to the *returned* rows (limited by input.limit).
       // They will not reflect the true share when the result set is capped.
       const totalValue = values.reduce((s, r) => s + r.value, 0);
@@ -844,7 +1126,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       return {
         breakdown: values.map(r => ({
           key: r.key,
-          label: r.key,
+          label: userEmailsById.get(r.key) ?? r.key,
           value: r.value,
           percentage: totalValue > 0 ? (r.value / totalValue) * 100 : 0,
         })),
@@ -857,17 +1139,21 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(TableInputSchema)
     .output(TableOutputSchema)
     .query(async ({ input, ctx }) => {
-      await ensureScopeAccess(ctx, input);
+      const { filters, scopedUserEmailMaps } = await prepareUsageFilters(
+        ctx,
+        input,
+        input.groupBy.includes('user')
+      );
 
       const config = resolveSnowflakeConfig();
-      const meta = resolveTier(input.granularity, input.startDate);
+      const meta = resolveTier(filters.granularity, filters.startDate);
       if (!config) {
         return { rows: [], effectiveGranularity: meta.effectiveGranularity };
       }
       const table = getTableName(meta.tier);
       const bucketExpr = bucketExprSql(meta.effectiveGranularity, meta.tier);
-      const where = buildWhereClause(meta.tier, input, ctx.user.id, true);
-      const costSumExpr = costSumExprSql(input.costSource);
+      const where = buildWhereClause(meta.tier, filters, ctx.user.id, true);
+      const costSumExpr = costSumExprSql(filters.costSource);
 
       const requestedDims = input.groupBy;
 
@@ -913,8 +1199,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         {
           route: 'usageAnalytics.getTable',
           queryLabel: `table_${meta.tier}_groupby_${requestedDims.join('+') || 'none'}`,
-          scope: input.organizationId ? 'org' : 'user',
-          period: `${input.startDate}/${input.endDate}`,
+          scope: filters.organizationId ? 'org' : 'user',
+          period: `${filters.startDate}/${filters.endDate}`,
         },
         signal =>
           executeSnowflakeStatement({
@@ -922,7 +1208,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
-              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+              defaultTimeoutForScope(filters.organizationId ? 'org' : 'user') / 1000
             ),
             signal,
           })
@@ -937,15 +1223,18 @@ export const usageAnalyticsRouter = createTRPCRouter({
         project: 6,
       };
 
+      const userEmailsById = userEmailsForDisplay(filters, scopedUserEmailMaps);
+
       return {
         rows: rows.map(row => {
           const dimensions: Record<string, string> = {};
           for (const d of requestedDims) {
             const raw = row[dimIndexMap[d]];
-            dimensions[d] = typeof raw === 'string' ? raw : '';
+            const value = toStringValue(raw);
+            dimensions[d] = d === 'user' ? (userEmailsById.get(value) ?? value) : value;
           }
           return {
-            datetime: row[0] ?? '',
+            datetime: toStringValue(row[0]),
             dimensions,
             costMicrodollars: toSafeNumber(row[7]),
             requestCount: toSafeNumber(row[8]),

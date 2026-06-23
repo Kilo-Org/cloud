@@ -37,14 +37,17 @@ const FiltersShape = {
   models: z.array(z.string()).optional(),
   modes: z.array(z.string()).optional(),
   userIds: z.array(z.string()).optional(),
+  userEmails: z.array(z.string()).optional(),
   providers: z.array(z.string()).optional(),
   projects: z.array(z.string()).optional(),
   excludedFeatures: z.array(z.string()).optional(),
   excludedModels: z.array(z.string()).optional(),
   excludedModes: z.array(z.string()).optional(),
   excludedUserIds: z.array(z.string()).optional(),
+  excludedUserEmails: z.array(z.string()).optional(),
   excludedProviders: z.array(z.string()).optional(),
   excludedProjects: z.array(z.string()).optional(),
+  userDisplay: z.enum(['id', 'email']).default('id'),
 } as const;
 
 export const UsageAnalyticsFiltersSchema = z.object(FiltersShape);

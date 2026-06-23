@@ -513,11 +513,42 @@ export function displayBreakdownValues(
   values: BreakdownValue[],
   limit: number
 ): BreakdownValue[] {
-  return values.slice(0, limit).map(value => ({
-    key: value.key,
-    label: dimensionDisplayValue(dimension, filters, userEmailsById, value.key),
-    value: value.value,
-  }));
+  const valuesByDisplayKey = new Map<string, BreakdownValue>();
+
+  for (const value of values) {
+    const label = dimensionDisplayValue(dimension, filters, userEmailsById, value.key);
+    const displayKey = dimension === 'user' && filters.userDisplay === 'email' ? label : value.key;
+    const existing = valuesByDisplayKey.get(displayKey);
+    if (existing) {
+      existing.value += value.value;
+      continue;
+    }
+    valuesByDisplayKey.set(displayKey, {
+      key: displayKey,
+      label,
+      value: value.value,
+    });
+  }
+
+  return Array.from(valuesByDisplayKey.values())
+    .sort((a, b) => b.value - a.value)
+    .slice(0, limit);
+}
+
+export function shouldLimitBreakdownInSql(
+  dimension: Dimension,
+  filters: Pick<UsageAnalyticsFilters, 'userDisplay'>
+): boolean {
+  return !(dimension === 'user' && filters.userDisplay === 'email');
+}
+
+export function scopedUserEmailBreakdownIds(
+  dimension: Dimension,
+  filters: Pick<UsageAnalyticsFilters, 'userDisplay'>,
+  scopedUserEmailMaps: ScopedUserEmailMaps | undefined
+): string[] | undefined {
+  if (dimension !== 'user' || filters.userDisplay !== 'email') return undefined;
+  return uniqueStrings(Array.from(scopedUserEmailMaps?.idsByEmail.values() ?? []).flat());
 }
 
 // ---------------------------------------------------------------------------
@@ -1120,6 +1151,20 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const dimCol = dimensionColumn(input.dimension);
       const metricExpr = metricExprSql(input.metric, meta.tier, filters.costSource);
       const where = buildWhereClause(meta.tier, filters, ctx.user.id, true);
+      const limitBreakdownInSql = shouldLimitBreakdownInSql(input.dimension, filters);
+      const scopedBreakdownUserIds = scopedUserEmailBreakdownIds(
+        input.dimension,
+        filters,
+        scopedUserEmailMaps
+      );
+
+      if (scopedBreakdownUserIds) {
+        if (scopedBreakdownUserIds.length > 0) {
+          where.addIn('kilo_user_id', scopedBreakdownUserIds);
+        } else {
+          where.addEq('kilo_user_id', NO_MATCHING_USER_EMAIL_ID);
+        }
+      }
 
       const statement = `
         SELECT
@@ -1129,11 +1174,11 @@ export const usageAnalyticsRouter = createTRPCRouter({
         WHERE ${where.sql()}
         GROUP BY 1
         ORDER BY 2 DESC
-        LIMIT ${Number(input.limit)}
+        ${limitBreakdownInSql ? `LIMIT ${Number(input.limit)}` : ''}
       `;
 
-      // SAFETY: LIMIT value is interpolated directly into SQL but is
-      // validated by Zod above: `z.number().int().min(1).max(10_000)`.
+      // SAFETY: LIMIT value is interpolated directly into SQL when present but
+      // is validated by Zod above: `z.number().int().min(1).max(100)`.
       // Snowflake's SQL API v2 does not support parameter binding for LIMIT.
 
       const rows = await timedSnowflakeQuery(

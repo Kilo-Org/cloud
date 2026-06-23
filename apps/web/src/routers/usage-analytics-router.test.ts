@@ -9,6 +9,8 @@ import {
   costSumExprSql,
   dimensionDisplayValue,
   displayBreakdownValues,
+  scopedUserEmailBreakdownIds,
+  shouldLimitBreakdownInSql,
   shouldLoadFullOrgWideUserEmailMap,
   userDisplayValue,
 } from './usage-analytics-router';
@@ -123,7 +125,7 @@ describe('usage analytics cost source', () => {
     );
   });
 
-  it('maps breakdown user ids to emails without changing Snowflake buckets', () => {
+  it('aggregates breakdown user ids by email before applying the display limit', () => {
     const userEmailsById = new Map([
       ['user_1', 'person@example.com'],
       ['oauth/github:123', 'person@example.com'],
@@ -136,17 +138,46 @@ describe('usage analytics cost source', () => {
         { userDisplay: 'email' },
         userEmailsById,
         [
-          { key: 'user_2', value: 80 },
-          { key: 'user_1', value: 60 },
-          { key: 'oauth/github:123', value: 50 },
-          { key: 'missing_user_1', value: 6 },
-          { key: 'missing_user_2', value: 4 },
+          { key: 'user_2', label: 'user_2', value: 80 },
+          { key: 'user_1', label: 'user_1', value: 60 },
+          { key: 'oauth/github:123', label: 'oauth/github:123', value: 50 },
+          { key: 'missing_user_1', label: 'missing_user_1', value: 6 },
+          { key: 'missing_user_2', label: 'missing_user_2', value: 4 },
         ],
         2
       )
     ).toEqual([
-      { key: 'user_2', label: 'other@example.com', value: 80 },
-      { key: 'user_1', label: 'person@example.com', value: 60 },
+      { key: 'person@example.com', label: 'person@example.com', value: 110 },
+      { key: 'other@example.com', label: 'other@example.com', value: 80 },
     ]);
+  });
+
+  it('does not apply the Snowflake breakdown limit before email aggregation', () => {
+    expect(shouldLimitBreakdownInSql('user', { userDisplay: 'email' })).toBe(false);
+    expect(shouldLimitBreakdownInSql('user', { userDisplay: 'id' })).toBe(true);
+    expect(shouldLimitBreakdownInSql('model', { userDisplay: 'email' })).toBe(true);
+  });
+
+  it('scopes email-display user breakdown queries to mapped user identities', () => {
+    const maps = buildScopedUserEmailMaps(
+      [
+        { id: 'user_1', email: 'person@example.com' },
+        { id: 'user_2', email: 'other@example.com' },
+      ],
+      [
+        { userId: 'user_1', provider: 'github', providerAccountId: '123' },
+        { userId: 'user_1', provider: 'github', providerAccountId: '123' },
+        { userId: 'user_2', provider: 'google', providerAccountId: 'abc' },
+      ]
+    );
+
+    expect(scopedUserEmailBreakdownIds('user', { userDisplay: 'email' }, maps)).toEqual([
+      'user_1',
+      'oauth/github:123',
+      'user_2',
+      'oauth/google:abc',
+    ]);
+    expect(scopedUserEmailBreakdownIds('user', { userDisplay: 'id' }, maps)).toBe(undefined);
+    expect(scopedUserEmailBreakdownIds('model', { userDisplay: 'email' }, maps)).toBe(undefined);
   });
 });

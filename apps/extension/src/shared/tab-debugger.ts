@@ -102,7 +102,10 @@ export interface PageSnapshot {
 
 export interface ViewportScreenshot {
   readonly dataUrl: string;
+  readonly devicePixelRatio: number;
+  readonly height: number;
   readonly mediaType: 'image/png';
+  readonly width: number;
 }
 
 export type EvalTabResult =
@@ -232,6 +235,7 @@ const chromeEvalResponseSchema = z.object({
   exceptionDetails: z.unknown().optional(),
   result: chromeEvalResultSchema.optional(),
 });
+const maxEvalStringLength = 8000;
 
 const isNormalPageUrl = (url: string | undefined): url is string =>
   url?.startsWith('http://') === true || url?.startsWith('https://') === true;
@@ -282,6 +286,19 @@ export const listInspectableTabsWithTabsApi = async (
 
 const getTabId = (tab: BrowserTabInfo | undefined): number | undefined =>
   typeof tab?.id === 'number' ? tab.id : undefined;
+const getPngDimensions = (dataUrl: string): { height: number; width: number } | undefined => {
+  try {
+    const bytes = Uint8Array.from(
+      atob(dataUrl.slice('data:image/png;base64,'.length)),
+      character => character.codePointAt(0) ?? 0
+    );
+    const view = new DataView(bytes.buffer);
+
+    return { height: view.getUint32(20), width: view.getUint32(16) };
+  } catch {
+    return undefined;
+  }
+};
 
 export const getViewportScreenshotWithTabsApi = async ({
   tabId,
@@ -311,8 +328,18 @@ export const getViewportScreenshotWithTabsApi = async ({
     if (!dataUrl.startsWith('data:image/png;base64,')) {
       return { error: 'Viewport screenshot API returned an invalid image.', ok: false };
     }
+    const dimensions = getPngDimensions(dataUrl);
 
-    return { ok: true, value: { dataUrl, mediaType: 'image/png' } satisfies ViewportScreenshot };
+    return {
+      ok: true,
+      value: {
+        dataUrl,
+        devicePixelRatio: 1,
+        height: dimensions?.height ?? 0,
+        mediaType: 'image/png',
+        width: dimensions?.width ?? 0,
+      } satisfies ViewportScreenshot,
+    };
   } finally {
     if (previousActiveTabId !== undefined && previousActiveTabId !== tabId) {
       await tabsApi.update(previousActiveTabId, { active: true });
@@ -321,6 +348,40 @@ export const getViewportScreenshotWithTabsApi = async ({
 };
 
 const getEvalExpression = (code: string): string => `(async () => { ${code} })()`;
+const getExceptionMessage = (exceptionDetails: unknown): string => {
+  if (
+    typeof exceptionDetails === 'object' &&
+    exceptionDetails !== null &&
+    'text' in exceptionDetails &&
+    typeof exceptionDetails.text === 'string' &&
+    exceptionDetails.text.trim() !== ''
+  ) {
+    return `Page evaluation failed: ${exceptionDetails.text}`;
+  }
+
+  return 'Page evaluation failed.';
+};
+const toSerializableEvalResult = (value: unknown): EvalTabResult => {
+  try {
+    JSON.stringify(value);
+  } catch {
+    return { error: 'Eval result was not JSON-serializable.', ok: false };
+  }
+
+  if (typeof value === 'string' && value.length > maxEvalStringLength) {
+    return {
+      ok: true,
+      value: {
+        originalLength: value.length,
+        truncated: true,
+        type: 'string',
+        value: value.slice(0, maxEvalStringLength),
+      },
+    };
+  }
+
+  return { ok: true, value };
+};
 
 const runInjectedEval = (code: string): unknown =>
   // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval, typescript-eslint/no-unsafe-call
@@ -609,18 +670,20 @@ export const evalInTab = async ({
     const { exceptionDetails, result } = parsed.data;
 
     if (exceptionDetails !== undefined) {
-      return { error: 'Page evaluation failed.', ok: false };
+      return { error: getExceptionMessage(exceptionDetails), ok: false };
     }
 
     if (result === undefined) {
       return { error: 'Debugger returned an invalid eval result.', ok: false };
     }
 
-    return {
-      ok: true,
-      ...(result.description === undefined ? {} : { description: result.description }),
-      ...(Object.hasOwn(result, 'value') ? { value: result.value } : {}),
-    };
+    const normalizedResult = Object.hasOwn(result, 'value')
+      ? toSerializableEvalResult(result.value)
+      : ({ ok: true } satisfies EvalTabResult);
+
+    return normalizedResult.ok && result.description !== undefined
+      ? { ...normalizedResult, description: result.description }
+      : normalizedResult;
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Page evaluation failed.',
@@ -657,7 +720,7 @@ export const evalInTabWithScripting = async ({
       timeoutMs
     );
 
-    return { ok: true, value: response?.result };
+    return toSerializableEvalResult(response?.result);
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Page evaluation failed.',

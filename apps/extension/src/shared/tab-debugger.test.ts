@@ -89,7 +89,7 @@ describe('tab debugger helpers', () => {
   it('returns eval errors and still detaches', async () => {
     const debuggerApi = createDebuggerApi({
       sendCommand: () => ({
-        exceptionDetails: { text: 'ReferenceError' },
+        exceptionDetails: { text: 'ReferenceError: missingValue is not defined' },
         result: { type: 'object' },
       }),
     });
@@ -100,8 +100,36 @@ describe('tab debugger helpers', () => {
         debuggerApi,
         tabId: 7,
       })
-    ).resolves.toStrictEqual({ error: 'Page evaluation failed.', ok: false });
+    ).resolves.toStrictEqual({
+      error: 'Page evaluation failed: ReferenceError: missingValue is not defined',
+      ok: false,
+    });
     expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
+  });
+
+  it('summarizes huge eval string results', async () => {
+    const hugeValue = 'x'.repeat(8001);
+    const debuggerApi = createDebuggerApi({
+      sendCommand: () => ({
+        result: { type: 'string', value: hugeValue },
+      }),
+    });
+
+    await expect(
+      evalInTab({
+        code: 'return document.documentElement.outerHTML;',
+        debuggerApi,
+        tabId: 7,
+      })
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: {
+        originalLength: 8001,
+        truncated: true,
+        type: 'string',
+        value: 'x'.repeat(8000),
+      },
+    });
   });
 
   it('lists normal page tabs through Firefox tabs API', async () => {
@@ -167,6 +195,28 @@ describe('tab debugger helpers', () => {
     ).resolves.toStrictEqual({ error: 'Page evaluation timed out.', ok: false });
   });
 
+  it('rejects non-serializable Firefox scripting eval results', async () => {
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: () => {
+        const value: { self?: unknown } = {};
+        value.self = value;
+
+        return [{ result: value }];
+      },
+    };
+
+    await expect(
+      evalInTabWithScripting({
+        code: 'const value = {}; value.self = value; return value;',
+        scriptingApi,
+        tabId: 7,
+      })
+    ).resolves.toStrictEqual({
+      error: 'Eval result was not JSON-serializable.',
+      ok: false,
+    });
+  });
+
   it('passes the snapshot timeout into the injected scan', async () => {
     const calls: Parameters<BrowserScriptingApi['executeScript']>[0][] = [];
     const scriptingApi: BrowserScriptingApi = {
@@ -201,10 +251,12 @@ describe('tab debugger helpers', () => {
 
   it('captures a viewport screenshot for the selected tab and restores the active tab', async () => {
     const calls: unknown[] = [];
+    const pngDataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
     const tabsApi: BrowserTabsApi = {
       captureVisibleTab: (windowId, options) => {
         calls.push({ name: 'captureVisibleTab', options, windowId });
-        return 'data:image/png;base64,c2NyZWVu';
+        return pngDataUrl;
       },
       get: tabId => {
         calls.push({ name: 'get', tabId });
@@ -223,8 +275,11 @@ describe('tab debugger helpers', () => {
     await expect(getViewportScreenshotWithTabsApi({ tabId: 7, tabsApi })).resolves.toStrictEqual({
       ok: true,
       value: {
-        dataUrl: 'data:image/png;base64,c2NyZWVu',
+        dataUrl: pngDataUrl,
+        devicePixelRatio: 1,
+        height: 1,
         mediaType: 'image/png',
+        width: 1,
       },
     });
     expect(calls).toStrictEqual([

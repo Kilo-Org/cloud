@@ -59,6 +59,7 @@ export function useDeviceAuth(): DeviceAuthResult {
             case 200: {
               const data = (await response.json()) as { token: string };
               cleanup();
+              void WebBrowser.dismissBrowser();
               setState(previous => ({
                 status: 'approved',
                 code,

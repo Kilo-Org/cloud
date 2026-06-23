@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import type {
   KiloGatewayChatCompletion,
   KiloGatewayChatMessage,
@@ -162,14 +163,29 @@ const applyStreamingData = (
   }
 
   const { delta } = choice;
+  const { content, tool_calls: toolCalls } = delta;
+  const reasoningKeys = Object.keys(delta).filter(
+    key => key.includes('reason') || key.includes('thinking')
+  );
 
-  if (typeof delta['content'] === 'string') {
-    accumulator.content += delta['content'];
-    onContentDelta(delta['content']);
+  if (content === '' || reasoningKeys.length > 0) {
+    console.debug('[kilo-extension] non-visible gateway stream delta', {
+      contentLength: typeof content === 'string' ? content.length : undefined,
+      deltaKeys: Object.keys(delta),
+      finishReason:
+        typeof choice['finish_reason'] === 'string' ? choice['finish_reason'] : undefined,
+      reasoningKeys,
+      toolCallCount: Array.isArray(toolCalls) ? toolCalls.length : 0,
+    });
   }
 
-  if (Array.isArray(delta['tool_calls'])) {
-    for (const toolCall of delta['tool_calls']) {
+  if (typeof content === 'string' && content.length > 0) {
+    accumulator.content += content;
+    onContentDelta(content);
+  }
+
+  if (Array.isArray(toolCalls)) {
+    for (const toolCall of toolCalls) {
       mergeStreamingToolCall(accumulator.toolCallsByIndex, toolCall);
     }
   }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fetchKiloGatewayChatCompletionStream } from './kilo-api-client';
 import type { FetchLike } from './auth';
 
@@ -85,6 +85,42 @@ describe('kilo gateway chat stream client', () => {
     expect(seen[0]?.headers.get('accept')).toBe('text/event-stream');
     expect(seen[0]?.headers.get('x-kilocode-organizationid')).toBe('org-1');
     expect(seen[0]?.body).toMatchObject({ stream: true });
+  });
+
+  it('ignores empty content deltas before visible content', async () => {
+    const contentDeltas: string[] = [];
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"content":""}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"Visible answer."}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Inspect this page', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: delta => {
+          contentDeltas.push(delta);
+        },
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      content: 'Visible answer.',
+      toolCalls: [],
+    });
+
+    expect(contentDeltas).toStrictEqual(['Visible answer.']);
+    expect(debug).toHaveBeenCalledWith(
+      '[kilo-extension] non-visible gateway stream delta',
+      expect.objectContaining({ contentLength: 0, deltaKeys: ['content'] })
+    );
+
+    debug.mockRestore();
   });
 
   it('sends selected thinking effort as gateway reasoning', async () => {

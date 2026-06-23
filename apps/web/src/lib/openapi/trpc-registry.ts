@@ -1,5 +1,6 @@
 import type { inferRouterInputs } from '@trpc/server';
-import type * as z from 'zod';
+import * as z from 'zod';
+import { PublicOrganizationMembersSchema } from '@/lib/organizations/organization-types';
 import type { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 import {
   BreakdownInputSchema,
@@ -19,6 +20,21 @@ export type TrpcOpenApiProcedure = {
   summary: string;
   description?: string;
   input: z.ZodType;
+  output: z.ZodType;
+};
+
+export type RestOpenApiRoute = {
+  path: string;
+  method: 'get' | 'post';
+  operationId: string;
+  tags: string[];
+  summary: string;
+  description?: string;
+  pathParameters?: Array<{
+    name: string;
+    description: string;
+    schema: z.ZodType;
+  }>;
   output: z.ZodType;
 };
 
@@ -79,3 +95,23 @@ export const publicTrpcOpenApiProcedures = [
     output: TableOutputSchema,
   }),
 ];
+
+export const publicRestOpenApiRoutes = [
+  {
+    path: '/api/v1/organizations/{id}/members',
+    method: 'get',
+    operationId: 'organizations_getMembers',
+    tags: ['Organizations'],
+    summary: 'Return organization members',
+    description:
+      'Returns active and invited members for an organization the authenticated user can access. Invite tokens and invite URLs are omitted from the response.',
+    pathParameters: [
+      {
+        name: 'id',
+        description: 'Organization ID.',
+        schema: z.string(),
+      },
+    ],
+    output: PublicOrganizationMembersSchema,
+  },
+] satisfies RestOpenApiRoute[];

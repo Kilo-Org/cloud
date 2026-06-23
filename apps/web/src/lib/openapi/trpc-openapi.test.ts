@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { TRPCError, initTRPC } from '@trpc/server';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import * as z from 'zod';
-import { publicTrpcOpenApiProcedures } from '@/lib/openapi/trpc-registry';
+import { publicRestOpenApiRoutes, publicTrpcOpenApiProcedures } from '@/lib/openapi/trpc-registry';
 import { generateTrpcOpenApiDocument } from '@/lib/openapi/trpc-openapi';
 import {
   TrpcErrorResponseSchema,
@@ -41,11 +41,14 @@ async function callVerificationProcedure(path: string, input?: unknown): Promise
 }
 
 describe('generateTrpcOpenApiDocument', () => {
-  it('documents only the allowlisted tRPC procedures', () => {
+  it('documents only the allowlisted API paths', () => {
     const document = generateTrpcOpenApiDocument();
 
     expect(Object.keys(document.paths).sort()).toEqual(
-      publicTrpcOpenApiProcedures.map(procedure => `/api/trpc/${procedure.procedurePath}`).sort()
+      [
+        ...publicTrpcOpenApiProcedures.map(procedure => `/api/trpc/${procedure.procedurePath}`),
+        ...publicRestOpenApiRoutes.map(route => route.path),
+      ].sort()
     );
     expect(document.paths['/api/trpc/usageAnalytics.getTable']?.get).toMatchObject({
       operationId: 'usageAnalytics_getTable',
@@ -53,6 +56,58 @@ describe('generateTrpcOpenApiDocument', () => {
       tags: ['Usage Analytics'],
     });
     expect(document.paths).not.toHaveProperty('/api/trpc/admin');
+  });
+
+  it('generates the REST organization members endpoint', () => {
+    const document = generateTrpcOpenApiDocument();
+    const operation = document.paths['/api/v1/organizations/{id}/members']?.get as {
+      responses: Record<string, { content: Record<string, { schema: Record<string, any> }> }>;
+    };
+    const responseSchema = operation?.responses['200'].content['application/json'].schema;
+
+    expect(document.info.title).toBe('Kilo Code API');
+    expect(operation).toMatchObject({
+      operationId: 'organizations_getMembers',
+      summary: 'Return organization members',
+      tags: ['Organizations'],
+      parameters: [
+        {
+          name: 'id',
+          in: 'path',
+          required: true,
+          schema: { type: 'string' },
+        },
+      ],
+      responses: {
+        '200': {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'array',
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(responseSchema.items.oneOf).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          required: expect.arrayContaining(['id', 'name', 'email', 'status']),
+          properties: expect.objectContaining({
+            status: { type: 'string', const: 'active' },
+          }),
+        }),
+        expect.objectContaining({
+          required: expect.arrayContaining(['email', 'status']),
+          properties: expect.objectContaining({
+            status: { type: 'string', const: 'invited' },
+          }),
+        }),
+      ])
+    );
+    expect(JSON.stringify(responseSchema)).not.toContain('inviteToken');
+    expect(JSON.stringify(responseSchema)).not.toContain('inviteUrl');
   });
 
   it('documents bearer auth metadata for protected procedures', () => {

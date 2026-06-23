@@ -77,7 +77,7 @@ function swaggerUiHtml(nonce: string) {
     <header class="kilo-docs-header">
       <div>
         <h1 class="kilo-docs-title">Kilo Code API Docs</h1>
-        <p class="kilo-docs-subtitle">Swagger UI generated from the allowlisted tRPC OpenAPI document.</p>
+        <p class="kilo-docs-subtitle">Swagger UI generated from the Kilo Code OpenAPI document.</p>
       </div>
       <a class="kilo-docs-link" href="/api/openapi.json">Open JSON</a>
     </header>

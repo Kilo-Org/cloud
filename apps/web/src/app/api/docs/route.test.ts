@@ -13,5 +13,7 @@ describe('GET /api/docs', () => {
     expect(body).toContain('.swagger-ui .auth-wrapper');
     expect(body).toContain('.swagger-ui .authorization__btn');
     expect(body).toContain('display: none !important');
+    expect(body).toContain('Swagger UI generated from the Kilo Code OpenAPI document.');
+    expect(body).not.toContain('tRPC OpenAPI document');
   });
 });

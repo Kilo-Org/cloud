@@ -5,7 +5,6 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user/server';
 import {
@@ -178,19 +177,7 @@ export async function POST(request: NextRequest) {
 
   setTag('ui.ai_model', requestBody.model);
 
-  // Use read replica for balance check - this is a read-only operation that can tolerate
-  // slight replication lag, and provides lower latency for US users.
-  const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
-
-  if (balance <= 0 && !(await isFreeModel(requestBody.model)) && !userByok) {
-    return NextResponse.json(
-      {
-        error: { message: 'Insufficient credits' },
-        error_type: ProxyErrorType.insufficient_credits,
-      },
-      { status: 402 }
-    );
-  }
+  const { settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
     modelId: requestBody.model,

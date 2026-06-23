@@ -487,7 +487,7 @@ describe('countAndStoreEditUsage', () => {
     expect(stats.market_cost).toBe(4_750);
   });
 
-  it('preserves cost_mUsd and cacheDiscount_mUsd for non-BYOK requests', async () => {
+  it('preserves market cost but does not bill non-BYOK requests', async () => {
     const response = makeUpstreamResponse({
       id: 'edit-paid',
       model: 'mercury-edit-2',
@@ -506,8 +506,8 @@ describe('countAndStoreEditUsage', () => {
 
     expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
-    expect(stats.cost_mUsd).toBe(4_750);
-    expect(stats.cacheDiscount_mUsd).toBe(20_250);
+    expect(stats.cost_mUsd).toBe(0);
+    expect(stats.cacheDiscount_mUsd).toBe(0);
     expect(stats.market_cost).toBe(4_750);
   });
 

@@ -22,7 +22,7 @@ const storybookPublicEnvDefaults = {
 
 const config: StorybookConfig = {
   stories: ['../stories/**/*.stories.@(js|jsx|mjs|ts|tsx)'],
-  addons: ['@storybook/addon-links', '@storybook/addon-docs'],
+  addons: ['@storybook/addon-docs'],
   framework: {
     name: '@storybook/nextjs',
     options: {

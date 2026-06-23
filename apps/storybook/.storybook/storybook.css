@@ -5,25 +5,58 @@
 @import 'tailwindcss';
 @import '../../web/src/app/globals.css';
 
-/* Override Storybook's default styles to match our dark theme */
-.sb-show-main {
-  background-color: var(--background);
+html {
+  background-color: var(--surface-background);
+  color-scheme: dark;
+  font-family: var(--font-sans-loaded, 'Inter', ui-sans-serif, system-ui, sans-serif);
+}
+
+body,
+#storybook-root,
+#storybook-docs {
+  min-height: 100vh;
+  background-color: var(--surface-background);
   color: var(--foreground);
 }
 
+.sb-show-main,
 .sb-main-padded {
-  background-color: var(--background);
+  background-color: var(--surface-background);
   color: var(--foreground);
 }
 
-/* Ensure components render with proper dark theme */
+.docs-story,
+.sbdocs-wrapper,
+.sbdocs-content {
+  background-color: var(--surface-background);
+  color: var(--foreground);
+}
+
 .storybook-component {
-  background-color: var(--background);
+  min-height: 100vh;
+  background-color: var(--surface-background);
   color: var(--foreground);
 }
 
-/* Apply dark theme to Storybook UI */
-body {
-  background-color: var(--background);
+.storybook-canvas {
+  min-height: 100vh;
+  background-color: var(--surface-background);
   color: var(--foreground);
+}
+
+.storybook-raised-surface {
+  background-color: var(--surface-raised);
+}
+
+.storybook-overlay-surface {
+  background-color: var(--surface-overlay);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storybook-motion-sample,
+  .storybook-motion-sample * {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
 }

@@ -5,7 +5,7 @@
   "scripts": {
     "storybook": "storybook dev",
     "build-storybook": "storybook build --webpack-stats-json",
-    "preview": "storybook preview",
+    "preview": "node scripts/serve-storybook-static.mjs",
     "chromatic": "chromatic --exit-zero-on-changes",
     "generate-screenshot-stories": "node scripts/generate-playwright-screenshot-stories.js",
     "component-inventory": "node scripts/component-inventory.js",
@@ -30,7 +30,6 @@
     "@faker-js/faker": "10.3.0",
     "@storybook/addon-docs": "9.1.20",
     "@storybook/addon-links": "9.1.20",
-    "@storybook/addon-themes": "9.1.20",
     "@storybook/nextjs": "9.1.20",
     "@storybook/test-runner": "0.23.0",
     "@tailwindcss/typography": "0.5.19",

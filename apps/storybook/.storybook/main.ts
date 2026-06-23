@@ -13,9 +13,16 @@ expand(dotenvConfig({ path: resolve(repoRoot, '.env.local') }));
 expand(dotenvConfig({ path: resolve(webRoot, '.env.development') }));
 expand(dotenvConfig({ path: resolve(webRoot, '.env') }));
 
+const storybookPublicEnvDefaults = {
+  NEXT_PUBLIC_EVENT_SERVICE_URL: 'https://event-service.storybook.invalid',
+  NEXT_PUBLIC_GASTOWN_URL: 'https://gastown.storybook.invalid',
+  NEXT_PUBLIC_KILO_CHAT_URL: 'https://kilo-chat.storybook.invalid',
+  NEXT_PUBLIC_WASTELAND_URL: 'https://wasteland.storybook.invalid',
+} satisfies Record<string, string>;
+
 const config: StorybookConfig = {
   stories: ['../stories/**/*.stories.@(js|jsx|mjs|ts|tsx)'],
-  addons: ['@storybook/addon-links', '@storybook/addon-docs', '@storybook/addon-themes'],
+  addons: ['@storybook/addon-links', '@storybook/addon-docs'],
   framework: {
     name: '@storybook/nextjs',
     options: {
@@ -66,6 +73,10 @@ const config: StorybookConfig = {
  */
 function getNextPublicEnvDefinitions() {
   const definitions: Record<string, string> = {};
+
+  for (const [key, defaultValue] of Object.entries(storybookPublicEnvDefaults)) {
+    definitions[`process.env.${key}`] = JSON.stringify(process.env[key] ?? defaultValue);
+  }
 
   // Find all NEXT_PUBLIC_ variables in process.env
   // eslint-disable-next-line n/no-process-env

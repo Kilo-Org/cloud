@@ -165,7 +165,9 @@ export const waitForStoredConversationText = async (page: Page, text: string): P
                   return;
                 }
 
-                resolve(JSON.stringify(items['kiloAgentConversation']).includes(expectedText));
+                resolve(
+                  JSON.stringify(items['kiloAgentConversation'] ?? null).includes(expectedText)
+                );
               });
             }),
           text

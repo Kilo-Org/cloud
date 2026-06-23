@@ -1,7 +1,6 @@
 import { expect } from '@playwright/test';
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 import { z } from 'zod';
-
 const toolMessageSchema = z.object({
   content: z.string(),
   role: z.literal('tool'),
@@ -22,7 +21,6 @@ const chatRequestSchema = z.object({
 const toolResultSchema = z.object({
   value: z.number(),
 });
-
 const getToolResultHtmlLength = (body: unknown): string => {
   const request = chatRequestSchema.safeParse(body);
 
@@ -60,6 +58,7 @@ export const mockKiloApi = async (
   options: {
     beforeFirstCompletion?: () => Promise<void>;
     beforeModels?: (organizationId: string) => Promise<void>;
+    afterModels?: (organizationId: string) => void;
     firstCompletionEvents?: unknown[];
     modelInputModalities?: string[];
     modelFailuresBeforeSuccessByOrganizationId?: Record<string, number>;
@@ -101,6 +100,7 @@ export const mockKiloApi = async (
         (options.modelFailuresBeforeSuccessByOrganizationId?.[organizationId] ?? 0)
     ) {
       await route.fulfill({ status: 500 });
+      options.afterModels?.(organizationId);
       return;
     }
 
@@ -121,6 +121,7 @@ export const mockKiloApi = async (
       },
       status: 200,
     });
+    options.afterModels?.(organizationId);
   });
   await context.route('https://app.kilo.ai/api/gateway/v1/chat/completions', async route => {
     chatCompletionCalls += 1;

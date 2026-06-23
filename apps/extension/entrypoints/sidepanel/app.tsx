@@ -12,6 +12,7 @@ import {
   validateAuthToken,
 } from '@/src/shared/auth';
 import type { DeviceAuthRequest, FetchLike, StoredAuth } from '@/src/shared/auth';
+import { persistApprovedDeviceAuth } from '@/src/shared/device-auth-approval';
 import { getAuthValidationQueryKey } from '@/src/shared/side-panel-query-options';
 import {
   LoadingView,
@@ -137,14 +138,21 @@ export const App = (): JSX.Element => {
 
     if (result.status === 'approved') {
       void (async (): Promise<void> => {
-        await saveStoredAuth(storage, result.auth);
+        const persistence = await persistApprovedDeviceAuth(storage, result.auth);
+
+        setPendingAuthRequest(undefined);
+        if (persistence.status === 'failed') {
+          setSignedOutMessage(persistence.message);
+          queryClient.setQueryData(storedAuthQueryKey, undefined);
+          return;
+        }
+
         setSignedOutMessage(undefined);
-        queryClient.setQueryData(storedAuthQueryKey, result.auth);
-        queryClient.setQueryData(getAuthValidationQueryKey(result.auth.token), {
-          auth: result.auth,
+        queryClient.setQueryData(storedAuthQueryKey, persistence.auth);
+        queryClient.setQueryData(getAuthValidationQueryKey(persistence.auth.token), {
+          auth: persistence.auth,
           status: 'signedIn',
         } satisfies AuthValidationData);
-        setPendingAuthRequest(undefined);
       })();
       return;
     }

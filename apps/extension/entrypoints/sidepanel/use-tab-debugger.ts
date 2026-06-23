@@ -2,6 +2,7 @@ import { browser } from '#imports';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getTabListQueryKey } from '@/src/shared/side-panel-query-options';
+import { deriveInspectableTabState } from '@/src/shared/tab-debugger-selection';
 import { LIST_INSPECTABLE_TABS_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
 import type {
   InspectableTab,
@@ -64,31 +65,29 @@ export const useTabDebugger = (): {
   });
 
   useEffect(() => {
-    if (tabs === undefined) {
-      if (isError) {
-        setInspectableTabs([]);
-        setSelectedTabId(undefined);
-        rememberedSelectedTabId = null;
-      }
+    const nextState = deriveInspectableTabState({
+      currentSelectedTabId: selectedTabId,
+      hasLoadedTabs: hasLoadedTabsRef.current,
+      isError,
+      tabs,
+    });
+
+    if (nextState === undefined) {
       return;
     }
 
-    const isInitialLoad = !hasLoadedTabsRef.current;
+    const {
+      hasLoadedTabs,
+      inspectableTabs: nextInspectableTabs,
+      rememberedSelectedTabId: nextRememberedSelectedTabId,
+      selectedTabId: nextSelectedTabId,
+    } = nextState;
 
-    hasLoadedTabsRef.current = true;
-    setInspectableTabs(tabs);
-    setSelectedTabId(currentTabId => {
-      if (currentTabId !== undefined && tabs.some(tab => tab.id === currentTabId)) {
-        rememberedSelectedTabId = currentTabId;
-        return currentTabId;
-      }
-
-      const nextTabId = isInitialLoad ? tabs[0]?.id : undefined;
-
-      rememberedSelectedTabId = nextTabId ?? null;
-      return nextTabId;
-    });
-  }, [isError, tabs]);
+    hasLoadedTabsRef.current = hasLoadedTabs;
+    rememberedSelectedTabId = nextRememberedSelectedTabId;
+    setInspectableTabs(nextInspectableTabs);
+    setSelectedTabId(nextSelectedTabId);
+  }, [isError, selectedTabId, tabs]);
 
   const loadInspectableTabs = useCallback(
     async (_options: { readonly showLoading?: boolean } = {}): Promise<void> => {

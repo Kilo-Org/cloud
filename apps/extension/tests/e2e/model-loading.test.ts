@@ -53,6 +53,21 @@ const delayOrgTwoModels =
     return pendingOrgTwoModels;
   };
 
+const markSecondOrgOneModelResponse = (markOrgOneModelsFulfilled: () => void) => {
+  let orgOneModelResponses = 0;
+
+  return (organizationId: string): void => {
+    if (organizationId !== orgOneId) {
+      return;
+    }
+
+    orgOneModelResponses += 1;
+    if (orgOneModelResponses === 2) {
+      markOrgOneModelsFulfilled();
+    }
+  };
+};
+
 test('model and thinking controls wait for the model catalog', async () => {
   const { promise: pendingModels, resolve: releaseModels } = Promise.withResolvers<void>();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -167,10 +182,13 @@ test('stale organization model loads cannot overwrite the current catalog', asyn
     Promise.withResolvers<void>();
   const { promise: orgOneModelsRequested, resolve: markOrgOneModelsRequested } =
     Promise.withResolvers<void>();
+  const { promise: staleOrgOneModelsFulfilled, resolve: markStaleOrgOneModelsFulfilled } =
+    Promise.withResolvers<void>();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 
   try {
     await mockKiloApi(context, {
+      afterModels: markSecondOrgOneModelResponse(markStaleOrgOneModelsFulfilled),
       beforeModels: delaySecondOrgOneModelRequest({
         markOrgOneModelsRequested,
         pendingOrgOneModels,
@@ -200,6 +218,7 @@ test('stale organization model loads cannot overwrite the current catalog', asyn
     await expect(sidePanel.getByLabel('Model')).toContainText('Org Two Model');
 
     releaseOrgOneModels();
+    await staleOrgOneModelsFulfilled;
 
     await expect(sidePanel.getByLabel('Model')).toContainText('Org Two Model');
   } finally {

@@ -1,5 +1,6 @@
 import { withQueryClient } from './../src/decorators/withQueryClient';
 import type { Decorator, Preview } from '@storybook/nextjs';
+import { themes } from 'storybook/theming';
 import { Inter, JetBrains_Mono, Roboto_Mono } from 'next/font/google';
 import { withTRPC } from '../src/decorators/withTRPC';
 import { withSessionProvider } from '../src/decorators/withSessionProvider';
@@ -67,6 +68,29 @@ const preview: Preview = {
     },
     nextjs: {
       appDirectory: true, // Enable Next.js 13+ App Router hooks support
+    },
+    docs: {
+      theme: themes.dark,
+    },
+    options: {
+      storySort: {
+        order: [
+          'Design System',
+          ['Stickersheet'],
+          'Components',
+          [
+            'Actions',
+            'App Controls',
+            'Data Display',
+            'Feedback',
+            'Forms',
+            'Layout',
+            'Navigation',
+            'Overlays',
+            'Utilities',
+          ],
+        ],
+      },
     },
   },
   decorators: [withProductionFonts, withTRPC, withQueryClient, withSessionProvider],

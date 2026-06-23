@@ -3,7 +3,7 @@ import { ArrowRight, LoaderCircle, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const meta: Meta<typeof Button> = {
-  title: 'Components/Button',
+  title: 'Components/Actions/Button',
   component: Button,
   parameters: {
     layout: 'centered',

@@ -47,7 +47,7 @@ export interface BrowserScriptingInjectionResult {
 export interface BrowserScriptingApi {
   readonly executeScript: (details: {
     readonly args: string[];
-    readonly func: (code: string) => unknown;
+    readonly func: (...args: string[]) => unknown;
     readonly target: { readonly tabId: number };
     readonly world: 'MAIN';
   }) => Promise<BrowserScriptingInjectionResult[]> | BrowserScriptingInjectionResult[];
@@ -181,10 +181,20 @@ const runInjectedEval = (code: string): unknown =>
   new Function(`return (async () => { ${code} })()`)();
 
 /* eslint-disable unicorn/consistent-function-scoping */
-const runInjectedPageSnapshot = (_unused: string): PageSnapshot => {
+const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
   const maxTextLength = 8000;
   const maxNodeCount = 80;
   const maxNodeTextLength = 500;
+  const timeoutMs = Number(timeoutMsText);
+  const deadline =
+    Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? performance.now() + timeoutMs
+      : Number.POSITIVE_INFINITY;
+  const checkDeadline = (): void => {
+    if (performance.now() > deadline) {
+      throw new Error('Page snapshot timed out.');
+    }
+  };
   const normalize = (value: string): string => value.replaceAll(/\s+/gu, ' ').trim();
   const truncate = (value: string, maxLength: number): string =>
     value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
@@ -223,6 +233,27 @@ const runInjectedPageSnapshot = (_unused: string): PageSnapshot => {
     }
 
     return '';
+  };
+  const getPageText = (): string => {
+    const root = document.body ?? document.documentElement;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const parts: string[] = [];
+    let length = 0;
+    let node = walker.nextNode();
+
+    while (node !== null && length < maxTextLength) {
+      checkDeadline();
+
+      const text = normalize(node.textContent ?? '');
+      if (text !== '') {
+        parts.push(text);
+        length += text.length + 1;
+      }
+
+      node = walker.nextNode();
+    }
+
+    return truncate(normalize(parts.join(' ')), maxTextLength);
   };
   const getRole = (element: Element): string => {
     const explicitRole = element.getAttribute('role');
@@ -265,9 +296,21 @@ const runInjectedPageSnapshot = (_unused: string): PageSnapshot => {
     'h5',
     'h6',
   ].join(',');
-  const nodes = [...document.querySelectorAll(selector)]
-    .slice(0, maxNodeCount)
-    .map((element, index) => {
+  const root = document.body ?? document.documentElement;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
+    acceptNode: node =>
+      node instanceof Element && node.matches(selector)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_SKIP,
+  });
+  const nodes: PageSnapshotNode[] = [];
+  let elementNode = walker.nextNode();
+
+  while (elementNode !== null && nodes.length < maxNodeCount) {
+    checkDeadline();
+
+    if (elementNode instanceof Element) {
+      const element = elementNode;
       const tag = element.tagName.toLowerCase();
       const text = truncate(normalize(element.textContent ?? ''), maxNodeTextLength);
       const label = truncate(normalize(getLabelText(element)), maxNodeTextLength);
@@ -295,7 +338,7 @@ const runInjectedPageSnapshot = (_unused: string): PageSnapshot => {
         tag: string;
         text?: string;
       } = {
-        id: `node-${index + 1}`,
+        id: `node-${nodes.length + 1}`,
         role: getRole(element),
         tag,
       };
@@ -316,12 +359,15 @@ const runInjectedPageSnapshot = (_unused: string): PageSnapshot => {
         node.text = text;
       }
 
-      return node;
-    });
+      nodes.push(node);
+    }
+
+    elementNode = walker.nextNode();
+  }
 
   return {
     nodes,
-    text: truncate(normalize(document.body?.textContent ?? ''), maxTextLength),
+    text: getPageText(),
     title: document.title,
     url: sanitizeUrl(location.href),
   };
@@ -453,17 +499,12 @@ export const getPageSnapshotInTabWithScripting = async ({
   readonly timeoutMs?: number;
 }): Promise<EvalTabResult> => {
   try {
-    const [response] = await withTimeout(
-      Promise.resolve(
-        scriptingApi.executeScript({
-          args: [''],
-          func: runInjectedPageSnapshot,
-          target: { tabId },
-          world: 'MAIN',
-        })
-      ),
-      timeoutMs
-    );
+    const [response] = await scriptingApi.executeScript({
+      args: [String(timeoutMs)],
+      func: runInjectedPageSnapshot,
+      target: { tabId },
+      world: 'MAIN',
+    });
 
     return { ok: true, value: response?.result };
   } catch (error) {

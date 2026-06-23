@@ -49,10 +49,6 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
     : undefined;
 };
 
-export const clearStoredAgentConversation = async (): Promise<void> => {
-  await storage.removeItem(conversationStorageKey);
-};
-
 export const useStoredAgentConversation = (
   createDefaultEvents: () => AgentConversationEvent[]
 ): readonly [AgentConversationEvent[], Dispatch<SetStateAction<AgentConversationEvent[]>>] => {

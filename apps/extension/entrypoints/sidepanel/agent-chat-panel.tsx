@@ -66,6 +66,7 @@ export const AgentChatPanel = ({
   const [thinkingEffort, setThinkingEffort] = useState('');
   const conversationResetSignalRef = useRef(conversationResetSignal);
   const runAbortRef = useRef<AbortController | null>(null);
+  const runTokenRef = useRef(0);
   const modelLoadRequestRef = useRef(0);
   const {
     inspectableTabs,
@@ -100,7 +101,10 @@ export const AgentChatPanel = ({
     }
 
     conversationResetSignalRef.current = conversationResetSignal;
+    runTokenRef.current += 1;
     runAbortRef.current?.abort();
+    runAbortRef.current = null;
+    setIsRunning(false);
     setDraft('');
     setEvents(createDefaultConversationEvents());
   }, [conversationResetSignal, setEvents]);
@@ -218,6 +222,25 @@ export const AgentChatPanel = ({
 
     const runMode = mode;
     const abort = new AbortController();
+    const runToken = (runTokenRef.current += 1);
+    const isCurrentRun = (): boolean =>
+      runTokenRef.current === runToken && runAbortRef.current === abort;
+    const appendRunEvents = (nextEvents: AgentConversationEvent[]): void => {
+      if (isCurrentRun()) {
+        appendEvents(nextEvents);
+      }
+    };
+    const updateRunAssistantMessage = (eventId: string, messageText: string): void => {
+      if (isCurrentRun()) {
+        updateAssistantMessage(eventId, messageText);
+      }
+    };
+    const updateRunThinkingBlock = (eventId: string, thinkingText: string): void => {
+      if (isCurrentRun()) {
+        updateThinkingBlock(eventId, thinkingText);
+      }
+    };
+
     runAbortRef.current = abort;
     setIsRunning(true);
 
@@ -227,7 +250,7 @@ export const AgentChatPanel = ({
 
         await runTurn({
           apiBaseUrl,
-          appendEvents,
+          appendEvents: appendRunEvents,
           conversationEvents: conversationWithUserMessage,
           fetch: fetchFromWindow,
           model,
@@ -236,15 +259,14 @@ export const AgentChatPanel = ({
           signal: abort.signal,
           thinkingEffort,
           token: auth.token,
-          updateAssistantMessage,
-          updateThinkingBlock,
+          updateAssistantMessage: updateRunAssistantMessage,
+          updateThinkingBlock: updateRunThinkingBlock,
         });
       } finally {
-        if (runAbortRef.current === abort) {
+        if (isCurrentRun()) {
           runAbortRef.current = null;
+          setIsRunning(false);
         }
-
-        setIsRunning(false);
       }
     })();
   };

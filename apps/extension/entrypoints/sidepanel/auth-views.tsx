@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { JSX } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
 import { AgentChatPanel } from './agent-chat-panel';
-import { clearStoredAgentConversation } from './agent-conversation-storage';
 import { Shell } from './auth-shell';
 import { useOrganizationCreditAccount } from './organization-credit-account';
 
@@ -144,7 +143,6 @@ export const SignedInView = ({
       auth={auth}
       onNewConversation={() => {
         setConversationResetSignal(current => current + 1);
-        void clearStoredAgentConversation();
       }}
       onOrganizationChange={selectOrganization}
       onSignOut={onSignOut}

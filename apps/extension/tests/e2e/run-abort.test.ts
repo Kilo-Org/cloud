@@ -40,6 +40,8 @@ test('new conversation aborts a running request', async () => {
     await sidePanel.getByLabel('New conversation').click();
 
     await expect.poll(() => wasChatCompletionAborted(sidePanel)).toBe(true);
+    releaseCompletion();
+    await expect(sidePanel.getByText('Stopped.')).toBeHidden();
   } finally {
     releaseCompletion();
     await context.close();

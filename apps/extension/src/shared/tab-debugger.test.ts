@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evalInTab,
   evalInTabWithScripting,
+  getPageSnapshotInTabWithScripting,
   listInspectableTabs,
   listInspectableTabsWithTabsApi,
 } from './tab-debugger';
@@ -163,5 +164,37 @@ describe('tab debugger helpers', () => {
         timeoutMs: 1,
       })
     ).resolves.toStrictEqual({ error: 'Page evaluation timed out.', ok: false });
+  });
+
+  it('passes the snapshot timeout into the injected scan', async () => {
+    const calls: Parameters<BrowserScriptingApi['executeScript']>[0][] = [];
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: details => {
+        calls.push(details);
+        return [
+          { result: { nodes: [], text: 'page text', title: 'Kilo', url: 'https://kilo.ai/' } },
+        ];
+      },
+    };
+
+    await expect(
+      getPageSnapshotInTabWithScripting({
+        scriptingApi,
+        tabId: 7,
+        timeoutMs: 123,
+      })
+    ).resolves.toStrictEqual({
+      ok: true,
+      value: { nodes: [], text: 'page text', title: 'Kilo', url: 'https://kilo.ai/' },
+    });
+    expect(
+      calls.map(call => ({ args: call.args, target: call.target, world: call.world }))
+    ).toStrictEqual([
+      {
+        args: ['123'],
+        target: { tabId: 7 },
+        world: 'MAIN',
+      },
+    ]);
   });
 });

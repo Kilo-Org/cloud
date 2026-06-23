@@ -22,6 +22,8 @@ const sendTabDebuggerRequest = async (
   return response;
 };
 
+let rememberedSelectedTabId: number | null = null;
+
 export const useTabDebugger = (): {
   readonly inspectableTabs: InspectableTab[];
   readonly isLoadingTabs: boolean;
@@ -32,7 +34,9 @@ export const useTabDebugger = (): {
 } => {
   const [inspectableTabs, setInspectableTabs] = useState<InspectableTab[]>([]);
   const [isLoadingTabs, setIsLoadingTabs] = useState(false);
-  const [selectedTabId, setSelectedTabId] = useState<number | undefined>();
+  const [selectedTabId, setSelectedTabId] = useState<number | undefined>(
+    rememberedSelectedTabId ?? undefined
+  );
   const [tabDebuggerError, setTabDebuggerError] = useState<string | undefined>();
 
   const loadInspectableTabs = useCallback(async (): Promise<void> => {
@@ -53,14 +57,19 @@ export const useTabDebugger = (): {
       setInspectableTabs(response.tabs);
       setSelectedTabId(currentTabId => {
         if (currentTabId !== undefined && response.tabs.some(tab => tab.id === currentTabId)) {
+          rememberedSelectedTabId = currentTabId;
           return currentTabId;
         }
 
-        return response.tabs[0]?.id;
+        const nextTabId = response.tabs[0]?.id;
+
+        rememberedSelectedTabId = nextTabId ?? null;
+        return nextTabId;
       });
     } catch (error) {
       setInspectableTabs([]);
       setSelectedTabId(undefined);
+      rememberedSelectedTabId = null;
       setTabDebuggerError(getErrorMessage(error, 'Failed to load tabs.'));
     } finally {
       setIsLoadingTabs(false);
@@ -68,6 +77,7 @@ export const useTabDebugger = (): {
   }, []);
 
   const selectTab = useCallback((tabId: number): void => {
+    rememberedSelectedTabId = tabId;
     setSelectedTabId(tabId);
     setTabDebuggerError(undefined);
   }, []);

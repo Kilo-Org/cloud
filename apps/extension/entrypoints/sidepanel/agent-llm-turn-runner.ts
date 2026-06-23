@@ -40,6 +40,7 @@ export const runDangerousLlmTurn = ({
       `LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
     maxToolRounds: maxEvalRounds,
     noResponseMessage: 'The model did not return a response.',
+    supportsImages,
     toToolCallEvents: toolCalls => toDangerousToolCallEvents(toolCalls, selectedTabId),
     tooManyToolRoundsMessage:
       'The model requested too many eval rounds. Send another message to continue.',

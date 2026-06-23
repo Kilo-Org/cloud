@@ -34,6 +34,7 @@ export const runSafeLlmTurn = ({
     failureMessage: error => (error instanceof Error ? error.message : 'Failed to run safe mode.'),
     maxToolRounds: maxSafeToolRounds,
     noResponseMessage: 'The model did not return a response.',
+    supportsImages,
     toToolCallEvents: toolCalls => toSafeToolCallEvents(toolCalls, selectedTabId),
     tooManyToolRoundsMessage:
       'The model requested too many safe read rounds. Send another message to continue.',

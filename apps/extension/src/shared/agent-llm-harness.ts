@@ -184,11 +184,17 @@ const toScreenshotMessage = (
     : undefined;
 };
 
-const appendToolResultMessages = (
-  messages: KiloGatewayChatMessage[],
-  event: ToolResultEvent,
-  toolCall: ToolCallEvent
-): void => {
+const appendToolResultMessages = ({
+  event,
+  messages,
+  supportsImages,
+  toolCall,
+}: {
+  readonly event: ToolResultEvent;
+  readonly messages: KiloGatewayChatMessage[];
+  readonly supportsImages: boolean;
+  readonly toolCall: ToolCallEvent;
+}): void => {
   messages.push({
     content: toToolResultContent(event, toolCall),
     role: 'tool',
@@ -197,7 +203,7 @@ const appendToolResultMessages = (
 
   const screenshotMessage = toScreenshotMessage(event, toolCall);
 
-  if (screenshotMessage !== undefined) {
+  if (supportsImages && screenshotMessage !== undefined) {
     messages.push(screenshotMessage);
   }
 };
@@ -227,7 +233,8 @@ const getGatewayMessageText = (event: MessageEvent): string =>
     : event.text;
 
 export const buildGatewayMessagesFromEvents = (
-  events: AgentConversationEvent[]
+  events: AgentConversationEvent[],
+  { supportsImages = false }: { readonly supportsImages?: boolean } = {}
 ): KiloGatewayChatMessage[] => {
   const toolCallsById = new Map<string, ToolCallEvent>();
   const messages: KiloGatewayChatMessage[] = [
@@ -279,7 +286,7 @@ export const buildGatewayMessagesFromEvents = (
           const toolCall = toolCallsById.get(event.toolCallId);
 
           if (toolCall !== undefined) {
-            appendToolResultMessages(messages, event, toolCall);
+            appendToolResultMessages({ event, messages, supportsImages, toolCall });
           }
           break;
         }

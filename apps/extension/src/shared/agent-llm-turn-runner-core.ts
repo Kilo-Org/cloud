@@ -21,6 +21,7 @@ interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly noResponseMessage: string;
   readonly organizationId?: string | undefined;
   readonly signal?: AbortSignal | undefined;
+  readonly supportsImages?: boolean | undefined;
   readonly thinkingEffort?: string | undefined;
   readonly token: string;
   readonly tools: KiloGatewayToolDefinition[];
@@ -47,6 +48,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   noResponseMessage,
   organizationId,
   signal,
+  supportsImages = false,
   thinkingEffort,
   token,
   tools,
@@ -63,7 +65,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
     fetchKiloGatewayChatCompletionStream({
       apiBaseUrl,
       fetch,
-      messages: buildGatewayMessagesFromEvents(nextEvents),
+      messages: buildGatewayMessagesFromEvents(nextEvents, { supportsImages }),
       model,
       onContentDelta,
       onReasoningDelta,

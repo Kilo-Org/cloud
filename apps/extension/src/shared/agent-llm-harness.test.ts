@@ -203,7 +203,7 @@ describe('agent LLM harness', () => {
     ]);
   });
 
-  it('adds viewport screenshots as image inputs after the tool result', () => {
+  it('omits viewport screenshot image inputs for text-only models', () => {
     const toolCall = createSafeToolCall({
       name: 'get_viewport_screenshot',
       providerToolCallId: 'call_screenshot_1',
@@ -219,6 +219,48 @@ describe('agent LLM harness', () => {
     });
 
     expect(buildGatewayMessagesFromEvents([toolCall, toolResult])).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      {
+        content: null,
+        role: 'assistant',
+        tool_calls: [
+          {
+            function: {
+              arguments: '{}',
+              name: 'get_viewport_screenshot',
+            },
+            id: 'call_screenshot_1',
+            type: 'function',
+          },
+        ],
+      },
+      {
+        content:
+          '{"ok":true,"value":{"mediaType":"image/png","note":"Viewport screenshot attached as an image input."}}',
+        role: 'tool',
+        tool_call_id: 'call_screenshot_1',
+      },
+    ]);
+  });
+
+  it('adds viewport screenshots as image inputs for image-capable models', () => {
+    const toolCall = createSafeToolCall({
+      name: 'get_viewport_screenshot',
+      providerToolCallId: 'call_screenshot_1',
+      tabId: 7,
+    });
+    const toolResult = createToolResult({
+      ok: true,
+      toolCallId: toolCall.id,
+      value: {
+        dataUrl: 'data:image/png;base64,c2NyZWVu',
+        mediaType: 'image/png',
+      },
+    });
+
+    expect(
+      buildGatewayMessagesFromEvents([toolCall, toolResult], { supportsImages: true })
+    ).toStrictEqual([
       { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
       {
         content: null,

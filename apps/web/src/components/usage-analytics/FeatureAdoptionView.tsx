@@ -40,9 +40,17 @@ export function FeatureAdoptionView({
   onViewDetails?: () => void;
 }) {
   const trpc = useTRPC();
-  const { data, isLoading, isError, refetch } = useQuery(
-    trpc.organizations.usageDetails.getFeatureAdoption.queryOptions({ organizationId })
-  );
+  const featureAdoptionQuery = useQuery({
+    ...trpc.organizations.usageDetails.getFeatureAdoption.queryOptions({ organizationId }),
+    enabled: compact,
+  });
+  const recommendationsQuery = useQuery({
+    ...trpc.organizations.usageDetails.getRecommendations.queryOptions({ organizationId }),
+    enabled: !compact,
+  });
+  const { data, isLoading, isError, refetch } = compact
+    ? featureAdoptionQuery
+    : recommendationsQuery;
 
   if (isLoading) {
     return <FeatureAdoptionSkeleton compact={compact} />;

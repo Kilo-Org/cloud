@@ -5,8 +5,10 @@ const organizationId = '00000000-0000-4000-8000-000000000001';
 // Defaults represent a healthy organization: nothing open, no feature gaps.
 function buildState(overrides: Partial<RecommendationState> = {}): RecommendationState {
   return {
+    sourceControlConnected: false,
     codeReviewerEnabled: false,
     codeReviewMissingSecurityFocus: false,
+    codeReviewGateApplicable: false,
     codeReviewGateOff: false,
     securityAgentEnabled: false,
     securitySlaDisabled: false,
@@ -14,13 +16,15 @@ function buildState(overrides: Partial<RecommendationState> = {}): Recommendatio
     brokenIntegrationPlatforms: [],
     linearConnected: false,
     linearBotEnabled: false,
+    teamIntegrationConnected: false,
     cloudAgentUsed: false,
+    projectDeployed: false,
     webhookTriggerCount: 1,
     githubConnected: false,
     githubLiteApp: false,
     ssoConfigured: true,
     seatCount: 0,
-    memberCount: 0,
+    seatsUsed: 0,
     ...overrides,
   };
 }
@@ -67,15 +71,35 @@ describe('buildRecommendations', () => {
     expect(recommendation?.title).toBe('Security review focus enabled');
   });
 
-  it('does not apply the merge gate rule on the read-only GitHub app', () => {
+  it('suppresses the merge gate rule when no enabled config can gate', () => {
+    // GitHub-only org on the read-only app: no gate-capable config.
     const state = buildState({
       githubConnected: true,
       githubLiteApp: true,
       codeReviewerEnabled: true,
-      codeReviewGateOff: true,
+      codeReviewGateApplicable: false,
+      codeReviewGateOff: false,
     });
     expect(find(state, 'code-reviewer-no-merge-gate')).toBeUndefined();
     expect(find(state, 'org-github-lite-app')?.status).toBe('open');
+  });
+
+  it('opens the merge gate rule when a gate-capable config has the gate off', () => {
+    const state = buildState({
+      codeReviewerEnabled: true,
+      codeReviewGateApplicable: true,
+      codeReviewGateOff: true,
+    });
+    expect(find(state, 'code-reviewer-no-merge-gate')?.status).toBe('open');
+  });
+
+  it('marks the merge gate rule completed when a gate-capable config has a gate set', () => {
+    const state = buildState({
+      codeReviewerEnabled: true,
+      codeReviewGateApplicable: true,
+      codeReviewGateOff: false,
+    });
+    expect(find(state, 'code-reviewer-no-merge-gate')?.status).toBe('completed');
   });
 
   it('treats a broken integration as an open attention item with no completed state', () => {
@@ -100,10 +124,8 @@ describe('buildRecommendations', () => {
   });
 
   it('opens the unused-seats rule only when seats exceed members', () => {
-    expect(openKeys(buildState({ seatCount: 5, memberCount: 2 }))).toContain('org-unused-seats');
-    expect(openKeys(buildState({ seatCount: 2, memberCount: 2 }))).not.toContain(
-      'org-unused-seats'
-    );
+    expect(openKeys(buildState({ seatCount: 5, seatsUsed: 2 }))).toContain('org-unused-seats');
+    expect(openKeys(buildState({ seatCount: 2, seatsUsed: 2 }))).not.toContain('org-unused-seats');
   });
 
   it('scopes every action url to the organization', () => {
@@ -119,7 +141,7 @@ describe('buildRecommendations', () => {
         webhookTriggerCount: 0,
         ssoConfigured: false,
         seatCount: 5,
-        memberCount: 1,
+        seatsUsed: 1,
       })
     );
     expect(recommendations.every(r => r.actionUrl.includes(organizationId))).toBe(true);

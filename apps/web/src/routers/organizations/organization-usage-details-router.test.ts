@@ -4,6 +4,7 @@ import { insertUsageWithOverrides } from '@/tests/helpers/microdollar-usage.help
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { db, pool } from '@/lib/drizzle';
 import {
+  agent_configs,
   microdollar_usage,
   organizations,
   organization_recommendation_dismissals,
@@ -68,6 +69,9 @@ describe('organizations usage details trpc router', () => {
         .where(
           eq(organization_recommendation_dismissals.owned_by_organization_id, testOrganization.id)
         ),
+      db
+        .delete(agent_configs)
+        .where(eq(agent_configs.owned_by_organization_id, testOrganization.id)),
     ]);
   });
 
@@ -186,6 +190,79 @@ describe('organizations usage details trpc router', () => {
       expect(
         afterRestore.recommendations.find(r => r.key === 'org-sso-not-configured')?.status
       ).toBe('open');
+    });
+
+    it('opens the merge gate recommendation when a code reviewer config has no gate threshold', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      // Enabled Code Reviewer with a security focus but no gate_threshold. A
+      // missing threshold defaults to 'off', so the merge gate is not active.
+      await db.insert(agent_configs).values({
+        owned_by_organization_id: testOrganization.id,
+        agent_type: 'code_review',
+        platform: 'github',
+        is_enabled: true,
+        created_by: regularUser.id,
+        config: { review_style: 'balanced', focus_areas: ['security'], model_slug: 'test-model' },
+      });
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getRecommendations({
+        organizationId: testOrganization.id,
+      });
+
+      expect(
+        result.recommendations.find(r => r.key === 'code-reviewer-no-merge-gate')?.status
+      ).toBe('open');
+    });
+
+    it('keeps the merge gate open for a GitLab config even when GitHub is on the read-only app', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      // Read-only GitHub app: GitHub cannot gate, but GitLab is unaffected.
+      await db.insert(platform_integrations).values({
+        owned_by_organization_id: testOrganization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `github-${crypto.randomUUID()}`,
+        platform_account_login: 'test-github-org',
+        repository_access: 'all',
+        integration_status: 'active',
+        github_app_type: 'lite',
+      });
+      // Enabled GitLab Code Reviewer with the gate off; GitLab can gate.
+      await db.insert(agent_configs).values({
+        owned_by_organization_id: testOrganization.id,
+        agent_type: 'code_review',
+        platform: 'gitlab',
+        is_enabled: true,
+        created_by: regularUser.id,
+        config: {
+          review_style: 'balanced',
+          focus_areas: ['security'],
+          model_slug: 'test-model',
+          gate_threshold: 'off',
+        },
+      });
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getRecommendations({
+        organizationId: testOrganization.id,
+      });
+
+      // The GitLab config can gate, so the recommendation is not suppressed by the
+      // unrelated GitHub Lite installation.
+      expect(
+        result.recommendations.find(r => r.key === 'code-reviewer-no-merge-gate')?.status
+      ).toBe('open');
+      // The lite app is still flagged separately.
+      expect(result.recommendations.find(r => r.key === 'org-github-lite-app')?.status).toBe(
+        'open'
+      );
     });
 
     it('rejects dismissal from a non-owner member', async () => {

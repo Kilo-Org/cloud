@@ -3471,7 +3471,6 @@ export const organization_recommendation_dismissals = pgTable(
       table.owned_by_organization_id,
       table.recommendation_key
     ),
-    index('IDX_org_recommendation_dismissals_org_id').on(table.owned_by_organization_id),
   ]
 );
 

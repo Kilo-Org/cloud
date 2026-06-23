@@ -109,6 +109,7 @@ const FeatureAdoptionOutputSchema = z.object({
 });
 
 const RecommendationsOutputSchema = z.object({
+  checks: FeatureAdoptionOutputSchema.shape.checks,
   recommendations: z.array(
     z.object({
       key: z.enum(RECOMMENDATION_KEYS),
@@ -226,7 +227,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
           message: 'Feature adoption reporting is available on the Enterprise plan.',
         });
       }
-      return { recommendations: result.recommendations };
+      return { checks: result.checks, recommendations: result.recommendations };
     }),
   dismissRecommendation: organizationOwnerProcedure
     .input(DismissRecommendationInputSchema)

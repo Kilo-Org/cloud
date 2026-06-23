@@ -237,6 +237,21 @@ export function ReviewConfigForm({
     [selectedModel]
   );
 
+  const selectableRepositories = useMemo(() => {
+    const cachedRepositories = (repositoriesData?.repositories ?? []).map(repo => ({
+      id: repo.id,
+      name: repo.name,
+      full_name: repo.fullName,
+      private: repo.private,
+    }));
+    const cachedRepositoryIds = new Set(cachedRepositories.map(repo => repo.id));
+    const legacyRepositories = (configData?.manuallyAddedRepositories ?? []).filter(
+      repo => !cachedRepositoryIds.has(repo.id)
+    );
+
+    return [...cachedRepositories, ...legacyRepositories];
+  }, [configData?.manuallyAddedRepositories, repositoriesData?.repositories]);
+
   // Reset thinking effort when the model changes and the current selection is invalid
   useEffect(() => {
     if (thinkingEffort && !availableVariants.includes(thinkingEffort)) {
@@ -425,8 +440,11 @@ export function ReviewConfigForm({
     // Clear previous webhook sync result
     setWebhookSyncResult(null);
 
-    // Preserve legacy live-search selections until their persisted contract is migrated.
-    const manuallyAddedRepositories = configData?.manuallyAddedRepositories ?? [];
+    // Preserve selected legacy live-search entries until their persisted contract is migrated.
+    const selectedRepositoryIdSet = new Set(selectedRepositoryIds);
+    const manuallyAddedRepositories = (configData?.manuallyAddedRepositories ?? []).filter(repo =>
+      selectedRepositoryIdSet.has(repo.id)
+    );
 
     if (organizationId) {
       orgSaveMutation.mutate({
@@ -683,7 +701,7 @@ export function ReviewConfigForm({
                       `${platformLabel} integration is not connected. Please connect ${platformLabel} in the Integrations page to configure repository selection.`}
                   </p>
                 </div>
-              ) : repositoriesData.repositories.length === 0 ? (
+              ) : selectableRepositories.length === 0 ? (
                 <div className="rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3">
                   <p className="text-sm text-yellow-200">
                     No repositories found. Please ensure the {platformLabel}{' '}
@@ -720,12 +738,7 @@ export function ReviewConfigForm({
                   {(isGitLab || repositorySelectionMode === 'selected') && (
                     <div className="mt-4">
                       <RepositoryMultiSelect
-                        repositories={repositoriesData.repositories.map(repo => ({
-                          id: repo.id,
-                          name: repo.name,
-                          full_name: repo.fullName,
-                          private: repo.private,
-                        }))}
+                        repositories={selectableRepositories}
                         selectedIds={selectedRepositoryIds}
                         onSelectionChange={setSelectedRepositoryIds}
                       />

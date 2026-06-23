@@ -2,7 +2,9 @@
 
 A first-class **AgentCard** connection for KiloClaw: a one-click *Connect Agentcard*
 OAuth 2.1 (PKCE) flow that replaces the old paste-a-token approach. Once connected,
-the user's AgentCard access token is pushed to their agent's worker, the `agentcard`
+the user's AgentCard refresh token + client id are seeded into the worker's
+**native MCP OAuth** token cache (`mcporter`, `auth: "oauth"`); mcporter then
+self-refreshes on a 401, so no server-side refresh cron is needed. The `agentcard`
 MCP server is configured automatically, and the bundled `agentcard` skill lets the
 agent act on requests like "create a $20 card."
 
@@ -19,10 +21,13 @@ Settings ▸ Connect Agentcard
   └─ GET  /api/integrations/agentcard/connect       → signed PKCE state, redirect to AgentCard /authorize
         └─ AgentCard sign-in (magic link) + consent
   └─ GET  /api/integrations/agentcard/callback      → verify state, exchange code → tokens (encrypted, stored)
-        └─ push access token to the worker as AGENTCARD_API_KEY  (config-writer → `agentcard` MCP Bearer)
-  └─ POST /api/integrations/agentcard/disconnect    → revoke grant, clear connection, drop worker secret
-  cron  /api/cron/agentcard-token-refresh (10m)     → refresh near-expiry tokens, re-push to the worker
+        └─ seed worker secrets AGENTCARD_OAUTH_{CLIENT_ID,REFRESH_TOKEN,ACCESS_TOKEN,EXPIRES_IN,SCOPE}
+           (config-writer → mcporter `auth: "oauth"` + tokens.json/client.json; mcporter self-refreshes on 401)
+  └─ POST /api/integrations/agentcard/disconnect    → revoke grant, clear connection, drop worker secrets
 ```
+
+No refresh cron: mcporter holds the rotating refresh token and renews lazily on a
+401. AgentCard's 24h access-token TTL just means it does so ~once/day.
 
 Key files:
 
@@ -30,12 +35,12 @@ Key files:
 |---|---|
 | `apps/web/src/lib/integrations/agentcard/agentcard-service.ts` | OAuth 2.1 client (PKCE, dynamic registration, token exchange/refresh/revoke) |
 | `apps/web/src/lib/integrations/agentcard/oauth-state.ts` | HMAC-signed PKCE state (binds the flow to the user; 10-min TTL) |
-| `apps/web/src/lib/kiloclaw/agentcard-oauth-connections.ts` | Encrypted per-instance token store + refresh helpers |
-| `apps/web/src/lib/kiloclaw/agentcard-token-refresh.ts` | Cron sweep that refreshes + re-pushes tokens |
+| `apps/web/src/lib/kiloclaw/agentcard-oauth-connections.ts` | Encrypted per-instance token store |
 | `apps/web/src/app/api/integrations/agentcard/{connect,callback,disconnect}/route.ts` | The three OAuth routes |
+| `services/kiloclaw/controller/src/config-writer.ts` | `seedAgentCardOAuthCache` writes mcporter's `tokens.json`/`client.json` from the worker env |
 | `apps/web/src/app/(app)/claw/components/SettingsTab.tsx` | The "Agentcard" settings card |
 | `services/kiloclaw/skills/agentcard/SKILL.md` | Agent skill describing the AgentCard MCP tools |
-| `packages/db` migration `0159` | `kiloclaw_agentcard_oauth_connections` table |
+| `packages/db` migration `0173` | `kiloclaw_agentcard_oauth_connections` table |
 
 ## Environment variables
 
@@ -91,8 +96,9 @@ the secret hand-off, so card *usage* by the agent isn't exercised locally.
 
 ### Verifying the token actually works (simulating the worker)
 
-The worker just sets a `Bearer` header on the `agentcard` MCP server. To prove the
-token Kilo obtained authorizes against AgentCard without standing up a worker,
+The worker hands mcporter the OAuth tokens and mcporter sends the `Bearer` header
+on the `agentcard` MCP server. To prove the token Kilo obtained authorizes against
+AgentCard without standing up a worker,
 decrypt the stored access token (`kiloclaw_agentcard_oauth_connections.access_token_encrypted`,
 `BYOK_ENCRYPTION_KEY`) and call the AgentCard MCP server directly:
 

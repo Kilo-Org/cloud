@@ -726,6 +726,81 @@ export function setNestedValue(obj: ConfigObject, path: string, value: string): 
 
 export const DEFAULT_MCPORTER_CONFIG_PATH = '/root/.openclaw/workspace/config/mcporter.json';
 
+const AGENTCARD_OAUTH_TOKENS_FILE = 'tokens.json';
+const AGENTCARD_OAUTH_CLIENT_FILE = 'client.json';
+
+/**
+ * Seed mcporter's per-server OAuth token cache for AgentCard from the
+ * connect-time env, but ONLY if it doesn't already exist. mcporter's
+ * DirectoryPersistence reads/writes `<dir>/tokens.json` + `<dir>/client.json`;
+ * once it self-refreshes it rotates the refresh token in `tokens.json`, so
+ * re-seeding from the (now stale) connect-time env on a later restart would
+ * break refresh. Seed-if-absent keeps mcporter's own rotated tokens
+ * authoritative.
+ *
+ * Shape matches the MCP SDK's OAuthTokens / OAuthClientInformation that
+ * mcporter@0.7.3 persists.
+ */
+export function seedAgentCardOAuthCache(
+  env: EnvLike,
+  cacheDir: string,
+  deps: ConfigWriterDeps = defaultDeps
+): void {
+  const tokensPath = path.join(cacheDir, AGENTCARD_OAUTH_TOKENS_FILE);
+  if (deps.existsSync(tokensPath)) {
+    // mcporter already manages tokens here — don't clobber a rotated refresh token.
+    return;
+  }
+  if (!deps.existsSync(cacheDir)) {
+    deps.mkdirSync(cacheDir, { recursive: true });
+  }
+
+  const tokens: Record<string, unknown> = {
+    access_token: env.AGENTCARD_OAUTH_ACCESS_TOKEN ?? '',
+    token_type: 'Bearer',
+    refresh_token: env.AGENTCARD_OAUTH_REFRESH_TOKEN,
+  };
+  const expiresIn = Number(env.AGENTCARD_OAUTH_EXPIRES_IN);
+  if (Number.isFinite(expiresIn) && expiresIn > 0) {
+    tokens.expires_in = expiresIn;
+  }
+  if (env.AGENTCARD_OAUTH_SCOPE) {
+    tokens.scope = env.AGENTCARD_OAUTH_SCOPE;
+  }
+
+  deps.writeFileSync(tokensPath, JSON.stringify(tokens, null, 2));
+  deps.writeFileSync(
+    path.join(cacheDir, AGENTCARD_OAUTH_CLIENT_FILE),
+    JSON.stringify({ client_id: env.AGENTCARD_OAUTH_CLIENT_ID }, null, 2)
+  );
+  console.log(`Seeded AgentCard OAuth token cache at ${cacheDir}`);
+}
+
+/**
+ * Remove the AgentCard OAuth token cache (on disconnect or when creds are
+ * absent) so a revoked refresh token can't linger on the volume.
+ */
+export function clearAgentCardOAuthCache(
+  cacheDir: string,
+  deps: ConfigWriterDeps = defaultDeps
+): void {
+  for (const file of [
+    AGENTCARD_OAUTH_TOKENS_FILE,
+    AGENTCARD_OAUTH_CLIENT_FILE,
+    'code_verifier.txt',
+    'state.txt',
+  ]) {
+    const filePath = path.join(cacheDir, file);
+    try {
+      if (deps.existsSync(filePath)) {
+        deps.unlinkSync(filePath);
+      }
+    } catch {
+      // best-effort cleanup
+    }
+  }
+}
+
 /**
  * Write mcporter.json with MCP server definitions derived from environment variables.
  * MCPorter is the middleware layer that lets OpenClaw agents call MCP server tools
@@ -765,17 +840,32 @@ export function writeMcporterConfig(
   // Managed server keys — add when env var is set, remove when absent.
   // This ensures credential removal on the dashboard actually revokes access
   // even though mcporter.json persists on the volume across restarts.
-  if (env.AGENTCARD_API_KEY) {
+  //
+  // AgentCard uses native MCP OAuth: mcporter holds the OAuth tokens and
+  // self-refreshes on a 401 (24h access tokens; a long-lived, rotating refresh
+  // token — see AgentCard's token-lifetime contract). The web app seeds the
+  // refresh token + pinned client id once at connect time, so no server-side
+  // refresh cron is required. We point mcporter at a per-server token cache dir
+  // in `auth: "oauth"` mode and seed that cache from the connect-time env, but
+  // only if it doesn't already exist — a container restart must never clobber a
+  // refresh token mcporter has since rotated on its own. The cache dir lives on
+  // the same persistent config volume as mcporter.json, so rotated tokens
+  // survive restarts.
+  const agentcardTokenCacheDir = path.join(path.dirname(configPath), 'agentcard-oauth');
+  if (env.AGENTCARD_OAUTH_CLIENT_ID && env.AGENTCARD_OAUTH_REFRESH_TOKEN) {
     existingServers['agentcard'] = {
       url: 'https://mcp.agentcard.sh/mcp',
-      headers: { Authorization: 'Bearer ' + env.AGENTCARD_API_KEY },
+      auth: 'oauth',
+      tokenCacheDir: agentcardTokenCacheDir,
     };
-    console.log('AgentCard MCP server configured (via mcporter)');
+    seedAgentCardOAuthCache(env, agentcardTokenCacheDir, deps);
+    console.log('AgentCard MCP server configured (native OAuth via mcporter)');
   } else {
     if ('agentcard' in existingServers) {
       delete existingServers['agentcard'];
       console.log('AgentCard MCP server removed from mcporter config');
     }
+    clearAgentCardOAuthCache(agentcardTokenCacheDir, deps);
   }
 
   if (env.LINEAR_API_KEY) {

@@ -146,28 +146,3 @@ export function decryptAccessToken(connection: KiloClawAgentCardOAuthConnection)
   return decryptToken(connection.access_token_encrypted);
 }
 
-/**
- * Optimistically claim a connection for refresh so two overlapping sweeps don't
- * both refresh the same row. AgentCard rotates refresh tokens (each refresh
- * invalidates the previous one), so a concurrent double-refresh would make one
- * side fail and needlessly flip the connection to `action_required`.
- *
- * Bumps `updated_at` only if it still matches what the caller read; the row
- * lock makes this atomic, so exactly one concurrent caller gets `true`.
- */
-export async function claimAgentCardConnectionForRefresh(
-  connection: KiloClawAgentCardOAuthConnection
-): Promise<boolean> {
-  const claimedAt = new Date().toISOString();
-  const claimed = await db
-    .update(kiloclaw_agentcard_oauth_connections)
-    .set({ updated_at: claimedAt })
-    .where(
-      and(
-        eq(kiloclaw_agentcard_oauth_connections.id, connection.id),
-        eq(kiloclaw_agentcard_oauth_connections.updated_at, connection.updated_at)
-      )
-    )
-    .returning({ id: kiloclaw_agentcard_oauth_connections.id });
-  return claimed.length === 1;
-}

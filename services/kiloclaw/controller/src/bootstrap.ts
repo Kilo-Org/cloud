@@ -1407,7 +1407,7 @@ export async function bootstrapNonCritical(
         updateToolsMdSection(googleWorkspaceToolsEnabled, GOG_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.OP_SERVICE_ACCOUNT_TOKEN, OP_SECTION_CONFIG, deps);
         updateToolsMdSection(!!env.LINEAR_API_KEY, LINEAR_SECTION_CONFIG, deps);
-        updateToolsMdSection(!!env.AGENTCARD_API_KEY, AGENTCARD_SECTION_CONFIG, deps);
+        updateToolsMdSection(!!env.AGENTCARD_OAUTH_REFRESH_TOKEN, AGENTCARD_SECTION_CONFIG, deps);
         updateToolsMdSection(
           !!env.COMPOSIO_USER_API_KEY && !!env.COMPOSIO_ORG,
           COMPOSIO_SECTION_CONFIG,

@@ -1788,9 +1788,9 @@ describe('TOOLS.md section configs', () => {
     });
   }
 
-  // AgentCard discoverability: gated on AGENTCARD_API_KEY, so the section must
-  // append when a token is present and drop out when it isn't, and it must point
-  // the agent at the agentcard skill.
+  // AgentCard discoverability: gated on AGENTCARD_OAUTH_REFRESH_TOKEN, so the
+  // section must append when a connection is present and drop out when it isn't,
+  // and it must point the agent at the agentcard skill.
   it('AgentCard: appends when enabled and removes when disabled', () => {
     const enabled = fakeDeps();
     (enabled.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue('# TOOLS\n');

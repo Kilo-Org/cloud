@@ -113,7 +113,7 @@ export function registerConfigRoutes(
       writeBaseConfig(process.env);
       // Also regenerate the mcporter (MCP servers) config from the current
       // env so credential changes that toggle managed MCP servers — e.g.
-      // connecting/disconnecting Agentcard (AGENTCARD_API_KEY) — take effect
+      // connecting/disconnecting Agentcard (AGENTCARD_OAUTH_*) — take effect
       // on restore instead of only at bootstrap. Without this the
       // `agentcard` MCP server wouldn't appear until the next redeploy.
       writeMcporterConfig(process.env);

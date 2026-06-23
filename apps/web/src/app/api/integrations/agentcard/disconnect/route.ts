@@ -19,7 +19,16 @@ import {
 import { revokeAgentCardToken } from '@/lib/integrations/agentcard/agentcard-service';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
-const AGENTCARD_SECRET_KEY = 'AGENTCARD_API_KEY';
+// Null these out to drop the `agentcard` MCP server + its native-OAuth token
+// cache from the worker on next config sync (see config-writer.ts). Must match
+// the keys seeded by the connect callback.
+const AGENTCARD_OAUTH_SECRET_KEYS = [
+  'AGENTCARD_OAUTH_CLIENT_ID',
+  'AGENTCARD_OAUTH_REFRESH_TOKEN',
+  'AGENTCARD_OAUTH_ACCESS_TOKEN',
+  'AGENTCARD_OAUTH_EXPIRES_IN',
+  'AGENTCARD_OAUTH_SCOPE',
+] as const;
 const OrganizationIdSchema = z.string().uuid();
 
 function buildDisconnectPath(organizationId: string | undefined, queryParam: string): string {
@@ -105,9 +114,13 @@ export async function POST(request: NextRequest) {
     // already-dead token behind — it must not fail the whole disconnect.
     try {
       const kiloclawClient = new KiloClawInternalClient();
+      const clearedSecrets: Record<string, null> = {};
+      for (const key of AGENTCARD_OAUTH_SECRET_KEYS) {
+        clearedSecrets[key] = null;
+      }
       await kiloclawClient.patchSecrets(
         user.id,
-        { secrets: { [AGENTCARD_SECRET_KEY]: null } },
+        { secrets: clearedSecrets },
         workerInstanceId(instance)
       );
     } catch (secretError) {

@@ -20,10 +20,17 @@ import {
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 
-// The OpenClaw worker reads this env secret and configures the `agentcard` MCP
-// server with `Authorization: Bearer <value>` (see config-writer.ts). The OAuth
-// access token slots into the same place the legacy pasted token used.
-const AGENTCARD_SECRET_KEY = 'AGENTCARD_API_KEY';
+// The OpenClaw worker reads these env secrets; config-writer seeds mcporter's
+// native-OAuth token cache from them (see config-writer.ts → seedAgentCardOAuthCache).
+// mcporter then self-refreshes on a 401 using the refresh token, so no
+// server-side refresh cron is required.
+const AGENTCARD_OAUTH_SECRET_KEYS = {
+  clientId: 'AGENTCARD_OAUTH_CLIENT_ID',
+  refreshToken: 'AGENTCARD_OAUTH_REFRESH_TOKEN',
+  accessToken: 'AGENTCARD_OAUTH_ACCESS_TOKEN',
+  expiresIn: 'AGENTCARD_OAUTH_EXPIRES_IN',
+  scope: 'AGENTCARD_OAUTH_SCOPE',
+} as const;
 
 function buildRedirectPath(
   state: { owner: VerifiedAgentCardOAuthState['owner']; returnTo?: string } | null | undefined,
@@ -77,9 +84,9 @@ function oauthSentryContext(searchParams: URLSearchParams) {
  * AgentCard OAuth callback.
  *
  * Verifies the signed state, exchanges the authorization code (+ PKCE verifier)
- * for tokens, stores them encrypted, and pushes the access token to the
- * OpenClaw worker as the AGENTCARD_API_KEY secret so the `agentcard` MCP server
- * is configured for the user's agent.
+ * for tokens, stores them encrypted, and seeds the OpenClaw worker's native MCP
+ * OAuth cache (AGENTCARD_OAUTH_* secrets) so the `agentcard` MCP server is
+ * configured for the user's agent and mcporter self-refreshes from there.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -184,22 +191,45 @@ export async function GET(request: NextRequest) {
       tokens,
     });
 
-    // Push the freshly-minted access token to the worker. config-writer turns
-    // AGENTCARD_API_KEY into the `agentcard` MCP server's Bearer header.
-    // Retry a few times: the grant is already persisted, but the cron only
-    // refreshes near-expiry tokens, so it won't re-push this fresh (~1h) token
-    // for ~40 min — a silent push failure would leave the agent "connected" but
-    // unable to use AgentCard until then.
+    if (!tokens.refreshToken) {
+      // Native MCP OAuth needs a refresh token to self-refresh; without one the
+      // agent would lose access when the access token expires with no way to
+      // renew unattended. AgentCard issues one on authorization_code, so this is
+      // a defensive guard rather than an expected path.
+      await setKiloClawAgentCardOAuthConnectionError(
+        verifiedState.instanceId,
+        'AgentCard did not return a refresh token'
+      );
+      return NextResponse.redirect(
+        new URL(buildRedirectPath(verifiedState, 'error=agentcard_connect_incomplete'), APP_URL)
+      );
+    }
+
+    // Seed the worker's mcporter native-OAuth token cache (client id + refresh
+    // token + the initial access token). config-writer writes tokens.json +
+    // client.json from these and mcporter self-refreshes from there.
+    // Retry a few times: the grant is already persisted, but a silent push
+    // failure would leave the agent "connected" yet unable to use AgentCard.
+    const expiresAtMs = tokens.expiresAt ? Date.parse(tokens.expiresAt) : Number.NaN;
+    const secrets: Record<string, string> = {
+      [AGENTCARD_OAUTH_SECRET_KEYS.clientId]: encryptKiloClawSecret(verifiedState.clientId),
+      [AGENTCARD_OAUTH_SECRET_KEYS.refreshToken]: encryptKiloClawSecret(tokens.refreshToken),
+      [AGENTCARD_OAUTH_SECRET_KEYS.accessToken]: encryptKiloClawSecret(tokens.accessToken),
+      [AGENTCARD_OAUTH_SECRET_KEYS.scope]: encryptKiloClawSecret(tokens.scopes.join(' ')),
+    };
+    if (Number.isFinite(expiresAtMs)) {
+      const expiresInSeconds = Math.max(1, Math.floor((expiresAtMs - Date.now()) / 1000));
+      secrets[AGENTCARD_OAUTH_SECRET_KEYS.expiresIn] = encryptKiloClawSecret(
+        String(expiresInSeconds)
+      );
+    }
+
     const kiloclawClient = new KiloClawInternalClient();
     let pushed = false;
     let lastPushError: unknown = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        await kiloclawClient.patchSecrets(
-          user.id,
-          { secrets: { [AGENTCARD_SECRET_KEY]: encryptKiloClawSecret(tokens.accessToken) } },
-          workerInstanceId(instance)
-        );
+        await kiloclawClient.patchSecrets(user.id, { secrets }, workerInstanceId(instance));
         pushed = true;
         break;
       } catch (pushError) {

@@ -1746,19 +1746,106 @@ describe('writeMcporterConfig', () => {
     expect(config.mcpServers.linear).toBeDefined();
   });
 
-  it('adds both AgentCard and Linear when both keys are set', () => {
+  it('adds both AgentCard and Linear when both sets of creds are present', () => {
     const { deps, written } = mcporterFakeDeps();
     const env = {
-      AGENTCARD_API_KEY: 'ac_test123',
+      AGENTCARD_OAUTH_CLIENT_ID: 'oauth_client_abc',
+      AGENTCARD_OAUTH_REFRESH_TOKEN: 'rt_test123',
       LINEAR_API_KEY: 'lin_api_test123',
     };
 
     writeMcporterConfig(env, '/tmp/mcporter.json', deps);
 
-    expect(written).toHaveLength(1);
-    const config = JSON.parse(written[0].data);
+    const mcporterWrite = written.find(w => w.path === '/tmp/mcporter.json');
+    expect(mcporterWrite).toBeDefined();
+    const config = JSON.parse(mcporterWrite!.data);
     expect(config.mcpServers.agentcard).toBeDefined();
     expect(config.mcpServers.linear).toBeDefined();
+  });
+
+  it('configures AgentCard in native OAuth mode and seeds the token cache', () => {
+    const { deps, written } = mcporterFakeDeps();
+    const env = {
+      AGENTCARD_OAUTH_CLIENT_ID: 'oauth_client_abc',
+      AGENTCARD_OAUTH_REFRESH_TOKEN: 'rt_seed_123',
+      AGENTCARD_OAUTH_ACCESS_TOKEN: 'at_seed_456',
+      AGENTCARD_OAUTH_EXPIRES_IN: '86400',
+      AGENTCARD_OAUTH_SCOPE: 'cards:write cards:read',
+    };
+
+    writeMcporterConfig(env, '/tmp/mcporter.json', deps);
+
+    const config = JSON.parse(written.find(w => w.path === '/tmp/mcporter.json')!.data);
+    expect(config.mcpServers.agentcard).toEqual({
+      url: 'https://mcp.agentcard.sh/mcp',
+      auth: 'oauth',
+      tokenCacheDir: '/tmp/agentcard-oauth',
+    });
+    // No static Authorization header anymore.
+    expect(config.mcpServers.agentcard.headers).toBeUndefined();
+
+    const tokens = JSON.parse(
+      written.find(w => w.path === '/tmp/agentcard-oauth/tokens.json')!.data
+    );
+    expect(tokens).toEqual({
+      access_token: 'at_seed_456',
+      token_type: 'Bearer',
+      refresh_token: 'rt_seed_123',
+      expires_in: 86400,
+      scope: 'cards:write cards:read',
+    });
+    const client = JSON.parse(
+      written.find(w => w.path === '/tmp/agentcard-oauth/client.json')!.data
+    );
+    expect(client).toEqual({ client_id: 'oauth_client_abc' });
+  });
+
+  it('does not re-seed the token cache when tokens.json already exists (preserves rotated refresh token)', () => {
+    const { deps, written } = mcporterFakeDeps();
+    // tokens.json already present — mcporter has rotated the refresh token.
+    deps.existsSync = vi.fn((filePath: string) => filePath.endsWith('tokens.json'));
+    const env = {
+      AGENTCARD_OAUTH_CLIENT_ID: 'oauth_client_abc',
+      AGENTCARD_OAUTH_REFRESH_TOKEN: 'rt_stale_original',
+    };
+
+    writeMcporterConfig(env, '/tmp/mcporter.json', deps);
+
+    // mcporter server still configured...
+    const config = JSON.parse(written.find(w => w.path === '/tmp/mcporter.json')!.data);
+    expect(config.mcpServers.agentcard.auth).toBe('oauth');
+    // ...but the cache was NOT overwritten with the stale env token.
+    expect(written.find(w => w.path === '/tmp/agentcard-oauth/tokens.json')).toBeUndefined();
+  });
+
+  it('removes AgentCard and clears the token cache when OAuth creds are absent', () => {
+    const existing = JSON.stringify({
+      mcpServers: {
+        agentcard: {
+          url: 'https://mcp.agentcard.sh/mcp',
+          auth: 'oauth',
+          tokenCacheDir: '/tmp/agentcard-oauth',
+        },
+      },
+    });
+    const unlinked: string[] = [];
+    const { deps, written } = mcporterFakeDeps(existing);
+    deps.existsSync = vi.fn((filePath: string) => {
+      if (filePath.endsWith('mcporter.json')) return true;
+      // pretend the cache files exist so clear unlinks them
+      return filePath.endsWith('tokens.json') || filePath.endsWith('client.json');
+    });
+    deps.unlinkSync = vi.fn((filePath: string) => {
+      unlinked.push(filePath);
+    });
+    const env: Record<string, string | undefined> = {};
+
+    writeMcporterConfig(env, '/tmp/mcporter.json', deps);
+
+    const config = JSON.parse(written.find(w => w.path === '/tmp/mcporter.json')!.data);
+    expect(config.mcpServers.agentcard).toBeUndefined();
+    expect(unlinked).toContain('/tmp/agentcard-oauth/tokens.json');
+    expect(unlinked).toContain('/tmp/agentcard-oauth/client.json');
   });
 
   it('uses literal ${LINEAR_API_KEY} in authorization header (not interpolated)', () => {

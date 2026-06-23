@@ -4,7 +4,7 @@ import {
   type MagicLinkTokenWithPlaintext,
 } from '@/lib/auth/magic-link-tokens';
 import { sendMagicLinkEmail } from '@/lib/email';
-import { findUserByEmail } from '@/lib/user';
+import { findUserByEmail, getWorkOSOrganization } from '@/lib/user';
 import { MAGIC_LINK_EMAIL_ERRORS } from '@/lib/schemas/email';
 import { checkRateLimit } from '@vercel/firewall';
 import { NextResponse } from 'next/server';
@@ -24,6 +24,7 @@ const mockVerifyTurnstileJWT = jest.mocked(verifyTurnstileJWT);
 const mockCreateMagicLinkToken = jest.mocked(createMagicLinkToken);
 const mockSendMagicLinkEmail = jest.mocked(sendMagicLinkEmail);
 const mockFindUserByEmail = jest.mocked(findUserByEmail);
+const mockGetWorkOSOrganization = jest.mocked(getWorkOSOrganization);
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
 
@@ -70,6 +71,9 @@ describe('POST /api/auth/magic-link', () => {
       status: 'not_required',
       domain,
     }));
+    mockGetWorkOSOrganization.mockResolvedValue({ id: 'workos-organization-id' } as Awaited<
+      ReturnType<typeof getWorkOSOrganization>
+    >);
   });
 
   it('should send magic link for valid email with valid JWT', async () => {
@@ -105,7 +109,27 @@ describe('POST /api/auth/magic-link', () => {
     await expect(response.json()).resolves.toEqual({
       success: false,
       error: 'Sign in with your organization SSO provider.',
-      ssoOrganizationId: 'sso-organization-id',
+      ssoOrganizationId: 'workos-organization-id',
+    });
+    expect(mockGetWorkOSOrganization).toHaveBeenCalledWith('example.com');
+    expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+    expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when WorkOS is missing for an SSO-protected domain', async () => {
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'required',
+      domain: 'example.com',
+      sourceOrganizationId: 'sso-organization-id',
+    });
+    mockGetWorkOSOrganization.mockResolvedValue(null);
+
+    const response = await POST(createRequest({ email: 'user@example.com' }));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: 'SSO configuration error. Contact your administrator.',
     });
     expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
     expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();

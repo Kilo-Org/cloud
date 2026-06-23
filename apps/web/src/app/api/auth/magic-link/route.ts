@@ -6,7 +6,7 @@ import { createMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { sendMagicLinkEmail } from '@/lib/email';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import * as z from 'zod';
-import { findUserByEmail } from '@/lib/user';
+import { findUserByEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
@@ -80,11 +80,19 @@ export async function POST(request: NextRequest) {
       );
     }
     if (ssoAuthority.status === 'required') {
+      const workosOrganization = await getWorkOSOrganization(primaryDomain);
+      if (!workosOrganization) {
+        return NextResponse.json(
+          { success: false, error: 'SSO configuration error. Contact your administrator.' },
+          { status: 503 }
+        );
+      }
+
       return NextResponse.json(
         {
           success: false,
           error: 'Sign in with your organization SSO provider.',
-          ssoOrganizationId: ssoAuthority.sourceOrganizationId,
+          ssoOrganizationId: workosOrganization.id,
         },
         { status: 403 }
       );

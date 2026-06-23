@@ -30,12 +30,14 @@ const toSafeToolCallEvent = (
 
   const elementId = getStringArgument(toolCall.arguments, 'elementId');
   const query = getStringArgument(toolCall.arguments, 'query');
+  const snapshotId = getStringArgument(toolCall.arguments, 'snapshotId');
 
   return createSafeToolCall({
     name: toolCall.name,
     providerToolCallId: toolCall.id,
     ...(elementId === undefined ? {} : { elementId }),
     ...(query === undefined ? {} : { query }),
+    ...(snapshotId === undefined ? {} : { snapshotId }),
     tabId: selectedTabId,
   });
 };

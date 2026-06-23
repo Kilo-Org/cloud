@@ -85,6 +85,7 @@ export interface PageSnapshotNode {
 
 export interface PageSnapshot {
   readonly nodes: PageSnapshotNode[];
+  readonly snapshotId: string;
   readonly text: string;
   readonly title: string;
   readonly url: string;
@@ -503,6 +504,7 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
 
   return {
     nodes,
+    snapshotId: `snapshot-${Date.now().toString(36)}`,
     text: getPageText(),
     title: document.title,
     url: sanitizeUrl(location.href),

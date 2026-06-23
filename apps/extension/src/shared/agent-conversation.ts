@@ -33,6 +33,7 @@ export type AgentConversationEvent =
       readonly name: SafeToolName;
       readonly providerToolCallId?: string;
       readonly query?: string;
+      readonly snapshotId?: string;
       readonly tabId: number;
       readonly type: 'tool-call';
     }
@@ -72,6 +73,7 @@ interface CreateSafeToolCallOptions {
   readonly name: SafeToolName;
   readonly providerToolCallId?: string;
   readonly query?: string;
+  readonly snapshotId?: string;
   readonly tabId: number;
 }
 
@@ -131,6 +133,7 @@ export const createSafeToolCall = ({
   name,
   providerToolCallId,
   query,
+  snapshotId,
   tabId,
 }: CreateSafeToolCallOptions): SafeToolCallEvent => ({
   id: createEventId(),
@@ -138,6 +141,7 @@ export const createSafeToolCall = ({
   ...(elementId === undefined ? {} : { elementId }),
   ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
   ...(query === undefined ? {} : { query }),
+  ...(snapshotId === undefined ? {} : { snapshotId }),
   tabId,
   type: 'tool-call',
 });

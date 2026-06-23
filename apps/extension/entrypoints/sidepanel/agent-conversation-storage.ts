@@ -38,6 +38,7 @@ const conversationEventSchema = z.union([
     ]),
     providerToolCallId: z.string().optional(),
     query: z.string().optional(),
+    snapshotId: z.string().optional(),
     tabId: z.number(),
     type: z.literal('tool-call'),
   }),
@@ -113,6 +114,7 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
             ? {}
             : { providerToolCallId: event.providerToolCallId }),
           ...(event.query === undefined ? {} : { query: event.query }),
+          ...(event.snapshotId === undefined ? {} : { snapshotId: event.snapshotId }),
           tabId: event.tabId,
           type: event.type,
         });

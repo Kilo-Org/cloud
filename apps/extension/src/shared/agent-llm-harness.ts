@@ -1,10 +1,10 @@
+/* eslint-disable max-lines */
 import type { KiloGatewayChatMessage, KiloGatewayToolDefinition } from './kilo-api-client';
 import type { AgentConversationEvent } from './agent-conversation';
 
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
 type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
-
 export const EXTENSION_AGENT_SYSTEM_PROMPT = [
   'You are Kilo, an agent running in a browser extension side panel.',
   'You help the user understand and operate the currently selected browser tab.',
@@ -71,8 +71,12 @@ export const createSafeToolDefinitions = ({
               description: 'Opaque element id from a previous safe-mode page snapshot.',
               type: 'string',
             },
+            snapshotId: {
+              description: 'Snapshot id returned with the element id.',
+              type: 'string',
+            },
           },
-          required: ['elementId'],
+          required: ['elementId', 'snapshotId'],
           type: 'object',
         },
       },
@@ -231,7 +235,6 @@ const getGatewayMessageText = (event: MessageEvent): string =>
   event.role === 'user' && event.systemEnvironment !== undefined
     ? `${event.text}\n\n${event.systemEnvironment}`
     : event.text;
-
 export const buildGatewayMessagesFromEvents = (
   events: AgentConversationEvent[],
   { supportsImages = false }: { readonly supportsImages?: boolean } = {}
@@ -273,6 +276,9 @@ export const buildGatewayMessagesFromEvents = (
                           ? {}
                           : { elementId: toolCall.elementId }),
                         ...(toolCall.query === undefined ? {} : { query: toolCall.query }),
+                        ...(toolCall.snapshotId === undefined
+                          ? {}
+                          : { snapshotId: toolCall.snapshotId }),
                       }),
                 name: toolCall.name,
               },

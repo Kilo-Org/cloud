@@ -20,6 +20,7 @@ const pageSnapshotNodeSchema = z.object({
 });
 const pageSnapshotSchema = z.object({
   nodes: z.array(pageSnapshotNodeSchema),
+  snapshotId: z.string().optional(),
   text: z.string(),
   title: z.string(),
   url: z.string(),
@@ -33,8 +34,22 @@ const toPageSnapshotNode = (node: z.infer<typeof pageSnapshotNodeSchema>): PageS
   tag: node.tag,
   ...(node.text === undefined ? {} : { text: node.text }),
 });
+let nextSnapshotId = 1;
+const createSnapshotId = (): string => {
+  const id = `snapshot-${nextSnapshotId}`;
+  nextSnapshotId += 1;
+  return id;
+};
+const snapshotCache = new Map<string, PageSnapshot>();
+const getSnapshotCacheKey = (tabId: number, snapshotId: string): string => `${tabId}:${snapshotId}`;
+const cacheSnapshot = (tabId: number, snapshot: PageSnapshot): void => {
+  snapshotCache.set(getSnapshotCacheKey(tabId, snapshot.snapshotId), snapshot);
+};
+const getCachedSnapshot = (tabId: number, snapshotId: string): PageSnapshot | undefined =>
+  snapshotCache.get(getSnapshotCacheKey(tabId, snapshotId));
 const toPageSnapshot = (snapshot: z.infer<typeof pageSnapshotSchema>): PageSnapshot => ({
   nodes: snapshot.nodes.map(toPageSnapshotNode),
+  snapshotId: snapshot.snapshotId ?? createSnapshotId(),
   text: snapshot.text,
   title: snapshot.title,
   url: snapshot.url,
@@ -91,7 +106,14 @@ const getSnapshot = async (tabId: number): Promise<PageSnapshot | string> => {
 
   const snapshot = pageSnapshotSchema.safeParse(result.value);
 
-  return snapshot.success ? toPageSnapshot(snapshot.data) : 'Page snapshot was invalid.';
+  if (!snapshot.success) {
+    return 'Page snapshot was invalid.';
+  }
+
+  const pageSnapshot = toPageSnapshot(snapshot.data);
+  cacheSnapshot(tabId, pageSnapshot);
+
+  return pageSnapshot;
 };
 
 const nodeMatchesQuery = (node: PageSnapshotNode, query: string): boolean => {
@@ -108,6 +130,24 @@ export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalT
     return readViewportScreenshot(toolCall.tabId);
   }
 
+  if (toolCall.name === 'get_element_details') {
+    if (toolCall.snapshotId === undefined) {
+      return { error: 'Snapshot id is required.', ok: false };
+    }
+
+    const cachedSnapshot = getCachedSnapshot(toolCall.tabId, toolCall.snapshotId);
+
+    if (cachedSnapshot === undefined) {
+      return { error: 'Snapshot expired; call get_page_snapshot again.', ok: false };
+    }
+
+    const element = cachedSnapshot.nodes.find(node => node.id === toolCall.elementId);
+
+    return element === undefined
+      ? { error: 'Element was not found in the page snapshot.', ok: false }
+      : { ok: true, value: element };
+  }
+
   const snapshot = await getSnapshot(toolCall.tabId);
 
   if (typeof snapshot === 'string') {
@@ -116,14 +156,6 @@ export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalT
 
   if (toolCall.name === 'get_page_snapshot') {
     return { ok: true, value: snapshot };
-  }
-
-  if (toolCall.name === 'get_element_details') {
-    const element = snapshot.nodes.find(node => node.id === toolCall.elementId);
-
-    return element === undefined
-      ? { error: 'Element was not found in the page snapshot.', ok: false }
-      : { ok: true, value: element };
   }
 
   const query = toolCall.query?.trim();

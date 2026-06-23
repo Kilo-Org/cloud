@@ -42,7 +42,7 @@ Active.
 4. The final authentication callback MUST independently enforce SSO even when discovery or UI routing was bypassed.
 5. Authentication discovery errors and disagreement between local policy and WorkOS MUST NOT fall back to ordinary signup.
 6. Development fake login MAY bypass SSO only when the existing non-production fake-login feature is enabled.
-7. Converting an existing user to WorkOS MUST invalidate their existing browser sessions and API tokens.
+7. Converting an existing user to WorkOS MUST invalidate their existing browser sessions and MUST NOT eagerly invalidate their API tokens solely through credential-pepper rotation.
 
 ### Invitations
 

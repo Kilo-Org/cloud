@@ -569,11 +569,10 @@ export async function createOrUpdateUser(
             .update(kilocode_users)
             .set({
               web_session_pepper: randomUUID(),
-              api_token_pepper: randomUUID(),
             })
             .where(eq(kilocode_users.id, userByEmail.id))
             .returning();
-          if (!updatedUser) throw new Error('Failed to rotate credentials for WorkOS user');
+          if (!updatedUser) throw new Error('Failed to rotate web sessions for WorkOS user');
           return updatedUser;
         });
       } else {

@@ -464,6 +464,35 @@ describe('User', () => {
       );
       consoleError.mockRestore();
     });
+
+    it('preserves API token pepper when upgrading an existing user to WorkOS', async () => {
+      const existingUser = await insertTestUser({
+        google_user_email: 'workos-upgrade@example.com',
+        api_token_pepper: 'api-pepper-before-workos',
+        web_session_pepper: 'web-pepper-before-workos',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'workos-upgrade@example.com',
+          google_user_name: 'WorkOS Upgrade',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-upgrade-provider-id',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, existingUser.id),
+      });
+      expect(updatedUser?.api_token_pepper).toBe('api-pepper-before-workos');
+      expect(updatedUser?.web_session_pepper).toEqual(expect.any(String));
+      expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
+    });
   });
 
   describe('softDeleteUser', () => {

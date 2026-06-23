@@ -19,9 +19,18 @@ const pageSnapshotNodeSchema = z.object({
   text: z.string().optional(),
 });
 const pageSnapshotSchema = z.object({
+  limits: z
+    .object({
+      maxNodeCount: z.number(),
+      maxNodeTextLength: z.number(),
+      maxTextLength: z.number(),
+    })
+    .optional(),
   nodes: z.array(pageSnapshotNodeSchema),
+  nodesTruncated: z.boolean().optional(),
   snapshotId: z.string().optional(),
   text: z.string(),
+  textTruncated: z.boolean().optional(),
   title: z.string(),
   url: z.string(),
 });
@@ -47,10 +56,18 @@ const cacheSnapshot = (tabId: number, snapshot: PageSnapshot): void => {
 };
 const getCachedSnapshot = (tabId: number, snapshotId: string): PageSnapshot | undefined =>
   snapshotCache.get(getSnapshotCacheKey(tabId, snapshotId));
+const defaultSnapshotLimits = {
+  maxNodeCount: 80,
+  maxNodeTextLength: 500,
+  maxTextLength: 8000,
+};
 const toPageSnapshot = (snapshot: z.infer<typeof pageSnapshotSchema>): PageSnapshot => ({
+  limits: snapshot.limits ?? defaultSnapshotLimits,
   nodes: snapshot.nodes.map(toPageSnapshotNode),
+  nodesTruncated: snapshot.nodesTruncated ?? false,
   snapshotId: snapshot.snapshotId ?? createSnapshotId(),
   text: snapshot.text,
+  textTruncated: snapshot.textTruncated ?? false,
   title: snapshot.title,
   url: snapshot.url,
 });
@@ -116,13 +133,48 @@ const getSnapshot = async (tabId: number): Promise<PageSnapshot | string> => {
   return pageSnapshot;
 };
 
-const nodeMatchesQuery = (node: PageSnapshotNode, query: string): boolean => {
-  const haystack = [node.text, node.label, node.href, node.role, node.tag]
-    .filter((value): value is string => value !== undefined)
-    .join(' ')
-    .toLowerCase();
+const searchableFields = ['text', 'label', 'href', 'role', 'tag'] as const;
+const findMatchedField = (
+  node: PageSnapshotNode,
+  query: string
+): (typeof searchableFields)[number] | undefined =>
+  searchableFields.find(field => node[field]?.toLowerCase().includes(query.toLowerCase()) === true);
+const getExcerpt = (text: string, query: string): string => {
+  const index = text.toLowerCase().indexOf(query.toLowerCase());
+  const start = Math.max(0, index - 40);
+  const end = Math.min(text.length, index + query.length + 40);
 
-  return haystack.includes(query.toLowerCase());
+  return text.slice(start, end);
+};
+const getFindResults = (snapshot: PageSnapshot, query: string) => {
+  const nodeMatches = snapshot.nodes.flatMap(node => {
+    const matchedField = findMatchedField(node, query);
+
+    return matchedField === undefined ? [] : [{ ...node, matchedField }];
+  });
+  const pageTextMatch = snapshot.text.toLowerCase().includes(query.toLowerCase())
+    ? [
+        {
+          excerpt: getExcerpt(snapshot.text, query),
+          matchedField: 'pageText',
+          role: 'document',
+          tag: 'body',
+        },
+      ]
+    : [];
+  const matches = [...nodeMatches, ...pageTextMatch].toSorted(
+    (left, right) =>
+      ['text', 'label', 'pageText', 'href', 'role', 'tag'].indexOf(left.matchedField) -
+      ['text', 'label', 'pageText', 'href', 'role', 'tag'].indexOf(right.matchedField)
+  );
+  const maxMatches = 20;
+
+  return {
+    matches: matches.slice(0, maxMatches),
+    snapshotId: snapshot.snapshotId,
+    totalMatches: matches.length,
+    truncated: matches.length > maxMatches,
+  };
 };
 
 export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalTabResult> => {
@@ -164,5 +216,5 @@ export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalT
     return { error: 'Search query is required.', ok: false };
   }
 
-  return { ok: true, value: snapshot.nodes.filter(node => nodeMatchesQuery(node, query)) };
+  return { ok: true, value: getFindResults(snapshot, query) };
 };

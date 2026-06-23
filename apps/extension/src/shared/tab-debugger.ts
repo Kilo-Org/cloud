@@ -83,10 +83,19 @@ export interface PageSnapshotNode {
   readonly text?: string;
 }
 
+export interface PageSnapshotLimits {
+  readonly maxNodeCount: number;
+  readonly maxNodeTextLength: number;
+  readonly maxTextLength: number;
+}
+
 export interface PageSnapshot {
+  readonly limits: PageSnapshotLimits;
   readonly nodes: PageSnapshotNode[];
+  readonly nodesTruncated: boolean;
   readonly snapshotId: string;
   readonly text: string;
+  readonly textTruncated: boolean;
   readonly title: string;
   readonly url: string;
 }
@@ -371,7 +380,7 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
 
     return '';
   };
-  const getPageText = (): string => {
+  const getPageText = (): { text: string; truncated: boolean } => {
     const root = document.body ?? document.documentElement;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const parts: string[] = [];
@@ -390,7 +399,9 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
       node = walker.nextNode();
     }
 
-    return truncate(normalize(parts.join(' ')), maxTextLength);
+    const text = normalize(parts.join(' '));
+
+    return { text: truncate(text, maxTextLength), truncated: text.length > maxTextLength };
   };
   const getRole = (element: Element): string => {
     const explicitRole = element.getAttribute('role');
@@ -433,6 +444,28 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
     'h5',
     'h6',
   ].join(',');
+  const isVisible = (element: Element): boolean => {
+    const style = getComputedStyle(element);
+
+    if (style.display === 'none' || style.visibility === 'hidden') {
+      return false;
+    }
+
+    const rect = element.getBoundingClientRect();
+
+    return rect.width > 0 && rect.height > 0;
+  };
+  const getPriority = (node: PageSnapshotNode): number => {
+    if (node.role === 'button' || node.role === 'field') {
+      return 0;
+    }
+
+    if (node.role === 'link' || node.role === 'heading') {
+      return 1;
+    }
+
+    return 2;
+  };
   const root = document.body ?? document.documentElement;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
     acceptNode: node =>
@@ -440,13 +473,13 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
         ? NodeFilter.FILTER_ACCEPT
         : NodeFilter.FILTER_SKIP,
   });
-  const nodes: PageSnapshotNode[] = [];
+  const candidates: PageSnapshotNode[] = [];
   let elementNode = walker.nextNode();
 
-  while (elementNode !== null && nodes.length < maxNodeCount) {
+  while (elementNode !== null && candidates.length < maxNodeCount * 3) {
     checkDeadline();
 
-    if (elementNode instanceof Element) {
+    if (elementNode instanceof Element && isVisible(elementNode)) {
       const element = elementNode;
       const tag = element.tagName.toLowerCase();
       const text = truncate(normalize(element.textContent ?? ''), maxNodeTextLength);
@@ -475,7 +508,7 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
         tag: string;
         text?: string;
       } = {
-        id: `node-${nodes.length + 1}`,
+        id: `node-${candidates.length + 1}`,
         role: getRole(element),
         tag,
       };
@@ -496,16 +529,23 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
         node.text = text;
       }
 
-      nodes.push(node);
+      candidates.push(node);
     }
 
     elementNode = walker.nextNode();
   }
+  const nodes = candidates
+    .toSorted((left, right) => getPriority(left) - getPriority(right))
+    .slice(0, maxNodeCount);
+  const pageText = getPageText();
 
   return {
+    limits: { maxNodeCount, maxNodeTextLength, maxTextLength },
     nodes,
+    nodesTruncated: candidates.length > maxNodeCount || elementNode !== null,
     snapshotId: `snapshot-${Date.now().toString(36)}`,
-    text: getPageText(),
+    text: pageText.text,
+    textTruncated: pageText.truncated,
     title: document.title,
     url: sanitizeUrl(location.href),
   };

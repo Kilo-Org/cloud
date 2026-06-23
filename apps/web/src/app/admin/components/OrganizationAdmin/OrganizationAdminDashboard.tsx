@@ -1,6 +1,9 @@
 'use client';
 
-import { OrganizationInfoCard } from '@/components/organizations/OrganizationInfoCard';
+import {
+  ChildOrganizationsCard,
+  OrganizationInfoCard,
+} from '@/components/organizations/OrganizationInfoCard';
 import { OrganizationAdminMembers } from '@/components/organizations/OrganizationMembersCard';
 import { OrganizationUsageSummaryCard } from '@/components/organizations/OrganizationUsageSummaryCard';
 import { SeatUsageCard } from '@/components/organizations/SeatUsageCard';
@@ -53,12 +56,9 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
         <div className="flex w-full flex-col gap-y-8">
           <div className="w-full max-w-[1000px]">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-              <div>
-                <OrganizationInfoCard
-                  organizationId={organizationId}
-                  showAdminControls
-                  className="h-full"
-                />
+              <div className="space-y-4">
+                <OrganizationInfoCard organizationId={organizationId} showAdminControls />
+                <ChildOrganizationsCard organizationId={organizationId} />
               </div>
               <div className="space-y-7">
                 <OrganizationUsageSummaryCard organizationId={organizationId} />

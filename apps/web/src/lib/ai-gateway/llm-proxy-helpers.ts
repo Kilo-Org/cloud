@@ -7,7 +7,7 @@ import {
   processTokenData,
 } from '@/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
-import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
+import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT, INCEPTION_PROMO_RUNNING } from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { type User } from '@kilocode/db/schema';
 import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
@@ -870,11 +870,11 @@ export function countAndStoreEditUsage(
       usageStats.market_cost = usageStats.cost_mUsd;
 
       // Mirror the canonical chat path in `processOpenRouterUsage`: when the
-      // request is BYOK we don't bill the user, so the cache discount we
-      // would otherwise have given them must be zeroed too. Otherwise the
-      // usage row would claim a discount on spend that never happened and
-      // distort "money saved by caching" reporting.
-      if (usageContext.user_byok) {
+      // promotion is running or the request is BYOK we don't bill the user, so
+      // the cache discount we would otherwise have given them must be zeroed
+      // too. Otherwise the usage row would claim a discount on spend that never
+      // happened and distort "money saved by caching" reporting.
+      if (INCEPTION_PROMO_RUNNING || usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }

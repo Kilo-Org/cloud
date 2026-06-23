@@ -136,3 +136,4 @@ allowBuilds:
   '@openrouter/sdk': false
   spawn-sync: false
   tree-sitter-bash: false
+  geckodriver: true

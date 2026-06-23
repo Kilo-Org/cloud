@@ -16,9 +16,12 @@ export default defineConfig({
       },
     },
     description: 'Kilo browser extension.',
-    host_permissions: ['https://app.kilo.ai/*', 'http://127.0.0.1/*', 'http://localhost/*'],
+    host_permissions:
+      browser === 'firefox'
+        ? ['<all_urls>', 'https://app.kilo.ai/*', 'http://127.0.0.1/*', 'http://localhost/*']
+        : ['https://app.kilo.ai/*', 'http://127.0.0.1/*', 'http://localhost/*'],
     name: 'Kilo Extension',
-    permissions: browser === 'firefox' ? ['storage'] : ['debugger', 'storage'],
+    permissions: browser === 'firefox' ? ['scripting', 'storage', 'tabs'] : ['debugger', 'storage'],
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({

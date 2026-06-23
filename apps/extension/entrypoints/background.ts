@@ -3,10 +3,14 @@ import {
   EVAL_TAB_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
   evalInTab,
+  evalInTabWithScripting,
   isTabDebuggerRequest,
   listInspectableTabs,
+  listInspectableTabsWithTabsApi,
 } from '@/src/shared/tab-debugger';
 import type {
+  BrowserScriptingApi,
+  BrowserTabsApi,
   ChromeDebuggerApi,
   TabDebuggerRequest,
   TabDebuggerResponse,
@@ -27,33 +31,61 @@ interface ChromeRuntimeApi {
 const handleTabDebuggerRequest = async ({
   debuggerApi,
   request,
+  scriptingApi,
+  tabsApi,
 }: {
   debuggerApi: ChromeDebuggerApi | undefined;
   request: TabDebuggerRequest;
+  scriptingApi: BrowserScriptingApi | undefined;
+  tabsApi: BrowserTabsApi | undefined;
 }): Promise<TabDebuggerResponse> => {
-  if (debuggerApi === undefined) {
-    return { error: 'Debugger API is unavailable.', ok: false };
-  }
-
   try {
     if (request.type === LIST_INSPECTABLE_TABS_MESSAGE) {
+      if (debuggerApi) {
+        return {
+          ok: true,
+          tabs: await listInspectableTabs(debuggerApi),
+          type: LIST_INSPECTABLE_TABS_MESSAGE,
+        };
+      }
+
+      if (tabsApi) {
+        return {
+          ok: true,
+          tabs: await listInspectableTabsWithTabsApi(tabsApi),
+          type: LIST_INSPECTABLE_TABS_MESSAGE,
+        };
+      }
+
+      return { error: 'Tab listing API is unavailable.', ok: false };
+    }
+
+    if (debuggerApi) {
       return {
         ok: true,
-        tabs: await listInspectableTabs(debuggerApi),
-        type: LIST_INSPECTABLE_TABS_MESSAGE,
+        result: await evalInTab({
+          code: request.code,
+          debuggerApi,
+          tabId: request.tabId,
+          ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+        }),
+        type: EVAL_TAB_MESSAGE,
       };
     }
 
-    return {
-      ok: true,
-      result: await evalInTab({
-        code: request.code,
-        debuggerApi,
-        tabId: request.tabId,
-        ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
-      }),
-      type: EVAL_TAB_MESSAGE,
-    };
+    if (scriptingApi) {
+      return {
+        ok: true,
+        result: await evalInTabWithScripting({
+          code: request.code,
+          scriptingApi,
+          tabId: request.tabId,
+        }),
+        type: EVAL_TAB_MESSAGE,
+      };
+    }
+
+    return { error: 'Tab evaluation API is unavailable.', ok: false };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Debugger request failed.',
@@ -68,7 +100,9 @@ export default defineBackground(() => {
       chrome?: {
         debugger?: ChromeDebuggerApi;
         runtime?: ChromeRuntimeApi;
+        scripting?: BrowserScriptingApi;
         sidePanel?: Parameters<typeof enableActionClickSidePanel>[0];
+        tabs?: BrowserTabsApi;
       };
     }
   ).chrome;
@@ -86,6 +120,8 @@ export default defineBackground(() => {
       const response = await handleTabDebuggerRequest({
         debuggerApi: chromeApi.debugger,
         request: message,
+        scriptingApi: chromeApi.scripting,
+        tabsApi: chromeApi.tabs,
       });
       sendResponse(response);
     })();

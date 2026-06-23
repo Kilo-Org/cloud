@@ -26,6 +26,31 @@ export interface ChromeDebuggerApi {
   ) => unknown;
 }
 
+export interface BrowserTabInfo {
+  readonly id?: number;
+  readonly title?: string;
+  readonly url?: string;
+}
+
+export interface BrowserTabsApi {
+  readonly query: (
+    queryInfo: Record<string, unknown>
+  ) => Promise<BrowserTabInfo[]> | BrowserTabInfo[];
+}
+
+export interface BrowserScriptingInjectionResult {
+  readonly result?: unknown;
+}
+
+export interface BrowserScriptingApi {
+  readonly executeScript: (details: {
+    readonly args: string[];
+    readonly func: (code: string) => unknown;
+    readonly target: { readonly tabId: number };
+    readonly world: 'MAIN';
+  }) => Promise<BrowserScriptingInjectionResult[]> | BrowserScriptingInjectionResult[];
+}
+
 export interface InspectableTab {
   readonly id: number;
   readonly title: string;
@@ -99,7 +124,32 @@ export const listInspectableTabs = async (
     });
 };
 
+export const listInspectableTabsWithTabsApi = async (
+  tabsApi: BrowserTabsApi
+): Promise<InspectableTab[]> => {
+  const tabs = await tabsApi.query({});
+
+  return tabs
+    .filter(
+      (tab): tab is BrowserTabInfo & { readonly id: number; readonly url: string } =>
+        typeof tab.id === 'number' && isNormalPageUrl(tab.url)
+    )
+    .map(tab => {
+      const title = tab.title?.trim();
+
+      return {
+        id: tab.id,
+        title: title === undefined || title === '' ? tab.url : title,
+        url: tab.url,
+      };
+    });
+};
+
 const getEvalExpression = (code: string): string => `(async () => { ${code} })()`;
+
+const runInjectedEval = (code: string): unknown =>
+  // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval, typescript-eslint/no-unsafe-call
+  new Function(code)();
 
 export const evalInTab = async ({
   code,
@@ -157,6 +207,32 @@ export const evalInTab = async ({
     if (attached) {
       await debuggerApi.detach(target);
     }
+  }
+};
+
+export const evalInTabWithScripting = async ({
+  code,
+  scriptingApi,
+  tabId,
+}: {
+  readonly code: string;
+  readonly scriptingApi: BrowserScriptingApi;
+  readonly tabId: number;
+}): Promise<EvalTabResult> => {
+  try {
+    const [response] = await scriptingApi.executeScript({
+      args: [code],
+      func: runInjectedEval,
+      target: { tabId },
+      world: 'MAIN',
+    });
+
+    return { ok: true, value: response?.result };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Page evaluation failed.',
+      ok: false,
+    };
   }
 };
 

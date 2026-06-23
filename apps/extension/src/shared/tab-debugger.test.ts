@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { evalInTab, listInspectableTabs } from './tab-debugger';
-import type { ChromeDebuggerApi, ChromeDebuggerTargetInfo } from './tab-debugger';
+import {
+  evalInTab,
+  evalInTabWithScripting,
+  listInspectableTabs,
+  listInspectableTabsWithTabsApi,
+} from './tab-debugger';
+import type {
+  BrowserScriptingApi,
+  BrowserTabsApi,
+  ChromeDebuggerApi,
+  ChromeDebuggerTargetInfo,
+} from './tab-debugger';
 
 const createDebuggerApi = ({
   sendCommand,
@@ -90,5 +100,52 @@ describe('tab debugger helpers', () => {
       })
     ).resolves.toStrictEqual({ error: 'Page evaluation failed.', ok: false });
     expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
+  });
+
+  it('lists normal page tabs through Firefox tabs API', async () => {
+    const tabsApi: BrowserTabsApi = {
+      query: () => [
+        { id: 1, title: 'Kilo', url: 'https://app.kilo.ai/' },
+        { id: 2, title: 'Firefox settings', url: 'about:preferences' },
+        { id: 3, title: '', url: 'http://localhost:3001/' },
+      ],
+    };
+
+    await expect(listInspectableTabsWithTabsApi(tabsApi)).resolves.toStrictEqual([
+      { id: 1, title: 'Kilo', url: 'https://app.kilo.ai/' },
+      { id: 3, title: 'http://localhost:3001/', url: 'http://localhost:3001/' },
+    ]);
+  });
+
+  it('evaluates dangerous-mode code through Firefox scripting API', async () => {
+    const calls: Parameters<BrowserScriptingApi['executeScript']>[0][] = [];
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: details => {
+        calls.push(details);
+        return [{ result: 12_345 }];
+      },
+    };
+
+    await expect(
+      evalInTabWithScripting({
+        code: 'return document.documentElement.outerHTML.length;',
+        scriptingApi,
+        tabId: 7,
+      })
+    ).resolves.toStrictEqual({ ok: true, value: 12_345 });
+    expect(calls[0]?.func).toBeTypeOf('function');
+    expect(
+      calls.map(call => ({
+        args: call.args,
+        target: call.target,
+        world: call.world,
+      }))
+    ).toStrictEqual([
+      {
+        args: ['return document.documentElement.outerHTML.length;'],
+        target: { tabId: 7 },
+        world: 'MAIN',
+      },
+    ]);
   });
 });

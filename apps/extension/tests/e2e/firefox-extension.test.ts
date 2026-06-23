@@ -65,10 +65,18 @@ const readFirefoxManifest = async (): Promise<Record<string, unknown>> => {
 
 test('firefox build installs as a running add-on without invalid manifest warnings', async () => {
   const manifest = await readFirefoxManifest();
-  const { permissions, side_panel: sidePanel, sidebar_action: sidebarAction } = manifest;
+  const {
+    host_permissions: hostPermissions,
+    permissions,
+    side_panel: sidePanel,
+    sidebar_action: sidebarAction,
+  } = manifest;
 
   expect(permissions).toContain('storage');
+  expect(permissions).toContain('scripting');
+  expect(permissions).toContain('tabs');
   expect(permissions).not.toContain('debugger');
+  expect(hostPermissions).toContain('<all_urls>');
   expect(sidebarAction).toMatchObject({ default_panel: 'sidepanel.html' });
   expect(sidePanel).toBeUndefined();
 

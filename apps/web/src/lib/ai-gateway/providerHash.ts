@@ -3,9 +3,6 @@ import { type Provider } from '@/lib/ai-gateway/providers/types';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getEnvVariable } from '@/lib/dotenvx';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/worker-utils/provider-safety-identifiers';
-
-export { generateOpenRouterDownstreamSafetyIdentifier };
 
 /**
  * Generates a service-specific SHA256 hash.
@@ -26,6 +23,10 @@ export function generateProviderSpecificHash(payload: string, provider: Provider
     .createHash('sha256')
     .update(salt + pepper + payload)
     .digest('base64');
+}
+
+export function generateOpenRouterDownstreamSafetyIdentifier(userId: string): string {
+  return generateProviderSpecificHash(userId, PROVIDERS.OPENROUTER);
 }
 
 export function generateVercelDownstreamSafetyIdentifier(userId: string): string {

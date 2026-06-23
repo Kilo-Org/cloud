@@ -6,7 +6,6 @@ import {
   organization_memberships,
 } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
-import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/worker-utils/provider-safety-identifiers';
 
 export { getWorkerDb, type WorkerDb };
 
@@ -115,8 +114,6 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
     .select({
       id: kilocode_users.id,
       api_token_pepper: kilocode_users.api_token_pepper,
-      openrouter_downstream_safety_identifier:
-        kilocode_users.openrouter_downstream_safety_identifier,
     })
     .from(kilocode_users)
     .where(and(eq(kilocode_users.id, botId), eq(kilocode_users.is_bot, true)))
@@ -127,22 +124,18 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
 
     await ensureBotIsOrgMember(db, existing.id, orgId);
 
-    if (existing.api_token_pepper && existing.openrouter_downstream_safety_identifier) {
+    if (existing.api_token_pepper) {
       return { id: existing.id, api_token_pepper: existing.api_token_pepper };
     }
 
-    const apiTokenPepper = existing.api_token_pepper ?? generateApiTokenPepper();
+    // Edge case: existing bot has NULL api_token_pepper — generate one
+    const newPepper = generateApiTokenPepper();
     await db
       .update(kilocode_users)
-      .set({
-        api_token_pepper: apiTokenPepper,
-        openrouter_downstream_safety_identifier:
-          existing.openrouter_downstream_safety_identifier ??
-          generateOpenRouterDownstreamSafetyIdentifier(existing.id),
-      })
+      .set({ api_token_pepper: newPepper })
       .where(eq(kilocode_users.id, existing.id));
 
-    return { id: existing.id, api_token_pepper: apiTokenPepper };
+    return { id: existing.id, api_token_pepper: newPepper };
   }
 
   // Create new bot user
@@ -157,7 +150,6 @@ export async function ensureBotUserForOrg(db: WorkerDb, orgId: string): Promise<
     stripe_customer_id: stripeCustomerId,
     is_bot: true,
     api_token_pepper: apiTokenPepper,
-    openrouter_downstream_safety_identifier: generateOpenRouterDownstreamSafetyIdentifier(botId),
   });
 
   await ensureBotIsOrgMember(db, botId, orgId);

@@ -8,6 +8,7 @@ import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
+  organizationOwnerMutationProcedure,
 } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -140,6 +141,12 @@ const UpdateMinimumBalanceAlertInputSchema = OrganizationIdInputSchema.extend({
       'When enabled is true, minimum_balance must be a positive number and minimum_balance_alert_email must have at least one email',
   }
 );
+
+const UpdateAdoptionDigestInputSchema = OrganizationIdInputSchema.extend({
+  // Empty array disables the digest (the recipient list is removed); a non-empty
+  // list of valid emails enables it. No separate boolean — presence is the toggle.
+  adoption_digest_email: z.array(z.email()),
+});
 
 const SettingsResponseSchema = z.object({
   settings: z.custom<OrganizationSettings>(),
@@ -443,6 +450,67 @@ export const organizationsSettingsRouter = createTRPCRouter({
           message: enabled
             ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
             : 'Minimum balance alert: disabled',
+          organization_id: organizationId,
+        });
+      }
+
+      return {
+        settings: updatedSettings,
+      };
+    }),
+
+  // Owners-only: configure recipients for the weekly enterprise adoption digest.
+  // Mirrors updateMinimumBalanceAlert, but is Enterprise-gated and owner-only
+  // (matching the adoption recommendations dismiss/restore permission model).
+  updateAdoptionDigest: organizationOwnerMutationProcedure
+    .input(UpdateAdoptionDigestInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, adoption_digest_email } = input;
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      // Enterprise-only feature.
+      if (existingOrg.plan !== 'enterprise') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'The adoption digest is not available for this organization.',
+        });
+      }
+
+      const recipients = dedupeStrings(adoption_digest_email);
+      const enabled = recipients.length > 0;
+      const wasEnabled = (existingOrg.settings?.adoption_digest_email?.length ?? 0) > 0;
+
+      const currentSettings = existingOrg.settings || {};
+      let updatedSettings: OrganizationSettings;
+
+      if (enabled) {
+        updatedSettings = await updateOrganizationSettings(organizationId, {
+          ...currentSettings,
+          adoption_digest_email: recipients,
+        });
+      } else {
+        // Remove the field when there are no recipients (digest disabled).
+        const { adoption_digest_email: _omit, ...rest } = currentSettings;
+        updatedSettings = await updateOrganizationSettings(organizationId, rest);
+      }
+
+      if (enabled !== wasEnabled || enabled) {
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: enabled
+            ? `Adoption digest: enabled (recipients: ${recipients.join(', ')})`
+            : 'Adoption digest: disabled',
           organization_id: organizationId,
         });
       }

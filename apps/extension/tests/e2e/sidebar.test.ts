@@ -11,6 +11,7 @@ import {
   launchExtensionContext,
   seedExtensionAuth,
   startFixtureServer,
+  waitForStoredConversationText,
 } from './extension-context-fixture';
 
 const extensionManifestSchema = z.object({
@@ -277,6 +278,7 @@ test('conversation survives side panel reload', async () => {
     await sidePanel.getByLabel('Message agent').fill('Remember this after reload');
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(sidePanel.getByText('Remember this after reload')).toBeVisible();
+    await waitForStoredConversationText(sidePanel, 'Remember this after reload');
 
     await sidePanel.reload();
 

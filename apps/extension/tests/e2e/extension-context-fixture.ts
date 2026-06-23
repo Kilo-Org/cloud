@@ -1,5 +1,5 @@
 /* eslint-disable import/no-nodejs-modules, promise/avoid-new, promise/prefer-await-to-callbacks */
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
 import { access, mkdtemp } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -125,3 +125,52 @@ export const setExtensionStorage = async (
 
 export const seedExtensionAuth = (page: Page): Promise<void> =>
   setExtensionStorage(page, { kiloAuth: { token: 'token-1', userEmail: 'user@kilo.ai' } });
+
+export const waitForStoredConversationText = async (page: Page, text: string): Promise<void> => {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          expectedText =>
+            new Promise<boolean>((resolve, reject) => {
+              const chromeApi = (
+                globalThis as typeof globalThis & {
+                  chrome?: {
+                    runtime?: { lastError?: { message?: string } };
+                    storage?: {
+                      local?: {
+                        get: (
+                          key: string,
+                          callback: (items: Record<string, unknown>) => void
+                        ) => void;
+                      };
+                    };
+                  };
+                }
+              ).chrome;
+
+              const runtime = chromeApi?.runtime;
+              const storage = chromeApi?.storage?.local;
+
+              if (runtime === undefined || storage === undefined) {
+                reject(new Error('Extension runtime storage is unavailable.'));
+                return;
+              }
+
+              storage.get('kiloAgentConversation', items => {
+                const message = runtime.lastError?.message;
+
+                if (message !== undefined && message !== '') {
+                  reject(new Error(message));
+                  return;
+                }
+
+                resolve(JSON.stringify(items['kiloAgentConversation']).includes(expectedText));
+              });
+            }),
+          text
+        ),
+      { timeout: 5000 }
+    )
+    .toBe(true);
+};

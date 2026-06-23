@@ -537,6 +537,46 @@ const seedFirefoxConversation = async (driver: WebDriver, events: unknown[]): Pr
   assert.equal(result, 'ok');
 };
 
+const waitForStoredFirefoxConversationText = async (
+  driver: WebDriver,
+  text: string
+): Promise<void> => {
+  await waitUntil(
+    driver,
+    async () => {
+      const result = await driver.executeAsyncScript(
+        (expectedText: string, done: (value: unknown) => void) => {
+          const browserApi = (
+            globalThis as typeof globalThis & {
+              browser?: {
+                storage?: {
+                  local?: {
+                    get: (key: string) => Promise<Record<string, unknown>>;
+                  };
+                };
+              };
+            }
+          ).browser;
+
+          browserApi?.storage?.local
+            ?.get('kiloAgentConversation')
+            .then(items => {
+              done(JSON.stringify(items['kiloAgentConversation']).includes(expectedText));
+              return null;
+            })
+            .catch((error: unknown) => {
+              done(error instanceof Error ? error.message : String(error));
+            });
+        },
+        text
+      );
+
+      return result === true;
+    },
+    `Timed out waiting for stored conversation text: ${text}`
+  );
+};
+
 const startFirefoxSession = async (): Promise<FirefoxSession> => {
   const options = new firefox.Options();
 
@@ -1200,6 +1240,7 @@ const scenarios: FirefoxScenario[] = [
         await switchToDangerousMode(session.driver);
         await sendMessage(session.driver, 'Remember this after reload');
         await waitForText(session.driver, 'Remember this after reload');
+        await waitForStoredFirefoxConversationText(session.driver, 'Remember this after reload');
         await session.driver.navigate().refresh();
         await waitForText(session.driver, 'Remember this after reload');
       }),

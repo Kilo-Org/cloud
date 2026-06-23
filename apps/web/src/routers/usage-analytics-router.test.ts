@@ -1,18 +1,33 @@
 jest.mock('@/lib/redis', () => ({ redisClient: {} }));
 
+jest.mock('@/lib/snowflake', () => ({
+  executeSnowflakeStatement: jest.fn(),
+  resolveSnowflakeConfig: jest.fn(() => ({ account: 'test-account' })),
+}));
+
+jest.mock('@/lib/drizzle', () => ({
+  readDb: { select: jest.fn() },
+}));
+
+import type { User } from '@kilocode/db/schema';
+import { readDb } from '@/lib/drizzle';
+import { executeSnowflakeStatement } from '@/lib/snowflake';
+import { createCallerFactory } from '@/lib/trpc/init';
 import {
   CostSourceSchema,
   UsageAnalyticsFiltersSchema,
   applySelfEmailExclusion,
+  buildWhereClause,
   buildScopedUserEmailMaps,
   costColumnFor,
   costSumExprSql,
   dimensionDisplayValue,
   displayBreakdownValues,
   scopedUserEmailBreakdownIds,
-  shouldLimitBreakdownInSql,
   shouldLoadFullOrgWideUserEmailMap,
+  userEmailMapValuesSql,
   userDisplayValue,
+  usageAnalyticsRouter,
 } from './usage-analytics-router';
 
 const baseFilters = {
@@ -21,7 +36,37 @@ const baseFilters = {
   granularity: 'day' as const,
 };
 
+const createCaller = createCallerFactory(usageAnalyticsRouter);
+const mockExecuteSnowflakeStatement = jest.mocked(executeSnowflakeStatement);
+const mockReadDbSelect = jest.mocked(readDb.select);
+const mockAuthProviderRows: Array<{
+  userId: string;
+  provider: 'github' | 'google';
+  providerAccountId: string;
+}> = [];
+
+function createUsageAnalyticsCaller() {
+  return createCaller({
+    user: {
+      id: 'user_1',
+      google_user_email: 'person@example.com',
+      is_admin: false,
+    } as User,
+  });
+}
+
 describe('usage analytics cost source', () => {
+  beforeEach(() => {
+    mockExecuteSnowflakeStatement.mockReset();
+    mockExecuteSnowflakeStatement.mockResolvedValue([['person@example.com', '110']]);
+    mockAuthProviderRows.splice(0, mockAuthProviderRows.length);
+    mockReadDbSelect.mockReturnValue({
+      from: jest.fn(() => ({
+        where: jest.fn(async () => mockAuthProviderRows),
+      })),
+    } as never);
+  });
+
   it('defaults to billable cost for existing clients', () => {
     expect(UsageAnalyticsFiltersSchema.parse(baseFilters).costSource).toBe('cost');
     expect(costColumnFor('cost')).toBe('total_cost_microdollars');
@@ -152,10 +197,131 @@ describe('usage analytics cost source', () => {
     ]);
   });
 
-  it('does not apply the Snowflake breakdown limit before email aggregation', () => {
-    expect(shouldLimitBreakdownInSql('user', { userDisplay: 'email' })).toBe(false);
-    expect(shouldLimitBreakdownInSql('user', { userDisplay: 'id' })).toBe(true);
-    expect(shouldLimitBreakdownInSql('model', { userDisplay: 'email' })).toBe(true);
+  it('builds bound SQL values for email-display user aggregation', () => {
+    const maps = buildScopedUserEmailMaps(
+      [
+        { id: 'user_1', email: 'person@example.com' },
+        { id: 'user_2', email: 'other@example.com' },
+      ],
+      [{ userId: 'user_1', provider: 'github', providerAccountId: '123' }]
+    );
+
+    const values = userEmailMapValuesSql(maps);
+
+    expect(values?.valuesSql).toBe('(?, ?), (?, ?), (?, ?)');
+    expect(values?.valuesSql).not.toContain('person@example.com');
+    expect(values?.valuesSql).not.toContain('oauth/github:123');
+    expect(values?.bindings).toEqual([
+      { type: 'TEXT', value: 'user_1' },
+      { type: 'TEXT', value: 'person@example.com' },
+      { type: 'TEXT', value: 'user_2' },
+      { type: 'TEXT', value: 'other@example.com' },
+      { type: 'TEXT', value: 'oauth/github:123' },
+      { type: 'TEXT', value: 'person@example.com' },
+    ]);
+  });
+
+  it('getBreakdown aggregates email-display user buckets in SQL before limiting', async () => {
+    mockAuthProviderRows.push({
+      userId: 'user_1',
+      provider: 'github',
+      providerAccountId: '123',
+    });
+
+    const caller = createUsageAnalyticsCaller();
+
+    await caller.getBreakdown({
+      ...baseFilters,
+      dimension: 'user',
+      metric: 'cost',
+      userDisplay: 'email',
+      limit: 2,
+    });
+
+    expect(mockExecuteSnowflakeStatement).toHaveBeenCalledTimes(1);
+    const statement = mockExecuteSnowflakeStatement.mock.calls[0][0].statement as string;
+    expect(statement).toContain('WITH user_email_map(mapped_user_id, mapped_email) AS');
+    expect(statement).toContain('FROM VALUES (?, ?), (?, ?)');
+    expect(statement).toContain('JOIN user_email_map ON kilo_user_id = mapped_user_id');
+    expect(statement).toContain('mapped_email AS key');
+    expect(statement).toContain('GROUP BY 1');
+    expect(statement).toContain('ORDER BY 2 DESC');
+    expect(statement).toContain('LIMIT 2');
+    expect(statement).not.toContain('person@example.com');
+    expect(statement).not.toContain('oauth/github:123');
+  });
+
+  it('getBreakdown wires scoped self email identities into the self-scope predicate', async () => {
+    mockAuthProviderRows.push({
+      userId: 'user_1',
+      provider: 'github',
+      providerAccountId: '123',
+    });
+
+    const caller = createUsageAnalyticsCaller();
+
+    await caller.getBreakdown({
+      ...baseFilters,
+      dimension: 'user',
+      metric: 'cost',
+      userDisplay: 'email',
+      limit: 2,
+    });
+
+    const call = mockExecuteSnowflakeStatement.mock.calls[0][0];
+    const statement = call.statement as string;
+    expect(statement).toContain('kilo_user_id IN (?, ?)');
+    expect(statement).not.toContain('kilo_user_id = ?');
+    expect(call.bindings).toEqual([
+      { type: 'TEXT', value: 'user_1' },
+      { type: 'TEXT', value: 'person@example.com' },
+      { type: 'TEXT', value: 'oauth/github:123' },
+      { type: 'TEXT', value: 'person@example.com' },
+      { type: 'TEXT', value: '2026-06-04' },
+      { type: 'TEXT', value: '2026-06-05' },
+      { type: 'TEXT', value: 'user_1' },
+      { type: 'TEXT', value: 'oauth/github:123' },
+      { type: 'TEXT', value: '' },
+    ]);
+  });
+
+  it('uses scoped self ids instead of intersecting email breakdowns with the canonical user id', () => {
+    const filters = UsageAnalyticsFiltersSchema.parse({
+      ...baseFilters,
+      userDisplay: 'email',
+    });
+
+    const where = buildWhereClause('daily', filters, 'user_1', true, [
+      'user_1',
+      'oauth/github:123',
+    ]);
+
+    expect(where.sql()).toContain('kilo_user_id IN (?, ?)');
+    expect(where.sql()).not.toContain('kilo_user_id = ?');
+    expect(where.bindings.map(binding => binding.value)).toEqual(
+      expect.arrayContaining(['user_1', 'oauth/github:123'])
+    );
+  });
+
+  it('uses scoped self ids for organization self-scope email breakdowns', () => {
+    const filters = UsageAnalyticsFiltersSchema.parse({
+      ...baseFilters,
+      organizationId: '00000000-0000-4000-8000-000000000001',
+      viewAs: 'self',
+      userDisplay: 'email',
+    });
+
+    const where = buildWhereClause('daily', filters, 'user_1', true, [
+      'user_1',
+      'oauth/github:123',
+    ]);
+
+    expect(where.sql()).toContain('organization_id = ?');
+    expect(where.sql()).toContain('kilo_user_id IN (?, ?)');
+    expect(where.sql()).not.toContain('kilo_user_id = ?');
+    expect(where.bindings.map(binding => binding.value)).toEqual(
+      expect.arrayContaining(['00000000-0000-4000-8000-000000000001', 'user_1', 'oauth/github:123'])
+    );
   });
 
   it('scopes email-display user breakdown queries to mapped user identities', () => {

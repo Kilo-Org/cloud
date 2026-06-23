@@ -137,7 +137,7 @@ function ceilIsoToUtcMonthExclusive(iso: string): string {
  * Accumulates SQL WHERE clauses with positional `?` bindings.
  * Callers push conditions in any order; `sql()` joins them with AND.
  */
-class WhereBuilder {
+export class WhereBuilder {
   readonly clauses: string[] = [];
   readonly bindings: SnowflakeBinding[] = [];
 
@@ -535,13 +535,6 @@ export function displayBreakdownValues(
     .slice(0, limit);
 }
 
-export function shouldLimitBreakdownInSql(
-  dimension: Dimension,
-  filters: Pick<UsageAnalyticsFilters, 'userDisplay'>
-): boolean {
-  return !(dimension === 'user' && filters.userDisplay === 'email');
-}
-
 export function scopedUserEmailBreakdownIds(
   dimension: Dimension,
   filters: Pick<UsageAnalyticsFilters, 'userDisplay'>,
@@ -549,6 +542,23 @@ export function scopedUserEmailBreakdownIds(
 ): string[] | undefined {
   if (dimension !== 'user' || filters.userDisplay !== 'email') return undefined;
   return uniqueStrings(Array.from(scopedUserEmailMaps?.idsByEmail.values() ?? []).flat());
+}
+
+export function userEmailMapValuesSql(
+  scopedUserEmailMaps: ScopedUserEmailMaps | undefined
+): { valuesSql: string; bindings: SnowflakeBinding[] } | undefined {
+  const entries = Array.from(scopedUserEmailMaps?.emailsById.entries() ?? []);
+  if (entries.length === 0) return undefined;
+
+  const bindings: SnowflakeBinding[] = [];
+  for (const [userId, email] of entries) {
+    bindings.push({ type: 'TEXT', value: userId }, { type: 'TEXT', value: email });
+  }
+
+  return {
+    valuesSql: entries.map(() => '(?, ?)').join(', '),
+    bindings,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -583,15 +593,26 @@ function buildDateConditions(
 function buildScopeConditions(
   where: WhereBuilder,
   filters: UsageAnalyticsFilters,
-  ctxUserId: string
+  ctxUserId: string,
+  scopedSelfUserIds?: string[]
 ): void {
+  const selfUserIds =
+    scopedSelfUserIds && scopedSelfUserIds.length > 0 ? scopedSelfUserIds : undefined;
+  const addSelfScope = () => {
+    if (selfUserIds) {
+      where.addIn('kilo_user_id', selfUserIds);
+    } else {
+      where.addEq('kilo_user_id', ctxUserId);
+    }
+    if (filters.excludedUserIds?.includes(ctxUserId)) {
+      where.addNotIn('kilo_user_id', selfUserIds ?? [ctxUserId]);
+    }
+  };
+
   if (filters.organizationId) {
     where.addEq('organization_id', filters.organizationId);
     if (filters.viewAs === 'self') {
-      where.addEq('kilo_user_id', ctxUserId);
-      if (filters.excludedUserIds?.includes(ctxUserId)) {
-        where.addNotIn('kilo_user_id', [ctxUserId]);
-      }
+      addSelfScope();
     } else {
       if (filters.userIds && filters.userIds.length > 0) {
         where.addIn('kilo_user_id', filters.userIds);
@@ -601,10 +622,7 @@ function buildScopeConditions(
       }
     }
   } else {
-    where.addEq('kilo_user_id', ctxUserId);
-    if (filters.excludedUserIds?.includes(ctxUserId)) {
-      where.addNotIn('kilo_user_id', [ctxUserId]);
-    }
+    addSelfScope();
     if (filters.personalScope === 'personal-only') {
       // DBT coalesces personal Snowflake usage rollups to an empty-string sentinel
       // so incremental merges can match on organization_id.
@@ -633,15 +651,16 @@ function buildDimensionConditions(where: WhereBuilder, filters: UsageAnalyticsFi
   addNotInIfNonEmpty('project_id', filters.excludedProjects);
 }
 
-function buildWhereClause(
+export function buildWhereClause(
   tier: GranularityTier,
   filters: UsageAnalyticsFilters,
   ctxUserId: string,
-  includeDimensions: boolean
+  includeDimensions: boolean,
+  scopedSelfUserIds?: string[]
 ): WhereBuilder {
   const where = new WhereBuilder();
   buildDateConditions(where, tier, filters);
-  buildScopeConditions(where, filters, ctxUserId);
+  buildScopeConditions(where, filters, ctxUserId, scopedSelfUserIds);
   if (includeDimensions) {
     buildDimensionConditions(where, filters);
   }
@@ -1150,15 +1169,26 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const table = getTableName(meta.tier);
       const dimCol = dimensionColumn(input.dimension);
       const metricExpr = metricExprSql(input.metric, meta.tier, filters.costSource);
-      const where = buildWhereClause(meta.tier, filters, ctx.user.id, true);
-      const limitBreakdownInSql = shouldLimitBreakdownInSql(input.dimension, filters);
       const scopedBreakdownUserIds = scopedUserEmailBreakdownIds(
         input.dimension,
         filters,
         scopedUserEmailMaps
       );
+      const scopedSelfUserIds =
+        scopedBreakdownUserIds && (filters.viewAs === 'self' || !filters.organizationId)
+          ? scopedBreakdownUserIds
+          : undefined;
+      const where = buildWhereClause(meta.tier, filters, ctx.user.id, true, scopedSelfUserIds);
+      const emailMapValues =
+        input.dimension === 'user' && filters.userDisplay === 'email'
+          ? userEmailMapValuesSql(scopedUserEmailMaps)
+          : undefined;
 
-      if (scopedBreakdownUserIds) {
+      if (input.dimension === 'user' && filters.userDisplay === 'email' && !emailMapValues) {
+        return { breakdown: [], totalValue: 0, effectiveGranularity: meta.effectiveGranularity };
+      }
+
+      if (scopedBreakdownUserIds && !emailMapValues && !scopedSelfUserIds) {
         if (scopedBreakdownUserIds.length > 0) {
           where.addIn('kilo_user_id', scopedBreakdownUserIds);
         } else {
@@ -1166,16 +1196,32 @@ export const usageAnalyticsRouter = createTRPCRouter({
         }
       }
 
-      const statement = `
-        SELECT
-          ${dimCol} AS key,
-          ${metricExpr} AS value
-        FROM ${table}
-        WHERE ${where.sql()}
-        GROUP BY 1
-        ORDER BY 2 DESC
-        ${limitBreakdownInSql ? `LIMIT ${Number(input.limit)}` : ''}
-      `;
+      const statement = emailMapValues
+        ? `
+          WITH user_email_map(mapped_user_id, mapped_email) AS (
+            SELECT column1, column2
+            FROM VALUES ${emailMapValues.valuesSql}
+          )
+          SELECT
+            mapped_email AS key,
+            ${metricExpr} AS value
+          FROM ${table}
+          JOIN user_email_map ON kilo_user_id = mapped_user_id
+          WHERE ${where.sql()}
+          GROUP BY 1
+          ORDER BY 2 DESC
+          LIMIT ${Number(input.limit)}
+        `
+        : `
+          SELECT
+            ${dimCol} AS key,
+            ${metricExpr} AS value
+          FROM ${table}
+          WHERE ${where.sql()}
+          GROUP BY 1
+          ORDER BY 2 DESC
+          LIMIT ${Number(input.limit)}
+        `;
 
       // SAFETY: LIMIT value is interpolated directly into SQL when present but
       // is validated by Zod above: `z.number().int().min(1).max(100)`.
@@ -1192,7 +1238,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           executeSnowflakeStatement({
             config,
             statement,
-            bindings: where.bindings,
+            bindings: [...(emailMapValues?.bindings ?? []), ...where.bindings],
             timeoutSeconds: Math.ceil(
               defaultTimeoutForScope(filters.organizationId ? 'org' : 'user') / 1000
             ),
@@ -1206,13 +1252,9 @@ export const usageAnalyticsRouter = createTRPCRouter({
         value: toSafeNumber(row[1]),
       }));
       const userEmailsById = userEmailsForDisplay(filters, scopedUserEmailMaps);
-      const values = displayBreakdownValues(
-        input.dimension,
-        filters,
-        userEmailsById,
-        rawValues,
-        input.limit
-      );
+      const values = emailMapValues
+        ? rawValues
+        : displayBreakdownValues(input.dimension, filters, userEmailsById, rawValues, input.limit);
       // Percentages are relative to the *returned* rows (limited by input.limit).
       // They will not reflect the true share when the result set is capped.
       const totalValue = values.reduce((s, r) => s + r.value, 0);

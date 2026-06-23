@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
+import { GatewayError, GatewayErrorCode } from '@kilocode/mcp-gateway';
 import type * as mcpRoute from './route';
 
 const mockVerify = jest.fn<
@@ -81,5 +82,41 @@ describe('/mcp', () => {
     expect(mockVerify).toHaveBeenCalledWith('native-token');
     expect(mockConnect).toHaveBeenCalledTimes(1);
     expect(mockHandleRequest).toHaveBeenCalledTimes(1);
+  });
+
+  test('preserves insufficient scope verifier errors', async () => {
+    mockVerify.mockRejectedValue(
+      new GatewayError(GatewayErrorCode.InvalidScope, 'mcp:access scope is required', 403)
+    );
+
+    const response = await loadedRoute().POST(
+      new NextRequest('http://localhost:3000/mcp', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer scoped-token' },
+      })
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: 'insufficient_scope' });
+    const challenge = response.headers.get('www-authenticate') ?? '';
+    expect(challenge).toContain('Bearer error="insufficient_scope"');
+    expect(challenge).toContain('scope="mcp:access"');
+  });
+
+  test('preserves forbidden verifier errors', async () => {
+    mockVerify.mockRejectedValue(
+      new GatewayError(GatewayErrorCode.Forbidden, 'Native MCP access is unavailable', 403)
+    );
+
+    const response = await loadedRoute().POST(
+      new NextRequest('http://localhost:3000/mcp', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer revoked-token' },
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('www-authenticate')).toBeNull();
+    await expect(response.json()).resolves.toEqual({ error: 'forbidden' });
   });
 });

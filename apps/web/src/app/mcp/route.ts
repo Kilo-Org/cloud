@@ -2,6 +2,8 @@ import 'server-only';
 import { NextResponse, type NextRequest } from 'next/server';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {
+  GatewayError,
+  GatewayErrorCode,
   nativeMcpAuthorizationUrl,
   nativeMcpProtectedResourceMetadataUrl,
   nativeMcpResourceUrl,
@@ -44,6 +46,33 @@ function unauthorizedChallenge(appBaseUrl: string) {
   );
 }
 
+function insufficientScopeChallenge(appBaseUrl: string) {
+  const authenticate = [
+    'Bearer error="insufficient_scope"',
+    `resource="${nativeMcpResourceUrl(appBaseUrl)}"`,
+    `resource_metadata="${nativeMcpProtectedResourceMetadataUrl(appBaseUrl)}"`,
+    'scope="mcp:access"',
+    `authorization_uri="${nativeMcpAuthorizationUrl(appBaseUrl)}"`,
+  ].join(', ');
+  return NextResponse.json(
+    { error: 'insufficient_scope' },
+    {
+      status: 403,
+      headers: {
+        'WWW-Authenticate': authenticate,
+        'Cache-Control': 'no-store',
+      },
+    }
+  );
+}
+
+function forbidden() {
+  return NextResponse.json(
+    { error: 'forbidden' },
+    { status: 403, headers: { 'Cache-Control': 'no-store' } }
+  );
+}
+
 function originAllowed(request: NextRequest, appBaseUrl: string) {
   const origin = request.headers.get('origin');
   if (!origin) return true;
@@ -70,7 +99,15 @@ async function authenticateNativeMcpRequest(request: NextRequest) {
   const services = createGatewayServices();
   try {
     return await services.nativeMcpTokenVerifier.verify(token);
-  } catch {
+  } catch (error) {
+    if (error instanceof GatewayError) {
+      if (error.code === GatewayErrorCode.InvalidScope) {
+        return { response: insufficientScopeChallenge(services.config.appBaseUrl) };
+      }
+      if (error.code === GatewayErrorCode.Forbidden) {
+        return { response: forbidden() };
+      }
+    }
     return { response: unauthorizedChallenge(services.config.appBaseUrl) };
   }
 }

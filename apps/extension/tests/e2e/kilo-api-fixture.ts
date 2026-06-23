@@ -33,6 +33,7 @@ const chatCompletionStreamResponse = (events: unknown[]): string =>
 const longEvalIdentifier = `kilo${'VeryLongIdentifier'.repeat(16)}`;
 const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.outerHTML.length; return ${longEvalIdentifier};`;
 const chatCompletionsPath = '/api/gateway/v1/chat/completions';
+const dangerousToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page', 'eval'];
 
 type ChatAbortObserverWindow = typeof globalThis & {
   __kiloChatCompletionAborted?: boolean;
@@ -115,7 +116,7 @@ export const mockKiloApi = async (
     const body: unknown = route.request().postDataJSON();
     const messages = isRecord(body) && Array.isArray(body['messages']) ? body['messages'] : [];
 
-    const toolNames = options.toolNames ?? ['eval'];
+    const toolNames = options.toolNames ?? dangerousToolNames;
 
     expect(body).toMatchObject({
       model: 'anthropic/claude-sonnet-4',

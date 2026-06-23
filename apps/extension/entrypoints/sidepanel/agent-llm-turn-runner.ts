@@ -1,19 +1,22 @@
 import {
   createAssistantMessage,
   createEvalToolCall,
+  createSafeToolCall,
   createThinkingBlock,
 } from '@/src/shared/agent-conversation';
-import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
+import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-conversation';
 import {
   buildGatewayMessagesFromEvents,
   createEvalToolDefinition,
+  createSafeToolDefinitions,
 } from '@/src/shared/agent-llm-harness';
 import { runToolCalls } from '@/src/shared/agent-tool-results';
 import type { FetchLike } from '@/src/shared/auth';
 import { fetchKiloGatewayChatCompletionStream } from '@/src/shared/kilo-api-client';
 import { executeEvalToolCall } from './agent-eval-runtime';
+import { executeSafeToolCall } from './agent-safe-tool-runtime';
 
-type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
+type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
 
 interface RunDangerousLlmTurnOptions {
   readonly apiBaseUrl: string;
@@ -30,7 +33,7 @@ interface RunDangerousLlmTurnOptions {
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
 }
 
-const evalToolDefinition = createEvalToolDefinition();
+const dangerousToolDefinitions = [...createSafeToolDefinitions(), createEvalToolDefinition()];
 const createAssistantMessageEvent = (
   text: string
 ): Extract<AgentConversationEvent, { readonly type: 'message' }> => {
@@ -47,6 +50,10 @@ const isAbortError = (error: unknown): boolean =>
   error instanceof Error && error.name === 'AbortError';
 
 const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
+const getStringArgument = (args: Record<string, unknown>, name: string): string | undefined =>
+  typeof args[name] === 'string' ? args[name] : undefined;
+const isSafeToolName = (name: string): name is SafeToolName =>
+  name === 'find_in_page' || name === 'get_element_details' || name === 'get_page_snapshot';
 const maxEvalRounds = 4;
 
 export const runDangerousLlmTurn = async ({
@@ -79,14 +86,14 @@ export const runDangerousLlmTurn = async ({
       signal,
       thinkingEffort,
       token,
-      tools: [evalToolDefinition],
+      tools: dangerousToolDefinitions,
     });
 
   const appendCompletion = async (
     nextEvents: AgentConversationEvent[]
   ): Promise<{
     completionEvents: AgentConversationEvent[];
-    toolCallEvents: EvalToolCallEvent[];
+    toolCallEvents: ToolCallEvent[];
   }> => {
     const completionEvents: AgentConversationEvent[] = [];
     let streamedText = '';
@@ -164,17 +171,34 @@ export const runDangerousLlmTurn = async ({
       completionEvents.push(createThinkingBlock(completion.reasoning));
     }
 
-    const toolCallEvents = completion.toolCalls.flatMap(evalToolCall =>
-      evalToolCall.name === 'eval' && typeof evalToolCall.arguments['code'] === 'string'
-        ? [
+    const toolCallEvents: ToolCallEvent[] = [];
+
+    for (const toolCall of completion.toolCalls) {
+      if (toolCall.name === 'eval') {
+        if (typeof toolCall.arguments['code'] === 'string') {
+          toolCallEvents.push(
             createEvalToolCall({
-              code: evalToolCall.arguments['code'],
-              providerToolCallId: evalToolCall.id,
+              code: toolCall.arguments['code'],
+              providerToolCallId: toolCall.id,
               tabId: selectedTabId,
-            }),
-          ]
-        : []
-    );
+            })
+          );
+        }
+      } else if (isSafeToolName(toolCall.name)) {
+        const elementId = getStringArgument(toolCall.arguments, 'elementId');
+        const query = getStringArgument(toolCall.arguments, 'query');
+
+        toolCallEvents.push(
+          createSafeToolCall({
+            name: toolCall.name,
+            providerToolCallId: toolCall.id,
+            ...(elementId === undefined ? {} : { elementId }),
+            ...(query === undefined ? {} : { query }),
+            tabId: selectedTabId,
+          })
+        );
+      }
+    }
     completionEvents.push(...toolCallEvents);
 
     appendEvents(
@@ -220,7 +244,8 @@ export const runDangerousLlmTurn = async ({
 
       const toolResultEvents: AgentConversationEvent[] = await runToolCalls(
         toolCallEvents,
-        executeEvalToolCall
+        toolCall =>
+          toolCall.name === 'eval' ? executeEvalToolCall(toolCall) : executeSafeToolCall(toolCall)
       );
 
       if (isSignalAborted(signal)) {

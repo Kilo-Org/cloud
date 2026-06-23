@@ -22,6 +22,7 @@ const chromeWorkflowNames = [
   'native side panel is outside the page DOM',
   'dangerous mode conversation can eval against a normal tab',
   'safe mode conversation reads the selected tab with safe tools',
+  'dangerous mode conversation can use safe read tools',
   'running conversation can be stopped',
   'target tab list can be refreshed',
   'conversation survives side panel reload',
@@ -54,6 +55,7 @@ interface KiloApiOptions {
   readonly secondCompletionEvents?: unknown[];
   readonly seenChatOrganizationIds?: string[];
   readonly thirdCompletionEvents?: unknown[];
+  readonly toolNames?: string[];
 }
 
 interface KiloApiHandle extends ServerHandle {
@@ -93,6 +95,7 @@ const chatCompletionStreamResponse = (events: unknown[]): string =>
   `${events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')}data: [DONE]\n\n`;
 
 const defaultEvalCode = 'return document.documentElement.outerHTML.length;';
+const dangerousToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page', 'eval'];
 
 const defaultFirstCompletionEvents = (): unknown[] => [
   { choices: [{ delta: { content: 'I will inspect Firefox.' } }] },
@@ -151,6 +154,13 @@ const getToolResultHtmlLength = (body: unknown): string => {
 
   return String(toolResult['value']);
 };
+
+const getRequestToolNames = (body: unknown): unknown[] =>
+  isRecord(body) && Array.isArray(body['tools'])
+    ? body['tools'].map(tool =>
+        isRecord(tool) && isRecord(tool['function']) ? tool['function']['name'] : undefined
+      )
+    : [];
 
 const closeServer = (server: Server): Promise<void> =>
   new Promise((resolve, reject) => {
@@ -293,6 +303,7 @@ const startKiloApiServer = async (): Promise<KiloApiHandle> => {
           }
 
           const body = await readRequestBody(request);
+          assert.deepEqual(getRequestToolNames(body), options.toolNames ?? dangerousToolNames);
 
           if (chatCall === 1 && options.beforeFirstCompletion !== undefined) {
             await options.beforeFirstCompletion();
@@ -952,6 +963,7 @@ const scenarios: FirefoxScenario[] = [
           secondCompletionEvents: [
             { choices: [{ delta: { content: 'The page is the Kilo extension fixture.' } }] },
           ],
+          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
         },
         async session => {
           await session.openTargetPage();
@@ -961,6 +973,49 @@ const scenarios: FirefoxScenario[] = [
           await sendMessage(session.driver, 'What is on this page?');
           await waitForText(session.driver, 'get_page_snapshot completed');
           await waitForText(session.driver, 'The page is the Kilo extension fixture.');
+        }
+      ),
+  },
+  {
+    name: 'dangerous mode conversation can use safe read tools',
+    run: context =>
+      withSession(
+        context.api,
+        {
+          firstCompletionEvents: [
+            {
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        function: {
+                          arguments: JSON.stringify({}),
+                          name: 'get_page_snapshot',
+                        },
+                        id: 'call_snapshot_1',
+                        index: 0,
+                        type: 'function',
+                      },
+                    ],
+                  },
+                },
+              ],
+            },
+          ],
+          secondCompletionEvents: [
+            { choices: [{ delta: { content: 'Dangerous mode read the page safely first.' } }] },
+          ],
+        },
+        async session => {
+          await session.openTargetPage();
+          await openAuthenticatedPanel(session);
+          await waitForModel(session.driver);
+          await waitForTargetTab(session.driver, 'Kilo extension fixture');
+          await switchToDangerousMode(session.driver);
+          await sendMessage(session.driver, 'Read this page safely first');
+          await waitForText(session.driver, 'get_page_snapshot completed');
+          await waitForText(session.driver, 'Dangerous mode read the page safely first.');
         }
       ),
   },

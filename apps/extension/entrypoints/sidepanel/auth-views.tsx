@@ -135,7 +135,7 @@ export const SignedInView = ({
   auth: StoredAuth;
   onSignOut: () => void;
 }): JSX.Element => {
-  const [conversationKey, setConversationKey] = useState(0);
+  const [conversationResetSignal, setConversationResetSignal] = useState(0);
   const { organizationOptions, selectOrganization, selectedOrganizationId } =
     useOrganizationCreditAccount(auth.token);
 
@@ -143,10 +143,8 @@ export const SignedInView = ({
     <Shell
       auth={auth}
       onNewConversation={() => {
-        void (async (): Promise<void> => {
-          await clearStoredAgentConversation();
-          setConversationKey(current => current + 1);
-        })();
+        setConversationResetSignal(current => current + 1);
+        void clearStoredAgentConversation();
       }}
       onOrganizationChange={selectOrganization}
       onSignOut={onSignOut}
@@ -155,7 +153,7 @@ export const SignedInView = ({
     >
       <AgentChatPanel
         auth={auth}
-        key={conversationKey}
+        conversationResetSignal={conversationResetSignal}
         organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
       />
     </Shell>

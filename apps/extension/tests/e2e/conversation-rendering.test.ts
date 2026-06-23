@@ -40,6 +40,43 @@ test('new conversation keeps the selected target tab', async () => {
   }
 });
 
+test('new conversation does not drop an immediately typed draft', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await expect(sidePanel.getByLabel('Settings')).toBeVisible();
+    await sidePanel.evaluate(`
+      (() => {
+        const storageLocal = globalThis.browser.storage.local;
+        const originalRemove = storageLocal.remove.bind(storageLocal);
+        storageLocal.remove = async keys => {
+          await new Promise(resolve => {
+            setTimeout(resolve, 100);
+          });
+          await originalRemove(keys);
+        };
+      })()
+    `);
+
+    await sidePanel.getByLabel('New conversation').click();
+    await sidePanel.getByLabel('Message agent').fill('Fast follow-up');
+    await sidePanel.waitForTimeout(150);
+
+    await expect(sidePanel.getByLabel('Message agent')).toHaveValue('Fast follow-up');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
+  } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
 test('assistant messages render markdown', async () => {
   const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();

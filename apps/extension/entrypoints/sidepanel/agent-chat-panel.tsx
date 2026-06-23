@@ -49,9 +49,11 @@ export const formatSelectedTabSystemEnvironment = ({
 
 export const AgentChatPanel = ({
   auth,
+  conversationResetSignal,
   organizationId,
 }: {
   auth: StoredAuth;
+  conversationResetSignal: number;
   organizationId: string | undefined;
 }): JSX.Element => {
   const [draft, setDraft] = useState('');
@@ -62,6 +64,7 @@ export const AgentChatPanel = ({
   const [modelLoadError, setModelLoadError] = useState<string | undefined>();
   const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>([]);
   const [thinkingEffort, setThinkingEffort] = useState('');
+  const conversationResetSignalRef = useRef(conversationResetSignal);
   const runAbortRef = useRef<AbortController | null>(null);
   const modelLoadRequestRef = useRef(0);
   const {
@@ -90,6 +93,17 @@ export const AgentChatPanel = ({
       runAbortRef.current?.abort();
     };
   }, [loadInspectableTabs]);
+
+  useEffect(() => {
+    if (conversationResetSignalRef.current === conversationResetSignal) {
+      return;
+    }
+
+    conversationResetSignalRef.current = conversationResetSignal;
+    runAbortRef.current?.abort();
+    setDraft('');
+    setEvents(createDefaultConversationEvents());
+  }, [conversationResetSignal, setEvents]);
 
   const loadModels = useCallback(
     async (signal?: AbortSignal): Promise<void> => {

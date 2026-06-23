@@ -1,0 +1,30 @@
+{
+  "name": "headroom-compress",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "types": "wrangler types --include-runtime=false --env-file /dev/null",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/headroom-compress/src",
+    "test": "vitest run",
+    "container:build": "scripts/build-headroom-image.sh",
+    "benchmark:compression": "node scripts/benchmark-compression.mjs"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "@kilocode/worker-utils": "workspace:*",
+    "hono": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

@@ -1,0 +1,39 @@
+import { Container } from '@cloudflare/containers';
+
+export class HeadroomContainer extends Container<Env> {
+  defaultPort = 8787;
+  sleepAfter = '10m';
+
+  envVars = {
+    HEADROOM_HOST: '0.0.0.0',
+    HEADROOM_PORT: '8787',
+    HEADROOM_WORKERS: '1',
+    HEADROOM_STATELESS: this.env.HEADROOM_STATELESS,
+    HEADROOM_TELEMETRY: this.env.HEADROOM_TELEMETRY,
+    HEADROOM_SKIP_UPSTREAM_CHECK: this.env.HEADROOM_SKIP_UPSTREAM_CHECK,
+    HEADROOM_NO_CCR_INJECT_TOOL: this.env.HEADROOM_NO_CCR_INJECT_TOOL,
+    HEADROOM_NO_CCR_MARKER: this.env.HEADROOM_NO_CCR_MARKER,
+    HEADROOM_NO_CCR_PROACTIVE_EXPANSION: this.env.HEADROOM_NO_CCR_PROACTIVE_EXPANSION,
+    HEADROOM_LOG_MESSAGES: this.env.HEADROOM_LOG_MESSAGES,
+    HEADROOM_RATE_LIMIT_ENABLED: this.env.HEADROOM_RATE_LIMIT_ENABLED,
+    HEADROOM_LIMIT_CONCURRENCY: this.env.HEADROOM_LIMIT_CONCURRENCY,
+    HEADROOM_COMPRESS_WORKERS: this.env.HEADROOM_COMPRESS_WORKERS,
+    HEADROOM_KOMPRESS_MAX_CONCURRENT: this.env.HEADROOM_KOMPRESS_MAX_CONCURRENT,
+    HEADROOM_TOOL_OUTPUT_COMPRESSION_PARALLELISM:
+      this.env.HEADROOM_TOOL_OUTPUT_COMPRESSION_PARALLELISM,
+    HEADROOM_MODEL_LIMITS: this.env.HEADROOM_MODEL_LIMITS,
+  };
+
+  override onStart(): void {
+    console.log(JSON.stringify({ event: 'headroom_container_started' }));
+  }
+
+  override onError(error: unknown): void {
+    console.error(
+      JSON.stringify({
+        event: 'headroom_container_error',
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
+  }
+}

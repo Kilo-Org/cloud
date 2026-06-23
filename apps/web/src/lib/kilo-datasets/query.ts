@@ -509,12 +509,22 @@ function rowsFromExecute(result: unknown): Array<Record<string, unknown>> {
   return [];
 }
 
+function serializeBoolean(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 't' || normalized === 'true') return true;
+    if (normalized === 'f' || normalized === 'false') return false;
+  }
+  throw new DatasetQueryError('invalid boolean value');
+}
+
 function serializeValue(value: unknown, type: ColumnType): string | number | boolean | null {
   if (value === null || value === undefined) return null;
   if (type === 'timestamp') return new Date(String(value)).toISOString();
   if (type === 'integer') return Number(value);
   if (type === 'decimal') return String(value);
-  if (type === 'boolean') return Boolean(value);
+  if (type === 'boolean') return serializeBoolean(value);
   return String(value);
 }
 

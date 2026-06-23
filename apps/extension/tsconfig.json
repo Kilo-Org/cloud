@@ -16,5 +16,5 @@
     "useUnknownInCatchVariables": true
   },
   "include": ["**/*.ts", "**/*.tsx", ".wxt/types/**/*.d.ts"],
-  "exclude": ["node_modules", ".output"]
+  "exclude": ["node_modules", ".output", "test-results", "playwright-report"]
 }

@@ -10,8 +10,8 @@ import { TRPCError } from '@trpc/server';
 import { GeneratePortalLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { kilocode_users, organizations } from '@kilocode/db/schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { organizations } from '@kilocode/db/schema';
+import { eq, sql } from 'drizzle-orm';
 import { OrganizationSSODomainSchema } from '@/lib/organizations/organization-types';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { successResult } from '@/lib/maybe-result';
@@ -166,21 +166,6 @@ export const organizationSsoRouter = createTRPCRouter({
         .update(organizations)
         .set({ sso_domain: ssoDomain })
         .where(eq(organizations.id, organizationId));
-
-      if (organization.sso_domain !== ssoDomain) {
-        await tx
-          .update(kilocode_users)
-          .set({
-            api_token_pepper: sql`pg_catalog.gen_random_uuid()::text`,
-            web_session_pepper: sql`pg_catalog.gen_random_uuid()::text`,
-          })
-          .where(
-            and(
-              eq(kilocode_users.is_bot, false),
-              sql`lower(split_part(${kilocode_users.google_user_email}, '@', 2)) = ${ssoDomain}`
-            )
-          );
-      }
 
       await createAuditLog({
         action: 'organization.sso.set_domain',

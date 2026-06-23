@@ -10,7 +10,6 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 describe('organization SSO router', () => {
   let admin: User;
   let sameDomainUser: User;
-  let sameDomainBot: User;
   let organization: Organization;
 
   beforeAll(async () => {
@@ -23,12 +22,6 @@ describe('organization SSO router', () => {
       api_token_pepper: 'old-api-pepper',
       web_session_pepper: 'old-web-pepper',
     });
-    sameDomainBot = await insertTestUser({
-      google_user_email: 'bot@example.com',
-      api_token_pepper: 'bot-api-pepper',
-      web_session_pepper: 'bot-web-pepper',
-      is_bot: true,
-    });
     organization = await createOrganization('SSO Router Organization', admin.id);
   });
 
@@ -36,7 +29,7 @@ describe('organization SSO router', () => {
     await db.delete(organizations).where(eq(organizations.id, organization.id));
   });
 
-  test('rotates same-domain human credentials when SSO is enabled', async () => {
+  test('does not eagerly rotate same-domain credentials when SSO is enabled', async () => {
     const caller = await createCallerForUser(admin.id);
 
     await caller.organizations.sso.updateSsoDomain({
@@ -47,13 +40,8 @@ describe('organization SSO router', () => {
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, sameDomainUser.id),
     });
-    const unchangedBot = await db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, sameDomainBot.id),
-    });
 
-    expect(updatedUser?.api_token_pepper).not.toBe('old-api-pepper');
-    expect(updatedUser?.web_session_pepper).not.toBe('old-web-pepper');
-    expect(unchangedBot?.api_token_pepper).toBe('bot-api-pepper');
-    expect(unchangedBot?.web_session_pepper).toBe('bot-web-pepper');
+    expect(updatedUser?.api_token_pepper).toBe('old-api-pepper');
+    expect(updatedUser?.web_session_pepper).toBe('old-web-pepper');
   });
 });

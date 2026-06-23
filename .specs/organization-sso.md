@@ -72,7 +72,7 @@ Active.
 
 ### Policy Transitions
 
-1. Enabling SSO or attaching a child to an SSO authority MUST invalidate affected Same-domain users' existing browser sessions and API tokens before enforcement is considered complete.
+1. Enabling SSO or attaching a child to an SSO authority MUST NOT eagerly invalidate affected Same-domain users' existing browser sessions or API tokens solely through credential-pepper rotation; SSO requirements MUST instead be enforced at authentication and authorization boundaries.
 2. Pending authentication artifacts that could mint credentials after the transition SHOULD be expired.
 3. Existing Same-domain ordinary invitations MUST NOT remain usable after the transition.
 4. Policy transitions, configuration failures, denied membership admissions, and administrative overrides MUST be audited without recording tokens, cookies, credentials, or authentication headers.

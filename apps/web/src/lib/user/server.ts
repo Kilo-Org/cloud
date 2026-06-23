@@ -1070,8 +1070,6 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
 
   if (!isWebSessionCurrent(session.webSessionPepper, user))
     return authError(401, 'Reauthentication required', maybeKiloUserId);
-  if (!(await hasCurrentSsoAuthentication(user, session)))
-    return authError(401, 'SSO reauthentication required', maybeKiloUserId);
 
   // NOTE: we currently do not thread organization id through here as its only used for extension-originated requests
   return await validateUserAuthorization(

@@ -7,7 +7,9 @@ import {
   buildScopedUserEmailMaps,
   costColumnFor,
   costSumExprSql,
+  dimensionDisplayValue,
   shouldLoadFullOrgWideUserEmailMap,
+  userDisplayValue,
 } from './usage-analytics-router';
 
 const baseFilters = {
@@ -102,6 +104,21 @@ describe('usage analytics cost source', () => {
     expect(shouldLoadFullOrgWideUserEmailMap(filters, true)).toBe(false);
     expect(shouldLoadFullOrgWideUserEmailMap({ ...filters, userDisplay: 'email' }, true)).toBe(
       true
+    );
+  });
+
+  it('does not fall back to raw user ids for unmapped email display values', () => {
+    const userEmailsById = new Map([['user_1', 'person@example.com']]);
+
+    expect(userDisplayValue({ userDisplay: 'email' }, userEmailsById, 'user_1')).toBe(
+      'person@example.com'
+    );
+    expect(userDisplayValue({ userDisplay: 'email' }, userEmailsById, 'missing_user')).toBe('');
+    expect(userDisplayValue({ userDisplay: 'id' }, userEmailsById, 'missing_user')).toBe(
+      'missing_user'
+    );
+    expect(dimensionDisplayValue('model', { userDisplay: 'email' }, userEmailsById, 'claude')).toBe(
+      'claude'
     );
   });
 });

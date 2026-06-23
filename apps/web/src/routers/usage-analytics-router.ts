@@ -483,6 +483,23 @@ function userEmailsForDisplay(
     : new Map();
 }
 
+export function userDisplayValue(
+  filters: Pick<UsageAnalyticsFilters, 'userDisplay'>,
+  userEmailsById: Map<string, string>,
+  rawUserId: string
+): string {
+  return filters.userDisplay === 'email' ? (userEmailsById.get(rawUserId) ?? '') : rawUserId;
+}
+
+export function dimensionDisplayValue(
+  dimension: Dimension,
+  filters: Pick<UsageAnalyticsFilters, 'userDisplay'>,
+  userEmailsById: Map<string, string>,
+  rawValue: string
+): string {
+  return dimension === 'user' ? userDisplayValue(filters, userEmailsById, rawValue) : rawValue;
+}
+
 // ---------------------------------------------------------------------------
 // WHERE clause helpers
 // ---------------------------------------------------------------------------
@@ -1051,12 +1068,13 @@ export const usageAnalyticsRouter = createTRPCRouter({
       return {
         timeseries: rows.map(row => {
           const rawLabel = toStringValue(row[2]);
+          const label = input.splitBy
+            ? dimensionDisplayValue(input.splitBy, filters, userEmailsById, rawLabel)
+            : undefined;
           return {
             datetime: toStringValue(row[0]),
             value: toSafeNumber(row[1]),
-            label: input.splitBy
-              ? (userEmailsById.get(rawLabel) ?? rawLabel) || undefined
-              : undefined,
+            label: label || undefined,
           };
         }),
         effectiveGranularity: meta.effectiveGranularity,
@@ -1124,12 +1142,15 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const totalValue = values.reduce((s, r) => s + r.value, 0);
 
       return {
-        breakdown: values.map(r => ({
-          key: r.key,
-          label: userEmailsById.get(r.key) ?? r.key,
-          value: r.value,
-          percentage: totalValue > 0 ? (r.value / totalValue) * 100 : 0,
-        })),
+        breakdown: values.map(r => {
+          const key = dimensionDisplayValue(input.dimension, filters, userEmailsById, r.key);
+          return {
+            key,
+            label: key,
+            value: r.value,
+            percentage: totalValue > 0 ? (r.value / totalValue) * 100 : 0,
+          };
+        }),
         totalValue,
         effectiveGranularity: meta.effectiveGranularity,
       };
@@ -1231,7 +1252,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           for (const d of requestedDims) {
             const raw = row[dimIndexMap[d]];
             const value = toStringValue(raw);
-            dimensions[d] = d === 'user' ? (userEmailsById.get(value) ?? value) : value;
+            dimensions[d] = dimensionDisplayValue(d, filters, userEmailsById, value);
           }
           return {
             datetime: toStringValue(row[0]),

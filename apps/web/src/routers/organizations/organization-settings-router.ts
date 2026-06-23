@@ -1,4 +1,8 @@
-import { getOrganizationById, updateOrganizationSettings } from '@/lib/organizations/organizations';
+import {
+  getOrganizationById,
+  setOrganizationRecommendationsDigestEnabled,
+  updateOrganizationSettings,
+} from '@/lib/organizations/organizations';
 import type {
   OpenRouterModelsResponse,
   OrganizationSettings,
@@ -484,19 +488,13 @@ export const organizationsSettingsRouter = createTRPCRouter({
       }
 
       const wasEnabled = existingOrg.settings?.recommendations_digest_enabled === true;
-      const currentSettings = existingOrg.settings || {};
-      let updatedSettings: OrganizationSettings;
 
-      if (enabled) {
-        updatedSettings = await updateOrganizationSettings(organizationId, {
-          ...currentSettings,
-          recommendations_digest_enabled: true,
-        });
-      } else {
-        // Remove the flag when disabled rather than storing `false`.
-        const { recommendations_digest_enabled: _omit, ...rest } = currentSettings;
-        updatedSettings = await updateOrganizationSettings(organizationId, rest);
-      }
+      // Atomic single-key JSONB update so a concurrent settings mutation can't be
+      // clobbered by a stale read-modify-write of the whole settings object.
+      const updatedSettings = await setOrganizationRecommendationsDigestEnabled(
+        organizationId,
+        enabled
+      );
 
       if (enabled !== wasEnabled) {
         await createAuditLog({

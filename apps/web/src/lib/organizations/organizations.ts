@@ -826,6 +826,27 @@ export async function updateOrganizationSettings(
   return settings;
 }
 
+// Atomically toggle the recommendations-digest flag inside the settings JSONB
+// without a read-modify-write of the whole object, so a concurrent settings
+// mutation can't clobber other fields. Enabling sets the single key; disabling
+// removes it (we never persist `false`). Returns the fresh settings.
+export async function setOrganizationRecommendationsDigestEnabled(
+  organizationId: Organization['id'],
+  enabled: boolean
+): Promise<OrganizationSettings> {
+  const [row] = await db
+    .update(organizations)
+    .set({
+      settings: enabled
+        ? sql`jsonb_set(COALESCE(${organizations.settings}, '{}'::jsonb), '{recommendations_digest_enabled}', 'true'::jsonb)`
+        : sql`COALESCE(${organizations.settings}, '{}'::jsonb) - 'recommendations_digest_enabled'`,
+    })
+    .where(eq(organizations.id, organizationId))
+    .returning({ settings: organizations.settings });
+
+  return row?.settings ?? {};
+}
+
 export async function markOrganizationAsDeleted(organizationId: Organization['id']): Promise<void> {
   await db
     .update(organizations)

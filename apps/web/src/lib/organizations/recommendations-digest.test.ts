@@ -1,4 +1,7 @@
-import { buildOrganizationRecommendationsDigest } from './recommendations-digest';
+import {
+  buildOrganizationRecommendationsDigest,
+  currentDigestPeriodKey,
+} from './recommendations-digest';
 
 jest.mock('./recommendations', () => ({
   getOrganizationRecommendations: jest.fn(),
@@ -101,5 +104,18 @@ describe('buildOrganizationRecommendationsDigest', () => {
     expect(result?.openCount).toBe(5);
     expect(result?.recommendations).toHaveLength(3);
     expect(result?.recommendations.map(r => r.title)).toEqual(['Title 0', 'Title 1', 'Title 2']);
+  });
+});
+
+describe('currentDigestPeriodKey', () => {
+  it("returns the week's Monday (UTC) for any day in that week", () => {
+    // 2026-06-22 is a Monday; every day Mon..Sun maps to it.
+    expect(currentDigestPeriodKey(new Date('2026-06-22T09:00:00Z'))).toBe('2026-06-22');
+    expect(currentDigestPeriodKey(new Date('2026-06-24T23:30:00Z'))).toBe('2026-06-22');
+    expect(currentDigestPeriodKey(new Date('2026-06-28T00:00:00Z'))).toBe('2026-06-22');
+  });
+
+  it('rolls over to the next Monday for the following week', () => {
+    expect(currentDigestPeriodKey(new Date('2026-06-29T00:00:00Z'))).toBe('2026-06-29');
   });
 });

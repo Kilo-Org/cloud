@@ -279,6 +279,53 @@ describe('CloudAgentSession message admission', () => {
     expect(result.metadata?.workspace).toEqual(input.workspace);
   });
 
+  it('rejects readiness updates that change a shared route to another sandbox', async () => {
+    const userId = 'user_shared_route_ready_mismatch' as const;
+    const sessionId = 'agent_shared_route_ready_mismatch' as const;
+    const routeKey = 'usr-000000000000000000000000000000000000000000000000' as const;
+    const sandboxId = 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df' as const;
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const registration = await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'preserve shared assignment',
+          mode: 'code',
+          model: 'test-model',
+          kiloSessionId: '17171717-1717-4717-9717-171717171717',
+          kilocodeToken: 'token-shared-route-ready',
+        }),
+        workspace: {
+          sandboxId,
+          sandboxRoute: {
+            kind: 'shared',
+            routeKey,
+            suffix: 'shared-slot-v1',
+          },
+        },
+      });
+      const ready = await instance.recordSessionReady({
+        workspacePath: `/workspace/${userId}/sessions/${sessionId}`,
+        sandboxId: 'usr-111111111111111111111111111111111111111111111111',
+        sessionHome: `/home/${sessionId}`,
+        branchName: `session/${sessionId}`,
+        kiloSessionId: '17171717-1717-4717-9717-171717171717',
+      });
+      return { registration, ready, metadata: await instance.getMetadata() };
+    });
+
+    expect(result.registration.success).toBe(true);
+    expect(result.ready).toMatchObject({
+      success: false,
+      error: expect.stringContaining('does not match its route suffix'),
+    });
+    expect(result.metadata?.workspace?.sandboxId).toBe(sandboxId);
+  });
+
   it('rejects shared route metadata whose sandbox does not match its suffix', async () => {
     const userId = 'user_invalid_shared_route' as const;
     const sessionId = 'agent_invalid_shared_route' as const;

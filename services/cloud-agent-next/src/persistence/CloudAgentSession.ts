@@ -267,16 +267,17 @@ function isSameAcceptedInitialTurn(
   );
 }
 
-async function validateSharedSandboxRouteAssignment(
-  input: GroupedRegisterSessionInput
-): Promise<string | null> {
-  const route = input.workspace?.sandboxRoute;
+async function validateSharedSandboxRouteAssignment(workspace: {
+  sandboxId?: string;
+  sandboxRoute?: NonNullable<SessionMetadata['workspace']>['sandboxRoute'];
+}): Promise<string | null> {
+  const route = workspace.sandboxRoute;
   if (!route) return null;
   try {
     const expectedSandboxId = route.suffix
       ? await deriveSharedSandboxId(route.routeKey, route.suffix)
       : route.routeKey;
-    return input.workspace?.sandboxId === expectedSandboxId
+    return workspace.sandboxId === expectedSandboxId
       ? null
       : 'Shared sandbox assignment does not match its route suffix';
   } catch (error) {
@@ -1651,7 +1652,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (existing) {
       return { success: false, error: 'Session already registered' };
     }
-    const routeAssignmentError = await validateSharedSandboxRouteAssignment(input);
+    const routeAssignmentError = await validateSharedSandboxRouteAssignment(input.workspace ?? {});
     if (routeAssignmentError) {
       return { success: false, error: `Invalid metadata: ${routeAssignmentError}` };
     }
@@ -1888,6 +1889,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     if (!metadata) {
       return { success: false, error: 'Session metadata is not available' };
+    }
+    const routeAssignmentError = await validateSharedSandboxRouteAssignment({
+      sandboxId: input.sandboxId,
+      sandboxRoute: metadata.workspace?.sandboxRoute,
+    });
+    if (routeAssignmentError) {
+      return {
+        success: false,
+        error: `Invalid metadata after readiness update: ${routeAssignmentError}`,
+      };
     }
 
     const now = Date.now();

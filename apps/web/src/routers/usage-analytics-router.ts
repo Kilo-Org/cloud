@@ -502,6 +502,7 @@ export function dimensionDisplayValue(
 
 type BreakdownValue = {
   key: string;
+  label: string;
   value: number;
 };
 
@@ -513,7 +514,8 @@ export function displayBreakdownValues(
   limit: number
 ): BreakdownValue[] {
   return values.slice(0, limit).map(value => ({
-    key: dimensionDisplayValue(dimension, filters, userEmailsById, value.key),
+    key: value.key,
+    label: dimensionDisplayValue(dimension, filters, userEmailsById, value.key),
     value: value.value,
   }));
 }
@@ -1155,6 +1157,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
 
       const rawValues = rows.map(row => ({
         key: toStringValue(row[0]),
+        label: toStringValue(row[0]),
         value: toSafeNumber(row[1]),
       }));
       const userEmailsById = userEmailsForDisplay(filters, scopedUserEmailMaps);
@@ -1173,7 +1176,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         breakdown: values.map(r => {
           return {
             key: r.key,
-            label: r.key,
+            label: r.label,
             value: r.value,
             percentage: totalValue > 0 ? (r.value / totalValue) * 100 : 0,
           };

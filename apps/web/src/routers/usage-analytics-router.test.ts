@@ -145,8 +145,8 @@ describe('usage analytics cost source', () => {
         2
       )
     ).toEqual([
-      { key: 'other@example.com', value: 80 },
-      { key: 'person@example.com', value: 60 },
+      { key: 'user_2', label: 'other@example.com', value: 80 },
+      { key: 'user_1', label: 'person@example.com', value: 60 },
     ]);
   });
 });

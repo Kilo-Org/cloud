@@ -25,6 +25,10 @@ export function generateProviderSpecificHash(payload: string, provider: Provider
     .digest('base64');
 }
 
+export function generateOpenRouterDownstreamSafetyIdentifier(userId: string): string {
+  return generateProviderSpecificHash(userId, PROVIDERS.OPENROUTER);
+}
+
 export function generateVercelDownstreamSafetyIdentifier(userId: string): string {
   return generateProviderSpecificHash(userId, PROVIDERS.VERCEL_AI_GATEWAY);
 }
@@ -39,7 +43,7 @@ export function generateOpenRouterUpstreamSafetyIdentifier(userId: string): stri
   }
   return crypto
     .createHash('sha256')
-    .update(orgId + '-' + generateProviderSpecificHash(userId, PROVIDERS.OPENROUTER))
+    .update(orgId + '-' + generateOpenRouterDownstreamSafetyIdentifier(userId))
     .digest('hex');
 }
 

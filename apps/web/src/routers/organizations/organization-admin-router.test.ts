@@ -745,6 +745,55 @@ describe('organization admin router', () => {
     });
   });
 
+  describe('getHierarchy', () => {
+    it('returns parent and child organization summaries', async () => {
+      const searchPrefix = `Admin Org Hierarchy ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+      const siblingOrganization = await createOrganization(`${searchPrefix} sibling`, adminUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parentOrganization.id })
+          .where(inArray(organizations.id, [childOrganization.id, siblingOrganization.id]));
+
+        const caller = await createCallerForUser(adminUser.id);
+        const childHierarchy = await caller.organizations.admin.getHierarchy({
+          organizationId: childOrganization.id,
+        });
+        const parentHierarchy = await caller.organizations.admin.getHierarchy({
+          organizationId: parentOrganization.id,
+        });
+
+        expect(childHierarchy.parent).toEqual({
+          id: parentOrganization.id,
+          name: parentOrganization.name,
+        });
+        expect(childHierarchy.children).toEqual([]);
+        expect(parentHierarchy.parent).toBeNull();
+        expect(parentHierarchy.children).toEqual([
+          { id: childOrganization.id, name: childOrganization.name },
+          { id: siblingOrganization.id, name: siblingOrganization.name },
+        ]);
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(inArray(organizations.id, [childOrganization.id, siblingOrganization.id]));
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              childOrganization.id,
+              siblingOrganization.id,
+              parentOrganization.id,
+            ])
+          );
+      }
+    });
+  });
+
   describe('list — trial active filter', () => {
     it('uses effective trial end date and trial_active threshold', async () => {
       const searchPrefix = `Admin Trial Active ${crypto.randomUUID()}`;

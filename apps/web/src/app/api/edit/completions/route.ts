@@ -6,6 +6,7 @@ import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { INCEPTION_PROMO_RUNNING } from '@/lib/constants';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user/server';
 import {
@@ -182,7 +183,12 @@ export async function POST(request: NextRequest) {
   // slight replication lag, and provides lower latency for US users.
   const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
-  if (balance <= 0 && !(await isFreeModel(requestBody.model)) && !userByok) {
+  if (
+    !INCEPTION_PROMO_RUNNING &&
+    balance <= 0 &&
+    !(await isFreeModel(requestBody.model)) &&
+    !userByok
+  ) {
     return NextResponse.json(
       {
         error: { message: 'Insufficient credits' },

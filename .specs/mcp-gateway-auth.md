@@ -110,7 +110,7 @@ when they appear in all capitals.
 | Surface | Owner | Required behavior |
 |---|---|---|
 | `GET /health` | Worker | Health response only. |
-| `POST /mcp` | App | First-party native MCP server for individual read-only stats; requires native `mcp:access` OAuth token and rejects Gateway/Kilo API tokens. |
+| `POST /mcp` | App | First-party native MCP server for individual read-only stats and query metadata; requires native `mcp:access` OAuth token and rejects Gateway/Kilo API tokens. |
 | `GET` or `POST /mcp-connect/user/{user_id}/{config_id}/{route_key}` | Worker | Protected runtime entrypoint. Unauthenticated callers receive an OAuth challenge; authorized callers are proxied. |
 | `GET` or `POST /mcp-connect/org/{org_id}/{config_id}/{route_key}` | Worker | Same as personal route, with org eligibility checks. |
 | Descendants under scoped connect routes | Worker | Allowed only when config path passthrough is enabled and authorized against the root route. |
@@ -130,6 +130,22 @@ when they appear in all capitals.
 | `GET /api/mcp-gateway/oauth/jwks.json` | App | Public JWKS for gateway JWT verification. |
 | `GET /api/mcp-gateway/oauth/userinfo` | App | Profile-gated user-info. |
 | `GET /api/mcp-gateway/available` | App | Authenticated list of configs usable in the current execution context. |
+
+## Native MCP Dataset Tools
+
+1. The root `/mcp` native server MUST expose read-only tools only.
+2. The native server MUST expose `query_kilo_dataset` for aggregate and
+   timeseries stats over approved per-user Kilo datasets.
+3. The native server MAY expose `describe_kilo_dataset` to return static query
+   metadata, field capabilities, mode rules, output aliases, and example payloads.
+4. `describe_kilo_dataset` MUST NOT query user data and MUST NOT reveal fields
+   excluded from the public dataset catalog.
+5. Both native tools MUST require the same native `mcp:access` OAuth token and
+   current Kilo org admin eligibility gate.
+6. Dataset tool descriptions, schemas, and validation errors SHOULD make the
+   following rules clear to MCP clients: aggregate queries do not use buckets,
+   timeseries queries require buckets, `count` metrics do not use a field, and
+   cost metrics use `costMicrodollars` or `costUsd`.
 
 ## Scoped Route Contract
 

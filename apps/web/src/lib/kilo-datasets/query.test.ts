@@ -52,6 +52,35 @@ describe('queryKiloDatasetStats validation', () => {
     ).rejects.toThrow('metric field is not allowed');
   });
 
+  test('lists allowed usage cost metric fields for unknown cost aliases', async () => {
+    await expect(
+      queryKiloDatasetStats({
+        user: adminUser,
+        now: new Date('2026-06-01T00:00:00.000Z'),
+        input: {
+          dataset: 'microdollar_usage',
+          mode: 'aggregate',
+          metrics: [{ operation: 'sum', field: 'microdollars' }],
+        },
+      })
+    ).rejects.toThrow('allowed metric fields for microdollar_usage are costMicrodollars, costUsd');
+  });
+
+  test('explains count metric shape before executing a query', async () => {
+    await expect(
+      queryKiloDatasetStats({
+        user: adminUser,
+        now: new Date('2026-06-01T00:00:00.000Z'),
+        input: {
+          dataset: 'microdollar_usage',
+          mode: 'aggregate',
+          metrics: [{ operation: 'count', field: 'model' }],
+        },
+      })
+    ).rejects.toThrow('count must not specify a field');
+    expect(mockTimedUsageQuery).not.toHaveBeenCalled();
+  });
+
   test('keeps session datasets count-only for the MVP', async () => {
     await expect(
       queryKiloDatasetStats({
@@ -63,7 +92,9 @@ describe('queryKiloDatasetStats validation', () => {
           metrics: [{ operation: 'sum', field: 'version' }],
         },
       })
-    ).rejects.toThrow('session datasets support count only');
+    ).rejects.toThrow(
+      'session datasets support count only in this MVP; use metrics: [{ "operation": "count" }]'
+    );
   });
 
   test('serializes string-backed boolean values explicitly', async () => {

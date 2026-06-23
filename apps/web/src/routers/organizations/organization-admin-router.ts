@@ -24,6 +24,7 @@ import {
   sql,
   type SQL,
 } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { AdminCreditTransactionSchema, OrganizationsApiGetResponseSchema } from '@/types/admin';
@@ -125,6 +126,16 @@ const AdminOrganizationDetailsSchema = z.object({
   created_by_kilo_user_id: z.string().nullable(),
   created_by_user_email: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
+});
+
+const OrganizationHierarchySummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+const AdminOrganizationHierarchySchema = z.object({
+  parent: OrganizationHierarchySummarySchema.nullable(),
+  children: z.array(OrganizationHierarchySummarySchema),
 });
 
 const GrantCreditInputSchema = z
@@ -297,6 +308,53 @@ export const organizationAdminRouter = createTRPCRouter({
       }
 
       return organizationDetails[0];
+    }),
+
+  getHierarchy: adminProcedure
+    .input(OrganizationIdInputSchema)
+    .output(AdminOrganizationHierarchySchema)
+    .query(async ({ input }) => {
+      const { organizationId } = input;
+      const parentOrganizations = alias(organizations, 'parent_organizations');
+
+      const [organizationHierarchy] = await db
+        .select({
+          parent_id: parentOrganizations.id,
+          parent_name: parentOrganizations.name,
+        })
+        .from(organizations)
+        .leftJoin(
+          parentOrganizations,
+          eq(organizations.parent_organization_id, parentOrganizations.id)
+        )
+        .where(eq(organizations.id, organizationId))
+        .limit(1);
+
+      if (!organizationHierarchy) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      const children = await db
+        .select({
+          id: organizations.id,
+          name: organizations.name,
+        })
+        .from(organizations)
+        .where(eq(organizations.parent_organization_id, organizationId))
+        .orderBy(asc(organizations.name));
+
+      return {
+        parent: organizationHierarchy.parent_id
+          ? {
+              id: organizationHierarchy.parent_id,
+              name: organizationHierarchy.parent_name ?? 'Unknown organization',
+            }
+          : null,
+        children,
+      };
     }),
 
   creditTransactions: adminProcedure

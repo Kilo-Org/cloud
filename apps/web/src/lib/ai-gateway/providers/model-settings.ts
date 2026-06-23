@@ -25,6 +25,11 @@ const REASONING_VARIANTS_THINKING_ONLY = {
   thinking: { reasoning: { enabled: true, effort: 'high' } },
 } as const;
 
+const REASONING_VARIANTS_NONE_THINKING = {
+  none: { reasoning: { enabled: false, effort: 'none' } },
+  ...REASONING_VARIANTS_THINKING_ONLY,
+} as const;
+
 export const REASONING_VARIANTS_BINARY = {
   instant: { reasoning: { enabled: false, effort: 'none' } },
   ...REASONING_VARIANTS_THINKING_ONLY,
@@ -104,11 +109,11 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (model.includes('mistral-medium-3-5')) {
     return REASONING_VARIANTS_BINARY;
   }
-  if (
-    model.includes('kimi-k2.7-code') ||
-    (isMinimaxModel(model) && model.toLowerCase().includes('minimax-m3'))
-  ) {
+  if (model.includes('kimi-k2.7-code')) {
     return REASONING_VARIANTS_THINKING_ONLY;
+  }
+  if (isMinimaxModel(model) && model.toLowerCase().includes('minimax-m3')) {
+    return REASONING_VARIANTS_NONE_THINKING;
   }
   if (
     isMinimaxModel(model) ||

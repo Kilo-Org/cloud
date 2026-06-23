@@ -222,6 +222,7 @@ describe('effective session profile policy', () => {
     { origin: 'linear', expected: 'include-web-defaults' },
     { origin: 'discord', expected: 'include-web-defaults' },
     { origin: 'app-builder', expected: 'include-web-defaults' },
+    { origin: 'kilo-usage-ai', expected: 'include-web-defaults' },
     { origin: 'webhook', expected: 'include-web-defaults' },
     { origin: 'scheduled', expected: 'include-web-defaults' },
     { origin: undefined, expected: 'explicit-profile-only' },

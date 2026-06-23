@@ -138,7 +138,9 @@ DynamicMessages.displayName = 'DynamicMessages';
 // ---------------------------------------------------------------------------
 const emptyQuestionRequestIds = new Map<string, string>();
 
-type CloudChatPageProps = { organizationId?: string };
+type CloudChatSurface = 'default' | 'usage-analyst';
+
+type CloudChatPageProps = { organizationId?: string; surface?: CloudChatSurface };
 
 type TerminalStatusSummary = { status: TerminalStatus; statusText: string };
 
@@ -174,7 +176,8 @@ function TerminalPaneSlot({
   );
 }
 
-export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
+export default function CloudChatPage({ organizationId, surface = 'default' }: CloudChatPageProps) {
+  const isUsageAnalystSurface = surface === 'usage-analyst';
   const manager = useManager();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -626,17 +629,19 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     : (sessionConfig?.variant ?? undefined);
   const displayAvailableVariants = modelPickerLocked ? [] : availableVariants;
 
-  const placeholder = isLoading
-    ? 'Loading session…'
-    : cloudStatus?.type === 'preparing'
-      ? 'Setting up environment…'
-      : cloudStatus?.type === 'finalizing'
-        ? 'Wrapping up…'
-        : 'Ask anything…';
+  const placeholder = isUsageAnalystSurface
+    ? 'Ask a usage question...'
+    : isLoading
+      ? 'Loading session…'
+      : cloudStatus?.type === 'preparing'
+        ? 'Setting up environment…'
+        : cloudStatus?.type === 'finalizing'
+          ? 'Wrapping up…'
+          : 'Ask anything…';
 
-  const canOpenTerminal = Boolean(sessionId) && !isReadOnly;
+  const canOpenTerminal = Boolean(sessionId) && !isReadOnly && !isUsageAnalystSurface;
 
-  const sessionActions = (
+  const sessionActions = isUsageAnalystSurface ? null : (
     <ChatHeader
       cloudAgentSessionId={sessionId ?? 'Starting session…'}
       kiloSessionId={sessionIdFromParams ?? undefined}
@@ -672,7 +677,11 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
         >
           <div className="flex h-full w-full flex-col overflow-hidden">
             <SetPageTitle
-              title={fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'}
+              title={
+                isUsageAnalystSurface
+                  ? 'Ask Usage'
+                  : fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'
+              }
             >
               {totalCost > 0 && (
                 <span className="text-muted-foreground text-sm">${totalCost.toFixed(4)}</span>
@@ -682,23 +691,25 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
               <>
                 {showLoadingIndicator && <div className="bg-primary h-0.5 w-full animate-pulse" />}
 
-                <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
-                  <MobileSidebarToggle variant="inline" label="Sessions" />
-                  <div className="min-w-0 flex-1">
-                    {canOpenTerminal && (
-                      <CloudAgentWorkspaceTabs
-                        activeTabId={workspaceTabs.activeTabId}
-                        terminals={workspaceTabs.terminals}
-                        terminalStatuses={terminalStatuses}
-                        canCreateTerminal={canOpenTerminal}
-                        onSelectTab={handleSelectWorkspaceTab}
-                        onCreateTerminal={handleCreateTerminalTab}
-                        onCloseTerminal={handleCloseTerminalTab}
-                      />
-                    )}
+                {!isUsageAnalystSurface && (
+                  <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
+                    <MobileSidebarToggle variant="inline" label="Sessions" />
+                    <div className="min-w-0 flex-1">
+                      {canOpenTerminal && (
+                        <CloudAgentWorkspaceTabs
+                          activeTabId={workspaceTabs.activeTabId}
+                          terminals={workspaceTabs.terminals}
+                          terminalStatuses={terminalStatuses}
+                          canCreateTerminal={canOpenTerminal}
+                          onSelectTab={handleSelectWorkspaceTab}
+                          onCreateTerminal={handleCreateTerminalTab}
+                          onCloseTerminal={handleCloseTerminalTab}
+                        />
+                      )}
+                    </div>
+                    <div className="shrink-0">{sessionActions}</div>
                   </div>
-                  <div className="shrink-0">{sessionActions}</div>
-                </div>
+                )}
 
                 <div
                   ref={setChildSessionDrawerContainer}
@@ -800,12 +811,14 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                             <div className={activeQuestion || activePermission ? 'hidden' : ''}>
                               <ChatInput
                                 onSend={handleSendMessage}
-                                onSendCommand={handleSendSlashCommand}
+                                onSendCommand={
+                                  isUsageAnalystSurface ? undefined : handleSendSlashCommand
+                                }
                                 onStop={handleStopExecution}
                                 disabled={!canSend}
                                 isStreaming={isStreaming && !activeSuggestion}
                                 placeholder={placeholder}
-                                slashCommands={availableCommands}
+                                slashCommands={isUsageAnalystSurface ? [] : availableCommands}
                                 mode={sessionConfig?.mode as AgentMode | undefined}
                                 model={displayModel}
                                 modelOptions={modelOptions}
@@ -815,14 +828,14 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                 variant={displayVariant}
                                 onVariantChange={handleVariantChange}
                                 availableVariants={displayAvailableVariants}
-                                showToolbar={Boolean(sessionIdFromParams)}
+                                showToolbar={Boolean(sessionIdFromParams) && !isUsageAnalystSurface}
                                 initialValue={failedPrompt ?? undefined}
                                 customModeOptions={customModeOptions}
                                 modelPickerDisabled={modelPickerLocked}
                                 modelPickerTooltip={lockTooltip}
                                 variantPickerDisabled={modelPickerLocked}
                                 variantPickerTooltip={lockTooltip}
-                                attachmentsEnabled={supportsAttachments}
+                                attachmentsEnabled={supportsAttachments && !isUsageAnalystSurface}
                                 attachmentUploadOptions={{
                                   messageUuid: attachmentMessageUuid,
                                   organizationId,
@@ -832,33 +845,34 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                   },
                                 }}
                               />
-                              {(sessionConfig?.repository ||
-                                (contextUsage !== undefined && contextWindow !== undefined)) && (
-                                <div className="text-muted-foreground flex items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
-                                  {sessionConfig?.repository && (
-                                    <div className="flex min-w-0 items-center gap-1.5">
-                                      <GitBranch className="h-3 w-3 shrink-0" />
-                                      <span className="truncate">{sessionConfig.repository}</span>
-                                      {fetchedSessionData?.gitBranch && (
-                                        <>
-                                          <span>·</span>
-                                          <span className="truncate">
-                                            {fetchedSessionData.gitBranch}
-                                          </span>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
-                                  {contextUsage !== undefined && contextWindow !== undefined && (
-                                    <div className="ml-auto shrink-0">
-                                      <ContextUsageIndicator
-                                        contextTokens={contextUsage.contextTokens}
-                                        contextWindow={contextWindow}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                              {!isUsageAnalystSurface &&
+                                (sessionConfig?.repository ||
+                                  (contextUsage !== undefined && contextWindow !== undefined)) && (
+                                  <div className="text-muted-foreground flex items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
+                                    {sessionConfig?.repository && (
+                                      <div className="flex min-w-0 items-center gap-1.5">
+                                        <GitBranch className="h-3 w-3 shrink-0" />
+                                        <span className="truncate">{sessionConfig.repository}</span>
+                                        {fetchedSessionData?.gitBranch && (
+                                          <>
+                                            <span>·</span>
+                                            <span className="truncate">
+                                              {fetchedSessionData.gitBranch}
+                                            </span>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                    {contextUsage !== undefined && contextWindow !== undefined && (
+                                      <div className="ml-auto shrink-0">
+                                        <ContextUsageIndicator
+                                          contextTokens={contextUsage.contextTokens}
+                                          contextWindow={contextWindow}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                             </div>
                           </>
                         )}

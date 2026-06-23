@@ -33,6 +33,7 @@ import {
   Gift,
   ChevronLeft,
   ChevronRight,
+  BarChart3,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -87,6 +88,15 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: Code,
       url: '/usage',
     },
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'Ask Usage',
+            icon: BarChart3,
+            url: '/aks',
+          },
+        ]
+      : []),
   ];
 
   // KiloClaw group

@@ -81,21 +81,37 @@ export const QueryKiloDatasetInputSchema = z
 
 export type QueryKiloDatasetInput = z.infer<typeof QueryKiloDatasetInputSchema>;
 
-export type QueryKiloDatasetColumn = {
-  name: string;
-  type: 'string' | 'boolean' | 'integer' | 'decimal' | 'timestamp';
-  nullable: boolean;
-};
+export const QueryKiloDatasetColumnSchema = z
+  .object({
+    name: z.string().min(1),
+    type: z.enum(['string', 'boolean', 'integer', 'decimal', 'timestamp']),
+    nullable: z.boolean(),
+  })
+  .strict();
 
-export type QueryKiloDatasetOutput = {
-  dataset: QueryKiloDatasetInput['dataset'];
-  mode: QueryKiloDatasetInput['mode'];
-  scope: { type: 'me' };
-  range: {
-    startDate: string;
-    endDate: string;
-    timeField: 'createdAt';
-  };
-  columns: QueryKiloDatasetColumn[];
-  rows: Array<Record<string, string | number | boolean | null>>;
-};
+export const QueryKiloDatasetScalarRowValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.null(),
+]);
+
+export const QueryKiloDatasetOutputSchema = z
+  .object({
+    dataset: QueryKiloDatasetNameSchema,
+    mode: QueryKiloDatasetInputSchema.shape.mode,
+    scope: z.object({ type: z.literal('me') }).strict(),
+    range: z
+      .object({
+        startDate: z.string().datetime(),
+        endDate: z.string().datetime(),
+        timeField: z.literal('createdAt'),
+      })
+      .strict(),
+    columns: z.array(QueryKiloDatasetColumnSchema),
+    rows: z.array(z.record(z.string(), QueryKiloDatasetScalarRowValueSchema)),
+  })
+  .strict();
+
+export type QueryKiloDatasetColumn = z.infer<typeof QueryKiloDatasetColumnSchema>;
+export type QueryKiloDatasetOutput = z.infer<typeof QueryKiloDatasetOutputSchema>;

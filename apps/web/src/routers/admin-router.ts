@@ -55,6 +55,7 @@ import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-rou
 import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
+import { adminKiloUsageAiRouter } from '@/routers/admin/kilo-usage-ai-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
@@ -1682,6 +1683,8 @@ export const adminRouter = createTRPCRouter({
   codeReviews: adminCodeReviewsRouter,
 
   cloudAgentNext: adminCloudAgentNextRouter,
+
+  kiloUsageAi: adminKiloUsageAiRouter,
 
   sessionTraces: createTRPCRouter({
     resolveCloudAgentSession: adminProcedure

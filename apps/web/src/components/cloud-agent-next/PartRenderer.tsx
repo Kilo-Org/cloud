@@ -18,6 +18,7 @@ import { TodoWriteToolCard } from './TodoWriteToolCard';
 import { QuestionToolStatus } from './QuestionToolStatus';
 import { SuggestToolCard } from './SuggestToolCard';
 import { SkillToolCard } from './SkillToolCard';
+import { KILO_DATASET_TOOL_NAME, KiloDatasetToolCard } from './KiloDatasetToolCard';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
 import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
 import { useState } from 'react';
@@ -164,6 +165,10 @@ function ToolPartRenderer({
   // plan_enter / plan_exit are internal mode-switching tools with no user-visible output
   if (part.tool === 'plan_exit' || part.tool === 'plan_enter') {
     return null;
+  }
+
+  if (part.tool === KILO_DATASET_TOOL_NAME) {
+    return <KiloDatasetToolCard toolPart={part} />;
   }
 
   // Check if tool input is still streaming (incomplete data)

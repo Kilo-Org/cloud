@@ -55,6 +55,7 @@ const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
   'linear',
   'discord',
   'app-builder',
+  'kilo-usage-ai',
   'webhook',
   'scheduled',
 ]);

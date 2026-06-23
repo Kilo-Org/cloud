@@ -23,6 +23,7 @@ import {
   getUserOrganizationsWithSeats,
 } from '@/lib/organizations/organizations';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
+import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
 import { getStripeInvoices } from '@/lib/stripe';
 import { adminProcedure, baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
@@ -219,11 +220,28 @@ export const organizationsRouter = createTRPCRouter({
       }
     }
 
-    const members = await getOrganizationMembers(organizationId);
+    const [members, ssoPolicy] = await Promise.all([
+      getOrganizationMembers(organizationId),
+      resolveEffectiveOrganizationSsoPolicy(organizationId),
+    ]);
 
     return {
       ...organization,
       members,
+      effectiveSsoPolicy:
+        ssoPolicy.status === 'required'
+          ? {
+              required: true,
+              source: ssoPolicy.source,
+              domain: ssoPolicy.domain,
+              configurationError: false,
+            }
+          : {
+              required: false,
+              source: null,
+              domain: null,
+              configurationError: ssoPolicy.status === 'misconfigured',
+            },
     };
   }),
 

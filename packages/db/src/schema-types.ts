@@ -909,6 +909,7 @@ export const AuditLogAction = z.enum([
   'organization.promo_credit_granted', // ✅
   'organization.member.remove', // ✅
   'organization.member.change_role', // ✅
+  'organization.member.admin_add',
   'organization.sso.auto_provision', // ✅
   'organization.sso.set_domain', // ✅
   'organization.sso.remove_domain', // ✅

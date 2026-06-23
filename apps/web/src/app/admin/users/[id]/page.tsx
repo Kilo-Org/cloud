@@ -17,7 +17,7 @@ import { findUserById } from '@/lib/user';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
 import { redirect } from 'next/navigation';
-import { doesOrgWithSSODomainExist } from '@/lib/organizations/organizations';
+import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import { getLowerDomainFromEmail } from '@/lib/utils';
 
 async function getUserData(userId: string): Promise<UserDetailProps | null> {
@@ -74,9 +74,8 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
 
   // Check if user's email domain has SSO configured
   const emailDomain = getLowerDomainFromEmail(user.google_user_email);
-  const isSSOProtectedDomain = emailDomain
-    ? !!(await doesOrgWithSSODomainExist(emailDomain))
-    : false;
+  const ssoAuthority = emailDomain ? await resolveSsoAuthorityForDomain(emailDomain) : null;
+  const isSSOProtectedDomain = ssoAuthority?.status !== 'not_required' && ssoAuthority !== null;
 
   return {
     ...user,

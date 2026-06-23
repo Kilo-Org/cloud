@@ -10,6 +10,8 @@ import { findUserByEmail } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail } from '@/lib/utils';
 
 const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';
 
@@ -67,6 +69,23 @@ export async function POST(request: NextRequest) {
 
   // Check if this is an existing user (sign-in) or new user (signup)
   const existingUser = await findUserByEmail(email);
+  const primaryEmail = existingUser?.google_user_email ?? email;
+  const primaryDomain = getLowerDomainFromEmail(primaryEmail);
+  if (primaryDomain && primaryDomain !== 'gmail.com') {
+    const ssoAuthority = await resolveSsoAuthorityForDomain(primaryDomain);
+    if (ssoAuthority.status === 'misconfigured') {
+      return NextResponse.json(
+        { success: false, error: 'SSO configuration error. Contact your administrator.' },
+        { status: 503 }
+      );
+    }
+    if (ssoAuthority.status === 'required') {
+      return NextResponse.json(
+        { success: false, error: 'Sign in with your organization SSO provider.' },
+        { status: 403 }
+      );
+    }
+  }
 
   // For new users, enforce stricter email validation and TLD blocking
   if (!existingUser) {

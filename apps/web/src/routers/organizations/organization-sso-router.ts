@@ -10,11 +10,12 @@ import { TRPCError } from '@trpc/server';
 import { GeneratePortalLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
-import { organizations } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { kilocode_users, organizations } from '@kilocode/db/schema';
+import { and, eq, sql } from 'drizzle-orm';
 import { OrganizationSSODomainSchema } from '@/lib/organizations/organization-types';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { successResult } from '@/lib/maybe-result';
+import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 
 const OrgIdSchema = OrganizationIdInputSchema;
 
@@ -60,6 +61,12 @@ export const organizationSsoRouter = createTRPCRouter({
     const org = await getOrganizationById(organizationId);
     if (!org) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+    }
+    if (org.parent_organization_id) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Child organizations inherit SSO from their parent',
+      });
     }
     const createdOrg = await workos.organizations.createOrganization({
       name: org.name,
@@ -124,18 +131,66 @@ export const organizationSsoRouter = createTRPCRouter({
     const { organizationId, ssoDomain } = opts.input;
     await ensureOrganizationAccess(opts.ctx, organizationId, ['owner']);
 
-    await db
-      .update(organizations)
-      .set({ sso_domain: ssoDomain.toLowerCase() })
-      .where(eq(organizations.id, organizationId));
+    await db.transaction(async tx => {
+      const [organization] = await tx
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, organizationId))
+        .for('update');
+      if (!organization || organization.deleted_at) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      if (organization.parent_organization_id) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Child organizations inherit SSO from their parent',
+        });
+      }
 
-    await createAuditLog({
-      action: 'organization.sso.set_domain',
-      actor_email: opts.ctx.user.google_user_email,
-      actor_id: opts.ctx.user.id,
-      actor_name: opts.ctx.user.google_user_name,
-      message: `Set SSO domain to ${ssoDomain}`,
-      organization_id: organizationId,
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended('sso-domain:' || ${ssoDomain}, 0))`
+      );
+      const existingAuthority = await resolveSsoAuthorityForDomain(ssoDomain, tx);
+      if (
+        existingAuthority.status === 'misconfigured' ||
+        (existingAuthority.status === 'required' &&
+          existingAuthority.sourceOrganizationId !== organizationId)
+      ) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This SSO domain is already assigned to another organization',
+        });
+      }
+
+      await tx
+        .update(organizations)
+        .set({ sso_domain: ssoDomain })
+        .where(eq(organizations.id, organizationId));
+
+      if (organization.sso_domain !== ssoDomain) {
+        await tx
+          .update(kilocode_users)
+          .set({
+            api_token_pepper: sql`pg_catalog.gen_random_uuid()::text`,
+            web_session_pepper: sql`pg_catalog.gen_random_uuid()::text`,
+          })
+          .where(
+            and(
+              eq(kilocode_users.is_bot, false),
+              sql`lower(split_part(${kilocode_users.google_user_email}, '@', 2)) = ${ssoDomain}`
+            )
+          );
+      }
+
+      await createAuditLog({
+        action: 'organization.sso.set_domain',
+        actor_email: opts.ctx.user.google_user_email,
+        actor_id: opts.ctx.user.id,
+        actor_name: opts.ctx.user.google_user_name,
+        message: `Set SSO domain to ${ssoDomain}`,
+        organization_id: organizationId,
+        tx,
+      });
     });
 
     return successResult({ message: 'SSO domain updated successfully' });

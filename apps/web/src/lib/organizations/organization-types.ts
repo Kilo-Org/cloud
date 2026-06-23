@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
 import type { Result } from '@/lib/maybe-result';
-import { CompanyDomainSchema } from './company-domain';
+import { CompanyDomainSchema, isValidDomain } from './company-domain';
 
 // Re-export base types that don't depend on schema.ts
 export type {
@@ -115,8 +115,16 @@ type ActiveMember = {
 
 export type OrganizationMember = InvitedMember | ActiveMember;
 
+export type OrganizationSsoPolicyView = {
+  required: boolean;
+  source: 'self' | 'direct_parent' | null;
+  domain: string | null;
+  configurationError: boolean;
+};
+
 export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
   members: OrganizationMember[];
+  effectiveSsoPolicy: OrganizationSsoPolicyView;
 };
 
 export type AcceptInviteResult = Result<
@@ -252,9 +260,9 @@ export type OpenRouterModelsResponse = z.infer<typeof OpenRouterModelsResponseSc
 
 export const OrganizationSSODomainSchema = z
   .string()
-  .min(1, 'Domain cannot be empty')
-  .lowercase()
-  .trim();
+  .trim()
+  .toLowerCase()
+  .refine(isValidDomain, { message: 'Please enter a valid domain (e.g. acme.com)' });
 
 export type OrgTrialStatus =
   | 'subscribed' // Has active paid subscription

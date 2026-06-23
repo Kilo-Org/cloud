@@ -998,6 +998,8 @@ async function hasCurrentSsoAuthentication(
   if (authority.status === 'not_required') return true;
   if (authority.status === 'misconfigured') return false;
 
+  if (session?.authProvider === 'fake-login' && allow_fake_login) return true;
+
   if (session) {
     return (
       session.authProvider === 'workos' &&

@@ -4,7 +4,7 @@ import { EVAL_TAB_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugg
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 
 export const executeEvalToolCall = async (
-  toolCall: Extract<AgentConversationEvent, { readonly type: 'tool-call' }>
+  toolCall: Extract<AgentConversationEvent, { readonly name: 'eval' }>
 ): Promise<EvalTabResult> => {
   try {
     const response: unknown = await browser.runtime.sendMessage({

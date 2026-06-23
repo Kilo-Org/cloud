@@ -2,6 +2,7 @@
 export const DEBUGGER_PROTOCOL_VERSION = '1.3';
 export const LIST_INSPECTABLE_TABS_MESSAGE = 'kilo.tabs.listInspectable';
 export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
+export const PAGE_SNAPSHOT_MESSAGE = 'kilo.tabs.snapshot';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
 
 export interface ChromeDebuggerTargetInfo {
@@ -58,6 +59,23 @@ export interface InspectableTab {
   readonly url: string;
 }
 
+export interface PageSnapshotNode {
+  readonly href?: string;
+  readonly id: string;
+  readonly label?: string;
+  readonly role: string;
+  readonly state?: Record<string, boolean>;
+  readonly tag: string;
+  readonly text?: string;
+}
+
+export interface PageSnapshot {
+  readonly nodes: PageSnapshotNode[];
+  readonly text: string;
+  readonly title: string;
+  readonly url: string;
+}
+
 export type EvalTabResult =
   | {
       readonly description?: string;
@@ -78,6 +96,11 @@ export type TabDebuggerRequest =
       readonly tabId: number;
       readonly timeoutMs?: number;
       readonly type: typeof EVAL_TAB_MESSAGE;
+    }
+  | {
+      readonly tabId: number;
+      readonly timeoutMs?: number;
+      readonly type: typeof PAGE_SNAPSHOT_MESSAGE;
     };
 
 export type TabDebuggerResponse =
@@ -90,6 +113,11 @@ export type TabDebuggerResponse =
       readonly result: EvalTabResult;
       readonly ok: true;
       readonly type: typeof EVAL_TAB_MESSAGE;
+    }
+  | {
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof PAGE_SNAPSHOT_MESSAGE;
     }
   | {
       readonly error: string;
@@ -151,6 +179,154 @@ const getEvalExpression = (code: string): string => `(async () => { ${code} })()
 const runInjectedEval = (code: string): unknown =>
   // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval, typescript-eslint/no-unsafe-call
   new Function(`return (async () => { ${code} })()`)();
+
+/* eslint-disable unicorn/consistent-function-scoping */
+const runInjectedPageSnapshot = (_unused: string): PageSnapshot => {
+  const maxTextLength = 8000;
+  const maxNodeCount = 80;
+  const maxNodeTextLength = 500;
+  const normalize = (value: string): string => value.replaceAll(/\s+/gu, ' ').trim();
+  const truncate = (value: string, maxLength: number): string =>
+    value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+  const sanitizeUrl = (value: string): string => {
+    try {
+      const url = new URL(value);
+
+      url.search = '';
+      url.hash = '';
+
+      return url.toString();
+    } catch {
+      return '[invalid URL]';
+    }
+  };
+  const getLabelText = (element: Element): string => {
+    const ariaLabel = element.getAttribute('aria-label');
+
+    if (ariaLabel !== null && ariaLabel.trim() !== '') {
+      return ariaLabel;
+    }
+
+    if (
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLSelectElement
+    ) {
+      const labels =
+        element.labels === null ? [] : [...element.labels].map(label => label.textContent ?? '');
+      const placeholder =
+        element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+          ? element.placeholder
+          : '';
+
+      return [...labels, placeholder].find(value => value.trim() !== '') ?? '';
+    }
+
+    return '';
+  };
+  const getRole = (element: Element): string => {
+    const explicitRole = element.getAttribute('role');
+    const tag = element.tagName.toLowerCase();
+
+    if (explicitRole !== null && explicitRole.trim() !== '') {
+      return explicitRole;
+    }
+
+    if (/^h[1-6]$/u.test(tag)) {
+      return 'heading';
+    }
+
+    if (tag === 'a') {
+      return 'link';
+    }
+
+    if (tag === 'button') {
+      return 'button';
+    }
+
+    if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+      return 'field';
+    }
+
+    return tag;
+  };
+  const selector = [
+    'a',
+    'button',
+    'input',
+    'select',
+    'textarea',
+    '[aria-label]',
+    '[role]',
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+  ].join(',');
+  const nodes = [...document.querySelectorAll(selector)]
+    .slice(0, maxNodeCount)
+    .map((element, index) => {
+      const tag = element.tagName.toLowerCase();
+      const text = truncate(normalize(element.textContent ?? ''), maxNodeTextLength);
+      const label = truncate(normalize(getLabelText(element)), maxNodeTextLength);
+      const state: Record<string, boolean> = {};
+
+      if (
+        element instanceof HTMLButtonElement ||
+        element instanceof HTMLInputElement ||
+        element instanceof HTMLSelectElement ||
+        element instanceof HTMLTextAreaElement
+      ) {
+        state['disabled'] = element.disabled;
+      }
+
+      if (element instanceof HTMLInputElement && ['checkbox', 'radio'].includes(element.type)) {
+        state['checked'] = element.checked;
+      }
+
+      const node: {
+        href?: string;
+        id: string;
+        label?: string;
+        role: string;
+        state?: Record<string, boolean>;
+        tag: string;
+        text?: string;
+      } = {
+        id: `node-${index + 1}`,
+        role: getRole(element),
+        tag,
+      };
+
+      if (element instanceof HTMLAnchorElement && element.href !== '') {
+        node.href = sanitizeUrl(element.href);
+      }
+
+      if (label !== '') {
+        node.label = label;
+      }
+
+      if (Object.keys(state).length > 0) {
+        node.state = state;
+      }
+
+      if (text !== '') {
+        node.text = text;
+      }
+
+      return node;
+    });
+
+  return {
+    nodes,
+    text: truncate(normalize(document.body?.textContent ?? ''), maxTextLength),
+    title: document.title,
+    url: sanitizeUrl(location.href),
+  };
+};
+/* eslint-enable unicorn/consistent-function-scoping */
 
 const withTimeout = async <Result>(
   promise: Promise<Result>,
@@ -267,6 +443,37 @@ export const evalInTabWithScripting = async ({
   }
 };
 
+export const getPageSnapshotInTabWithScripting = async ({
+  scriptingApi,
+  tabId,
+  timeoutMs = DEFAULT_EVAL_TIMEOUT_MS,
+}: {
+  readonly scriptingApi: BrowserScriptingApi;
+  readonly tabId: number;
+  readonly timeoutMs?: number;
+}): Promise<EvalTabResult> => {
+  try {
+    const [response] = await withTimeout(
+      Promise.resolve(
+        scriptingApi.executeScript({
+          args: [''],
+          func: runInjectedPageSnapshot,
+          target: { tabId },
+          world: 'MAIN',
+        })
+      ),
+      timeoutMs
+    );
+
+    return { ok: true, value: response?.result };
+  } catch (error) {
+    return {
+      error: error instanceof Error ? error.message : 'Failed to read page snapshot.',
+      ok: false,
+    };
+  }
+};
+
 export const isTabDebuggerRequest = (value: unknown): value is TabDebuggerRequest => {
   if (!isRecord(value) || typeof value['type'] !== 'string') {
     return false;
@@ -274,6 +481,13 @@ export const isTabDebuggerRequest = (value: unknown): value is TabDebuggerReques
 
   if (value['type'] === LIST_INSPECTABLE_TABS_MESSAGE) {
     return true;
+  }
+
+  if (value['type'] === PAGE_SNAPSHOT_MESSAGE) {
+    return (
+      typeof value['tabId'] === 'number' &&
+      (value['timeoutMs'] === undefined || typeof value['timeoutMs'] === 'number')
+    );
   }
 
   return (
@@ -306,7 +520,7 @@ export const isTabDebuggerResponse = (value: unknown): value is TabDebuggerRespo
     );
   }
 
-  if (value['type'] === EVAL_TAB_MESSAGE) {
+  if (value['type'] === EVAL_TAB_MESSAGE || value['type'] === PAGE_SNAPSHOT_MESSAGE) {
     const { result } = value;
     return (
       isRecord(result) &&

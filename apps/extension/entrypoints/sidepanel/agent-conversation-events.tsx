@@ -93,14 +93,18 @@ const ToolExchangeEvent = ({
   return (
     <details className={panelClassName}>
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 outline-none transition focus-visible:ring-2 focus-visible:ring-[#EDFF00] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
-        <span className={titleClassName}>eval {isSuccessful ? 'completed' : 'failed'}</span>
+        <span className={titleClassName}>
+          {item.toolCall.name} {isSuccessful ? 'completed' : 'failed'}
+        </span>
         <span className={tabClassName}>tab {item.toolCall.tabId}</span>
       </summary>
       <div className="mt-2 grid min-w-0 gap-2">
-        <div className="min-w-0">
-          <p className={codeLabelClassName}>Code</p>
-          <pre className={codeBlockClassName}>{item.toolCall.code}</pre>
-        </div>
+        {item.toolCall.name === 'eval' ? (
+          <div className="min-w-0">
+            <p className={codeLabelClassName}>Code</p>
+            <pre className={codeBlockClassName}>{item.toolCall.code}</pre>
+          </div>
+        ) : null}
         <div className="min-w-0">
           <p className="text-[11px] font-medium text-zinc-300">
             {isSuccessful ? 'Result' : 'Error'}
@@ -119,13 +123,13 @@ const StandaloneToolEvent = ({
 }: {
   event: Exclude<AgentConversationEvent, { readonly type: 'message' | 'thinking' }>;
 }): JSX.Element => {
-  let title = 'eval error';
-  let body = event.type === 'tool-call' ? event.code : event.error;
+  let title = 'tool error';
+  let body = event.type === 'tool-call' ? event.name : event.error;
 
   if (event.type === 'tool-call') {
-    title = 'eval';
+    title = event.name;
   } else if (event.ok) {
-    title = 'eval result';
+    title = 'tool result';
     body = formatToolValue(event.value);
   }
 

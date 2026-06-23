@@ -7,8 +7,9 @@ export type {
   KiloGatewayChatCompletion,
   KiloGatewayChatMessage,
   KiloGatewayChatToolCall,
-  KiloGatewayEvalToolCall,
+  KiloGatewayToolCallRequest,
   KiloGatewayToolDefinition,
+  KiloGatewayToolName,
 } from './kilo-gateway-chat-client';
 
 export interface KiloGatewayModelOption {

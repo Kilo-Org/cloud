@@ -1,21 +1,21 @@
 import {
   createAssistantMessage,
-  createEvalToolCall,
+  createSafeToolCall,
   createThinkingBlock,
 } from '@/src/shared/agent-conversation';
-import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
+import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-conversation';
 import {
   buildGatewayMessagesFromEvents,
-  createEvalToolDefinition,
+  createSafeToolDefinitions,
 } from '@/src/shared/agent-llm-harness';
 import { runToolCalls } from '@/src/shared/agent-tool-results';
 import type { FetchLike } from '@/src/shared/auth';
 import { fetchKiloGatewayChatCompletionStream } from '@/src/shared/kilo-api-client';
-import { executeEvalToolCall } from './agent-eval-runtime';
+import { executeSafeToolCall } from './agent-safe-tool-runtime';
 
-type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
+type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 
-interface RunDangerousLlmTurnOptions {
+interface RunSafeLlmTurnOptions {
   readonly apiBaseUrl: string;
   readonly appendEvents: (events: AgentConversationEvent[]) => void;
   readonly conversationEvents: AgentConversationEvent[];
@@ -30,26 +30,25 @@ interface RunDangerousLlmTurnOptions {
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
 }
 
-const evalToolDefinition = createEvalToolDefinition();
+const safeToolDefinitions = createSafeToolDefinitions();
+const maxSafeToolRounds = 4;
+
 const createAssistantMessageEvent = (
   text: string
-): Extract<AgentConversationEvent, { readonly type: 'message' }> => {
-  const event = createAssistantMessage(text);
-
-  if (event.type !== 'message') {
-    throw new Error('Expected assistant message event.');
-  }
-
-  return event;
-};
+): Extract<AgentConversationEvent, { readonly type: 'message' }> => createAssistantMessage(text);
 
 const isAbortError = (error: unknown): boolean =>
   error instanceof Error && error.name === 'AbortError';
 
 const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
-const maxEvalRounds = 4;
 
-export const runDangerousLlmTurn = async ({
+const getStringArgument = (args: Record<string, unknown>, name: string): string | undefined =>
+  typeof args[name] === 'string' ? args[name] : undefined;
+
+const isSafeToolName = (name: string): name is SafeToolName =>
+  name === 'find_in_page' || name === 'get_element_details' || name === 'get_page_snapshot';
+
+export const runSafeLlmTurn = async ({
   apiBaseUrl,
   appendEvents,
   conversationEvents,
@@ -62,7 +61,7 @@ export const runDangerousLlmTurn = async ({
   token,
   updateAssistantMessage,
   updateThinkingBlock,
-}: RunDangerousLlmTurnOptions): Promise<void> => {
+}: RunSafeLlmTurnOptions): Promise<void> => {
   const getGatewayChatCompletion = (
     nextEvents: AgentConversationEvent[],
     onContentDelta: (delta: string) => void,
@@ -79,14 +78,14 @@ export const runDangerousLlmTurn = async ({
       signal,
       thinkingEffort,
       token,
-      tools: [evalToolDefinition],
+      tools: safeToolDefinitions,
     });
 
   const appendCompletion = async (
     nextEvents: AgentConversationEvent[]
   ): Promise<{
     completionEvents: AgentConversationEvent[];
-    toolCallEvents: EvalToolCallEvent[];
+    toolCallEvents: SafeToolCallEvent[];
   }> => {
     const completionEvents: AgentConversationEvent[] = [];
     let streamedText = '';
@@ -125,37 +124,6 @@ export const runDangerousLlmTurn = async ({
       }
     );
 
-    if (streamedThinkingEventId !== undefined) {
-      const finalStreamedThinkingText = completion.reasoning ?? streamedThinkingText;
-      const streamedThinkingEventIndex = completionEvents.findIndex(
-        event => event.id === streamedThinkingEventId
-      );
-
-      if (streamedThinkingEventIndex !== -1) {
-        completionEvents.splice(streamedThinkingEventIndex, 1, {
-          id: streamedThinkingEventId,
-          text: finalStreamedThinkingText,
-          type: 'thinking',
-        });
-      }
-    }
-
-    if (streamedAssistantEventId !== undefined) {
-      const finalStreamedText = completion.content ?? streamedText;
-      const streamedAssistantEventIndex = completionEvents.findIndex(
-        event => event.id === streamedAssistantEventId
-      );
-
-      if (streamedAssistantEventIndex !== -1) {
-        completionEvents.splice(streamedAssistantEventIndex, 1, {
-          id: streamedAssistantEventId,
-          role: 'assistant',
-          text: finalStreamedText,
-          type: 'message',
-        });
-      }
-    }
-
     if (completion.content !== undefined && streamedAssistantEventId === undefined) {
       completionEvents.push(createAssistantMessage(completion.content));
     }
@@ -164,17 +132,24 @@ export const runDangerousLlmTurn = async ({
       completionEvents.push(createThinkingBlock(completion.reasoning));
     }
 
-    const toolCallEvents = completion.toolCalls.flatMap(evalToolCall =>
-      evalToolCall.name === 'eval' && typeof evalToolCall.arguments['code'] === 'string'
-        ? [
-            createEvalToolCall({
-              code: evalToolCall.arguments['code'],
-              providerToolCallId: evalToolCall.id,
-              tabId: selectedTabId,
-            }),
-          ]
-        : []
-    );
+    const toolCallEvents = completion.toolCalls.flatMap(toolCall => {
+      if (!isSafeToolName(toolCall.name)) {
+        return [];
+      }
+
+      const elementId = getStringArgument(toolCall.arguments, 'elementId');
+      const query = getStringArgument(toolCall.arguments, 'query');
+
+      return [
+        createSafeToolCall({
+          name: toolCall.name,
+          providerToolCallId: toolCall.id,
+          ...(elementId === undefined ? {} : { elementId }),
+          ...(query === undefined ? {} : { query }),
+          tabId: selectedTabId,
+        }),
+      ];
+    });
     completionEvents.push(...toolCallEvents);
 
     appendEvents(
@@ -194,7 +169,7 @@ export const runDangerousLlmTurn = async ({
       if (remainingRounds === 0) {
         appendEvents([
           createAssistantMessage(
-            'The model requested too many eval rounds. Send another message to continue.'
+            'The model requested too many safe read rounds. Send another message to continue.'
           ),
         ]);
         return;
@@ -220,7 +195,7 @@ export const runDangerousLlmTurn = async ({
 
       const toolResultEvents: AgentConversationEvent[] = await runToolCalls(
         toolCallEvents,
-        executeEvalToolCall
+        executeSafeToolCall
       );
 
       if (isSignalAborted(signal)) {
@@ -234,7 +209,7 @@ export const runDangerousLlmTurn = async ({
       await continueConversation(nextConversationEvents, remainingRounds - 1);
     };
 
-    await continueConversation([...conversationEvents], maxEvalRounds);
+    await continueConversation([...conversationEvents], maxSafeToolRounds);
   } catch (error) {
     if (isAbortError(error)) {
       appendEvents([createAssistantMessage('Stopped.')]);
@@ -242,9 +217,7 @@ export const runDangerousLlmTurn = async ({
     }
 
     appendEvents([
-      createAssistantMessage(
-        `LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      ),
+      createAssistantMessage(error instanceof Error ? error.message : 'Failed to run safe mode.'),
     ]);
   }
 };

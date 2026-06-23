@@ -14,7 +14,7 @@ import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
 import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { AgentFooterControls } from './agent-footer-controls';
 import { useStoredAgentConversation } from './agent-conversation-storage';
-import { runDangerousLlmTurn } from './agent-llm-turn-runner';
+import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
 
@@ -22,7 +22,7 @@ const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
 const createDefaultConversationEvents = (): AgentConversationEvent[] => [
-  createAssistantMessage('Pick a tab, switch to dangerous mode, and ask Kilo to inspect it.'),
+  createAssistantMessage('Pick a tab and ask Kilo to inspect it.'),
 ];
 const sanitizeTabContextText = (text: string): string =>
   text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
@@ -216,20 +216,16 @@ export const AgentChatPanel = ({
       return;
     }
 
-    if (mode !== 'dangerous') {
-      appendEvents([
-        createAssistantMessage('Switch to dangerous mode before I can run eval in a tab.'),
-      ]);
-      return;
-    }
-
+    const runMode = mode;
     const abort = new AbortController();
     runAbortRef.current = abort;
     setIsRunning(true);
 
     void (async (): Promise<void> => {
       try {
-        await runDangerousLlmTurn({
+        const runTurn = runMode === 'dangerous' ? runDangerousLlmTurn : runSafeLlmTurn;
+
+        await runTurn({
           apiBaseUrl,
           appendEvents,
           conversationEvents: conversationWithUserMessage,

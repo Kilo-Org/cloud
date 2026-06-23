@@ -2,10 +2,10 @@ import { createToolResult } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
 import type { EvalTabResult } from './tab-debugger';
 
-type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
 
-const toToolResultEvent = (toolCall: EvalToolCallEvent, result: EvalTabResult): ToolResultEvent =>
+const toToolResultEvent = (toolCall: ToolCallEvent, result: EvalTabResult): ToolResultEvent =>
   result.ok
     ? createToolResult({
         ok: true,
@@ -18,9 +18,9 @@ const toToolResultEvent = (toolCall: EvalToolCallEvent, result: EvalTabResult): 
         toolCallId: toolCall.id,
       });
 
-export const runEvalToolCalls = (
-  toolCalls: EvalToolCallEvent[],
-  executeEvalToolCall: (toolCall: EvalToolCallEvent) => Promise<EvalTabResult>
+export const runToolCalls = <ToolCall extends ToolCallEvent>(
+  toolCalls: ToolCall[],
+  executeToolCall: (toolCall: ToolCall) => Promise<EvalTabResult>
 ): Promise<ToolResultEvent[]> => {
   const runNext = async (index: number, results: ToolResultEvent[]): Promise<ToolResultEvent[]> => {
     const toolCall = toolCalls[index];
@@ -29,7 +29,7 @@ export const runEvalToolCalls = (
       return results;
     }
 
-    const result = await executeEvalToolCall(toolCall);
+    const result = await executeToolCall(toolCall);
 
     return runNext(index + 1, [...results, toToolResultEvent(toolCall, result)]);
   };

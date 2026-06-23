@@ -2,8 +2,10 @@ import { enableActionClickSidePanel } from '@/src/shared/side-panel';
 import {
   EVAL_TAB_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
+  PAGE_SNAPSHOT_MESSAGE,
   evalInTab,
   evalInTabWithScripting,
+  getPageSnapshotInTabWithScripting,
   isTabDebuggerRequest,
   listInspectableTabs,
   listInspectableTabsWithTabsApi,
@@ -58,6 +60,22 @@ const handleTabDebuggerRequest = async ({
       }
 
       return { error: 'Tab listing API is unavailable.', ok: false };
+    }
+
+    if (request.type === PAGE_SNAPSHOT_MESSAGE) {
+      if (scriptingApi) {
+        return {
+          ok: true,
+          result: await getPageSnapshotInTabWithScripting({
+            scriptingApi,
+            tabId: request.tabId,
+            ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
+          }),
+          type: PAGE_SNAPSHOT_MESSAGE,
+        };
+      }
+
+      return { error: 'Page snapshot API is unavailable.', ok: false };
     }
 
     if (debuggerApi) {

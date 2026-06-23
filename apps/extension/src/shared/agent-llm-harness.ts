@@ -1,12 +1,14 @@
 import type { KiloGatewayChatMessage, KiloGatewayToolDefinition } from './kilo-api-client';
 import type { AgentConversationEvent } from './agent-conversation';
 
-type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
 type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
 
 export const EXTENSION_AGENT_SYSTEM_PROMPT = [
   'You are Kilo, an agent running in a browser extension side panel.',
   'You are helping the user with the currently selected browser tab.',
+  'In safe mode, you have read-only page tools for snapshots, element details, and text search.',
+  'Safe mode tools cannot click, type, navigate, submit forms, read storage, read cookies, or run model-authored JavaScript.',
   'In dangerous mode, you have exactly one tool: eval.',
   'The eval tool runs JavaScript in the selected browser tab. Its code argument is inserted inside an async function body.',
   'Always return a JSON-serializable value from eval when you need to inspect or change the page.',
@@ -36,7 +38,61 @@ export const createEvalToolDefinition = (): KiloGatewayToolDefinition => ({
   type: 'function',
 });
 
-const getProviderToolCallId = (toolCall: EvalToolCallEvent): string =>
+export const createSafeToolDefinitions = (): KiloGatewayToolDefinition[] => [
+  {
+    function: {
+      description:
+        'Read a bounded, sanitized snapshot of the selected browser tab. Returns title, URL, visible text, headings, links, controls, and opaque element ids.',
+      name: 'get_page_snapshot',
+      parameters: {
+        additionalProperties: false,
+        properties: {},
+        type: 'object',
+      },
+    },
+    type: 'function',
+  },
+  {
+    function: {
+      description:
+        'Read more details for an element id returned by get_page_snapshot or find_in_page.',
+      name: 'get_element_details',
+      parameters: {
+        additionalProperties: false,
+        properties: {
+          elementId: {
+            description: 'Opaque element id from a previous safe-mode page snapshot.',
+            type: 'string',
+          },
+        },
+        required: ['elementId'],
+        type: 'object',
+      },
+    },
+    type: 'function',
+  },
+  {
+    function: {
+      description:
+        'Search the selected tab snapshot for visible text. Returns matching safe snapshot nodes.',
+      name: 'find_in_page',
+      parameters: {
+        additionalProperties: false,
+        properties: {
+          query: {
+            description: 'Plain text to search for in the selected tab snapshot.',
+            type: 'string',
+          },
+        },
+        required: ['query'],
+        type: 'object',
+      },
+    },
+    type: 'function',
+  },
+];
+
+const getProviderToolCallId = (toolCall: ToolCallEvent): string =>
   toolCall.providerToolCallId ?? toolCall.id;
 
 const toToolResultContent = (
@@ -51,8 +107,8 @@ const toToolResultContent = (
 const getConsecutiveToolCalls = (
   events: AgentConversationEvent[],
   startIndex: number
-): EvalToolCallEvent[] => {
-  const toolCalls: EvalToolCallEvent[] = [];
+): ToolCallEvent[] => {
+  const toolCalls: ToolCallEvent[] = [];
 
   for (let index = startIndex; index < events.length; index += 1) {
     const toolCall = events[index];
@@ -75,7 +131,7 @@ const getGatewayMessageText = (event: MessageEvent): string =>
 export const buildGatewayMessagesFromEvents = (
   events: AgentConversationEvent[]
 ): KiloGatewayChatMessage[] => {
-  const toolCallsById = new Map<string, EvalToolCallEvent>();
+  const toolCallsById = new Map<string, ToolCallEvent>();
   const messages: KiloGatewayChatMessage[] = [
     { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
   ];
@@ -104,8 +160,16 @@ export const buildGatewayMessagesFromEvents = (
             role: 'assistant',
             tool_calls: toolCalls.map(toolCall => ({
               function: {
-                arguments: JSON.stringify({ code: toolCall.code }),
-                name: 'eval',
+                arguments:
+                  toolCall.name === 'eval'
+                    ? JSON.stringify({ code: toolCall.code })
+                    : JSON.stringify({
+                        ...(toolCall.elementId === undefined
+                          ? {}
+                          : { elementId: toolCall.elementId }),
+                        ...(toolCall.query === undefined ? {} : { query: toolCall.query }),
+                      }),
+                name: toolCall.name,
               },
               id: getProviderToolCallId(toolCall),
               type: 'function',

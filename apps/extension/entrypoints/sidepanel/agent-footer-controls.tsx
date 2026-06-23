@@ -58,9 +58,11 @@ const CompactSelectControl = ({
 );
 
 const ModeControl = ({
+  disabled,
   mode,
   onChange,
 }: {
+  disabled: boolean;
   mode: AgentMode;
   onChange: (mode: AgentMode) => void;
 }): JSX.Element => {
@@ -73,6 +75,7 @@ const ModeControl = ({
         aria-expanded={isOpen}
         aria-label={`${display.modeLabel} mode: ${display.modeDescription}`}
         className="flex h-8 w-10 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 outline-none transition hover:border-zinc-700 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
+        disabled={disabled}
         onClick={() => {
           setIsOpen(current => !current);
         }}
@@ -82,7 +85,7 @@ const ModeControl = ({
         <ModeIcon className="size-3.5" icon={display.modeIcon} tone={display.modeIconTone} />
       </button>
 
-      {isOpen ? (
+      {isOpen && !disabled ? (
         <div className="absolute bottom-10 left-0 z-10 grid w-56 gap-1 rounded-md border border-zinc-800 bg-zinc-950 p-1">
           {modeOptions.map(option => {
             const optionDisplay = getFooterControlDisplay({
@@ -208,7 +211,7 @@ export const AgentFooterControls = ({
       <p className="text-xs leading-4 text-red-300">{tabDebuggerError}</p>
     )}
     <div className="flex min-w-0 items-center gap-2">
-      <ModeControl mode={mode} onChange={onModeChange} />
+      <ModeControl disabled={isRunning} mode={mode} onChange={onModeChange} />
       <CompactSelectControl
         ariaLabel="Model"
         className="flex-1 pl-2 pr-6"

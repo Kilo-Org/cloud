@@ -1,3 +1,9 @@
+export type KiloGatewayToolName =
+  | 'eval'
+  | 'find_in_page'
+  | 'get_element_details'
+  | 'get_page_snapshot';
+
 export interface KiloGatewayChatMessage {
   readonly content?: string | null;
   readonly role: 'assistant' | 'system' | 'tool' | 'user';
@@ -8,7 +14,7 @@ export interface KiloGatewayChatMessage {
 export interface KiloGatewayChatToolCall {
   readonly function: {
     readonly arguments: string;
-    readonly name: 'eval';
+    readonly name: KiloGatewayToolName;
   };
   readonly id: string;
   readonly type: 'function';
@@ -17,20 +23,20 @@ export interface KiloGatewayChatToolCall {
 export interface KiloGatewayToolDefinition {
   readonly function: {
     readonly description: string;
-    readonly name: 'eval';
+    readonly name: KiloGatewayToolName;
     readonly parameters: Record<string, unknown>;
   };
   readonly type: 'function';
 }
 
-export interface KiloGatewayEvalToolCall {
-  readonly code: string;
+export interface KiloGatewayToolCallRequest {
+  readonly arguments: Record<string, unknown>;
   readonly id: string;
-  readonly name: 'eval';
+  readonly name: KiloGatewayToolName;
 }
 
 export interface KiloGatewayChatCompletion {
   readonly content?: string;
   readonly reasoning?: string;
-  readonly toolCalls: KiloGatewayEvalToolCall[];
+  readonly toolCalls: KiloGatewayToolCallRequest[];
 }

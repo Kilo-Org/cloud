@@ -2,8 +2,9 @@
 import type {
   KiloGatewayChatCompletion,
   KiloGatewayChatMessage,
-  KiloGatewayEvalToolCall,
+  KiloGatewayToolCallRequest,
   KiloGatewayToolDefinition,
+  KiloGatewayToolName,
 } from './kilo-gateway-chat-client';
 import type { FetchLike } from './auth';
 
@@ -24,7 +25,7 @@ interface FetchKiloGatewayChatCompletionStreamOptions {
 interface StreamingToolCallBuffer {
   arguments: string;
   id: string | undefined;
-  name: 'eval' | undefined;
+  name: KiloGatewayToolName | undefined;
 }
 
 interface StreamingAccumulator {
@@ -65,7 +66,7 @@ const parseJson = (value: string): unknown => {
   try {
     return JSON.parse(value);
   } catch {
-    throw new TypeError('Gateway eval tool call arguments were not valid JSON.');
+    throw new TypeError('Gateway tool call arguments were not valid JSON.');
   }
 };
 const getString = (value: unknown, message: string): string => {
@@ -75,28 +76,20 @@ const getString = (value: unknown, message: string): string => {
 
   return value;
 };
-const parseEvalToolArguments = (value: unknown): { readonly code: string } => {
-  if (typeof value !== 'string') {
-    throw new TypeError('Gateway eval tool call did not include arguments.');
+const isGatewayToolName = (value: unknown): value is KiloGatewayToolName =>
+  value === 'eval' ||
+  value === 'find_in_page' ||
+  value === 'get_element_details' ||
+  value === 'get_page_snapshot';
+const parseToolCallBuffer = (value: StreamingToolCallBuffer): KiloGatewayToolCallRequest => {
+  if (value.name === undefined) {
+    throw new TypeError('Gateway stream tool call did not include a supported tool name.');
   }
 
-  const parsed = parseJson(value);
-
-  if (!isRecord(parsed) || typeof parsed['code'] !== 'string' || parsed['code'].length === 0) {
-    throw new TypeError('Gateway eval tool call did not include code.');
-  }
-
-  return { code: parsed['code'] };
-};
-const parseEvalToolCallBuffer = (value: StreamingToolCallBuffer): KiloGatewayEvalToolCall => {
-  if (value.name !== 'eval') {
-    throw new TypeError('Gateway stream tool call did not include eval.');
-  }
-
-  const { code } = parseEvalToolArguments(value.arguments);
+  const parsedArguments = parseJson(value.arguments);
 
   return {
-    code,
+    arguments: isRecord(parsedArguments) ? parsedArguments : {},
     id: getString(value.id, 'Gateway eval tool call did not include an id.'),
     name: value.name,
   };
@@ -136,8 +129,8 @@ const mergeStreamingToolCall = (
   };
 
   if (isRecord(functionValue)) {
-    if (functionValue['name'] === 'eval') {
-      next.name = 'eval';
+    if (isGatewayToolName(functionValue['name'])) {
+      next.name = functionValue['name'];
     }
 
     if (typeof functionValue['arguments'] === 'string') {
@@ -192,7 +185,7 @@ const toCompletion = (accumulator: StreamingAccumulator): KiloGatewayChatComplet
   ...(accumulator.content === '' ? {} : { content: accumulator.content }),
   ...(accumulator.reasoning === '' ? {} : { reasoning: accumulator.reasoning }),
   toolCalls: [...accumulator.toolCallsByIndex.values()].map(toolCall =>
-    parseEvalToolCallBuffer(toolCall)
+    parseToolCallBuffer(toolCall)
   ),
 });
 

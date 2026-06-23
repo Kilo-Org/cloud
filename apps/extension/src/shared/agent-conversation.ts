@@ -1,4 +1,6 @@
 export type AgentMode = 'dangerous' | 'safe';
+export type SafeToolName = 'find_in_page' | 'get_element_details' | 'get_page_snapshot';
+export type AgentToolName = 'eval' | SafeToolName;
 
 export type AgentConversationEvent =
   | {
@@ -22,6 +24,15 @@ export type AgentConversationEvent =
       readonly type: 'tool-call';
     }
   | {
+      readonly elementId?: string;
+      readonly id: string;
+      readonly name: SafeToolName;
+      readonly providerToolCallId?: string;
+      readonly query?: string;
+      readonly tabId: number;
+      readonly type: 'tool-call';
+    }
+  | {
       readonly error?: string;
       readonly id: string;
       readonly ok: boolean;
@@ -31,7 +42,8 @@ export type AgentConversationEvent =
     };
 
 type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
-type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
+type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
 
 export type GroupedConversationItem =
@@ -48,6 +60,14 @@ export type GroupedConversationItem =
 interface CreateEvalToolCallOptions {
   readonly code: string;
   readonly providerToolCallId?: string;
+  readonly tabId: number;
+}
+
+interface CreateSafeToolCallOptions {
+  readonly elementId?: string;
+  readonly name: SafeToolName;
+  readonly providerToolCallId?: string;
+  readonly query?: string;
   readonly tabId: number;
 }
 
@@ -93,11 +113,27 @@ export const createEvalToolCall = ({
   code,
   providerToolCallId,
   tabId,
-}: CreateEvalToolCallOptions): ToolCallEvent => ({
+}: CreateEvalToolCallOptions): EvalToolCallEvent => ({
   code,
   id: createEventId(),
   name: 'eval',
   ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+  tabId,
+  type: 'tool-call',
+});
+
+export const createSafeToolCall = ({
+  elementId,
+  name,
+  providerToolCallId,
+  query,
+  tabId,
+}: CreateSafeToolCallOptions): SafeToolCallEvent => ({
+  id: createEventId(),
+  name,
+  ...(elementId === undefined ? {} : { elementId }),
+  ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+  ...(query === undefined ? {} : { query }),
   tabId,
   type: 'tool-call',
 });

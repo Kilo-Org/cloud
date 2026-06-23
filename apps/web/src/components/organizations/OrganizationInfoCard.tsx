@@ -43,6 +43,7 @@ import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds, fromMicrodollars } 
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useExpiringCredits } from './useExpiringCredits';
+import { useAdminOrganizationHierarchy } from '@/app/admin/api/organizations/hooks';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -72,6 +73,80 @@ type InnerProps = {
   className?: string;
   showAdminControls: boolean;
 };
+
+type OrganizationHierarchySummary = {
+  id: string;
+  name: string;
+};
+
+type OrganizationHierarchySectionProps = {
+  parent: OrganizationHierarchySummary | null;
+};
+
+function OrganizationHierarchySection({ parent }: OrganizationHierarchySectionProps) {
+  if (!parent) {
+    return null;
+  }
+
+  return (
+    <section className="border-b border-border pb-4">
+      <div className="mt-3 space-y-3">
+        {parent ? (
+          <div className="space-y-1">
+            <p className="text-sm text-foreground">
+              Parent organization:{' '}
+              <Link
+                href={`/admin/organizations/${encodeURIComponent(parent.id)}`}
+                className="text-link hover:text-link-hover inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline"
+              >
+                {parent.name}
+              </Link>
+              .
+            </p>
+            <p className="text-muted-foreground text-sm">
+              Most child organization management should happen through the parent organization.
+            </p>
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+export function ChildOrganizationsCard({ organizationId }: { organizationId: string }) {
+  const hierarchyQuery = useAdminOrganizationHierarchy(organizationId, true);
+  const childOrganizations = hierarchyQuery.data?.children ?? [];
+
+  if (childOrganizations.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Child Organizations</CardTitle>
+        <CardDescription>
+          This organization is the parent of {childOrganizations.length} child organization
+          {childOrganizations.length === 1 ? '' : 's'}:
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-1.5">
+          {childOrganizations.map(childOrganization => (
+            <Link
+              key={childOrganization.id}
+              href={`/admin/organizations/${encodeURIComponent(childOrganization.id)}`}
+              className="hover:bg-surface-hover flex items-center justify-between gap-3 rounded-md py-1.5 text-sm transition-colors"
+            >
+              <span className="truncate font-medium">{childOrganization.name}</span>
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function Inner(props: InnerProps) {
   const { info, className, showAdminControls } = props;
   const {
@@ -182,6 +257,7 @@ function Inner(props: InnerProps) {
   const isAutoTopUpEnabled = useIsAutoTopUpEnabled();
   const isInAdminDashboard = isKiloAdmin && showAdminControls;
   const isOrgOwner = useCanManagePaymentInfo();
+  const hierarchyQuery = useAdminOrganizationHierarchy(id, isInAdminDashboard);
 
   const handleSeatsRequirementEdit = () => {
     setPendingSeatsValue(!info.require_seats);
@@ -227,6 +303,9 @@ function Inner(props: InnerProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
+        {isInAdminDashboard && hierarchyQuery.data ? (
+          <OrganizationHierarchySection parent={hierarchyQuery.data.parent} />
+        ) : null}
         <div>
           <label className="text-muted-foreground text-sm font-medium">Name</label>
           {isEditing ? (

@@ -137,3 +137,4 @@ allowBuilds:
   spawn-sync: false
   tree-sitter-bash: false
   geckodriver: true
+  '@scarf/scarf': false

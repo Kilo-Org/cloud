@@ -17,8 +17,7 @@ app shell with marketing-scale spacing.
 - Cards use `p-6` for header/content/footer, `gap-1.5` between card title
   and description (`apps/web/src/components/ui/card.tsx`).
 - App topbars run at `h-14`; avoid arbitrary topbar heights.
-- Controls stay compact: `h-8` (sm), `h-9` (default), `h-10` (lg). Match
-  this rhythm when adding new interactive elements.
+- Controls stay compact: `h-8` (sm), `h-control-default` / 36px (default), `h-10` (lg). Use `h-control-touch` or `size-control-touch` for 44px touch targets.
 - Mobile (React Native) has its own safe-area behavior — use the tokens
   in `apps/mobile/`, not web-only `env(safe-area-inset-*)`.
 
@@ -28,11 +27,10 @@ Kilo defines a radius scale:
 
 | Token | Value | Use |
 |---|---|---|
-| `--radius` | `0.625rem` | Base |
-| `--radius-sm` | `calc(var(--radius) - 4px)` | Tight inline chips |
-| `--radius-md` | `calc(var(--radius) - 2px)` | Buttons, inputs |
-| `--radius-lg` | `var(--radius)` | Popovers, medium containers |
-| `--radius-xl` | `calc(var(--radius) + 4px)` | Cards, dialogs |
+| `--radius-sm` | `4px` | Tight inline chips |
+| `--radius-md` | `8px` | Buttons, inputs |
+| `--radius-lg` | `10px` | Popovers, medium containers |
+| `--radius-xl` | `14px` | Cards, dialogs |
 | (full) | `rounded-full` | Badges, avatars, status pills |
 
 Do not introduce new radius values.

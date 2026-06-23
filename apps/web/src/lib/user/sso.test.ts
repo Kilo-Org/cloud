@@ -20,9 +20,17 @@ jest.mock('@/lib/user', () => ({
 }));
 
 jest.mock('@/lib/organizations/organizations', () => ({
-  addUserToOrganization: jest.fn(async () => false),
+  addSsoUserToOrganization: jest.fn(async () => false),
   getOrganizationById: jest.fn(async () => ({ id: 'org-local' })),
   getOrganizationMembers: jest.fn(async () => []),
+}));
+
+jest.mock('@/lib/organizations/organization-sso-policy', () => ({
+  resolveSsoAuthorityForDomain: jest.fn(async () => ({
+    status: 'required',
+    domain: 'example.com',
+    sourceOrganizationId: 'org-local',
+  })),
 }));
 
 jest.mock('@/lib/organizations/organization-audit-logs', () => ({
@@ -38,9 +46,11 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 import { createOrUpdateUser } from '@/lib/user';
+import { addSsoUserToOrganization } from '@/lib/organizations/organizations';
 import { processSSOUserLogin } from './sso';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
+const mockAddSsoUserToOrganization = jest.mocked(addSsoUserToOrganization);
 const { mockWorkOSInstance } = jest.requireMock('@workos-inc/node') as {
   mockWorkOSInstance: { organizations: { listOrganizations: jest.Mock } };
 };
@@ -96,5 +106,6 @@ describe('processSSOUserLogin', () => {
       'impact-click-123',
       trackingContext
     );
+    expect(mockAddSsoUserToOrganization).toHaveBeenCalledWith('org-local', 'user-workos');
   });
 });

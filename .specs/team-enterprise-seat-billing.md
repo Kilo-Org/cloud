@@ -303,18 +303,23 @@ grants billing access without consuming a seat.
 
 1. The system MUST ensure the subscription metadata user is a
    member of the organization when processing any subscription
-   event, subject to the removal check in rule 2. If the user has
-   never been a member of the organization, the system MUST add
-   them as owner. If the user already has a membership in any role,
-   the system MUST preserve their current role. If the metadata
-   user ID does not resolve to a valid user record, the membership
-   step silently fails (no membership is created) but the
-   subscription event continues to be processed normally — the
-   purchase record is still created and seat counts are still
-   updated. The membership-ensure step MAY execute outside the
-   purchase-recording transaction; if it succeeds but the purchase
-   recording subsequently fails, the membership MUST NOT be rolled
-   back — the user retains their membership.
+   event, subject to the removal check in rule 2 and the SSO exception
+   below. If the user has never been a member of the organization,
+   the system MUST add them as owner. If the user already has a
+   membership in any role, the system MUST preserve their current
+   role. For an organization with an Effective SSO policy as defined
+   in `.specs/organization-sso.md`, the system MUST NOT create a new
+   Same-domain human membership as a subscription side effect; it
+   MUST continue processing the purchase and MUST make the skipped
+   admission observable to operators. If the metadata user ID does
+   not resolve to a valid user record, the membership step silently
+   fails (no membership is created) but the subscription event
+   continues to be processed normally — the purchase record is still
+   created and seat counts are still updated. The membership-ensure
+   step MAY execute outside the purchase-recording transaction; if it
+   succeeds but the purchase recording subsequently fails, the
+   membership MUST NOT be rolled back — the user retains their
+   membership.
 2. The system MUST NOT re-add a subscription metadata user who was
    previously removed from the organization. This rule takes
    precedence over rule 1: a removed user is not treated as "never

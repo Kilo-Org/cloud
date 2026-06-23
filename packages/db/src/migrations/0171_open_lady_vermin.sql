@@ -1,0 +1,3 @@
+ALTER TABLE "organization_invitations" ADD COLUMN "authentication_requirement" text DEFAULT 'default' NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization_invitations" ADD COLUMN "sso_source_organization_id" uuid;--> statement-breakpoint
+ALTER TABLE "organization_invitations" ADD CONSTRAINT "organization_invitations_sso_source_organization_id_organizations_id_fk" FOREIGN KEY ("sso_source_organization_id") REFERENCES "public"."organizations"("id") ON DELETE restrict ON UPDATE no action;

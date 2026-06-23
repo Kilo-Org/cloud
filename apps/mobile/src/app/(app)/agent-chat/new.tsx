@@ -12,6 +12,8 @@ import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generateMessageId } from 'cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
+import * as WebBrowser from 'expo-web-browser';
+import { ExternalLink, RefreshCw } from 'lucide-react-native';
 import { toast } from 'sonner-native';
 
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
@@ -22,6 +24,11 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
+import {
+  getGitHubIntegrationUrl,
+  shouldShowGitHubIntegrationPrompt,
+} from '@/lib/agent-github-integration';
+import { WEB_BASE_URL } from '@/lib/config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -86,7 +93,12 @@ export default function NewSessionScreen() {
 
   // ── Repositories ─────────────────────────────────────────────────
   const trpc = useTRPC();
-  const { data: repoData, isLoading: isLoadingRepos } = useQuery(
+  const {
+    data: repoData,
+    isLoading: isLoadingRepos,
+    isRefetching: isRefetchingRepos,
+    refetch: refetchRepos,
+  } = useQuery(
     organizationId
       ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
           organizationId,
@@ -96,6 +108,11 @@ export default function NewSessionScreen() {
           forceRefresh: false,
         })
   );
+
+  const showGitHubIntegrationPrompt = shouldShowGitHubIntegrationPrompt({
+    isLoadingRepos,
+    integrationInstalled: repoData?.integrationInstalled,
+  });
 
   const repositories = useMemo(() => {
     if (!repoData?.repositories) {
@@ -112,6 +129,15 @@ export default function NewSessionScreen() {
     setModel(modelId);
     setVariant(newVariant);
   }, []);
+
+  const handleOpenGitHubIntegration = useCallback(async () => {
+    try {
+      await WebBrowser.openAuthSessionAsync(getGitHubIntegrationUrl(WEB_BASE_URL, organizationId));
+      await refetchRepos();
+    } catch {
+      toast.error('Could not open GitHub setup. Please try again.');
+    }
+  }, [organizationId, refetchRepos]);
 
   const handleCreate = useCallback(async () => {
     const prompt = promptRef.current.trim();
@@ -230,6 +256,43 @@ export default function NewSessionScreen() {
             onChange={setSelectedRepo}
             disabled={isCreating}
           />
+          {showGitHubIntegrationPrompt ? (
+            <View className="mt-3 gap-3 rounded-lg border border-border bg-card p-4">
+              <View className="gap-1">
+                <Text className="text-sm font-semibold text-foreground">Connect GitHub</Text>
+                <Text variant="muted">
+                  Connect GitHub in your browser, then return here to pick a repository.
+                </Text>
+              </View>
+              <View className="flex-row gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onPress={() => {
+                    void handleOpenGitHubIntegration();
+                  }}
+                >
+                  <ExternalLink size={16} color={colors.foreground} />
+                  <Text>Open</Text>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onPress={() => {
+                    void refetchRepos();
+                  }}
+                  disabled={isRefetchingRepos}
+                  accessibilityLabel="Refresh repositories"
+                >
+                  {isRefetchingRepos ? (
+                    <ActivityIndicator size="small" color={colors.foreground} />
+                  ) : (
+                    <RefreshCw size={16} color={colors.foreground} />
+                  )}
+                </Button>
+              </View>
+            </View>
+          ) : null}
         </View>
 
         <Button

@@ -56,6 +56,7 @@ export const APP_URL = resolveAppUrl({
 export const TRIAL_DURATION_DAYS = 14;
 
 export const AUTOCOMPLETE_MODEL = 'codestral-2508';
+export const INCEPTION_PROMO_RUNNING = true;
 
 export const ENABLE_DEPLOY_FEATURE = true;
 

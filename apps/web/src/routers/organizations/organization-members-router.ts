@@ -257,6 +257,18 @@ export const organizationsMembersRouter = createTRPCRouter({
               message: 'This user is already a member of this organization',
             });
           }
+          if (error.message === 'User must join this organization through SSO') {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'This user must join through your organization SSO provider',
+            });
+          }
+          if (error.message === 'Organization SSO policy is misconfigured') {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: 'This organization has an invalid SSO configuration',
+            });
+          }
         }
         throw error;
       }

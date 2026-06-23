@@ -122,9 +122,10 @@ function pickSubscriptionForState(
 
 export async function getKiloPassStateForUser(
   db: DbOrTx,
-  kiloUserId: string
+  kiloUserId: string,
+  options: { forUpdate?: boolean } = {}
 ): Promise<KiloPassSubscriptionState | null> {
-  const subscriptions = await db
+  const subscriptionQuery = db
     .select({
       subscriptionId: kilo_pass_subscriptions.id,
       stripeSubscriptionId: kilo_pass_subscriptions.stripe_subscription_id,
@@ -141,6 +142,9 @@ export async function getKiloPassStateForUser(
     })
     .from(kilo_pass_subscriptions)
     .where(eq(kilo_pass_subscriptions.kilo_user_id, kiloUserId));
+  const subscriptions = options.forUpdate
+    ? await subscriptionQuery.for('update')
+    : await subscriptionQuery;
 
   const selected = pickSubscriptionForState(subscriptions);
   if (!selected) return null;

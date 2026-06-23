@@ -47,6 +47,12 @@ export function generateOrganization(): OrganizationWithMembers {
     ...base,
     name: `Company ${randomInt(rng, 0, 999)} ${companyType}`,
     members: Array.from({ length: randomInt(rng, 2, 7) }, generateMember),
+    effectiveSsoPolicy: {
+      required: false,
+      source: null,
+      domain: null,
+      configurationError: false,
+    },
   };
 }
 

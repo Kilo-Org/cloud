@@ -109,13 +109,16 @@ export function InviteMemberDialog({
     return emailSchema.safeParse(email.trim()).success;
   }, [email]);
 
-  const emailDomainMatchesSSODomain = useMemo(() => {
-    if (!email.trim() || !organizationData?.sso_domain) return false;
+  const emailDomainMatchesDirectSSODomain = useMemo(() => {
+    const policy = organizationData?.effectiveSsoPolicy;
+    if (!email.trim() || !policy?.required || policy.source !== 'self' || !policy.domain) {
+      return false;
+    }
     const emailDomain = getLowerDomainFromEmail(email.trim());
-    return emailDomain === organizationData.sso_domain.toLowerCase();
-  }, [email, organizationData?.sso_domain]);
+    return emailDomain === policy.domain;
+  }, [email, organizationData?.effectiveSsoPolicy]);
 
-  const ssoErrorText = `Members of your enterprise domain (@${organizationData?.sso_domain}) should sign in to Kilo Code via your SSO IdP to be automatically added to this organization.`;
+  const ssoErrorText = `Members of your enterprise domain (@${organizationData?.effectiveSsoPolicy.domain}) should sign in through your SSO provider to join this organization.`;
 
   const shouldShowEmailError = useMemo(() => {
     return email.trim() && !isEmailFocused && !isEmailValid;
@@ -153,7 +156,7 @@ export function InviteMemberDialog({
       return;
     }
 
-    if (emailDomainMatchesSSODomain) {
+    if (emailDomainMatchesDirectSSODomain) {
       toast.error(ssoErrorText);
       return;
     }
@@ -228,7 +231,7 @@ export function InviteMemberDialog({
                       }
                     }}
                     className={
-                      shouldShowEmailError || emailDomainMatchesSSODomain
+                      shouldShowEmailError || emailDomainMatchesDirectSSODomain
                         ? 'border-red-500 focus:border-red-500'
                         : ''
                     }
@@ -278,7 +281,7 @@ export function InviteMemberDialog({
               </div>
             </div>
 
-            {(shouldShowEmailError || emailDomainMatchesSSODomain) && (
+            {(shouldShowEmailError || emailDomainMatchesDirectSSODomain) && (
               <div className="rounded-md border border-red-800 bg-red-950/30 p-3">
                 <div className="flex items-center gap-2">
                   <svg
@@ -294,7 +297,7 @@ export function InviteMemberDialog({
                   </svg>
                   <p className="text-sm text-red-300" role="alert">
                     {shouldShowEmailError && 'Please enter a valid email address'}
-                    {emailDomainMatchesSSODomain && ssoErrorText}
+                    {emailDomainMatchesDirectSSODomain && ssoErrorText}
                   </p>
                 </div>
               </div>
@@ -342,7 +345,7 @@ export function InviteMemberDialog({
               onClick={handleInviteMember}
               disabled={
                 !isEmailValid ||
-                emailDomainMatchesSSODomain ||
+                emailDomainMatchesDirectSSODomain ||
                 inviteMemberMutation.isPending ||
                 !canInviteMembers ||
                 !hasSeatsAvailable

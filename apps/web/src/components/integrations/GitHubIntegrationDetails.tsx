@@ -23,6 +23,7 @@ import { DevAddGitHubInstallationCard } from './DevAddGitHubInstallationCard';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { buildGitHubInstallState } from './github-install-state';
 
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
@@ -31,6 +32,7 @@ type GitHubIntegrationDetailsProps = {
   error?: string;
   pendingApproval?: boolean;
   existingPendingOrg?: string;
+  appReturnPath?: string;
 };
 
 export function GitHubIntegrationDetails({
@@ -40,6 +42,7 @@ export function GitHubIntegrationDetails({
   error,
   pendingApproval,
   existingPendingOrg,
+  appReturnPath,
 }: GitHubIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -222,7 +225,7 @@ export function GitHubIntegrationDetails({
 
   const handleInstall = () => {
     const state = organizationId ? `org_${organizationId}` : `user_${user?.id}`;
-    const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${state}`;
+    const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(state, appReturnPath))}`;
     window.location.href = installUrl;
   };
 
@@ -595,29 +598,31 @@ export function GitHubIntegrationDetails({
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader>
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="flex items-center gap-2">
-                  <UserRound className="h-5 w-5" />
-                  Use your GitHub identity
-                </CardTitle>
-                <Badge variant="outline">Optional</Badge>
+        !appReturnPath && (
+          <Card>
+            <CardHeader>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <UserRound className="h-5 w-5" />
+                    Use your GitHub identity
+                  </CardTitle>
+                  <Badge variant="outline">Optional</Badge>
+                </div>
+                <CardDescription>
+                  Your GitHub identity is personal, not owned by this organization. Manage it from
+                  your personal integration to let eligible Cloud Agent sessions act as you where
+                  supported repository access is available.
+                </CardDescription>
               </div>
-              <CardDescription>
-                Your GitHub identity is personal, not owned by this organization. Manage it from
-                your personal integration to let eligible Cloud Agent sessions act as you where
-                supported repository access is available.
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline">
-              <Link href="/integrations/github#github-identity">Manage GitHub identity</Link>
-            </Button>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline">
+                <Link href="/integrations/github#github-identity">Manage GitHub identity</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )
       )}
 
       {/* Dev-only card for adding existing installations - only show when no app is installed */}

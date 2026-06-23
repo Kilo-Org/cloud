@@ -2,6 +2,7 @@ import { storage } from '#imports';
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { z } from 'zod';
+import { toPersistedConversationEvents } from '@/src/shared/agent-conversation-persistence';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 
 const conversationStorageKey = 'local:kiloAgentConversation';
@@ -152,7 +153,7 @@ export const useStoredAgentConversation = (
 
   useEffect(() => {
     if (isLoaded) {
-      void storage.setItem(conversationStorageKey, events);
+      void storage.setItem(conversationStorageKey, toPersistedConversationEvents(events));
     }
   }, [events, isLoaded]);
 

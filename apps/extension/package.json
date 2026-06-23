@@ -12,7 +12,7 @@
     "build:firefox": "wxt build -b firefox --mv3",
     "e2e": "pnpm run build && pnpm run build:firefox && playwright test -c playwright.config.ts && pnpm run e2e:firefox",
     "e2e:debug": "pnpm run build && pnpm run build:firefox && playwright test -c playwright.config.ts --debug",
-    "e2e:firefox": "tsx tests/e2e/firefox-selenium-e2e.ts",
+    "e2e:firefox": "echo 'Running Firefox extension e2e via Selenium/geckodriver' && tsx tests/e2e/firefox-selenium-e2e.ts",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox --mv3",
     "typecheck": "tsc --noEmit",

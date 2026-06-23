@@ -120,15 +120,15 @@ describe('tab debugger helpers', () => {
   it('evaluates dangerous-mode code through Firefox scripting API', async () => {
     const calls: Parameters<BrowserScriptingApi['executeScript']>[0][] = [];
     const scriptingApi: BrowserScriptingApi = {
-      executeScript: details => {
+      executeScript: async details => {
         calls.push(details);
-        return [{ result: 12_345 }];
+        return [{ result: await Promise.resolve(details.func(details.args.join(''))) }];
       },
     };
 
     await expect(
       evalInTabWithScripting({
-        code: 'return document.documentElement.outerHTML.length;',
+        code: 'return await Promise.resolve(12_345);',
         scriptingApi,
         tabId: 7,
       })
@@ -142,10 +142,26 @@ describe('tab debugger helpers', () => {
       }))
     ).toStrictEqual([
       {
-        args: ['return document.documentElement.outerHTML.length;'],
+        args: ['return await Promise.resolve(12_345);'],
         target: { tabId: 7 },
         world: 'MAIN',
       },
     ]);
+  });
+
+  it('times out Firefox scripting eval requests', async () => {
+    const scriptingApi: BrowserScriptingApi = {
+      // eslint-disable-next-line promise/prefer-await-to-then
+      executeScript: () => Promise.race([]),
+    };
+
+    await expect(
+      evalInTabWithScripting({
+        code: 'return await new Promise(() => {});',
+        scriptingApi,
+        tabId: 7,
+        timeoutMs: 1,
+      })
+    ).resolves.toStrictEqual({ error: 'Page evaluation timed out.', ok: false });
   });
 });

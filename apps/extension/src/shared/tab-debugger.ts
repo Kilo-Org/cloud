@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 export const DEBUGGER_PROTOCOL_VERSION = '1.3';
 export const LIST_INSPECTABLE_TABS_MESSAGE = 'kilo.tabs.listInspectable';
 export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
@@ -149,7 +150,30 @@ const getEvalExpression = (code: string): string => `(async () => { ${code} })()
 
 const runInjectedEval = (code: string): unknown =>
   // eslint-disable-next-line eslint/no-new-func, typescript-eslint/no-implied-eval, typescript-eslint/no-unsafe-call
-  new Function(code)();
+  new Function(`return (async () => { ${code} })()`)();
+
+const withTimeout = async <Result>(
+  promise: Promise<Result>,
+  timeoutMs: number
+): Promise<Result> => {
+  let timeout: ReturnType<typeof setTimeout> | undefined = undefined;
+
+  try {
+    return await Promise.race([
+      promise,
+      // eslint-disable-next-line promise/avoid-new
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => {
+          reject(new Error('Page evaluation timed out.'));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
+  }
+};
 
 export const evalInTab = async ({
   code,
@@ -214,18 +238,25 @@ export const evalInTabWithScripting = async ({
   code,
   scriptingApi,
   tabId,
+  timeoutMs = DEFAULT_EVAL_TIMEOUT_MS,
 }: {
   readonly code: string;
   readonly scriptingApi: BrowserScriptingApi;
   readonly tabId: number;
+  readonly timeoutMs?: number;
 }): Promise<EvalTabResult> => {
   try {
-    const [response] = await scriptingApi.executeScript({
-      args: [code],
-      func: runInjectedEval,
-      target: { tabId },
-      world: 'MAIN',
-    });
+    const [response] = await withTimeout(
+      Promise.resolve(
+        scriptingApi.executeScript({
+          args: [code],
+          func: runInjectedEval,
+          target: { tabId },
+          world: 'MAIN',
+        })
+      ),
+      timeoutMs
+    );
 
     return { ok: true, value: response?.result };
   } catch (error) {

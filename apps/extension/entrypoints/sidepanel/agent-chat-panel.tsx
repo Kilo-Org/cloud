@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
 import {
@@ -23,14 +24,28 @@ const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =
 const createDefaultConversationEvents = (): AgentConversationEvent[] => [
   createAssistantMessage('Pick a tab, switch to dangerous mode, and ask Kilo to inspect it.'),
 ];
-const formatSelectedTabSystemEnvironment = ({
+const sanitizeTabContextText = (text: string): string =>
+  text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+const sanitizeTabContextUrl = (url: string): string => {
+  try {
+    const parsedUrl = new URL(url);
+
+    parsedUrl.search = '';
+    parsedUrl.hash = '';
+
+    return parsedUrl.toString();
+  } catch {
+    return '[invalid URL]';
+  }
+};
+export const formatSelectedTabSystemEnvironment = ({
   title,
   url,
 }: {
   readonly title: string;
   readonly url: string;
 }): string =>
-  `<system_environment>\nSelected tab title: ${title}\nSelected tab URL: ${url}\nCurrent time: ${new Date().toISOString()}\nTimezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}\n</system_environment>`;
+  `<system_environment>\nSelected tab title: ${sanitizeTabContextText(title)}\nSelected tab URL: ${sanitizeTabContextUrl(url)}\nCurrent time: ${new Date().toISOString()}\nTimezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}\n</system_environment>`;
 
 export const AgentChatPanel = ({
   auth,

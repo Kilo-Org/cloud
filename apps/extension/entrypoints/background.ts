@@ -80,6 +80,7 @@ const handleTabDebuggerRequest = async ({
           code: request.code,
           scriptingApi,
           tabId: request.tabId,
+          ...(request.timeoutMs === undefined ? {} : { timeoutMs: request.timeoutMs }),
         }),
         type: EVAL_TAB_MESSAGE,
       };

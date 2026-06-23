@@ -136,13 +136,17 @@ when they appear in all capitals.
 1. The root `/mcp` native server MUST expose read-only tools only.
 2. The native server MUST expose `query_kilo_dataset` for aggregate and
    timeseries stats over approved per-user Kilo datasets.
-3. The native server MAY expose `describe_kilo_dataset` to return static query
+3. The native server MAY expose `get_kilo_usage_cost` as a read-only convenience
+   tool that derives valid `query_kilo_dataset` usage-cost queries for common
+   periods, timezone-aware calendar ranges, optional buckets, and safe public
+   grouping dimensions.
+4. The native server MAY expose `describe_kilo_dataset` to return static query
    metadata, field capabilities, mode rules, output aliases, and example payloads.
-4. `describe_kilo_dataset` MUST NOT query user data and MUST NOT reveal fields
+5. `describe_kilo_dataset` MUST NOT query user data and MUST NOT reveal fields
    excluded from the public dataset catalog.
-5. Both native tools MUST require the same native `mcp:access` OAuth token and
-   current Kilo org admin eligibility gate.
-6. Dataset tool descriptions, schemas, and validation errors SHOULD make the
+6. All native dataset tools MUST require the same native `mcp:access` OAuth token
+   and current Kilo org admin eligibility gate.
+7. Dataset tool descriptions, schemas, recipes, and validation errors SHOULD make the
    following rules clear to MCP clients: aggregate queries do not use buckets,
    timeseries queries require buckets, `count` metrics do not use a field, and
    cost metrics use `costMicrodollars` or `costUsd`.

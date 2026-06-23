@@ -1,6 +1,7 @@
 import 'server-only';
 import type {
   DescribeKiloDatasetInput,
+  GetKiloUsageCostInput,
   QueryKiloDatasetColumn,
   QueryKiloDatasetInput,
 } from './contracts';
@@ -23,6 +24,26 @@ type QueryExample = {
   input: QueryKiloDatasetInput;
 };
 
+type QueryDatasetRecipe = {
+  id: string;
+  title: string;
+  description: string;
+  useWhen: string[];
+  tool: 'query_kilo_dataset';
+  input: QueryKiloDatasetInput;
+};
+
+type UsageCostRecipe = {
+  id: string;
+  title: string;
+  description: string;
+  useWhen: string[];
+  tool: 'get_kilo_usage_cost';
+  input: GetKiloUsageCostInput;
+};
+
+type DatasetRecipe = QueryDatasetRecipe | UsageCostRecipe;
+
 type DatasetDescription = {
   name: DatasetName;
   description: string;
@@ -37,6 +58,7 @@ type DatasetDescription = {
 
 export type DescribeKiloDatasetOutput = {
   datasets: DatasetDescription[];
+  recipes?: DatasetRecipe[];
   rules: {
     scope: { type: 'me' };
     range: string[];
@@ -59,6 +81,7 @@ const commonRules: DescribeKiloDatasetOutput['rules'] = {
     'timeseries returns UTC buckets and includes bucketStart. Include bucket: hour, day, or week.',
   ],
   metrics: [
+    'For usage cost, prefer get_kilo_usage_cost. It derives valid aggregate or timeseries query_kilo_dataset inputs for common cost questions.',
     'count counts rows and must be written as { "operation": "count" } with no field.',
     'sum, avg, min, max, and countDistinct require a metric field approved for the selected dataset.',
     'Metric output aliases are count or <operation>_<field>, such as sum_costUsd.',
@@ -123,6 +146,55 @@ const microdollarUsageExamples: QueryExample[] = [
       groupBy: ['model'],
       metrics: [{ operation: 'count' }],
       orderBy: [{ field: 'count', direction: 'desc' }],
+    },
+  },
+];
+
+const microdollarUsageRecipes: DatasetRecipe[] = [
+  {
+    id: 'usage_cost_yesterday',
+    title: 'Usage cost for yesterday',
+    description:
+      'Best default for prompts like "What was my cost yesterday?". Replace UTC with the user or local IANA timezone when known.',
+    useWhen: ['cost yesterday', 'spend yesterday', 'usage cost yesterday'],
+    tool: 'get_kilo_usage_cost',
+    input: { period: 'yesterday', timezone: 'UTC' },
+  },
+  {
+    id: 'usage_cost_by_model_last_7_days',
+    title: 'Usage cost by model',
+    description:
+      'Breaks recent model usage cost down by requested or routed model without hand-building groupBy metrics.',
+    useWhen: ['cost by model', 'spend by model', 'model costs'],
+    tool: 'get_kilo_usage_cost',
+    input: { period: 'last_7_days', timezone: 'UTC', groupBy: 'model' },
+  },
+  {
+    id: 'usage_cost_daily_trend',
+    title: 'Daily usage cost trend',
+    description: 'Returns bucketed cost rows for charting or trend summaries.',
+    useWhen: ['daily cost trend', 'cost over time', 'usage spend trend'],
+    tool: 'get_kilo_usage_cost',
+    input: { period: 'last_7_days', timezone: 'UTC', bucket: 'day' },
+  },
+  {
+    id: 'raw_usage_cost_total_day',
+    title: 'Raw usage cost aggregate query',
+    description:
+      'Minimal valid generic query_kilo_dataset payload for a fixed UTC day. Aggregate mode must not include bucket.',
+    useWhen: ['raw aggregate cost query', 'query_kilo_dataset cost example'],
+    tool: 'query_kilo_dataset',
+    input: {
+      dataset: 'microdollar_usage',
+      mode: 'aggregate',
+      range: {
+        startDate: '2026-06-22T00:00:00.000Z',
+        endDate: '2026-06-23T00:00:00.000Z',
+      },
+      metrics: [
+        { operation: 'sum', field: 'costUsd' },
+        { operation: 'sum', field: 'costMicrodollars' },
+      ],
     },
   },
 ];
@@ -384,6 +456,14 @@ const datasetDescriptions: Record<DatasetName, DatasetDescription> = {
   ),
 };
 
+const datasetRecipes: Record<DatasetName, DatasetRecipe[]> = {
+  microdollar_usage: microdollarUsageRecipes,
+  code_reviews: [],
+  cloud_sessions: [],
+  cli_sessions: [],
+  vscode_sessions: [],
+};
+
 function withoutExamples(description: DatasetDescription): DatasetDescription {
   const descriptionWithoutExamples = { ...description };
   delete descriptionWithoutExamples.examples;
@@ -403,9 +483,11 @@ export function describeKiloDataset(input: DescribeKiloDatasetInput): DescribeKi
   const descriptions = input.dataset
     ? [datasetDescriptions[input.dataset]]
     : Object.values(datasetDescriptions);
+  const recipes = descriptions.flatMap(description => datasetRecipes[description.name]);
 
   return {
     datasets: includeExamples ? descriptions : descriptions.map(withoutExamples),
+    ...(includeExamples ? { recipes } : {}),
     rules: commonRules,
   };
 }

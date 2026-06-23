@@ -153,6 +153,98 @@ export const QueryKiloDatasetInputSchema = z
     }
   });
 
+const UsageCostGroupBySchema = z.enum([
+  'organizationId',
+  'provider',
+  'model',
+  'hasError',
+  'inferenceProvider',
+  'projectId',
+]);
+
+function isValidTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format(new Date(0));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const GetKiloUsageCostInputSchema = z
+  .object({
+    period: z
+      .enum(['today', 'yesterday', 'last_7_days', 'last_30_days', 'custom'])
+      .describe('Calendar period to query. Use custom only with explicit startDate and endDate.'),
+    timezone: z
+      .string()
+      .min(1)
+      .refine(isValidTimeZone, 'timezone must be a valid IANA timezone, such as UTC')
+      .optional()
+      .describe(
+        'IANA timezone for calendar periods such as today and yesterday. Defaults to UTC; use the user/local timezone when known.'
+      ),
+    startDate: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Inclusive ISO timestamp lower bound. Required only when period is custom.'),
+    endDate: z
+      .string()
+      .min(1)
+      .optional()
+      .describe('Exclusive ISO timestamp upper bound. Required only when period is custom.'),
+    groupBy: UsageCostGroupBySchema.optional().describe(
+      'Optional safe dimension for cost breakdowns. Omit for one total row.'
+    ),
+    bucket: z
+      .enum(['hour', 'day', 'week'])
+      .optional()
+      .describe('Optional trend bucket. Omit for one total row; include for a timeseries.'),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(100)
+      .optional()
+      .describe('Maximum rows when grouping or bucketed. Defaults to 50.'),
+  })
+  .strict()
+  .superRefine((input, ctx) => {
+    if (input.period === 'custom') {
+      if (input.startDate === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['startDate'],
+          message: 'startDate is required when period is custom',
+        });
+      }
+      if (input.endDate === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['endDate'],
+          message: 'endDate is required when period is custom',
+        });
+      }
+      return;
+    }
+
+    if (input.startDate !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['startDate'],
+        message: 'startDate is only allowed when period is custom',
+      });
+    }
+    if (input.endDate !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['endDate'],
+        message: 'endDate is only allowed when period is custom',
+      });
+    }
+  });
+
 export const DescribeKiloDatasetInputSchema = z
   .object({
     dataset: QueryKiloDatasetNameSchema.optional().describe(
@@ -167,6 +259,7 @@ export const DescribeKiloDatasetInputSchema = z
 
 export type QueryKiloDatasetInput = z.infer<typeof QueryKiloDatasetInputSchema>;
 export type DescribeKiloDatasetInput = z.infer<typeof DescribeKiloDatasetInputSchema>;
+export type GetKiloUsageCostInput = z.infer<typeof GetKiloUsageCostInputSchema>;
 
 export type QueryKiloDatasetColumn = {
   name: string;
@@ -185,4 +278,24 @@ export type QueryKiloDatasetOutput = {
   };
   columns: QueryKiloDatasetColumn[];
   rows: Array<Record<string, string | number | boolean | null>>;
+};
+
+export type GetKiloUsageCostOutput = {
+  dataset: 'microdollar_usage';
+  period: GetKiloUsageCostInput['period'];
+  timezone: string | null;
+  range: QueryKiloDatasetOutput['range'];
+  bucket?: GetKiloUsageCostInput['bucket'];
+  groupBy?: GetKiloUsageCostInput['groupBy'];
+  columns: QueryKiloDatasetColumn[];
+  rows: Array<Record<string, string | number | boolean | null>>;
+  summary: {
+    totalCostUsd: string;
+    totalCostMicrodollars: number;
+    rowCount: number;
+  };
+  query: {
+    tool: 'query_kilo_dataset';
+    input: QueryKiloDatasetInput;
+  };
 };

@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { QueryKiloDatasetInputSchema } from './contracts';
+import { GetKiloUsageCostInputSchema, QueryKiloDatasetInputSchema } from './contracts';
 
 function parseMessages(input: unknown): string[] {
   const result = QueryKiloDatasetInputSchema.safeParse(input);
@@ -76,5 +76,73 @@ describe('QueryKiloDatasetInputSchema', () => {
         orderBy: [{ field: 'count', direction: 'desc' }],
       }).success
     ).toBe(true);
+  });
+});
+
+describe('GetKiloUsageCostInputSchema', () => {
+  test('accepts yesterday cost queries with a timezone', () => {
+    expect(
+      GetKiloUsageCostInputSchema.safeParse({
+        period: 'yesterday',
+        timezone: 'Europe/Athens',
+      }).success
+    ).toBe(true);
+  });
+
+  test('accepts grouped and bucketed cost queries', () => {
+    expect(
+      GetKiloUsageCostInputSchema.safeParse({
+        period: 'last_7_days',
+        timezone: 'UTC',
+        groupBy: 'model',
+        bucket: 'day',
+      }).success
+    ).toBe(true);
+  });
+
+  test('requires explicit dates for custom ranges', () => {
+    const result = GetKiloUsageCostInputSchema.safeParse({ period: 'custom' });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map(issue => issue.message)).toEqual(
+        expect.arrayContaining([
+          'startDate is required when period is custom',
+          'endDate is required when period is custom',
+        ])
+      );
+    }
+  });
+
+  test('rejects manual dates for calendar periods', () => {
+    const result = GetKiloUsageCostInputSchema.safeParse({
+      period: 'yesterday',
+      startDate: '2026-06-22T00:00:00.000Z',
+      endDate: '2026-06-23T00:00:00.000Z',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map(issue => issue.message)).toEqual(
+        expect.arrayContaining([
+          'startDate is only allowed when period is custom',
+          'endDate is only allowed when period is custom',
+        ])
+      );
+    }
+  });
+
+  test('rejects invalid timezones', () => {
+    const result = GetKiloUsageCostInputSchema.safeParse({
+      period: 'today',
+      timezone: 'not-a-zone',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map(issue => issue.message)).toContain(
+        'timezone must be a valid IANA timezone, such as UTC'
+      );
+    }
   });
 });

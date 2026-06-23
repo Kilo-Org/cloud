@@ -11,7 +11,10 @@ import {
 import { readDb } from '@/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
+  GetKiloUsageCostInputSchema,
   QueryKiloDatasetInputSchema,
+  type GetKiloUsageCostInput,
+  type GetKiloUsageCostOutput,
   type QueryKiloDatasetColumn,
   type QueryKiloDatasetInput,
   type QueryKiloDatasetOutput,
@@ -55,10 +58,12 @@ function formatZodError(error: z.ZodError): string {
     .join('; ');
 }
 
-export function formatKiloDatasetQueryError(error: unknown): string {
+export function formatKiloDatasetQueryError(
+  error: unknown,
+  toolName = 'query_kilo_dataset'
+): string {
   if (error instanceof DatasetQueryError) return error.message;
-  if (error instanceof z.ZodError)
-    return `Invalid query_kilo_dataset input: ${formatZodError(error)}`;
+  if (error instanceof z.ZodError) return `Invalid ${toolName} input: ${formatZodError(error)}`;
   return 'Unable to query Kilo dataset';
 }
 
@@ -86,6 +91,154 @@ function normalizeRange(input: QueryKiloDatasetInput['range'], now: Date): Norma
     throw new DatasetQueryError('range cannot exceed 60 days');
   }
   return { startDate: start.toISOString(), endDate: end.toISOString() };
+}
+
+type LocalDate = { year: number; month: number; day: number };
+type LocalDateTime = LocalDate & { hour: number; minute: number; second: number };
+
+function numericPart(parts: Intl.DateTimeFormatPart[], type: string): number {
+  const value = parts.find(part => part.type === type)?.value;
+  if (!value) throw new DatasetQueryError(`unable to resolve ${type} for timezone`);
+  return Number(value);
+}
+
+function localDateFor(date: Date, timeZone: string): LocalDate {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  return {
+    year: numericPart(parts, 'year'),
+    month: numericPart(parts, 'month'),
+    day: numericPart(parts, 'day'),
+  };
+}
+
+function localDateTimeFor(date: Date, timeZone: string): LocalDateTime {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  return {
+    year: numericPart(parts, 'year'),
+    month: numericPart(parts, 'month'),
+    day: numericPart(parts, 'day'),
+    hour: numericPart(parts, 'hour'),
+    minute: numericPart(parts, 'minute'),
+    second: numericPart(parts, 'second'),
+  };
+}
+
+function addLocalDays(date: LocalDate, days: number): LocalDate {
+  const shifted = new Date(Date.UTC(date.year, date.month - 1, date.day + days));
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+  };
+}
+
+function localMidnightToUtc(date: LocalDate, timeZone: string): Date {
+  const targetAsUtc = Date.UTC(date.year, date.month - 1, date.day);
+  let guess = targetAsUtc;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const observed = localDateTimeFor(new Date(guess), timeZone);
+    const observedAsUtc = Date.UTC(
+      observed.year,
+      observed.month - 1,
+      observed.day,
+      observed.hour,
+      observed.minute,
+      observed.second
+    );
+    const diff = targetAsUtc - observedAsUtc;
+    if (diff === 0) break;
+    guess += diff;
+  }
+
+  return new Date(guess);
+}
+
+function usageCostRange(
+  input: GetKiloUsageCostInput,
+  now: Date
+): {
+  range: NormalizedRange;
+  timezone: string | null;
+} {
+  if (input.period === 'custom') {
+    return {
+      range: normalizeRange({ startDate: input.startDate, endDate: input.endDate }, now),
+      timezone: input.timezone ?? null,
+    };
+  }
+
+  const timezone = input.timezone ?? 'UTC';
+  const today = localDateFor(now, timezone);
+  const startLocalDate =
+    input.period === 'today'
+      ? today
+      : input.period === 'yesterday'
+        ? addLocalDays(today, -1)
+        : input.period === 'last_7_days'
+          ? addLocalDays(today, -6)
+          : addLocalDays(today, -29);
+  const endLocalDate = input.period === 'yesterday' ? today : addLocalDays(today, 1);
+
+  return {
+    range: {
+      startDate: localMidnightToUtc(startLocalDate, timezone).toISOString(),
+      endDate: localMidnightToUtc(endLocalDate, timezone).toISOString(),
+    },
+    timezone,
+  };
+}
+
+function formatUsdFromMicrodollars(value: number): string {
+  const sign = value < 0 ? '-' : '';
+  const absoluteValue = Math.abs(value);
+  const dollars = Math.trunc(absoluteValue / 1_000_000);
+  const microdollars = absoluteValue % 1_000_000;
+  const fractional = String(microdollars).padStart(6, '0').replace(/0+$/, '');
+  return fractional ? `${sign}${dollars}.${fractional}` : `${sign}${dollars}`;
+}
+
+function usageCostColumn(column: QueryKiloDatasetColumn): QueryKiloDatasetColumn {
+  if (column.name === 'sum_costUsd') return { ...column, name: 'costUsd' };
+  if (column.name === 'sum_costMicrodollars') return { ...column, name: 'costMicrodollars' };
+  return column;
+}
+
+function usageCostRows(rows: QueryKiloDatasetOutput['rows']): GetKiloUsageCostOutput['rows'] {
+  return rows.map(row => {
+    const output: Record<string, string | number | boolean | null> = {};
+    for (const [key, value] of Object.entries(row)) {
+      if (key === 'sum_costUsd') {
+        output.costUsd = value;
+      } else if (key === 'sum_costMicrodollars') {
+        output.costMicrodollars = value;
+      } else {
+        output[key] = value;
+      }
+    }
+    return output;
+  });
+}
+
+function rowMicrodollars(row: Record<string, string | number | boolean | null>): number {
+  const value = row.costMicrodollars;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') return Number(value);
+  return 0;
 }
 
 function microdollarUsageCatalog(user: User, range: NormalizedRange): Catalog {
@@ -685,4 +838,56 @@ export async function queryKiloDatasetStats(params: {
     columns,
     rows: serializeRows(rowsFromExecute(rawRows), columns),
   };
+}
+
+export async function getKiloUsageCost(params: {
+  user: User;
+  input: unknown;
+  now?: Date;
+}): Promise<GetKiloUsageCostOutput> {
+  const input = GetKiloUsageCostInputSchema.parse(params.input);
+  const { range, timezone } = usageCostRange(input, params.now ?? new Date());
+  const queryInput: QueryKiloDatasetInput = {
+    dataset: 'microdollar_usage',
+    mode: input.bucket ? 'timeseries' : 'aggregate',
+    range,
+    ...(input.bucket ? { bucket: input.bucket } : {}),
+    ...(input.groupBy ? { groupBy: [input.groupBy] } : {}),
+    metrics: [
+      { operation: 'sum', field: 'costUsd' },
+      { operation: 'sum', field: 'costMicrodollars' },
+    ],
+    ...(input.groupBy && !input.bucket
+      ? { orderBy: [{ field: 'sum_costUsd', direction: 'desc' as const }] }
+      : {}),
+    ...(input.limit ? { limit: input.limit } : {}),
+  };
+
+  const queryResult = await queryKiloDatasetStats({
+    user: params.user,
+    input: queryInput,
+    now: params.now,
+  });
+  const rows = usageCostRows(queryResult.rows);
+  const totalCostMicrodollars = rows.reduce((total, row) => total + rowMicrodollars(row), 0);
+
+  const output: GetKiloUsageCostOutput = {
+    dataset: 'microdollar_usage',
+    period: input.period,
+    timezone,
+    range: queryResult.range,
+    columns: queryResult.columns.map(usageCostColumn),
+    rows,
+    summary: {
+      totalCostUsd: formatUsdFromMicrodollars(totalCostMicrodollars),
+      totalCostMicrodollars,
+      rowCount: rows.length,
+    },
+    query: { tool: 'query_kilo_dataset', input: queryInput },
+  };
+
+  if (input.bucket) output.bucket = input.bucket;
+  if (input.groupBy) output.groupBy = input.groupBy;
+
+  return output;
 }

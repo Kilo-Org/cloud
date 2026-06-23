@@ -138,11 +138,11 @@ describe('POST /api/fim/completions', () => {
     expect(response.status).toBe(200);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockedFetch.mock.calls[0];
+    expect(init).toBeDefined();
+    const headers = init?.headers as Record<string, string>;
     expect(url).toBe('https://api.inceptionlabs.ai/v1/fim/completions');
     expect(JSON.parse(init?.body as string).model).toBe('mercury-edit-2');
-    expect((init?.headers as Record<string, string>).Authorization).toBe(
-      'Bearer system-inception-key'
-    );
+    expect(headers.Authorization).toBe('Bearer system-inception-key');
 
     await flushAfter();
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
@@ -187,9 +187,9 @@ describe('POST /api/fim/completions', () => {
 
     expect(response.status).toBe(200);
     const [, init] = mockedFetch.mock.calls[0];
-    expect((init?.headers as Record<string, string>).Authorization).toBe(
-      'Bearer user-inception-key'
-    );
+    expect(init).toBeDefined();
+    const headers = init?.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer user-inception-key');
     await flushAfter();
   });
 });

@@ -505,23 +505,17 @@ type BreakdownValue = {
   value: number;
 };
 
-export function aggregateDisplayedBreakdownValues(
+export function displayBreakdownValues(
   dimension: Dimension,
   filters: Pick<UsageAnalyticsFilters, 'userDisplay'>,
   userEmailsById: Map<string, string>,
   values: BreakdownValue[],
   limit: number
 ): BreakdownValue[] {
-  const totalsByKey = new Map<string, number>();
-
-  for (const value of values) {
-    const key = dimensionDisplayValue(dimension, filters, userEmailsById, value.key);
-    totalsByKey.set(key, (totalsByKey.get(key) ?? 0) + value.value);
-  }
-
-  return Array.from(totalsByKey, ([key, value]) => ({ key, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, limit);
+  return values.slice(0, limit).map(value => ({
+    key: dimensionDisplayValue(dimension, filters, userEmailsById, value.key),
+    value: value.value,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -1124,7 +1118,6 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const dimCol = dimensionColumn(input.dimension);
       const metricExpr = metricExprSql(input.metric, meta.tier, filters.costSource);
       const where = buildWhereClause(meta.tier, filters, ctx.user.id, true);
-      const aggregateByDisplayedKey = input.dimension === 'user' && filters.userDisplay === 'email';
 
       const statement = `
         SELECT
@@ -1134,7 +1127,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         WHERE ${where.sql()}
         GROUP BY 1
         ORDER BY 2 DESC
-        ${aggregateByDisplayedKey ? '' : `LIMIT ${Number(input.limit)}`}
+        LIMIT ${Number(input.limit)}
       `;
 
       // SAFETY: LIMIT value is interpolated directly into SQL but is
@@ -1165,7 +1158,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         value: toSafeNumber(row[1]),
       }));
       const userEmailsById = userEmailsForDisplay(filters, scopedUserEmailMaps);
-      const values = aggregateDisplayedBreakdownValues(
+      const values = displayBreakdownValues(
         input.dimension,
         filters,
         userEmailsById,

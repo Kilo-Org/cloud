@@ -1,7 +1,6 @@
 jest.mock('@/lib/redis', () => ({ redisClient: {} }));
 
 import {
-  aggregateDisplayedBreakdownValues,
   CostSourceSchema,
   UsageAnalyticsFiltersSchema,
   applySelfEmailExclusion,
@@ -9,6 +8,7 @@ import {
   costColumnFor,
   costSumExprSql,
   dimensionDisplayValue,
+  displayBreakdownValues,
   shouldLoadFullOrgWideUserEmailMap,
   userDisplayValue,
 } from './usage-analytics-router';
@@ -123,7 +123,7 @@ describe('usage analytics cost source', () => {
     );
   });
 
-  it('coalesces breakdown values by displayed user email before limiting', () => {
+  it('maps breakdown user ids to emails without changing Snowflake buckets', () => {
     const userEmailsById = new Map([
       ['user_1', 'person@example.com'],
       ['oauth/github:123', 'person@example.com'],
@@ -131,7 +131,7 @@ describe('usage analytics cost source', () => {
     ]);
 
     expect(
-      aggregateDisplayedBreakdownValues(
+      displayBreakdownValues(
         'user',
         { userDisplay: 'email' },
         userEmailsById,
@@ -145,8 +145,8 @@ describe('usage analytics cost source', () => {
         2
       )
     ).toEqual([
-      { key: 'person@example.com', value: 110 },
       { key: 'other@example.com', value: 80 },
+      { key: 'person@example.com', value: 60 },
     ]);
   });
 });

@@ -307,6 +307,86 @@ describe('cli-sessions-v2-router', () => {
     });
   });
 
+  describe('session read authorization', () => {
+    const organizationSessionId = 'ses_read_auth_org_1234';
+    const cloudAgentSessionId = 'cloud-agent-read-auth-org-1234';
+
+    async function removeCreatorMembership() {
+      await db
+        .delete(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, testOrganization.id),
+            eq(organization_memberships.kilo_user_id, regularUser.id)
+          )
+        );
+    }
+
+    beforeEach(async () => {
+      await db.insert(organization_memberships).values({
+        organization_id: testOrganization.id,
+        kilo_user_id: regularUser.id,
+        role: 'member',
+      });
+      await db.insert(cli_sessions_v2).values({
+        session_id: organizationSessionId,
+        cloud_agent_session_id: cloudAgentSessionId,
+        kilo_user_id: regularUser.id,
+        organization_id: testOrganization.id,
+        created_on_platform: 'cloud-agent',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      await removeCreatorMembership();
+    });
+
+    it('get rejects an organization session after its creator loses membership', async () => {
+      await removeCreatorMembership();
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: organizationSessionId })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('getByCloudAgentSessionId rejects an organization session after its creator loses membership', async () => {
+      await removeCreatorMembership();
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getByCloudAgentSessionId({
+          cloud_agent_session_id: cloudAgentSessionId,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('getSessionMessages rejects an organization session before fetching messages after its creator loses membership', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ info: {}, messages: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      try {
+        await removeCreatorMembership();
+
+        const caller = await createCallerForUser(regularUser.id);
+
+        await expect(
+          caller.cliSessionsV2.getSessionMessages({ session_id: organizationSessionId })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        expect(fetchSpy).not.toHaveBeenCalled();
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
   describe('parseGitHubOwnerRepo', () => {
     it('parses https URLs', () => {
       expect(parseGitHubOwnerRepo('https://github.com/Kilo/repo')).toEqual({

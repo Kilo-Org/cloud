@@ -623,6 +623,10 @@ export const cliSessionsV2Router = createTRPCRouter({
       });
     }
 
+    if (session.organization_id) {
+      await ensureOrganizationAccess(ctx, session.organization_id);
+    }
+
     return session;
   }),
 
@@ -653,6 +657,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
+      if (session.organization_id) {
+        await ensureOrganizationAccess(ctx, session.organization_id);
+      }
+
       return session;
     }),
 
@@ -662,7 +670,10 @@ export const cliSessionsV2Router = createTRPCRouter({
   getSessionMessages: baseProcedure
     .input(z.object({ session_id: sessionIdField }))
     .query(async ({ ctx, input }) => {
-      await getSessionWithOwnerCheck(input.session_id, ctx.user.id);
+      const session = await getSessionWithOwnerCheck(input.session_id, ctx.user.id);
+      if (session.organization_id) {
+        await ensureOrganizationAccess(ctx, session.organization_id);
+      }
 
       try {
         const messages = await fetchSessionMessages(input.session_id, ctx.user);

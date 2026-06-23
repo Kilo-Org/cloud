@@ -31,5 +31,6 @@ export interface KiloGatewayEvalToolCall {
 
 export interface KiloGatewayChatCompletion {
   readonly content?: string;
+  readonly reasoning?: string;
   readonly toolCalls: KiloGatewayEvalToolCall[];
 }

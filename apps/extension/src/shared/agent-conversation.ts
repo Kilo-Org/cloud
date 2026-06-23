@@ -9,6 +9,11 @@ export type AgentConversationEvent =
       readonly type: 'message';
     }
   | {
+      readonly id: string;
+      readonly text: string;
+      readonly type: 'thinking';
+    }
+  | {
       readonly code: string;
       readonly id: string;
       readonly name: 'eval';
@@ -74,6 +79,14 @@ export const createAssistantMessage = (text: string): MessageEvent => ({
   role: 'assistant',
   text,
   type: 'message',
+});
+
+export const createThinkingBlock = (
+  text: string
+): Extract<AgentConversationEvent, { readonly type: 'thinking' }> => ({
+  id: createEventId(),
+  text,
+  type: 'thinking',
 });
 
 export const createEvalToolCall = ({
@@ -143,6 +156,8 @@ export const getConversationScrollKey = (items: GroupedConversationItem[]): stri
 
       const { event } = item;
 
-      return event.type === 'message' ? `${event.id}:${event.text.length}` : event.id;
+      return event.type === 'message' || event.type === 'thinking'
+        ? `${event.id}:${event.text.length}`
+        : event.id;
     })
     .join('|');

@@ -13,6 +13,7 @@ interface FetchKiloGatewayChatCompletionStreamOptions {
   readonly messages: KiloGatewayChatMessage[];
   readonly model: string;
   readonly onContentDelta: (delta: string) => void;
+  readonly onReasoningDelta?: ((delta: string) => void) | undefined;
   readonly organizationId?: string | undefined;
   readonly signal?: AbortSignal | undefined;
   readonly thinkingEffort?: string | undefined;
@@ -30,13 +31,19 @@ interface StreamingAccumulator {
   content: string;
   isDone: boolean;
   pendingText: string;
+  reasoning: string;
   toolCallsByIndex: Map<number, StreamingToolCallBuffer>;
+}
+
+interface StreamingDeltaHandlers {
+  readonly onContentDelta: (delta: string) => void;
+  readonly onReasoningDelta: (delta: string) => void;
 }
 
 interface StreamReaderContext {
   readonly accumulator: StreamingAccumulator;
   readonly decoder: TextDecoder;
-  readonly onContentDelta: (delta: string) => void;
+  readonly handlers: StreamingDeltaHandlers;
   readonly reader: ReadableStreamDefaultReader<Uint8Array>;
 }
 
@@ -143,7 +150,7 @@ const mergeStreamingToolCall = (
 const applyStreamingData = (
   accumulator: StreamingAccumulator,
   data: string,
-  onContentDelta: (delta: string) => void
+  handlers: StreamingDeltaHandlers
 ): void => {
   if (data === '[DONE]') {
     accumulator.isDone = true;
@@ -163,7 +170,7 @@ const applyStreamingData = (
   }
 
   const { delta } = choice;
-  const { content, tool_calls: toolCalls } = delta;
+  const { content, reasoning, tool_calls: toolCalls } = delta;
   const reasoningKeys = Object.keys(delta).filter(
     key => key.includes('reason') || key.includes('thinking')
   );
@@ -181,7 +188,12 @@ const applyStreamingData = (
 
   if (typeof content === 'string' && content.length > 0) {
     accumulator.content += content;
-    onContentDelta(content);
+    handlers.onContentDelta(content);
+  }
+
+  if (typeof reasoning === 'string' && reasoning.length > 0) {
+    accumulator.reasoning += reasoning;
+    handlers.onReasoningDelta(reasoning);
   }
 
   if (Array.isArray(toolCalls)) {
@@ -192,6 +204,7 @@ const applyStreamingData = (
 };
 const toCompletion = (accumulator: StreamingAccumulator): KiloGatewayChatCompletion => ({
   ...(accumulator.content === '' ? {} : { content: accumulator.content }),
+  ...(accumulator.reasoning === '' ? {} : { reasoning: accumulator.reasoning }),
   toolCalls: [...accumulator.toolCallsByIndex.values()].map(toolCall =>
     parseEvalToolCallBuffer(toolCall)
   ),
@@ -199,17 +212,20 @@ const toCompletion = (accumulator: StreamingAccumulator): KiloGatewayChatComplet
 
 export const parseKiloGatewayChatCompletionStream = (
   text: string,
-  onContentDelta: (delta: string) => void
+  onContentDelta: (delta: string) => void,
+  onReasoningDelta: (delta: string) => void = () => {}
 ): KiloGatewayChatCompletion => {
   const accumulator: StreamingAccumulator = {
     content: '',
     isDone: false,
     pendingText: '',
+    reasoning: '',
     toolCallsByIndex: new Map(),
   };
+  const handlers = { onContentDelta, onReasoningDelta };
 
   for (const data of parseServerSentEvents(text)) {
-    applyStreamingData(accumulator, data, onContentDelta);
+    applyStreamingData(accumulator, data, handlers);
 
     if (accumulator.isDone) {
       break;
@@ -221,7 +237,7 @@ export const parseKiloGatewayChatCompletionStream = (
 const consumeStreamReader = async ({
   accumulator,
   decoder,
-  onContentDelta,
+  handlers,
   reader,
 }: StreamReaderContext): Promise<void> => {
   if (accumulator.isDone) {
@@ -236,7 +252,7 @@ const consumeStreamReader = async ({
   accumulator.pendingText = blocks.pop() ?? '';
 
   for (const data of parseServerSentEvents(blocks.join('\n\n'))) {
-    applyStreamingData(accumulator, data, onContentDelta);
+    applyStreamingData(accumulator, data, handlers);
 
     if (accumulator.isDone) {
       return;
@@ -248,25 +264,28 @@ const consumeStreamReader = async ({
     return;
   }
 
-  await consumeStreamReader({ accumulator, decoder, onContentDelta, reader });
+  await consumeStreamReader({ accumulator, decoder, handlers, reader });
 };
 const consumeKiloGatewayChatCompletionStream = async (
   body: ReadableStream<Uint8Array>,
-  onContentDelta: (delta: string) => void
+  onContentDelta: (delta: string) => void,
+  onReasoningDelta: (delta: string) => void
 ): Promise<KiloGatewayChatCompletion> => {
   const accumulator: StreamingAccumulator = {
     content: '',
     isDone: false,
     pendingText: '',
+    reasoning: '',
     toolCallsByIndex: new Map(),
   };
   const reader = body.getReader();
   const decoder = new TextDecoder();
+  const handlers = { onContentDelta, onReasoningDelta };
 
-  await consumeStreamReader({ accumulator, decoder, onContentDelta, reader });
+  await consumeStreamReader({ accumulator, decoder, handlers, reader });
 
   for (const data of parseServerSentEvents(accumulator.pendingText)) {
-    applyStreamingData(accumulator, data, onContentDelta);
+    applyStreamingData(accumulator, data, handlers);
   }
 
   return toCompletion(accumulator);
@@ -277,6 +296,7 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   messages,
   model,
   onContentDelta,
+  onReasoningDelta = () => {},
   organizationId,
   signal,
   thinkingEffort,
@@ -311,5 +331,5 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   if (response.body === null) {
     throw new Error('Gateway chat completion stream did not include a body.');
   }
-  return consumeKiloGatewayChatCompletionStream(response.body, onContentDelta);
+  return consumeKiloGatewayChatCompletionStream(response.body, onContentDelta, onReasoningDelta);
 };

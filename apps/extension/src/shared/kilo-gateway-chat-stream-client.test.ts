@@ -123,6 +123,45 @@ describe('kilo gateway chat stream client', () => {
     debug.mockRestore();
   });
 
+  it('streams reasoning deltas separately from visible content', async () => {
+    const contentDeltas: string[] = [];
+    const reasoningDeltas: string[] = [];
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"content":"","reasoning":"Think","reasoning_details":[{"type":"reasoning.text","text":"Think","format":"unknown","index":0}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"","reasoning":"ing"}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"Visible answer."}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Think', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: delta => {
+          contentDeltas.push(delta);
+        },
+        onReasoningDelta: delta => {
+          reasoningDeltas.push(delta);
+        },
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      content: 'Visible answer.',
+      reasoning: 'Thinking',
+      toolCalls: [],
+    });
+
+    expect(contentDeltas).toStrictEqual(['Visible answer.']);
+    expect(reasoningDeltas).toStrictEqual(['Think', 'ing']);
+
+    debug.mockRestore();
+  });
+
   it('sends selected thinking effort as gateway reasoning', async () => {
     let seenBody: unknown = null;
     const fetch: FetchLike = (_input, init) => {

@@ -89,6 +89,9 @@ export const buildGatewayMessagesFromEvents = (
           messages.push({ content: getGatewayMessageText(event), role: event.role });
           break;
         }
+        case 'thinking': {
+          break;
+        }
         case 'tool-call': {
           const toolCalls = getConsecutiveToolCalls(events, index);
           for (const toolCall of toolCalls) {

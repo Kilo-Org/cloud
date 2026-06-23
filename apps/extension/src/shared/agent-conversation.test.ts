@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createAssistantMessage,
   createEvalToolCall,
+  createThinkingBlock,
   createToolResult,
   createUserMessage,
   groupConversationEvents,
@@ -12,6 +13,7 @@ describe('agent conversation events', () => {
   it('creates stable conversation events for messages and eval tools', () => {
     const userMessage = createUserMessage('Inspect the page');
     const assistantMessage = createAssistantMessage('I can do that.');
+    const thinkingBlock = createThinkingBlock('I should inspect the title.');
     const toolCall = createEvalToolCall({
       code: 'return document.title;',
       tabId: 7,
@@ -24,12 +26,15 @@ describe('agent conversation events', () => {
 
     const { id: userMessageId, ...userMessagePayload } = userMessage;
     const { id: assistantMessageId, ...assistantMessagePayload } = assistantMessage;
+    const { id: thinkingBlockId, ...thinkingBlockPayload } = thinkingBlock;
     const { id: toolCallId, ...toolCallPayload } = toolCall;
     const { id: toolResultId, ...toolResultPayload } = toolResult;
 
     expect({
       assistantMessageIdType: typeof assistantMessageId,
       assistantMessagePayload,
+      thinkingBlockIdType: typeof thinkingBlockId,
+      thinkingBlockPayload,
       toolCallIdType: typeof toolCallId,
       toolCallPayload,
       toolResultIdType: typeof toolResultId,
@@ -42,6 +47,11 @@ describe('agent conversation events', () => {
         role: 'assistant',
         text: 'I can do that.',
         type: 'message',
+      },
+      thinkingBlockIdType: 'string',
+      thinkingBlockPayload: {
+        text: 'I should inspect the title.',
+        type: 'thinking',
       },
       toolCallIdType: 'string',
       toolCallPayload: {
@@ -93,6 +103,16 @@ describe('agent conversation events', () => {
     const firstKey = getConversationScrollKey(groupConversationEvents([assistantMessage]));
     const nextKey = getConversationScrollKey(
       groupConversationEvents([{ ...assistantMessage, text: 'Streaming more tokens' }])
+    );
+
+    expect(nextKey).not.toBe(firstKey);
+  });
+
+  it('changes the scroll key when a streamed thinking block grows in place', () => {
+    const thinkingBlock = createThinkingBlock('Thinking');
+    const firstKey = getConversationScrollKey(groupConversationEvents([thinkingBlock]));
+    const nextKey = getConversationScrollKey(
+      groupConversationEvents([{ ...thinkingBlock, text: 'Thinking more tokens' }])
     );
 
     expect(nextKey).not.toBe(firstKey);

@@ -179,6 +179,14 @@ export const AgentChatPanel = ({
     );
   };
 
+  const updateThinkingBlock = (eventId: string, text: string): void => {
+    setEvents(currentEvents =>
+      currentEvents.map(event =>
+        event.id === eventId && event.type === 'thinking' ? { ...event, text } : event
+      )
+    );
+  };
+
   const submitMessage = (text: string): void => {
     const selectedTab = inspectableTabs.find(tab => tab.id === selectedTabId);
     const userEvent = createUserMessage(
@@ -219,6 +227,7 @@ export const AgentChatPanel = ({
           thinkingEffort,
           token: auth.token,
           updateAssistantMessage,
+          updateThinkingBlock,
         });
       } finally {
         if (runAbortRef.current === abort) {

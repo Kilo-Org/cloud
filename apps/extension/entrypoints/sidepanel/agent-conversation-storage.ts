@@ -14,6 +14,11 @@ const isMessageEvent = (value: Record<string, unknown>): boolean =>
   typeof value['id'] === 'string' &&
   typeof value['text'] === 'string';
 
+const isThinkingEvent = (value: Record<string, unknown>): boolean =>
+  value['type'] === 'thinking' &&
+  typeof value['id'] === 'string' &&
+  typeof value['text'] === 'string';
+
 const isToolCallEvent = (value: Record<string, unknown>): boolean =>
   value['type'] === 'tool-call' &&
   value['name'] === 'eval' &&
@@ -35,7 +40,10 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
   return value.every(
     event =>
       isRecord(event) &&
-      (isMessageEvent(event) || isToolCallEvent(event) || isToolResultEvent(event))
+      (isMessageEvent(event) ||
+        isThinkingEvent(event) ||
+        isToolCallEvent(event) ||
+        isToolResultEvent(event))
   )
     ? value
     : undefined;

@@ -1,4 +1,8 @@
-import { createAssistantMessage, createEvalToolCall } from '@/src/shared/agent-conversation';
+import {
+  createAssistantMessage,
+  createEvalToolCall,
+  createThinkingBlock,
+} from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import {
   buildGatewayMessagesFromEvents,
@@ -23,6 +27,7 @@ interface RunDangerousLlmTurnOptions {
   readonly thinkingEffort?: string | undefined;
   readonly token: string;
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
+  readonly updateThinkingBlock: (eventId: string, text: string) => void;
 }
 
 const evalToolDefinition = createEvalToolDefinition();
@@ -56,10 +61,12 @@ export const runDangerousLlmTurn = async ({
   thinkingEffort,
   token,
   updateAssistantMessage,
+  updateThinkingBlock,
 }: RunDangerousLlmTurnOptions): Promise<void> => {
   const getGatewayChatCompletion = (
     nextEvents: AgentConversationEvent[],
-    onContentDelta: (delta: string) => void
+    onContentDelta: (delta: string) => void,
+    onReasoningDelta: (delta: string) => void
   ) =>
     fetchKiloGatewayChatCompletionStream({
       apiBaseUrl,
@@ -67,6 +74,7 @@ export const runDangerousLlmTurn = async ({
       messages: buildGatewayMessagesFromEvents(nextEvents),
       model,
       onContentDelta,
+      onReasoningDelta,
       organizationId,
       signal,
       thinkingEffort,
@@ -83,20 +91,54 @@ export const runDangerousLlmTurn = async ({
     const completionEvents: AgentConversationEvent[] = [];
     let streamedText = '';
     let streamedAssistantEventId: string | undefined = undefined;
-    const completion = await getGatewayChatCompletion(nextEvents, delta => {
-      streamedText += delta;
+    let streamedThinkingText = '';
+    let streamedThinkingEventId: string | undefined = undefined;
+    const completion = await getGatewayChatCompletion(
+      nextEvents,
+      delta => {
+        streamedText += delta;
 
-      if (streamedAssistantEventId === undefined) {
-        const assistantEvent = createAssistantMessageEvent(streamedText);
+        if (streamedAssistantEventId === undefined) {
+          const assistantEvent = createAssistantMessageEvent(streamedText);
 
-        streamedAssistantEventId = assistantEvent.id;
-        completionEvents.push(assistantEvent);
-        appendEvents([assistantEvent]);
-        return;
+          streamedAssistantEventId = assistantEvent.id;
+          completionEvents.push(assistantEvent);
+          appendEvents([assistantEvent]);
+          return;
+        }
+
+        updateAssistantMessage(streamedAssistantEventId, streamedText);
+      },
+      delta => {
+        streamedThinkingText += delta;
+
+        if (streamedThinkingEventId === undefined) {
+          const thinkingEvent = createThinkingBlock(streamedThinkingText);
+
+          streamedThinkingEventId = thinkingEvent.id;
+          completionEvents.push(thinkingEvent);
+          appendEvents([thinkingEvent]);
+          return;
+        }
+
+        updateThinkingBlock(streamedThinkingEventId, streamedThinkingText);
       }
+    );
 
-      updateAssistantMessage(streamedAssistantEventId, streamedText);
-    });
+    if (streamedThinkingEventId !== undefined) {
+      const finalStreamedThinkingText = completion.reasoning ?? streamedThinkingText;
+      const streamedThinkingEventIndex = completionEvents.findIndex(
+        event => event.id === streamedThinkingEventId
+      );
+
+      if (streamedThinkingEventIndex !== -1) {
+        completionEvents.splice(streamedThinkingEventIndex, 1, {
+          id: streamedThinkingEventId,
+          text: finalStreamedThinkingText,
+          type: 'thinking',
+        });
+      }
+    }
 
     if (streamedAssistantEventId !== undefined) {
       const finalStreamedText = completion.content ?? streamedText;
@@ -118,6 +160,10 @@ export const runDangerousLlmTurn = async ({
       completionEvents.push(createAssistantMessage(completion.content));
     }
 
+    if (completion.reasoning !== undefined && streamedThinkingEventId === undefined) {
+      completionEvents.push(createThinkingBlock(completion.reasoning));
+    }
+
     const toolCallEvents = completion.toolCalls.map(evalToolCall =>
       createEvalToolCall({
         code: evalToolCall.code,
@@ -127,7 +173,11 @@ export const runDangerousLlmTurn = async ({
     );
     completionEvents.push(...toolCallEvents);
 
-    appendEvents(completionEvents.filter(event => event.id !== streamedAssistantEventId));
+    appendEvents(
+      completionEvents.filter(
+        event => event.id !== streamedAssistantEventId && event.id !== streamedThinkingEventId
+      )
+    );
 
     return { completionEvents, toolCallEvents };
   };

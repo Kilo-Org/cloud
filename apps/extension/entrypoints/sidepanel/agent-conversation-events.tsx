@@ -54,6 +54,21 @@ const MessageEvent = ({
   );
 };
 
+const ThinkingEvent = ({
+  event,
+}: {
+  event: Extract<AgentConversationEvent, { readonly type: 'thinking' }>;
+}): JSX.Element => (
+  <details className="group rounded-md border border-zinc-800 bg-zinc-900/60 px-3 py-2">
+    <summary className="cursor-pointer list-none text-xs font-semibold text-zinc-400 outline-none transition hover:text-zinc-200 focus-visible:ring-2 focus-visible:ring-[#EDFF00] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950">
+      thinking
+    </summary>
+    <div className="agent-message-markdown mt-2 text-xs leading-5 text-zinc-400">
+      <ReactMarkdown>{event.text}</ReactMarkdown>
+    </div>
+  </details>
+);
+
 const ToolExchangeEvent = ({
   item,
 }: {
@@ -102,7 +117,7 @@ const ToolExchangeEvent = ({
 const StandaloneToolEvent = ({
   event,
 }: {
-  event: Exclude<AgentConversationEvent, { readonly type: 'message' }>;
+  event: Exclude<AgentConversationEvent, { readonly type: 'message' | 'thinking' }>;
 }): JSX.Element => {
   let title = 'eval error';
   let body = event.type === 'tool-call' ? event.code : event.error;
@@ -137,6 +152,10 @@ export const AgentConversationItemView = ({
 
   if (event.type === 'message') {
     return <MessageEvent event={event} />;
+  }
+
+  if (event.type === 'thinking') {
+    return <ThinkingEvent event={event} />;
   }
 
   return <StandaloneToolEvent event={event} />;

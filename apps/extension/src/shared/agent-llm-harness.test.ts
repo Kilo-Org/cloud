@@ -7,6 +7,7 @@ import {
 import {
   createAssistantMessage,
   createEvalToolCall,
+  createThinkingBlock,
   createToolResult,
   createUserMessage,
 } from './agent-conversation';
@@ -114,6 +115,19 @@ describe('agent LLM harness', () => {
     const assistantMessage = createAssistantMessage('Summary');
 
     expect(buildGatewayMessagesFromEvents([assistantMessage])).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      {
+        content: 'Summary',
+        role: 'assistant',
+      },
+    ]);
+  });
+
+  it('does not send thinking blocks back to the gateway', () => {
+    const thinkingBlock = createThinkingBlock('Private scratchpad');
+    const assistantMessage = createAssistantMessage('Summary');
+
+    expect(buildGatewayMessagesFromEvents([thinkingBlock, assistantMessage])).toStrictEqual([
       { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
       {
         content: 'Summary',

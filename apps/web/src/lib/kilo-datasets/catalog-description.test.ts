@@ -23,6 +23,21 @@ describe('describeKiloDataset recipes', () => {
 
       expect(result.success).toBe(true);
     }
+
+    expect(output.recipes?.find(recipe => recipe.id === 'usage_cost_yesterday')).toMatchObject({
+      tool: 'get_kilo_usage_cost',
+      input: { period: 'yesterday', timezone: null },
+    });
+    expect(
+      output.recipes?.find(recipe => recipe.id === 'usage_cost_by_model_last_7_days')
+    ).toMatchObject({
+      tool: 'query_kilo_dataset',
+      input: { mode: 'aggregate', groupBy: ['model'] },
+    });
+    expect(output.recipes?.find(recipe => recipe.id === 'usage_cost_daily_trend')).toMatchObject({
+      tool: 'query_kilo_dataset',
+      input: { mode: 'timeseries', bucket: 'day' },
+    });
   });
 
   test('omits recipes when examples are disabled', () => {

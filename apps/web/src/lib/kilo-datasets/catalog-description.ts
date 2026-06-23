@@ -81,7 +81,7 @@ const commonRules: DescribeKiloDatasetOutput['rules'] = {
     'timeseries returns UTC buckets and includes bucketStart. Include bucket: hour, day, or week.',
   ],
   metrics: [
-    'For usage cost, prefer get_kilo_usage_cost. It derives valid aggregate or timeseries query_kilo_dataset inputs for common cost questions.',
+    'For common total usage-cost questions, prefer get_kilo_usage_cost. Use query_kilo_dataset for custom ranges, trends, or breakdowns.',
     'count counts rows and must be written as { "operation": "count" } with no field.',
     'sum, avg, min, max, and countDistinct require a metric field approved for the selected dataset.',
     'Metric output aliases are count or <operation>_<field>, such as sum_costUsd.',
@@ -155,27 +155,52 @@ const microdollarUsageRecipes: DatasetRecipe[] = [
     id: 'usage_cost_yesterday',
     title: 'Usage cost for yesterday',
     description:
-      'Best default for prompts like "What was my cost yesterday?". Replace UTC with the user or local IANA timezone when known.',
+      'Best default for prompts like "What was my cost yesterday?". null uses UTC; use an exact user or local IANA timezone when known.',
     useWhen: ['cost yesterday', 'spend yesterday', 'usage cost yesterday'],
     tool: 'get_kilo_usage_cost',
-    input: { period: 'yesterday', timezone: 'UTC' },
+    input: { period: 'yesterday', timezone: null },
   },
   {
     id: 'usage_cost_by_model_last_7_days',
     title: 'Usage cost by model',
     description:
-      'Breaks recent model usage cost down by requested or routed model without hand-building groupBy metrics.',
+      'Generic query_kilo_dataset payload for a fixed seven-day UTC model cost breakdown.',
     useWhen: ['cost by model', 'spend by model', 'model costs'],
-    tool: 'get_kilo_usage_cost',
-    input: { period: 'last_7_days', timezone: 'UTC', groupBy: 'model' },
+    tool: 'query_kilo_dataset',
+    input: {
+      dataset: 'microdollar_usage',
+      mode: 'aggregate',
+      range: {
+        startDate: '2026-06-16T00:00:00.000Z',
+        endDate: '2026-06-23T00:00:00.000Z',
+      },
+      groupBy: ['model'],
+      metrics: [
+        { operation: 'sum', field: 'costUsd' },
+        { operation: 'sum', field: 'costMicrodollars' },
+      ],
+      orderBy: [{ field: 'sum_costUsd', direction: 'desc' }],
+    },
   },
   {
     id: 'usage_cost_daily_trend',
     title: 'Daily usage cost trend',
-    description: 'Returns bucketed cost rows for charting or trend summaries.',
+    description: 'Generic query_kilo_dataset payload for bucketed cost rows.',
     useWhen: ['daily cost trend', 'cost over time', 'usage spend trend'],
-    tool: 'get_kilo_usage_cost',
-    input: { period: 'last_7_days', timezone: 'UTC', bucket: 'day' },
+    tool: 'query_kilo_dataset',
+    input: {
+      dataset: 'microdollar_usage',
+      mode: 'timeseries',
+      bucket: 'day',
+      range: {
+        startDate: '2026-06-16T00:00:00.000Z',
+        endDate: '2026-06-23T00:00:00.000Z',
+      },
+      metrics: [
+        { operation: 'sum', field: 'costUsd' },
+        { operation: 'sum', field: 'costMicrodollars' },
+      ],
+    },
   },
   {
     id: 'raw_usage_cost_total_day',

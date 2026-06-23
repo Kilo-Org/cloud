@@ -168,21 +168,24 @@ function localMidnightToUtc(date: LocalDate, timeZone: string): Date {
   return new Date(guess);
 }
 
+function resolveUsageCostTimezone(timezone: GetKiloUsageCostInput['timezone']): string {
+  if (timezone === null) return 'UTC';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone }).format(new Date(0));
+    return timezone;
+  } catch {
+    throw new DatasetQueryError('timezone must be a valid IANA timezone, such as UTC');
+  }
+}
+
 function usageCostRange(
   input: GetKiloUsageCostInput,
   now: Date
 ): {
   range: NormalizedRange;
-  timezone: string | null;
+  timezone: string;
 } {
-  if (input.period === 'custom') {
-    return {
-      range: normalizeRange({ startDate: input.startDate, endDate: input.endDate }, now),
-      timezone: input.timezone ?? null,
-    };
-  }
-
-  const timezone = input.timezone ?? 'UTC';
+  const timezone = resolveUsageCostTimezone(input.timezone);
   const today = localDateFor(now, timezone);
   const startLocalDate =
     input.period === 'today'
@@ -849,18 +852,12 @@ export async function getKiloUsageCost(params: {
   const { range, timezone } = usageCostRange(input, params.now ?? new Date());
   const queryInput: QueryKiloDatasetInput = {
     dataset: 'microdollar_usage',
-    mode: input.bucket ? 'timeseries' : 'aggregate',
+    mode: 'aggregate',
     range,
-    ...(input.bucket ? { bucket: input.bucket } : {}),
-    ...(input.groupBy ? { groupBy: [input.groupBy] } : {}),
     metrics: [
       { operation: 'sum', field: 'costUsd' },
       { operation: 'sum', field: 'costMicrodollars' },
     ],
-    ...(input.groupBy && !input.bucket
-      ? { orderBy: [{ field: 'sum_costUsd', direction: 'desc' as const }] }
-      : {}),
-    ...(input.limit ? { limit: input.limit } : {}),
   };
 
   const queryResult = await queryKiloDatasetStats({
@@ -885,9 +882,6 @@ export async function getKiloUsageCost(params: {
     },
     query: { tool: 'query_kilo_dataset', input: queryInput },
   };
-
-  if (input.bucket) output.bucket = input.bucket;
-  if (input.groupBy) output.groupBy = input.groupBy;
 
   return output;
 }

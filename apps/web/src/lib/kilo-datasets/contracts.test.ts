@@ -80,7 +80,16 @@ describe('QueryKiloDatasetInputSchema', () => {
 });
 
 describe('GetKiloUsageCostInputSchema', () => {
-  test('accepts yesterday cost queries with a timezone', () => {
+  test('accepts canonical yesterday cost queries with null timezone', () => {
+    expect(
+      GetKiloUsageCostInputSchema.safeParse({
+        period: 'yesterday',
+        timezone: null,
+      }).success
+    ).toBe(true);
+  });
+
+  test('accepts yesterday cost queries with an exact IANA timezone', () => {
     expect(
       GetKiloUsageCostInputSchema.safeParse({
         period: 'yesterday',
@@ -89,60 +98,32 @@ describe('GetKiloUsageCostInputSchema', () => {
     ).toBe(true);
   });
 
-  test('accepts grouped and bucketed cost queries', () => {
-    expect(
-      GetKiloUsageCostInputSchema.safeParse({
-        period: 'last_7_days',
-        timezone: 'UTC',
-        groupBy: 'model',
-        bucket: 'day',
-      }).success
-    ).toBe(true);
-  });
-
-  test('requires explicit dates for custom ranges', () => {
-    const result = GetKiloUsageCostInputSchema.safeParse({ period: 'custom' });
+  test('rejects omitted timezone', () => {
+    const result = GetKiloUsageCostInputSchema.safeParse({ period: 'yesterday' });
 
     expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues.map(issue => issue.message)).toEqual(
-        expect.arrayContaining([
-          'startDate is required when period is custom',
-          'endDate is required when period is custom',
-        ])
-      );
-    }
   });
 
-  test('rejects manual dates for calendar periods', () => {
+  test('rejects custom ranges on the convenience cost tool', () => {
     const result = GetKiloUsageCostInputSchema.safeParse({
-      period: 'yesterday',
+      period: 'custom',
+      timezone: null,
       startDate: '2026-06-22T00:00:00.000Z',
       endDate: '2026-06-23T00:00:00.000Z',
     });
 
     expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues.map(issue => issue.message)).toEqual(
-        expect.arrayContaining([
-          'startDate is only allowed when period is custom',
-          'endDate is only allowed when period is custom',
-        ])
-      );
-    }
   });
 
-  test('rejects invalid timezones', () => {
+  test('rejects removed advanced cost properties', () => {
     const result = GetKiloUsageCostInputSchema.safeParse({
-      period: 'today',
-      timezone: 'not-a-zone',
+      period: 'last_7_days',
+      timezone: null,
+      groupBy: 'model',
+      bucket: 'day',
+      limit: 10,
     });
 
     expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues.map(issue => issue.message)).toContain(
-        'timezone must be a valid IANA timezone, such as UTC'
-      );
-    }
   });
 });

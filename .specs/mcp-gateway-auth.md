@@ -137,16 +137,23 @@ when they appear in all capitals.
 2. The native server MUST expose `query_kilo_dataset` for aggregate and
    timeseries stats over approved per-user Kilo datasets.
 3. The native server MAY expose `get_kilo_usage_cost` as a read-only convenience
-   tool that derives valid `query_kilo_dataset` usage-cost queries for common
-   periods, timezone-aware calendar ranges, optional buckets, and safe public
-   grouping dimensions.
+   tool for total model usage cost over common calendar periods. It MUST derive
+   the underlying aggregate `query_kilo_dataset` query server-side and MUST NOT
+   expose conditionally forbidden custom range, grouping, bucket, or limit
+   properties on this common path.
 4. The native server MAY expose `describe_kilo_dataset` to return static query
    metadata, field capabilities, mode rules, output aliases, and example payloads.
 5. `describe_kilo_dataset` MUST NOT query user data and MUST NOT reveal fields
    excluded from the public dataset catalog.
 6. All native dataset tools MUST require the same native `mcp:access` OAuth token
    and current Kilo org admin eligibility gate.
-7. Dataset tool descriptions, schemas, recipes, and validation errors SHOULD make the
+7. Model-facing schemas for common paths SHOULD avoid optional properties whose
+   presence is conditionally forbidden by handler logic. Where provider strict
+   structured-tool compatibility requires an explicit no-value representation,
+   schemas MAY use required nullable properties, such as `timezone: null` for UTC.
+8. Custom timestamp ranges, grouped costs, cost trends, and raw cost metrics MUST
+   use `query_kilo_dataset` in this version.
+9. Dataset tool descriptions, schemas, recipes, and validation errors SHOULD make the
    following rules clear to MCP clients: aggregate queries do not use buckets,
    timeseries queries require buckets, `count` metrics do not use a field, and
    cost metrics use `costMicrodollars` or `costUsd`.

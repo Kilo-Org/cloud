@@ -67,12 +67,13 @@ describe('createKiloDatasetMcpServer', () => {
       idempotentHint: true,
       openWorldHint: false,
     });
-    expect(costTool.config.description).toContain('Use this instead of query_kilo_dataset');
-    expect(costTool.config.description).toContain('timezone');
+    expect(costTool.config.description).toContain('{"period":"yesterday","timezone":null}');
+    expect(costTool.config.description).toContain('returns one total row');
+    expect(costTool.config.description).toContain('custom ranges, trends, or breakdowns');
     expect(
       costTool.config.inputSchema.safeParse({
         period: 'yesterday',
-        timezone: 'Europe/Athens',
+        timezone: null,
       }).success
     ).toBe(true);
 
@@ -85,6 +86,7 @@ describe('createKiloDatasetMcpServer', () => {
     });
     expect(queryTool.config.description).toContain('Use aggregate without bucket');
     expect(queryTool.config.description).toContain('Prefer get_kilo_usage_cost');
+    expect(queryTool.config.description).toContain('custom ranges, trends, or breakdowns');
     expect(queryTool.config.description).toContain('Use count with no field');
     expect(queryTool.config.description).toContain('costUsd or costMicrodollars');
     expect(

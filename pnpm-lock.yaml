@@ -165,6 +165,9 @@ importers:
 
   apps/extension:
     dependencies:
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.100.10(react@19.2.6)
       '@tanstack/react-virtual':
         specifier: ^3.14.3
         version: 3.14.3(react-dom@19.2.6(react@19.2.6))(react@19.2.6)

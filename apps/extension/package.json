@@ -28,6 +28,7 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@tanstack/react-query": "catalog:",
     "@tanstack/react-virtual": "^3.14.3",
     "lucide-react": "0.552.0",
     "react": "19.2.6",

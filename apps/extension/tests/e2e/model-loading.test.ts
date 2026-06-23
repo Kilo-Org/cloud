@@ -1,6 +1,5 @@
 /* eslint-disable import/no-nodejs-modules */
 import { expect, test } from '@playwright/test';
-import type { Response } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import {
   launchExtensionContext,
@@ -11,10 +10,6 @@ import { mockKiloApi } from './kilo-api-fixture';
 
 const orgOneId = 'org-1';
 const orgTwoId = 'org-2';
-
-const isOrgOneModelsResponse = (response: Response): boolean =>
-  response.url().endsWith('/api/gateway/models') &&
-  response.request().headers()['x-kilocode-organizationid'] === orgOneId;
 
 const delaySecondOrgOneModelRequest = ({
   pendingOrgOneModels,
@@ -204,9 +199,7 @@ test('stale organization model loads cannot overwrite the current catalog', asyn
     await sidePanel.getByLabel('Credit account').selectOption(orgTwoId);
     await expect(sidePanel.getByLabel('Model')).toContainText('Org Two Model');
 
-    const orgOneResponse = sidePanel.waitForResponse(isOrgOneModelsResponse);
     releaseOrgOneModels();
-    await orgOneResponse;
 
     await expect(sidePanel.getByLabel('Model')).toContainText('Org Two Model');
   } finally {

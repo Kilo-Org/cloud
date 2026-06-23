@@ -1,5 +1,6 @@
 import { browser, storage } from '#imports';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import {
   clearStoredAuth,
@@ -10,7 +11,8 @@ import {
   saveStoredAuth,
   validateAuthToken,
 } from '@/src/shared/auth';
-import type { FetchLike, StoredAuth } from '@/src/shared/auth';
+import type { DeviceAuthRequest, FetchLike, StoredAuth } from '@/src/shared/auth';
+import { getAuthValidationQueryKey } from '@/src/shared/side-panel-query-options';
 import {
   LoadingView,
   PendingView,
@@ -22,237 +24,220 @@ import {
 const pollIntervalMs = 3000;
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow: FetchLike = (input, init) => fetch(input, init);
-const isAbortError = (error: unknown): boolean =>
-  error instanceof Error && error.name === 'AbortError';
+const storedAuthQueryKey = ['side-panel', 'stored-auth'] as const;
 
-type PanelState =
-  | {
-      readonly message?: string;
-      readonly status: 'checking' | 'signedOut' | 'starting';
-    }
-  | {
-      readonly code: string;
-      readonly status: 'pending';
-      readonly verificationUrl: string;
-    }
+type AuthValidationData =
   | {
       readonly auth: StoredAuth;
       readonly status: 'signedIn';
+    }
+  | {
+      readonly message?: string;
+      readonly status: 'signedOut';
     }
   | {
       readonly status: 'validationError';
     };
 
 export const App = (): JSX.Element => {
-  const [state, setState] = useState<PanelState>({ status: 'checking' });
-  const abortRef = useRef<AbortController | null>(null);
-  const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const stopPolling = useCallback((): void => {
-    if (pollTimeoutRef.current !== null) {
-      clearTimeout(pollTimeoutRef.current);
-      pollTimeoutRef.current = null;
-    }
-
-    abortRef.current?.abort();
-    abortRef.current = null;
-  }, []);
-
-  const validateStoredAuth = useCallback(async (): Promise<void> => {
-    stopPolling();
-    setState({ status: 'checking' });
-
-    try {
-      const storedAuth = await loadStoredAuth(storage);
-      if (!storedAuth) {
-        setState({ status: 'signedOut' });
-        return;
+  const queryClient = useQueryClient();
+  const [pendingAuthRequest, setPendingAuthRequest] = useState<DeviceAuthRequest | undefined>();
+  const [signedOutMessage, setSignedOutMessage] = useState<string | undefined>();
+  const {
+    data: storedAuth,
+    isLoading: isStoredAuthLoading,
+    isSuccess: isStoredAuthSuccess,
+    refetch: refetchStoredAuth,
+  } = useQuery({
+    queryFn: () => loadStoredAuth(storage),
+    queryKey: storedAuthQueryKey,
+  });
+  const {
+    data: authValidationData,
+    isError: isAuthValidationError,
+    isLoading: isAuthValidationLoading,
+    refetch: refetchAuthValidation,
+  } = useQuery({
+    enabled: isStoredAuthSuccess,
+    queryFn: async ({ signal }): Promise<AuthValidationData> => {
+      if (storedAuth === undefined) {
+        return { status: 'signedOut' };
       }
 
-      const abort = new AbortController();
-      abortRef.current = abort;
       const result = await validateAuthToken({
         apiBaseUrl,
         fetch: fetchFromWindow,
-        signal: abort.signal,
+        signal,
         token: storedAuth.token,
       });
 
-      if (abort.signal.aborted) {
-        return;
-      }
-
       if (result.status === 'valid') {
         await saveStoredAuth(storage, result.auth);
-        setState({ auth: result.auth, status: 'signedIn' });
-        return;
+        return { auth: result.auth, status: 'signedIn' };
       }
 
       if (result.status === 'invalid') {
         await clearStoredAuth(storage);
-        setState({ message: 'Your session expired. Sign in again.', status: 'signedOut' });
-        return;
+        return { message: 'Your session expired. Sign in again.', status: 'signedOut' };
       }
 
-      setState({ status: 'validationError' });
-    } catch (error) {
-      if (isAbortError(error)) {
-        return;
+      return { status: 'validationError' };
+    },
+    queryKey:
+      storedAuth === undefined
+        ? getAuthValidationQueryKey('none')
+        : getAuthValidationQueryKey(storedAuth.token),
+  });
+  const startSignIn = useMutation({
+    mutationFn: () =>
+      createDeviceAuthRequest({
+        apiBaseUrl,
+        fetch: fetchFromWindow,
+      }),
+    onError: () => {
+      setSignedOutMessage('Failed to start sign in. Try again.');
+    },
+    onSuccess: authRequest => {
+      setSignedOutMessage(undefined);
+      setPendingAuthRequest(authRequest);
+      void browser.tabs.create({ url: authRequest.verificationUrl });
+    },
+  });
+  const devicePollQuery = useQuery({
+    enabled: pendingAuthRequest !== undefined,
+    queryFn: ({ signal }) => {
+      if (pendingAuthRequest === undefined) {
+        return Promise.resolve({ status: 'pending' as const });
       }
 
-      setState({ status: 'validationError' });
-    }
-  }, [stopPolling]);
+      return pollDeviceAuthCode({
+        apiBaseUrl,
+        code: pendingAuthRequest.code,
+        fetch: fetchFromWindow,
+        signal,
+      });
+    },
+    queryKey: ['side-panel', 'device-auth', pendingAuthRequest?.code ?? 'idle'],
+    refetchInterval: pendingAuthRequest === undefined ? false : pollIntervalMs,
+  });
 
   useEffect(() => {
-    void validateStoredAuth();
+    if (authValidationData?.status === 'signedOut') {
+      setSignedOutMessage(authValidationData.message);
+      queryClient.setQueryData(storedAuthQueryKey, undefined);
+    }
+  }, [authValidationData, queryClient]);
 
-    return () => {
-      stopPolling();
-    };
-  }, [stopPolling, validateStoredAuth]);
+  useEffect(() => {
+    const result = devicePollQuery.data;
+
+    if (pendingAuthRequest === undefined || result === undefined || result.status === 'pending') {
+      return;
+    }
+
+    if (result.status === 'approved') {
+      void (async (): Promise<void> => {
+        await saveStoredAuth(storage, result.auth);
+        setSignedOutMessage(undefined);
+        queryClient.setQueryData(storedAuthQueryKey, result.auth);
+        queryClient.setQueryData(getAuthValidationQueryKey(result.auth.token), {
+          auth: result.auth,
+          status: 'signedIn',
+        } satisfies AuthValidationData);
+        setPendingAuthRequest(undefined);
+      })();
+      return;
+    }
+
+    setPendingAuthRequest(undefined);
+    setSignedOutMessage(
+      result.status === 'denied' ? 'Access was denied.' : 'Your sign-in code expired.'
+    );
+  }, [devicePollQuery.data, pendingAuthRequest, queryClient]);
+
+  useEffect(() => {
+    if (devicePollQuery.isError) {
+      setPendingAuthRequest(undefined);
+      setSignedOutMessage('Sign in failed. Try again.');
+    }
+  }, [devicePollQuery.isError]);
 
   const cancelSignIn = useCallback((): void => {
-    stopPolling();
-    setState({ status: 'signedOut' });
-  }, [stopPolling]);
+    setPendingAuthRequest(undefined);
+  }, []);
 
   const signOut = useCallback((): void => {
-    stopPolling();
+    setPendingAuthRequest(undefined);
+    setSignedOutMessage(undefined);
     void (async (): Promise<void> => {
       try {
         await clearStoredAuth(storage);
-      } catch {
-        // Storage clear failure should not keep the local panel signed in.
-      }
-
-      setState({ status: 'signedOut' });
-    })();
-  }, [stopPolling]);
-
-  const startPolling = useCallback(
-    (code: string): void => {
-      const tick = async (): Promise<void> => {
-        const abort = abortRef.current;
-
-        if (abort === null) {
-          return;
-        }
-
-        try {
-          const result = await pollDeviceAuthCode({
-            apiBaseUrl,
-            code,
-            fetch: fetchFromWindow,
-            signal: abort.signal,
-          });
-
-          if (abort.signal.aborted) {
-            return;
-          }
-
-          switch (result.status) {
-            case 'pending': {
-              pollTimeoutRef.current = setTimeout(() => {
-                void tick();
-              }, pollIntervalMs);
-              return;
-            }
-            case 'approved': {
-              stopPolling();
-              await saveStoredAuth(storage, result.auth);
-              setState({ auth: result.auth, status: 'signedIn' });
-              return;
-            }
-            case 'denied': {
-              stopPolling();
-              setState({ message: 'Access was denied.', status: 'signedOut' });
-              return;
-            }
-            case 'expired': {
-              stopPolling();
-              setState({ message: 'Your sign-in code expired.', status: 'signedOut' });
-            }
-          }
-        } catch (error) {
-          if (isAbortError(error)) {
-            return;
-          }
-
-          stopPolling();
-          setState({ message: 'Sign in failed. Try again.', status: 'signedOut' });
-        }
-      };
-
-      void tick();
-    },
-    [stopPolling]
-  );
-
-  const startSignIn = useCallback((): void => {
-    stopPolling();
-    setState({ status: 'starting' });
-
-    void (async (): Promise<void> => {
-      try {
-        const authRequest = await createDeviceAuthRequest({
-          apiBaseUrl,
-          fetch: fetchFromWindow,
-        });
-        const abort = new AbortController();
-        abortRef.current = abort;
-
-        setState({
-          code: authRequest.code,
-          status: 'pending',
-          verificationUrl: authRequest.verificationUrl,
-        });
-        await browser.tabs.create({ url: authRequest.verificationUrl });
-        startPolling(authRequest.code);
-      } catch {
-        setState({ message: 'Failed to start sign in. Try again.', status: 'signedOut' });
+      } finally {
+        queryClient.setQueryData(storedAuthQueryKey, undefined);
+        queryClient.removeQueries({ queryKey: ['side-panel', 'auth-validation'] });
       }
     })();
-  }, [startPolling, stopPolling]);
+  }, [queryClient]);
 
-  if (state.status === 'checking') {
+  const retrySessionCheck = useCallback((): void => {
+    if (storedAuth === undefined) {
+      void refetchStoredAuth();
+      return;
+    }
+
+    void refetchAuthValidation();
+  }, [refetchAuthValidation, refetchStoredAuth, storedAuth]);
+
+  if (isStoredAuthLoading || isAuthValidationLoading) {
     return <LoadingView />;
   }
 
-  if (state.status === 'starting') {
-    return <SignedOutView isStarting message={state.message} onSignIn={startSignIn} />;
+  if (startSignIn.isPending) {
+    return (
+      <SignedOutView
+        isStarting
+        message={signedOutMessage}
+        onSignIn={() => {
+          startSignIn.mutate();
+        }}
+      />
+    );
   }
 
-  if (state.status === 'signedOut') {
-    return <SignedOutView isStarting={false} message={state.message} onSignIn={startSignIn} />;
-  }
-
-  if (state.status === 'pending') {
+  if (pendingAuthRequest !== undefined) {
     return (
       <PendingView
-        code={state.code}
+        code={pendingAuthRequest.code}
         onCancel={cancelSignIn}
         onOpen={() => {
-          void browser.tabs.create({ url: state.verificationUrl });
+          void browser.tabs.create({ url: pendingAuthRequest.verificationUrl });
         }}
       />
     );
   }
 
-  if (state.status === 'validationError') {
+  if (authValidationData?.status === 'validationError' || isAuthValidationError) {
     return (
       <ValidationErrorView
-        onRetry={() => {
-          void validateStoredAuth();
+        onRetry={retrySessionCheck}
+        onSignInAgain={() => {
+          startSignIn.mutate();
         }}
-        onSignInAgain={startSignIn}
       />
     );
   }
 
-  if (state.status === 'signedIn') {
-    return <SignedInView auth={state.auth} onSignOut={signOut} />;
+  if (authValidationData?.status === 'signedIn') {
+    return <SignedInView auth={authValidationData.auth} onSignOut={signOut} />;
   }
 
-  return <LoadingView />;
+  return (
+    <SignedOutView
+      isStarting={false}
+      message={signedOutMessage}
+      onSignIn={() => {
+        startSignIn.mutate();
+      }}
+    />
+  );
 };

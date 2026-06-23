@@ -1,5 +1,5 @@
 /* eslint-disable max-lines */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
 import {
   createAssistantMessage,
@@ -10,13 +10,12 @@ import type { AgentConversationEvent, AgentMode } from '@/src/shared/agent-conve
 import { defaultMode } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
-import { fetchKiloGatewayModels } from '@/src/shared/kilo-api-client';
-import type { KiloGatewayModelOption } from '@/src/shared/kilo-api-client';
 import { AgentFooterControls } from './agent-footer-controls';
 import { useStoredAgentConversation } from './agent-conversation-storage';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
+import { useGatewayModels } from './use-gateway-models';
 
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
@@ -61,21 +60,16 @@ export const AgentChatPanel = ({
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState<AgentMode>(defaultMode);
   const [model, setModel] = useState('');
-  const [modelLoadError, setModelLoadError] = useState<string | undefined>();
-  const [modelOptions, setModelOptions] = useState<KiloGatewayModelOption[]>([]);
   const [thinkingEffort, setThinkingEffort] = useState('');
   const conversationResetSignalRef = useRef(conversationResetSignal);
   const runAbortRef = useRef<AbortController | null>(null);
   const runTokenRef = useRef(0);
-  const modelLoadRequestRef = useRef(0);
-  const {
-    inspectableTabs,
-    isLoadingTabs,
-    loadInspectableTabs,
-    selectTab,
-    selectedTabId,
-    tabDebuggerError,
-  } = useTabDebugger();
+  const { inspectableTabs, isLoadingTabs, selectTab, selectedTabId, tabDebuggerError } =
+    useTabDebugger();
+  const { modelLoadError, modelOptions, refetchModels } = useGatewayModels({
+    auth,
+    organizationId,
+  });
   const selectedModel = useMemo(
     () => modelOptions.find(option => option.id === model),
     [model, modelOptions]
@@ -89,17 +83,12 @@ export const AgentChatPanel = ({
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
   const isSendDisabled = draft.trim() === '' || model === '' || selectedTabId === undefined;
 
-  useEffect(() => {
-    void loadInspectableTabs();
-    const tabPollingInterval = globalThis.setInterval(() => {
-      void loadInspectableTabs({ showLoading: false });
-    }, 2000);
-
-    return () => {
-      globalThis.clearInterval(tabPollingInterval);
+  useEffect(
+    () => () => {
       runAbortRef.current?.abort();
-    };
-  }, [loadInspectableTabs]);
+    },
+    []
+  );
 
   useEffect(() => {
     if (isRunning && selectedTabId === undefined) {
@@ -120,54 +109,6 @@ export const AgentChatPanel = ({
     setDraft('');
     setEvents(createDefaultConversationEvents());
   }, [conversationResetSignal, setEvents]);
-
-  const loadModels = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
-      const requestId = (modelLoadRequestRef.current += 1);
-      const isCurrentRequest = (): boolean =>
-        modelLoadRequestRef.current === requestId && signal?.aborted !== true;
-
-      setModelLoadError(undefined);
-      setModelOptions([]);
-      setModel('');
-      setThinkingEffort('');
-
-      try {
-        const models = await fetchKiloGatewayModels({
-          apiBaseUrl,
-          fetch: fetchFromWindow,
-          organizationId,
-          ...(signal === undefined ? {} : { signal }),
-          token: auth.token,
-        });
-
-        if (isCurrentRequest()) {
-          setModelOptions(models);
-        }
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          return;
-        }
-
-        if (!isCurrentRequest()) {
-          return;
-        }
-
-        setModelOptions([]);
-        setModelLoadError('Could not load models.');
-      }
-    },
-    [auth.token, organizationId]
-  );
-
-  useEffect(() => {
-    const abort = new AbortController();
-
-    void loadModels(abort.signal);
-    return () => {
-      abort.abort();
-    };
-  }, [loadModels]);
 
   useEffect(() => {
     if (modelOptions.length === 0) {
@@ -353,7 +294,9 @@ export const AgentChatPanel = ({
           modelOptions={modelOptions}
           onModeChange={setMode}
           onModelChange={setModel}
-          onRetryModels={() => loadModels()}
+          onRetryModels={async () => {
+            await refetchModels();
+          }}
           onSelectedTabChange={selectTab}
           onThinkingEffortChange={setThinkingEffort}
           selectedTabId={selectedTabId}

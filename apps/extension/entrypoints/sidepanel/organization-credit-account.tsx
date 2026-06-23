@@ -1,4 +1,5 @@
 import { storage } from '#imports';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { z } from 'zod';
@@ -7,6 +8,7 @@ import type { FetchLike } from '@/src/shared/auth';
 import { fetchKiloOrganizations } from '@/src/shared/kilo-api-client';
 import type { KiloOrganizationOption } from '@/src/shared/kilo-api-client';
 import { getSelectableOrganizationId } from '@/src/shared/organization-selection';
+import { getOrganizationsQueryKey } from '@/src/shared/side-panel-query-options';
 
 const selectedOrganizationStorageKey = 'local:kiloSelectedOrganizationId';
 const apiBaseUrl = getKiloApiBaseUrl();
@@ -23,53 +25,57 @@ export const useOrganizationCreditAccount = (
   const [organizationOptions, setOrganizationOptions] = useState<KiloOrganizationOption[]>([]);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState('');
   const selectedOrganizationIdRef = useRef('');
+  const { data: organizations, isError } = useQuery({
+    queryFn: ({ signal }) =>
+      fetchKiloOrganizations({
+        apiBaseUrl,
+        fetch: fetchFromWindow,
+        signal,
+        token,
+      }),
+    queryKey: getOrganizationsQueryKey(token),
+  });
 
   useEffect(() => {
-    const abort = new AbortController();
+    if (organizations === undefined) {
+      if (isError && organizationOptions.length > 0) {
+        setOrganizationOptions([]);
+      }
+      return;
+    }
+
+    let isCurrent = true;
 
     void (async (): Promise<void> => {
-      try {
-        const organizations = await fetchKiloOrganizations({
-          apiBaseUrl,
-          fetch: fetchFromWindow,
-          signal: abort.signal,
-          token,
-        });
-        const storedOrganizationId = await storage.getItem<string>(selectedOrganizationStorageKey);
+      const storedOrganizationId = await storage.getItem<string>(selectedOrganizationStorageKey);
 
-        if (abort.signal.aborted) {
-          return;
-        }
+      if (!isCurrent) {
+        return;
+      }
 
-        setOrganizationOptions(organizations);
-        const parsedStoredOrganizationId =
-          selectedOrganizationIdSchema.safeParse(storedOrganizationId);
+      setOrganizationOptions(organizations);
+      const parsedStoredOrganizationId =
+        selectedOrganizationIdSchema.safeParse(storedOrganizationId);
+      const nextOrganizationId = getSelectableOrganizationId({
+        organizations,
+        selectedOrganizationId: selectedOrganizationIdRef.current,
+        storedOrganizationId: parsedStoredOrganizationId.success
+          ? parsedStoredOrganizationId.data
+          : null,
+      });
 
-        const nextOrganizationId = getSelectableOrganizationId({
-          organizations,
-          selectedOrganizationId: selectedOrganizationIdRef.current,
-          storedOrganizationId: parsedStoredOrganizationId.success
-            ? parsedStoredOrganizationId.data
-            : null,
-        });
+      selectedOrganizationIdRef.current = nextOrganizationId;
+      setSelectedOrganizationId(nextOrganizationId);
 
-        selectedOrganizationIdRef.current = nextOrganizationId;
-        setSelectedOrganizationId(nextOrganizationId);
-
-        if (nextOrganizationId === '') {
-          await storage.removeItem(selectedOrganizationStorageKey);
-        }
-      } catch (error) {
-        if (!(error instanceof Error) || error.name !== 'AbortError') {
-          setOrganizationOptions([]);
-        }
+      if (nextOrganizationId === '') {
+        await storage.removeItem(selectedOrganizationStorageKey);
       }
     })();
 
     return () => {
-      abort.abort();
+      isCurrent = false;
     };
-  }, [token]);
+  }, [isError, organizationOptions.length, organizations]);
 
   const selectOrganization = (organizationId: string): void => {
     selectedOrganizationIdRef.current = organizationId;

@@ -1,6 +1,7 @@
 import { browser } from '#imports';
-import { useCallback, useRef, useState } from 'react';
-import { isLatestRequest } from '@/src/shared/request-order';
+import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getTabListQueryKey } from '@/src/shared/side-panel-query-options';
 import { LIST_INSPECTABLE_TABS_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
 import type {
   InspectableTab,
@@ -34,82 +35,79 @@ export const useTabDebugger = (): {
   readonly tabDebuggerError: string | undefined;
 } => {
   const [inspectableTabs, setInspectableTabs] = useState<InspectableTab[]>([]);
-  const [isLoadingTabs, setIsLoadingTabs] = useState(false);
   const [selectedTabId, setSelectedTabId] = useState<number | undefined>(
     rememberedSelectedTabId ?? undefined
   );
-  const [tabDebuggerError, setTabDebuggerError] = useState<string | undefined>();
   const hasLoadedTabsRef = useRef(false);
-  const tabLoadRequestRef = useRef(0);
+  const {
+    data: tabs,
+    error: tabsError,
+    isError,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryFn: async () => {
+      const response = await sendTabDebuggerRequest({ type: LIST_INSPECTABLE_TABS_MESSAGE });
 
-  const loadInspectableTabs = useCallback(
-    async ({ showLoading = true }: { readonly showLoading?: boolean } = {}): Promise<void> => {
-      const requestId = (tabLoadRequestRef.current += 1);
-      const isCurrentRequest = (): boolean => isLatestRequest(requestId, tabLoadRequestRef.current);
-
-      if (showLoading) {
-        setIsLoadingTabs(true);
+      if (!response.ok) {
+        throw new Error(response.error);
       }
 
-      setTabDebuggerError(undefined);
+      if (response.type !== LIST_INSPECTABLE_TABS_MESSAGE) {
+        throw new Error('Extension background returned the wrong response.');
+      }
 
-      try {
-        const response = await sendTabDebuggerRequest({ type: LIST_INSPECTABLE_TABS_MESSAGE });
+      return response.tabs;
+    },
+    queryKey: getTabListQueryKey(),
+    refetchInterval: 2000,
+  });
 
-        if (!response.ok) {
-          throw new Error(response.error);
-        }
-
-        if (response.type !== LIST_INSPECTABLE_TABS_MESSAGE) {
-          throw new Error('Extension background returned the wrong response.');
-        }
-
-        if (!isCurrentRequest()) {
-          return;
-        }
-
-        const isInitialLoad = !hasLoadedTabsRef.current;
-
-        hasLoadedTabsRef.current = true;
-        setInspectableTabs(response.tabs);
-        setSelectedTabId(currentTabId => {
-          if (currentTabId !== undefined && response.tabs.some(tab => tab.id === currentTabId)) {
-            rememberedSelectedTabId = currentTabId;
-            return currentTabId;
-          }
-
-          const nextTabId = isInitialLoad ? response.tabs[0]?.id : undefined;
-
-          rememberedSelectedTabId = nextTabId ?? null;
-          return nextTabId;
-        });
-      } catch (error) {
-        if (!isCurrentRequest()) {
-          return;
-        }
-
+  useEffect(() => {
+    if (tabs === undefined) {
+      if (isError) {
         setInspectableTabs([]);
         setSelectedTabId(undefined);
         rememberedSelectedTabId = null;
-        setTabDebuggerError(getErrorMessage(error, 'Failed to load tabs.'));
-      } finally {
-        if (showLoading && isCurrentRequest()) {
-          setIsLoadingTabs(false);
-        }
       }
+      return;
+    }
+
+    const isInitialLoad = !hasLoadedTabsRef.current;
+
+    hasLoadedTabsRef.current = true;
+    setInspectableTabs(tabs);
+    setSelectedTabId(currentTabId => {
+      if (currentTabId !== undefined && tabs.some(tab => tab.id === currentTabId)) {
+        rememberedSelectedTabId = currentTabId;
+        return currentTabId;
+      }
+
+      const nextTabId = isInitialLoad ? tabs[0]?.id : undefined;
+
+      rememberedSelectedTabId = nextTabId ?? null;
+      return nextTabId;
+    });
+  }, [isError, tabs]);
+
+  const loadInspectableTabs = useCallback(
+    async (_options: { readonly showLoading?: boolean } = {}): Promise<void> => {
+      await refetch();
     },
-    []
+    [refetch]
   );
+
+  const tabDebuggerError =
+    tabsError === null ? undefined : getErrorMessage(tabsError, 'Failed to load tabs.');
 
   const selectTab = useCallback((tabId: number): void => {
     rememberedSelectedTabId = tabId;
     setSelectedTabId(tabId);
-    setTabDebuggerError(undefined);
   }, []);
 
   return {
     inspectableTabs,
-    isLoadingTabs,
+    isLoadingTabs: isLoading,
     loadInspectableTabs,
     selectTab,
     selectedTabId,

@@ -1,4 +1,5 @@
 import { browser } from '#imports';
+import { z } from 'zod';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import { PAGE_SNAPSHOT_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
 import type { EvalTabResult, PageSnapshot, PageSnapshotNode } from '@/src/shared/tab-debugger';
@@ -7,23 +8,36 @@ type SafeToolCall = Extract<
   AgentConversationEvent,
   { readonly name: 'find_in_page' | 'get_element_details' | 'get_page_snapshot' }
 >;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const isPageSnapshotNode = (value: unknown): value is PageSnapshotNode =>
-  isRecord(value) &&
-  typeof value['id'] === 'string' &&
-  typeof value['role'] === 'string' &&
-  typeof value['tag'] === 'string';
-
-const isPageSnapshot = (value: unknown): value is PageSnapshot =>
-  isRecord(value) &&
-  Array.isArray(value['nodes']) &&
-  value['nodes'].every(node => isPageSnapshotNode(node)) &&
-  typeof value['text'] === 'string' &&
-  typeof value['title'] === 'string' &&
-  typeof value['url'] === 'string';
+const pageSnapshotNodeSchema = z.object({
+  href: z.string().optional(),
+  id: z.string(),
+  label: z.string().optional(),
+  role: z.string(),
+  state: z.record(z.string(), z.boolean()).optional(),
+  tag: z.string(),
+  text: z.string().optional(),
+});
+const pageSnapshotSchema = z.object({
+  nodes: z.array(pageSnapshotNodeSchema),
+  text: z.string(),
+  title: z.string(),
+  url: z.string(),
+});
+const toPageSnapshotNode = (node: z.infer<typeof pageSnapshotNodeSchema>): PageSnapshotNode => ({
+  ...(node.href === undefined ? {} : { href: node.href }),
+  id: node.id,
+  ...(node.label === undefined ? {} : { label: node.label }),
+  role: node.role,
+  ...(node.state === undefined ? {} : { state: node.state }),
+  tag: node.tag,
+  ...(node.text === undefined ? {} : { text: node.text }),
+});
+const toPageSnapshot = (snapshot: z.infer<typeof pageSnapshotSchema>): PageSnapshot => ({
+  nodes: snapshot.nodes.map(toPageSnapshotNode),
+  text: snapshot.text,
+  title: snapshot.title,
+  url: snapshot.url,
+});
 
 const readPageSnapshot = async (tabId: number): Promise<EvalTabResult> => {
   const response: unknown = await browser.runtime.sendMessage({
@@ -53,7 +67,9 @@ const getSnapshot = async (tabId: number): Promise<PageSnapshot | string> => {
     return result.error;
   }
 
-  return isPageSnapshot(result.value) ? result.value : 'Page snapshot was invalid.';
+  const snapshot = pageSnapshotSchema.safeParse(result.value);
+
+  return snapshot.success ? toPageSnapshot(snapshot.data) : 'Page snapshot was invalid.';
 };
 
 const nodeMatchesQuery = (node: PageSnapshotNode, query: string): boolean => {

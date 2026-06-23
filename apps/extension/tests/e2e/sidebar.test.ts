@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import type { Locator } from '@playwright/test';
 import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { expectEvalToolBoxNoHorizontalOverflow } from './eval-overflow-fixture';
 import { mockKiloApi } from './kilo-api-fixture';
 import {
@@ -28,36 +29,13 @@ interface ExtensionManifest {
     | undefined;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const getStringArray = (value: unknown): string[] | undefined => {
-  if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) {
-    return undefined;
-  }
-
-  return value;
-};
-
-const getAction = (value: unknown): ExtensionManifest['action'] => {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-
-  return {
-    default_popup: typeof value['default_popup'] === 'string' ? value['default_popup'] : undefined,
-  };
-};
-
-const getSidePanel = (value: unknown): ExtensionManifest['side_panel'] => {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-
-  return {
-    default_path: typeof value['default_path'] === 'string' ? value['default_path'] : undefined,
-  };
-};
+const extensionManifestSchema = z.object({
+  action: z.object({ default_popup: z.string().optional() }).optional(),
+  content_scripts: z.array(z.unknown()).optional(),
+  host_permissions: z.array(z.string()).optional(),
+  permissions: z.array(z.string()).optional(),
+  side_panel: z.object({ default_path: z.string().optional() }).optional(),
+});
 
 const requireBoundingBox = async (
   locator: Locator
@@ -94,20 +72,24 @@ const expectNonErrorToolPanel = async (locator: Locator): Promise<void> => {
 
 const readOutputManifest = async (): Promise<ExtensionManifest> => {
   const manifestText = await readFile(join(extensionPath, 'manifest.json'), 'utf8');
-  const manifest: unknown = JSON.parse(manifestText);
+  const manifest = extensionManifestSchema.safeParse(JSON.parse(manifestText));
 
-  if (!isRecord(manifest)) {
+  if (!manifest.success) {
     throw new TypeError('Extension manifest was not an object.');
   }
 
   return {
-    action: getAction(manifest['action']),
-    content_scripts: Array.isArray(manifest['content_scripts'])
-      ? manifest['content_scripts']
-      : undefined,
-    host_permissions: getStringArray(manifest['host_permissions']),
-    permissions: getStringArray(manifest['permissions']),
-    side_panel: getSidePanel(manifest['side_panel']),
+    action:
+      manifest.data.action === undefined
+        ? undefined
+        : { default_popup: manifest.data.action.default_popup },
+    content_scripts: manifest.data.content_scripts,
+    host_permissions: manifest.data.host_permissions,
+    permissions: manifest.data.permissions,
+    side_panel:
+      manifest.data.side_panel === undefined
+        ? undefined
+        : { default_path: manifest.data.side_panel.default_path },
   };
 };
 

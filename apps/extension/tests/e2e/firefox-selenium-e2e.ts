@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Builder, By, Key } from 'selenium-webdriver';
 import type { WebDriver, WebElement } from 'selenium-webdriver';
 import firefox from 'selenium-webdriver/firefox';
+import { z } from 'zod';
 
 const extensionRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), '../..');
 const firefoxZipPath = resolvePath(extensionRoot, '.output/kilo-extension-0.0.0-firefox.zip');
@@ -84,6 +85,30 @@ interface FirefoxScenario {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+const toolMessageSchema = z.object({
+  content: z.string(),
+  role: z.literal('tool'),
+});
+const toolDefinitionSchema = z.object({
+  function: z.object({
+    name: z.unknown().optional(),
+  }),
+});
+const chatRequestSchema = z.object({
+  messages: z.array(z.unknown()).optional(),
+  tools: z.array(z.unknown()).optional(),
+});
+const toolResultSchema = z.object({
+  value: z.number(),
+});
+const scrollStateSchema = z.object({
+  documentClientHeight: z.number(),
+  documentScrollHeight: z.number(),
+  messagePaneClientHeight: z.number(),
+  messagePaneScrollHeight: z.number(),
+  messagePaneScrollTop: z.number(),
+  mountedMessageItems: z.number(),
+});
 
 const isFirefoxWebDriver = (driver: WebDriver): driver is FirefoxWebDriver => {
   const candidate: unknown = driver;
@@ -129,38 +154,40 @@ const readRequestBody = async (request: IncomingMessage): Promise<unknown> => {
 
   const body = chunks.join('');
 
-  return body === '' ? undefined : JSON.parse(body);
+  return body === '' ? undefined : chatRequestSchema.parse(JSON.parse(body));
 };
 
 const getToolResultHtmlLength = (body: unknown): string => {
-  if (!isRecord(body) || !Array.isArray(body['messages'])) {
+  const request = chatRequestSchema.safeParse(body);
+
+  if (!request.success || request.data.messages === undefined) {
     return 'unknown';
   }
 
-  const toolMessage = body['messages'].find(
-    (message): message is Record<string, unknown> =>
-      isRecord(message) && message['role'] === 'tool' && typeof message['content'] === 'string'
-  );
+  const toolMessage = request.data.messages
+    .map(message => toolMessageSchema.safeParse(message))
+    .find(message => message.success);
 
-  if (toolMessage === undefined) {
+  if (toolMessage === undefined || !toolMessage.success) {
     return 'unknown';
   }
 
-  const toolResult: unknown = JSON.parse(String(toolMessage['content']));
+  const toolResult = toolResultSchema.safeParse(JSON.parse(toolMessage.data.content));
 
-  if (!isRecord(toolResult) || typeof toolResult['value'] !== 'number') {
-    return 'unknown';
-  }
-
-  return String(toolResult['value']);
+  return toolResult.success ? String(toolResult.data.value) : 'unknown';
 };
 
-const getRequestToolNames = (body: unknown): unknown[] =>
-  isRecord(body) && Array.isArray(body['tools'])
-    ? body['tools'].map(tool =>
-        isRecord(tool) && isRecord(tool['function']) ? tool['function']['name'] : undefined
-      )
+const getRequestToolNames = (body: unknown): unknown[] => {
+  const request = chatRequestSchema.safeParse(body);
+
+  return request.success
+    ? (request.data.tools ?? []).map(tool => {
+        const parsedTool = toolDefinitionSchema.safeParse(tool);
+
+        return parsedTool.success ? parsedTool.data.function.name : undefined;
+      })
     : [];
+};
 
 const closeServer = (server: Server): Promise<void> =>
   new Promise((resolve, reject) => {
@@ -863,17 +890,19 @@ const scenarios: FirefoxScenario[] = [
           };
         });
 
-        assert.ok(isRecord(scrollState));
-        assert.equal(scrollState['documentScrollHeight'], scrollState['documentClientHeight']);
-        assert.ok(
-          Number(scrollState['messagePaneScrollHeight']) >
-            Number(scrollState['messagePaneClientHeight'])
+        const parsedScrollState = scrollStateSchema.parse(scrollState);
+
+        assert.equal(
+          parsedScrollState.documentScrollHeight,
+          parsedScrollState.documentClientHeight
         );
-        assert.ok(Number(scrollState['mountedMessageItems']) < 80);
         assert.ok(
-          Number(scrollState['messagePaneScrollTop']) +
-            Number(scrollState['messagePaneClientHeight']) >=
-            Number(scrollState['messagePaneScrollHeight']) - 4
+          parsedScrollState.messagePaneScrollHeight > parsedScrollState.messagePaneClientHeight
+        );
+        assert.ok(parsedScrollState.mountedMessageItems < 80);
+        assert.ok(
+          parsedScrollState.messagePaneScrollTop + parsedScrollState.messagePaneClientHeight >=
+            parsedScrollState.messagePaneScrollHeight - 4
         );
       }),
   },

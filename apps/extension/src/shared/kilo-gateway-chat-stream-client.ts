@@ -7,6 +7,7 @@ import type {
   KiloGatewayToolName,
 } from './kilo-gateway-chat-client';
 import type { FetchLike } from './auth';
+import { z } from 'zod';
 
 interface FetchKiloGatewayChatCompletionStreamOptions {
   readonly apiBaseUrl: string;
@@ -51,8 +52,34 @@ interface StreamReaderContext {
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 const organizationHeaderName = 'x-kilocode-organizationid';
 const validGatewayReasoningEfforts = new Set(['high', 'low', 'medium', 'minimal', 'none']);
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+const toolArgumentsSchema = z.record(z.string(), z.unknown());
+const gatewayToolNameSchema = z.enum([
+  'eval',
+  'find_in_page',
+  'get_element_details',
+  'get_page_snapshot',
+]);
+const streamingToolCallDeltaSchema = z.object({
+  function: z
+    .object({
+      arguments: z.string().optional(),
+      name: gatewayToolNameSchema.optional(),
+    })
+    .optional(),
+  id: z.string().optional(),
+  index: z.number(),
+});
+const streamDataSchema = z.object({
+  choices: z.array(
+    z.object({
+      delta: z.object({
+        content: z.string().optional(),
+        reasoning: z.string().optional(),
+        tool_calls: z.array(z.unknown()).optional(),
+      }),
+    })
+  ),
+});
 const toReasoning = (effort: string | undefined) => {
   const gatewayEffort = effort === 'instant' ? 'none' : effort;
 
@@ -66,7 +93,7 @@ const parseJson = (value: string): unknown => {
   try {
     return JSON.parse(value);
   } catch {
-    throw new TypeError('Gateway tool call arguments were not valid JSON.');
+    throw new TypeError('Gateway stream JSON was invalid.');
   }
 };
 const getString = (value: unknown, message: string): string => {
@@ -77,19 +104,28 @@ const getString = (value: unknown, message: string): string => {
   return value;
 };
 const isGatewayToolName = (value: unknown): value is KiloGatewayToolName =>
-  value === 'eval' ||
-  value === 'find_in_page' ||
-  value === 'get_element_details' ||
-  value === 'get_page_snapshot';
+  gatewayToolNameSchema.safeParse(value).success;
 const parseToolCallBuffer = (value: StreamingToolCallBuffer): KiloGatewayToolCallRequest => {
   if (value.name === undefined) {
     throw new TypeError('Gateway stream tool call did not include a supported tool name.');
   }
 
-  const parsedArguments = parseJson(value.arguments);
+  const parsedArguments = (() => {
+    try {
+      return parseJson(value.arguments);
+    } catch {
+      throw new TypeError('Gateway tool call arguments were not valid JSON.');
+    }
+  })();
+
+  const argumentsRecord = toolArgumentsSchema.safeParse(parsedArguments);
+
+  if (!argumentsRecord.success) {
+    throw new TypeError('Gateway tool call arguments were not an object.');
+  }
 
   return {
-    arguments: isRecord(parsedArguments) ? parsedArguments : {},
+    arguments: argumentsRecord.data,
     id: getString(value.id, 'Gateway eval tool call did not include an id.'),
     name: value.name,
   };
@@ -111,30 +147,32 @@ const mergeStreamingToolCall = (
   toolCallsByIndex: Map<number, StreamingToolCallBuffer>,
   value: unknown
 ): void => {
-  if (!isRecord(value) || typeof value['index'] !== 'number') {
+  const parsed = streamingToolCallDeltaSchema.safeParse(value);
+
+  if (!parsed.success) {
     throw new TypeError('Gateway stream tool call delta did not include an index.');
   }
 
-  const { index } = value;
+  const { index } = parsed.data;
   const current = toolCallsByIndex.get(index) ?? {
     arguments: '',
     id: undefined,
     name: undefined,
   };
-  const functionValue = value['function'];
+  const functionValue = parsed.data.function;
   const next: StreamingToolCallBuffer = {
     arguments: current.arguments,
-    id: typeof value['id'] === 'string' ? value['id'] : current.id,
+    id: parsed.data.id ?? current.id,
     name: current.name,
   };
 
-  if (isRecord(functionValue)) {
-    if (isGatewayToolName(functionValue['name'])) {
-      next.name = functionValue['name'];
+  if (functionValue !== undefined) {
+    if (isGatewayToolName(functionValue.name)) {
+      next.name = functionValue.name;
     }
 
-    if (typeof functionValue['arguments'] === 'string') {
-      next.arguments += functionValue['arguments'];
+    if (functionValue.arguments !== undefined) {
+      next.arguments += functionValue.arguments;
     }
   }
 
@@ -150,15 +188,15 @@ const applyStreamingData = (
     return;
   }
 
-  const parsed = parseJson(data);
+  const parsed = streamDataSchema.safeParse(parseJson(data));
 
-  if (!isRecord(parsed) || !Array.isArray(parsed['choices'])) {
+  if (!parsed.success) {
     return;
   }
 
-  const choice: unknown = parsed['choices'].at(0);
+  const choice = parsed.data.choices.at(0);
 
-  if (!isRecord(choice) || !isRecord(choice['delta'])) {
+  if (choice === undefined) {
     return;
   }
 

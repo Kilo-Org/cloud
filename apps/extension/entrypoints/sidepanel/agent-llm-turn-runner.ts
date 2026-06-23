@@ -4,6 +4,7 @@ import {
   createSafeToolCall,
   createThinkingBlock,
 } from '@/src/shared/agent-conversation';
+import { z } from 'zod';
 import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-conversation';
 import {
   buildGatewayMessagesFromEvents,
@@ -50,8 +51,12 @@ const isAbortError = (error: unknown): boolean =>
   error instanceof Error && error.name === 'AbortError';
 
 const isSignalAborted = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
-const getStringArgument = (args: Record<string, unknown>, name: string): string | undefined =>
-  typeof args[name] === 'string' ? args[name] : undefined;
+const stringArgumentSchema = z.string();
+const getStringArgument = (args: Record<string, unknown>, name: string): string | undefined => {
+  const parsed = stringArgumentSchema.safeParse(args[name]);
+
+  return parsed.success ? parsed.data : undefined;
+};
 const isSafeToolName = (name: string): name is SafeToolName =>
   name === 'find_in_page' || name === 'get_element_details' || name === 'get_page_snapshot';
 const maxEvalRounds = 4;
@@ -175,10 +180,12 @@ export const runDangerousLlmTurn = async ({
 
     for (const toolCall of completion.toolCalls) {
       if (toolCall.name === 'eval') {
-        if (typeof toolCall.arguments['code'] === 'string') {
+        const code = getStringArgument(toolCall.arguments, 'code');
+
+        if (code !== undefined) {
           toolCallEvents.push(
             createEvalToolCall({
-              code: toolCall.arguments['code'],
+              code,
               providerToolCallId: toolCall.id,
               tabId: selectedTabId,
             })

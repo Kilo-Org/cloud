@@ -1,52 +1,121 @@
 import { storage } from '#imports';
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import { z } from 'zod';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 
 const conversationStorageKey = 'local:kiloAgentConversation';
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const isMessageEvent = (value: Record<string, unknown>): boolean =>
-  value['type'] === 'message' &&
-  (value['role'] === 'assistant' || value['role'] === 'user') &&
-  typeof value['id'] === 'string' &&
-  typeof value['text'] === 'string';
-
-const isThinkingEvent = (value: Record<string, unknown>): boolean =>
-  value['type'] === 'thinking' &&
-  typeof value['id'] === 'string' &&
-  typeof value['text'] === 'string';
-
-const isToolCallEvent = (value: Record<string, unknown>): boolean =>
-  value['type'] === 'tool-call' &&
-  value['name'] === 'eval' &&
-  typeof value['code'] === 'string' &&
-  typeof value['id'] === 'string' &&
-  typeof value['tabId'] === 'number';
-
-const isToolResultEvent = (value: Record<string, unknown>): boolean =>
-  value['type'] === 'tool-result' &&
-  typeof value['id'] === 'string' &&
-  typeof value['ok'] === 'boolean' &&
-  typeof value['toolCallId'] === 'string';
+const conversationEventSchema = z.union([
+  z.object({
+    id: z.string(),
+    role: z.enum(['assistant', 'user']),
+    systemEnvironment: z.string().optional(),
+    text: z.string(),
+    type: z.literal('message'),
+  }),
+  z.object({
+    id: z.string(),
+    text: z.string(),
+    type: z.literal('thinking'),
+  }),
+  z.object({
+    code: z.string(),
+    id: z.string(),
+    name: z.literal('eval'),
+    providerToolCallId: z.string().optional(),
+    tabId: z.number(),
+    type: z.literal('tool-call'),
+  }),
+  z.object({
+    elementId: z.string().optional(),
+    id: z.string(),
+    name: z.enum(['find_in_page', 'get_element_details', 'get_page_snapshot']),
+    providerToolCallId: z.string().optional(),
+    query: z.string().optional(),
+    tabId: z.number(),
+    type: z.literal('tool-call'),
+  }),
+  z.object({
+    error: z.string().optional(),
+    id: z.string(),
+    ok: z.boolean(),
+    toolCallId: z.string(),
+    type: z.literal('tool-result'),
+    value: z.unknown().optional(),
+  }),
+]);
+const conversationEventsSchema = z.array(conversationEventSchema);
 
 const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] | undefined => {
-  if (!Array.isArray(value)) {
+  const parsed = conversationEventsSchema.safeParse(value);
+
+  if (!parsed.success) {
     return undefined;
   }
 
-  return value.every(
-    event =>
-      isRecord(event) &&
-      (isMessageEvent(event) ||
-        isThinkingEvent(event) ||
-        isToolCallEvent(event) ||
-        isToolResultEvent(event))
-  )
-    ? value
-    : undefined;
+  const events: AgentConversationEvent[] = [];
+
+  for (const event of parsed.data) {
+    switch (event.type) {
+      case 'message': {
+        events.push({
+          id: event.id,
+          role: event.role,
+          ...(event.systemEnvironment === undefined
+            ? {}
+            : { systemEnvironment: event.systemEnvironment }),
+          text: event.text,
+          type: event.type,
+        });
+        break;
+      }
+      case 'thinking': {
+        events.push(event);
+        break;
+      }
+      case 'tool-result': {
+        events.push({
+          ...(event.error === undefined ? {} : { error: event.error }),
+          id: event.id,
+          ok: event.ok,
+          toolCallId: event.toolCallId,
+          type: event.type,
+          ...(event.value === undefined ? {} : { value: event.value }),
+        });
+        break;
+      }
+      case 'tool-call': {
+        if (event.name === 'eval') {
+          events.push({
+            code: event.code,
+            id: event.id,
+            name: event.name,
+            ...(event.providerToolCallId === undefined
+              ? {}
+              : { providerToolCallId: event.providerToolCallId }),
+            tabId: event.tabId,
+            type: event.type,
+          });
+          break;
+        }
+
+        events.push({
+          ...(event.elementId === undefined ? {} : { elementId: event.elementId }),
+          id: event.id,
+          name: event.name,
+          ...(event.providerToolCallId === undefined
+            ? {}
+            : { providerToolCallId: event.providerToolCallId }),
+          ...(event.query === undefined ? {} : { query: event.query }),
+          tabId: event.tabId,
+          type: event.type,
+        });
+        break;
+      }
+    }
+  }
+
+  return events;
 };
 
 export const useStoredAgentConversation = (

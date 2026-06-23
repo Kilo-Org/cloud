@@ -1,30 +1,46 @@
 import { expect } from '@playwright/test';
 import type { BrowserContext, Locator, Page } from '@playwright/test';
+import { z } from 'zod';
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+const toolMessageSchema = z.object({
+  content: z.string(),
+  role: z.literal('tool'),
+});
+const userMessageSchema = z.object({
+  content: z.string(),
+  role: z.literal('user'),
+});
+const toolDefinitionSchema = z.object({
+  function: z.object({
+    name: z.unknown().optional(),
+  }),
+});
+const chatRequestSchema = z.object({
+  messages: z.array(z.unknown()).optional(),
+  tools: z.array(z.unknown()).optional(),
+});
+const toolResultSchema = z.object({
+  value: z.number(),
+});
 
 const getToolResultHtmlLength = (body: unknown): string => {
-  if (!isRecord(body) || !Array.isArray(body['messages'])) {
+  const request = chatRequestSchema.safeParse(body);
+
+  if (!request.success || request.data.messages === undefined) {
     return 'unknown';
   }
 
-  const toolMessage = body['messages'].find(
-    (message): message is Record<string, unknown> =>
-      isRecord(message) && message['role'] === 'tool' && typeof message['content'] === 'string'
-  );
+  const toolMessage = request.data.messages
+    .map(message => toolMessageSchema.safeParse(message))
+    .find(message => message.success);
 
-  if (toolMessage === undefined || typeof toolMessage['content'] !== 'string') {
+  if (toolMessage === undefined || !toolMessage.success) {
     return 'unknown';
   }
 
-  const toolResult: unknown = JSON.parse(toolMessage['content']);
+  const toolResult = toolResultSchema.safeParse(JSON.parse(toolMessage.data.content));
 
-  if (!isRecord(toolResult) || typeof toolResult['value'] !== 'number') {
-    return 'unknown';
-  }
-
-  return String(toolResult['value']);
+  return toolResult.success ? String(toolResult.data.value) : 'unknown';
 };
 
 const chatCompletionStreamResponse = (events: unknown[]): string =>
@@ -114,7 +130,8 @@ export const mockKiloApi = async (
     );
 
     const body: unknown = route.request().postDataJSON();
-    const messages = isRecord(body) && Array.isArray(body['messages']) ? body['messages'] : [];
+    const parsedBody = chatRequestSchema.safeParse(body);
+    const messages = parsedBody.success ? (parsedBody.data.messages ?? []) : [];
 
     const toolNames = options.toolNames ?? dangerousToolNames;
 
@@ -124,21 +141,21 @@ export const mockKiloApi = async (
       tool_choice: 'auto',
     });
     expect(
-      isRecord(body) && Array.isArray(body['tools'])
-        ? body['tools'].map(tool =>
-            isRecord(tool) && isRecord(tool['function']) ? tool['function']['name'] : undefined
-          )
+      parsedBody.success && parsedBody.data.tools !== undefined
+        ? parsedBody.data.tools.map(tool => {
+            const parsedTool = toolDefinitionSchema.safeParse(tool);
+
+            return parsedTool.success ? parsedTool.data.function.name : undefined;
+          })
         : []
     ).toStrictEqual(toolNames);
-    const userMessages = messages.filter(
-      (message): message is Record<string, unknown> =>
-        isRecord(message) && message['role'] === 'user'
-    );
-    expect(userMessages.at(-1)?.['content']).toEqual(
-      expect.stringContaining('<system_environment>')
-    );
-    expect(userMessages.at(-1)?.['content']).toEqual(expect.stringContaining('Current time:'));
-    expect(userMessages.at(-1)?.['content']).toEqual(expect.stringContaining('Timezone:'));
+    const userMessages = messages
+      .map(message => userMessageSchema.safeParse(message))
+      .filter(message => message.success)
+      .map(message => message.data);
+    expect(userMessages.at(-1)?.content).toEqual(expect.stringContaining('<system_environment>'));
+    expect(userMessages.at(-1)?.content).toEqual(expect.stringContaining('Current time:'));
+    expect(userMessages.at(-1)?.content).toEqual(expect.stringContaining('Timezone:'));
 
     if (chatCompletionCalls === 1) {
       if (options.beforeFirstCompletion !== undefined) {

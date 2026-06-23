@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { z } from 'zod';
 
 const extensionId = 'kilo-extension@kilocode.ai';
 const firefoxExtensionPath = resolvePath(import.meta.dirname, '../../.output/firefox-mv3');
@@ -32,6 +33,7 @@ interface WebExtFirefoxRemote {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+const firefoxManifestSchema = z.record(z.string(), z.unknown());
 
 const isWebExtFirefoxRemote = (value: unknown): value is WebExtFirefoxRemote =>
   isRecord(value) &&
@@ -52,15 +54,15 @@ const loadWebExtFirefoxRemote = async (): Promise<WebExtFirefoxRemote> => {
 };
 
 const readFirefoxManifest = async (): Promise<Record<string, unknown>> => {
-  const manifest: unknown = JSON.parse(
-    await readFile(join(firefoxExtensionPath, 'manifest.json'), 'utf8')
+  const manifest = firefoxManifestSchema.safeParse(
+    JSON.parse(await readFile(join(firefoxExtensionPath, 'manifest.json'), 'utf8'))
   );
 
-  if (!isRecord(manifest)) {
+  if (!manifest.success) {
     throw new TypeError('Firefox manifest was not an object.');
   }
 
-  return manifest;
+  return manifest.data;
 };
 
 test('firefox build installs as a running add-on without invalid manifest warnings', async () => {

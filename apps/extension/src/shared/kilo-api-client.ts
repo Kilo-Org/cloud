@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type { FetchLike } from './auth';
 export {
   fetchKiloGatewayChatCompletionStream,
@@ -54,18 +55,30 @@ interface ParsedGatewayModelOption {
 }
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const getOptionalBoolean = (value: unknown): boolean | undefined =>
-  typeof value === 'boolean' ? value : undefined;
-
-const getOptionalNumber = (value: unknown): number | undefined =>
-  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-
-const getOptionalString = (value: unknown): string | undefined =>
-  typeof value === 'string' && value.length > 0 ? value : undefined;
+const nonEmptyStringSchema = z.string().min(1);
+const modelSchema = z.object({
+  hasUserByokAvailable: z.boolean().optional(),
+  id: nonEmptyStringSchema,
+  isFree: z.boolean().optional(),
+  mayTrainOnYourPrompts: z.boolean().optional(),
+  name: nonEmptyStringSchema,
+  opencode: z
+    .object({
+      variants: z.record(z.string(), z.unknown()).optional(),
+    })
+    .optional(),
+  preferredIndex: z.number().optional(),
+});
+const gatewayModelsResponseSchema = z.object({
+  data: z.array(z.unknown()),
+});
+const organizationSchema = z.object({
+  id: nonEmptyStringSchema,
+  name: nonEmptyStringSchema,
+});
+const organizationsResponseSchema = z.object({
+  organizations: z.array(z.unknown()),
+});
 
 const formatShortModelName = (name: string): string => {
   const colonIndex = name.indexOf(': ');
@@ -82,17 +95,8 @@ const withOrganizationHeader = (
     ? headers
     : { ...headers, [organizationHeaderName]: organizationId };
 
-const getModelVariants = (model: Record<string, unknown>): string[] => {
-  const { opencode } = model;
-
-  if (!isRecord(opencode)) {
-    return [];
-  }
-
-  const { variants } = opencode;
-
-  return isRecord(variants) ? Object.keys(variants) : [];
-};
+const getModelVariants = (model: z.infer<typeof modelSchema>): string[] =>
+  Object.keys(model.opencode?.variants ?? {});
 
 const compareModelOptions = (
   left: ParsedGatewayModelOption,
@@ -148,36 +152,35 @@ const toGatewayModelOption = (model: ParsedGatewayModelOption): KiloGatewayModel
 };
 
 export const parseKiloGatewayModelsResponse = (value: unknown): KiloGatewayModelOption[] => {
-  if (!isRecord(value) || !Array.isArray(value['data'])) {
+  const parsed = gatewayModelsResponseSchema.safeParse(value);
+
+  if (!parsed.success) {
     throw new TypeError('Gateway models response did not include a model list.');
   }
 
-  return value['data']
-    .flatMap(model => {
-      if (!isRecord(model)) {
+  return parsed.data.data
+    .flatMap(candidate => {
+      const model = modelSchema.safeParse(candidate);
+
+      if (!model.success) {
         return [];
       }
 
-      const id = getOptionalString(model['id']);
-      const name = getOptionalString(model['name']);
-
-      if (id === undefined || name === undefined) {
-        return [];
-      }
-
-      const hasUserByokAvailable = getOptionalBoolean(model['hasUserByokAvailable']);
-      const isFree = getOptionalBoolean(model['isFree']);
-      const mayTrainOnYourPrompts = getOptionalBoolean(model['mayTrainOnYourPrompts']);
-      const preferredIndex = getOptionalNumber(model['preferredIndex']);
       const option: ParsedGatewayModelOption = {
-        id,
-        isPreferred: preferredIndex !== undefined,
-        name: formatShortModelName(name),
-        variants: getModelVariants(model),
-        ...(hasUserByokAvailable === undefined ? {} : { hasUserByokAvailable }),
-        ...(isFree === undefined ? {} : { isFree }),
-        ...(mayTrainOnYourPrompts === undefined ? {} : { mayTrainOnYourPrompts }),
-        ...(preferredIndex === undefined ? {} : { preferredIndex }),
+        id: model.data.id,
+        isPreferred: model.data.preferredIndex !== undefined,
+        name: formatShortModelName(model.data.name),
+        variants: getModelVariants(model.data),
+        ...(model.data.hasUserByokAvailable === undefined
+          ? {}
+          : { hasUserByokAvailable: model.data.hasUserByokAvailable }),
+        ...(model.data.isFree === undefined ? {} : { isFree: model.data.isFree }),
+        ...(model.data.mayTrainOnYourPrompts === undefined
+          ? {}
+          : { mayTrainOnYourPrompts: model.data.mayTrainOnYourPrompts }),
+        ...(model.data.preferredIndex === undefined
+          ? {}
+          : { preferredIndex: model.data.preferredIndex }),
       };
 
       return [option];
@@ -187,19 +190,16 @@ export const parseKiloGatewayModelsResponse = (value: unknown): KiloGatewayModel
 };
 
 export const parseKiloOrganizationsResponse = (value: unknown): KiloOrganizationOption[] => {
-  if (!isRecord(value) || !Array.isArray(value['organizations'])) {
+  const parsed = organizationsResponseSchema.safeParse(value);
+
+  if (!parsed.success) {
     throw new TypeError('Organizations response did not include a list.');
   }
 
-  return value['organizations'].flatMap(organization => {
-    if (!isRecord(organization)) {
-      return [];
-    }
+  return parsed.data.organizations.flatMap(candidate => {
+    const organization = organizationSchema.safeParse(candidate);
 
-    const id = getOptionalString(organization['id']);
-    const name = getOptionalString(organization['name']);
-
-    return id === undefined || name === undefined ? [] : [{ id, name }];
+    return organization.success ? [organization.data] : [];
   });
 };
 

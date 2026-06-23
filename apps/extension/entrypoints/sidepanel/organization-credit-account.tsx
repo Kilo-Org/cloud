@@ -1,6 +1,7 @@
 import { storage } from '#imports';
 import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
+import { z } from 'zod';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { FetchLike } from '@/src/shared/auth';
 import { fetchKiloOrganizations } from '@/src/shared/kilo-api-client';
@@ -10,6 +11,7 @@ import { getSelectableOrganizationId } from '@/src/shared/organization-selection
 const selectedOrganizationStorageKey = 'local:kiloSelectedOrganizationId';
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow: FetchLike = (input, init) => fetch(input, init);
+const selectedOrganizationIdSchema = z.string();
 
 export const useOrganizationCreditAccount = (
   token: string
@@ -40,12 +42,15 @@ export const useOrganizationCreditAccount = (
         }
 
         setOrganizationOptions(organizations);
+        const parsedStoredOrganizationId =
+          selectedOrganizationIdSchema.safeParse(storedOrganizationId);
 
         const nextOrganizationId = getSelectableOrganizationId({
           organizations,
           selectedOrganizationId: selectedOrganizationIdRef.current,
-          storedOrganizationId:
-            typeof storedOrganizationId === 'string' ? storedOrganizationId : null,
+          storedOrganizationId: parsedStoredOrganizationId.success
+            ? parsedStoredOrganizationId.data
+            : null,
         });
 
         selectedOrganizationIdRef.current = nextOrganizationId;

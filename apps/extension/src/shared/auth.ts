@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export const AUTH_STORAGE_KEY = 'local:kiloAuth';
 export const DEFAULT_KILO_API_BASE_URL = 'https://app.kilo.ai';
 export const DEFAULT_LOCAL_KILO_API_BASE_URL = 'http://localhost:3000';
@@ -56,12 +58,18 @@ interface ValidateAuthTokenOptions extends ApiClientOptions {
 }
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const getOptionalString = (value: unknown): string | undefined =>
-  typeof value === 'string' && value.length > 0 ? value : undefined;
+const nonEmptyStringSchema = z.string().min(1);
+const storedAuthSchema = z.object({
+  token: nonEmptyStringSchema,
+  userEmail: nonEmptyStringSchema.optional(),
+});
+const deviceAuthRequestSchema = z.object({
+  code: nonEmptyStringSchema,
+  verificationUrl: nonEmptyStringSchema,
+});
+const userResponseSchema = z.object({
+  google_user_email: nonEmptyStringSchema.optional(),
+});
 
 export const getKiloApiBaseUrl = (): string => {
   const configuredUrl = import.meta.env.VITE_KILO_API_BASE_URL;
@@ -78,20 +86,11 @@ export const getKiloApiBaseUrl = (): string => {
 };
 
 export const normalizeStoredAuth = (value: unknown): StoredAuth | undefined => {
-  if (!isRecord(value)) {
-    return undefined;
-  }
+  const parsed = storedAuthSchema.safeParse(value);
 
-  const token = getOptionalString(value['token']);
-
-  if (token === undefined) {
-    return undefined;
-  }
-
-  return {
-    token,
-    userEmail: getOptionalString(value['userEmail']),
-  };
+  return parsed.success
+    ? { token: parsed.data.token, userEmail: parsed.data.userEmail }
+    : undefined;
 };
 
 export const loadStoredAuth = async (
@@ -111,34 +110,25 @@ export const clearStoredAuth = async (storageArea: AuthStorageArea): Promise<voi
 };
 
 const parseDeviceAuthRequest = (value: unknown): DeviceAuthRequest => {
-  if (!isRecord(value)) {
-    throw new TypeError('Device auth response was not an object.');
-  }
+  const parsed = deviceAuthRequestSchema.safeParse(value);
 
-  const code = getOptionalString(value['code']);
-  const verificationUrl = getOptionalString(value['verificationUrl']);
-
-  if (code === undefined || verificationUrl === undefined) {
+  if (!parsed.success) {
     throw new TypeError('Device auth response did not include a code and verification URL.');
   }
 
-  return { code, verificationUrl };
+  return parsed.data;
 };
 
 const parseApprovedAuth = (value: unknown): StoredAuth => {
-  if (!isRecord(value)) {
-    throw new TypeError('Device auth poll response was not an object.');
-  }
+  const parsed = storedAuthSchema.safeParse(value);
 
-  const token = getOptionalString(value['token']);
-
-  if (token === undefined) {
+  if (!parsed.success) {
     throw new TypeError('Device auth poll response did not include a token.');
   }
 
   return {
-    token,
-    userEmail: getOptionalString(value['userEmail']),
+    token: parsed.data.token,
+    userEmail: parsed.data.userEmail,
   };
 };
 
@@ -212,15 +202,16 @@ export const validateAuthToken = async ({
   }
 
   const data: unknown = await response.json();
+  const parsed = userResponseSchema.safeParse(data);
 
-  if (!isRecord(data)) {
+  if (!parsed.success) {
     return { auth: { token, userEmail: undefined }, status: 'valid' };
   }
 
   return {
     auth: {
       token,
-      userEmail: getOptionalString(data['google_user_email']),
+      userEmail: parsed.data.google_user_email,
     },
     status: 'valid',
   };

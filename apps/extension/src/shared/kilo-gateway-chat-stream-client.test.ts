@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { fetchKiloGatewayChatCompletionStream } from './kilo-api-client';
 import type { FetchLike } from './auth';
+
+const jsonRequestBodySchema = z.record(z.string(), z.unknown());
 
 const parseJsonRequestBody = (body: BodyInit | null | undefined): unknown => {
   if (typeof body !== 'string') {
     throw new TypeError('Expected JSON string request body.');
   }
 
-  return JSON.parse(body);
+  return jsonRequestBodySchema.parse(JSON.parse(body));
 };
 
 const streamResponse = (chunks: string[]): Response => {
@@ -113,6 +116,26 @@ describe('kilo gateway chat stream client', () => {
         },
       ],
     });
+  });
+
+  it('rejects non-object tool call arguments from the gateway stream', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":"[]"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Read this page', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).rejects.toThrow('Gateway tool call arguments were not an object.');
   });
 
   it('ignores empty content deltas before visible content', async () => {

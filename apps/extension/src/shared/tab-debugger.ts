@@ -1,4 +1,6 @@
 /* eslint-disable max-lines */
+import { z } from 'zod';
+
 export const DEBUGGER_PROTOCOL_VERSION = '1.3';
 export const LIST_INSPECTABLE_TABS_MESSAGE = 'kilo.tabs.listInspectable';
 export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
@@ -124,8 +126,67 @@ export type TabDebuggerResponse =
       readonly ok: false;
     };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
+const inspectableTabSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  url: z.string(),
+});
+const evalTabResultSchema = z.union([
+  z.object({
+    description: z.string().optional(),
+    ok: z.literal(true),
+    value: z.unknown().optional(),
+  }),
+  z.object({
+    error: z.string(),
+    ok: z.literal(false),
+  }),
+]);
+const tabDebuggerRequestSchema = z.union([
+  z.object({
+    type: z.literal(LIST_INSPECTABLE_TABS_MESSAGE),
+  }),
+  z.object({
+    tabId: z.number(),
+    timeoutMs: z.number().optional(),
+    type: z.literal(PAGE_SNAPSHOT_MESSAGE),
+  }),
+  z.object({
+    code: z.string(),
+    tabId: z.number(),
+    timeoutMs: z.number().optional(),
+    type: z.literal(EVAL_TAB_MESSAGE),
+  }),
+]);
+const tabDebuggerResponseSchema = z.union([
+  z.object({
+    ok: z.literal(true),
+    tabs: z.array(inspectableTabSchema),
+    type: z.literal(LIST_INSPECTABLE_TABS_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    result: evalTabResultSchema,
+    type: z.literal(EVAL_TAB_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    result: evalTabResultSchema,
+    type: z.literal(PAGE_SNAPSHOT_MESSAGE),
+  }),
+  z.object({
+    error: z.string(),
+    ok: z.literal(false),
+  }),
+]);
+const chromeEvalResultSchema = z.object({
+  description: z.string().optional(),
+  value: z.unknown().optional(),
+});
+const chromeEvalResponseSchema = z.object({
+  exceptionDetails: z.unknown().optional(),
+  result: chromeEvalResultSchema.optional(),
+});
 
 const isNormalPageUrl = (url: string | undefined): url is string =>
   url?.startsWith('http://') === true || url?.startsWith('https://') === true;
@@ -422,27 +483,26 @@ export const evalInTab = async ({
       timeout: timeoutMs,
     });
 
-    if (!isRecord(response)) {
+    const parsed = chromeEvalResponseSchema.safeParse(response);
+
+    if (!parsed.success) {
       return { error: 'Debugger returned an invalid eval response.', ok: false };
     }
 
-    const { exceptionDetails, result } = response;
+    const { exceptionDetails, result } = parsed.data;
 
     if (exceptionDetails !== undefined) {
       return { error: 'Page evaluation failed.', ok: false };
     }
 
-    if (!isRecord(result)) {
+    if (result === undefined) {
       return { error: 'Debugger returned an invalid eval result.', ok: false };
     }
 
-    const description =
-      typeof result['description'] === 'string' ? result['description'] : undefined;
-
     return {
       ok: true,
-      ...(description === undefined ? {} : { description }),
-      ...('value' in result ? { value: result['value'] } : {}),
+      ...(result.description === undefined ? {} : { description: result.description }),
+      ...(Object.hasOwn(result, 'value') ? { value: result.value } : {}),
     };
   } catch (error) {
     return {
@@ -515,60 +575,8 @@ export const getPageSnapshotInTabWithScripting = async ({
   }
 };
 
-export const isTabDebuggerRequest = (value: unknown): value is TabDebuggerRequest => {
-  if (!isRecord(value) || typeof value['type'] !== 'string') {
-    return false;
-  }
+export const isTabDebuggerRequest = (value: unknown): value is TabDebuggerRequest =>
+  tabDebuggerRequestSchema.safeParse(value).success;
 
-  if (value['type'] === LIST_INSPECTABLE_TABS_MESSAGE) {
-    return true;
-  }
-
-  if (value['type'] === PAGE_SNAPSHOT_MESSAGE) {
-    return (
-      typeof value['tabId'] === 'number' &&
-      (value['timeoutMs'] === undefined || typeof value['timeoutMs'] === 'number')
-    );
-  }
-
-  return (
-    value['type'] === EVAL_TAB_MESSAGE &&
-    typeof value['tabId'] === 'number' &&
-    typeof value['code'] === 'string' &&
-    (value['timeoutMs'] === undefined || typeof value['timeoutMs'] === 'number')
-  );
-};
-
-export const isTabDebuggerResponse = (value: unknown): value is TabDebuggerResponse => {
-  if (!isRecord(value) || typeof value['ok'] !== 'boolean') {
-    return false;
-  }
-
-  if (!value['ok']) {
-    return typeof value['error'] === 'string';
-  }
-
-  if (value['type'] === LIST_INSPECTABLE_TABS_MESSAGE) {
-    return (
-      Array.isArray(value['tabs']) &&
-      value['tabs'].every(
-        tab =>
-          isRecord(tab) &&
-          typeof tab['id'] === 'number' &&
-          typeof tab['title'] === 'string' &&
-          typeof tab['url'] === 'string'
-      )
-    );
-  }
-
-  if (value['type'] === EVAL_TAB_MESSAGE || value['type'] === PAGE_SNAPSHOT_MESSAGE) {
-    const { result } = value;
-    return (
-      isRecord(result) &&
-      typeof result['ok'] === 'boolean' &&
-      (result['ok'] || typeof result['error'] === 'string')
-    );
-  }
-
-  return false;
-};
+export const isTabDebuggerResponse = (value: unknown): value is TabDebuggerResponse =>
+  tabDebuggerResponseSchema.safeParse(value).success;

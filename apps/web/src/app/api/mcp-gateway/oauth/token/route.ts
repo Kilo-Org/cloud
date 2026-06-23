@@ -32,7 +32,17 @@ async function exchangeToken(request: NextRequest, route?: ScopedConnectRoute) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
   const services = createGatewayServices();
-  if (isNativeMcpResource(parsed.data.resource, services.config.appBaseUrl)) {
+  let nativeRefreshToken = false;
+  if (
+    parsed.data.grant_type === 'refresh_token' &&
+    !parsed.data.resource &&
+    parsed.data.refresh_token
+  ) {
+    nativeRefreshToken = await services.nativeMcpTokenService.hasRefreshToken(
+      parsed.data.refresh_token
+    );
+  }
+  if (isNativeMcpResource(parsed.data.resource, services.config.appBaseUrl) || nativeRefreshToken) {
     const result = await services.nativeMcpTokenService.exchangeToken({
       request: parsed.data,
       headers: request.headers,

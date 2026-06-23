@@ -36,6 +36,25 @@ export function createNativeMcpTokenService(params: {
     }
   }
 
+  function rejectNonNativeResource(request: OAuthTokenRequest) {
+    if (
+      request.resource === undefined ||
+      isNativeMcpResource(request.resource, params.config.appBaseUrl)
+    ) {
+      return;
+    }
+    throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Native MCP resource is invalid', 400);
+  }
+
+  async function hasRefreshToken(refreshToken: string) {
+    const [row] = await database
+      .select({ refreshTokenId: mcp_native_refresh_tokens.refresh_token_id })
+      .from(mcp_native_refresh_tokens)
+      .where(eq(mcp_native_refresh_tokens.token_hash, hashToken(refreshToken)))
+      .limit(1);
+    return Boolean(row);
+  }
+
   function requireMcpAccess(scopes: string[]) {
     if (!scopes.includes(GatewayMcpAccessScope)) {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'mcp:access scope is required', 400);
@@ -188,7 +207,7 @@ export function createNativeMcpTokenService(params: {
     if (input.request.grant_type !== 'refresh_token' || !input.request.refresh_token) {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Refresh token is required', 400);
     }
-    requireNativeResource(input.request);
+    rejectNonNativeResource(input.request);
     const client = await authenticateGatewayOAuthClient({
       request: input.request,
       headers: input.headers,
@@ -284,7 +303,7 @@ export function createNativeMcpTokenService(params: {
     return await exchangeRefreshToken(input);
   }
 
-  return { exchangeToken, mintAccessToken };
+  return { exchangeToken, hasRefreshToken, mintAccessToken };
 }
 
 export type NativeMcpTokenService = ReturnType<typeof createNativeMcpTokenService>;

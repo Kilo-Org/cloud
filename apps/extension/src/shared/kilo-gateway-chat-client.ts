@@ -2,10 +2,23 @@ export type KiloGatewayToolName =
   | 'eval'
   | 'find_in_page'
   | 'get_element_details'
-  | 'get_page_snapshot';
+  | 'get_page_snapshot'
+  | 'get_viewport_screenshot';
+
+export type KiloGatewayChatContentPart =
+  | {
+      readonly text: string;
+      readonly type: 'text';
+    }
+  | {
+      readonly image_url: {
+        readonly url: string;
+      };
+      readonly type: 'image_url';
+    };
 
 export interface KiloGatewayChatMessage {
-  readonly content?: string | null;
+  readonly content?: KiloGatewayChatContentPart[] | string | null;
   readonly role: 'assistant' | 'system' | 'tool' | 'user';
   readonly tool_call_id?: string;
   readonly tool_calls?: KiloGatewayChatToolCall[];

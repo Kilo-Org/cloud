@@ -3,6 +3,7 @@ import {
   evalInTab,
   evalInTabWithScripting,
   getPageSnapshotInTabWithScripting,
+  getViewportScreenshotWithTabsApi,
   listInspectableTabs,
   listInspectableTabsWithTabsApi,
 } from './tab-debugger';
@@ -195,6 +196,43 @@ describe('tab debugger helpers', () => {
         target: { tabId: 7 },
         world: 'MAIN',
       },
+    ]);
+  });
+
+  it('captures a viewport screenshot for the selected tab and restores the active tab', async () => {
+    const calls: unknown[] = [];
+    const tabsApi: BrowserTabsApi = {
+      captureVisibleTab: (windowId, options) => {
+        calls.push({ name: 'captureVisibleTab', options, windowId });
+        return 'data:image/png;base64,c2NyZWVu';
+      },
+      get: tabId => {
+        calls.push({ name: 'get', tabId });
+        return { id: tabId, title: 'Target', url: 'https://example.com/', windowId: 3 };
+      },
+      query: queryInfo => {
+        calls.push({ name: 'query', queryInfo });
+        return [{ id: 1, title: 'Previous', url: 'https://kilo.ai/', windowId: 3 }];
+      },
+      update: (tabId, updateProperties) => {
+        calls.push({ name: 'update', tabId, updateProperties });
+        return { id: tabId, title: 'Tab', url: 'https://example.com/', windowId: 3 };
+      },
+    };
+
+    await expect(getViewportScreenshotWithTabsApi({ tabId: 7, tabsApi })).resolves.toStrictEqual({
+      ok: true,
+      value: {
+        dataUrl: 'data:image/png;base64,c2NyZWVu',
+        mediaType: 'image/png',
+      },
+    });
+    expect(calls).toStrictEqual([
+      { name: 'get', tabId: 7 },
+      { name: 'query', queryInfo: { active: true, windowId: 3 } },
+      { name: 'update', tabId: 7, updateProperties: { active: true } },
+      { name: 'captureVisibleTab', options: { format: 'png' }, windowId: 3 },
+      { name: 'update', tabId: 1, updateProperties: { active: true } },
     ]);
   });
 });

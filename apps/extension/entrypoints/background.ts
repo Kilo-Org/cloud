@@ -3,9 +3,11 @@ import {
   EVAL_TAB_MESSAGE,
   LIST_INSPECTABLE_TABS_MESSAGE,
   PAGE_SNAPSHOT_MESSAGE,
+  VIEWPORT_SCREENSHOT_MESSAGE,
   evalInTab,
   evalInTabWithScripting,
   getPageSnapshotInTabWithScripting,
+  getViewportScreenshotWithTabsApi,
   isTabDebuggerRequest,
   listInspectableTabs,
   listInspectableTabsWithTabsApi,
@@ -76,6 +78,21 @@ const handleTabDebuggerRequest = async ({
       }
 
       return { error: 'Page snapshot API is unavailable.', ok: false };
+    }
+
+    if (request.type === VIEWPORT_SCREENSHOT_MESSAGE) {
+      if (tabsApi) {
+        return {
+          ok: true,
+          result: await getViewportScreenshotWithTabsApi({
+            tabId: request.tabId,
+            tabsApi,
+          }),
+          type: VIEWPORT_SCREENSHOT_MESSAGE,
+        };
+      }
+
+      return { error: 'Viewport screenshot API is unavailable.', ok: false };
     }
 
     if (debuggerApi) {

@@ -58,6 +58,7 @@ const gatewayToolNameSchema = z.enum([
   'find_in_page',
   'get_element_details',
   'get_page_snapshot',
+  'get_viewport_screenshot',
 ]);
 const streamingToolCallDeltaSchema = z.object({
   function: z

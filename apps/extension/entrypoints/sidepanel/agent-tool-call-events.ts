@@ -15,7 +15,10 @@ const getStringArgument = (args: Record<string, unknown>, name: string): string 
 };
 
 const isSafeToolName = (name: string): name is SafeToolName =>
-  name === 'find_in_page' || name === 'get_element_details' || name === 'get_page_snapshot';
+  name === 'find_in_page' ||
+  name === 'get_element_details' ||
+  name === 'get_page_snapshot' ||
+  name === 'get_viewport_screenshot';
 
 const toSafeToolCallEvent = (
   toolCall: KiloGatewayToolCallRequest,

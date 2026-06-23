@@ -1,13 +1,14 @@
 import { browser } from '#imports';
 import { z } from 'zod';
-import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
-import { PAGE_SNAPSHOT_MESSAGE, isTabDebuggerResponse } from '@/src/shared/tab-debugger';
+import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-conversation';
+import {
+  PAGE_SNAPSHOT_MESSAGE,
+  VIEWPORT_SCREENSHOT_MESSAGE,
+  isTabDebuggerResponse,
+} from '@/src/shared/tab-debugger';
 import type { EvalTabResult, PageSnapshot, PageSnapshotNode } from '@/src/shared/tab-debugger';
 
-type SafeToolCall = Extract<
-  AgentConversationEvent,
-  { readonly name: 'find_in_page' | 'get_element_details' | 'get_page_snapshot' }
->;
+type SafeToolCall = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 const pageSnapshotNodeSchema = z.object({
   href: z.string().optional(),
   id: z.string(),
@@ -60,6 +61,27 @@ const readPageSnapshot = async (tabId: number): Promise<EvalTabResult> => {
   return response.result;
 };
 
+const readViewportScreenshot = async (tabId: number): Promise<EvalTabResult> => {
+  const response: unknown = await browser.runtime.sendMessage({
+    tabId,
+    type: VIEWPORT_SCREENSHOT_MESSAGE,
+  });
+
+  if (!isTabDebuggerResponse(response)) {
+    return { error: 'Extension background returned an invalid response.', ok: false };
+  }
+
+  if (!response.ok) {
+    return { error: response.error, ok: false };
+  }
+
+  if (response.type !== VIEWPORT_SCREENSHOT_MESSAGE) {
+    return { error: 'Extension background returned the wrong response.', ok: false };
+  }
+
+  return response.result;
+};
+
 const getSnapshot = async (tabId: number): Promise<PageSnapshot | string> => {
   const result = await readPageSnapshot(tabId);
 
@@ -82,6 +104,10 @@ const nodeMatchesQuery = (node: PageSnapshotNode, query: string): boolean => {
 };
 
 export const executeSafeToolCall = async (toolCall: SafeToolCall): Promise<EvalTabResult> => {
+  if (toolCall.name === 'get_viewport_screenshot') {
+    return readViewportScreenshot(toolCall.tabId);
+  }
+
   const snapshot = await getSnapshot(toolCall.tabId);
 
   if (typeof snapshot === 'string') {

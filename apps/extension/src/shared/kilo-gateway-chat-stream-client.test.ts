@@ -119,6 +119,34 @@ describe('kilo gateway chat stream client', () => {
     });
   });
 
+  it('streams viewport screenshot tool call deltas', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_screenshot_1","type":"function","function":{"name":"get_viewport_screenshot","arguments":"{}"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Look at this page', role: 'user' }],
+        model: 'kilo-auto/frontier',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: {},
+          id: 'call_screenshot_1',
+          name: 'get_viewport_screenshot',
+        },
+      ],
+    });
+  });
+
   it('streams tool call deltas when the gateway sends null content', async () => {
     const contentDeltas: string[] = [];
     const reasoningDeltas: string[] = [];

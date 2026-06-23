@@ -5,6 +5,7 @@ export const DEBUGGER_PROTOCOL_VERSION = '1.3';
 export const LIST_INSPECTABLE_TABS_MESSAGE = 'kilo.tabs.listInspectable';
 export const EVAL_TAB_MESSAGE = 'kilo.tabs.eval';
 export const PAGE_SNAPSHOT_MESSAGE = 'kilo.tabs.snapshot';
+export const VIEWPORT_SCREENSHOT_MESSAGE = 'kilo.tabs.viewportScreenshot';
 export const DEFAULT_EVAL_TIMEOUT_MS = 5000;
 
 export interface ChromeDebuggerTargetInfo {
@@ -31,15 +32,26 @@ export interface ChromeDebuggerApi {
 }
 
 export interface BrowserTabInfo {
+  readonly active?: boolean;
   readonly id?: number;
   readonly title?: string;
   readonly url?: string;
+  readonly windowId?: number;
 }
 
 export interface BrowserTabsApi {
+  readonly captureVisibleTab?: (
+    windowId?: number,
+    options?: { readonly format: 'png' }
+  ) => Promise<string> | string;
+  readonly get?: (tabId: number) => Promise<BrowserTabInfo> | BrowserTabInfo;
   readonly query: (
     queryInfo: Record<string, unknown>
   ) => Promise<BrowserTabInfo[]> | BrowserTabInfo[];
+  readonly update?: (
+    tabId: number,
+    updateProperties: { readonly active: boolean }
+  ) => Promise<BrowserTabInfo> | BrowserTabInfo;
 }
 
 export interface BrowserScriptingInjectionResult {
@@ -78,6 +90,11 @@ export interface PageSnapshot {
   readonly url: string;
 }
 
+export interface ViewportScreenshot {
+  readonly dataUrl: string;
+  readonly mediaType: 'image/png';
+}
+
 export type EvalTabResult =
   | {
       readonly description?: string;
@@ -103,6 +120,10 @@ export type TabDebuggerRequest =
       readonly tabId: number;
       readonly timeoutMs?: number;
       readonly type: typeof PAGE_SNAPSHOT_MESSAGE;
+    }
+  | {
+      readonly tabId: number;
+      readonly type: typeof VIEWPORT_SCREENSHOT_MESSAGE;
     };
 
 export type TabDebuggerResponse =
@@ -120,6 +141,11 @@ export type TabDebuggerResponse =
       readonly result: EvalTabResult;
       readonly ok: true;
       readonly type: typeof PAGE_SNAPSHOT_MESSAGE;
+    }
+  | {
+      readonly result: EvalTabResult;
+      readonly ok: true;
+      readonly type: typeof VIEWPORT_SCREENSHOT_MESSAGE;
     }
   | {
       readonly error: string;
@@ -152,6 +178,10 @@ const tabDebuggerRequestSchema = z.union([
     type: z.literal(PAGE_SNAPSHOT_MESSAGE),
   }),
   z.object({
+    tabId: z.number(),
+    type: z.literal(VIEWPORT_SCREENSHOT_MESSAGE),
+  }),
+  z.object({
     code: z.string(),
     tabId: z.number(),
     timeoutMs: z.number().optional(),
@@ -173,6 +203,11 @@ const tabDebuggerResponseSchema = z.union([
     ok: z.literal(true),
     result: evalTabResultSchema,
     type: z.literal(PAGE_SNAPSHOT_MESSAGE),
+  }),
+  z.object({
+    ok: z.literal(true),
+    result: evalTabResultSchema,
+    type: z.literal(VIEWPORT_SCREENSHOT_MESSAGE),
   }),
   z.object({
     error: z.string(),
@@ -233,6 +268,46 @@ export const listInspectableTabsWithTabsApi = async (
         url: tab.url,
       };
     });
+};
+
+const getTabId = (tab: BrowserTabInfo | undefined): number | undefined =>
+  typeof tab?.id === 'number' ? tab.id : undefined;
+
+export const getViewportScreenshotWithTabsApi = async ({
+  tabId,
+  tabsApi,
+}: {
+  readonly tabId: number;
+  readonly tabsApi: BrowserTabsApi;
+}): Promise<EvalTabResult> => {
+  if (
+    tabsApi.captureVisibleTab === undefined ||
+    tabsApi.get === undefined ||
+    tabsApi.update === undefined
+  ) {
+    return { error: 'Viewport screenshot API is unavailable.', ok: false };
+  }
+
+  const { windowId } = await tabsApi.get(tabId);
+  const [previousActiveTab] = await tabsApi.query(
+    windowId === undefined ? { active: true, currentWindow: true } : { active: true, windowId }
+  );
+  const previousActiveTabId = getTabId(previousActiveTab);
+
+  try {
+    await tabsApi.update(tabId, { active: true });
+    const dataUrl = await tabsApi.captureVisibleTab(windowId, { format: 'png' });
+
+    if (!dataUrl.startsWith('data:image/png;base64,')) {
+      return { error: 'Viewport screenshot API returned an invalid image.', ok: false };
+    }
+
+    return { ok: true, value: { dataUrl, mediaType: 'image/png' } satisfies ViewportScreenshot };
+  } finally {
+    if (previousActiveTabId !== undefined && previousActiveTabId !== tabId) {
+      await tabsApi.update(previousActiveTabId, { active: true });
+    }
+  }
 };
 
 const getEvalExpression = (code: string): string => `(async () => { ${code} })()`;

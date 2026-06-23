@@ -18,17 +18,18 @@ interface RunDangerousLlmTurnOptions {
   readonly organizationId?: string | undefined;
   readonly selectedTabId: number;
   readonly signal?: AbortSignal | undefined;
+  readonly supportsImages?: boolean;
   readonly thinkingEffort?: string | undefined;
   readonly token: string;
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
 }
 
-const dangerousToolDefinitions = [...createSafeToolDefinitions(), createEvalToolDefinition()];
 const maxEvalRounds = 4;
 
 export const runDangerousLlmTurn = ({
   selectedTabId,
+  supportsImages = false,
   ...options
 }: RunDangerousLlmTurnOptions): Promise<void> =>
   runLlmTurn({
@@ -42,5 +43,5 @@ export const runDangerousLlmTurn = ({
     toToolCallEvents: toolCalls => toDangerousToolCallEvents(toolCalls, selectedTabId),
     tooManyToolRoundsMessage:
       'The model requested too many eval rounds. Send another message to continue.',
-    tools: dangerousToolDefinitions,
+    tools: [...createSafeToolDefinitions({ supportsImages }), createEvalToolDefinition()],
   });

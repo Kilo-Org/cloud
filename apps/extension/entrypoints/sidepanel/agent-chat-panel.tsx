@@ -269,6 +269,7 @@ export const AgentChatPanel = ({
           organizationId,
           selectedTabId,
           signal: abort.signal,
+          supportsImages: selectedModel?.supportsImages === true,
           thinkingEffort,
           token: auth.token,
           updateAssistantMessage: updateRunAssistantMessage,

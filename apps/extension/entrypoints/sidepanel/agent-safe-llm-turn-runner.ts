@@ -14,17 +14,18 @@ interface RunSafeLlmTurnOptions {
   readonly organizationId?: string | undefined;
   readonly selectedTabId: number;
   readonly signal?: AbortSignal | undefined;
+  readonly supportsImages?: boolean;
   readonly thinkingEffort?: string | undefined;
   readonly token: string;
   readonly updateAssistantMessage: (eventId: string, text: string) => void;
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
 }
 
-const safeToolDefinitions = createSafeToolDefinitions();
 const maxSafeToolRounds = 4;
 
 export const runSafeLlmTurn = ({
   selectedTabId,
+  supportsImages = false,
   ...options
 }: RunSafeLlmTurnOptions): Promise<void> =>
   runLlmTurn({
@@ -36,5 +37,5 @@ export const runSafeLlmTurn = ({
     toToolCallEvents: toolCalls => toSafeToolCallEvents(toolCalls, selectedTabId),
     tooManyToolRoundsMessage:
       'The model requested too many safe read rounds. Send another message to continue.',
-    tools: safeToolDefinitions,
+    tools: createSafeToolDefinitions({ supportsImages }),
   });

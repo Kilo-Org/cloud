@@ -113,6 +113,7 @@ describe('kilo API client', () => {
             preferredIndex: 1,
           },
           {
+            architecture: { input_modalities: ['text', 'image'] },
             id: 'a-model',
             name: 'A Model',
           },
@@ -139,6 +140,7 @@ describe('kilo API client', () => {
         id: 'a-model',
         isPreferred: false,
         name: 'A Model',
+        supportsImages: true,
         variants: [],
       },
       {

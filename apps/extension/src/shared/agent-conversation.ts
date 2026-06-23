@@ -1,5 +1,9 @@
 export type AgentMode = 'dangerous' | 'safe';
-export type SafeToolName = 'find_in_page' | 'get_element_details' | 'get_page_snapshot';
+export type SafeToolName =
+  | 'find_in_page'
+  | 'get_element_details'
+  | 'get_page_snapshot'
+  | 'get_viewport_screenshot';
 export type AgentToolName = 'eval' | SafeToolName;
 
 export type AgentConversationEvent =

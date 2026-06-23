@@ -3,10 +3,12 @@ import {
   EXTENSION_AGENT_SYSTEM_PROMPT,
   buildGatewayMessagesFromEvents,
   createEvalToolDefinition,
+  createSafeToolDefinitions,
 } from './agent-llm-harness';
 import {
   createAssistantMessage,
   createEvalToolCall,
+  createSafeToolCall,
   createThinkingBlock,
   createToolResult,
   createUserMessage,
@@ -44,6 +46,23 @@ describe('agent LLM harness', () => {
       },
       type: 'function',
     });
+  });
+
+  it('only exposes viewport screenshots for image-capable models', () => {
+    const toolNames = (supportsImages: boolean): string[] =>
+      createSafeToolDefinitions({ supportsImages }).map(tool => tool.function.name);
+
+    expect(toolNames(false)).toStrictEqual([
+      'get_page_snapshot',
+      'get_element_details',
+      'find_in_page',
+    ]);
+    expect(toolNames(true)).toStrictEqual([
+      'get_page_snapshot',
+      'get_element_details',
+      'find_in_page',
+      'get_viewport_screenshot',
+    ]);
   });
 
   it('maps conversation events to gateway messages with tool results', () => {
@@ -180,6 +199,59 @@ describe('agent LLM harness', () => {
             type: 'function',
           },
         ],
+      },
+    ]);
+  });
+
+  it('adds viewport screenshots as image inputs after the tool result', () => {
+    const toolCall = createSafeToolCall({
+      name: 'get_viewport_screenshot',
+      providerToolCallId: 'call_screenshot_1',
+      tabId: 7,
+    });
+    const toolResult = createToolResult({
+      ok: true,
+      toolCallId: toolCall.id,
+      value: {
+        dataUrl: 'data:image/png;base64,c2NyZWVu',
+        mediaType: 'image/png',
+      },
+    });
+
+    expect(buildGatewayMessagesFromEvents([toolCall, toolResult])).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      {
+        content: null,
+        role: 'assistant',
+        tool_calls: [
+          {
+            function: {
+              arguments: '{}',
+              name: 'get_viewport_screenshot',
+            },
+            id: 'call_screenshot_1',
+            type: 'function',
+          },
+        ],
+      },
+      {
+        content:
+          '{"ok":true,"value":{"mediaType":"image/png","note":"Viewport screenshot attached as an image input."}}',
+        role: 'tool',
+        tool_call_id: 'call_screenshot_1',
+      },
+      {
+        content: [
+          {
+            text: 'Viewport screenshot from get_viewport_screenshot.',
+            type: 'text',
+          },
+          {
+            image_url: { url: 'data:image/png;base64,c2NyZWVu' },
+            type: 'image_url',
+          },
+        ],
+        role: 'user',
       },
     ]);
   });

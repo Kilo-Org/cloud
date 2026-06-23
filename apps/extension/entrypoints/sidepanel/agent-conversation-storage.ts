@@ -29,7 +29,12 @@ const conversationEventSchema = z.union([
   z.object({
     elementId: z.string().optional(),
     id: z.string(),
-    name: z.enum(['find_in_page', 'get_element_details', 'get_page_snapshot']),
+    name: z.enum([
+      'find_in_page',
+      'get_element_details',
+      'get_page_snapshot',
+      'get_viewport_screenshot',
+    ]),
     providerToolCallId: z.string().optional(),
     query: z.string().optional(),
     tabId: z.number(),

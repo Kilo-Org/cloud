@@ -20,6 +20,7 @@ export interface KiloGatewayModelOption {
   readonly isPreferred: boolean;
   readonly mayTrainOnYourPrompts?: boolean;
   readonly name: string;
+  readonly supportsImages?: boolean;
   readonly variants: string[];
 }
 
@@ -51,12 +52,18 @@ interface ParsedGatewayModelOption {
   mayTrainOnYourPrompts?: boolean;
   name: string;
   preferredIndex?: number;
+  supportsImages?: boolean;
   variants: string[];
 }
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 const nonEmptyStringSchema = z.string().min(1);
 const modelSchema = z.object({
+  architecture: z
+    .object({
+      input_modalities: z.array(z.string()).optional(),
+    })
+    .optional(),
   hasUserByokAvailable: z.boolean().optional(),
   id: nonEmptyStringSchema,
   isFree: z.boolean().optional(),
@@ -128,6 +135,7 @@ const toGatewayModelOption = (model: ParsedGatewayModelOption): KiloGatewayModel
     isPreferred: boolean;
     mayTrainOnYourPrompts?: boolean;
     name: string;
+    supportsImages?: boolean;
     variants: string[];
   } = {
     id: model.id,
@@ -146,6 +154,10 @@ const toGatewayModelOption = (model: ParsedGatewayModelOption): KiloGatewayModel
 
   if (model.mayTrainOnYourPrompts !== undefined) {
     option.mayTrainOnYourPrompts = model.mayTrainOnYourPrompts;
+  }
+
+  if (model.supportsImages !== undefined) {
+    option.supportsImages = model.supportsImages;
   }
 
   return option;
@@ -181,6 +193,9 @@ export const parseKiloGatewayModelsResponse = (value: unknown): KiloGatewayModel
         ...(model.data.preferredIndex === undefined
           ? {}
           : { preferredIndex: model.data.preferredIndex }),
+        ...(model.data.architecture?.input_modalities?.includes('image') === true
+          ? { supportsImages: true }
+          : {}),
       };
 
       return [option];

@@ -4,6 +4,7 @@ import type {
   AgentConversationEvent,
   GroupedConversationItem,
 } from '@/src/shared/agent-conversation';
+import { getViewportScreenshotDataUrl } from '@/src/shared/agent-tool-output';
 
 const formatToolValue = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -75,6 +76,9 @@ const ToolExchangeEvent = ({
   item: Extract<GroupedConversationItem, { readonly type: 'tool-exchange' }>;
 }): JSX.Element => {
   const isSuccessful = item.result.ok;
+  const screenshotDataUrl = isSuccessful
+    ? getViewportScreenshotDataUrl(item.toolCall.name, item.result.value)
+    : undefined;
 
   const panelClassName = isSuccessful
     ? 'group min-w-0 rounded-md border border-zinc-800 bg-zinc-900/70 px-3 py-2'
@@ -109,9 +113,17 @@ const ToolExchangeEvent = ({
           <p className="text-[11px] font-medium text-zinc-300">
             {isSuccessful ? 'Result' : 'Error'}
           </p>
-          <pre className="mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400">
-            {isSuccessful ? formatToolValue(item.result.value) : item.result.error}
-          </pre>
+          {screenshotDataUrl === undefined ? (
+            <pre className="mt-1 max-h-28 min-w-0 overflow-x-hidden overflow-y-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-4 text-zinc-400">
+              {isSuccessful ? formatToolValue(item.result.value) : item.result.error}
+            </pre>
+          ) : (
+            <img
+              alt="Viewport screenshot captured by get_viewport_screenshot"
+              className="mt-1 max-h-40 max-w-full rounded border border-zinc-800 object-contain"
+              src={screenshotDataUrl}
+            />
+          )}
         </div>
       </div>
     </details>

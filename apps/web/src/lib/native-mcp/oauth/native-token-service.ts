@@ -4,10 +4,10 @@ import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import {
   GatewayErrorCode,
   GatewayMcpAccessScope,
-  NativeMcpResourceUrl,
   NativeMcpTokenClaimsSchema,
   createGatewayError,
   isNativeMcpResource,
+  nativeMcpResourceUrl,
   type OAuthTokenRequest,
 } from '@kilocode/mcp-gateway';
 import { mcp_native_authorization_codes, mcp_native_refresh_tokens } from '@kilocode/db/schema';
@@ -24,9 +24,10 @@ export function createNativeMcpTokenService(params: {
   config: GatewayAppConfig;
 }) {
   const database = params.database ?? db;
+  const resourceUrl = nativeMcpResourceUrl(params.config.appBaseUrl);
 
   function requireNativeResource(request: OAuthTokenRequest) {
-    if (!isNativeMcpResource(request.resource)) {
+    if (!isNativeMcpResource(request.resource, params.config.appBaseUrl)) {
       throw createGatewayError(
         GatewayErrorCode.InvalidGrant,
         'Native MCP resource is required',
@@ -48,7 +49,7 @@ export function createNativeMcpTokenService(params: {
     const claims = NativeMcpTokenClaimsSchema.parse({
       iss: params.config.issuer,
       sub: input.userId,
-      aud: NativeMcpResourceUrl,
+      aud: resourceUrl,
       exp,
       iat: now,
       scope: input.scopes.join(' '),
@@ -75,7 +76,7 @@ export function createNativeMcpTokenService(params: {
       rotated_from_refresh_token_id: input.rotatedFromRefreshTokenId ?? null,
       oauth_client_id: input.oauthClientId,
       client_id: input.clientId,
-      canonical_resource_url: NativeMcpResourceUrl,
+      canonical_resource_url: resourceUrl,
       granted_scopes: input.scopes,
       kilo_user_id: input.userId,
     });
@@ -121,7 +122,7 @@ export function createNativeMcpTokenService(params: {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Authorization code is invalid', 400);
     }
     requireMcpAccess(code.granted_scopes);
-    if (code.canonical_resource_url !== NativeMcpResourceUrl) {
+    if (code.canonical_resource_url !== resourceUrl) {
       throw createGatewayError(
         GatewayErrorCode.InvalidGrant,
         'Authorization code resource is invalid',
@@ -215,7 +216,7 @@ export function createNativeMcpTokenService(params: {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Refresh token is invalid', 400);
     }
     requireMcpAccess(refreshToken.granted_scopes);
-    if (refreshToken.canonical_resource_url !== NativeMcpResourceUrl) {
+    if (refreshToken.canonical_resource_url !== resourceUrl) {
       throw createGatewayError(
         GatewayErrorCode.InvalidGrant,
         'Refresh token resource is invalid',
@@ -249,7 +250,7 @@ export function createNativeMcpTokenService(params: {
         rotated_from_refresh_token_id: refreshToken.refresh_token_id,
         oauth_client_id: client.oauth_client_id,
         client_id: client.client_id,
-        canonical_resource_url: NativeMcpResourceUrl,
+        canonical_resource_url: resourceUrl,
         granted_scopes: refreshToken.granted_scopes,
         kilo_user_id: refreshToken.kilo_user_id,
       });

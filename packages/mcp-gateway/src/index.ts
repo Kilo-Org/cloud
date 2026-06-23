@@ -69,9 +69,9 @@ export {
 export { isIpAddress, isPublicIp } from './ip';
 export {
   NativeMcpResourcePath,
-  NativeMcpResourceUrl,
   NativeMcpTokenUse,
   NativeMcpTokenClaimsSchema,
+  nativeMcpResourceUrl,
   isNativeMcpResource,
   nativeMcpProtectedResourceMetadata,
   nativeMcpProtectedResourceMetadataUrl,

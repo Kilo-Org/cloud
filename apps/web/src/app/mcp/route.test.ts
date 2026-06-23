@@ -51,7 +51,7 @@ describe('/mcp', () => {
     expect(response.status).toBe(401);
     expect(response.headers.get('cache-control')).toBe('no-store');
     const challenge = response.headers.get('www-authenticate') ?? '';
-    expect(challenge).toContain('Bearer resource="https://app.kilocode.ai/mcp"');
+    expect(challenge).toContain('Bearer resource="http://localhost:3000/mcp"');
     expect(challenge).toContain(
       'resource_metadata="http://localhost:3000/.well-known/oauth-protected-resource/mcp"'
     );

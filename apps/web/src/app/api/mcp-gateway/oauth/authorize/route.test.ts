@@ -49,7 +49,7 @@ jest.mock('@/lib/user/server', () => ({
 
 jest.mock('@/lib/mcp-gateway/services', () => ({
   createGatewayServices: () => ({
-    config: { rateLimitSecret: 'test-rate-limit-secret' },
+    config: { appBaseUrl: 'http://localhost:3000', rateLimitSecret: 'test-rate-limit-secret' },
     routeService: {
       parseResource: () => ({
         ownerScope: 'organization',
@@ -145,7 +145,7 @@ function nativeAuthorizationUrl(redirectUri = 'http://127.0.0.1:60424/callback')
     client_id: 'mcp:client',
     redirect_uri: redirectUri,
     response_type: 'code',
-    resource: 'https://app.kilocode.ai/mcp',
+    resource: 'http://localhost:3000/mcp',
     scope: 'mcp:access',
     state: 'client-state',
     code_challenge: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._~abcdefghijk',
@@ -267,9 +267,9 @@ describe('GET /api/mcp-gateway/oauth/authorize', () => {
       clientId: 'mcp:client',
       clientName: 'Codex',
       redirectUri: 'http://127.0.0.1:60424/callback',
-      resource: 'https://app.kilocode.ai/mcp',
+      resource: 'http://localhost:3000/mcp',
       connectionName: 'Kilo usage stats',
-      endpointHost: 'app.kilocode.ai',
+      endpointHost: 'localhost:3000',
       contextName: 'Kilo admin preview',
       ownerScope: 'personal',
       scopes: ['mcp:access'],

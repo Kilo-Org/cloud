@@ -4,9 +4,9 @@ import { and, eq, isNull } from 'drizzle-orm';
 import {
   GatewayErrorCode,
   GatewayMcpAccessScope,
-  NativeMcpResourceUrl,
   NativeMcpTokenClaimsSchema,
   createGatewayError,
+  nativeMcpResourceUrl,
   parseScopeString,
 } from '@kilocode/mcp-gateway';
 import { kilocode_users, organization_memberships, type User } from '@kilocode/db/schema';
@@ -50,6 +50,7 @@ export async function verifyNativeMcpBearerToken(params: {
   database?: Database;
 }) {
   const config = params.config ?? getGatewayAppConfig();
+  const resourceUrl = nativeMcpResourceUrl(config.appBaseUrl);
   const decoded = jwt.decode(params.token, { complete: true });
   const kid = decoded && typeof decoded === 'object' ? decoded.header.kid : undefined;
   if (!kid) {
@@ -62,7 +63,7 @@ export async function verifyNativeMcpBearerToken(params: {
   const payload = jwt.verify(params.token, verificationKey(key), {
     algorithms: ['RS256'],
     issuer: config.issuer,
-    audience: NativeMcpResourceUrl,
+    audience: resourceUrl,
   });
   if (typeof payload === 'string') {
     throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Token payload is malformed', 401);

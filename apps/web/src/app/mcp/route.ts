@@ -2,9 +2,9 @@ import 'server-only';
 import { NextResponse, type NextRequest } from 'next/server';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import {
-  NativeMcpResourceUrl,
   nativeMcpAuthorizationUrl,
   nativeMcpProtectedResourceMetadataUrl,
+  nativeMcpResourceUrl,
 } from '@kilocode/mcp-gateway';
 import { extractBearerToken } from '@/lib/mcp-gateway/http';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
@@ -27,7 +27,7 @@ function methodNotAllowed() {
 
 function unauthorizedChallenge(appBaseUrl: string) {
   const authenticate = [
-    `Bearer resource="${NativeMcpResourceUrl}"`,
+    `Bearer resource="${nativeMcpResourceUrl(appBaseUrl)}"`,
     `resource_metadata="${nativeMcpProtectedResourceMetadataUrl(appBaseUrl)}"`,
     'scope="mcp:access"',
     `authorization_uri="${nativeMcpAuthorizationUrl(appBaseUrl)}"`,
@@ -50,7 +50,7 @@ function originAllowed(request: NextRequest, appBaseUrl: string) {
   const allowedOrigins = new Set([
     new URL(request.url).origin,
     new URL(appBaseUrl).origin,
-    new URL(NativeMcpResourceUrl).origin,
+    new URL(nativeMcpResourceUrl(appBaseUrl)).origin,
   ]);
   return allowedOrigins.has(origin);
 }

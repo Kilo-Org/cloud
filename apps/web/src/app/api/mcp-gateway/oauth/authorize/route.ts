@@ -11,6 +11,7 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
 import { gatewayErrorResponse } from '@/lib/mcp-gateway/http';
 import type { ScopedConnectRoute } from '@kilocode/mcp-gateway';
+import { APP_URL } from '@/lib/constants';
 import { executionContextFromAuth } from '@/lib/mcp-gateway/context';
 import { hmacValue, randomToken } from '@/lib/mcp-gateway/crypto';
 import { OAuthAuthorizationRedirectError } from '@/lib/mcp-gateway/authorization-service';
@@ -116,7 +117,7 @@ async function authorizeRequest(
   allowBrowserOrgResourceContext: boolean
 ) {
   const services = createGatewayServices();
-  if (isNativeMcpResource(query.resource)) {
+  if (isNativeMcpResource(query.resource, services.config.appBaseUrl)) {
     const result = await services.nativeMcpAuthorizationService.authorize({ query, userId });
     const response = NextResponse.redirect(result.redirectUrl, 303);
     response.headers.set('Cache-Control', 'no-store');
@@ -492,7 +493,8 @@ async function consentResponse(request: NextRequest, route?: ScopedConnectRoute)
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
-  const nativeMcp = isNativeMcpResource(parsed.data.resource);
+  const appBaseUrl = process.env.MCP_GATEWAY_APP_BASE_URL || APP_URL;
+  const nativeMcp = isNativeMcpResource(parsed.data.resource, appBaseUrl);
   const identity = await authorizationIdentity(request, { adminOnly: nativeMcp });
   if ('response' in identity) return identity.response;
   const services = createGatewayServices();
@@ -592,7 +594,8 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
   if (!parsed.success) {
     return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
   }
-  const nativeMcp = isNativeMcpResource(parsed.data.resource);
+  const appBaseUrl = process.env.MCP_GATEWAY_APP_BASE_URL || APP_URL;
+  const nativeMcp = isNativeMcpResource(parsed.data.resource, appBaseUrl);
   const identity = await authorizationIdentity(request, { adminOnly: nativeMcp });
   if ('response' in identity) return identity.response;
   const services = createGatewayServices();

@@ -3,9 +3,9 @@ import {
   GatewayErrorCode,
   GatewayMcpAccessScope,
   GatewayOAuthClientAuthMethod,
-  NativeMcpResourceUrl,
   createGatewayError,
   isNativeMcpResource,
+  nativeMcpResourceUrl,
   parseScopeString,
   type OAuthAuthorizationQuery,
 } from '@kilocode/mcp-gateway';
@@ -39,6 +39,7 @@ export function createNativeMcpAuthorizationService(params: {
   config: GatewayAppConfig;
 }) {
   const database = params.database ?? db;
+  const resourceUrl = nativeMcpResourceUrl(params.config.appBaseUrl);
 
   function redirectOrThrow(input: {
     query: OAuthAuthorizationQuery;
@@ -73,7 +74,7 @@ export function createNativeMcpAuthorizationService(params: {
         400
       );
     }
-    if (!isNativeMcpResource(input.query.resource)) {
+    if (!isNativeMcpResource(input.query.resource, params.config.appBaseUrl)) {
       redirectOrThrow({
         query: input.query,
         redirectErrors: input.redirectErrors,
@@ -144,9 +145,9 @@ export function createNativeMcpAuthorizationService(params: {
       clientId: prepared.client.client_id,
       clientName: prepared.client.client_name,
       redirectUri: input.query.redirect_uri,
-      resource: NativeMcpResourceUrl,
+      resource: resourceUrl,
       connectionName: 'Kilo usage stats',
-      endpointHost: new URL(NativeMcpResourceUrl).host,
+      endpointHost: new URL(resourceUrl).host,
       ownerScope: 'personal' as const,
       contextName: 'Kilo admin preview',
       scopes: prepared.scopes,
@@ -160,7 +161,7 @@ export function createNativeMcpAuthorizationService(params: {
       code_hash: hashToken(code),
       oauth_client_id: prepared.client.oauth_client_id,
       client_id: prepared.client.client_id,
-      canonical_resource_url: NativeMcpResourceUrl,
+      canonical_resource_url: resourceUrl,
       redirect_uri: input.query.redirect_uri,
       granted_scopes: prepared.scopes,
       code_challenge: prepared.codeChallenge,

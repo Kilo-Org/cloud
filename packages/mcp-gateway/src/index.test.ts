@@ -11,6 +11,10 @@ import {
   ProviderGrantBundleSchema,
   OAuthClientMetadataSchema,
   OAuthAuthorizationQuerySchema,
+  NativeMcpTokenClaimsSchema,
+  nativeMcpProtectedResourceMetadata,
+  nativeMcpResourceUrl,
+  isNativeMcpResource,
 } from './index';
 
 describe('scoped routes', () => {
@@ -159,6 +163,36 @@ describe('OAuth redirect URI policy', () => {
         response_type: 'code',
       }).success
     ).toBe(false);
+  });
+});
+
+describe('native MCP resource helpers', () => {
+  test('derive resource identity from the app base URL', () => {
+    const appBaseUrl = 'https://preview.example.com';
+
+    expect(nativeMcpResourceUrl(appBaseUrl)).toBe('https://preview.example.com/mcp');
+    expect(isNativeMcpResource('https://preview.example.com/mcp', appBaseUrl)).toBe(true);
+    expect(isNativeMcpResource('https://app.kilocode.ai/mcp', appBaseUrl)).toBe(false);
+    expect(nativeMcpProtectedResourceMetadata(appBaseUrl)).toEqual({
+      resource: 'https://preview.example.com/mcp',
+      authorization_servers: [appBaseUrl],
+      scopes_supported: ['mcp:access'],
+    });
+  });
+
+  test('accepts a runtime native MCP token audience', () => {
+    expect(
+      NativeMcpTokenClaimsSchema.parse({
+        iss: 'https://preview.example.com',
+        sub: 'user-1',
+        aud: 'https://preview.example.com/mcp',
+        exp: 2,
+        iat: 1,
+        scope: 'mcp:access',
+        token_use: 'native_mcp',
+        client_id: 'mcp:client',
+      }).aud
+    ).toBe('https://preview.example.com/mcp');
   });
 });
 

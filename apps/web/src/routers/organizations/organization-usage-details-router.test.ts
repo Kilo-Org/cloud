@@ -5,6 +5,9 @@ import { createOrganization, addUserToOrganization } from '@/lib/organizations/o
 import { db, pool } from '@/lib/drizzle';
 import {
   agent_configs,
+  agent_environment_profiles,
+  cloud_agent_webhook_triggers,
+  cli_sessions_v2,
   microdollar_usage,
   organizations,
   organization_recommendation_dismissals,
@@ -57,6 +60,12 @@ describe('organizations usage details trpc router', () => {
 
   afterEach(async () => {
     // Clean up usage and feature adoption data after each test
+    await db
+      .delete(cloud_agent_webhook_triggers)
+      .where(eq(cloud_agent_webhook_triggers.organization_id, testOrganization.id));
+    await db
+      .delete(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.owned_by_organization_id, testOrganization.id));
     await Promise.all([
       db
         .delete(microdollar_usage)
@@ -72,6 +81,7 @@ describe('organizations usage details trpc router', () => {
       db
         .delete(agent_configs)
         .where(eq(agent_configs.owned_by_organization_id, testOrganization.id)),
+      db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.organization_id, testOrganization.id)),
     ]);
   });
 
@@ -263,6 +273,109 @@ describe('organizations usage details trpc router', () => {
       expect(result.recommendations.find(r => r.key === 'org-github-lite-app')?.status).toBe(
         'open'
       );
+    });
+
+    it('ignores inactive and non-Cloud-Agent triggers when recommending automation', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      const [profile] = await db
+        .insert(agent_environment_profiles)
+        .values({
+          owned_by_organization_id: testOrganization.id,
+          created_by_user_id: regularUser.id,
+          name: `recommendations-${crypto.randomUUID()}`,
+        })
+        .returning({ id: agent_environment_profiles.id });
+      await db.insert(cli_sessions_v2).values({
+        session_id: `recommendations-${crypto.randomUUID()}`,
+        kilo_user_id: regularUser.id,
+        organization_id: testOrganization.id,
+        cloud_agent_session_id: `cloud-${crypto.randomUUID()}`,
+      });
+      await db.insert(cloud_agent_webhook_triggers).values({
+        trigger_id: `inactive-${crypto.randomUUID()}`,
+        organization_id: testOrganization.id,
+        github_repo: 'test/repo',
+        profile_id: profile.id,
+        is_active: false,
+      });
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getRecommendations({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result.recommendations.find(r => r.key === 'cloud-agent-no-automation')?.status).toBe(
+        'open'
+      );
+    });
+
+    it('treats mixed full and Lite GitHub installations as full-app capable', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise' })
+        .where(eq(organizations.id, testOrganization.id));
+      await db.insert(platform_integrations).values([
+        {
+          owned_by_organization_id: testOrganization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `lite-${crypto.randomUUID()}`,
+          integration_status: 'active',
+          github_app_type: 'lite',
+        },
+        {
+          owned_by_organization_id: testOrganization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `standard-${crypto.randomUUID()}`,
+          integration_status: 'active',
+          github_app_type: 'standard',
+        },
+      ]);
+      await db.insert(agent_configs).values({
+        owned_by_organization_id: testOrganization.id,
+        agent_type: 'code_review',
+        platform: 'github',
+        is_enabled: true,
+        created_by: regularUser.id,
+        config: { review_style: 'balanced', focus_areas: ['security'], model_slug: 'test-model' },
+      });
+      const caller = await createCallerForUser(memberUser.id);
+
+      const result = await caller.organizations.usageDetails.getRecommendations({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result.recommendations.find(r => r.key === 'org-github-lite-app')?.status).toBe(
+        'completed'
+      );
+      expect(
+        result.recommendations.find(r => r.key === 'code-reviewer-no-merge-gate')?.status
+      ).toBe('open');
+    });
+
+    it('rejects dismissal and restore for a hard-expired organization', async () => {
+      await db
+        .update(organizations)
+        .set({ plan: 'enterprise', free_trial_end_at: '2020-01-01T00:00:00.000Z' })
+        .where(eq(organizations.id, testOrganization.id));
+      const owner = await createCallerForUser(regularUser.id);
+
+      await expect(
+        owner.organizations.usageDetails.dismissRecommendation({
+          organizationId: testOrganization.id,
+          recommendationKey: 'org-sso-not-configured',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        owner.organizations.usageDetails.restoreRecommendation({
+          organizationId: testOrganization.id,
+          recommendationKey: 'org-sso-not-configured',
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
 
     it('rejects dismissal from a non-owner member', async () => {

@@ -1,17 +1,17 @@
 import {
   agent_configs,
   cloud_agent_webhook_triggers,
-  deployments,
   organization_recommendation_dismissals,
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, count, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, eq, inArray } from 'drizzle-orm';
 import { readDb } from '@/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import {
   FEATURE_ADOPTION_KEYS,
   buildFeatureAdoptionChecks,
+  getFeatureAdoptionState,
 } from '@/lib/organizations/feature-adoption';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 
@@ -379,8 +379,9 @@ function readString(config: unknown, key: string): string | undefined {
 }
 
 async function getRecommendationState(organizationId: string): Promise<RecommendationState> {
-  const [agentConfigRows, integrationRows, triggerRows, seatUsage, activityResult] =
+  const [featureAdoption, agentConfigRows, integrationRows, triggerRows, seatUsage] =
     await Promise.all([
+      getFeatureAdoptionState(organizationId),
       readDb
         .select({
           agent_type: agent_configs.agent_type,
@@ -409,26 +410,14 @@ async function getRecommendationState(organizationId: string): Promise<Recommend
       readDb
         .select({ value: count() })
         .from(cloud_agent_webhook_triggers)
-        .where(eq(cloud_agent_webhook_triggers.organization_id, organizationId)),
+        .where(
+          and(
+            eq(cloud_agent_webhook_triggers.organization_id, organizationId),
+            eq(cloud_agent_webhook_triggers.target_type, 'cloud_agent'),
+            eq(cloud_agent_webhook_triggers.is_active, true)
+          )
+        ),
       getOrganizationSeatUsage(organizationId),
-      readDb.execute(sql`
-        SELECT
-          (
-            EXISTS (
-              SELECT 1 FROM cli_sessions_v2
-              WHERE organization_id = ${organizationId} AND cloud_agent_session_id IS NOT NULL
-            ) OR EXISTS (
-              SELECT 1 FROM cli_sessions
-              WHERE organization_id = ${organizationId} AND cloud_agent_session_id IS NOT NULL
-            )
-          ) AS cloud_agent_used,
-          EXISTS (
-            SELECT 1 FROM ${deployments}
-            WHERE ${deployments.owned_by_organization_id} = ${organizationId}
-              AND ${deployments.created_from} = 'deploy'
-              AND ${deployments.last_deployed_at} IS NOT NULL
-          ) AS project_deployed
-      `),
     ]);
 
   const enabledCodeReviewConfigs = agentConfigRows.filter(
@@ -455,25 +444,15 @@ async function getRecommendationState(organizationId: string): Promise<Recommend
     new Set(integrationRows.filter(isBroken).map(row => row.platform))
   );
 
-  const sourceControlConnected = integrationRows.some(
-    row => (row.platform === 'github' || row.platform === 'gitlab') && isActive(row)
-  );
   const activeLinear = integrationRows.filter(row => row.platform === 'linear' && isActive(row));
   const linearConnected = activeLinear.length > 0;
   const linearBotEnabled = activeLinear.some(
     row => readBoolean(row.metadata, 'bot_enabled') === true
   );
-  const teamIntegrationConnected = integrationRows.some(
-    row =>
-      isActive(row) &&
-      (row.platform === 'slack' ||
-        row.platform === 'discord' ||
-        (row.platform === 'linear' && readBoolean(row.metadata, 'bot_enabled') === true))
-  );
-
   const activeGithub = integrationRows.filter(row => row.platform === 'github' && isActive(row));
   const githubConnected = activeGithub.length > 0;
-  const githubLiteApp = activeGithub.some(row => row.github_app_type === 'lite');
+  const githubLiteApp =
+    githubConnected && activeGithub.every(row => row.github_app_type === 'lite');
 
   // A merge gate posts a check run (GitHub) or commit status (GitLab). GitLab can
   // always gate; GitHub can only gate on the full app, not the read-only one.
@@ -487,10 +466,9 @@ async function getRecommendationState(organizationId: string): Promise<Recommend
     .where(eq(organizations.id, organizationId))
     .limit(1);
   const sso = orgRow[0]?.sso_domain ?? null;
-  const activity = activityResult.rows[0];
 
   return {
-    sourceControlConnected,
+    ...featureAdoption,
     codeReviewerEnabled,
     codeReviewMissingSecurityFocus: enabledCodeReviewConfigs.some(
       row => !readStringArray(row.config, 'focus_areas').includes('security')
@@ -512,9 +490,6 @@ async function getRecommendationState(organizationId: string): Promise<Recommend
     brokenIntegrationPlatforms,
     linearConnected,
     linearBotEnabled,
-    teamIntegrationConnected,
-    cloudAgentUsed: activity?.cloud_agent_used === true,
-    projectDeployed: activity?.project_deployed === true,
     webhookTriggerCount: triggerRows[0]?.value ?? 0,
     githubConnected,
     githubLiteApp,
@@ -556,14 +531,7 @@ export async function getOrganizationRecommendations(organizationId: string): Pr
       ? { ...recommendation, status: 'dismissed' as const }
       : recommendation
   );
-  const checks = buildFeatureAdoptionChecks(organizationId, {
-    sourceControlConnected: state.sourceControlConnected,
-    codeReviewerEnabled: state.codeReviewerEnabled,
-    securityAgentEnabled: state.securityAgentEnabled,
-    teamIntegrationConnected: state.teamIntegrationConnected,
-    cloudAgentUsed: state.cloudAgentUsed,
-    projectDeployed: state.projectDeployed,
-  });
+  const checks = buildFeatureAdoptionChecks(organizationId, state);
 
   return { plan: organization.plan, checks, recommendations };
 }

@@ -4,7 +4,7 @@ import { createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationMemberProcedure,
-  organizationOwnerProcedure,
+  organizationOwnerMutationProcedure,
 } from '@/routers/organizations/utils';
 import { db, readDb } from '@/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
@@ -229,7 +229,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
       }
       return { checks: result.checks, recommendations: result.recommendations };
     }),
-  dismissRecommendation: organizationOwnerProcedure
+  dismissRecommendation: organizationOwnerMutationProcedure
     .input(DismissRecommendationInputSchema)
     .mutation(async ({ ctx, input }) => {
       await assertEnterprise(input.organizationId);
@@ -248,7 +248,7 @@ export const organizationsUsageDetailsRouter = createTRPCRouter({
         });
       return { dismissed: true };
     }),
-  restoreRecommendation: organizationOwnerProcedure
+  restoreRecommendation: organizationOwnerMutationProcedure
     .input(DismissRecommendationInputSchema)
     .mutation(async ({ input }) => {
       await assertEnterprise(input.organizationId);

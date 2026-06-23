@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { FeatureAdoptionKey } from '@/lib/organizations/feature-adoption';
+import { StatusDonutChart } from './StatusDonutChart';
 
 export const featureIcons: Record<FeatureAdoptionKey, typeof Bot> = {
   'source-control-integration': Cable,
@@ -107,7 +108,20 @@ export function FeatureAdoptionView({
           aria-label={`${adoptionPercent}% of features adopted`}
         />
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+        {!compact && (
+          <StatusDonutChart
+            totalLabel={`${adoptedCount} adopted and ${checks.length - adoptedCount} not adopted yet`}
+            data={[
+              { label: 'Adopted', value: adoptedCount, color: 'var(--status-success-icon)' },
+              {
+                label: 'Not adopted yet',
+                value: checks.length - adoptedCount,
+                color: 'var(--status-neutral-icon)',
+              },
+            ]}
+          />
+        )}
         <div className="divide-border divide-y rounded-lg border">
           {visibleChecks.map(check => {
             const FeatureIcon = featureIcons[check.key];

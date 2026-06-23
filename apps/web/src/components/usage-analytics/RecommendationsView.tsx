@@ -17,6 +17,7 @@ import type {
   RecommendationStatus,
 } from '@/lib/organizations/recommendations';
 import { featureIcons } from './FeatureAdoptionView';
+import { StatusDonutChart } from './StatusDonutChart';
 
 type Pane = RecommendationStatus;
 
@@ -30,6 +31,16 @@ const EMPTY_COPY: Record<Pane, string> = {
   open: 'No open recommendations. You are all caught up.',
   completed: 'Nothing completed yet. Acting on an open recommendation moves it here.',
   dismissed: 'No dismissed recommendations.',
+};
+
+const FEATURE_LABELS: Record<Recommendation['feature'], string> = {
+  organization: 'Organization',
+  'source-control-integration': 'Source control',
+  'code-reviewer': 'Code Reviewer',
+  'security-agent': 'Security Agent',
+  'team-integration': 'Team integrations',
+  'cloud-agent-used': 'Cloud Agent',
+  'project-deployed': 'Deploy',
 };
 
 function FeatureIcon({ recommendation }: { recommendation: Recommendation }) {
@@ -145,7 +156,23 @@ export function RecommendationsView({
           ))}
         </nav>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-6">
+        <StatusDonutChart
+          totalLabel={`${byStatus.open.length} open, ${byStatus.completed.length} completed, and ${byStatus.dismissed.length} dismissed recommendations`}
+          data={[
+            { label: 'Open', value: byStatus.open.length, color: 'var(--status-warning-icon)' },
+            {
+              label: 'Completed',
+              value: byStatus.completed.length,
+              color: 'var(--status-success-icon)',
+            },
+            {
+              label: 'Dismissed',
+              value: byStatus.dismissed.length,
+              color: 'var(--status-neutral-icon)',
+            },
+          ]}
+        />
         {visible.length === 0 ? (
           <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
             {EMPTY_COPY[pane]}
@@ -173,6 +200,9 @@ export function RecommendationsView({
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
+                    <p className="text-muted-foreground type-eyebrow mb-1">
+                      {FEATURE_LABELS[recommendation.feature]}
+                    </p>
                     <p
                       className={cn(
                         'text-sm font-medium',

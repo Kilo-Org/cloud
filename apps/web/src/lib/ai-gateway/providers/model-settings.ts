@@ -104,7 +104,10 @@ export function getModelVariants(model: string): OpenCodeSettings['variants'] {
   if (model.includes('mistral-medium-3-5')) {
     return REASONING_VARIANTS_BINARY;
   }
-  if (model.includes('kimi-k2.7-code')) {
+  if (
+    model.includes('kimi-k2.7-code') ||
+    (isMinimaxModel(model) && model.toLowerCase().includes('minimax-m3'))
+  ) {
     return REASONING_VARIANTS_THINKING_ONLY;
   }
   if (

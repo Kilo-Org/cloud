@@ -213,7 +213,7 @@ describe('organizations usage details trpc router', () => {
           member.organizations.usageDetails.getRecommendations({
             organizationId: testOrganization.id,
           })
-        ).rejects.toThrow('Organization not found');
+        ).rejects.toMatchObject({ code: 'NOT_FOUND' });
         await expect(
           owner.organizations.usageDetails.dismissRecommendation({
             organizationId: testOrganization.id,

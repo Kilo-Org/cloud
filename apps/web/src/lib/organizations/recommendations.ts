@@ -6,6 +6,7 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { and, count, eq, inArray, isNull } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
 import { readDb } from '@/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import {
@@ -509,7 +510,7 @@ export async function getOrganizationRecommendations(organizationId: string): Pr
     .limit(1);
   const organization = orgRows[0];
   if (!organization) {
-    throw new Error('Organization not found');
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
   }
   if (organization.plan !== 'enterprise') {
     return { plan: organization.plan, checks: [], recommendations: [] };

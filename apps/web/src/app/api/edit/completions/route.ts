@@ -179,6 +179,8 @@ export async function POST(request: NextRequest) {
 
   setTag('ui.ai_model', requestBody.model);
 
+  // Use read replica for balance check - this is a read-only operation that can tolerate
+  // slight replication lag, and provides lower latency for US users.
   const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   if (

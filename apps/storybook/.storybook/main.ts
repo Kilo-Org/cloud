@@ -17,6 +17,7 @@ const storybookPublicEnvDefaults = {
   NEXT_PUBLIC_EVENT_SERVICE_URL: 'https://event-service.storybook.invalid',
   NEXT_PUBLIC_GASTOWN_URL: 'https://gastown.storybook.invalid',
   NEXT_PUBLIC_KILO_CHAT_URL: 'https://kilo-chat.storybook.invalid',
+  NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
   NEXT_PUBLIC_WASTELAND_URL: 'https://wasteland.storybook.invalid',
 } satisfies Record<string, string>;
 

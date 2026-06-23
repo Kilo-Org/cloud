@@ -41,8 +41,7 @@ import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat
 import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
-import { user_auth_provider, type Organization, type User } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import type { Organization, User } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
@@ -985,39 +984,6 @@ type GetAuthResponse =
       tokenSource?: string;
     };
 
-async function hasCurrentSsoAuthentication(
-  user: User,
-  session?: { authProvider?: string; ssoSourceOrganizationId?: string }
-): Promise<boolean> {
-  if (user.is_bot) return true;
-
-  const domain = getLowerDomainFromEmail(user.google_user_email);
-  if (!domain || domain === 'gmail.com') return true;
-
-  const authority = await resolveSsoAuthorityForDomain(domain);
-  if (authority.status === 'not_required') return true;
-  if (authority.status === 'misconfigured') return false;
-
-  if (session?.authProvider === 'fake-login' && allow_fake_login) return true;
-
-  if (session) {
-    return (
-      session.authProvider === 'workos' &&
-      session.ssoSourceOrganizationId === authority.sourceOrganizationId
-    );
-  }
-
-  const provider = await readDb.query.user_auth_provider.findFirst({
-    where: and(
-      eq(user_auth_provider.kilo_user_id, user.id),
-      eq(user_auth_provider.provider, 'workos'),
-      eq(user_auth_provider.hosted_domain, authority.domain)
-    ),
-    columns: { kilo_user_id: true },
-  });
-  return Boolean(provider);
-}
-
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
   const headersList = await headers();
 
@@ -1038,10 +1004,6 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     ) {
       return authError(401, 'Invalid API token', user.id);
     }
-    if (user && !(await hasCurrentSsoAuthentication(user))) {
-      return authError(401, 'SSO reauthentication required', user.id);
-    }
-
     const organizationId = headersList.get(ORGANIZATION_ID_HEADER) || undefined;
     const internalApiUse = authorizationValidationResult.internalApiUse;
     const botId = authorizationValidationResult.botId;

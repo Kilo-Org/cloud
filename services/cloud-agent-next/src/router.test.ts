@@ -25,6 +25,16 @@ const { preflightExistingPromptModelMock, preflightPreparedInitialPromptModelMoc
     preflightPreparedInitialPromptModelMock: vi.fn(),
   })
 );
+const { requireCurrentSessionAccessMock } = vi.hoisted(() => ({
+  requireCurrentSessionAccessMock: vi.fn().mockResolvedValue({
+    kiloSessionId: 'ses_12345678901234567890123456',
+    organizationId: null,
+  }),
+}));
+
+vi.mock('./session-access.js', () => ({
+  requireCurrentSessionAccess: requireCurrentSessionAccessMock,
+}));
 
 vi.mock('./session/model-preflight.js', () => ({
   preflightExistingPromptModel: preflightExistingPromptModelMock,
@@ -490,18 +500,28 @@ describe('router sessionId validation', () => {
         });
 
         describe('idempotency', () => {
-          it('treats deletion without runtime metadata as idempotent', async () => {
+          it('treats deletion without ownership or runtime metadata as idempotent', async () => {
             const sessionId: SessionId = 'agent_00000000-0000-0000-0000-000000000000';
             vi.mocked(fetchSessionMetadata).mockResolvedValue(null);
+            requireCurrentSessionAccessMock.mockRejectedValue(
+              new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+            );
 
-            const result = await caller.deleteSession({ sessionId });
+            try {
+              const result = await caller.deleteSession({ sessionId });
 
-            expect(result).toEqual({
-              success: true,
-              message: 'Session not found or already deleted',
-            });
-            expect(getSandbox).not.toHaveBeenCalled();
-            expect(cloudAgentSession.get).not.toHaveBeenCalled();
+              expect(result).toEqual({
+                success: true,
+                message: 'Session not found or already deleted',
+              });
+              expect(getSandbox).not.toHaveBeenCalled();
+              expect(cloudAgentSession.get).not.toHaveBeenCalled();
+            } finally {
+              requireCurrentSessionAccessMock.mockResolvedValue({
+                kiloSessionId: 'ses_12345678901234567890123456',
+                organizationId: null,
+              });
+            }
           });
         });
 
@@ -619,6 +639,33 @@ describe('router sessionId validation', () => {
             await expect(
               unauthenticatedCaller.deleteSession({ sessionId: 'agent_test' })
             ).rejects.toThrow('Authentication required');
+          });
+
+          it('denies deletion when current access to an existing session has been removed', async () => {
+            const sessionId: SessionId = 'agent_12341234-5678-9012-3456-789012345678';
+            vi.mocked(fetchSessionMetadata).mockResolvedValue(
+              legacySessionMetadata({
+                version: 123456789,
+                sessionId,
+                orgId: 'org-123',
+                userId: 'test-user-123',
+                timestamp: 123456789,
+              })
+            );
+            requireCurrentSessionAccessMock.mockRejectedValueOnce(
+              new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+            );
+
+            await expect(caller.deleteSession({ sessionId })).rejects.toMatchObject({
+              code: 'FORBIDDEN',
+            });
+
+            expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+              env: mockContext.env,
+              kiloUserId: 'test-user-123',
+              cloudAgentSessionId: sessionId,
+            });
+            expect(cloudAgentSession.get).not.toHaveBeenCalled();
           });
 
           it('does not delete runtime state for a guessed session belonging to another user', async () => {
@@ -1667,6 +1714,34 @@ describe('router terminal procedures', () => {
     });
     expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
     expect(createTerminal).toHaveBeenCalledWith({ cols: 120, rows: 32 });
+  });
+
+  it('denies terminal creation before Durable Object access', async () => {
+    requireCurrentSessionAccessMock.mockRejectedValueOnce(
+      new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+    );
+    const cloudAgentSession: MockCAS = {
+      idFromName: vi.fn(),
+      get: vi.fn(),
+    };
+    const caller = appRouter.createCaller({
+      userId: 'test-user-123',
+      authToken: 'token',
+      botId: undefined,
+      request: new Request('http://test.local'),
+      env: { CLOUD_AGENT_SESSION: cloudAgentSession },
+    } as unknown as TRPCContext);
+
+    await expect(
+      caller.createTerminal({
+        cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+        cols: 120,
+        rows: 32,
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
+    expect(cloudAgentSession.get).not.toHaveBeenCalled();
   });
 });
 

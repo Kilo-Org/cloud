@@ -90,7 +90,7 @@ function createTerminalTicket(params: {
   };
 }
 
-async function assertOrganizationOwnsTerminalSession(params: {
+async function assertOrganizationOwnsSession(params: {
   organizationId: string;
   userId: string;
   cloudAgentSessionId: string;
@@ -259,6 +259,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(InitiateFromPreparedSessionInput)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
@@ -285,6 +290,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(SendMessageInput)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
@@ -309,7 +319,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(CreateTerminalInput)
     .output(baseCreateTerminalNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertOrganizationOwnsTerminalSession({
+      await assertOrganizationOwnsSession({
         organizationId: input.organizationId,
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
@@ -344,7 +354,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(RefreshTerminalTicketInput)
     .output(baseRefreshTerminalTicketNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertOrganizationOwnsTerminalSession({
+      await assertOrganizationOwnsSession({
         organizationId: input.organizationId,
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
@@ -362,7 +372,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(ResizeTerminalInput)
     .output(baseResizeTerminalNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertOrganizationOwnsTerminalSession({
+      await assertOrganizationOwnsSession({
         organizationId: input.organizationId,
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
@@ -386,7 +396,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(CloseTerminalInput)
     .output(baseCloseTerminalNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertOrganizationOwnsTerminalSession({
+      await assertOrganizationOwnsSession({
         organizationId: input.organizationId,
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
@@ -448,6 +458,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
@@ -458,6 +473,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(AnswerQuestionInput)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.answerQuestion({
@@ -471,6 +491,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(RejectQuestionInput)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.rejectQuestion({
@@ -483,6 +508,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(AnswerPermissionInput)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.answerPermission({
@@ -500,6 +530,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(GetSessionInput)
     .output(baseGetSessionNextOutputSchema)
     .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 

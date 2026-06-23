@@ -19,7 +19,11 @@ import {
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import { TRPCClientError } from '@trpc/client';
-import { cli_sessions_v2, github_branch_pull_requests } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  github_branch_pull_requests,
+  organization_memberships,
+} from '@kilocode/db/schema';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateApiToken, generateInternalServiceToken } from '@/lib/tokens';
 import {
@@ -267,13 +271,18 @@ const sessionIdField = z.string().min(1);
 const cloudAgentSessionIdField = z.string().min(1).max(255);
 
 /**
- * Verify user owns the session. Returns the session if found.
+ * Verify the user owns the session and still has access to its organization.
  */
-async function getSessionWithOwnerCheck(sessionId: string, userId: string) {
+async function getSessionWithAccessCheck(
+  sessionId: string,
+  ctx: Parameters<typeof ensureOrganizationAccess>[0]
+) {
   const [session] = await db
     .select()
     .from(cli_sessions_v2)
-    .where(and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, userId)))
+    .where(
+      and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, ctx.user.id))
+    )
     .limit(1);
 
   if (!session) {
@@ -281,6 +290,10 @@ async function getSessionWithOwnerCheck(sessionId: string, userId: string) {
       code: 'NOT_FOUND',
       message: 'Session not found',
     });
+  }
+
+  if (session.organization_id) {
+    await ensureOrganizationAccess(ctx, session.organization_id);
   }
 
   return session;
@@ -397,6 +410,17 @@ async function addOrganizationCondition(
   organizationId: string | null | undefined
 ): Promise<void> {
   if (organizationId === undefined) {
+    if (!ctx.user.is_admin) {
+      whereConditions.push(sql`(
+        ${cli_sessions_v2.organization_id} IS NULL
+        OR EXISTS (
+          SELECT 1
+          FROM ${organization_memberships}
+          WHERE ${organization_memberships.organization_id} = ${cli_sessions_v2.organization_id}
+            AND ${organization_memberships.kilo_user_id} = ${ctx.user.id}
+        )
+      )`);
+    }
     return;
   }
 
@@ -623,6 +647,10 @@ export const cliSessionsV2Router = createTRPCRouter({
       });
     }
 
+    if (session.organization_id) {
+      await ensureOrganizationAccess(ctx, session.organization_id);
+    }
+
     return session;
   }),
 
@@ -653,6 +681,10 @@ export const cliSessionsV2Router = createTRPCRouter({
         });
       }
 
+      if (session.organization_id) {
+        await ensureOrganizationAccess(ctx, session.organization_id);
+      }
+
       return session;
     }),
 
@@ -662,7 +694,7 @@ export const cliSessionsV2Router = createTRPCRouter({
   getSessionMessages: baseProcedure
     .input(z.object({ session_id: sessionIdField }))
     .query(async ({ ctx, input }) => {
-      await getSessionWithOwnerCheck(input.session_id, ctx.user.id);
+      await getSessionWithAccessCheck(input.session_id, ctx);
 
       try {
         const messages = await fetchSessionMessages(input.session_id, ctx.user);
@@ -1107,7 +1139,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    */
   delete: baseProcedure.input(DeleteSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
-    const session = await getSessionWithOwnerCheck(session_id, ctx.user.id);
+    const session = await getSessionWithAccessCheck(session_id, ctx);
 
     if (session.cloud_agent_session_id) {
       const authToken = generateApiToken(ctx.user);
@@ -1145,7 +1177,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    */
   rename: baseProcedure.input(RenameSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id, title } = input;
-    const session = await getSessionWithOwnerCheck(session_id, ctx.user.id);
+    const session = await getSessionWithAccessCheck(session_id, ctx);
 
     const [updated] = await db
       .update(cli_sessions_v2)
@@ -1176,7 +1208,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    */
   share: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
-    await getSessionWithOwnerCheck(session_id, ctx.user.id);
+    await getSessionWithAccessCheck(session_id, ctx);
 
     try {
       const result = await shareSessionIngest(session_id, ctx.user.id);

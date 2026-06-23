@@ -43,6 +43,7 @@ const mockedFetchPullRequestForBranch =
 
 let regularUser: User;
 let otherUser: User;
+let adminUser: User;
 let testOrganization: Organization;
 
 describe('cli-sessions-v2-router', () => {
@@ -57,6 +58,12 @@ describe('cli-sessions-v2-router', () => {
       google_user_email: 'cli-sessions-v2-other@example.com',
       google_user_name: 'CLI Sessions V2 Other User',
       is_admin: false,
+    });
+
+    adminUser = await insertTestUser({
+      google_user_email: 'cli-sessions-v2-admin@example.com',
+      google_user_name: 'CLI Sessions V2 Admin',
+      is_admin: true,
     });
 
     const [org] = await db
@@ -304,6 +311,256 @@ describe('cli-sessions-v2-router', () => {
           trigger_id: 'non-existent-trigger',
         })
       ).rejects.toThrow('Trigger not found');
+    });
+  });
+
+  describe('session authorization', () => {
+    const organizationSessionId = 'ses_read_auth_org_1234';
+    const cloudAgentSessionId = 'cloud-agent-read-auth-org-1234';
+
+    async function removeCreatorMembership() {
+      await db
+        .delete(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, testOrganization.id),
+            eq(organization_memberships.kilo_user_id, regularUser.id)
+          )
+        );
+    }
+
+    beforeEach(async () => {
+      await db.insert(organization_memberships).values({
+        organization_id: testOrganization.id,
+        kilo_user_id: regularUser.id,
+        role: 'member',
+      });
+      await db.insert(cli_sessions_v2).values({
+        session_id: organizationSessionId,
+        cloud_agent_session_id: cloudAgentSessionId,
+        kilo_user_id: regularUser.id,
+        organization_id: testOrganization.id,
+        created_on_platform: 'cloud-agent',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      await removeCreatorMembership();
+    });
+
+    it('list omits organization sessions after their creator loses membership', async () => {
+      const personalSessionId = 'ses_read_auth_personal_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: personalSessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+      });
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        const beforeRemoval = await caller.cliSessionsV2.list({});
+        expect(beforeRemoval.cliSessions.map(session => session.session_id)).toEqual(
+          expect.arrayContaining([organizationSessionId, personalSessionId])
+        );
+
+        await removeCreatorMembership();
+
+        const afterRemoval = await caller.cliSessionsV2.list({});
+        expect(afterRemoval.cliSessions.map(session => session.session_id)).toContain(
+          personalSessionId
+        );
+        expect(afterRemoval.cliSessions.map(session => session.session_id)).not.toContain(
+          organizationSessionId
+        );
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, personalSessionId));
+      }
+    });
+
+    it('list preserves platform-admin access without organization membership', async () => {
+      const adminSessionId = 'ses_read_auth_admin_1234';
+      await db.insert(cli_sessions_v2).values({
+        session_id: adminSessionId,
+        kilo_user_id: adminUser.id,
+        organization_id: testOrganization.id,
+        created_on_platform: 'cloud-agent',
+      });
+
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.cliSessionsV2.list({});
+
+        expect(result.cliSessions.map(session => session.session_id)).toContain(adminSessionId);
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, adminSessionId));
+      }
+    });
+
+    it('search omits organization sessions after their creator loses membership', async () => {
+      await db
+        .update(cli_sessions_v2)
+        .set({ title: 'removed-member-search-result' })
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      await removeCreatorMembership();
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.search({
+        search_string: 'removed-member-search-result',
+      });
+
+      expect(result.results).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+
+    it('recentRepositories omits organization sessions after their creator loses membership', async () => {
+      const personalSessionId = 'ses_recent_repo_personal_1234';
+      const personalGitUrl = 'https://github.com/kilo/personal-repository';
+      const organizationGitUrl = 'https://github.com/kilo/organization-repository';
+      await db
+        .update(cli_sessions_v2)
+        .set({ git_url: organizationGitUrl })
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      await db.insert(cli_sessions_v2).values({
+        session_id: personalSessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+        git_url: personalGitUrl,
+      });
+
+      try {
+        await removeCreatorMembership();
+
+        const caller = await createCallerForUser(regularUser.id);
+        const result = await caller.cliSessionsV2.recentRepositories({
+          updatedSince: '2026-01-01T00:00:00.000Z',
+        });
+        const gitUrls = result.repositories.map(repository => repository.gitUrl);
+
+        expect(gitUrls).toContain(personalGitUrl);
+        expect(gitUrls).not.toContain(organizationGitUrl);
+      } finally {
+        await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, personalSessionId));
+      }
+    });
+
+    it('delete rejects an organization session before cleanup after its creator loses membership', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      try {
+        await removeCreatorMembership();
+
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.delete({ session_id: organizationSessionId })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        expect(fetchSpy).not.toHaveBeenCalled();
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('rename permits a current organization member', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.cliSessionsV2.rename({
+        session_id: organizationSessionId,
+        title: 'renamed by current member',
+      });
+
+      expect(result.title).toBe('renamed by current member');
+    });
+
+    it('rename rejects an organization session after its creator loses membership', async () => {
+      const originalTitle = 'organization session title';
+      await db
+        .update(cli_sessions_v2)
+        .set({ title: originalTitle })
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      await removeCreatorMembership();
+
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.rename({
+          session_id: organizationSessionId,
+          title: 'renamed after removal',
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+
+      const [session] = await db
+        .select({ title: cli_sessions_v2.title })
+        .from(cli_sessions_v2)
+        .where(eq(cli_sessions_v2.session_id, organizationSessionId));
+      expect(session?.title).toBe(originalTitle);
+    });
+
+    it('share rejects an organization session before publishing after its creator loses membership', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ success: true, public_id: 'test-public-uuid' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      try {
+        await removeCreatorMembership();
+
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.cliSessionsV2.share({ session_id: organizationSessionId })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        expect(fetchSpy).not.toHaveBeenCalled();
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('get rejects an organization session after its creator loses membership', async () => {
+      await removeCreatorMembership();
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.get({ session_id: organizationSessionId })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('getByCloudAgentSessionId rejects an organization session after its creator loses membership', async () => {
+      await removeCreatorMembership();
+
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getByCloudAgentSessionId({
+          cloud_agent_session_id: cloudAgentSessionId,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    it('getSessionMessages rejects an organization session before fetching messages after its creator loses membership', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ info: {}, messages: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      );
+
+      try {
+        await removeCreatorMembership();
+
+        const caller = await createCallerForUser(regularUser.id);
+
+        await expect(
+          caller.cliSessionsV2.getSessionMessages({ session_id: organizationSessionId })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+        expect(fetchSpy).not.toHaveBeenCalled();
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
   });
 

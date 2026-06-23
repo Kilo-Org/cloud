@@ -1,6 +1,7 @@
-import { cliSessions, cli_sessions_v2, organization_memberships } from '@kilocode/db/schema';
+import { cliSessions, organization_memberships } from '@kilocode/db/schema';
 import type { db } from '@/lib/drizzle';
 import { and, eq } from 'drizzle-orm';
+import { queryAccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 
 /**
  * Database type for dependency injection in functions.
@@ -77,25 +78,20 @@ export async function verifyUserOwnsSessionV2ByCloudAgentId(
   userId: string,
   cloudAgentSessionId: string
 ): Promise<{ kiloSessionId: string } | null> {
-  const [session] = await fromDb
-    .select({ session_id: cli_sessions_v2.session_id })
-    .from(cli_sessions_v2)
-    .where(
-      and(
-        eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId),
-        eq(cli_sessions_v2.kilo_user_id, userId)
-      )
-    )
-    .limit(1);
+  const session = await queryAccessibleCloudAgentSession(fromDb, {
+    kiloUserId: userId,
+    cloudAgentSessionId,
+    expectedOrganizationId: null,
+  });
 
-  return session ? { kiloSessionId: session.session_id } : null;
+  return session ? { kiloSessionId: session.kiloSessionId } : null;
 }
 
 /**
- * Verifies that an organization owns a V2 session by cloud_agent_session_id
- * and that the user is a member of that organization.
+ * Verifies that a user owns a V2 organization session by cloud_agent_session_id
+ * and is currently a member of that exact organization.
  *
- * @returns The kiloSessionId if organization owns the session, null otherwise
+ * @returns The kiloSessionId if the user can access the organization session, null otherwise
  */
 export async function verifyOrgOwnsSessionV2ByCloudAgentId(
   fromDb: DrizzleDb,
@@ -103,25 +99,13 @@ export async function verifyOrgOwnsSessionV2ByCloudAgentId(
   userId: string,
   cloudAgentSessionId: string
 ): Promise<{ kiloSessionId: string } | null> {
-  const [session] = await fromDb
-    .select({ session_id: cli_sessions_v2.session_id })
-    .from(cli_sessions_v2)
-    .innerJoin(
-      organization_memberships,
-      and(
-        eq(organization_memberships.organization_id, cli_sessions_v2.organization_id),
-        eq(organization_memberships.kilo_user_id, userId)
-      )
-    )
-    .where(
-      and(
-        eq(cli_sessions_v2.cloud_agent_session_id, cloudAgentSessionId),
-        eq(cli_sessions_v2.organization_id, organizationId)
-      )
-    )
-    .limit(1);
+  const session = await queryAccessibleCloudAgentSession(fromDb, {
+    kiloUserId: userId,
+    cloudAgentSessionId,
+    expectedOrganizationId: organizationId,
+  });
 
-  return session ? { kiloSessionId: session.session_id } : null;
+  return session ? { kiloSessionId: session.kiloSessionId } : null;
 }
 
 /**

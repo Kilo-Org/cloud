@@ -12,68 +12,45 @@ import {
 import { kilocode_users, organization_memberships, user_auth_provider } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import {
+  BreakdownInputSchema,
+  BreakdownOutputSchema,
+  SummaryOutputSchema,
+  TableInputSchema,
+  TableOutputSchema,
+  TimeseriesInputSchema,
+  TimeseriesOutputSchema,
+  UsageAnalyticsFiltersSchema,
+  type CostSource,
+  type Dimension,
+  type Granularity,
+  type Metric,
+  type SummaryOutput,
+  type UsageAnalyticsFilters,
+} from '@/routers/usage-analytics-schemas';
 
-export const GranularitySchema = z.enum(['hour', 'day', 'week', 'month']);
-export type Granularity = z.infer<typeof GranularitySchema>;
-
-export const CostSourceSchema = z.enum(['cost', 'market']);
-export type CostSource = z.infer<typeof CostSourceSchema>;
-
-export const DimensionSchema = z.enum(['feature', 'model', 'mode', 'user', 'provider', 'project']);
-export type Dimension = z.infer<typeof DimensionSchema>;
-
-export const MetricSchema = z.enum([
-  'cost',
-  'requests',
-  'tokens',
-  'inputTokens',
-  'outputTokens',
-  'errorRate',
-  'avgLatencyMs',
-  'avgGenerationTimeMs',
-  'costPerRequest',
-  'tokensPerRequest',
-  'cacheHitRatio',
-  'outputInputRatio',
-]);
-export type Metric = z.infer<typeof MetricSchema>;
-
-const FiltersShape = {
-  startDate: z.iso.datetime(),
-  endDate: z.iso.datetime(),
-  granularity: GranularitySchema,
-  costSource: CostSourceSchema.default('cost'),
-  organizationId: z.uuid().optional(),
-  /**
-   * Personal-scope narrowing:
-   * - 'personal-only' (default) → organization_id = '' in Snowflake rollups
-   * - 'include-orgs'            → any organization (including personal)
-   * Ignored when `organizationId` is set (org scope always filters by that org).
-   */
-  personalScope: z.enum(['personal-only', 'include-orgs']).default('personal-only'),
-  /**
-   * Org-scope narrowing when `organizationId` is set:
-   * - 'self'     (default) → restricts to ctx.user.id within the organization
-   * - 'org-wide'           → all users in the org; requires owner/billing_manager
-   * Ignored when `organizationId` is not set.
-   */
-  viewAs: z.enum(['self', 'org-wide']).default('self'),
-  features: z.array(z.string()).optional(),
-  models: z.array(z.string()).optional(),
-  modes: z.array(z.string()).optional(),
-  userIds: z.array(z.string()).optional(),
-  providers: z.array(z.string()).optional(),
-  projects: z.array(z.string()).optional(),
-  excludedFeatures: z.array(z.string()).optional(),
-  excludedModels: z.array(z.string()).optional(),
-  excludedModes: z.array(z.string()).optional(),
-  excludedUserIds: z.array(z.string()).optional(),
-  excludedProviders: z.array(z.string()).optional(),
-  excludedProjects: z.array(z.string()).optional(),
-} as const;
-
-export const UsageAnalyticsFiltersSchema = z.object(FiltersShape);
-export type UsageAnalyticsFilters = z.infer<typeof UsageAnalyticsFiltersSchema>;
+export {
+  BreakdownInputSchema,
+  BreakdownOutputSchema,
+  CostSourceSchema,
+  DimensionSchema,
+  GranularitySchema,
+  MetricSchema,
+  SummaryOutputSchema,
+  TableInputSchema,
+  TableOutputSchema,
+  TimeseriesInputSchema,
+  TimeseriesOutputSchema,
+  UsageAnalyticsFiltersSchema,
+} from '@/routers/usage-analytics-schemas';
+export type {
+  CostSource,
+  Dimension,
+  Granularity,
+  Metric,
+  SummaryOutput,
+  UsageAnalyticsFilters,
+} from '@/routers/usage-analytics-schemas';
 
 // ---------------------------------------------------------------------------
 // Table / tier resolution
@@ -532,35 +509,6 @@ async function timedSnowflakeQuery<T>(
 // getSummary
 // ---------------------------------------------------------------------------
 
-const SummaryOutputSchema = z.object({
-  costMicrodollars: z.number(),
-  requestCount: z.number(),
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  cacheWriteTokens: z.number(),
-  cacheHitTokens: z.number(),
-  errorCount: z.number(),
-  cancelledCount: z.number(),
-  freeRequestCount: z.number(),
-  byokRequestCount: z.number(),
-  totalLatencyMs: z.number(),
-  totalGenerationTimeMs: z.number(),
-  latencyCount: z.number(),
-  generationTimeCount: z.number(),
-  totalTokens: z.number(),
-  distinctUsers: z.number(),
-  errorRate: z.number(),
-  avgLatencyMs: z.number(),
-  avgGenerationTimeMs: z.number(),
-  costPerRequest: z.number(),
-  tokensPerRequest: z.number(),
-  cacheHitRatio: z.number(),
-  outputInputRatio: z.number(),
-  effectiveGranularity: GranularitySchema,
-});
-
-type SummaryOutput = z.infer<typeof SummaryOutputSchema>;
-
 function ratioSafe(numerator: number, denominator: number): number {
   if (denominator === 0) return 0;
   return numerator / denominator;
@@ -581,75 +529,6 @@ function toSafeNumber(value: unknown): number {
   }
   return n;
 }
-
-// ---------------------------------------------------------------------------
-// Timeseries
-// ---------------------------------------------------------------------------
-
-const TimeseriesInputSchema = UsageAnalyticsFiltersSchema.extend({
-  metric: MetricSchema,
-  splitBy: DimensionSchema.optional(),
-});
-
-const TimeseriesPointSchema = z.object({
-  datetime: z.string(),
-  value: z.number(),
-  label: z.string().optional(),
-});
-
-const TimeseriesOutputSchema = z.object({
-  timeseries: z.array(TimeseriesPointSchema),
-  effectiveGranularity: GranularitySchema,
-});
-
-// ---------------------------------------------------------------------------
-// Breakdown
-// ---------------------------------------------------------------------------
-
-const BreakdownInputSchema = UsageAnalyticsFiltersSchema.extend({
-  dimension: DimensionSchema,
-  metric: z.enum(['cost', 'requests', 'tokens']),
-  limit: z.number().int().min(1).max(100).default(15),
-});
-
-const BreakdownItemSchema = z.object({
-  key: z.string(),
-  label: z.string(),
-  value: z.number(),
-  percentage: z.number(),
-});
-
-const BreakdownOutputSchema = z.object({
-  breakdown: z.array(BreakdownItemSchema),
-  totalValue: z.number(),
-  effectiveGranularity: GranularitySchema,
-});
-
-// ---------------------------------------------------------------------------
-// Table
-// ---------------------------------------------------------------------------
-
-const TableInputSchema = UsageAnalyticsFiltersSchema.extend({
-  groupBy: z.array(DimensionSchema).max(3),
-  limit: z.number().int().min(1).max(10_000).default(1000),
-});
-
-const TableRowSchema = z.object({
-  datetime: z.string(),
-  dimensions: z.record(z.string(), z.string()),
-  costMicrodollars: z.number(),
-  requestCount: z.number(),
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  cacheWriteTokens: z.number(),
-  cacheHitTokens: z.number(),
-  errorCount: z.number(),
-});
-
-const TableOutputSchema = z.object({
-  rows: z.array(TableRowSchema),
-  effectiveGranularity: GranularitySchema,
-});
 
 // ---------------------------------------------------------------------------
 // User list (for org context)

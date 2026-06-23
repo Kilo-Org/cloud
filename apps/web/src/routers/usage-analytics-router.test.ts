@@ -1,6 +1,7 @@
 jest.mock('@/lib/redis', () => ({ redisClient: {} }));
 
 import {
+  aggregateDisplayedBreakdownValues,
   CostSourceSchema,
   UsageAnalyticsFiltersSchema,
   applySelfEmailExclusion,
@@ -120,5 +121,32 @@ describe('usage analytics cost source', () => {
     expect(dimensionDisplayValue('model', { userDisplay: 'email' }, userEmailsById, 'claude')).toBe(
       'claude'
     );
+  });
+
+  it('coalesces breakdown values by displayed user email before limiting', () => {
+    const userEmailsById = new Map([
+      ['user_1', 'person@example.com'],
+      ['oauth/github:123', 'person@example.com'],
+      ['user_2', 'other@example.com'],
+    ]);
+
+    expect(
+      aggregateDisplayedBreakdownValues(
+        'user',
+        { userDisplay: 'email' },
+        userEmailsById,
+        [
+          { key: 'user_2', value: 80 },
+          { key: 'user_1', value: 60 },
+          { key: 'oauth/github:123', value: 50 },
+          { key: 'missing_user_1', value: 6 },
+          { key: 'missing_user_2', value: 4 },
+        ],
+        2
+      )
+    ).toEqual([
+      { key: 'person@example.com', value: 110 },
+      { key: 'other@example.com', value: 80 },
+    ]);
   });
 });

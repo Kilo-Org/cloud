@@ -500,6 +500,30 @@ export function dimensionDisplayValue(
   return dimension === 'user' ? userDisplayValue(filters, userEmailsById, rawValue) : rawValue;
 }
 
+type BreakdownValue = {
+  key: string;
+  value: number;
+};
+
+export function aggregateDisplayedBreakdownValues(
+  dimension: Dimension,
+  filters: Pick<UsageAnalyticsFilters, 'userDisplay'>,
+  userEmailsById: Map<string, string>,
+  values: BreakdownValue[],
+  limit: number
+): BreakdownValue[] {
+  const totalsByKey = new Map<string, number>();
+
+  for (const value of values) {
+    const key = dimensionDisplayValue(dimension, filters, userEmailsById, value.key);
+    totalsByKey.set(key, (totalsByKey.get(key) ?? 0) + value.value);
+  }
+
+  return Array.from(totalsByKey, ([key, value]) => ({ key, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, limit);
+}
+
 // ---------------------------------------------------------------------------
 // WHERE clause helpers
 // ---------------------------------------------------------------------------
@@ -1100,6 +1124,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const dimCol = dimensionColumn(input.dimension);
       const metricExpr = metricExprSql(input.metric, meta.tier, filters.costSource);
       const where = buildWhereClause(meta.tier, filters, ctx.user.id, true);
+      const aggregateByDisplayedKey = input.dimension === 'user' && filters.userDisplay === 'email';
 
       const statement = `
         SELECT
@@ -1109,7 +1134,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         WHERE ${where.sql()}
         GROUP BY 1
         ORDER BY 2 DESC
-        LIMIT ${Number(input.limit)}
+        ${aggregateByDisplayedKey ? '' : `LIMIT ${Number(input.limit)}`}
       `;
 
       // SAFETY: LIMIT value is interpolated directly into SQL but is
@@ -1135,18 +1160,27 @@ export const usageAnalyticsRouter = createTRPCRouter({
           })
       );
 
-      const values = rows.map(row => ({ key: toStringValue(row[0]), value: toSafeNumber(row[1]) }));
+      const rawValues = rows.map(row => ({
+        key: toStringValue(row[0]),
+        value: toSafeNumber(row[1]),
+      }));
       const userEmailsById = userEmailsForDisplay(filters, scopedUserEmailMaps);
+      const values = aggregateDisplayedBreakdownValues(
+        input.dimension,
+        filters,
+        userEmailsById,
+        rawValues,
+        input.limit
+      );
       // Percentages are relative to the *returned* rows (limited by input.limit).
       // They will not reflect the true share when the result set is capped.
       const totalValue = values.reduce((s, r) => s + r.value, 0);
 
       return {
         breakdown: values.map(r => {
-          const key = dimensionDisplayValue(input.dimension, filters, userEmailsById, r.key);
           return {
-            key,
-            label: key,
+            key: r.key,
+            label: r.key,
             value: r.value,
             percentage: totalValue > 0 ? (r.value / totalValue) * 100 : 0,
           };

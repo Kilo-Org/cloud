@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import type { handleTRPCRequest } from '@/lib/trpc-route-handler';
+import type { GET as routeGET } from './route';
 
 jest.mock('@/lib/trpc-route-handler', () => ({
   handleTRPCRequest: jest.fn(),
@@ -12,7 +13,7 @@ const { handleTRPCRequest: mockedHandleTRPCRequest } = jest.requireMock(
   handleTRPCRequest: jest.MockedFunction<typeof handleTRPCRequest>;
 };
 
-let GET: typeof import('./route').GET;
+let GET: typeof routeGET;
 
 beforeAll(async () => {
   ({ GET } = await import('./route'));

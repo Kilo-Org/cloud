@@ -21,6 +21,7 @@ export {
   openStoredConversation,
   setActiveStoredConversation,
   updateStoredConversationEvents,
+  updateStoredConversationSettings,
 } from '@/src/shared/agent-conversation-tabs';
 export type { StoredAgentConversation } from '@/src/shared/agent-conversation-tabs';
 
@@ -76,6 +77,10 @@ const conversationEventsSchema = z.array(conversationEventSchema);
 const storedConversationSchema = z.object({
   events: conversationEventsSchema,
   id: z.string(),
+  mode: z.enum(['dangerous', 'safe']).optional(),
+  model: z.string().optional(),
+  selectedTabId: z.number().optional(),
+  thinkingEffort: z.string().optional(),
   title: z.string(),
   updatedAt: z.string().optional(),
 });
@@ -173,6 +178,14 @@ const normalizeStoredConversationStore = (
       conversations: parsed.data.conversations.map(conversation => ({
         events: normalizeConversationEvents(conversation.events) ?? [],
         id: conversation.id,
+        ...(conversation.mode === undefined ? {} : { mode: conversation.mode }),
+        ...(conversation.model === undefined ? {} : { model: conversation.model }),
+        ...(conversation.selectedTabId === undefined
+          ? {}
+          : { selectedTabId: conversation.selectedTabId }),
+        ...(conversation.thinkingEffort === undefined
+          ? {}
+          : { thinkingEffort: conversation.thinkingEffort }),
         title: conversation.title,
         updatedAt: conversation.updatedAt ?? new Date().toISOString(),
       })),

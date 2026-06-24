@@ -1,12 +1,20 @@
 /* eslint-disable import/no-nodejs-modules */
 import { expect, test } from '@playwright/test';
-import { rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { mockKiloApi } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
   startFixtureServer,
 } from './extension-context-fixture';
+
+const onePixelPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+  'base64'
+);
 
 test('safe mode conversation reads the selected tab with safe tools', async () => {
   const fixture = await startFixtureServer();
@@ -151,6 +159,77 @@ test('viewport screenshot tool output expands to a captured image preview', asyn
     await context.close();
     await fixture.close();
     await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('safe mode can capture a viewport screenshot from a local image file tab', async () => {
+  const localFileDir = await mkdtemp(join(tmpdir(), 'kilo-extension-file-e2e-'));
+  const imagePath = join(localFileDir, 'kilo-local-image.png');
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await writeFile(imagePath, onePixelPng);
+    await mockKiloApi(context, {
+      firstCompletionEvents: [
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    function: {
+                      arguments: JSON.stringify({}),
+                      name: 'get_viewport_screenshot',
+                    },
+                    id: 'call_screenshot_1',
+                    index: 0,
+                    type: 'function',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      modelInputModalities: ['text', 'image'],
+      secondCompletionEvents: [
+        {
+          choices: [
+            {
+              delta: {
+                content: 'I captured the local image tab.',
+              },
+            },
+          ],
+        },
+      ],
+      toolNames: [
+        'get_page_snapshot',
+        'get_element_details',
+        'find_in_page',
+        'get_viewport_screenshot',
+      ],
+    });
+
+    const page = await context.newPage();
+    await page.goto(pathToFileURL(imagePath).href);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('kilo-local-image');
+
+    await sidePanel.getByLabel('Message agent').fill('Capture this local image.');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+
+    await expect(sidePanel.getByText('get_viewport_screenshot completed')).toBeVisible();
+    await expect(sidePanel.getByText('I captured the local image tab.')).toBeVisible();
+  } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+    await rm(localFileDir, { force: true, recursive: true });
   }
 });
 

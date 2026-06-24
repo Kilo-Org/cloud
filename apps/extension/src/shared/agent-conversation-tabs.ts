@@ -1,9 +1,13 @@
 /* eslint-disable max-lines */
-import type { AgentConversationEvent } from './agent-conversation';
+import type { AgentConversationEvent, AgentMode } from './agent-conversation';
 
 export interface StoredAgentConversation {
   readonly events: AgentConversationEvent[];
   readonly id: string;
+  readonly mode?: AgentMode;
+  readonly model?: string;
+  readonly selectedTabId?: number;
+  readonly thinkingEffort?: string;
   readonly title: string;
   readonly updatedAt: string;
 }
@@ -12,6 +16,15 @@ export interface StoredAgentConversationStore {
   readonly activeConversationId: string;
   readonly conversations: StoredAgentConversation[];
   readonly openConversationIds: string[];
+}
+type StoredConversationSettings = Partial<
+  Pick<StoredAgentConversation, 'mode' | 'model' | 'selectedTabId' | 'thinkingEffort'>
+>;
+interface CreateStoredConversationOptions {
+  readonly defaultEvents?: AgentConversationEvent[];
+  readonly number: number;
+  readonly settings?: StoredConversationSettings;
+  readonly titleNumber?: number;
 }
 
 const conversationIdPrefix = 'conversation-';
@@ -66,13 +79,15 @@ export const createDefaultStoredConversations = (
   };
 };
 
-const createStoredConversation = (
-  number: number,
-  defaultEvents: AgentConversationEvent[] = [],
-  titleNumber = number
-): StoredAgentConversation => ({
+const createStoredConversation = ({
+  defaultEvents = [],
+  number,
+  settings = {},
+  titleNumber = number,
+}: CreateStoredConversationOptions): StoredAgentConversation => ({
   events: defaultEvents,
   id: createConversationId(number),
+  ...settings,
   title: createConversationTitle(titleNumber),
   updatedAt: nowIso(),
 });
@@ -83,7 +98,7 @@ const createFallbackOpenConversation = (
 ): StoredAgentConversation => {
   const nextNumber = getNextConversationNumber(store.conversations);
 
-  return createStoredConversation(nextNumber, defaultEvents, 1);
+  return createStoredConversation({ defaultEvents, number: nextNumber, titleNumber: 1 });
 };
 
 export const getOpenStoredConversations = (
@@ -131,10 +146,11 @@ const ensureOpenConversation = (
 
 export const createNextStoredConversation = (
   store: StoredAgentConversationStore,
-  defaultEvents: AgentConversationEvent[] = []
+  defaultEvents: AgentConversationEvent[] = [],
+  settings: StoredConversationSettings = {}
 ): StoredAgentConversationStore => {
   const nextNumber = getNextConversationNumber(store.conversations);
-  const conversation = createStoredConversation(nextNumber, defaultEvents);
+  const conversation = createStoredConversation({ defaultEvents, number: nextNumber, settings });
 
   return {
     activeConversationId: conversation.id,
@@ -150,7 +166,11 @@ export const getActiveStoredConversation = (
     conversation => conversation.id === store.activeConversationId
   );
 
-  return activeConversation ?? getOpenStoredConversations(store)[0] ?? createStoredConversation(1);
+  return (
+    activeConversation ??
+    getOpenStoredConversations(store)[0] ??
+    createStoredConversation({ number: 1 })
+  );
 };
 
 export const setActiveStoredConversation = (
@@ -171,6 +191,17 @@ export const updateStoredConversationEvents = (
     conversation.id === conversationId
       ? { ...conversation, events: updateEvents(conversation.events), updatedAt: nowIso() }
       : conversation
+  ),
+});
+
+export const updateStoredConversationSettings = (
+  store: StoredAgentConversationStore,
+  conversationId: string,
+  settings: StoredConversationSettings
+): StoredAgentConversationStore => ({
+  ...store,
+  conversations: store.conversations.map(conversation =>
+    conversation.id === conversationId ? { ...conversation, ...settings } : conversation
   ),
 });
 

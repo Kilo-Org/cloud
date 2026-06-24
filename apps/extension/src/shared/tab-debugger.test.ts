@@ -37,6 +37,7 @@ const createDebuggerApi = ({
         { tabId: 2, title: 'Chrome settings', type: 'page', url: 'chrome://settings' },
         { title: 'Extension worker', type: 'service_worker', url: 'chrome-extension://id/bg.js' },
         { tabId: 3, title: 'Local app', type: 'page', url: 'http://localhost:3001/' },
+        { tabId: 4, title: 'Local image', type: 'page', url: 'file:///tmp/kilo-image.png' },
       ],
     sendCommand:
       sendCommand ??
@@ -52,6 +53,7 @@ describe('tab debugger helpers', () => {
     await expect(listInspectableTabs(createDebuggerApi())).resolves.toStrictEqual([
       { id: 1, title: 'Kilo', url: 'https://app.kilo.ai/' },
       { id: 3, title: 'Local app', url: 'http://localhost:3001/' },
+      { id: 4, title: 'Local image', url: 'file:///tmp/kilo-image.png' },
     ]);
   });
 
@@ -138,12 +140,14 @@ describe('tab debugger helpers', () => {
         { id: 1, title: 'Kilo', url: 'https://app.kilo.ai/' },
         { id: 2, title: 'Firefox settings', url: 'about:preferences' },
         { id: 3, title: '', url: 'http://localhost:3001/' },
+        { id: 4, title: 'Local image', url: 'file:///tmp/kilo-image.png' },
       ],
     };
 
     await expect(listInspectableTabsWithTabsApi(tabsApi)).resolves.toStrictEqual([
       { id: 1, title: 'Kilo', url: 'https://app.kilo.ai/' },
       { id: 3, title: 'http://localhost:3001/', url: 'http://localhost:3001/' },
+      { id: 4, title: 'Local image', url: 'file:///tmp/kilo-image.png' },
     ]);
   });
 

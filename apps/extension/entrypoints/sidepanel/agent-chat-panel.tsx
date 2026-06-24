@@ -6,7 +6,7 @@ import {
   createUserMessage,
   groupConversationEvents,
 } from '@/src/shared/agent-conversation';
-import type { AgentConversationEvent, AgentMode } from '@/src/shared/agent-conversation';
+import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import { defaultMode } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
@@ -23,6 +23,7 @@ import {
   openStoredConversation,
   setActiveStoredConversation,
   updateStoredConversationEvents,
+  updateStoredConversationSettings,
   useStoredAgentConversations,
 } from './agent-conversation-storage';
 import type { StoredAgentConversation } from './agent-conversation-storage';
@@ -164,28 +165,26 @@ export const AgentChatPanel = ({
     createDefaultConversationEvents
   );
   const [runningConversationIds, setRunningConversationIds] = useState<string[]>([]);
-  const [mode, setMode] = useState<AgentMode>(defaultMode);
-  const [model, setModel] = useState('');
-  const [thinkingEffort, setThinkingEffort] = useState('');
+  const conversationStoreRef = useRef(conversationStore);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
-  const {
-    inspectableTabs,
-    isLoadingTabs,
-    selectDefaultTab,
-    selectTab,
-    selectedTabId,
-    tabDebuggerError,
-  } = useTabDebugger();
+  const { inspectableTabs, isLoadingTabs, tabDebuggerError } = useTabDebugger();
   const { modelLoadError, modelOptions, refetchModels } = useGatewayModels({
     auth,
     organizationId,
   });
+  const activeConversation = getActiveStoredConversation(conversationStore);
+  const {
+    events,
+    id: activeConversationId,
+    mode = defaultMode,
+    selectedTabId = inspectableTabs[0]?.id,
+  } = activeConversation;
+  const model = activeConversation.model ?? modelOptions[0]?.id ?? '';
   const selectedModel = useMemo(
     () => modelOptions.find(option => option.id === model),
     [model, modelOptions]
   );
-  const { events, id: activeConversationId } = getActiveStoredConversation(conversationStore);
   const openConversations = useMemo(
     () => getOpenStoredConversations(conversationStore),
     [conversationStore]
@@ -199,10 +198,15 @@ export const AgentChatPanel = ({
     () => (selectedModel === undefined ? [] : selectedModel.variants),
     [selectedModel]
   );
+  const thinkingEffort = activeConversation.thinkingEffort ?? thinkingOptions[0] ?? '';
   const isRunning = runningConversationIds.includes(activeConversationId);
   const isModelSelectDisabled = modelOptions.length === 0;
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
-  const isSendDisabled = draft.trim() === '' || model === '' || selectedTabId === undefined;
+  const modelControlValue = modelOptions.length === 0 ? '' : model;
+  const isSendDisabled =
+    draft.trim() === '' || modelControlValue === '' || selectedTabId === undefined;
+
+  conversationStoreRef.current = conversationStore;
 
   useEffect(
     () => () => {
@@ -228,30 +232,62 @@ export const AgentChatPanel = ({
   }, [inspectableTabs, isLoadingTabs]);
 
   useEffect(() => {
-    if (modelOptions.length === 0) {
-      if (model !== '') {
-        setModel('');
+    if (inspectableTabs.length === 0) {
+      return;
+    }
+
+    const inspectableTabIds = new Set(inspectableTabs.map(tab => tab.id));
+
+    if (
+      activeConversation.selectedTabId === undefined ||
+      !inspectableTabIds.has(activeConversation.selectedTabId)
+    ) {
+      const nextSelectedTabId = inspectableTabs[0]?.id;
+
+      if (nextSelectedTabId === undefined) {
+        return;
       }
+
+      setConversationStore(store =>
+        updateStoredConversationSettings(store, activeConversationId, {
+          selectedTabId: nextSelectedTabId,
+        })
+      );
+    }
+  }, [
+    activeConversation.selectedTabId,
+    activeConversationId,
+    inspectableTabs,
+    setConversationStore,
+  ]);
+
+  useEffect(() => {
+    if (modelOptions.length === 0) {
       return;
     }
 
     if (!modelOptions.some(option => option.id === model)) {
-      setModel(modelOptions[0]?.id ?? '');
+      setConversationStore(store =>
+        updateStoredConversationSettings(store, activeConversationId, {
+          model: modelOptions[0]?.id ?? '',
+        })
+      );
     }
-  }, [model, modelOptions]);
+  }, [activeConversationId, model, modelOptions, setConversationStore]);
 
   useEffect(() => {
     if (thinkingOptions.length === 0) {
-      if (thinkingEffort !== '') {
-        setThinkingEffort('');
-      }
       return;
     }
 
     if (!thinkingOptions.includes(thinkingEffort)) {
-      setThinkingEffort(thinkingOptions[0] ?? '');
+      setConversationStore(store =>
+        updateStoredConversationSettings(store, activeConversationId, {
+          thinkingEffort: thinkingOptions[0] ?? '',
+        })
+      );
     }
-  }, [thinkingEffort, thinkingOptions]);
+  }, [activeConversationId, setConversationStore, thinkingEffort, thinkingOptions]);
 
   const appendEvents = (conversationId: string, nextEvents: AgentConversationEvent[]): void => {
     setConversationStore(store =>
@@ -284,10 +320,29 @@ export const AgentChatPanel = ({
     );
   };
 
+  const updateActiveConversationSettings = (
+    settings: Parameters<typeof updateStoredConversationSettings>[2]
+  ): void => {
+    conversationStoreRef.current = updateStoredConversationSettings(
+      conversationStoreRef.current,
+      conversationStoreRef.current.activeConversationId,
+      settings
+    );
+    setConversationStore(store =>
+      updateStoredConversationSettings(store, store.activeConversationId, settings)
+    );
+  };
+
   const submitMessage = (text: string): void => {
-    const conversationId = activeConversationId;
-    const conversationEvents = events;
-    const selectedTab = inspectableTabs.find(tab => tab.id === selectedTabId);
+    const conversation = getActiveStoredConversation(conversationStoreRef.current);
+    const conversationId = conversation.id;
+    const conversationEvents = conversation.events;
+    const runModel = conversation.model ?? modelOptions[0]?.id ?? '';
+    const runSelectedModel = modelOptions.find(option => option.id === runModel);
+    const runThinkingOptions = runSelectedModel?.variants ?? [];
+    const runThinkingEffort = conversation.thinkingEffort ?? runThinkingOptions[0] ?? '';
+    const runSelectedTabId = conversation.selectedTabId ?? inspectableTabs[0]?.id;
+    const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
     const userEvent = createUserMessage(
       text,
       selectedTab === undefined ? undefined : formatSelectedTabSystemEnvironment(selectedTab)
@@ -296,12 +351,12 @@ export const AgentChatPanel = ({
 
     appendEvents(conversationId, [userEvent]);
 
-    if (selectedTabId === undefined) {
+    if (runSelectedTabId === undefined) {
       appendEvents(conversationId, [createAssistantMessage('Pick a target tab first.')]);
       return;
     }
 
-    const runMode = mode;
+    const runMode = conversation.mode ?? defaultMode;
     const abort = new AbortController();
     const runToken = (runTokenRef.current += 1);
     const isCurrentRun = (): boolean =>
@@ -322,7 +377,11 @@ export const AgentChatPanel = ({
       }
     };
 
-    runStatesRef.current.set(conversationId, { abort, selectedTabId, token: runToken });
+    runStatesRef.current.set(conversationId, {
+      abort,
+      selectedTabId: runSelectedTabId,
+      token: runToken,
+    });
     setRunningConversationIds(currentIds =>
       currentIds.includes(conversationId) ? currentIds : [...currentIds, conversationId]
     );
@@ -336,12 +395,12 @@ export const AgentChatPanel = ({
           appendEvents: appendRunEvents,
           conversationEvents: conversationWithUserMessage,
           fetch: fetchFromWindow,
-          model,
+          model: runModel,
           organizationId,
-          selectedTabId,
+          selectedTabId: runSelectedTabId,
           signal: abort.signal,
-          supportsImages: selectedModel?.supportsImages === true,
-          thinkingEffort,
+          supportsImages: runSelectedModel?.supportsImages === true,
+          thinkingEffort: runThinkingEffort,
           token: auth.token,
           updateAssistantMessage: updateRunAssistantMessage,
           updateThinkingBlock: updateRunThinkingBlock,
@@ -359,8 +418,17 @@ export const AgentChatPanel = ({
 
   const submitDraft = (): void => {
     const text = draft.trim();
+    const conversation = getActiveStoredConversation(conversationStoreRef.current);
+    const conversationModel = conversation.model ?? modelOptions[0]?.id ?? '';
+    const conversationSelectedTabId = conversation.selectedTabId ?? inspectableTabs[0]?.id;
+    const isConversationRunning = runningConversationIds.includes(conversation.id);
 
-    if (text === '' || isRunning || model === '' || selectedTabId === undefined) {
+    if (
+      text === '' ||
+      isConversationRunning ||
+      conversationModel === '' ||
+      conversationSelectedTabId === undefined
+    ) {
       return;
     }
 
@@ -373,15 +441,28 @@ export const AgentChatPanel = ({
   };
 
   const createConversation = (): void => {
+    const settings = {
+      mode,
+      model,
+      ...(selectedTabId === undefined ? {} : { selectedTabId }),
+      thinkingEffort,
+    };
+
     setDraft('');
-    selectDefaultTab();
-    setConversationStore(store =>
-      createNextStoredConversation(store, createDefaultConversationEvents())
+    conversationStoreRef.current = createNextStoredConversation(
+      conversationStoreRef.current,
+      createDefaultConversationEvents(),
+      settings
     );
+    setConversationStore(conversationStoreRef.current);
   };
 
   const selectConversation = (conversationId: string): void => {
-    setConversationStore(store => setActiveStoredConversation(store, conversationId));
+    conversationStoreRef.current = setActiveStoredConversation(
+      conversationStoreRef.current,
+      conversationId
+    );
+    setConversationStore(conversationStoreRef.current);
   };
 
   const abortConversationRun = useCallback((conversationId: string): void => {
@@ -519,16 +600,24 @@ export const AgentChatPanel = ({
           isRunning={isRunning}
           isThinkingSelectDisabled={isThinkingSelectDisabled}
           mode={mode}
-          model={model}
+          model={modelControlValue}
           modelLoadError={modelLoadError}
           modelOptions={modelOptions}
-          onModeChange={setMode}
-          onModelChange={setModel}
+          onModeChange={nextMode => {
+            updateActiveConversationSettings({ mode: nextMode });
+          }}
+          onModelChange={nextModel => {
+            updateActiveConversationSettings({ model: nextModel });
+          }}
           onRetryModels={async () => {
             await refetchModels();
           }}
-          onSelectedTabChange={selectTab}
-          onThinkingEffortChange={setThinkingEffort}
+          onSelectedTabChange={nextSelectedTabId => {
+            updateActiveConversationSettings({ selectedTabId: nextSelectedTabId });
+          }}
+          onThinkingEffortChange={nextThinkingEffort => {
+            updateActiveConversationSettings({ thinkingEffort: nextThinkingEffort });
+          }}
           selectedTabId={selectedTabId}
           tabDebuggerError={tabDebuggerError}
           thinkingEffort={thinkingEffort}

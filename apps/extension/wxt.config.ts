@@ -16,10 +16,13 @@ export default defineConfig({
       },
     },
     description: 'Kilo browser extension.',
-    host_permissions:
-      browser === 'firefox'
-        ? ['<all_urls>', 'https://app.kilo.ai/*', 'http://127.0.0.1/*', 'http://localhost/*']
-        : ['<all_urls>', 'https://app.kilo.ai/*', 'http://127.0.0.1/*', 'http://localhost/*'],
+    host_permissions: [
+      '<all_urls>',
+      'file:///*',
+      'https://app.kilo.ai/*',
+      'http://127.0.0.1/*',
+      'http://localhost/*',
+    ],
     name: 'Kilo Extension',
     permissions:
       browser === 'firefox'

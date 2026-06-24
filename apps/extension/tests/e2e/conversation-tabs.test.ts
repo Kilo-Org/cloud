@@ -1,5 +1,6 @@
 /* eslint-disable import/no-nodejs-modules, max-lines */
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { mockKiloApi } from './kilo-api-fixture';
 import {
@@ -11,6 +12,30 @@ import {
 } from './extension-context-fixture';
 
 const safeToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
+const getSelectedOptionText = (page: Page, label: string): Promise<string> =>
+  page.getByLabel(label).evaluate(element => {
+    if (!(element instanceof HTMLSelectElement)) {
+      return '';
+    }
+
+    return element.selectedOptions[0]?.textContent?.trim() ?? '';
+  });
+const getConversationScrollState = (
+  page: Page
+): Promise<{ isPinned: boolean; movedBackward: boolean }> =>
+  page.getByLabel('Agent conversation').evaluate(element => {
+    const samples =
+      (globalThis as typeof globalThis & { __kiloScrollTops?: number[] }).__kiloScrollTops ?? [];
+
+    return {
+      isPinned: element.scrollTop + element.clientHeight >= element.scrollHeight - 16,
+      movedBackward: samples.some((sample, index) => {
+        const previousSample = samples[index - 1];
+
+        return previousSample !== undefined && sample < previousSample - 2;
+      }),
+    };
+  });
 
 const conversationStoreWithTitle = (title: string): unknown => ({
   activeConversationId: 'conversation-1',
@@ -75,6 +100,234 @@ test('conversation tabs can run in parallel', async () => {
     await expect(sidePanel.getByText('Second tab finished.')).toBeVisible();
   } finally {
     releaseFirstCompletion();
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('inactive conversation completion does not switch the selected conversation', async () => {
+  const fixture = await startFixtureServer();
+  const { promise: pendingFirstCompletion, resolve: releaseFirstCompletion } =
+    Promise.withResolvers<void>();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      beforeFirstCompletion: () => pendingFirstCompletion,
+      firstCompletionEvents: [{ choices: [{ delta: { content: 'Inactive tab finished.' } }] }],
+      secondCompletionEvents: [{ choices: [{ delta: { content: 'Visible tab finished.' } }] }],
+      toolNames: safeToolNames,
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await sidePanel.getByLabel('Message agent').fill('Inactive request');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await sidePanel.getByLabel('New conversation').click();
+    await sidePanel.getByLabel('Message agent').fill('Visible request');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText('Visible tab finished.')).toBeVisible();
+
+    releaseFirstCompletion();
+
+    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText('Visible request');
+    await expect(sidePanel.getByText('Inactive tab finished.')).toBeHidden();
+    await sidePanel.getByRole('tab', { name: /Inactive request/u }).click();
+    await expect(sidePanel.getByText('Inactive tab finished.')).toBeVisible();
+  } finally {
+    releaseFirstCompletion();
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('conversation controls stay tied to the selected conversation', async () => {
+  const firstFixture = await startFixtureServer({ title: 'First target tab' });
+  const secondFixture = await startFixtureServer({ title: 'Second target tab' });
+  const seenChatBodies: unknown[] = [];
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      firstCompletionEvents: [{ choices: [{ delta: { content: 'First settings reply.' } }] }],
+      models: [
+        {
+          id: 'model-one',
+          name: 'Provider: First Model',
+          variants: { high: {}, low: {}, medium: {} },
+        },
+        {
+          id: 'model-two',
+          name: 'Provider: Second Model',
+          variants: { high: {}, low: {}, medium: {} },
+        },
+      ],
+      secondCompletionEvents: [{ choices: [{ delta: { content: 'Second settings reply.' } }] }],
+      seenChatBodies,
+      toolNames: safeToolNames,
+    });
+
+    const firstPage = await context.newPage();
+    await firstPage.goto(firstFixture.url);
+    const secondPage = await context.newPage();
+    await secondPage.goto(secondFixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('First target tab');
+    await sidePanel.getByLabel('Target tab').selectOption({ label: 'First target tab' });
+    await sidePanel.getByLabel('Model').selectOption('model-one');
+    await sidePanel.getByLabel('Thinking effort').selectOption('low');
+
+    await sidePanel.getByLabel('Message agent').fill('First settings');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText('First settings reply.')).toBeVisible();
+
+    await sidePanel.getByLabel('New conversation').click();
+    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText('Conversation 2');
+    await sidePanel.getByLabel('Target tab').selectOption({ label: 'Second target tab' });
+    await sidePanel.getByLabel('Model').selectOption('model-two');
+    await sidePanel.getByLabel('Thinking effort').selectOption('high');
+    await expect
+      .poll(() => getSelectedOptionText(sidePanel, 'Target tab'))
+      .toBe('Second target tab');
+    await expect(sidePanel.getByLabel('Model')).toHaveValue('model-two');
+    await expect(sidePanel.getByLabel('Thinking effort')).toHaveValue('high');
+
+    await sidePanel.getByLabel('Message agent').fill('Second settings');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText('Second settings reply.')).toBeVisible();
+
+    await sidePanel.getByRole('tab', { name: /First settings/u }).click();
+    await expect
+      .poll(() => getSelectedOptionText(sidePanel, 'Target tab'))
+      .toBe('First target tab');
+    await expect(sidePanel.getByLabel(/Safe mode/u)).toBeVisible();
+    await expect(sidePanel.getByLabel('Model')).toHaveValue('model-one');
+    await expect(sidePanel.getByLabel('Thinking effort')).toHaveValue('low');
+
+    await sidePanel.getByRole('tab', { name: /Second settings/u }).click();
+    await expect
+      .poll(() => getSelectedOptionText(sidePanel, 'Target tab'))
+      .toBe('Second target tab');
+    await expect(sidePanel.getByLabel('Model')).toHaveValue('model-two');
+    await expect(sidePanel.getByLabel('Thinking effort')).toHaveValue('high');
+
+    expect(JSON.stringify(seenChatBodies[0])).toContain('First target tab');
+    expect(JSON.stringify(seenChatBodies[0])).toContain('"model":"model-one"');
+    expect(JSON.stringify(seenChatBodies[0])).toContain('"effort":"low"');
+    expect(JSON.stringify(seenChatBodies[1])).toContain('Second target tab');
+    expect(JSON.stringify(seenChatBodies[1])).toContain('"model":"model-two"');
+    expect(JSON.stringify(seenChatBodies[1])).toContain('"effort":"high"');
+  } finally {
+    await context.close();
+    await firstFixture.close();
+    await secondFixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('conversation mode controls the selected conversation request tools', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      firstCompletionEvents: [{ choices: [{ delta: { content: 'Dangerous mode reply.' } }] }],
+      toolNames: [...safeToolNames, 'eval'],
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await setExtensionStorage(sidePanel, {
+      kiloAgentConversations: {
+        activeConversationId: 'conversation-2',
+        conversations: [
+          {
+            events: [],
+            id: 'conversation-1',
+            mode: 'safe',
+            title: 'Safe saved conversation',
+            updatedAt: '2026-06-24T10:00:00.000Z',
+          },
+          {
+            events: [],
+            id: 'conversation-2',
+            mode: 'dangerous',
+            title: 'Dangerous saved conversation',
+            updatedAt: '2026-06-24T11:00:00.000Z',
+          },
+        ],
+        openConversationIds: ['conversation-1', 'conversation-2'],
+      },
+    });
+    await sidePanel.reload();
+
+    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText(
+      'Dangerous saved conversation'
+    );
+    await sidePanel.getByLabel('Message agent').fill('Use dangerous tools');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText('Dangerous mode reply.')).toBeVisible();
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('streaming messages stay pinned to latest without scroll bounce', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+  const chunks = Array.from({ length: 80 }, (_value, index) => ({
+    choices: [{ delta: { content: `chunk-${index} ` } }],
+  }));
+
+  try {
+    await mockKiloApi(context, {
+      firstCompletionEvents: chunks,
+      toolNames: safeToolNames,
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    await sidePanel.getByLabel('Agent conversation').evaluate(element => {
+      const state = globalThis as typeof globalThis & { __kiloScrollTops?: number[] };
+
+      state.__kiloScrollTops = [];
+      element.addEventListener('scroll', () => {
+        state.__kiloScrollTops?.push(element.scrollTop);
+      });
+    });
+    await sidePanel.getByLabel('Message agent').fill('Stream a long response');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText(/chunk-79/u)).toBeVisible();
+
+    const scrollState = await getConversationScrollState(sidePanel);
+
+    expect(scrollState).toStrictEqual({ isPinned: true, movedBackward: false });
+  } finally {
     await context.close();
     await fixture.close();
     await rm(userDataDir, { force: true, recursive: true });

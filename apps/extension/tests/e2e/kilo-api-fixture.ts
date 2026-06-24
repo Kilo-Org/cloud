@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { expect } from '@playwright/test';
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 import { z } from 'zod';
@@ -48,6 +49,11 @@ const longEvalIdentifier = `kilo${'VeryLongIdentifier'.repeat(16)}`;
 const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.outerHTML.length; return ${longEvalIdentifier};`;
 const chatCompletionsPath = '/api/gateway/v1/chat/completions';
 const dangerousToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page', 'eval'];
+interface MockGatewayModel {
+  readonly id: string;
+  readonly name: string;
+  readonly variants?: Record<string, unknown>;
+}
 
 type ChatAbortObserverWindow = typeof globalThis & {
   __kiloChatCompletionAborted?: boolean;
@@ -62,11 +68,14 @@ export const mockKiloApi = async (
     firstCompletionEvents?: unknown[];
     modelInputModalities?: string[];
     modelFailuresBeforeSuccessByOrganizationId?: Record<string, number>;
+    models?: MockGatewayModel[];
     modelNameByOrganizationId?: Record<string, string>;
     modelFailuresBeforeSuccess?: number;
     organizations?: { id: string; name: string }[];
     secondCompletionEvents?: unknown[];
+    seenChatBodies?: unknown[];
     toolNames?: string[];
+    toolNamesByCall?: string[][];
     seenChatOrganizationIds?: string[];
     thirdCompletionEvents?: unknown[];
   } = {}
@@ -104,20 +113,33 @@ export const mockKiloApi = async (
       return;
     }
 
+    const models = options.models ?? [
+      {
+        id: 'anthropic/claude-sonnet-4',
+        name: options.modelNameByOrganizationId?.[organizationId] ?? 'Anthropic: Claude Sonnet 4',
+        variants: { high: {}, low: {}, medium: {} },
+      },
+    ];
+
+    const data = models.map((model, index) => {
+      const item = {
+        id: model.id,
+        name: model.name,
+        opencode: { variants: model.variants ?? { high: {}, low: {}, medium: {} } },
+      };
+
+      return Object.assign(
+        item,
+        options.modelInputModalities === undefined
+          ? {}
+          : { architecture: { input_modalities: options.modelInputModalities } },
+        index === 0 ? { preferredIndex: 0 } : {}
+      );
+    });
+
     await route.fulfill({
       json: {
-        data: [
-          {
-            ...(options.modelInputModalities === undefined
-              ? {}
-              : { architecture: { input_modalities: options.modelInputModalities } }),
-            id: 'anthropic/claude-sonnet-4',
-            name:
-              options.modelNameByOrganizationId?.[organizationId] ?? 'Anthropic: Claude Sonnet 4',
-            opencode: { variants: { high: {}, low: {}, medium: {} } },
-            preferredIndex: 0,
-          },
-        ],
+        data,
       },
       status: 200,
     });
@@ -130,16 +152,14 @@ export const mockKiloApi = async (
     );
 
     const body: unknown = route.request().postDataJSON();
+    options.seenChatBodies?.push(body);
     const parsedBody = chatRequestSchema.safeParse(body);
     const messages = parsedBody.success ? (parsedBody.data.messages ?? []) : [];
 
-    const toolNames = options.toolNames ?? dangerousToolNames;
+    const toolNames =
+      options.toolNamesByCall?.[chatCompletionCalls - 1] ?? options.toolNames ?? dangerousToolNames;
 
-    expect(body).toMatchObject({
-      model: 'anthropic/claude-sonnet-4',
-      stream: true,
-      tool_choice: 'auto',
-    });
+    expect(body).toMatchObject({ stream: true, tool_choice: 'auto' });
     expect(
       parsedBody.success && parsedBody.data.tools !== undefined
         ? parsedBody.data.tools.map(tool => {

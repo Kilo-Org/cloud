@@ -238,7 +238,9 @@ const chromeEvalResponseSchema = z.object({
 const maxEvalStringLength = 8000;
 
 const isNormalPageUrl = (url: string | undefined): url is string =>
-  url?.startsWith('http://') === true || url?.startsWith('https://') === true;
+  url?.startsWith('http://') === true ||
+  url?.startsWith('https://') === true ||
+  url?.startsWith('file://') === true;
 
 export const listInspectableTabs = async (
   debuggerApi: ChromeDebuggerApi

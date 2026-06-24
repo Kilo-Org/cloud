@@ -444,19 +444,26 @@ describe('WrapperLease', () => {
     await expect(getWrapperLease(storage)).resolves.toEqual(owned);
   });
 
-  it('rejects an unproven persisted cleanup quarantine', async () => {
+  it('repairs an invalid persisted lease into a durable cleanup quarantine', async () => {
     const storage = createMemoryStorage();
     await storage.put('wrapper_lease', {
+      state: 'owns_wrapper',
+      nextInstanceGeneration: 2,
+    });
+
+    const repaired = await getWrapperLease(storage);
+
+    expect(repaired).toMatchObject({
       state: 'stop_needed',
       nextInstanceGeneration: 2,
       target: { kind: 'session' },
       reason: 'observation-failed',
-      requestedAt: 1_000,
-      nextAttemptAt: 3_153_600_001_000,
-      attempts: 0,
-      exhaustedAt: 1_000,
+      attempts: 5,
+      lastError: 'Invalid persisted wrapper lease',
+      exhaustedAt: expect.any(Number),
     });
-
-    await expect(getWrapperLease(storage)).rejects.toThrow('Invalid persisted wrapper lease');
+    expect(isWrapperDeliveryHeld(emptyWrapperRuntimeState(), repaired)).toBe(true);
+    expect(nextWrapperCleanupDeadline(repaired)).toBeUndefined();
+    await expect(getWrapperLease(storage)).resolves.toEqual(repaired);
   });
 });

@@ -172,12 +172,36 @@ export const emptyWrapperLease = (): WrapperLease => ({
   nextInstanceGeneration: 1,
 });
 
+const persistedLeaseGenerationSchema = z.object({
+  nextInstanceGeneration: z.number().int().positive(),
+});
+
+async function quarantineInvalidWrapperLease(
+  storage: DurableObjectStorage,
+  stored: unknown
+): Promise<WrapperLease> {
+  const generation = persistedLeaseGenerationSchema.safeParse(stored);
+  const now = Date.now();
+  const quarantined: WrapperLease = {
+    state: 'stop_needed',
+    nextInstanceGeneration: generation.success ? generation.data.nextInstanceGeneration : 1,
+    target: { kind: 'session' },
+    reason: 'observation-failed',
+    requestedAt: now,
+    nextAttemptAt: now + CLEANUP_EXHAUSTED_ROLLBACK_FENCE_MS,
+    attempts: WRAPPER_STOP_MAX_ATTEMPTS,
+    lastError: 'Invalid persisted wrapper lease',
+    exhaustedAt: now,
+  };
+  await storage.put(WRAPPER_LEASE_KEY, wrapperLeaseSchema.parse(quarantined));
+  return quarantined;
+}
+
 export async function getWrapperLease(storage: DurableObjectStorage): Promise<WrapperLease> {
   const stored = await storage.get(WRAPPER_LEASE_KEY);
   if (stored === undefined) return emptyWrapperLease();
   const parsed = wrapperLeaseSchema.safeParse(stored);
-  if (!parsed.success) throw new Error('Invalid persisted wrapper lease');
-  return parsed.data;
+  return parsed.success ? parsed.data : quarantineInvalidWrapperLease(storage, stored);
 }
 
 export async function putWrapperLease(

@@ -1,6 +1,6 @@
 /* eslint-disable import/no-nodejs-modules, jest/no-conditional-in-test, max-lines, no-await-in-loop, promise/avoid-new */
 import { expect, test } from '@playwright/test';
-import type { BrowserContext, Page } from '@playwright/test';
+import type { BrowserContext, Page, Request } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { z } from 'zod';
 import { launchExtensionContext, startFixtureServer } from './extension-context-fixture';
@@ -19,6 +19,12 @@ interface ChatRequestSummary {
 interface ChatRequestOutcome {
   readonly errorText: string | undefined;
   readonly status: 'failed' | 'finished';
+}
+
+interface ChatRequestTiming {
+  finishedAt?: number;
+  lastUserContent: string | undefined;
+  startedAt: number;
 }
 
 interface ConversationSample {
@@ -115,6 +121,41 @@ const recordChatRequests = (context: BrowserContext, requests: ChatRequestSummar
       model: body?.model,
       toolNames: body?.tools?.map(tool => tool.function?.name ?? '').filter(Boolean) ?? [],
     });
+  });
+};
+
+const recordChatRequestTimings = (context: BrowserContext, timings: ChatRequestTiming[]): void => {
+  const activeTimings = new Map<Request, ChatRequestTiming>();
+  const finishTiming = (request: Request): void => {
+    const timing = activeTimings.get(request);
+
+    if (timing === undefined) {
+      return;
+    }
+
+    timing.finishedAt = Date.now();
+  };
+
+  context.on('request', request => {
+    if (!request.url().includes('/api/gateway/v1/chat/completions')) {
+      return;
+    }
+
+    const parsedBody = chatRequestSchema.safeParse(request.postDataJSON());
+    const body = parsedBody.success ? parsedBody.data : undefined;
+    const timing = {
+      lastUserContent: getLastUserContent(body?.messages),
+      startedAt: Date.now(),
+    };
+
+    activeTimings.set(request, timing);
+    timings.push(timing);
+  });
+  context.on('requestfailed', request => {
+    finishTiming(request);
+  });
+  context.on('requestfinished', request => {
+    finishTiming(request);
   });
 };
 
@@ -464,6 +505,83 @@ test('live local backend snapshots the selected target tab per send', async () =
     await context.close();
     await firstFixture.close();
     await secondFixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('live local backend runs parallel frontier conversations without switching tabs', async () => {
+  const fixture = await startFixtureServer({ title: 'Kilo live parallel target' });
+  const timings: ChatRequestTiming[] = [];
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  recordChatRequestTimings(context, timings);
+
+  try {
+    const targetPage = await context.newPage();
+    await targetPage.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live parallel target');
+    await selectFrontierModel(sidePanel);
+
+    const messageInput = sidePanel.getByLabel('Message agent');
+
+    await messageInput.fill('LOCAL_PARALLEL_FIRST: write a detailed answer of at least 700 words.');
+    await messageInput.press('Enter');
+    await expect(sidePanel.getByRole('button', { exact: true, name: 'Stop' })).toBeVisible();
+
+    await sidePanel.getByLabel('New conversation').click();
+    await messageInput.fill('LOCAL_PARALLEL_SECOND: reply in one short sentence.');
+    await messageInput.press('Enter');
+
+    await expect
+      .poll(
+        () => {
+          const first = timings.find(
+            timing => timing.lastUserContent?.includes('LOCAL_PARALLEL_FIRST') === true
+          );
+          const second = timings.find(
+            timing => timing.lastUserContent?.includes('LOCAL_PARALLEL_SECOND') === true
+          );
+
+          return (
+            first !== undefined &&
+            second !== undefined &&
+            (first.finishedAt === undefined || second.startedAt < first.finishedAt)
+          );
+        },
+        { timeout: 30_000 }
+      )
+      .toBe(true);
+
+    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText(
+      'LOCAL_PARALLEL_SECOND'
+    );
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+      timeout: 120_000,
+    });
+    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText(
+      'LOCAL_PARALLEL_SECOND'
+    );
+    await sidePanel.getByRole('tab', { name: /LOCAL_PARALLEL_FIRST/u }).click();
+    await expect(
+      sidePanel.getByLabel('Agent conversation').getByText('LOCAL_PARALLEL_FIRST')
+    ).toBeVisible();
+    const firstStopButton = sidePanel.getByRole('button', { exact: true, name: 'Stop' });
+
+    if (await firstStopButton.isVisible()) {
+      await firstStopButton.click();
+      await expect(sidePanel.getByText('Stopped.')).toBeVisible({ timeout: 30_000 });
+    }
+
+    await sidePanel.getByRole('tab', { name: /LOCAL_PARALLEL_SECOND/u }).click();
+    await expect(
+      sidePanel.getByLabel('Agent conversation').getByText('LOCAL_PARALLEL_SECOND')
+    ).toBeVisible();
+  } finally {
+    await context.close();
+    await fixture.close();
     await rm(userDataDir, { force: true, recursive: true });
   }
 });

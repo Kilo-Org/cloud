@@ -139,7 +139,7 @@ function successResponse(usage: InferenceProviderUsage[]): NextResponse {
   return NextResponse.json(usage, {
     headers: {
       ...CORS_HEADERS,
-      'Cache-Control': `s-max-age=${CACHE_TTL_SECONDS}`,
+      'Cache-Control': `public, s-max-age=${CACHE_TTL_SECONDS}`,
     },
   });
 }

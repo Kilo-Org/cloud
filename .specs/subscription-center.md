@@ -25,6 +25,7 @@ Updated 2026-05-28 -- Credit-funded payment source label.
 Updated 2026-05-28 -- Coding Plans API key configuration summary.
 Updated 2026-05-28 -- Coding Plans billing history USD amount display.
 Updated 2026-06-05 -- KiloClaw final Commit term continuation behavior.
+Updated 2026-06-19 -- Current Coding Plan quota presentation and routing independence.
 
 ## Conventions
 
@@ -273,7 +274,11 @@ historical Commit names, prices, invoices, and credit deductions.
 27. A user MAY have multiple Coding Plans subscriptions — one per
     configured Plan ID. The Coding Plans group MUST display one
     Subscription Card for each non-terminal coding plan subscription,
-    including a `past_due` subscription in its warning state.
+    including a `past_due` subscription in its warning state. Authenticated
+    Kilo clients MAY reuse the same current personal subscription data for
+    current-plan presentation outside the Subscription Center. These clients
+    MUST NOT include terminal history, invoices, or billing history in that
+    current-plan response.
 
 28. The Coding Plans detail page MUST be served at
     `/subscriptions/coding-plans/[subscriptionId]`.
@@ -294,8 +299,16 @@ historical Commit names, prices, invoices, and credit deductions.
       linking to `/byok` when a managed key is installed
     - Traffic routing information (Kilo Gateway through the ordinary
       MiniMax BYOK provider setup)
+    - Current Upstream Provider quota for an `active` or `past_due` Coding Plan
+      when available, authorized through the retained Managed Plan Credential
+      without exposing it to the client
     - Inline billing history showing credit transactions with amounts in USD
       (see Billing History rules)
+
+    Current quota state and Installed BYOK Configuration routing state MUST be
+    presented separately. An active or `past_due` Coding Plan remains visible
+    and billable, and its current quota remains queryable, after its Installed
+    BYOK Configuration is replaced, disabled, or deleted.
 
     Before update, disable, or delete, `/byok` MUST warn that routing changes
     do not cancel or pause Token Plan Plus billing and cancellation is managed
@@ -462,6 +475,11 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-06-19 -- Current Coding Plan quota presentation
+
+- Allowed authenticated Kilo clients to reuse current personal subscription data without moving billing history out of Subscription Center.
+- Kept provider quota authorization on the retained Managed Plan Credential and independent from current BYOK routing state.
 
 ### 2026-06-05 -- KiloClaw final Commit continuation
 

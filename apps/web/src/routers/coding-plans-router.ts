@@ -2,6 +2,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
+import { decryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import {
   cancelCodingPlanSubscription,
   getAvailableCodingPlanIds,
@@ -13,6 +14,11 @@ import {
   uploadKeysToInventory,
 } from '@/lib/coding-plans';
 import {
+  getMiniMaxUsage,
+  MiniMaxUsageError,
+  MiniMaxUsageNativeSchema,
+} from '@/lib/coding-plans/minimax-usage';
+import {
   listManualCredentialRevocations,
   markCredentialManuallyRevoked,
   markCredentialManualRevocationFailed,
@@ -23,10 +29,12 @@ import {
   getCodingPlanCatalog,
   getCodingPlanPrice,
 } from '@/lib/coding-plans/pricing';
+import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { billingHistoryResponseSchema } from '@/lib/subscriptions/subscription-center';
 import { baseProcedure, adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
+  coding_plan_key_inventory,
   coding_plan_subscriptions,
   coding_plan_terms,
   credit_transactions,
@@ -38,11 +46,24 @@ const BillingHistoryInputSchema = z.object({
   subscriptionId: SubscriptionIdSchema,
   cursor: z.string().optional(),
 });
+const EncryptedApiKeySchema = z.object({
+  iv: z.string().min(1),
+  data: z.string().min(1),
+  authTag: z.string().min(1),
+});
+const CodingPlanUsageOutputSchema = z.object({
+  subscriptionId: SubscriptionIdSchema,
+  providerId: z.literal('minimax'),
+  region: z.literal('global'),
+  fetchedAt: z.iso.datetime(),
+  native: MiniMaxUsageNativeSchema,
+});
 
 const codingPlanSubscriptionColumns = {
   id: coding_plan_subscriptions.id,
   planId: coding_plan_subscriptions.plan_id,
   providerId: coding_plan_subscriptions.provider_id,
+  keyInventoryId: coding_plan_subscriptions.key_inventory_id,
   installedByokKeyId: coding_plan_subscriptions.installed_byok_key_id,
   status: coding_plan_subscriptions.status,
   costMicrodollars: coding_plan_subscriptions.cost_microdollars,
@@ -159,6 +180,84 @@ export const codingPlansRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const subscription = await getOwnedSubscription(ctx.user.id, input.subscriptionId);
       return toCodingPlanSubscriptionView(subscription);
+    }),
+
+  getUsage: baseProcedure
+    .input(z.object({ subscriptionId: SubscriptionIdSchema }))
+    .output(CodingPlanUsageOutputSchema)
+    .query(async ({ input, ctx }) => {
+      const subscription = await getOwnedSubscription(ctx.user.id, input.subscriptionId);
+      if (
+        !['active', 'past_due'].includes(subscription.status) ||
+        subscription.planId !== 'minimax-token-plan-plus' ||
+        subscription.providerId !== 'minimax'
+      ) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Coding Plan subscription is not eligible for usage.',
+        });
+      }
+      if (!subscription.keyInventoryId) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Coding Plan usage is unavailable.',
+        });
+      }
+
+      const [assignment] = await db
+        .select({
+          planId: coding_plan_key_inventory.plan_id,
+          providerId: coding_plan_key_inventory.provider_id,
+          status: coding_plan_key_inventory.status,
+          assignedToUserId: coding_plan_key_inventory.assigned_to_user_id,
+          encryptedApiKey: coding_plan_key_inventory.encrypted_api_key,
+        })
+        .from(coding_plan_key_inventory)
+        .where(eq(coding_plan_key_inventory.id, subscription.keyInventoryId))
+        .limit(1);
+      const encrypted = EncryptedApiKeySchema.safeParse(assignment?.encryptedApiKey);
+      if (
+        !assignment ||
+        assignment.status !== 'assigned' ||
+        assignment.assignedToUserId !== ctx.user.id ||
+        assignment.planId !== subscription.planId ||
+        assignment.providerId !== subscription.providerId ||
+        !encrypted.success
+      ) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Coding Plan usage is unavailable.',
+        });
+      }
+
+      const apiKey = (() => {
+        try {
+          return decryptApiKey(encrypted.data, BYOK_ENCRYPTION_KEY);
+        } catch {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Coding Plan usage is unavailable.',
+          });
+        }
+      })();
+
+      const native = await getMiniMaxUsage(apiKey).catch(error => {
+        if (error instanceof MiniMaxUsageError) {
+          throw new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
+        }
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Coding Plan usage is unavailable.',
+        });
+      });
+
+      return {
+        subscriptionId: subscription.id,
+        providerId: 'minimax' as const,
+        region: 'global' as const,
+        fetchedAt: new Date().toISOString(),
+        native,
+      };
     }),
 
   getBillingHistory: baseProcedure

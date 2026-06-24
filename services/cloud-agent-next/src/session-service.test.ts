@@ -368,7 +368,7 @@ describe('SessionService.prepareWorkspace', () => {
       'main',
       true
     );
-    expect(progress).toHaveBeenCalledWith('kilo_session', 'Importing session…');
+    expect(progress).toHaveBeenCalledWith('kilo_session', 'Creating fresh session…');
     expect(progress).toHaveBeenCalledWith('setup_commands', 'Running setup commands…');
     expect(result.ready).toMatchObject({
       workspacePath: '/workspace/user/sessions/agent_test',

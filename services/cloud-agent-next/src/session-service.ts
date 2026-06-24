@@ -1928,7 +1928,10 @@ export class SessionService {
       }
 
       const preferSnapshot = metadata.lifecycle.preparedAt !== undefined;
-      onProgress?.('kilo_session', preferSnapshot ? 'Restoring session…' : 'Importing session…');
+      onProgress?.(
+        'kilo_session',
+        preferSnapshot ? 'Restoring session…' : 'Creating fresh session…'
+      );
       await this.restoreOrBootstrapKiloSession(
         sandbox,
         session,

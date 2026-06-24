@@ -732,7 +732,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
 
       progress?.(
         'kilo_session',
-        request.workspace.preferSnapshot ? 'Restoring session...' : 'Importing session...'
+        request.workspace.preferSnapshot ? 'Restoring session...' : 'Creating fresh session...'
       );
       await restoreOrBootstrapKiloSession(request, restore);
 

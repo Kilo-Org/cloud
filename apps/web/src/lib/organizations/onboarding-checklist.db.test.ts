@@ -53,8 +53,46 @@ describe('getOrganizationOnboardingState', () => {
     expect(state.connectedPlatform).toBe(platform);
   });
 
-  it('detects enabled Code Reviewer configuration', async () => {
+  it.each([
+    ['github', 'app'],
+    ['gitlab', 'oauth'],
+  ] as const)(
+    'detects enabled Code Reviewer configuration for connected %s',
+    async (platform, integrationType) => {
+      const { owner, organization } = await createFixtureOrganization();
+      await db.insert(platform_integrations).values({
+        owned_by_organization_id: organization.id,
+        platform,
+        integration_type: integrationType,
+        platform_installation_id: crypto.randomUUID(),
+        integration_status: 'active',
+        repository_access: 'all',
+      });
+      await db.insert(agent_configs).values({
+        owned_by_organization_id: organization.id,
+        agent_type: 'code_review',
+        platform,
+        is_enabled: true,
+        created_by: owner.id,
+        config: {},
+      });
+
+      expect((await getOrganizationOnboardingState(organization.id)).codeReviewerEnabled).toBe(
+        true
+      );
+    }
+  );
+
+  it('ignores an enabled Code Reviewer config for a different platform', async () => {
     const { owner, organization } = await createFixtureOrganization();
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: crypto.randomUUID(),
+      integration_status: 'active',
+      repository_access: 'all',
+    });
     await db.insert(agent_configs).values({
       owned_by_organization_id: organization.id,
       agent_type: 'code_review',
@@ -64,7 +102,9 @@ describe('getOrganizationOnboardingState', () => {
       config: {},
     });
 
-    expect((await getOrganizationOnboardingState(organization.id)).codeReviewerEnabled).toBe(true);
+    const state = await getOrganizationOnboardingState(organization.id);
+    expect(state.connectedPlatform).toBe('github');
+    expect(state.codeReviewerEnabled).toBe(false);
   });
 
   it.each(['member', 'owner', 'billing_manager'] as const)(

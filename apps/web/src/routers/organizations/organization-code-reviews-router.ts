@@ -21,6 +21,7 @@ import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   syncWebhooksForRepositories,
@@ -357,20 +358,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             platform,
             isEnabled: true,
             createdBy: ctx.user.id,
-            config: {
-              review_style: 'balanced',
-              focus_areas: [],
-              custom_instructions: null,
-              model_slug: PRIMARY_DEFAULT_MODEL,
-              thinking_effort: null,
-              gate_threshold: 'off',
-              repository_selection_mode: 'all',
-              selected_repository_ids: [],
-              manually_added_repositories: [],
-              disable_review_md: true,
-              review_memory_enabled: false,
-              review_analytics_enabled: false,
-            },
+            config: createDefaultCodeReviewConfig(),
           });
         }
         await clearCodeReviewActionRequiredState({ owner, platform });

@@ -46,7 +46,6 @@ const STEP_CONTENT = {
     title: 'Source Control',
     description: 'Connect GitHub or GitLab so Kilo can work with your repositories.',
     actionLabel: 'Choose source control',
-    helpTitle: 'Connect your repositories',
     helpText: 'Choose the source control platform your organization uses.',
     docsLabel: 'Read the integrations guide',
     docsHref: 'https://kilo.ai/docs/automate/integrations',
@@ -56,7 +55,6 @@ const STEP_CONTENT = {
     title: 'Turn on Code Reviewer',
     description: 'Enable AI-assisted reviews for pull requests and merge requests.',
     actionLabel: 'Turn on Code Reviewer',
-    helpTitle: 'Review pull requests automatically',
     helpText:
       'Turn on automatic reviews with balanced defaults. You can fine-tune repositories, review style, and models later.',
     docsLabel: 'Read the Code Reviewer guide',
@@ -67,7 +65,6 @@ const STEP_CONTENT = {
     title: 'Invite your team',
     description: 'Bring teammates into the organization so they can collaborate in Kilo.',
     actionLabel: 'Invite your team',
-    helpTitle: 'Invite the right roles',
     helpText:
       'Owners manage organization settings and billing. Billing managers manage billing and can invite members. Members use Kilo with the organization.',
     docsLabel: 'Read the team management guide',
@@ -80,7 +77,6 @@ const STEP_CONTENT = {
     title: string;
     description: string;
     actionLabel: string;
-    helpTitle: string;
     helpText: string;
     docsLabel: string;
     docsHref: string;
@@ -617,7 +613,7 @@ function StepScreen({
                         className="flex min-h-24 items-center gap-4 rounded-lg border border-border bg-surface-inset p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                       >
                         <span className="flex size-10 items-center justify-center rounded-md border border-border bg-surface-raised">
-                          <GitLabIcon className="size-5" />
+                          <GitLabIcon className="size-5 text-foreground [&_path]:fill-current" />
                         </span>
                         <span>
                           <span className="type-heading block">GitLab</span>

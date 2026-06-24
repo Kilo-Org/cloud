@@ -84,7 +84,17 @@ export async function getOrganizationOnboardingState(
         FROM agent_configs
         WHERE owned_by_organization_id = organizations.id
           AND agent_type = 'code_review'
-          AND platform IN ('github', 'gitlab')
+          AND platform = (
+            SELECT platform
+            FROM platform_integrations
+            WHERE owned_by_organization_id = organizations.id
+              AND platform IN (${PLATFORM.GITHUB}, ${PLATFORM.GITLAB})
+              AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
+              AND suspended_at IS NULL
+              AND auth_invalid_at IS NULL
+            ORDER BY CASE WHEN platform = ${PLATFORM.GITHUB} THEN 0 ELSE 1 END
+            LIMIT 1
+          )
           AND is_enabled = true
       ) AS "codeReviewerEnabled",
       (

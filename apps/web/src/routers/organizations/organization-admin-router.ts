@@ -1,5 +1,5 @@
 import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   organizations,
   organization_memberships,
@@ -195,9 +195,10 @@ const AddMemberInputSchema = z.object({
 
 async function validateParentOrganizationChange(
   organizationId: string,
-  parentOrganizationId: string | null
+  parentOrganizationId: string | null,
+  txn: DrizzleTransaction
 ) {
-  const [organization] = await db
+  const [organization] = await txn
     .select({ id: organizations.id })
     .from(organizations)
     .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
@@ -240,7 +241,7 @@ async function validateParentOrganizationChange(
     }
     visitedOrganizationIds.add(currentParentId);
 
-    const [parentOrganization] = await db
+    const [parentOrganization] = await txn
       .select({ parent_organization_id: organizations.parent_organization_id })
       .from(organizations)
       .where(and(eq(organizations.id, currentParentId), isNull(organizations.deleted_at)))
@@ -294,12 +295,15 @@ export const organizationAdminRouter = createTRPCRouter({
   }),
 
   setParent: adminProcedure.input(SetParentOrganizationInputSchema).mutation(async ({ input }) => {
-    await validateParentOrganizationChange(input.organizationId, input.parentOrganizationId);
+    await db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+      await validateParentOrganizationChange(input.organizationId, input.parentOrganizationId, tx);
 
-    await db
-      .update(organizations)
-      .set({ parent_organization_id: input.parentOrganizationId })
-      .where(eq(organizations.id, input.organizationId));
+      await tx
+        .update(organizations)
+        .set({ parent_organization_id: input.parentOrganizationId })
+        .where(eq(organizations.id, input.organizationId));
+    });
 
     return successResult();
   }),

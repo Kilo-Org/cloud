@@ -166,7 +166,10 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
           }
         }}
         onWheel={event => {
-          if (event.deltaY < 0) {
+          if (
+            event.deltaY < 0 &&
+            event.currentTarget.scrollHeight > event.currentTarget.clientHeight
+          ) {
             setIsAutoScrollEnabled(false);
           }
         }}

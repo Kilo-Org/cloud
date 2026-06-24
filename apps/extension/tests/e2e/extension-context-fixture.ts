@@ -66,10 +66,12 @@ export const launchExtensionContext = async (): Promise<{
 }> => {
   const userDataDir = await mkdtemp(join(tmpdir(), 'kilo-extension-e2e-'));
   await access(join(extensionPath, 'manifest.json'));
+  const isHeaded = process.env['EXTENSION_E2E_HEADED'] === '1';
 
   const context = await chromium.launchPersistentContext(userDataDir, {
     args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
-    headless: false,
+    channel: 'chromium',
+    headless: !isHeaded,
   });
 
   const [existingServiceWorker] = context.serviceWorkers();

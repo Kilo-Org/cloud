@@ -177,6 +177,7 @@ const signInWithLocalDeviceAuth = async ({
   );
   await authPage.getByRole('button', { name: 'Authorize' }).click({ timeout: 60_000 });
   await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
+  await authPage.close();
 };
 
 const selectFrontierModel = async (sidePanel: Page): Promise<void> => {
@@ -422,6 +423,8 @@ test('live local backend snapshots the selected target tab per send', async () =
     await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live target alpha');
     await selectFrontierModel(sidePanel);
+    await sidePanel.getByLabel('Target tab').selectOption({ label: 'Kilo live target alpha' });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live target alpha');
 
     const messageInput = sidePanel.getByLabel('Message agent');
 
@@ -497,6 +500,56 @@ test('live local backend aborts an active frontier request on logout', async () 
     await expect(
       getExtensionStorage(sidePanel, ['kiloAuth', 'kiloAgentConversations'])
     ).resolves.toStrictEqual({});
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('live local backend can stop a frontier response and continue chatting', async () => {
+  const fixture = await startFixtureServer({ title: 'Kilo live manual stop target' });
+  const outcomes: ChatRequestOutcome[] = [];
+  const requests: ChatRequestSummary[] = [];
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  recordChatRequestOutcomes(context, outcomes);
+  recordChatRequests(context, requests);
+
+  try {
+    const targetPage = await context.newPage();
+    await targetPage.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live manual stop target');
+    await selectFrontierModel(sidePanel);
+
+    await sidePanel
+      .getByLabel('Message agent')
+      .fill('LOCAL_MANUAL_STOP: write a very long answer with at least 1500 words.');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByRole('button', { exact: true, name: 'Stop' })).toBeVisible();
+    await sidePanel.getByRole('button', { exact: true, name: 'Stop' }).click();
+    await expect(sidePanel.getByText('Stopped.')).toBeVisible({ timeout: 30_000 });
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
+
+    await expect.poll(() => outcomes.length, { timeout: 30_000 }).toBeGreaterThan(0);
+    expect(outcomes.some(outcome => outcome.status === 'failed')).toBe(true);
+
+    await sidePanel.getByLabel('Message agent').fill('LOCAL_MANUAL_STOP_FOLLOWUP: reply briefly.');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+      timeout: 120_000,
+    });
+
+    expect(
+      requests.some(
+        request =>
+          request.model === frontierModel &&
+          request.lastUserContent?.includes('LOCAL_MANUAL_STOP_FOLLOWUP') === true
+      )
+    ).toBe(true);
   } finally {
     await context.close();
     await fixture.close();

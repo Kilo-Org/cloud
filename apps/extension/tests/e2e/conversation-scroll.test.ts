@@ -12,6 +12,42 @@ import {
 
 const safeReadToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
 
+test('upward wheel on a non-scrollable conversation keeps auto-scroll enabled', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      firstCompletionEvents: [{ choices: [{ delta: { content: 'Still pinned.' } }] }],
+      toolNames: safeReadToolNames,
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.setViewportSize({ height: 720, width: 360 });
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+
+    const conversationPane = sidePanel.getByLabel('Agent conversation');
+
+    await conversationPane.hover();
+    await sidePanel.mouse.wheel(0, -800);
+    await expect(sidePanel.getByRole('button', { name: 'Jump to latest' })).toBeHidden();
+
+    await sidePanel.getByLabel('Message agent').fill('Reply while still pinned');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText('Still pinned.')).toBeVisible();
+    await expect(sidePanel.getByRole('button', { name: 'Jump to latest' })).toBeHidden();
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
 test('manual scroll up shows jump to latest without following new messages', async () => {
   const fixture = await startFixtureServer();
   const { promise: pendingFirstCompletion, resolve: releaseFirstCompletion } =

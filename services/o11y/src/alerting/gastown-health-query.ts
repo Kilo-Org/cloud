@@ -56,7 +56,7 @@ export async function queryGastownHealth(
     FROM gastown_events
     WHERE timestamp > NOW() - INTERVAL '${GASTOWN_HEALTH_WINDOW_MINUTES}' MINUTE
       AND blob1 = 'container.health_ping'
-    GROUP BY IF(blob5 != '' AND blob6 != '', blob6, '')
+    GROUP BY town_id
     FORMAT JSON
   `;
 

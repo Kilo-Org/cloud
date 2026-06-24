@@ -60,7 +60,8 @@ export const App = (): JSX.Element => {
     isLoading: isAuthValidationLoading,
     refetch: refetchAuthValidation,
   } = useQuery({
-    enabled: isStoredAuthSuccess,
+    // Skip validation with no token; a message-less signedOut would clobber the expiry message.
+    enabled: isStoredAuthSuccess && storedAuth !== undefined,
     queryFn: async ({ signal }): Promise<AuthValidationData> => {
       if (storedAuth === undefined) {
         return { status: 'signedOut' };

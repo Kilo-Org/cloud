@@ -69,7 +69,7 @@ High-confidence findings have **concrete quality concerns** **and** **absent sub
 - **Size:** +24,510 / -59, 40 files, 15 commits
 - **Quality concern:** Adds a new database table (`user_github_app_tokens`), encryption-key plumbing, OAuth callback routes, a migration, GDPR soft-delete handling, and worker utilities. While the code appears structured, a feature of this security sensitivity (token encryption, user-to-server GitHub authorization) should not land without human security review.
 - **AI-assisted indicator:** Entirely bot-authored; multiple self-reported "Refinery code review passed" comments from the same bot.
-- **Human validation:** None. Reviews are exclusively from `kilo-code-bot` (multiple `COMMENTED` reviews) and the only other activity is a `github-actions` stale warning.
+- **Human validation:** None. Reviews are exclusively from `kilo-code-bot` (multiple `COMMENTED` reviews), and the only other activity is from bots — multiple `kilo-code-bot[bot]` issue comments and a `github-actions` stale warning.
 - **Confidence:** High
 - **Recommended action:** Require human security and domain review before merge. Do not rely solely on bot self-review.
 

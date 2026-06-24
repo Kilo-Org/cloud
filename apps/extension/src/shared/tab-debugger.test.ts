@@ -49,6 +49,23 @@ const createDebuggerApi = ({
   };
 };
 
+const restoreFailingPngDataUrl =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+
+// Activating the target tab (7) succeeds; restoring the previous tab (1) throws.
+const createRestoreFailingTabsApi = (): BrowserTabsApi => ({
+  captureVisibleTab: () => restoreFailingPngDataUrl,
+  get: tabId => ({ id: tabId, title: 'Target', url: 'https://example.com/', windowId: 3 }),
+  query: () => [{ id: 1, title: 'Previous', url: 'https://kilo.ai/', windowId: 3 }],
+  update: tabId => {
+    if (tabId === 1) {
+      throw new Error('No tab with id: 1');
+    }
+
+    return { id: tabId, title: 'Tab', url: 'https://example.com/', windowId: 3 };
+  },
+});
+
 describe('tab debugger helpers', () => {
   it('lists only normal inspectable page tabs', async () => {
     await expect(listInspectableTabs(createDebuggerApi())).resolves.toStrictEqual([
@@ -108,6 +125,22 @@ describe('tab debugger helpers', () => {
       ok: false,
     });
     expect(debuggerApi.calls).toStrictEqual(['attach:7', 'detach:7']);
+  });
+
+  it('returns the eval result even when detach fails', async () => {
+    const debuggerApi: ChromeDebuggerApi = {
+      attach: () => {},
+      detach: () => {
+        throw new Error('Debugger is not attached to the tab with id: 7');
+      },
+      getTargets: () => [],
+      sendCommand: () => ({ result: { type: 'number', value: 42 } }),
+    };
+
+    await expect(evalInTab({ code: 'return 42;', debuggerApi, tabId: 7 })).resolves.toStrictEqual({
+      ok: true,
+      value: 42,
+    });
   });
 
   it('summarizes huge eval string results', async () => {
@@ -309,5 +342,20 @@ describe('tab debugger helpers', () => {
       { name: 'captureVisibleTab', options: { format: 'png' }, windowId: 3 },
       { name: 'update', tabId: 1, updateProperties: { active: true } },
     ]);
+  });
+
+  it('returns the screenshot even when restoring the previous tab fails', async () => {
+    const tabsApi = createRestoreFailingTabsApi();
+
+    await expect(getViewportScreenshotWithTabsApi({ tabId: 7, tabsApi })).resolves.toStrictEqual({
+      ok: true,
+      value: {
+        dataUrl: restoreFailingPngDataUrl,
+        devicePixelRatio: 1,
+        height: 1,
+        mediaType: 'image/png',
+        width: 1,
+      },
+    });
   });
 });

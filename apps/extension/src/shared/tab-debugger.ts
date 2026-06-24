@@ -344,7 +344,11 @@ export const getViewportScreenshotWithTabsApi = async ({
     };
   } finally {
     if (previousActiveTabId !== undefined && previousActiveTabId !== tabId) {
-      await tabsApi.update(previousActiveTabId, { active: true });
+      try {
+        await tabsApi.update(previousActiveTabId, { active: true });
+      } catch {
+        // The previous tab may have closed; don't let restore mask the result.
+      }
     }
   }
 };
@@ -693,7 +697,11 @@ export const evalInTab = async ({
     };
   } finally {
     if (attached) {
-      await debuggerApi.detach(target);
+      try {
+        await debuggerApi.detach(target);
+      } catch {
+        // Detach can fail if the tab closed or already detached; keep the result.
+      }
     }
   }
 };

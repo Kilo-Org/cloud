@@ -34,28 +34,23 @@ describe('getOrganizationOnboardingState', () => {
     }
   });
 
-  it('requires an active, healthy GitHub integration', async () => {
+  it.each([
+    ['github', 'app'],
+    ['gitlab', 'oauth'],
+  ] as const)('accepts an active, healthy %s integration', async (platform, integrationType) => {
     const { organization } = await createFixtureOrganization();
     await db.insert(platform_integrations).values({
       owned_by_organization_id: organization.id,
-      platform: 'gitlab',
-      integration_type: 'oauth',
-      platform_installation_id: crypto.randomUUID(),
-      integration_status: 'active',
-    });
-
-    expect((await getOrganizationOnboardingState(organization.id)).githubConnected).toBe(false);
-
-    await db.insert(platform_integrations).values({
-      owned_by_organization_id: organization.id,
-      platform: 'github',
-      integration_type: 'app',
+      platform,
+      integration_type: integrationType,
       platform_installation_id: crypto.randomUUID(),
       integration_status: 'active',
       repository_access: 'all',
     });
 
-    expect((await getOrganizationOnboardingState(organization.id)).githubConnected).toBe(true);
+    const state = await getOrganizationOnboardingState(organization.id);
+    expect(state.sourceControlConnected).toBe(true);
+    expect(state.connectedPlatform).toBe(platform);
   });
 
   it('detects enabled Code Reviewer configuration', async () => {

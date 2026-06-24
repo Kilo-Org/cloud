@@ -195,6 +195,6 @@ async function resolveGitLabOAuthOwner(
     return { type: 'user', id: user.id };
   }
 
-  await ensureOrganizationAccess({ user }, organizationId);
+  await ensureOrganizationAccess({ user }, organizationId, ['owner', 'billing_manager']);
   return { type: 'org', id: organizationId };
 }

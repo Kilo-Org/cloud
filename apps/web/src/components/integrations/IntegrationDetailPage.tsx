@@ -70,6 +70,9 @@ const integrationDetailRegistry = {
           organizationId={organizationId}
           success={search.success === 'connected'}
           error={search.error}
+          appReturnPath={
+            search.returnTo ? (validateReturnPath(search.returnTo) ?? undefined) : undefined
+          }
         />
       );
     },

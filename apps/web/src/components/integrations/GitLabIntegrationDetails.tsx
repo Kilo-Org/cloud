@@ -32,6 +32,9 @@ type GitLabIntegrationDetailsProps = {
   organizationId?: string;
   success?: boolean;
   error?: string;
+  appReturnPath?: string;
+  onInstallationDetected?: () => void;
+  mode?: 'manage' | 'connect';
 };
 
 type InstanceValidationState = {
@@ -65,6 +68,9 @@ export function GitLabIntegrationDetails({
   organizationId,
   success,
   error,
+  appReturnPath,
+  onInstallationDetected,
+  mode = 'manage',
 }: GitLabIntegrationDetailsProps) {
   // Shared state between OAuth and PAT
   const [instanceUrl, setInstanceUrl] = useState('https://gitlab.com');
@@ -89,6 +95,7 @@ export function GitLabIntegrationDetails({
   const queryClient = useQueryClient();
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const patValidationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const installationDetectedRef = useRef(false);
   const gitLabOAuthCallbackPath = getPlatformOAuthCallbackPath(PLATFORM.GITLAB);
 
   const isSelfHostedInput = Boolean(
@@ -155,14 +162,15 @@ export function GitLabIntegrationDetails({
   // Connect with PAT mutation
   const { mutate: connectWithPATMutate, isPending: isConnectingWithPAT } = useMutation(
     trpc.gitlab.connectWithPAT.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
         toast.success('GitLab connected successfully!');
-        // Reset PAT form
         setPatToken('');
         setPATValidation({ status: 'idle' });
         setConnectionMethod('oauth');
-        // Reload the page to refresh the installation data
-        window.location.reload();
+        await queryClient.invalidateQueries({
+          queryKey: trpc.gitlab.getInstallation.queryKey(input),
+        });
+        await refetch();
       },
       onError: err => {
         toast.error('Failed to connect', { description: err.message });
@@ -239,9 +247,18 @@ export function GitLabIntegrationDetails({
     };
   }, [instanceUrl, isSelfHostedInput, validateInstanceMutate]);
 
-  const { data: installationData, isLoading } = useQuery(
-    trpc.gitlab.getInstallation.queryOptions(input)
-  );
+  const {
+    data: installationData,
+    isLoading,
+    refetch,
+  } = useQuery(trpc.gitlab.getInstallation.queryOptions(input));
+  const isConnected = installationData?.installed;
+
+  useEffect(() => {
+    if (!appReturnPath || !isConnected || installationDetectedRef.current) return;
+    installationDetectedRef.current = true;
+    onInstallationDetected?.();
+  }, [appReturnPath, isConnected, onInstallationDetected]);
 
   const disconnectMutation = useMutation(
     trpc.gitlab.disconnect.mutationOptions({
@@ -264,6 +281,19 @@ export function GitLabIntegrationDetails({
   );
 
   const isDisconnecting = disconnectMutation.isPending;
+
+  useEffect(() => {
+    if (!appReturnPath) return;
+    const refreshOnReturn = () => {
+      if (document.visibilityState === 'visible') void refetch();
+    };
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+    };
+  }, [appReturnPath, refetch]);
 
   useEffect(() => {
     if (success) {
@@ -294,6 +324,9 @@ export function GitLabIntegrationDetails({
     if (instanceUrl && instanceUrl !== 'https://gitlab.com') {
       params.set('instanceUrl', instanceUrl);
     }
+    if (appReturnPath) {
+      params.set('returnTo', appReturnPath);
+    }
 
     const basePath = getPlatformOAuthConnectPath(PLATFORM.GITLAB);
 
@@ -307,6 +340,7 @@ export function GitLabIntegrationDetails({
             instanceUrl,
             clientId,
             clientSecret,
+            ...(appReturnPath ? { returnTo: appReturnPath } : {}),
           }),
         });
         const responseBody = (await response.json().catch(() => null)) as {
@@ -315,9 +349,11 @@ export function GitLabIntegrationDetails({
         } | null;
 
         if (response.status === 401) {
-          const callbackPath = organizationId
-            ? `/organizations/${organizationId}/integrations/gitlab`
-            : '/integrations/gitlab';
+          const callbackPath =
+            appReturnPath ??
+            (organizationId
+              ? `/organizations/${organizationId}/integrations/gitlab`
+              : '/integrations/gitlab');
           window.location.href = `/users/sign_in?${new URLSearchParams({ callbackPath }).toString()}`;
           return;
         }
@@ -326,7 +362,12 @@ export function GitLabIntegrationDetails({
           throw new Error(responseBody?.error ?? 'Failed to initiate GitLab OAuth');
         }
 
-        window.location.href = responseBody.url;
+        if (appReturnPath) {
+          window.open(responseBody.url, '_blank', 'noopener,noreferrer');
+          setIsStartingOAuthConnection(false);
+        } else {
+          window.location.href = responseBody.url;
+        }
         return;
       } catch (err) {
         setIsStartingOAuthConnection(false);
@@ -338,7 +379,13 @@ export function GitLabIntegrationDetails({
     }
 
     const queryString = params.toString();
-    window.location.href = queryString ? `${basePath}?${queryString}` : basePath;
+    const connectPath = queryString ? `${basePath}?${queryString}` : basePath;
+    if (appReturnPath) {
+      window.open(connectPath, '_blank', 'noopener,noreferrer');
+      setIsStartingOAuthConnection(false);
+    } else {
+      window.location.href = connectPath;
+    }
   };
 
   const handleDisconnect = () => {
@@ -387,7 +434,6 @@ export function GitLabIntegrationDetails({
     );
   }
 
-  const isConnected = installationData?.installed;
   const installation = installationData?.installation;
   const gitlabInstanceUrl = installation?.instanceUrl || 'https://gitlab.com';
   const isSelfHosted = gitlabInstanceUrl !== 'https://gitlab.com';
@@ -396,7 +442,7 @@ export function GitLabIntegrationDetails({
   return (
     <div className="space-y-6">
       {/* Integration Status Card */}
-      <Card>
+      <Card className={mode === 'connect' ? 'shadow-none' : undefined}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -494,41 +540,47 @@ export function GitLabIntegrationDetails({
               </div>
 
               {/* Actions */}
-              <div className="flex flex-wrap gap-3">
-                {(authType === 'pat' || isSelfHosted) && (
+              {mode === 'manage' && (
+                <div className="flex flex-wrap gap-3">
+                  {(authType === 'pat' || isSelfHosted) && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const targetUrl =
+                          authType === 'pat'
+                            ? `${gitlabInstanceUrl}/-/user_settings/personal_access_tokens`
+                            : `${gitlabInstanceUrl}/-/profile/applications`;
+                        window.open(targetUrl, '_blank');
+                      }}
+                    >
+                      {authType === 'pat' ? (
+                        <Key className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Settings className="mr-2 h-4 w-4" />
+                      )}
+                      {authType === 'pat' ? 'Manage Access Token' : 'Manage on GitLab'}
+                      <ExternalLink className="ml-2 h-3 w-3" />
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
-                    onClick={() => {
-                      const targetUrl =
-                        authType === 'pat'
-                          ? `${gitlabInstanceUrl}/-/user_settings/personal_access_tokens`
-                          : `${gitlabInstanceUrl}/-/profile/applications`;
-                      window.open(targetUrl, '_blank');
-                    }}
+                    onClick={handleRefresh}
+                    disabled={refreshRepositoriesMutation.isPending}
                   >
-                    {authType === 'pat' ? (
-                      <Key className="mr-2 h-4 w-4" />
-                    ) : (
-                      <Settings className="mr-2 h-4 w-4" />
-                    )}
-                    {authType === 'pat' ? 'Manage Access Token' : 'Manage on GitLab'}
-                    <ExternalLink className="ml-2 h-3 w-3" />
+                    <RefreshCw
+                      className={`mr-2 h-4 w-4 ${refreshRepositoriesMutation.isPending ? 'animate-spin' : ''}`}
+                    />
+                    {refreshRepositoriesMutation.isPending ? 'Refreshing...' : 'Refresh Projects'}
                   </Button>
-                )}
-                <Button
-                  variant="outline"
-                  onClick={handleRefresh}
-                  disabled={refreshRepositoriesMutation.isPending}
-                >
-                  <RefreshCw
-                    className={`mr-2 h-4 w-4 ${refreshRepositoriesMutation.isPending ? 'animate-spin' : ''}`}
-                  />
-                  {refreshRepositoriesMutation.isPending ? 'Refreshing...' : 'Refresh Projects'}
-                </Button>
-                <Button variant="destructive" onClick={handleDisconnect} disabled={isDisconnecting}>
-                  {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
-                </Button>
-              </div>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDisconnect}
+                    disabled={isDisconnecting}
+                  >
+                    {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                  </Button>
+                </div>
+              )}
             </>
           ) : (
             <>

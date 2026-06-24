@@ -4,13 +4,15 @@ import type {
 } from '@/lib/organizations/onboarding-checklist';
 
 export const ORGANIZATION_ONBOARDING_SCREENS = [
-  'github',
+  'source-control',
   'code-reviewer',
   'invite-team',
   'complete',
 ] as const;
 
 export type OrganizationOnboardingScreen = (typeof ORGANIZATION_ONBOARDING_SCREENS)[number];
+export const SOURCE_CONTROL_PROVIDERS = ['github', 'gitlab'] as const;
+export type SourceControlProvider = (typeof SOURCE_CONTROL_PROVIDERS)[number];
 
 type SearchParamReader = {
   get(name: string): string | null;
@@ -23,6 +25,13 @@ export function getOrganizationOnboardingScreen(
   return ORGANIZATION_ONBOARDING_SCREENS.find(screen => screen === step) ?? null;
 }
 
+export function getSourceControlProvider(
+  searchParams: SearchParamReader
+): SourceControlProvider | null {
+  const provider = searchParams.get('provider');
+  return SOURCE_CONTROL_PROVIDERS.find(value => value === provider) ?? null;
+}
+
 export function getFirstIncompleteOnboardingScreen(
   checklist: OrganizationOnboardingChecklist
 ): OrganizationOnboardingScreen {
@@ -32,9 +41,12 @@ export function getFirstIncompleteOnboardingScreen(
 export function buildOrganizationWelcomePath(
   organizationId: string,
   screen: OrganizationOnboardingScreen,
-  extraParams?: Record<string, string>
+  extraParams?: Record<string, string | undefined>
 ): string {
-  const params = new URLSearchParams({ step: screen, ...extraParams });
+  const params = new URLSearchParams({ step: screen });
+  for (const [key, value] of Object.entries(extraParams ?? {})) {
+    if (value) params.set(key, value);
+  }
   return `/organizations/${organizationId}/welcome?${params.toString()}`;
 }
 

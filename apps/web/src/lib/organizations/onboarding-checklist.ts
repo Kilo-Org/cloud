@@ -5,7 +5,7 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
 export const ORGANIZATION_ONBOARDING_STEP_KEYS = [
-  'github',
+  'source-control',
   'code-reviewer',
   'invite-team',
 ] as const;
@@ -13,8 +13,12 @@ export const ORGANIZATION_ONBOARDING_STEP_KEYS = [
 export const OrganizationOnboardingStepKeySchema = z.enum(ORGANIZATION_ONBOARDING_STEP_KEYS);
 export type OrganizationOnboardingStepKey = z.infer<typeof OrganizationOnboardingStepKeySchema>;
 
+export const SourceControlPlatformSchema = z.enum(['github', 'gitlab']);
+export type SourceControlPlatform = z.infer<typeof SourceControlPlatformSchema>;
+
 export const OrganizationOnboardingStateSchema = z.object({
-  githubConnected: z.boolean(),
+  sourceControlConnected: z.boolean(),
+  connectedPlatform: SourceControlPlatformSchema.nullable(),
   codeReviewerEnabled: z.boolean(),
   teamInvited: z.boolean(),
 });
@@ -29,6 +33,7 @@ export const OrganizationOnboardingChecklistSchema = z.object({
   ),
   completedCount: z.number().int().nonnegative(),
   totalCount: z.number().int().positive(),
+  connectedPlatform: SourceControlPlatformSchema.nullable(),
 });
 export type OrganizationOnboardingChecklist = z.infer<typeof OrganizationOnboardingChecklistSchema>;
 
@@ -36,7 +41,7 @@ export function buildOrganizationOnboardingChecklist(
   state: OrganizationOnboardingState
 ): OrganizationOnboardingChecklist {
   const steps = [
-    { key: 'github', done: state.githubConnected },
+    { key: 'source-control', done: state.sourceControlConnected },
     { key: 'code-reviewer', done: state.codeReviewerEnabled },
     { key: 'invite-team', done: state.teamInvited },
   ] satisfies Array<{ key: OrganizationOnboardingStepKey; done: boolean }>;
@@ -45,6 +50,7 @@ export function buildOrganizationOnboardingChecklist(
     steps,
     completedCount: steps.filter(step => step.done).length,
     totalCount: steps.length,
+    connectedPlatform: state.connectedPlatform,
   };
 }
 
@@ -57,11 +63,22 @@ export async function getOrganizationOnboardingState(
         SELECT 1
         FROM platform_integrations
         WHERE owned_by_organization_id = organizations.id
-          AND platform = ${PLATFORM.GITHUB}
+          AND platform IN (${PLATFORM.GITHUB}, ${PLATFORM.GITLAB})
           AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
           AND suspended_at IS NULL
           AND auth_invalid_at IS NULL
-      ) AS "githubConnected",
+      ) AS "sourceControlConnected",
+      (
+        SELECT platform
+        FROM platform_integrations
+        WHERE owned_by_organization_id = organizations.id
+          AND platform IN (${PLATFORM.GITHUB}, ${PLATFORM.GITLAB})
+          AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
+          AND suspended_at IS NULL
+          AND auth_invalid_at IS NULL
+        ORDER BY CASE WHEN platform = ${PLATFORM.GITHUB} THEN 0 ELSE 1 END
+        LIMIT 1
+      ) AS "connectedPlatform",
       EXISTS (
         SELECT 1
         FROM agent_configs

@@ -112,7 +112,7 @@ export async function handleGitLabOAuthCallback(request: NextRequest) {
     const normalizedInstanceUrl = normalizeGitLabInstanceUrl(instanceUrl);
 
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
+      await ensureOrganizationAccess({ user }, owner.id, ['owner', 'billing_manager']);
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }

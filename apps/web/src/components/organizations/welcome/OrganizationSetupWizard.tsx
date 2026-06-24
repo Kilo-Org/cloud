@@ -15,6 +15,7 @@ import {
   CodeXml,
   ExternalLink,
   Github,
+  GitBranch,
   Loader2,
   RefreshCw,
   Users,
@@ -26,6 +27,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { InviteMemberDialog } from '@/components/organizations/members/InviteMemberDialog';
 import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
+import { GitLabIntegrationDetails } from '@/components/integrations/GitLabIntegrationDetails';
+import { GitLabIcon } from '@/app/collab/_components/icons/GitLabIcon';
 import { cn } from '@/lib/utils';
 import {
   buildOrganizationWelcomePath,
@@ -33,20 +36,21 @@ import {
   getNextOnboardingScreen,
   getOrganizationOnboardingScreen,
   getPreviousOnboardingScreen,
+  getSourceControlProvider,
   type OrganizationOnboardingScreen,
+  type SourceControlProvider,
 } from './organization-setup-path';
 
 const STEP_CONTENT = {
-  github: {
-    title: 'Connect GitHub',
-    description: 'Connect your repositories so Kilo can work with your development workflow.',
-    actionLabel: 'Connect GitHub',
-    helpTitle: 'Choose repository access',
-    helpText:
-      'GitHub will ask whether Kilo can access all repositories or only selected repositories. You can change this later.',
+  'source-control': {
+    title: 'Source Control',
+    description: 'Connect GitHub or GitLab so Kilo can work with your repositories.',
+    actionLabel: 'Choose source control',
+    helpTitle: 'Connect your repositories',
+    helpText: 'Choose the source control platform your organization uses.',
     docsLabel: 'Read the integrations guide',
-    docsHref: 'https://kilo.ai/docs/automate/integrations#connecting-github',
-    icon: Github,
+    docsHref: 'https://kilo.ai/docs/automate/integrations',
+    icon: GitBranch,
   },
   'code-reviewer': {
     title: 'Turn on Code Reviewer',
@@ -54,9 +58,9 @@ const STEP_CONTENT = {
     actionLabel: 'Turn on Code Reviewer',
     helpTitle: 'Review pull requests automatically',
     helpText:
-      'Turn on automatic reviews for GitHub with balanced defaults. You can fine-tune repositories, review style, and models later.',
+      'Turn on automatic reviews with balanced defaults. You can fine-tune repositories, review style, and models later.',
     docsLabel: 'Read the Code Reviewer guide',
-    docsHref: 'https://kilo.ai/docs/automate/code-reviews/github',
+    docsHref: 'https://kilo.ai/docs/automate/code-reviews',
     icon: CodeXml,
   },
   'invite-team': {
@@ -99,7 +103,9 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   const headingRef = useRef<HTMLHeadingElement>(null);
   const handledReturnRef = useRef<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [showGitHubSetup, setShowGitHubSetup] = useState(false);
+  const [sourceControlProvider, setSourceControlProvider] = useState<SourceControlProvider | null>(
+    null
+  );
   const [statusMessage, setStatusMessage] = useState('');
   const [visitedSteps, setVisitedSteps] = useState<Set<OrganizationOnboardingStepKey>>(new Set());
 
@@ -111,9 +117,12 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     trpc.organizations.reviewAgent.toggleReviewAgent.mutationOptions()
   );
   const requestedScreen = getOrganizationOnboardingScreen(searchParams);
+  const requestedProvider = getSourceControlProvider(searchParams);
   const currentScreen =
     requestedScreen ??
-    (checklistQuery.data ? getFirstIncompleteOnboardingScreen(checklistQuery.data) : 'github');
+    (checklistQuery.data
+      ? getFirstIncompleteOnboardingScreen(checklistQuery.data)
+      : 'source-control');
 
   const stepState = useMemo(
     () => new Map(checklistQuery.data?.steps.map(step => [step.key, step.done]) ?? []),
@@ -130,6 +139,10 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
       { scroll: false }
     );
   }, [checklistQuery.data, organizationId, requestedScreen, router]);
+
+  useEffect(() => {
+    if (requestedProvider) setSourceControlProvider(requestedProvider);
+  }, [requestedProvider]);
 
   useEffect(() => {
     if (!requestedScreen) return;
@@ -150,25 +163,29 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
       searchParams.get('github_pending_approval') ??
       searchParams.get('github_action') ??
       searchParams.get('error');
+    const gitlabResult = searchParams.get('success');
     const codeReviewerReturn = searchParams.get('code_reviewer_return');
     const returnKey = githubResult
       ? `github:${githubResult}`
-      : codeReviewerReturn
-        ? `code-reviewer:${codeReviewerReturn}`
-        : null;
+      : gitlabResult === 'gitlab_connected'
+        ? `gitlab:${gitlabResult}`
+        : codeReviewerReturn
+          ? `code-reviewer:${codeReviewerReturn}`
+          : null;
 
     if (!returnKey || handledReturnRef.current === returnKey) return;
     handledReturnRef.current = returnKey;
 
     const handleReturn = async () => {
       const result = await checklistQuery.refetch();
-      const cleanScreen = githubResult ? 'github' : 'code-reviewer';
+      const cleanScreen = githubResult || gitlabResult ? 'source-control' : 'code-reviewer';
       const completed = result.data?.steps.find(step => step.key === cleanScreen)?.done ?? false;
 
       if (searchParams.get('github_pending_approval') === 'true') {
         setStatusMessage('GitHub is waiting for an organization administrator to approve access.');
       } else if (searchParams.get('error')) {
-        setStatusMessage('GitHub setup did not complete. Review the error and try again.');
+        const providerName = requestedProvider === 'gitlab' ? 'GitLab' : 'GitHub';
+        setStatusMessage(`${providerName} setup did not complete. Review the error and try again.`);
       } else if (completed) {
         setStatusMessage(`${STEP_CONTENT[cleanScreen].title} is complete.`);
       }
@@ -187,16 +204,15 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
 
   const navigate = (screen: OrganizationOnboardingScreen) => {
     setStatusMessage('');
-    setShowGitHubSetup(false);
     router.push(buildOrganizationWelcomePath(organizationId, screen), { scroll: false });
   };
 
-  const handleGitHubInstallationDetected = async () => {
+  const handleSourceControlDetected = async (provider: SourceControlProvider) => {
     await queryClient.invalidateQueries({ queryKey: checklistQueryOptions.queryKey });
     const result = await checklistQuery.refetch();
-    const completed = result.data?.steps.find(step => step.key === 'github')?.done ?? false;
+    const completed = result.data?.steps.find(step => step.key === 'source-control')?.done ?? false;
     if (completed) {
-      setStatusMessage('GitHub is connected.');
+      toast.success(`${provider === 'github' ? 'GitHub' : 'GitLab'} is connected`);
       navigate('code-reviewer');
     }
   };
@@ -206,7 +222,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     try {
       await enableCodeReviewerMutation.mutateAsync({
         organizationId,
-        platform: 'github',
+        platform: checklistQuery.data?.connectedPlatform ?? sourceControlProvider ?? 'github',
         isEnabled: true,
       });
       await queryClient.invalidateQueries({ queryKey: checklistQueryOptions.queryKey });
@@ -215,7 +231,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
         result.data?.steps.find(step => step.key === 'code-reviewer')?.done ?? false;
       if (completed) {
         toast.success('Code Reviewer is on', {
-          description: 'Balanced defaults are active for GitHub repositories.',
+          description: `Balanced defaults are active for ${checklistQuery.data?.connectedPlatform === 'gitlab' || sourceControlProvider === 'gitlab' ? 'GitLab' : 'GitHub'} repositories.`,
         });
         navigate('invite-team');
       } else {
@@ -356,9 +372,17 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
                     organizationId={organizationId}
                     previous={getPreviousOnboardingScreen(currentScreen)}
                     onBack={navigate}
-                    showGitHubSetup={showGitHubSetup}
-                    onShowGitHubSetup={() => setShowGitHubSetup(true)}
-                    onGitHubInstallationDetected={() => void handleGitHubInstallationDetected()}
+                    sourceControlProvider={sourceControlProvider}
+                    onSelectSourceControl={provider => {
+                      setSourceControlProvider(provider);
+                      router.push(
+                        buildOrganizationWelcomePath(organizationId, 'source-control', {
+                          provider,
+                        }),
+                        { scroll: false }
+                      );
+                    }}
+                    onSourceControlDetected={provider => void handleSourceControlDetected(provider)}
                     codeReviewerPending={enableCodeReviewerMutation.isPending}
                     onEnableCodeReviewer={() => void handleEnableCodeReviewer()}
                     onContinue={() => navigate(getNextOnboardingScreen(currentScreen))}
@@ -460,10 +484,10 @@ function StepScreen({
   done,
   organizationId,
   previous,
-  showGitHubSetup,
+  sourceControlProvider,
   onBack,
-  onShowGitHubSetup,
-  onGitHubInstallationDetected,
+  onSelectSourceControl,
+  onSourceControlDetected,
   codeReviewerPending,
   onEnableCodeReviewer,
   onContinue,
@@ -474,10 +498,10 @@ function StepScreen({
   done: boolean;
   organizationId: string;
   previous: OrganizationOnboardingScreen | null;
-  showGitHubSetup: boolean;
+  sourceControlProvider: SourceControlProvider | null;
   onBack: (screen: OrganizationOnboardingScreen) => void;
-  onShowGitHubSetup: () => void;
-  onGitHubInstallationDetected: () => void;
+  onSelectSourceControl: (provider: SourceControlProvider) => void;
+  onSourceControlDetected: (provider: SourceControlProvider) => void;
   codeReviewerPending: boolean;
   onEnableCodeReviewer: () => void;
   onContinue: () => void;
@@ -485,7 +509,9 @@ function StepScreen({
 }) {
   const content = STEP_CONTENT[step];
   const Icon = content.icon;
-  const returnTo = buildOrganizationWelcomePath(organizationId, step);
+  const returnTo = buildOrganizationWelcomePath(organizationId, step, {
+    provider: sourceControlProvider ?? undefined,
+  });
 
   return (
     <>
@@ -530,11 +556,18 @@ function StepScreen({
 
         <div className="flex-1 py-6">
           <div className="min-w-0">
-            {step === 'github' && showGitHubSetup && !done ? (
+            {step === 'source-control' && sourceControlProvider === 'github' && !done ? (
               <GitHubIntegrationDetails
                 organizationId={organizationId}
                 appReturnPath={returnTo}
-                onInstallationDetected={onGitHubInstallationDetected}
+                onInstallationDetected={() => onSourceControlDetected('github')}
+              />
+            ) : step === 'source-control' && sourceControlProvider === 'gitlab' && !done ? (
+              <GitLabIntegrationDetails
+                organizationId={organizationId}
+                appReturnPath={returnTo}
+                onInstallationDetected={() => onSourceControlDetected('gitlab')}
+                mode="connect"
               />
             ) : (
               <div className="flex min-h-56 flex-col justify-between rounded-xl border border-border bg-surface-background p-6">
@@ -560,11 +593,41 @@ function StepScreen({
                       <Users className="size-4" />
                       {content.actionLabel}
                     </Button>
-                  ) : step === 'github' ? (
-                    <Button onClick={onShowGitHubSetup} className="min-h-control-touch sm:min-h-0">
-                      {content.actionLabel}
-                      <ArrowRight className="size-4" />
-                    </Button>
+                  ) : step === 'source-control' ? (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => onSelectSourceControl('github')}
+                        className="flex min-h-24 items-center gap-4 rounded-lg border border-border bg-surface-inset p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      >
+                        <span className="flex size-10 items-center justify-center rounded-md border border-border bg-surface-raised">
+                          <Github className="size-5" />
+                        </span>
+                        <span>
+                          <span className="type-heading block">GitHub</span>
+                          <span className="type-label text-muted-foreground">
+                            Connect GitHub App
+                          </span>
+                        </span>
+                        <ArrowRight className="ml-auto size-4 text-muted-foreground" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onSelectSourceControl('gitlab')}
+                        className="flex min-h-24 items-center gap-4 rounded-lg border border-border bg-surface-inset p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      >
+                        <span className="flex size-10 items-center justify-center rounded-md border border-border bg-surface-raised">
+                          <GitLabIcon className="size-5" />
+                        </span>
+                        <span>
+                          <span className="type-heading block">GitLab</span>
+                          <span className="type-label text-muted-foreground">
+                            OAuth or access token
+                          </span>
+                        </span>
+                        <ArrowRight className="ml-auto size-4 text-muted-foreground" />
+                      </button>
+                    </div>
                   ) : (
                     <Button
                       onClick={onEnableCodeReviewer}

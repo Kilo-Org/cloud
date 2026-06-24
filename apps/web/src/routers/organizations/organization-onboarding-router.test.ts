@@ -34,12 +34,13 @@ describe('getOnboardingChecklist procedure', () => {
 
     expect(result).toEqual({
       steps: [
-        { key: 'github', done: false },
+        { key: 'source-control', done: false },
         { key: 'code-reviewer', done: false },
         { key: 'invite-team', done: true },
       ],
       completedCount: 1,
       totalCount: 3,
+      connectedPlatform: null,
     });
   });
 

@@ -5,7 +5,8 @@ type OnboardingState = Parameters<typeof buildOrganizationOnboardingChecklist>[0
 
 function state(overrides: Partial<OnboardingState> = {}): OnboardingState {
   return {
-    githubConnected: false,
+    sourceControlConnected: false,
+    connectedPlatform: null,
     codeReviewerEnabled: false,
     teamInvited: false,
     ...overrides,
@@ -18,17 +19,18 @@ describe('buildOrganizationOnboardingChecklist', () => {
 
     expect(checklist).toEqual({
       steps: [
-        { key: 'github', done: false },
+        { key: 'source-control', done: false },
         { key: 'code-reviewer', done: false },
         { key: 'invite-team', done: false },
       ],
       completedCount: 0,
       totalCount: 3,
+      connectedPlatform: null,
     });
   });
 
   it.each([
-    ['githubConnected', 'github'],
+    ['sourceControlConnected', 'source-control'],
     ['codeReviewerEnabled', 'code-reviewer'],
     ['teamInvited', 'invite-team'],
   ] as const)('maps %s to the %s step', (stateKey, stepKey) => {
@@ -40,13 +42,19 @@ describe('buildOrganizationOnboardingChecklist', () => {
 
   it('derives mixed and complete counts from the steps', () => {
     const mixed = buildOrganizationOnboardingChecklist(
-      state({ githubConnected: true, teamInvited: true })
+      state({ sourceControlConnected: true, connectedPlatform: 'gitlab', teamInvited: true })
     );
     const complete = buildOrganizationOnboardingChecklist(
-      state({ githubConnected: true, codeReviewerEnabled: true, teamInvited: true })
+      state({
+        sourceControlConnected: true,
+        connectedPlatform: 'github',
+        codeReviewerEnabled: true,
+        teamInvited: true,
+      })
     );
 
     expect(mixed.completedCount).toBe(2);
+    expect(mixed.connectedPlatform).toBe('gitlab');
     expect(mixed.completedCount).toBe(mixed.steps.filter(step => step.done).length);
     expect(complete.completedCount).toBe(3);
     expect(complete.totalCount).toBe(complete.steps.length);

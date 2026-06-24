@@ -78,6 +78,8 @@ type ChatInputProps = {
   availableVariants?: string[];
   /** Whether to show the toolbar (hide when no active session) */
   showToolbar?: boolean;
+  /** Whether to show mode controls in the toolbar. */
+  showModePicker?: boolean;
   /** Pre-populate the textarea (e.g. to restore text after a failed send) */
   initialValue?: string;
   /** Custom modes exposed by the session's profile stack (shown in picker) */
@@ -110,6 +112,7 @@ export function ChatInput({
   onVariantChange,
   availableVariants = [],
   showToolbar = false,
+  showModePicker = true,
   initialValue,
   attachmentUploadOptions,
   attachmentsEnabled = true,
@@ -361,7 +364,11 @@ export function ChatInput({
     : undefined;
 
   // Check if toolbar should be rendered (has callbacks and options)
-  const hasToolbar = showToolbar && onModeChange && onModelChange && modelOptions.length > 0;
+  const hasToolbar =
+    showToolbar &&
+    Boolean(onModelChange) &&
+    modelOptions.length > 0 &&
+    (!showModePicker || Boolean(onModeChange));
 
   return (
     <div className="px-[max(1rem,calc(50%_-_27rem))] py-3 md:py-4">
@@ -499,8 +506,8 @@ export function ChatInput({
             <>
               {/* Mobile: single trigger that opens Mode + Model + Variant */}
               <MobileToolbarPopover
-                mode={mode}
-                onModeChange={onModeChange}
+                mode={showModePicker ? mode : undefined}
+                onModeChange={showModePicker ? onModeChange : undefined}
                 model={model}
                 modelOptions={modelOptions}
                 onModelChange={onModelChange}
@@ -518,15 +525,17 @@ export function ChatInput({
               />
               {/* Desktop: individual pickers */}
               <div className="hidden md:contents">
-                <ModeCombobox
-                  value={mode}
-                  onValueChange={onModeChange}
-                  options={NEXT_MODE_OPTIONS}
-                  customOptions={customModeOptions}
-                  variant="compact"
-                  disabled={disabled || isStreaming}
-                  className="min-w-0"
-                />
+                {showModePicker && onModeChange && (
+                  <ModeCombobox
+                    value={mode}
+                    onValueChange={onModeChange}
+                    options={NEXT_MODE_OPTIONS}
+                    customOptions={customModeOptions}
+                    variant="compact"
+                    disabled={disabled || isStreaming}
+                    className="min-w-0"
+                  />
+                )}
                 {modelPickerDisabled ? (
                   <Tooltip>
                     <TooltipTrigger asChild>

@@ -93,7 +93,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           {
             title: 'Ask Usage',
             icon: BarChart3,
-            url: '/aks',
+            url: '/ask',
           },
         ]
       : []),

@@ -3,6 +3,7 @@ import 'server-only';
 import type { PermissionConfig } from '@kilocode/db/schema-types';
 import { GatewayMcpAccessScope, nativeMcpResourceUrl } from '@kilocode/mcp-gateway';
 import { TRPCError } from '@trpc/server';
+import * as z from 'zod';
 import {
   createCloudAgentNextClient,
   rethrowAsPaymentRequired,
@@ -18,6 +19,13 @@ const KILO_USAGE_AI_CLIENT_ID = 'internal:kilo-usage-ai';
 const KILO_USAGE_AI_CREATED_ON_PLATFORM = 'kilo-usage-ai';
 const KILO_USAGE_AI_MODEL = 'kilo-auto/balanced';
 const KILO_USAGE_AI_TOOL_NAME = 'kilo_usage_query_kilo_dataset';
+
+const startInputSchema = z
+  .object({
+    model: z.string().trim().min(1).max(200).optional(),
+    variant: z.string().trim().min(1).max(50).optional(),
+  })
+  .optional();
 
 const usageAnalystPermission = {
   '*': 'deny',
@@ -64,7 +72,7 @@ Use aggregate mode for totals and grouped breakdowns. Use timeseries mode with a
 const blankUsageAnalysisPrompt = 'Blank Ask Usage session. Wait for the user to ask a question.';
 
 export const adminKiloUsageAiRouter = createTRPCRouter({
-  start: adminProcedure.mutation(async ({ ctx }) => {
+  start: adminProcedure.input(startInputSchema).mutation(async ({ ctx, input }) => {
     const eligibleUser = await findEligibleNativeMcpUser(ctx.user.id);
     if (!eligibleUser) {
       throw new TRPCError({
@@ -94,12 +102,14 @@ export const adminKiloUsageAiRouter = createTRPCRouter({
 
     const authToken = generateCloudAgentToken(ctx.user);
     const client = createCloudAgentNextClient(authToken);
+    const model = input?.model ?? KILO_USAGE_AI_MODEL;
 
     try {
       const session = await client.prepareSession({
         repositorySource: 'empty-local',
         mode: 'usage-analyst',
-        model: KILO_USAGE_AI_MODEL,
+        model,
+        variant: input?.variant,
         prompt: blankUsageAnalysisPrompt,
         autoCommit: false,
         autoInitiate: false,
@@ -119,7 +129,6 @@ export const adminKiloUsageAiRouter = createTRPCRouter({
             name: 'Usage Analyst',
             config: {
               mode: 'primary',
-              model: KILO_USAGE_AI_MODEL,
               steps: 8,
               color: 'info',
               prompt: usageAnalystPrompt,

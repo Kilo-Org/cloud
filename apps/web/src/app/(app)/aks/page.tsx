@@ -1,19 +1,20 @@
-import { Suspense } from 'react';
-import { notFound } from 'next/navigation';
-import { getUserFromAuth } from '@/lib/user/server';
-import { KiloUsageAiContent } from './KiloUsageAiContent';
+import { redirect } from 'next/navigation';
 
-export default async function AskUsagePage() {
-  const { user } = await getUserFromAuth({ adminOnly: true });
-  if (!user) notFound();
+type LegacyAskUsagePageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-  return (
-    <Suspense
-      fallback={
-        <div className="flex h-[calc(100dvh-3.5rem)] items-center justify-center">Loading...</div>
-      }
-    >
-      <KiloUsageAiContent />
-    </Suspense>
-  );
+export default async function LegacyAskUsagePage({ searchParams }: LegacyAskUsagePageProps) {
+  const params = await searchParams;
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) {
+      value.forEach(item => query.append(key, item));
+    } else if (value !== undefined) {
+      query.set(key, value);
+    }
+  }
+
+  const suffix = query.toString();
+  redirect(suffix ? `/ask?${suffix}` : '/ask');
 }

@@ -9,6 +9,8 @@ const mockPrepareSession =
       prompt: string;
       repositorySource?: 'empty-local';
       gitUrl?: string;
+      model?: string;
+      variant?: string;
       autoInitiate?: boolean;
       mcpServers?: Record<string, unknown>;
     }) => Promise<{ cloudAgentSessionId: string; kiloSessionId: string }>
@@ -57,7 +59,7 @@ jest.mock('@/lib/tokens', () => ({
 }));
 
 let createCaller: (ctx: { user: User }) => {
-  start: () => Promise<{ kiloSessionId: string }>;
+  start: (input?: { model?: string; variant?: string }) => Promise<{ kiloSessionId: string }>;
 };
 
 beforeAll(async () => {
@@ -82,7 +84,9 @@ describe('adminKiloUsageAiRouter.start', () => {
   it('creates a blank MCP-connected Usage Analyst session without auto-submitting analysis', async () => {
     const caller = createCaller({ user: { id: 'user-1', is_admin: true } as User });
 
-    await expect(caller.start()).resolves.toEqual({
+    await expect(
+      caller.start({ model: 'anthropic/claude-sonnet-4.5', variant: 'low' })
+    ).resolves.toEqual({
       kiloSessionId: 'ses_12345678901234567890123456',
     });
 
@@ -90,7 +94,8 @@ describe('adminKiloUsageAiRouter.start', () => {
       expect.objectContaining({
         repositorySource: 'empty-local',
         mode: 'usage-analyst',
-        model: 'kilo-auto/balanced',
+        model: 'anthropic/claude-sonnet-4.5',
+        variant: 'low',
         prompt: 'Blank Ask Usage session. Wait for the user to ask a question.',
         autoCommit: false,
         autoInitiate: false,
@@ -113,5 +118,14 @@ describe('adminKiloUsageAiRouter.start', () => {
     );
     expect(mockPrepareSession.mock.calls[0]?.[0]).not.toHaveProperty('gitUrl');
     expect(mockPrepareSession.mock.calls[0]?.[0].prompt).not.toContain('30-day overview');
+    expect(mockPrepareSession.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        runtimeAgents: [
+          expect.objectContaining({
+            config: expect.not.objectContaining({ model: expect.any(String) }),
+          }),
+        ],
+      })
+    );
   });
 });

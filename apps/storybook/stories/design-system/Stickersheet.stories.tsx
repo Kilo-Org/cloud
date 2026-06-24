@@ -1,10 +1,29 @@
 import type { Meta, StoryObj } from '@storybook/nextjs';
 import type { ReactNode } from 'react';
-import { ArrowRight, CheckCircle2, Clock3, LoaderCircle, Search } from 'lucide-react';
+import {
+  ArrowRight,
+  Bot,
+  CheckCircle2,
+  Clock3,
+  CreditCard,
+  Home,
+  LoaderCircle,
+  Search,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from '@/components/ui/sidebar';
 import {
   Table,
   TableBody,
@@ -97,6 +116,44 @@ function TypographySample({
       <code className="type-code text-muted-foreground">{label}</code>
       <span className={className}>{sample}</span>
     </div>
+  );
+}
+
+const sidebarItems = [
+  { icon: Home, label: 'Your Profile', active: true },
+  { icon: Bot, label: 'Cloud Agent', active: false, badge: 'NEW' },
+  { icon: CreditCard, label: 'Subscriptions', active: false },
+];
+
+function SidebarSample() {
+  return (
+    <SidebarProvider defaultOpen className="min-h-0! w-full!">
+      <div className="max-w-sm rounded-xl border border-sidebar-border bg-sidebar p-2 text-sidebar-foreground">
+        <SidebarGroup className="p-0">
+          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {sidebarItems.map(item => (
+                <SidebarMenuItem key={item.label}>
+                  <SidebarMenuButton
+                    isActive={item.active}
+                    className="flex items-center gap-3 transition-colors"
+                  >
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                  {item.badge && (
+                    <SidebarMenuBadge className="bg-brand-primary text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-[active=true]/menu-button:text-primary-foreground right-4 !top-1/2 h-4 min-w-0 !-translate-y-1/2 rounded-full px-1.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-brand-primary/30">
+                      {item.badge}
+                    </SidebarMenuBadge>
+                  )}
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </div>
+    </SidebarProvider>
   );
 }
 
@@ -291,26 +348,9 @@ function StickersheetPage() {
       <Section
         eyebrow="08"
         title="Sidebar"
-        description="Sidebar samples preserve dark navigation surfaces, selected row contrast, and compact action spacing."
+        description="Sidebar sample renders the same menu primitives as app navigation, including the primary-accent selected item state."
       >
-        <div className="max-w-sm rounded-xl border border-sidebar-border bg-sidebar p-2 text-sidebar-foreground">
-          <div className="px-2 py-2">
-            <p className="type-label text-sidebar-foreground/70">Workspace</p>
-          </div>
-          <div className="grid gap-1">
-            <div className="flex h-8 items-center justify-between rounded-md bg-surface-selected px-2 text-sidebar-accent-foreground">
-              <span className="type-body">Dashboard</span>
-              <Badge variant="secondary">4</Badge>
-            </div>
-            <div className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-8 items-center justify-between rounded-md px-2 transition-colors">
-              <span className="type-body">Cloud sessions</span>
-              <Badge variant="secondary-outline">12</Badge>
-            </div>
-            <div className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-8 items-center rounded-md px-2 transition-colors">
-              <span className="type-body">Billing</span>
-            </div>
-          </div>
-        </div>
+        <SidebarSample />
       </Section>
     </StoryCanvas>
   );

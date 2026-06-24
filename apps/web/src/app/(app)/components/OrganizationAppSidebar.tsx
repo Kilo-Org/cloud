@@ -386,7 +386,7 @@ export default function OrganizationAppSidebar({
   return (
     <Sidebar {...props}>
       <SidebarHeader className="p-4">
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-8">
           <div className="flex items-center gap-3">
             <HeaderLogo href="/profile" />
           </div>

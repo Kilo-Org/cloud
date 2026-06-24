@@ -152,19 +152,27 @@ describe('design primitive defaults', () => {
     expectClasses(tableCellClassName, ['px-3', 'py-3']);
   });
 
-  it('keeps active sidebar rows distinct from hover rows', () => {
+  it('uses primary-tinted active sidebar rows without yellow text', () => {
     const menuButtonClassName = sidebarMenuButtonVariants();
 
     expectClasses(menuButtonClassName, [
       'hover:bg-sidebar-accent',
-      'data-[active=true]:bg-surface-selected',
+      'data-[active=true]:bg-primary/10',
+      'data-[active=true]:text-sidebar-accent-foreground',
     ]);
+    expect(menuButtonClassName).not.toContain('data-[active=true]:bg-surface-selected');
     expect(menuButtonClassName).not.toContain('data-[active=true]:bg-sidebar-accent');
+    expect(menuButtonClassName).not.toContain('data-[active=true]:shadow');
+    expect(menuButtonClassName).not.toContain('data-[active=true]:text-primary');
 
     expectClasses(sidebarMenuSubButtonClassName, [
       'hover:bg-sidebar-accent',
-      'data-[active=true]:bg-surface-selected',
+      'data-[active=true]:bg-primary/10',
+      'data-[active=true]:text-sidebar-accent-foreground',
     ]);
+    expect(sidebarMenuSubButtonClassName).not.toContain('data-[active=true]:bg-surface-selected');
     expect(sidebarMenuSubButtonClassName).not.toContain('data-[active=true]:bg-sidebar-accent');
+    expect(sidebarMenuSubButtonClassName).not.toContain('data-[active=true]:shadow');
+    expect(sidebarMenuSubButtonClassName).not.toContain('data-[active=true]:text-primary');
   });
 });

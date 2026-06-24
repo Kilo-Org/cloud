@@ -309,7 +309,7 @@
 | [#1040](https://github.com/Kilo-Org/cloud/issues/1040) | Integrating with the Wasteland — Dolt sync + DoltHub onboarding | enhancement, kilo-triaged, kilo-auto-fix, gt:core, P3 | 2026-03-11 | 2026-03-31 |
 | [#1024](https://github.com/Kilo-Org/cloud/issues/1024) | need to periodically refresh kilo api key | enhancement, kilo-triaged, kilo-auto-fix | 2026-03-11 | 2026-03-11 |
 | [#1014](https://github.com/Kilo-Org/cloud/issues/1014) | Return openclaw running version in a more performant manner | enhancement, kilo-triaged, kilo-auto-fix | 2026-03-11 | 2026-03-11 |
-| [#1005](https://github.com/Kilo-Org/cloud/issues/1005) | Bead archival Ã¢ clean up old beads without deleting | enhancement, kilo-triaged, kilo-auto-fix, gt:core, gt:ui, P2 | 2026-03-10 | 2026-03-23 |
+| [#1005](https://github.com/Kilo-Org/cloud/issues/1005) | Bead archival — clean up old beads without deleting | enhancement, kilo-triaged, kilo-auto-fix, gt:core, gt:ui, P2 | 2026-03-10 | 2026-03-23 |
 | [#1004](https://github.com/Kilo-Org/cloud/issues/1004) | Automatic merge conflict resolution on open PRs | enhancement, kilo-triaged, kilo-auto-fix, gt:refinery, P2 | 2026-03-10 | 2026-03-23 |
 | [#1003](https://github.com/Kilo-Org/cloud/issues/1003) | Track commits in bead history with SCM links | enhancement, kilo-triaged, kilo-auto-fix, gt:core, gt:ui, P2 | 2026-03-10 | 2026-03-23 |
 | [#1000](https://github.com/Kilo-Org/cloud/issues/1000) | Investigate Fly machine auto restart policy | bug, kilo-triaged, kilo-auto-fix | 2026-03-10 | 2026-03-10 |

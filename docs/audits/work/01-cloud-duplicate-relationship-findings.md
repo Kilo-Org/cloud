@@ -17,7 +17,7 @@
 
 - Highly confident duplicate open issues: 10
 - PRs related to open issues but lacking explicit closing link: 0
-- Substantive PRs without tracking issue: 35
+- Substantive PRs without tracking issue: 36
 - Duplicate or competing PRs: 2
 - Symptom clusters (medium confidence): 5
 - Issues already labeled `kilo-duplicate`: 6
@@ -86,7 +86,7 @@
 
 ## 2. PRs related to existing open issues but lacking explicit closing link
 
-_None detected among open issues and open PRs. Only one open PR (#4137) references an open issue (#4136), and it uses a closing keyword._
+_Only two open PRs reference open issues using a closing keyword: #4137 closes #4136, and #1432 closes #1297. No PRs reference open issues without an explicit closing link._
 
 ## 3. Substantive PRs that should have a tracking issue
 
@@ -225,22 +225,27 @@ The following substantive feature/fix PRs have no linked issue. The list exclude
 **Confidence:** medium  
 **PR:** [#3428](https://github.com/Kilo-Org/cloud/pull/3428) fix(gastown): tag structured logs with town IDs  
 **Evidence:** Substantive feature/fix PR (26 files changed, 1210 line changes) with no issue reference.  
-**Suggested action:** Create a tracking issue and link it in the PR description, or document why none is needed.  
+**Suggested action:** Create a tracking issue and link it in the PR description, or document why none is needed.
 
 **Confidence:** medium  
 **PR:** [#3424](https://github.com/Kilo-Org/cloud/pull/3424) feat(ui): add Gastown badge to SessionsList  
 **Evidence:** Substantive feature/fix PR (18 files changed, 933 line changes) with no issue reference.  
-**Suggested action:** Create a tracking issue and link it in the PR description, or document why none is needed.  
+**Suggested action:** Create a tracking issue and link it in the PR description, or document why none is needed.
+
+**Confidence:** medium  
+**PR:** [#3353](https://github.com/Kilo-Org/cloud/pull/3353) chore(gastown): stage release updates  
+**Evidence:** Substantive feature/fix PR (62 files changed, 4395 line changes) with no issue reference.  
+**Suggested action:** Create a tracking issue and link it in the PR description, or document why none is needed.
 
 **Confidence:** medium  
 **PR:** [#3327](https://github.com/Kilo-Org/cloud/pull/3327) feat(teams): add Microsoft Teams bot integration  
 **Evidence:** Substantive feature/fix PR (31 files changed, 25694 line changes) with no issue reference.  
-**Suggested action:** Create a tracking issue and link it in the PR description, or document why none is needed.  
+**Suggested action:** Create a tracking issue and link it in the PR description, or document why none is needed.
 
 **Confidence:** medium  
 **PR:** [#3311](https://github.com/Kilo-Org/cloud/pull/3311) feat(kilo-chat): auto-open chat conversations  
 **Evidence:** Substantive feature/fix PR (8 files changed, 773 line changes) with no issue reference.  
-**Suggested action:** Create a tracking issue and link it in the PR description, or document why none is needed.  
+**Suggested action:** Create a tracking issue and link it in the PR description, or document why none is needed.
 
 **Confidence:** medium  
 **PR:** [#3209](https://github.com/Kilo-Org/cloud/pull/3209) feat(github): MVP commit-as-user via GitHub App user-to-server tokens  

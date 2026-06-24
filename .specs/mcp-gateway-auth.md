@@ -110,7 +110,7 @@ when they appear in all capitals.
 | Surface | Owner | Required behavior |
 |---|---|---|
 | `GET /health` | Worker | Health response only. |
-| `POST /mcp` | App | First-party native MCP server for individual read-only stats; requires native `mcp:access` OAuth token and rejects Gateway/Kilo API tokens. |
+| `POST /mcp` | App | First-party native MCP server for individual read-only stats and query metadata; requires native `mcp:access` OAuth token and rejects Gateway/Kilo API tokens. |
 | `GET` or `POST /mcp-connect/user/{user_id}/{config_id}/{route_key}` | Worker | Protected runtime entrypoint. Unauthenticated callers receive an OAuth challenge; authorized callers are proxied. |
 | `GET` or `POST /mcp-connect/org/{org_id}/{config_id}/{route_key}` | Worker | Same as personal route, with org eligibility checks. |
 | Descendants under scoped connect routes | Worker | Allowed only when config path passthrough is enabled and authorized against the root route. |
@@ -130,6 +130,33 @@ when they appear in all capitals.
 | `GET /api/mcp-gateway/oauth/jwks.json` | App | Public JWKS for gateway JWT verification. |
 | `GET /api/mcp-gateway/oauth/userinfo` | App | Profile-gated user-info. |
 | `GET /api/mcp-gateway/available` | App | Authenticated list of configs usable in the current execution context. |
+
+## Native MCP Dataset Tools
+
+1. The root `/mcp` native server MUST expose read-only tools only.
+2. The native server MUST expose `query_kilo_dataset` for aggregate and
+   timeseries stats over approved per-user Kilo datasets.
+3. The native server MAY expose `get_kilo_usage_cost` as a read-only convenience
+   tool for total model usage cost over common calendar periods. It MUST derive
+   the underlying aggregate `query_kilo_dataset` query server-side and MUST NOT
+   expose conditionally forbidden custom range, grouping, bucket, or limit
+   properties on this common path.
+4. The native server MAY expose `describe_kilo_dataset` to return static query
+   metadata, field capabilities, mode rules, output aliases, and example payloads.
+5. `describe_kilo_dataset` MUST NOT query user data and MUST NOT reveal fields
+   excluded from the public dataset catalog.
+6. All native dataset tools MUST require the same native `mcp:access` OAuth token
+   and current Kilo org admin eligibility gate.
+7. Model-facing schemas for common paths SHOULD avoid optional properties whose
+   presence is conditionally forbidden by handler logic. Where provider strict
+   structured-tool compatibility requires an explicit no-value representation,
+   schemas MAY use required nullable properties, such as `timezone: null` for UTC.
+8. Custom timestamp ranges, grouped costs, cost trends, and raw cost metrics MUST
+   use `query_kilo_dataset` in this version.
+9. Dataset tool descriptions, schemas, recipes, and validation errors SHOULD make the
+   following rules clear to MCP clients: aggregate queries do not use buckets,
+   timeseries queries require buckets, `count` metrics do not use a field, and
+   cost metrics use `costMicrodollars` or `costUsd`.
 
 ## Scoped Route Contract
 

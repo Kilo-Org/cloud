@@ -10,6 +10,7 @@ const localUserEmail = 'fl@fl.fl';
 const frontierModel = 'kilo-auto/frontier';
 
 interface ChatRequestSummary {
+  readonly lastUserContent: string | undefined;
   readonly messageCount: number | undefined;
   readonly model: string | undefined;
   readonly toolNames: string[];
@@ -22,7 +23,14 @@ interface ConversationSample {
 }
 
 const chatRequestSchema = z.object({
-  messages: z.array(z.unknown()).optional(),
+  messages: z
+    .array(
+      z.object({
+        content: z.unknown().optional(),
+        role: z.string().optional(),
+      })
+    )
+    .optional(),
   model: z.string().optional(),
   tools: z
     .array(
@@ -36,6 +44,15 @@ const chatRequestSchema = z.object({
     )
     .optional(),
 });
+
+const getLastUserContent = (
+  messages: z.infer<typeof chatRequestSchema>['messages']
+): string | undefined =>
+  messages
+    ?.flatMap(message =>
+      message.role === 'user' && typeof message.content === 'string' ? [message.content] : []
+    )
+    .at(-1);
 
 test.skip(
   process.env['EXTENSION_LOCAL_BACKEND_E2E'] !== '1',
@@ -53,6 +70,7 @@ const recordChatRequests = (context: BrowserContext, requests: ChatRequestSummar
     const body = parsedBody.success ? parsedBody.data : undefined;
 
     requests.push({
+      lastUserContent: getLastUserContent(body?.messages),
       messageCount: body?.messages?.length,
       model: body?.model,
       toolNames: body?.tools?.map(tool => tool.function?.name ?? '').filter(Boolean) ?? [],
@@ -290,6 +308,68 @@ test('live local backend keeps frontier conversations stable across modes, reloa
   } finally {
     await context.close();
     await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('live local backend snapshots the selected target tab per send', async () => {
+  const firstFixture = await startFixtureServer({ title: 'Kilo live target alpha' });
+  const secondFixture = await startFixtureServer({ title: 'Kilo live target beta' });
+  const requests: ChatRequestSummary[] = [];
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  recordChatRequests(context, requests);
+
+  try {
+    const firstTarget = await context.newPage();
+    await firstTarget.goto(`${firstFixture.url}/alpha?token=SECRET_ALPHA#secret-alpha`);
+    const secondTarget = await context.newPage();
+    await secondTarget.goto(`${secondFixture.url}/beta?token=SECRET_BETA#secret-beta`);
+    await firstTarget.bringToFront();
+
+    const sidePanel = await context.newPage();
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live target alpha');
+    await selectFrontierModel(sidePanel);
+
+    const messageInput = sidePanel.getByLabel('Message agent');
+
+    await messageInput.fill('LOCAL_CONTEXT_ALPHA: answer with the selected tab title only.');
+    await messageInput.press('Enter');
+    await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
+    await sidePanel.getByLabel('Target tab').selectOption({ label: 'Kilo live target beta' });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live target beta');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+      timeout: 120_000,
+    });
+
+    await messageInput.fill('LOCAL_CONTEXT_BETA: answer with the selected tab title only.');
+    await messageInput.press('Enter');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+      timeout: 120_000,
+    });
+
+    const alphaRequest = requests.find(
+      request => request.lastUserContent?.includes('LOCAL_CONTEXT_ALPHA') === true
+    );
+    const betaRequest = requests.find(
+      request => request.lastUserContent?.includes('LOCAL_CONTEXT_BETA') === true
+    );
+
+    expect(alphaRequest?.model).toBe(frontierModel);
+    expect(alphaRequest?.lastUserContent).toContain('Kilo live target alpha');
+    expect(alphaRequest?.lastUserContent).not.toContain('Kilo live target beta');
+    expect(alphaRequest?.lastUserContent).not.toContain('SECRET_ALPHA');
+    expect(alphaRequest?.lastUserContent).not.toContain('secret-alpha');
+
+    expect(betaRequest?.model).toBe(frontierModel);
+    expect(betaRequest?.lastUserContent).toContain('Kilo live target beta');
+    expect(betaRequest?.lastUserContent).not.toContain('SECRET_BETA');
+    expect(betaRequest?.lastUserContent).not.toContain('secret-beta');
+  } finally {
+    await context.close();
+    await firstFixture.close();
+    await secondFixture.close();
     await rm(userDataDir, { force: true, recursive: true });
   }
 });

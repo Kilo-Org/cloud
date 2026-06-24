@@ -183,6 +183,7 @@ describe('discoverSessionWrappers', () => {
     await expect(observedResult).resolves.toEqual({
       status: 'inspection-failed',
       error: `Wrapper process discovery timed out after ${WRAPPER_DISCOVERY_TIMEOUT_MS}ms`,
+      reason: 'wrapper_discovery_list_processes_timeout',
     });
     expect(mockLogger.withTags).toHaveBeenCalledWith({ logTag: 'sandbox-operation-timeout' });
     expect(mockTimeoutWithFields).toHaveBeenCalledWith({
@@ -193,6 +194,18 @@ describe('discoverSessionWrappers', () => {
     expect(mockWarn).toHaveBeenCalledOnce();
     expect(mockWarn).toHaveBeenCalledWith('Sandbox operation timed out');
     expect(sandbox.exec).not.toHaveBeenCalled();
+  });
+
+  it('does not classify an ordinary process-list rejection as a timeout', async () => {
+    const sandbox = {
+      listProcesses: vi.fn().mockRejectedValue(new Error('provider unavailable')),
+      exec: vi.fn(),
+    };
+
+    await expect(discoverSessionWrappers(sandbox as never, 'agent_xyz')).resolves.toEqual({
+      status: 'inspection-failed',
+      error: 'provider unavailable',
+    });
   });
 
   it('returns every direct and devcontainer wrapper process tagged for the session', async () => {

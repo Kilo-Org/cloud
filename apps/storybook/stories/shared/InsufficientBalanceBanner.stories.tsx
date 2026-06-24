@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 
 const meta: Meta<typeof InsufficientBalanceBanner> = {
-  title: 'Shared/InsufficientBalanceBanner',
+  title: 'Components/Feedback/InsufficientBalanceBanner',
   component: InsufficientBalanceBanner,
   tags: ['autodocs'],
   parameters: {

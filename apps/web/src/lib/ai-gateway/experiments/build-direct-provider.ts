@@ -3,6 +3,7 @@ import {
   injectReasoningIntoContent,
   removeCacheBreakpoints,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+import type { CustomLlmCompression } from '@kilocode/db';
 import { api_request_compress_log, type CustomLlmApiConfig } from '@kilocode/db';
 import type {
   GatewayChatApiKind,
@@ -29,7 +30,10 @@ import { db } from '@/lib/drizzle';
  */
 export type ResolvedExperimentUpstream = CustomLlmApiConfig & { api_key: string };
 
-async function compressWithHeadroom(context: TransformRequestContext) {
+async function compressWithHeadroom(
+  context: TransformRequestContext,
+  compression: CustomLlmCompression
+) {
   const messages =
     context.request.kind === 'responses'
       ? context.request.body.input
@@ -39,7 +43,9 @@ async function compressWithHeadroom(context: TransformRequestContext) {
   }
   try {
     const result = await compress(messages, {
-      model: context.request.body.model,
+      baseUrl: compression.base_url,
+      apiKey: compression.api_key,
+      model: compression.model_alias,
       fallback: false,
     });
     const logId = await db
@@ -104,8 +110,8 @@ export function buildDirectProvider(
       if (upstream.inject_reasoning_into_content) {
         injectReasoningIntoContent(context.request);
       }
-      if (upstream.enable_headroom_compression) {
-        const messages = await compressWithHeadroom(context);
+      if (upstream.compression?.enabled) {
+        const messages = await compressWithHeadroom(context, upstream.compression);
         if (context.request.kind === 'responses') {
           context.request.body.input = messages as GatewayResponsesRequest['input'];
         } else if (context.request.kind === 'messages') {

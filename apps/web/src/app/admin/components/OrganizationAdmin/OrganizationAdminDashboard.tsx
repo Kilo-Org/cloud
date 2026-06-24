@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  ChildOrganizationsCard,
-  OrganizationInfoCard,
-} from '@/components/organizations/OrganizationInfoCard';
+import { OrganizationInfoCard } from '@/components/organizations/OrganizationInfoCard';
 import { OrganizationAdminMembers } from '@/components/organizations/OrganizationMembersCard';
 import { OrganizationUsageSummaryCard } from '@/components/organizations/OrganizationUsageSummaryCard';
 import { SeatUsageCard } from '@/components/organizations/SeatUsageCard';
@@ -12,6 +9,7 @@ import { OrganizationAdminDelete } from './OrganizationAdminDelete';
 import { OrganizationAdminCreditGrant } from './OrganizationAdminCreditGrant';
 import { OrganizationAdminCreditNullify } from './OrganizationAdminCreditNullify';
 import { OrganizationAdminCreatedBy } from './OrganizationAdminCreatedBy';
+import { OrganizationAdminHierarchyManagement } from './OrganizationAdminHierarchyManagement';
 import { OrganizationWorkOSCard } from './OrganizationWorkOSCard';
 import { OrganizationAdminWebhooks } from './OrganizationAdminWebhooks';
 import { OrganizationContextProvider } from '@/components/organizations/OrganizationContext';
@@ -58,7 +56,7 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
               <div className="space-y-4">
                 <OrganizationInfoCard organizationId={organizationId} showAdminControls />
-                <ChildOrganizationsCard organizationId={organizationId} />
+                <OrganizationAdminHierarchyManagement organizationId={organizationId} />
               </div>
               <div className="space-y-7">
                 <OrganizationUsageSummaryCard organizationId={organizationId} />

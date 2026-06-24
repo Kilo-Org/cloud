@@ -26,11 +26,13 @@ import {
   clearWrapperRuntimeIdentity,
   getWrapperLease,
   getWrapperRuntimeState,
+  isWrapperCleanupExhausted,
   isWrapperRunFinalizing,
   markWrapperFinalizing,
   nextWrapperCleanupDeadline,
   putWrapperLease,
   READY_ONLY_IDLE_MS,
+  recordSandboxInspectionFailure,
   recordWrapperAcceptedMessage,
   recordWrapperDispatchingMessage,
   recordWrapperReadyLease,
@@ -90,11 +92,14 @@ export type AgentRuntimeDependencies = {
 };
 
 function cleanupBlockedError(lease: WrapperLease): WrapperCleanupBlockedError {
+  if (isWrapperCleanupExhausted(lease)) {
+    return new WrapperCleanupBlockedError({ kind: 'exhausted' });
+  }
   const retryAt = nextWrapperCleanupDeadline(lease);
   if (retryAt === undefined) {
-    throw new Error('Wrapper cleanup state is missing its retry deadline');
+    throw new Error('Retryable wrapper cleanup is missing its deadline');
   }
-  return new WrapperCleanupBlockedError(retryAt);
+  return new WrapperCleanupBlockedError({ kind: 'retryable', retryAt });
 }
 
 function hasSamePhysicalAuthorization(expected: WrapperLease, latest: WrapperLease): boolean {
@@ -213,6 +218,11 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
         const reason =
           observation.status === 'inspection-failed' ? 'observation-failed' : 'unexpected-wrapper';
         const now = Date.now();
+        if (observation.status === 'inspection-failed') {
+          await recordSandboxInspectionFailure(storage, observation.reason, {
+            startsRecovery: true,
+          });
+        }
         const cleanupLease = reduceWrapperLease(current, {
           type: 'request_stop',
           target: { kind: 'session' },
@@ -242,6 +252,9 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       const reason =
         observation.status === 'inspection-failed' ? 'observation-failed' : 'unexpected-wrapper';
       const now = Date.now();
+      if (observation.status === 'inspection-failed') {
+        await recordSandboxInspectionFailure(storage, observation.reason, { startsRecovery: true });
+      }
       const cleanupLease = reduceWrapperLease(allocatable, {
         type: 'request_stop',
         target: { kind: 'session' },

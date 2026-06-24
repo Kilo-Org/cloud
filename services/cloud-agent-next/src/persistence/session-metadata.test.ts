@@ -68,7 +68,12 @@ describe('session metadata boundary', () => {
       profile,
       callback: { target: callbackTarget },
       workspace: {
-        sandboxId: 'usr-abcdef' as const,
+        sandboxId: 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df' as const,
+        sandboxRoute: {
+          kind: 'shared' as const,
+          routeKey: 'usr-000000000000000000000000000000000000000000000000' as const,
+          suffix: 'shared-slot-v1' as const,
+        },
         workspacePath: '/workspace',
         sessionHome: '/home/kilo',
         branchName: 'session/agent_123',
@@ -86,6 +91,32 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(serializeSessionMetadata(current)).toEqual(current);
     expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+  });
+
+  it('rejects shared route metadata without a compatible assigned sandbox', () => {
+    const base = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_invalid_route', userId: 'user_invalid_route' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+    const route = {
+      kind: 'shared' as const,
+      routeKey: 'usr-000000000000000000000000000000000000000000000000' as const,
+    };
+
+    expect(() =>
+      serializeSessionMetadata({ ...base, workspace: { sandboxRoute: route } })
+    ).toThrow();
+    expect(() =>
+      serializeSessionMetadata({
+        ...base,
+        workspace: {
+          sandboxId: 'usr-111111111111111111111111111111111111111111111111',
+          sandboxRoute: route,
+        },
+      })
+    ).toThrow();
   });
 
   it('parses and serializes current grouped DIND workspace metadata', () => {

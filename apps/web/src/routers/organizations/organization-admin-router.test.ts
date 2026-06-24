@@ -7,11 +7,15 @@ import {
   organization_memberships,
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import type { User, Organization } from '@kilocode/db/schema';
+
+jest.mock('@/lib/organizations/organization-billing', () => ({
+  getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_admin_org'),
+}));
 
 let adminUser: User;
 let adminWithoutCreditAccess: User;
@@ -748,11 +752,19 @@ describe('organization admin router', () => {
   describe('getHierarchy', () => {
     it('returns parent and child organization summaries', async () => {
       const searchPrefix = `Admin Org Hierarchy ${crypto.randomUUID()}`;
+      const grandparentOrganization = await createOrganization(
+        `${searchPrefix} grandparent`,
+        adminUser.id
+      );
       const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
       const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
       const siblingOrganization = await createOrganization(`${searchPrefix} sibling`, adminUser.id);
 
       try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: grandparentOrganization.id })
+          .where(eq(organizations.id, parentOrganization.id));
         await db
           .update(organizations)
           .set({ parent_organization_id: parentOrganization.id })
@@ -770,8 +782,18 @@ describe('organization admin router', () => {
           id: parentOrganization.id,
           name: parentOrganization.name,
         });
+        expect(childHierarchy.ancestors).toEqual([
+          { id: parentOrganization.id, name: parentOrganization.name },
+          { id: grandparentOrganization.id, name: grandparentOrganization.name },
+        ]);
         expect(childHierarchy.children).toEqual([]);
-        expect(parentHierarchy.parent).toBeNull();
+        expect(parentHierarchy.parent).toEqual({
+          id: grandparentOrganization.id,
+          name: grandparentOrganization.name,
+        });
+        expect(parentHierarchy.ancestors).toEqual([
+          { id: grandparentOrganization.id, name: grandparentOrganization.name },
+        ]);
         expect(parentHierarchy.children).toEqual([
           { id: childOrganization.id, name: childOrganization.name },
           { id: siblingOrganization.id, name: siblingOrganization.name },
@@ -780,9 +802,6 @@ describe('organization admin router', () => {
         await db
           .update(organizations)
           .set({ parent_organization_id: null })
-          .where(inArray(organizations.id, [childOrganization.id, siblingOrganization.id]));
-        await db
-          .delete(organizations)
           .where(
             inArray(organizations.id, [
               childOrganization.id,
@@ -790,6 +809,324 @@ describe('organization admin router', () => {
               parentOrganization.id,
             ])
           );
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              childOrganization.id,
+              siblingOrganization.id,
+              parentOrganization.id,
+              grandparentOrganization.id,
+            ])
+          );
+      }
+    });
+  });
+
+  describe('hierarchy management', () => {
+    it('creates an empty child organization under a parent organization', async () => {
+      const searchPrefix = `Admin Create Child Org ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const caller = await createCallerForUser(adminUser.id);
+      let childOrganizationId: string | null = null;
+
+      try {
+        const result = await caller.organizations.admin.create({
+          name: `${searchPrefix} child`,
+          parentOrganizationId: parentOrganization.id,
+        });
+        childOrganizationId = result.organization.id;
+
+        const [childOrganization] = await db
+          .select({
+            parent_organization_id: organizations.parent_organization_id,
+            member_count: sql<number>`(
+              SELECT COUNT(*)::int
+              FROM ${organization_memberships}
+              WHERE ${organization_memberships.organization_id} = ${organizations.id}
+            )`,
+          })
+          .from(organizations)
+          .where(eq(organizations.id, childOrganizationId));
+
+        expect(result.organization.parent_organization_id).toBe(parentOrganization.id);
+        expect(childOrganization.parent_organization_id).toBe(parentOrganization.id);
+        expect(childOrganization.member_count).toBe(0);
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.parent_organization_id, parentOrganization.id));
+        if (childOrganizationId) {
+          await db.delete(organizations).where(eq(organizations.id, childOrganizationId));
+        }
+        await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+      }
+    });
+
+    it('sets an existing organization as a child organization', async () => {
+      const searchPrefix = `Admin Set Child Org ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        await caller.organizations.admin.setParent({
+          organizationId: childOrganization.id,
+          parentOrganizationId: parentOrganization.id,
+        });
+
+        const hierarchy = await caller.organizations.admin.getHierarchy({
+          organizationId: parentOrganization.id,
+        });
+
+        expect(hierarchy.children).toContainEqual({
+          id: childOrganization.id,
+          name: childOrganization.name,
+        });
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, childOrganization.id));
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [childOrganization.id, parentOrganization.id]));
+      }
+    });
+
+    it('only returns addable organizations from child autocomplete search', async () => {
+      const searchPrefix = `Admin Addable Child Search ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const directChildOrganization = await createOrganization(
+        `${searchPrefix} direct child`,
+        adminUser.id
+      );
+      const parentCandidate = await createOrganization(`${searchPrefix} has child`, adminUser.id);
+      const childOfCandidate = await createOrganization(
+        `${searchPrefix} child of candidate`,
+        adminUser.id
+      );
+      const addableOrganization = await createOrganization(`${searchPrefix} addable`, adminUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parentOrganization.id })
+          .where(eq(organizations.id, directChildOrganization.id));
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parentCandidate.id })
+          .where(eq(organizations.id, childOfCandidate.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        const results = await caller.organizations.admin.search({
+          search: searchPrefix,
+          limit: 20,
+          childOfOrganizationId: parentOrganization.id,
+        });
+
+        expect(results.map(organization => organization.id)).toEqual([addableOrganization.id]);
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(inArray(organizations.id, [directChildOrganization.id, childOfCandidate.id]));
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              addableOrganization.id,
+              childOfCandidate.id,
+              parentCandidate.id,
+              directChildOrganization.id,
+              parentOrganization.id,
+            ])
+          );
+      }
+    });
+
+    it('returns no addable autocomplete results when the target parent is a child', async () => {
+      const searchPrefix = `Admin Child Target Search ${crypto.randomUUID()}`;
+      const rootOrganization = await createOrganization(`${searchPrefix} root`, adminUser.id);
+      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+      const candidateOrganization = await createOrganization(
+        `${searchPrefix} candidate`,
+        adminUser.id
+      );
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: rootOrganization.id })
+          .where(eq(organizations.id, childOrganization.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        const results = await caller.organizations.admin.search({
+          search: searchPrefix,
+          limit: 20,
+          childOfOrganizationId: childOrganization.id,
+        });
+
+        expect(results).toEqual([]);
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, childOrganization.id));
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              candidateOrganization.id,
+              childOrganization.id,
+              rootOrganization.id,
+            ])
+          );
+      }
+    });
+
+    it('rejects hierarchy cycles', async () => {
+      const searchPrefix = `Admin Hierarchy Cycle ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parentOrganization.id })
+          .where(eq(organizations.id, childOrganization.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: parentOrganization.id,
+            parentOrganizationId: childOrganization.id,
+          })
+        ).rejects.toThrow(
+          'Cannot add a parent to an organization that already has child organizations'
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(inArray(organizations.id, [childOrganization.id, parentOrganization.id]));
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [childOrganization.id, parentOrganization.id]));
+      }
+    });
+
+    it('rejects adding child organizations to a child organization', async () => {
+      const searchPrefix = `Admin Child Parent ${crypto.randomUUID()}`;
+      const rootOrganization = await createOrganization(`${searchPrefix} root`, adminUser.id);
+      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+      const newChildOrganization = await createOrganization(
+        `${searchPrefix} new child`,
+        adminUser.id
+      );
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: rootOrganization.id })
+          .where(eq(organizations.id, childOrganization.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: newChildOrganization.id,
+            parentOrganizationId: childOrganization.id,
+          })
+        ).rejects.toThrow(
+          'Cannot add child organizations to an organization that is already a child'
+        );
+
+        await expect(
+          caller.organizations.admin.create({
+            name: `${searchPrefix} created child`,
+            parentOrganizationId: childOrganization.id,
+          })
+        ).rejects.toThrow(
+          'Cannot add child organizations to an organization that is already a child'
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(inArray(organizations.id, [childOrganization.id, newChildOrganization.id]));
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              newChildOrganization.id,
+              childOrganization.id,
+              rootOrganization.id,
+            ])
+          );
+      }
+    });
+
+    it('rejects adding a parent to an organization with child organizations', async () => {
+      const searchPrefix = `Admin Parent Child ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const existingParentOrganization = await createOrganization(
+        `${searchPrefix} existing parent`,
+        adminUser.id
+      );
+      const existingChildOrganization = await createOrganization(
+        `${searchPrefix} existing child`,
+        adminUser.id
+      );
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: existingParentOrganization.id })
+          .where(eq(organizations.id, existingChildOrganization.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: existingParentOrganization.id,
+            parentOrganizationId: parentOrganization.id,
+          })
+        ).rejects.toThrow(
+          'Cannot add a parent to an organization that already has child organizations'
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, existingChildOrganization.id));
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              existingChildOrganization.id,
+              existingParentOrganization.id,
+              parentOrganization.id,
+            ])
+          );
+      }
+    });
+
+    it('rejects self-parenting', async () => {
+      const organization = await createOrganization(
+        `Admin Hierarchy Self Parent ${crypto.randomUUID()}`,
+        adminUser.id
+      );
+
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: organization.id,
+            parentOrganizationId: organization.id,
+          })
+        ).rejects.toThrow('An organization cannot be its own parent');
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
       }
     });
   });

@@ -137,6 +137,69 @@ export function useAdminOrganizationHierarchy(organizationId: string, enabled: b
   );
 }
 
+export function useSearchAdminOrganizations(
+  search: string,
+  limit = 10,
+  childOfOrganizationId?: string
+) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.admin.search.queryOptions(
+      {
+        search,
+        limit,
+        childOfOrganizationId,
+      },
+      { enabled: search.trim().length > 0 }
+    )
+  );
+}
+
+export function useSetParentOrganization(organizationId: string) {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateAllOrganizationData();
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.organizations.admin.setParent.mutationOptions({
+      onSuccess: (_data, variables) => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.admin.getHierarchy.queryKey({ organizationId }),
+        });
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.admin.getHierarchy.queryKey({
+            organizationId: variables.organizationId,
+          }),
+        });
+        void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
+        void invalidate();
+      },
+    })
+  );
+}
+
+export function useCreateAdminOrganization(parentOrganizationId?: string) {
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateAllOrganizationData();
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.organizations.admin.create.mutationOptions({
+      onSuccess: () => {
+        if (parentOrganizationId) {
+          void queryClient.invalidateQueries({
+            queryKey: trpc.organizations.admin.getHierarchy.queryKey({
+              organizationId: parentOrganizationId,
+            }),
+          });
+        }
+        void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
+        void invalidate();
+      },
+    })
+  );
+}
+
 export function useAdminOrganizationCreditTransactions(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(

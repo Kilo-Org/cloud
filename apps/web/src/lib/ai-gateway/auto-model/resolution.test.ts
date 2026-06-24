@@ -125,6 +125,23 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
   });
 
+  it('falls back to BALANCED_QWEN_MODEL when the worker returns a virtual auto model', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => ({
+          ...sampleDecision,
+          model: KILO_AUTO_EFFICIENT_MODEL.id,
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: BALANCED_QWEN_MODEL });
+  });
+
   it('does not call the thunk more than once', async () => {
     const thunk = jest.fn(async () => sampleDecision);
 

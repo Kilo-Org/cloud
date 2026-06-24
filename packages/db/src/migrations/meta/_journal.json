@@ -1205,6 +1205,13 @@
       "when": 1782208433098,
       "tag": "0171_open_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 172,
+      "version": "7",
+      "when": 1782227993584,
+      "tag": "0172_boring_ghost_rider",
+      "breakpoints": true
     }
   ]
 }

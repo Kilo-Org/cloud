@@ -746,6 +746,11 @@ const OrganizationSettingsSchema = z.object({
   projects_ui_enabled: z.boolean().optional(),
   minimum_balance: z.number().optional(),
   minimum_balance_alert_email: z.array(z.email()).optional(),
+  // Whether the weekly enterprise recommendations digest email is enabled. When on,
+  // the digest is emailed to the organization's owners. Enterprise-only feature.
+  // Named "recommendations" (not "adoption") to avoid confusion with AI adoption
+  // usage data and the Feature adoption tab.
+  recommendations_digest_enabled: z.boolean().optional(),
   suppress_trial_messaging: z.boolean().optional(),
   // OSS Sponsorship fields
   // null/undefined = not an OSS org, values: 1, 2, or 3
@@ -1486,6 +1491,15 @@ export const CustomLlmMetadataSchema = z.object({
 
 export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
+export const CustomLlmCompressionSchema = z.object({
+  enabled: z.literal(true),
+  base_url: z.url().optional(),
+  api_key: z.string().optional(),
+  model_alias: z.string(),
+});
+
+export type CustomLlmCompression = z.infer<typeof CustomLlmCompressionSchema>;
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1),
   base_url: z.url(),
@@ -1495,7 +1509,7 @@ export const CustomLlmApiConfigSchema = z.object({
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
   extra_body: CustomLlmExtraBodySchema.optional(),
   remove_from_body: z.array(z.string()).optional(),
-  enable_headroom_compression: z.boolean().optional(),
+  compression: CustomLlmCompressionSchema.optional(),
 });
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;

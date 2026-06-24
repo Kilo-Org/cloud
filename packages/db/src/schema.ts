@@ -3450,6 +3450,33 @@ export const agent_configs = pgTable(
   ]
 );
 
+// Per-organization dismissals of adoption recommendations. The recommendation
+// rules themselves live in code; this table only records which suggestions an
+// organization has explicitly dismissed so we stop showing them.
+export const organization_recommendation_dismissals = pgTable(
+  'organization_recommendation_dismissals',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    // Stable recommendation rule key (defined in code), e.g. 'org-sso-not-configured'.
+    recommendation_key: text().notNull(),
+    // Who dismissed it. Nullable + set null on user delete so the dismissal persists.
+    dismissed_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_org_recommendation_dismissals_org_key').on(
+      table.owned_by_organization_id,
+      table.recommendation_key
+    ),
+  ]
+);
+
+export type OrganizationRecommendationDismissal =
+  typeof organization_recommendation_dismissals.$inferSelect;
+
 export const webhook_events = pgTable(
   'webhook_events',
   {

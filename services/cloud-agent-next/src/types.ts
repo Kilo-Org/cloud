@@ -1,6 +1,7 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { CallbackJob } from './callbacks/index.js';
 import type { NotificationsBinding } from './notifications-binding.js';
@@ -195,6 +196,8 @@ export type Env = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
+  /** One-way shared sandbox failover overrides keyed by shared identity */
+  SHARED_SANDBOX_OVERRIDES: KVNamespace;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Shared secret for internal service-to-service authentication */
@@ -258,6 +261,11 @@ export type Env = {
   HYPERDRIVE: Hyperdrive;
 };
 
+export type ValidatedSessionAccess = AccessibleCloudAgentSession & {
+  kiloUserId: string;
+  cloudAgentSessionId: string;
+};
+
 /** tRPC context passed to all procedures */
 export type TRPCContext = {
   env: Env;
@@ -265,6 +273,7 @@ export type TRPCContext = {
   request: Request;
   authToken: string;
   botId?: string;
+  validatedSessionAccess?: ValidatedSessionAccess;
 };
 
 export type SystemSandboxUsageEvent = {

@@ -104,6 +104,8 @@ Findings whose analysis recommends `monitor` MUST NOT be remediated automaticall
 
 Findings whose exploitability is unknown MUST NOT be remediated automatically. Manual Remediation MAY proceed after the user reviews the finding when the analysis recommends opening a PR or manual review and the analysis or source metadata provides a concrete remediation path.
 
+Findings whose analysis says the vulnerable feature is not reachable MUST NOT be remediated automatically. Manual Remediation MAY proceed when the finding remains open and the analysis or source metadata provides a concrete dependency patch path or suggested fix.
+
 Triage-only analysis MUST NOT be enough to start remediation.
 
 ### Scenario: Eligible Finding
@@ -199,7 +201,7 @@ Manual Remediation MUST bypass automatic policy gates and MAY use the reviewed-f
 - Auto Remediation does not need to be enabled;
 - the finding does not need to meet the automatic severity threshold;
 - the analysis does not need to have completed after Auto Remediation was enabled.
-- the analysis MAY have unknown exploitability or recommend manual review when the user chooses to proceed and a concrete remediation path exists.
+- the analysis MAY have unknown exploitability, find the vulnerable feature unreachable, or recommend manual review when the user chooses to proceed and a concrete remediation path exists.
 
 Manual Remediation MUST still honor ownership, scope, freshness, concrete-fix, active-attempt, and duplicate-PR safety gates.
 
@@ -235,6 +237,13 @@ Given a finding has unknown exploitability or a manual-review recommendation
 And the finding has no concrete dependency patch path or suggested fix
 When the user views the finding
 Then Security Agent SHOULD explain that remediation needs a concrete fix path.
+
+Given a finding is open
+And Sandbox Analysis says the vulnerable feature is not reachable
+And the finding has a concrete dependency patch path or suggested fix
+When the user reviews the finding and clicks "Start remediation"
+Then Security Agent MAY start a manual Security Remediation.
+And Security Agent MUST NOT start Automatic Remediation for that finding.
 
 ## Remediation Execution
 
@@ -438,7 +447,7 @@ The report evidence basis MUST be Security Finding Activity Events. A Security F
 
 Security Agent MAY include supplemental legacy audit records when they can be mapped to a Security Finding without ambiguity. Legacy supplemental activity MUST be labeled as potentially incomplete. Ambiguous legacy records MUST NOT be guessed into a Security Finding group.
 
-Every report MUST display the reliable event-coverage start. Baseline events for existing Security Findings, if produced, MUST use actual capture time and MUST NOT be backdated or presented as original creation events.
+The customer UI does not need to display report provenance or reliable event-coverage metadata. Baseline events for existing Security Findings, if produced, MUST use actual capture time and MUST NOT be backdated or presented as original creation events.
 
 ### Reportable activity
 
@@ -481,7 +490,7 @@ Every platform-admin report generation MUST be audited after successful report a
 
 Successful reports MUST include every matching reportable Security Finding Activity Event recorded through the displayed cutoff. Timeout, over-budget, or query failure MUST return no report content and MUST NOT return a partial report.
 
-Each Security Finding group SHOULD show stable Security Finding and source identity, repository, title, severity, status, safe advisory metadata, first detected time, canonical Security Finding ID when recorded, and deletion status when applicable.
+Each Security Finding group SHOULD show stable Security Finding and source identity, repository, title, severity, status, safe advisory metadata, first detected time, canonical Security Finding ID when recorded, and deletion status when applicable. When legacy activity has a Security Finding ID but no recorded snapshot, Security Agent SHOULD fill missing descriptive metadata from the current owner-scoped Security Finding row. Recorded snapshots MUST take precedence, and deleted findings MUST remain renderable without a current row.
 
 Human actions MUST show an event-time display name and stable typed actor reference. Automated actions MUST show explicit system attribution. Actor email and notification recipient identity MUST NOT be report evidence.
 
@@ -540,13 +549,6 @@ Then Security Agent MUST allow the report.
 Given an ordinary organization member or non-member requests the report
 When Security Agent checks authorization
 Then Security Agent MUST reject access before loading counts or report data.
-
-### Scenario: Legacy coverage wording
-
-Given a report period overlaps activity before reliable event coverage began
-When Security Agent renders the report
-Then the report MUST state that it contains activity recorded by Kilo.
-And it MUST label supplemental legacy activity as potentially incomplete.
 
 ### Scenario: Repository report filter
 

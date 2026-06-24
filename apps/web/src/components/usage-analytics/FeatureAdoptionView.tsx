@@ -20,8 +20,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { FeatureAdoptionKey } from '@/lib/organizations/feature-adoption';
+import { StatusDonutChart } from './StatusDonutChart';
 
-const featureIcons: Record<FeatureAdoptionKey, typeof Bot> = {
+export const featureIcons: Record<FeatureAdoptionKey, typeof Bot> = {
   'source-control-integration': Cable,
   'code-reviewer': Bot,
   'security-agent': Shield,
@@ -40,9 +41,17 @@ export function FeatureAdoptionView({
   onViewDetails?: () => void;
 }) {
   const trpc = useTRPC();
-  const { data, isLoading, isError, refetch } = useQuery(
-    trpc.organizations.usageDetails.getFeatureAdoption.queryOptions({ organizationId })
-  );
+  const featureAdoptionQuery = useQuery({
+    ...trpc.organizations.usageDetails.getFeatureAdoption.queryOptions({ organizationId }),
+    enabled: compact,
+  });
+  const recommendationsQuery = useQuery({
+    ...trpc.organizations.usageDetails.getRecommendations.queryOptions({ organizationId }),
+    enabled: !compact,
+  });
+  const { data, isLoading, isError, refetch } = compact
+    ? featureAdoptionQuery
+    : recommendationsQuery;
 
   if (isLoading) {
     return <FeatureAdoptionSkeleton compact={compact} />;
@@ -99,7 +108,20 @@ export function FeatureAdoptionView({
           aria-label={`${adoptionPercent}% of features adopted`}
         />
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-6">
+        {!compact && (
+          <StatusDonutChart
+            totalLabel={`${adoptedCount} adopted and ${checks.length - adoptedCount} not adopted yet`}
+            data={[
+              { label: 'Adopted', value: adoptedCount, color: 'var(--status-success-icon)' },
+              {
+                label: 'Not adopted yet',
+                value: checks.length - adoptedCount,
+                color: 'var(--status-neutral-icon)',
+              },
+            ]}
+          />
+        )}
         <div className="divide-border divide-y rounded-lg border">
           {visibleChecks.map(check => {
             const FeatureIcon = featureIcons[check.key];

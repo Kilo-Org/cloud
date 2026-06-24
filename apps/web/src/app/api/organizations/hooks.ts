@@ -285,6 +285,21 @@ export function useUpdateMinimumBalanceAlert() {
   );
 }
 
+export function useUpdateRecommendationsDigest() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.organizations.settings.updateRecommendationsDigest.mutationOptions({
+      onSuccess: () => {
+        // Invalidate organization data to refresh settings (shared with the
+        // spending-alerts surface, so both stay in sync).
+        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
 export function useEnableOssSponsorship() {
   const trpc = useTRPC();
   const invalidate = useInvalidateAllOrganizationData();

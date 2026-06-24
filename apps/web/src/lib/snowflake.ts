@@ -141,6 +141,9 @@ type SnowflakeApiResponse = {
   message?: string;
   statementHandle?: string;
   statementStatusUrl?: string;
+  resultSetMetaData?: {
+    partitionInfo?: unknown[];
+  };
   data?: unknown[];
 };
 
@@ -174,6 +177,50 @@ function authHeaders(token: string): Record<string, string> {
     'user-agent': SNOWFLAKE_USER_AGENT,
     'x-snowflake-authorization-token-type': 'KEYPAIR_JWT',
   };
+}
+
+async function parseAllRows(
+  config: SnowflakeConfig,
+  token: string,
+  response: SnowflakeApiResponse,
+  signal?: AbortSignal
+): Promise<SnowflakeRow[]> {
+  const rows = parseRows(response);
+  const partitionCount = response.resultSetMetaData?.partitionInfo?.length ?? 0;
+
+  if (partitionCount <= 1) return rows;
+
+  const statusUrl =
+    response.statementStatusUrl ??
+    (response.statementHandle ? `/api/v2/statements/${response.statementHandle}` : null);
+  if (!statusUrl) {
+    throw new Error('Snowflake response missing statement URL for partitioned result');
+  }
+
+  const url = new URL(statusUrl, `https://${config.accountHost}`);
+  if (url.hostname !== config.accountHost) {
+    throw new Error(`Snowflake returned unexpected result host: ${url.hostname}`);
+  }
+
+  for (let partition = 1; partition < partitionCount; partition++) {
+    url.searchParams.set('partition', String(partition));
+    const partitionResponse = await fetch(url, {
+      headers: authHeaders(token),
+      signal,
+    });
+
+    if (partitionResponse.status !== 200) {
+      const body = await partitionResponse.text().catch(() => '');
+      throw new Error(
+        `Snowflake partition ${partition} failed (${partitionResponse.status}): ${body.slice(0, 500)}`
+      );
+    }
+
+    const payload = (await partitionResponse.json()) as SnowflakeApiResponse;
+    rows.push(...parseRows(payload));
+  }
+
+  return rows;
 }
 
 async function pollStatement(
@@ -258,7 +305,7 @@ export async function executeSnowflakeStatement(params: {
 
   if (response.status === 200) {
     const payload = (await response.json()) as SnowflakeApiResponse;
-    return parseRows(payload);
+    return parseAllRows(params.config, token, payload, params.signal);
   }
 
   if (response.status === 202) {
@@ -273,7 +320,7 @@ export async function executeSnowflakeStatement(params: {
       params.signal
     );
     if (completed.code === '090001' || Array.isArray(completed.data)) {
-      return parseRows(completed);
+      return parseAllRows(params.config, token, completed, params.signal);
     }
     throw new Error(completed.message ?? 'Snowflake async query failed');
   }

@@ -818,6 +818,30 @@ describe('getOrganizationSeatUsage', () => {
     });
   });
 
+  test('should count pending non-billing_manager invitations in seat usage', async () => {
+    const owner = await insertTestUser();
+    const organization = await createOrganization('Test Org', owner.id);
+
+    await inviteUserToOrganization(organization.id, owner.id, 'member@example.com', 'member');
+    await inviteUserToOrganization(
+      organization.id,
+      owner.id,
+      'billing@example.com',
+      'billing_manager'
+    );
+    await db
+      .update(organizations)
+      .set({ seat_count: 5 })
+      .where(sql`${organizations.id} = ${organization.id}`);
+
+    const result = await getOrganizationSeatUsage(organization.id);
+
+    expect(result).toEqual({
+      used: 2,
+      total: 5,
+    });
+  });
+
   test('should count all non-billing_manager roles in seat usage', async () => {
     const owner = await insertTestUser();
     const member = await insertTestUser();

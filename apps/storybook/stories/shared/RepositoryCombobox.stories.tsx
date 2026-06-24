@@ -38,7 +38,7 @@ function RepositoryComboboxStory({ value, repositories = mockRepositories, ...pr
 }
 
 const meta: Meta<typeof RepositoryComboboxStory> = {
-  title: 'Shared/RepositoryCombobox',
+  title: 'Components/App Controls/RepositoryCombobox',
   component: RepositoryComboboxStory,
   tags: ['autodocs'],
 };

@@ -81,7 +81,8 @@ import type {
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import type { Env as WorkerEnv, SandboxId } from '../types.js';
-import { generateSandboxId } from '../sandbox-id.js';
+import { deriveSharedSandboxId, generateSandboxId } from '../sandbox-id.js';
+import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
 
 import { validateStreamTicket } from '../auth.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
@@ -98,12 +99,13 @@ import {
 } from '../session/session-message-queue.js';
 import {
   clearWrapperRuntimeIdentity,
+  getSandboxRecoveryState,
   getWrapperLease,
   getWrapperRuntimeState,
+  isWrapperCleanupExhausted,
   isWrapperDeliveryHeld,
   isWrapperRunFinalizing,
   nextWrapperCleanupDeadline,
-  nextWrapperLeaseDeadline,
 } from '../session/wrapper-runtime-state.js';
 import {
   kiloGlobalFeedValidationSchema,
@@ -236,7 +238,7 @@ type GroupedRegisterSessionInput = {
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
     NonNullable<SessionMetadata['workspace']>,
-    'sandboxId' | 'shallow' | 'devcontainerRequested'
+    'sandboxId' | 'sandboxRoute' | 'shallow' | 'devcontainerRequested'
   >;
 };
 
@@ -266,11 +268,36 @@ function isSameAcceptedInitialTurn(
   );
 }
 
+async function validateSharedSandboxRouteAssignment(workspace: {
+  sandboxId?: string;
+  sandboxRoute?: NonNullable<SessionMetadata['workspace']>['sandboxRoute'];
+}): Promise<string | null> {
+  const route = workspace.sandboxRoute;
+  if (!route) return null;
+  try {
+    const expectedSandboxId = route.suffix
+      ? await deriveSharedSandboxId(route.routeKey, route.suffix)
+      : route.routeKey;
+    return workspace.sandboxId === expectedSandboxId
+      ? null
+      : 'Shared sandbox assignment does not match its route suffix';
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
 function isSameInitialAdmissionConfiguration(
   metadata: SessionMetadata,
   input: CreateSessionWithInitialAdmissionInput
 ): boolean {
   return (
+    metadata.identity.sessionId === input.identity.sessionId &&
+    metadata.identity.userId === input.identity.userId &&
+    metadata.identity.orgId === input.identity.orgId &&
+    metadata.identity.botId === input.identity.botId &&
+    metadata.workspace?.sandboxId === input.workspace?.sandboxId &&
+    JSON.stringify(metadata.workspace?.sandboxRoute) ===
+      JSON.stringify(input.workspace?.sandboxRoute) &&
     metadata.agent?.mode === input.agent.mode &&
     metadata.agent.model === input.agent.model &&
     metadata.agent.variant === input.agent.variant &&
@@ -295,6 +322,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     attemptId: string;
     reason: WrapperStopReason;
   }) => Promise<StopWrappersResult>;
+  private sandboxSessionDeleter?: (reason: 'explicit' | 'retention-expired') => Promise<void>;
+  private sharedSandboxFailoverRecorder?: (routeKey: SandboxId) => Promise<void>;
   private agentRuntime?: AgentRuntime;
   private messageSettlementOutbox?: MessageSettlementOutbox;
   private sessionMessageQueue?: SessionMessageQueue;
@@ -581,6 +610,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             return { status: 'inspection-failed', error: 'Session metadata unavailable' };
           return createAgentSandbox(this.env, metadata).stopWrappers(request);
         },
+        recordSharedSandboxFailover: routeKey =>
+          this.sharedSandboxFailoverRecorder
+            ? this.sharedSandboxFailoverRecorder(routeKey)
+            : recordSharedSandboxFailover(this.env.SHARED_SANDBOX_OVERRIDES, routeKey),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         getSessionIdForLogs: () => this.sessionId,
       });
@@ -622,8 +655,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         validateModeAgainstRuntimeAgents,
         getDeliveryContext: () => this.getPendingMessageDeliveryContext(),
         getDeliveryBlock: async () => {
-          const retryAt = nextWrapperCleanupDeadline(await getWrapperLease(this.ctx.storage));
-          return retryAt === undefined ? null : { retryAt };
+          const lease = await getWrapperLease(this.ctx.storage);
+          if (isWrapperCleanupExhausted(lease)) return { kind: 'exhausted' };
+          const retryAt = nextWrapperCleanupDeadline(lease);
+          return retryAt === undefined ? null : { kind: 'retryable', retryAt };
         },
         deliver: plan => this.executeDirectly(plan),
         isDeliveryHeld: async () =>
@@ -1535,10 +1570,27 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   private async schedulePhysicalWrapperCleanupRetry(): Promise<void> {
-    const deadline =
-      nextWrapperLeaseDeadline(await getWrapperLease(this.ctx.storage)) ??
-      Date.now() + REAPER_INTERVAL_MS_DEFAULT;
-    await this.ctx.storage.setAlarm(deadline);
+    const deadlines = await this.getWrapperSupervisor().nextMaintenanceDeadlines();
+    if (deadlines.length > 0) {
+      await this.ctx.storage.setAlarm(Math.min(...deadlines));
+      return;
+    }
+    if (!isWrapperCleanupExhausted(await getWrapperLease(this.ctx.storage))) {
+      await this.ctx.storage.setAlarm(Date.now() + REAPER_INTERVAL_MS_DEFAULT);
+    }
+  }
+
+  private async deleteSandboxSessionResources(
+    metadata: SessionMetadata,
+    reason: 'explicit' | 'retention-expired'
+  ): Promise<void> {
+    if (this.sandboxSessionDeleter) {
+      await this.sandboxSessionDeleter(reason);
+      return;
+    }
+    if (!this.orchestrator && (this.env.Sandbox || this.env.SandboxSmall)) {
+      await createAgentSandbox(this.env, metadata).delete(reason);
+    }
   }
 
   private async finalizeSessionDeletion(
@@ -1546,7 +1598,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   ): Promise<boolean> {
     const metadata = await this.getMetadata();
     if (!metadata) {
-      if ((await getWrapperLease(this.ctx.storage)).state !== 'none') {
+      const lease = await getWrapperLease(this.ctx.storage);
+      if (lease.state !== 'none' && !isWrapperCleanupExhausted(lease)) {
         await this.schedulePhysicalWrapperCleanupRetry();
         return false;
       }
@@ -1554,15 +1607,35 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const supervisor = this.getWrapperSupervisor();
       await supervisor.requestPhysicalWrapperStop('session-delete', { kind: 'session' });
       await supervisor.runMaintenance(Date.now());
-      if ((await getWrapperLease(this.ctx.storage)).state !== 'none') {
+      const lease = await getWrapperLease(this.ctx.storage);
+      if (lease.state !== 'none' && !isWrapperCleanupExhausted(lease)) {
         if (reason === 'explicit') {
           await this.schedulePhysicalWrapperCleanupRetry();
         }
         return false;
       }
-      if (!this.orchestrator && (this.env.Sandbox || this.env.SandboxSmall)) {
-        await createAgentSandbox(this.env, metadata).delete(reason);
+      if (isWrapperCleanupExhausted(lease)) {
+        try {
+          await this.deleteSandboxSessionResources(metadata, reason);
+        } catch (error) {
+          logger
+            .withFields({
+              sessionId: this.sessionId,
+              attempts: lease.attempts,
+              reason,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            .warn('Best-effort quarantined sandbox session deletion failed');
+        }
+      } else {
+        await this.deleteSandboxSessionResources(metadata, reason);
       }
+    }
+
+    const recovery = await getSandboxRecoveryState(this.ctx.storage);
+    if (recovery?.failoverPublication?.status === 'pending') {
+      if (reason === 'explicit') await this.schedulePhysicalWrapperCleanupRetry();
+      return false;
     }
 
     await this.ctx.storage.deleteAlarm();
@@ -1581,7 +1654,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
-   * Delete session only after physical wrapper absence has been verified.
+   * Delete session after physical wrapper absence is verified or cleanup is quarantined.
    */
   async deleteSession(): Promise<void> {
     logger.info('Explicit DELETE requested for Durable Object');
@@ -1604,6 +1677,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const existing = await this.ctx.storage.get('metadata');
     if (existing) {
       return { success: false, error: 'Session already registered' };
+    }
+    const routeAssignmentError = await validateSharedSandboxRouteAssignment(input.workspace ?? {});
+    if (routeAssignmentError) {
+      return { success: false, error: `Invalid metadata: ${routeAssignmentError}` };
     }
 
     const now = Date.now();
@@ -1838,6 +1915,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
 
     if (!metadata) {
       return { success: false, error: 'Session metadata is not available' };
+    }
+    const routeAssignmentError = await validateSharedSandboxRouteAssignment({
+      sandboxId: input.sandboxId,
+      sandboxRoute: metadata.workspace?.sandboxRoute,
+    });
+    if (routeAssignmentError) {
+      return {
+        success: false,
+        error: `Invalid metadata after readiness update: ${routeAssignmentError}`,
+      };
     }
 
     const now = Date.now();

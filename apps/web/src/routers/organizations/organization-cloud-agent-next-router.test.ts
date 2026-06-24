@@ -53,6 +53,8 @@ const mockCreateCloudAgentNextClient = jest.fn(() => ({
 
 const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
+const mockVerifyOrgOwnsSessionV2ByCloudAgentId =
+  jest.fn<() => Promise<{ kiloSessionId: string } | null>>();
 
 jest.mock('@/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
@@ -70,6 +72,10 @@ jest.mock('@/lib/posthog-feature-flags', () => ({
 jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
   generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
+}));
+
+jest.mock('@/lib/cloud-agent/session-ownership', () => ({
+  verifyOrgOwnsSessionV2ByCloudAgentId: mockVerifyOrgOwnsSessionV2ByCloudAgentId,
 }));
 
 jest.mock('@/routers/organizations/utils', () => {
@@ -119,6 +125,24 @@ beforeAll(async () => {
 describe('organizationCloudAgentNextRouter attachment forwarding', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+  });
+
+  it('denies an inaccessible organization session before calling the Worker', async () => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValueOnce(null);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.sendMessage({
+        organizationId: ORGANIZATION_ID,
+        cloudAgentSessionId: 'agent_123',
+        payload: { type: 'prompt', prompt: 'Read notes', mode: 'code', model: 'test' },
+      })
+    ).rejects.toThrow('Organization does not own this session');
+
+    expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
   it('forwards canonical document attachments without organization middleware fields', async () => {

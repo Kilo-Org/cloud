@@ -225,6 +225,143 @@ describe('CloudAgentSession message admission', () => {
     expect(result.pending[0]?.intent?.agent.model).toBe('test-model');
   });
 
+  it('persists shared route metadata and rejects a replay with another assignment', async () => {
+    const userId = 'user_grouped_route_replay' as const;
+    const sessionId = 'agent_grouped_route_replay' as const;
+    const messageId = 'msg_018f1e2d3c4bRouteMAbCdEfGh';
+    const routeKey = 'usr-000000000000000000000000000000000000000000000000' as const;
+    const sandboxId = 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df' as const;
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+    const base = groupedRegisterSessionInput({
+      sessionId,
+      userId,
+      prompt: 'persist shared route',
+      mode: 'code',
+      model: 'test-model',
+      kiloSessionId: '15151515-1515-4515-9515-151515151515',
+      kilocodeToken: 'token-grouped-route',
+    });
+    const input = {
+      ...base,
+      workspace: {
+        sandboxId,
+        sandboxRoute: {
+          kind: 'shared' as const,
+          routeKey,
+          suffix: 'shared-slot-v1' as const,
+        },
+      },
+      message: {
+        initialTurn: {
+          type: 'prompt' as const,
+          messageId,
+          prompt: 'persist shared route',
+        },
+      },
+    };
+
+    const result = await runInDurableObject(stub, async instance => {
+      const first = await instance.createSessionWithInitialAdmission(input);
+      const replay = await instance.createSessionWithInitialAdmission({
+        ...input,
+        workspace: {
+          sandboxId: routeKey,
+          sandboxRoute: { kind: 'shared', routeKey },
+        },
+      });
+      return { first, replay, metadata: await instance.getMetadata() };
+    });
+
+    expect(result.first).toMatchObject({ success: true, messageId });
+    expect(result.replay).toMatchObject({ success: false, code: 'BAD_REQUEST' });
+    expect(result.metadata?.workspace).toEqual(input.workspace);
+  });
+
+  it('rejects readiness updates that change a shared route to another sandbox', async () => {
+    const userId = 'user_shared_route_ready_mismatch' as const;
+    const sessionId = 'agent_shared_route_ready_mismatch' as const;
+    const routeKey = 'usr-000000000000000000000000000000000000000000000000' as const;
+    const sandboxId = 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df' as const;
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const registration = await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'preserve shared assignment',
+          mode: 'code',
+          model: 'test-model',
+          kiloSessionId: '17171717-1717-4717-9717-171717171717',
+          kilocodeToken: 'token-shared-route-ready',
+        }),
+        workspace: {
+          sandboxId,
+          sandboxRoute: {
+            kind: 'shared',
+            routeKey,
+            suffix: 'shared-slot-v1',
+          },
+        },
+      });
+      const ready = await instance.recordSessionReady({
+        workspacePath: `/workspace/${userId}/sessions/${sessionId}`,
+        sandboxId: 'usr-111111111111111111111111111111111111111111111111',
+        sessionHome: `/home/${sessionId}`,
+        branchName: `session/${sessionId}`,
+        kiloSessionId: '17171717-1717-4717-9717-171717171717',
+      });
+      return { registration, ready, metadata: await instance.getMetadata() };
+    });
+
+    expect(result.registration.success).toBe(true);
+    expect(result.ready).toMatchObject({
+      success: false,
+      error: expect.stringContaining('does not match its route suffix'),
+    });
+    expect(result.metadata?.workspace?.sandboxId).toBe(sandboxId);
+  });
+
+  it('rejects shared route metadata whose sandbox does not match its suffix', async () => {
+    const userId = 'user_invalid_shared_route' as const;
+    const sessionId = 'agent_invalid_shared_route' as const;
+    const routeKey = 'usr-000000000000000000000000000000000000000000000000' as const;
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, instance =>
+      instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'reject invalid shared route',
+          mode: 'code',
+          model: 'test-model',
+          kiloSessionId: '16161616-1616-4616-9616-161616161616',
+          kilocodeToken: 'token-invalid-shared-route',
+        }),
+        workspace: {
+          sandboxId: 'usr-111111111111111111111111111111111111111111111111',
+          sandboxRoute: {
+            kind: 'shared',
+            routeKey,
+            suffix: 'shared-slot-v1',
+          },
+        },
+      })
+    );
+
+    expect(result).toMatchObject({
+      success: false,
+      error: expect.stringContaining('does not match its route suffix'),
+    });
+  });
+
   it('persists repaired DIND devcontainer workspace readiness metadata', async () => {
     const userId = 'user_devcontainer_ready' as const;
     const sessionId = 'agent_devcontainer_ready' as const;

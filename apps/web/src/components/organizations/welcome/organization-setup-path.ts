@@ -1,9 +1,8 @@
 import type { OrganizationOnboardingChecklist } from '@/lib/organizations/onboarding-checklist';
+import { ORGANIZATION_ONBOARDING_STEP_KEYS } from '@/lib/organizations/onboarding-steps';
 
 export const ORGANIZATION_ONBOARDING_SCREENS = [
-  'source-control',
-  'code-reviewer',
-  'invite-team',
+  ...ORGANIZATION_ONBOARDING_STEP_KEYS,
   'complete',
 ] as const;
 

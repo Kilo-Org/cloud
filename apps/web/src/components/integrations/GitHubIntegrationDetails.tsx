@@ -52,12 +52,14 @@ export function GitHubIntegrationDetails({
 
   // Fetch organization data to check GitHub app type
   const { data: organizationData } = useOrganizationWithMembers(organizationId ?? '', {
-    enabled: !!organizationId,
+    enabled: !!organizationId && !appReturnPath,
   });
 
   // Fetch models for the model selector
-  const { data: openRouterModels, isLoading: isLoadingModels } =
-    useModelSelectorList(organizationId);
+  const { data: openRouterModels, isLoading: isLoadingModels } = useModelSelectorList(
+    organizationId,
+    !appReturnPath
+  );
 
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (
@@ -75,14 +77,21 @@ export function GitHubIntegrationDetails({
   const [selectedModel, setSelectedModel] = useState<string>('');
   const installationDetectedRef = useRef(false);
 
+  const { data: onboardingAppType } = useQuery({
+    ...trpc.githubApps.getAppType.queryOptions(input),
+    enabled: Boolean(appReturnPath),
+  });
+
   // Determine which GitHub App to use based on organization settings
   const githubAppName = useMemo(() => {
-    const isLiteApp = organizationData?.settings?.github_app_type === 'lite';
+    const isLiteApp = appReturnPath
+      ? onboardingAppType === 'lite'
+      : organizationData?.settings?.github_app_type === 'lite';
     if (isLiteApp) {
       return process.env.NEXT_PUBLIC_GITHUB_LITE_APP_NAME || 'KiloConnect-Lite';
     }
     return process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
-  }, [organizationData?.settings?.github_app_type]);
+  }, [appReturnPath, onboardingAppType, organizationData?.settings?.github_app_type]);
 
   // Fetch GitHub App installation status
   const {

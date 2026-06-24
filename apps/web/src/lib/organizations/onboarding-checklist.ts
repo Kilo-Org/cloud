@@ -3,18 +3,18 @@ import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants'
 import { sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
+import {
+  OrganizationOnboardingStepKeySchema,
+  type OrganizationOnboardingStepKey,
+} from '@/lib/organizations/onboarding-steps';
 
-export const ORGANIZATION_ONBOARDING_STEP_KEYS = [
-  'source-control',
-  'code-reviewer',
-  'invite-team',
-] as const;
-
-export const OrganizationOnboardingStepKeySchema = z.enum(ORGANIZATION_ONBOARDING_STEP_KEYS);
-export type OrganizationOnboardingStepKey = z.infer<typeof OrganizationOnboardingStepKeySchema>;
+export {
+  ORGANIZATION_ONBOARDING_STEP_KEYS,
+  OrganizationOnboardingStepKeySchema,
+  type OrganizationOnboardingStepKey,
+} from '@/lib/organizations/onboarding-steps';
 
 export const SourceControlPlatformSchema = z.enum(['github', 'gitlab']);
-export type SourceControlPlatform = z.infer<typeof SourceControlPlatformSchema>;
 
 export const OrganizationOnboardingStateSchema = z.object({
   sourceControlConnected: z.boolean(),

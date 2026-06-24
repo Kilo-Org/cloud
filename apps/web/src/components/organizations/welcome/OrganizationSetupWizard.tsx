@@ -22,7 +22,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { OrganizationOnboardingStepKey } from '@/lib/organizations/onboarding-checklist';
+import type { OrganizationOnboardingStepKey } from '@/lib/organizations/onboarding-steps';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -103,7 +103,6 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   const searchParams = useSearchParams();
   const prefersReducedMotion = useReducedMotion();
   const userRole = useUserOrganizationRole();
-  const organizationQuery = useOrganizationWithMembers(organizationId);
   const updateRecommendationsDigest = useUpdateRecommendationsDigest();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const handledReturnRef = useRef<string | null>(null);
@@ -128,6 +127,9 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     (checklistQuery.data
       ? getFirstIncompleteOnboardingScreen(checklistQuery.data)
       : 'source-control');
+  const organizationQuery = useOrganizationWithMembers(organizationId, {
+    enabled: currentScreen === 'complete' && userRole === 'owner',
+  });
 
   const stepState = useMemo(
     () => new Map(checklistQuery.data?.steps.map(step => [step.key, step.done]) ?? []),
@@ -178,7 +180,11 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
           ? `code-reviewer:${codeReviewerReturn}`
           : null;
 
-    if (!returnKey || handledReturnRef.current === returnKey) return;
+    if (!returnKey) {
+      handledReturnRef.current = null;
+      return;
+    }
+    if (handledReturnRef.current === returnKey) return;
     handledReturnRef.current = returnKey;
 
     const handleReturn = async () => {

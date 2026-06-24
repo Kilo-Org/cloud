@@ -31,6 +31,13 @@ const GastownHealthResponseSchema = z.object({
 
 const CF_API_BASE = 'https://api.cloudflare.com/client/v4';
 
+// Analytics Engine MAX(timestamp) may return strings like "2026-06-24 15:10:00.000"
+// without a timezone offset. Append "Z" when no offset or "Z" suffix is present so
+// new Date() treats the value as UTC rather than the runtime's local timezone.
+function toUtcIsoString(value: string): string {
+  return /[Zz]$|[+-]\d{2}:\d{2}$/.test(value) ? value : `${value}Z`;
+}
+
 export async function queryGastownHealth(
   env: QueryEnv,
   fetchFn: FetchFn = fetch
@@ -78,7 +85,9 @@ export async function queryGastownHealth(
   }
 
   const latestEventTimestamp =
-    row.latest_event_timestamp === null ? null : new Date(row.latest_event_timestamp);
+    row.latest_event_timestamp === null
+      ? null
+      : new Date(toUtcIsoString(row.latest_event_timestamp));
   if (latestEventTimestamp !== null && Number.isNaN(latestEventTimestamp.getTime())) {
     throw new Error('Gastown health Analytics Engine response contains an invalid timestamp');
   }

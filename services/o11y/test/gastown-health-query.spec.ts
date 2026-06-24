@@ -43,7 +43,7 @@ describe('queryGastownHealth', () => {
       weightedFailedChecks: 24,
       weightedSuccessfulChecks: 150,
       affectedTownCount: 4,
-      latestEventTimestamp: new Date('2026-06-24 15:10:00.000'),
+      latestEventTimestamp: new Date('2026-06-24T15:10:00.000Z'),
     });
     expect(calledUrl).toBe(
       `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/analytics_engine/sql`

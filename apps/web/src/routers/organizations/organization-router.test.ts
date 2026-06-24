@@ -152,6 +152,97 @@ describe('organizations trpc router', () => {
       ).rejects.toThrow('You do not have access to this organization');
     });
 
+    it('should return child organization data for a parent organization owner', async () => {
+      const parentOwner = await insertTestUser({
+        google_user_email: 'parent-owner-org@example.com',
+        google_user_name: 'Parent Owner Org User',
+        is_admin: false,
+      });
+      const childOwner = await insertTestUser({
+        google_user_email: 'child-owner-org@example.com',
+        google_user_name: 'Child Owner Org User',
+        is_admin: false,
+      });
+      const parentOrganization = await createOrganization(
+        'Parent Access Organization',
+        parentOwner.id
+      );
+      const childOrganization = await createOrganization(
+        'Child Access Organization',
+        childOwner.id
+      );
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parentOrganization.id })
+        .where(eq(organizations.id, childOrganization.id));
+
+      try {
+        const caller = await createCallerForUser(parentOwner.id);
+        const result = await caller.organizations.withMembers({
+          organizationId: childOrganization.id,
+        });
+
+        expect(result).toMatchObject({
+          id: childOrganization.id,
+          name: 'Child Access Organization',
+        });
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, childOrganization.id));
+        await db.delete(organizations).where(eq(organizations.id, childOrganization.id));
+        await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+      }
+    });
+
+    it('should reject child organization data for a regular parent organization member', async () => {
+      const parentOwner = await insertTestUser({
+        google_user_email: 'parent-member-owner-org@example.com',
+        google_user_name: 'Parent Member Owner Org User',
+        is_admin: false,
+      });
+      const parentMember = await insertTestUser({
+        google_user_email: 'parent-member-org@example.com',
+        google_user_name: 'Parent Member Org User',
+        is_admin: false,
+      });
+      const childOwner = await insertTestUser({
+        google_user_email: 'child-member-owner-org@example.com',
+        google_user_name: 'Child Member Owner Org User',
+        is_admin: false,
+      });
+      const parentOrganization = await createOrganization(
+        'Parent Member Access Organization',
+        parentOwner.id
+      );
+      await addUserToOrganization(parentOrganization.id, parentMember.id, 'member');
+      const childOrganization = await createOrganization(
+        'Child Member Access Organization',
+        childOwner.id
+      );
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parentOrganization.id })
+        .where(eq(organizations.id, childOrganization.id));
+
+      try {
+        const caller = await createCallerForUser(parentMember.id);
+        await expect(
+          caller.organizations.withMembers({
+            organizationId: childOrganization.id,
+          })
+        ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, childOrganization.id));
+        await db.delete(organizations).where(eq(organizations.id, childOrganization.id));
+        await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+      }
+    });
+
     it('should throw UNAUTHORIZED error for non-existent organization', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const nonExistentOrgId = '550e8400-e29b-41d4-a716-446655440001'; // Valid UUID but non-existent

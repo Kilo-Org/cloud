@@ -1,0 +1,721 @@
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { toast } from 'sonner';
+import {
+  ArrowLeft,
+  ArrowRight,
+  BookOpen,
+  Check,
+  Circle,
+  CodeXml,
+  ExternalLink,
+  Github,
+  Loader2,
+  RefreshCw,
+  Users,
+} from 'lucide-react';
+import { useTRPC } from '@/lib/trpc/utils';
+import type { OrganizationOnboardingStepKey } from '@/lib/organizations/onboarding-checklist';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { InviteMemberDialog } from '@/components/organizations/members/InviteMemberDialog';
+import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
+import { cn } from '@/lib/utils';
+import {
+  buildOrganizationWelcomePath,
+  getFirstIncompleteOnboardingScreen,
+  getNextOnboardingScreen,
+  getOrganizationOnboardingScreen,
+  getPreviousOnboardingScreen,
+  type OrganizationOnboardingScreen,
+} from './organization-setup-path';
+
+const STEP_CONTENT = {
+  github: {
+    title: 'Connect GitHub',
+    description: 'Connect your repositories so Kilo can work with your development workflow.',
+    actionLabel: 'Connect GitHub',
+    helpTitle: 'Choose repository access',
+    helpText:
+      'GitHub will ask whether Kilo can access all repositories or only selected repositories. You can change this later.',
+    docsLabel: 'Read the integrations guide',
+    docsHref: 'https://kilo.ai/docs/automate/integrations#connecting-github',
+    icon: Github,
+  },
+  'code-reviewer': {
+    title: 'Turn on Code Reviewer',
+    description: 'Enable AI-assisted reviews for pull requests and merge requests.',
+    actionLabel: 'Turn on Code Reviewer',
+    helpTitle: 'Review pull requests automatically',
+    helpText:
+      'Turn on automatic reviews for GitHub with balanced defaults. You can fine-tune repositories, review style, and models later.',
+    docsLabel: 'Read the Code Reviewer guide',
+    docsHref: 'https://kilo.ai/docs/automate/code-reviews/github',
+    icon: CodeXml,
+  },
+  'invite-team': {
+    title: 'Invite your team',
+    description: 'Bring teammates into the organization so they can collaborate in Kilo.',
+    actionLabel: 'Invite your team',
+    helpTitle: 'Invite the right roles',
+    helpText:
+      'Owners manage organization settings and billing. Billing managers manage billing and can invite members. Members use Kilo with the organization.',
+    docsLabel: 'Read the team management guide',
+    docsHref: 'https://kilo.ai/docs/collaborate/teams/team-management',
+    icon: Users,
+  },
+} satisfies Record<
+  OrganizationOnboardingStepKey,
+  {
+    title: string;
+    description: string;
+    actionLabel: string;
+    helpTitle: string;
+    helpText: string;
+    docsLabel: string;
+    docsHref: string;
+    icon: typeof Github;
+  }
+>;
+
+const STEP_KEYS = Object.keys(STEP_CONTENT) as OrganizationOnboardingStepKey[];
+
+type OrganizationSetupWizardProps = {
+  organizationId: string;
+};
+
+export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWizardProps) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const prefersReducedMotion = useReducedMotion();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const handledReturnRef = useRef<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [showGitHubSetup, setShowGitHubSetup] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [visitedSteps, setVisitedSteps] = useState<Set<OrganizationOnboardingStepKey>>(new Set());
+
+  const checklistQueryOptions = trpc.organizations.getOnboardingChecklist.queryOptions({
+    organizationId,
+  });
+  const checklistQuery = useQuery(checklistQueryOptions);
+  const enableCodeReviewerMutation = useMutation(
+    trpc.organizations.reviewAgent.toggleReviewAgent.mutationOptions()
+  );
+  const requestedScreen = getOrganizationOnboardingScreen(searchParams);
+  const currentScreen =
+    requestedScreen ??
+    (checklistQuery.data ? getFirstIncompleteOnboardingScreen(checklistQuery.data) : 'github');
+
+  const stepState = useMemo(
+    () => new Map(checklistQuery.data?.steps.map(step => [step.key, step.done]) ?? []),
+    [checklistQuery.data]
+  );
+
+  useEffect(() => {
+    if (!checklistQuery.data || requestedScreen) return;
+    router.replace(
+      buildOrganizationWelcomePath(
+        organizationId,
+        getFirstIncompleteOnboardingScreen(checklistQuery.data)
+      ),
+      { scroll: false }
+    );
+  }, [checklistQuery.data, organizationId, requestedScreen, router]);
+
+  useEffect(() => {
+    if (!requestedScreen) return;
+    headingRef.current?.focus();
+    if (requestedScreen !== 'complete') {
+      setVisitedSteps(previous => {
+        if (previous.has(requestedScreen)) return previous;
+        const next = new Set(previous);
+        next.add(requestedScreen);
+        return next;
+      });
+    }
+  }, [requestedScreen]);
+
+  useEffect(() => {
+    const githubResult =
+      searchParams.get('github_install') ??
+      searchParams.get('github_pending_approval') ??
+      searchParams.get('github_action') ??
+      searchParams.get('error');
+    const codeReviewerReturn = searchParams.get('code_reviewer_return');
+    const returnKey = githubResult
+      ? `github:${githubResult}`
+      : codeReviewerReturn
+        ? `code-reviewer:${codeReviewerReturn}`
+        : null;
+
+    if (!returnKey || handledReturnRef.current === returnKey) return;
+    handledReturnRef.current = returnKey;
+
+    const handleReturn = async () => {
+      const result = await checklistQuery.refetch();
+      const cleanScreen = githubResult ? 'github' : 'code-reviewer';
+      const completed = result.data?.steps.find(step => step.key === cleanScreen)?.done ?? false;
+
+      if (searchParams.get('github_pending_approval') === 'true') {
+        setStatusMessage('GitHub is waiting for an organization administrator to approve access.');
+      } else if (searchParams.get('error')) {
+        setStatusMessage('GitHub setup did not complete. Review the error and try again.');
+      } else if (completed) {
+        setStatusMessage(`${STEP_CONTENT[cleanScreen].title} is complete.`);
+      }
+
+      router.replace(
+        buildOrganizationWelcomePath(
+          organizationId,
+          completed ? getNextOnboardingScreen(cleanScreen) : cleanScreen
+        ),
+        { scroll: false }
+      );
+    };
+
+    void handleReturn();
+  }, [checklistQuery, organizationId, router, searchParams]);
+
+  const navigate = (screen: OrganizationOnboardingScreen) => {
+    setStatusMessage('');
+    setShowGitHubSetup(false);
+    router.push(buildOrganizationWelcomePath(organizationId, screen), { scroll: false });
+  };
+
+  const handleGitHubInstallationDetected = async () => {
+    await queryClient.invalidateQueries({ queryKey: checklistQueryOptions.queryKey });
+    const result = await checklistQuery.refetch();
+    const completed = result.data?.steps.find(step => step.key === 'github')?.done ?? false;
+    if (completed) {
+      setStatusMessage('GitHub is connected.');
+      navigate('code-reviewer');
+    }
+  };
+
+  const handleEnableCodeReviewer = async () => {
+    setStatusMessage('');
+    try {
+      await enableCodeReviewerMutation.mutateAsync({
+        organizationId,
+        platform: 'github',
+        isEnabled: true,
+      });
+      await queryClient.invalidateQueries({ queryKey: checklistQueryOptions.queryKey });
+      const result = await checklistQuery.refetch();
+      const completed =
+        result.data?.steps.find(step => step.key === 'code-reviewer')?.done ?? false;
+      if (completed) {
+        toast.success('Code Reviewer is on', {
+          description: 'Balanced defaults are active for GitHub repositories.',
+        });
+        navigate('invite-team');
+      } else {
+        const message = 'Code Reviewer was enabled, but setup status has not updated yet.';
+        setStatusMessage(message);
+        toast.error(message);
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Could not turn on Code Reviewer. Try again.';
+      setStatusMessage(message);
+      toast.error('Could not turn on Code Reviewer', { description: message });
+    }
+  };
+
+  const handleInvitationSuccess = async () => {
+    await queryClient.invalidateQueries({ queryKey: checklistQueryOptions.queryKey });
+    const result = await checklistQuery.refetch();
+    const completed = result.data?.steps.find(step => step.key === 'invite-team')?.done ?? false;
+    if (completed) {
+      setStatusMessage('Team invitation sent.');
+      navigate('complete');
+    }
+  };
+
+  if (checklistQuery.isLoading) {
+    return (
+      <WizardShell>
+        <div className="flex min-h-72 items-center justify-center gap-3 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+          Checking organization setup…
+        </div>
+      </WizardShell>
+    );
+  }
+
+  if (checklistQuery.isError || !checklistQuery.data) {
+    return (
+      <WizardShell>
+        <Alert variant="destructive">
+          <AlertTitle>Could not check organization setup</AlertTitle>
+          <AlertDescription>
+            <p>{checklistQuery.error?.message ?? 'Try loading the setup checklist again.'}</p>
+            <Button variant="outline" size="sm" onClick={() => void checklistQuery.refetch()}>
+              <RefreshCw className="size-4" />
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </WizardShell>
+    );
+  }
+
+  const checklist = checklistQuery.data;
+  const progressLabel = `${checklist.completedCount} of ${checklist.totalCount} complete`;
+
+  return (
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 py-4 md:py-8">
+      <Card className="overflow-hidden shadow-none">
+        <CardHeader className="gap-4 border-b border-border pb-5">
+          <div className="flex items-end justify-between gap-4">
+            <div className="space-y-1">
+              <p className="type-eyebrow text-muted-foreground">Onboarding progress</p>
+              <p className="type-body text-muted-foreground">
+                Complete these steps to prepare your organization.
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="type-heading tabular-nums">
+                {checklist.completedCount}/{checklist.totalCount}
+              </p>
+              <p className="type-label text-muted-foreground">steps complete</p>
+            </div>
+          </div>
+          <div
+            role="progressbar"
+            aria-label={progressLabel}
+            aria-valuemin={0}
+            aria-valuemax={checklist.totalCount}
+            aria-valuenow={checklist.completedCount}
+            className="h-2 overflow-hidden rounded-full bg-surface-inset"
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-transform duration-200 motion-reduce:transition-none"
+              style={{
+                transform: `translateX(-${100 - (checklist.completedCount / checklist.totalCount) * 100}%)`,
+              }}
+            />
+          </div>
+          {checklistQuery.isFetching && !checklistQuery.isLoading && (
+            <span className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="size-icon-sm animate-spin motion-reduce:animate-none" />
+              Checking setup…
+            </span>
+          )}
+        </CardHeader>
+
+        <div className="grid md:grid-cols-[18rem_minmax(0,1fr)]">
+          <SetupNavigation
+            currentScreen={currentScreen}
+            stepState={stepState}
+            visitedSteps={visitedSteps}
+            onNavigate={navigate}
+          />
+
+          <CardContent className="min-w-0 p-4 sm:p-6 md:border-l md:border-border lg:p-8">
+            {statusMessage && (
+              <p className="sr-only" aria-live="polite">
+                {statusMessage}
+              </p>
+            )}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.section
+                key={currentScreen}
+                initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: prefersReducedMotion ? 0 : -8 }}
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.22,
+                  ease: [0.23, 1, 0.32, 1],
+                }}
+                aria-labelledby={`setup-${currentScreen}-title`}
+                className="flex min-h-[32rem] flex-col"
+              >
+                {currentScreen === 'complete' ? (
+                  <CompletionScreen
+                    headingRef={headingRef}
+                    completedCount={checklist.completedCount}
+                    totalCount={checklist.totalCount}
+                    organizationId={organizationId}
+                    onBack={() => navigate('invite-team')}
+                  />
+                ) : (
+                  <StepScreen
+                    headingRef={headingRef}
+                    step={currentScreen}
+                    done={stepState.get(currentScreen) ?? false}
+                    organizationId={organizationId}
+                    previous={getPreviousOnboardingScreen(currentScreen)}
+                    onBack={navigate}
+                    showGitHubSetup={showGitHubSetup}
+                    onShowGitHubSetup={() => setShowGitHubSetup(true)}
+                    onGitHubInstallationDetected={() => void handleGitHubInstallationDetected()}
+                    codeReviewerPending={enableCodeReviewerMutation.isPending}
+                    onEnableCodeReviewer={() => void handleEnableCodeReviewer()}
+                    onContinue={() => navigate(getNextOnboardingScreen(currentScreen))}
+                    onInvite={() => setInviteOpen(true)}
+                  />
+                )}
+              </motion.section>
+            </AnimatePresence>
+          </CardContent>
+        </div>
+      </Card>
+
+      <InviteMemberDialog
+        open={inviteOpen}
+        onOpenChange={setInviteOpen}
+        organizationId={organizationId}
+        onMemberInvited={() => void handleInvitationSuccess()}
+      />
+    </div>
+  );
+}
+
+function WizardShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto w-full max-w-6xl py-4 md:py-8">
+      <Card>
+        <CardContent className="p-6">{children}</CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function SetupNavigation({
+  currentScreen,
+  stepState,
+  visitedSteps,
+  onNavigate,
+}: {
+  currentScreen: OrganizationOnboardingScreen;
+  stepState: Map<OrganizationOnboardingStepKey, boolean>;
+  visitedSteps: Set<OrganizationOnboardingStepKey>;
+  onNavigate: (screen: OrganizationOnboardingScreen) => void;
+}) {
+  return (
+    <nav aria-label="Organization setup" className="bg-surface-inset p-3 sm:p-4 md:p-3">
+      <ol className="grid gap-2 sm:grid-cols-3 md:grid-cols-1">
+        {STEP_KEYS.map((key, index) => {
+          const content = STEP_CONTENT[key];
+          const Icon = content.icon;
+          const done = stepState.get(key) ?? false;
+          const active = currentScreen === key;
+          const visited = visitedSteps.has(key);
+          return (
+            <li key={key}>
+              <button
+                type="button"
+                aria-current={active ? 'step' : undefined}
+                onClick={() => onNavigate(key)}
+                className={cn(
+                  'flex min-h-control-touch w-full items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
+                  active && 'border-border-strong bg-surface-selected',
+                  !active && 'hover:bg-surface-hover',
+                  done && !active && 'text-muted-foreground',
+                  visited && !done && !active && 'bg-surface-raised'
+                )}
+              >
+                <span
+                  className={cn(
+                    'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-surface-background text-muted-foreground',
+                    active && 'border-border-strong text-foreground',
+                    done && 'text-status-success-icon'
+                  )}
+                  aria-hidden="true"
+                >
+                  {done ? <Check className="size-4" /> : <Icon className="size-4" />}
+                </span>
+                <span className="min-w-0 space-y-1">
+                  <span className="type-eyebrow block text-muted-foreground">Step {index + 1}</span>
+                  <span className="type-body block font-medium text-foreground">
+                    {content.title}
+                  </span>
+                  <span className="type-label hidden text-muted-foreground lg:block">
+                    {content.description}
+                  </span>
+                  {done && <span className="sr-only">, done</span>}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+function StepScreen({
+  headingRef,
+  step,
+  done,
+  organizationId,
+  previous,
+  showGitHubSetup,
+  onBack,
+  onShowGitHubSetup,
+  onGitHubInstallationDetected,
+  codeReviewerPending,
+  onEnableCodeReviewer,
+  onContinue,
+  onInvite,
+}: {
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
+  step: OrganizationOnboardingStepKey;
+  done: boolean;
+  organizationId: string;
+  previous: OrganizationOnboardingScreen | null;
+  showGitHubSetup: boolean;
+  onBack: (screen: OrganizationOnboardingScreen) => void;
+  onShowGitHubSetup: () => void;
+  onGitHubInstallationDetected: () => void;
+  codeReviewerPending: boolean;
+  onEnableCodeReviewer: () => void;
+  onContinue: () => void;
+  onInvite: () => void;
+}) {
+  const content = STEP_CONTENT[step];
+  const Icon = content.icon;
+  const returnTo = buildOrganizationWelcomePath(organizationId, step);
+
+  return (
+    <>
+      <div className="flex flex-1 flex-col">
+        <div className="flex items-start justify-between gap-4 border-b border-border pb-6">
+          <div className="flex items-start gap-4">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-inset">
+              <Icon className="size-5 text-muted-foreground" />
+            </div>
+            <div className="space-y-2">
+              <p className="type-eyebrow text-muted-foreground">
+                Step {STEP_KEYS.indexOf(step) + 1} of {STEP_KEYS.length}
+              </p>
+              <h1
+                ref={headingRef}
+                tabIndex={-1}
+                id={`setup-${step}-title`}
+                className="type-title focus:outline-none"
+              >
+                {content.title}
+              </h1>
+              <p className="type-body max-w-2xl text-muted-foreground">{content.description}</p>
+              <a
+                href={content.docsHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="type-label inline-flex min-h-8 items-center gap-2 rounded-md text-link underline-offset-4 hover:text-link-hover hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              >
+                <BookOpen className="size-4" />
+                {content.docsLabel}
+                <ExternalLink className="size-icon-sm" />
+              </a>
+            </div>
+          </div>
+          {done && (
+            <span className="type-label flex shrink-0 items-center gap-1 rounded-full border border-status-success-border bg-status-success-surface px-2 py-1 text-status-success">
+              <Check className="size-icon-sm text-status-success-icon" />
+              Done
+            </span>
+          )}
+        </div>
+
+        <div className="flex-1 py-6">
+          <div className="min-w-0">
+            {step === 'github' && showGitHubSetup && !done ? (
+              <GitHubIntegrationDetails
+                organizationId={organizationId}
+                appReturnPath={returnTo}
+                onInstallationDetected={onGitHubInstallationDetected}
+              />
+            ) : (
+              <div className="flex min-h-56 flex-col justify-between rounded-xl border border-border bg-surface-background p-6">
+                <div className="space-y-3">
+                  <h2 className="type-heading">
+                    {done ? `${content.title} is complete` : content.actionLabel}
+                  </h2>
+                  <p className="type-body max-w-xl text-muted-foreground">
+                    {done
+                      ? 'Kilo detected this setup in your organization. Continue when you are ready.'
+                      : content.helpText}
+                  </p>
+                </div>
+
+                <div className="mt-8">
+                  {done ? (
+                    <Button onClick={onContinue} className="min-h-control-touch sm:min-h-0">
+                      Continue setup
+                      <ArrowRight className="size-4" />
+                    </Button>
+                  ) : step === 'invite-team' ? (
+                    <Button onClick={onInvite} className="min-h-control-touch sm:min-h-0">
+                      <Users className="size-4" />
+                      {content.actionLabel}
+                    </Button>
+                  ) : step === 'github' ? (
+                    <Button onClick={onShowGitHubSetup} className="min-h-control-touch sm:min-h-0">
+                      {content.actionLabel}
+                      <ArrowRight className="size-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={onEnableCodeReviewer}
+                      disabled={codeReviewerPending}
+                      className="min-h-control-touch sm:min-h-0"
+                    >
+                      {codeReviewerPending ? (
+                        <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+                      ) : (
+                        <CodeXml className="size-4" />
+                      )}
+                      {codeReviewerPending ? 'Turning on…' : 'Turn on Code Reviewer'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-10 flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col-reverse gap-2 sm:flex-row">
+          {previous && (
+            <Button
+              variant="ghost"
+              onClick={() => onBack(previous)}
+              className="min-h-control-touch sm:min-h-0"
+            >
+              <ArrowLeft className="size-4" />
+              Back
+            </Button>
+          )}
+          {!done && (
+            <Button
+              variant="secondary"
+              onClick={onContinue}
+              className="min-h-control-touch sm:min-h-0"
+            >
+              Skip for now
+            </Button>
+          )}
+        </div>
+        <Button asChild variant="ghost" className="min-h-control-touch sm:min-h-0">
+          <Link href={`/organizations/${organizationId}`}>Finish later</Link>
+        </Button>
+      </div>
+    </>
+  );
+}
+
+function CompletionScreen({
+  headingRef,
+  completedCount,
+  totalCount,
+  organizationId,
+  onBack,
+}: {
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
+  completedCount: number;
+  totalCount: number;
+  organizationId: string;
+  onBack: () => void;
+}) {
+  const complete = completedCount === totalCount;
+  return (
+    <>
+      <div className="flex flex-1 flex-col">
+        <div className="flex items-start gap-4 border-b border-border pb-6">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-status-success-border bg-status-success-surface text-status-success-icon">
+            {complete ? <Check className="size-5" /> : <Circle className="size-5" />}
+          </div>
+          <div className="space-y-2">
+            <p className="type-eyebrow text-muted-foreground">Setup summary</p>
+            <h1
+              ref={headingRef}
+              tabIndex={-1}
+              id="setup-complete-title"
+              className="type-title focus:outline-none"
+            >
+              {complete ? 'Your organization is set up' : 'Finish setup when you’re ready'}
+            </h1>
+            <p className="type-body max-w-xl text-muted-foreground">
+              You completed{' '}
+              <span className="tabular-nums">
+                {completedCount} of {totalCount}
+              </span>{' '}
+              setup tasks. You can return to this guide whenever you need it.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid flex-1 gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
+          <div className="flex min-h-56 flex-col justify-between rounded-xl border border-border bg-surface-background p-6">
+            <div className="space-y-3">
+              <h2 className="type-heading">
+                {complete ? 'Start working with your organization' : 'Continue when you are ready'}
+              </h2>
+              <p className="type-body text-muted-foreground">
+                Open the organization dashboard now, or return to Welcome later to finish any
+                incomplete setup tasks.
+              </p>
+            </div>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Button asChild className="min-h-control-touch sm:min-h-0">
+                <Link href={`/organizations/${organizationId}`}>Open organization</Link>
+              </Button>
+              <Button asChild variant="secondary" className="min-h-control-touch sm:min-h-0">
+                <Link href={`/organizations/${organizationId}/payment-details`}>
+                  Add usage credits
+                </Link>
+              </Button>
+            </div>
+          </div>
+
+          <aside
+            className="rounded-xl border border-border bg-surface-inset p-5"
+            aria-label="Setup help"
+          >
+            <div className="flex size-8 items-center justify-center rounded-md border border-border bg-surface-raised">
+              <BookOpen className="size-4 text-muted-foreground" />
+            </div>
+            <h2 className="type-heading mt-4">Explore organization guides</h2>
+            <p className="type-body mt-2 text-muted-foreground">
+              Learn how to manage members, roles, billing, and organization settings.
+            </p>
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="mt-5 w-full min-w-0 justify-start overflow-hidden"
+            >
+              <a
+                href="https://kilo.ai/docs/collaborate/teams/getting-started"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <BookOpen className="size-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate text-left">Read the team guide</span>
+                <ExternalLink className="size-icon-sm ml-auto shrink-0" />
+              </a>
+            </Button>
+          </aside>
+        </div>
+      </div>
+      <div className="border-t border-border pt-5">
+        <Button variant="ghost" onClick={onBack} className="min-h-control-touch sm:min-h-0">
+          <ArrowLeft className="size-4" />
+          Back
+        </Button>
+      </div>
+    </>
+  );
+}

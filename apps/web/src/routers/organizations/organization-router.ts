@@ -45,6 +45,11 @@ import { getCreditBlocks } from '@/lib/getCreditBlocks';
 import { processOrganizationExpirations } from '@/lib/creditExpiration';
 import { credit_transactions } from '@kilocode/db/schema';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
+import {
+  buildOrganizationOnboardingChecklist,
+  getOrganizationOnboardingState,
+  OrganizationOnboardingChecklistSchema,
+} from '@/lib/organizations/onboarding-checklist';
 import { organizationSsoRouter } from '@/routers/organizations/organization-sso-router';
 import { organizationAuditLogRouter } from '@/routers/organizations/organization-audit-log-router';
 import { organizationAdminRouter } from '@/routers/organizations/organization-admin-router';
@@ -174,6 +179,14 @@ export const organizationsRouter = createTRPCRouter({
 
     return { organization: org };
   }),
+
+  getOnboardingChecklist: organizationBillingProcedure
+    .input(OrganizationIdInputSchema)
+    .output(OrganizationOnboardingChecklistSchema)
+    .query(async ({ input }) => {
+      const state = await getOrganizationOnboardingState(input.organizationId);
+      return buildOrganizationOnboardingChecklist(state);
+    }),
 
   updateCompanyDomain: organizationBillingMutationProcedure
     .input(

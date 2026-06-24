@@ -16,6 +16,7 @@ import {
   Brain,
   ChartColumnIncreasing,
   ExternalLink,
+  ArrowLeft,
   ListChecks,
   Rocket,
   Settings2,
@@ -35,6 +36,7 @@ type ReviewAgentPageClientProps = {
   successMessage?: string;
   errorMessage?: string;
   initialPlatform?: Platform;
+  returnTo?: string;
 };
 
 export function ReviewAgentPageClient({
@@ -43,6 +45,7 @@ export function ReviewAgentPageClient({
   successMessage,
   errorMessage,
   initialPlatform = 'github',
+  returnTo,
 }: ReviewAgentPageClientProps) {
   const trpc = useTRPC();
   const router = useRouter();
@@ -52,6 +55,9 @@ export function ReviewAgentPageClient({
     const params = new URLSearchParams();
     if (platform !== 'github') {
       params.set('platform', platform);
+    }
+    if (returnTo) {
+      params.set('returnTo', returnTo);
     }
     const queryString = params.toString();
     router.push(
@@ -84,6 +90,12 @@ export function ReviewAgentPageClient({
   const isGitHubAppInstalled =
     githubStatusData?.connected && githubStatusData?.integration?.isValid;
   const isGitLabConnected = gitlabStatusData?.connected && gitlabStatusData?.integration?.isValid;
+  const returnPath = returnTo
+    ? `${returnTo}${returnTo.includes('?') ? '&' : '?'}code_reviewer_return=true`
+    : null;
+  const githubIntegrationPath = returnTo
+    ? `/organizations/${organizationId}/integrations/github?${new URLSearchParams({ returnTo })}`
+    : `/organizations/${organizationId}/integrations/github`;
 
   // Show toast messages from URL params
   useEffect(() => {
@@ -105,6 +117,16 @@ export function ReviewAgentPageClient({
       <SetPageTitle title="Code Reviewer">
         <Badge variant="new">new</Badge>
       </SetPageTitle>
+      {returnPath && (
+        <div>
+          <Button asChild variant="outline" size="sm">
+            <Link href={returnPath}>
+              <ArrowLeft className="size-4" />
+              Return to setup
+            </Link>
+          </Button>
+        </div>
+      )}
       {/* Header */}
       <div className="space-y-2">
         <p className="text-muted-foreground">
@@ -166,7 +188,7 @@ export function ReviewAgentPageClient({
                   The Kilo GitHub App must be installed to use Code Reviewer. The app automatically
                   manages workflows and triggers reviews on your pull requests.
                 </p>
-                <Link href={`/organizations/${organizationId}/integrations/github`}>
+                <Link href={githubIntegrationPath}>
                   <Button variant="default" size="sm">
                     Install GitHub App
                     <ExternalLink className="ml-2 h-3 w-3" />

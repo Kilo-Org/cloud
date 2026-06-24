@@ -347,7 +347,32 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           userId: ctx.user.id,
         };
 
-        await setAgentEnabled(input.organizationId, 'code_review', platform, input.isEnabled);
+        const existingConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
+        if (existingConfig) {
+          await setAgentEnabled(input.organizationId, 'code_review', platform, input.isEnabled);
+        } else if (input.isEnabled) {
+          await upsertAgentConfig({
+            organizationId: input.organizationId,
+            agentType: 'code_review',
+            platform,
+            isEnabled: true,
+            createdBy: ctx.user.id,
+            config: {
+              review_style: 'balanced',
+              focus_areas: [],
+              custom_instructions: null,
+              model_slug: PRIMARY_DEFAULT_MODEL,
+              thinking_effort: null,
+              gate_threshold: 'off',
+              repository_selection_mode: 'all',
+              selected_repository_ids: [],
+              manually_added_repositories: [],
+              disable_review_md: true,
+              review_memory_enabled: false,
+              review_analytics_enabled: false,
+            },
+          });
+        }
         await clearCodeReviewActionRequiredState({ owner, platform });
 
         // Audit log

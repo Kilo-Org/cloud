@@ -274,6 +274,13 @@ describe('getAuthorizedOrgContext', () => {
         invited_by: 'test-admin',
       });
 
+      await db.insert(organization_memberships).values({
+        organization_id: childOrganization.id,
+        kilo_user_id: parentOwner.id,
+        role: 'member',
+        invited_by: 'test-admin',
+      });
+
       const mockGetUserFromAuth: typeof getUserFromAuth = async () => ({
         user: parentOwner,
         authFailedResponse: null,

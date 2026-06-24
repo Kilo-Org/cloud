@@ -14,13 +14,17 @@ export const OrganizationIdInputSchema = z.object({
 });
 
 const parentOrganizationAccessRoles = ['owner', 'billing_manager'] satisfies OrganizationRole[];
+const rolePriority = ['owner', 'billing_manager', 'member'] satisfies OrganizationRole[];
 
 function allowedRole(
   rows: { role: OrganizationRole }[],
   roles?: OrganizationRole[]
 ): OrganizationRole | null {
-  if (!roles || roles.length === 0) return rows[0]?.role ?? null;
-  return rows.find(row => roles.includes(row.role))?.role ?? null;
+  const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
+  return (
+    rolePriority.find(role => allowedRoles.includes(role) && rows.some(row => row.role === role)) ??
+    null
+  );
 }
 
 export async function ensureOrganizationAccess(

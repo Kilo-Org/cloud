@@ -1,5 +1,5 @@
 import { storage } from '#imports';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { z } from 'zod';
@@ -226,8 +226,8 @@ export const useStoredAgentConversations = (
 ): readonly [
   StoredAgentConversationStore,
   Dispatch<SetStateAction<StoredAgentConversationStore>>,
+  boolean,
 ] => {
-  const queryClient = useQueryClient();
   const [store, setStore] = useState<StoredAgentConversationStore>(() =>
     normalizeStoredConversations({ defaultEvents: createDefaultEvents() })
   );
@@ -247,11 +247,10 @@ export const useStoredAgentConversations = (
 
   useEffect(() => {
     if (isLoaded) {
-      queryClient.setQueryData(conversationStoreQueryKey, store);
       void storage.setItem(conversationStorageKey, toPersistedConversationStore(store));
       void storage.removeItem(legacyConversationStorageKey);
     }
-  }, [isLoaded, queryClient, store]);
+  }, [isLoaded, store]);
 
-  return [store, setStore];
+  return [store, setStore, isLoaded];
 };

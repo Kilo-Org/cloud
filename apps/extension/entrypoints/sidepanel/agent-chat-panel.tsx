@@ -161,9 +161,8 @@ export const AgentChatPanel = ({
   organizationId: string | undefined;
 }): JSX.Element => {
   const [draft, setDraft] = useState('');
-  const [conversationStore, setConversationStore] = useStoredAgentConversations(
-    createDefaultConversationEvents
-  );
+  const [conversationStore, setConversationStore, isConversationStoreLoaded] =
+    useStoredAgentConversations(createDefaultConversationEvents);
   const [runningConversationIds, setRunningConversationIds] = useState<string[]>([]);
   const conversationStoreRef = useRef(conversationStore);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
@@ -204,7 +203,10 @@ export const AgentChatPanel = ({
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
   const modelControlValue = modelOptions.length === 0 ? '' : model;
   const isSendDisabled =
-    draft.trim() === '' || modelControlValue === '' || selectedTabId === undefined;
+    !isConversationStoreLoaded ||
+    draft.trim() === '' ||
+    modelControlValue === '' ||
+    selectedTabId === undefined;
 
   conversationStoreRef.current = conversationStore;
 
@@ -424,6 +426,7 @@ export const AgentChatPanel = ({
     const isConversationRunning = runningConversationIds.includes(conversation.id);
 
     if (
+      !isConversationStoreLoaded ||
       text === '' ||
       isConversationRunning ||
       conversationModel === '' ||

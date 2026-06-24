@@ -1,4 +1,4 @@
-/* eslint-disable import/no-nodejs-modules, max-lines */
+/* eslint-disable import/no-nodejs-modules, jest/no-conditional-in-test, max-lines */
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
@@ -36,6 +36,60 @@ const getConversationScrollState = (
       }),
     };
   });
+const installTimedChatStream = async (page: Page, chunks: string[]): Promise<void> => {
+  await page.evaluate(streamChunks => {
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    const encoder = new TextEncoder();
+
+    globalThis.fetch = ((input, init) => {
+      let url = '';
+
+      if (typeof input === 'string') {
+        url = input;
+      } else if (input instanceof Request) {
+        ({ url } = input);
+      } else if (input instanceof URL) {
+        ({ href: url } = input);
+      }
+
+      if (!url.endsWith('/api/gateway/v1/chat/completions')) {
+        return originalFetch(input, init);
+      }
+
+      let chunkIndex = 0;
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const push = (): void => {
+            const chunk = streamChunks[chunkIndex];
+
+            if (chunk === undefined) {
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
+              return;
+            }
+
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ choices: [{ delta: { content: chunk } }] })}\n\n`
+              )
+            );
+            chunkIndex += 1;
+            setTimeout(push, 1);
+          };
+
+          push();
+        },
+      });
+
+      return Promise.resolve(
+        new Response(body, {
+          headers: { 'content-type': 'text/event-stream' },
+          status: 200,
+        })
+      );
+    }) as typeof globalThis.fetch;
+  }, chunks);
+};
 
 const conversationStoreWithTitle = (title: string): unknown => ({
   activeConversationId: 'conversation-1',
@@ -327,6 +381,62 @@ test('streaming messages stay pinned to latest without scroll bounce', async () 
     const scrollState = await getConversationScrollState(sidePanel);
 
     expect(scrollState).toStrictEqual({ isPinned: true, movedBackward: false });
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('rapid streaming does not flicker conversation bubbles', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+  const chunks = Array.from({ length: 80 }, (_value, index) => `chunk-${index} `);
+
+  try {
+    await mockKiloApi(context, {
+      toolNames: safeToolNames,
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+    await installTimedChatStream(sidePanel, chunks);
+    await sidePanel.getByLabel('Agent conversation').evaluate(element => {
+      const state = globalThis as typeof globalThis & {
+        __kiloBubbleTextChanges?: number;
+        __kiloLastBubbleText?: string;
+      };
+
+      state.__kiloBubbleTextChanges = 0;
+      state.__kiloLastBubbleText = element.textContent ?? '';
+      new MutationObserver(() => {
+        const text = element.textContent ?? '';
+
+        if (text !== state.__kiloLastBubbleText) {
+          state.__kiloBubbleTextChanges = (state.__kiloBubbleTextChanges ?? 0) + 1;
+          state.__kiloLastBubbleText = text;
+        }
+      }).observe(element, { characterData: true, childList: true, subtree: true });
+    });
+
+    await sidePanel.getByLabel('Message agent').fill('Stream quickly');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText(/chunk-70/u)).toBeVisible();
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
+
+    const textChangeCount = await sidePanel.evaluate(() => {
+      const state = globalThis as typeof globalThis & { __kiloBubbleTextChanges?: number };
+
+      return state.__kiloBubbleTextChanges ?? 0;
+    });
+
+    expect(textChangeCount).toBeLessThan(200);
   } finally {
     await context.close();
     await fixture.close();

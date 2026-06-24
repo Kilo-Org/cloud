@@ -627,6 +627,22 @@ describe('restoreSession', () => {
     expect(fs.existsSync(path.join(workspace, 'old-file.txt'))).toBe(false);
   });
 
+  it('removes stale import failure diagnostics after a successful import', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const diagnosticPath = getKiloImportDiagnosticPath(process.env.WRAPPER_LOG_PATH);
+    fs.writeFileSync(diagnosticPath, '{"version":1,"stderr":{"text":"old failure"}}');
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 0, skipped: 0, total: 0 },
+    });
+    expect(fs.existsSync(diagnosticPath)).toBe(false);
+  });
+
   it('prefers top-level patch session diffs over legacy message summaries', async () => {
     const repo = path.join(tmpDir, 'repo');
     fs.mkdirSync(path.join(repo, 'src'), { recursive: true });

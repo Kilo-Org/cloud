@@ -717,6 +717,14 @@ async function main() {
       timestamp: new Date().toISOString(),
     });
 
+    // Start the final upload before startup cleanup so the sandbox grace window is reserved for logs.
+    const finalLogUpload =
+      uploader &&
+      Promise.race([
+        uploader.flushNow().catch(() => {}),
+        new Promise<void>(resolve => setTimeout(resolve, WRAPPER_FINAL_LOG_UPLOAD_TIMEOUT_MS)),
+      ]);
+
     workspaceBootstrapController.abort();
     const workspaceBootstraps = [...activeWorkspaceBootstraps];
     const runtimeStartups = [...activeRuntimeStartups];
@@ -734,12 +742,7 @@ async function main() {
     globalFeedManager.close();
 
     // Best-effort final log upload
-    if (uploader) {
-      const uploadTimeout = new Promise<void>(resolve =>
-        setTimeout(resolve, WRAPPER_FINAL_LOG_UPLOAD_TIMEOUT_MS)
-      );
-      await Promise.race([uploader.flushNow().catch(() => {}), uploadTimeout]);
-    }
+    await finalLogUpload;
 
     // Abort kilo session if running
     const session = state.currentSession;

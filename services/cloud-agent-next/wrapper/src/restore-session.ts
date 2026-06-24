@@ -91,6 +91,14 @@ function tryUnlink(filePath: string): void {
   }
 }
 
+function tryRemoveImportFailureDiagnostic(filePath: string): void {
+  try {
+    fs.unlinkSync(filePath);
+  } catch {
+    // absent diagnostics are expected after successful imports
+  }
+}
+
 function resolveKilocodeToken(): string | undefined {
   if (process.env.KILOCODE_TOKEN) {
     return process.env.KILOCODE_TOKEN;
@@ -748,6 +756,7 @@ export async function restoreSession(
     log(
       `kilo import finished outcome=ok exitCode=${importResult.exitCode} kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} elapsedMs=${importElapsedMs}`
     );
+    tryRemoveImportFailureDiagnostic(diagnosticPath);
 
     // ---- Step 3: Apply diffs ----
     // Extract diffs in a subprocess so the full snapshot JSON is never loaded

@@ -55,7 +55,9 @@ function startInputToSessionCreateRequest(
         ? { type: 'github', repo: repo.repo, branch: repo.branch }
         : repo.type === 'gitlab'
           ? { type: 'gitlab', url: repo.url, branch: repo.branch }
-          : { type: 'git', url: repo.url, token: repo.token, branch: repo.branch },
+          : repo.type === 'git'
+            ? { type: 'git', url: repo.url, token: repo.token, branch: repo.branch }
+            : { type: 'empty-local' },
     profile: profile
       ? {
           id: profile.id,

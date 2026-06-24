@@ -155,6 +155,47 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     ).toBe(true);
   });
 
+  it('initializes an empty local Git repository without cloning or fetching', async () => {
+    const request = makeRequest(tmpDir, {
+      repo: { kind: 'empty-local' },
+      materialized: {
+        env: {
+          HOME: path.join(tmpDir, 'home'),
+          KILOCODE_TOKEN: 'kilo-token',
+        },
+        setupCommands: [],
+      },
+    });
+    const gitCalls: string[][] = [];
+
+    const result = await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        gitCalls.push(args);
+        if (args[0] === 'init') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: false,
+        imported: true,
+        diffs: { applied: 0, skipped: 0, total: 0 },
+      }),
+    });
+
+    expect(result.workspaceWasWarm).toBe(false);
+    expect(gitCalls).toContainEqual(['init']);
+    expect(gitCalls).toContainEqual(['config', 'user.name', 'Kilo Code Cloud']);
+    expect(gitCalls).toContainEqual(['config', 'user.email', 'agent@kilocode.ai']);
+    expect(gitCalls).toContainEqual(['checkout', '--progress', '-B', 'main']);
+    expect(gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(gitCalls.some(args => args[0] === 'fetch')).toBe(false);
+    expect(
+      fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
+    ).toBe(true);
+  });
+
   it('uses activity watchdogs and reports sanitized progress for long git operations', async () => {
     const request = makeRequest(tmpDir);
     request.materialized.setupCommands = [];

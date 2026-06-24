@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
   type WrapperBootstrapAttachment,
+  type WrapperBootstrapRepoSource,
   type WrapperPromptRequest,
   type WrapperPromptPart,
   type WrapperSessionReadyRequest,
@@ -212,15 +213,35 @@ async function cleanupWorkspace(request: WrapperSessionReadyRequest): Promise<vo
   ]);
 }
 
+function requireRepositorySource(request: WrapperSessionReadyRequest): WrapperBootstrapRepoSource {
+  if (!request.repo) {
+    throw new Error('Session metadata is missing a repository source');
+  }
+  return request.repo;
+}
+
 async function cloneRepository(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner,
   progress: BootstrapProgress | undefined,
   signal: AbortSignal
 ): Promise<void> {
-  const repo = request.repo;
-  if (!repo) {
-    throw new Error('Session metadata is missing a repository source');
+  const repo = requireRepositorySource(request);
+
+  if (repo.kind === 'empty-local') {
+    await removePath(request.workspace.workspacePath, signal);
+    await fs.mkdir(request.workspace.workspacePath, { recursive: true });
+
+    const initResult = await runGit(['init'], {
+      cwd: request.workspace.workspacePath,
+      timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+    });
+    if (initResult.exitCode !== 0) {
+      throw gitOperationError(initResult, 'clone');
+    }
+
+    await configureGitAuthor(runGit, request.workspace.workspacePath);
+    return;
   }
 
   const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
@@ -240,16 +261,26 @@ async function cloneRepository(
     throw gitOperationError(result, 'clone');
   }
 
-  const authorName =
-    repo.kind === 'github' ? (repo.gitAuthor?.name ?? 'Kilo Code Cloud') : 'Kilo Code Cloud';
-  const authorEmail =
-    repo.kind === 'github' ? (repo.gitAuthor?.email ?? 'agent@kilocode.ai') : 'agent@kilocode.ai';
+  await configureGitAuthor(
+    runGit,
+    request.workspace.workspacePath,
+    repo.kind === 'github' ? repo.gitAuthor : undefined
+  );
+}
+
+async function configureGitAuthor(
+  runGit: GitRunner,
+  workspacePath: string,
+  gitAuthor?: { name: string; email: string }
+): Promise<void> {
+  const authorName = gitAuthor?.name ?? 'Kilo Code Cloud';
+  const authorEmail = gitAuthor?.email ?? 'agent@kilocode.ai';
   const authorNameResult = await runGit(['config', 'user.name', authorName], {
-    cwd: request.workspace.workspacePath,
+    cwd: workspacePath,
     timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
   });
   const authorEmailResult = await runGit(['config', 'user.email', authorEmail], {
-    cwd: request.workspace.workspacePath,
+    cwd: workspacePath,
     timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
   });
   if (authorNameResult.exitCode !== 0 || authorEmailResult.exitCode !== 0) {
@@ -311,6 +342,17 @@ async function prepareBranch(
   progress: BootstrapProgress | undefined
 ): Promise<void> {
   const { workspacePath, branchName, strictBranch } = request.workspace;
+  if (request.repo?.kind === 'empty-local') {
+    const result = await runGit(
+      ['checkout', '--progress', '-B', branchName],
+      longGitOptions(progress, 'branch', 'Creating branch...', workspacePath)
+    );
+    if (result.exitCode !== 0) {
+      throw gitOperationError(result, 'checkout');
+    }
+    return;
+  }
+
   if (strictBranch && isSyntheticReviewRef(branchName)) {
     await fetchSyntheticReviewRef(runGit, workspacePath, branchName, progress);
     return;
@@ -369,7 +411,7 @@ async function refreshGitRemoteToken(
   runGit: GitRunner
 ): Promise<void> {
   const repo = request.repo;
-  if (!repo?.refreshRemote || !repo.token) return;
+  if (!repo || repo.kind === 'empty-local' || !repo.refreshRemote || !repo.token) return;
 
   const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
   const platform = repo.kind === 'git' ? repo.platform : 'github';
@@ -649,6 +691,8 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     await ensureWorkspaceDirectories(request);
     signal.throwIfAborted();
 
+    const repo = requireRepositorySource(request);
+
     if (workspaceNeedsBootstrap) {
       await fs.rm(gitBootstrapMarkerPath(request.workspace.workspacePath), { force: true });
     }
@@ -662,12 +706,15 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       await refreshGitRemoteToken(request, runGit);
       logToFile(`bootstrap warm workspace remote ready kiloSessionId=${request.kiloSessionId}`);
     } else {
-      progress?.('cloning', 'Cloning repository...');
+      progress?.(
+        'cloning',
+        repo.kind === 'empty-local' ? 'Initializing repository...' : 'Cloning repository...'
+      );
       logToFile(
-        `bootstrap cold workspace cloning repository kiloSessionId=${request.kiloSessionId}`
+        `bootstrap cold workspace preparing repository kiloSessionId=${request.kiloSessionId} repoKind=${repo.kind}`
       );
       await cloneRepository(request, runGit, progress, signal);
-      logToFile(`bootstrap cold workspace clone ready kiloSessionId=${request.kiloSessionId}`);
+      logToFile(`bootstrap cold workspace repository ready kiloSessionId=${request.kiloSessionId}`);
     }
 
     if (workspaceNeedsBootstrap) {

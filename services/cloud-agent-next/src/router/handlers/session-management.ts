@@ -26,6 +26,7 @@ import {
 import { readProfileBundle } from '../../session-profile.js';
 import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
+import { metadataRepositoryUpstreamBranch } from '../../persistence/session-metadata.js';
 import type { MessageResultRPCResponse } from '../../session/message-result.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
@@ -38,6 +39,7 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
   if (repository.type === 'github') {
     return { githubRepo: repository.repo, platform: repository.platform ?? 'github' };
   }
+  if (repository.type === 'empty-local') return {};
   return {
     gitUrl: repository.url,
     platform: repository.platform ?? (repository.type === 'gitlab' ? 'gitlab' : undefined),
@@ -288,7 +290,7 @@ export function createSessionManagementHandlers() {
             model: sessionMetadata.agent?.model,
             variant: sessionMetadata.agent?.variant,
             autoCommit: sessionMetadata.finalization?.autoCommit,
-            upstreamBranch: sessionMetadata.repository?.upstreamBranch,
+            upstreamBranch: metadataRepositoryUpstreamBranch(sessionMetadata.repository),
             runtimeAgents: metadataProfile.runtimeAgents?.map(agent => ({
               slug: agent.slug,
               name: agent.name,

@@ -70,6 +70,11 @@ const MetadataRepositorySchema = z.discriminatedUnion('type', [
       ...RepositoryCommonSchema,
     })
     .strip(),
+  z
+    .object({
+      type: z.literal('empty-local'),
+    })
+    .strip(),
 ]);
 
 const CurrentMetadataInitialTurnSchema = z.discriminatedUnion('type', [
@@ -173,6 +178,13 @@ export const CurrentSessionMetadataSchema = z
   .strip();
 
 export type SessionMetadata = z.infer<typeof CurrentSessionMetadataSchema>;
+
+export function metadataRepositoryUpstreamBranch(
+  repository: SessionMetadata['repository']
+): string | undefined {
+  if (!repository || repository.type === 'empty-local') return undefined;
+  return repository.upstreamBranch;
+}
 
 type LegacySessionMetadata = z.output<typeof LegacySessionMetadataSchema>;
 

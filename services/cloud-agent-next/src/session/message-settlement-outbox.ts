@@ -6,7 +6,10 @@ import type {
   SendCloudAgentSessionNotificationResult,
 } from '../notifications-binding.js';
 import { buildCloudAgentPushBody } from '../notifications/producer.js';
-import type { SessionMetadata } from '../persistence/session-metadata.js';
+import {
+  metadataRepositoryUpstreamBranch,
+  type SessionMetadata,
+} from '../persistence/session-metadata.js';
 import { countPendingSessionMessages, type SessionQueueStorage } from './pending-messages.js';
 import {
   getSessionMessageState,
@@ -468,7 +471,7 @@ export function createMessageSettlementOutbox(
               error: failure?.message ?? legacyErrorMessage,
             }),
           }),
-      lastSeenBranch: metadata?.repository?.upstreamBranch,
+      lastSeenBranch: metadataRepositoryUpstreamBranch(metadata?.repository),
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,
       lastAssistantMessageText,

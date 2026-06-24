@@ -7,6 +7,8 @@ const mockPrepareSession =
   jest.fn<
     (input: {
       prompt: string;
+      repositorySource?: 'empty-local';
+      gitUrl?: string;
       autoInitiate?: boolean;
       mcpServers?: Record<string, unknown>;
     }) => Promise<{ cloudAgentSessionId: string; kiloSessionId: string }>
@@ -86,7 +88,7 @@ describe('adminKiloUsageAiRouter.start', () => {
 
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        gitUrl: 'https://github.com/Kilo-Org/KiloMan.git',
+        repositorySource: 'empty-local',
         mode: 'usage-analyst',
         model: 'kilo-auto/balanced',
         prompt: 'Blank Ask Usage session. Wait for the user to ask a question.',
@@ -109,6 +111,7 @@ describe('adminKiloUsageAiRouter.start', () => {
         },
       })
     );
+    expect(mockPrepareSession.mock.calls[0]?.[0]).not.toHaveProperty('gitUrl');
     expect(mockPrepareSession.mock.calls[0]?.[0].prompt).not.toContain('30-day overview');
   });
 });

@@ -222,7 +222,7 @@ describe('effective session profile policy', () => {
     { origin: 'linear', expected: 'include-web-defaults' },
     { origin: 'discord', expected: 'include-web-defaults' },
     { origin: 'app-builder', expected: 'include-web-defaults' },
-    { origin: 'kilo-usage-ai', expected: 'include-web-defaults' },
+    { origin: 'kilo-usage-ai', expected: 'explicit-profile-only' },
     { origin: 'webhook', expected: 'include-web-defaults' },
     { origin: 'scheduled', expected: 'include-web-defaults' },
     { origin: undefined, expected: 'explicit-profile-only' },
@@ -609,6 +609,26 @@ describe('prepareSession endpoint', () => {
         },
       })
     );
+  });
+
+  it('registers an explicit empty local repository source', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Ask a stats question later',
+      mode: 'code',
+      model: 'claude-3',
+      repositorySource: 'empty-local',
+      createdOnPlatform: 'kilo-usage-ai',
+    });
+
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repository: { type: 'empty-local' },
+      })
+    );
+    expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
   });
 
   it('auto-initiates through grouped creation with canonicalized legacy initial attachments', async () => {
@@ -1507,6 +1527,23 @@ describe('schema validation', () => {
         prompt: 'Test',
         mode: 'code',
         model: 'claude-3',
+      }).success
+    ).toBe(false);
+    expect(
+      schemas.PrepareSessionInput.safeParse({
+        prompt: 'Test',
+        mode: 'code',
+        model: 'claude-3',
+        repositorySource: 'empty-local',
+      }).success
+    ).toBe(true);
+    expect(
+      schemas.PrepareSessionInput.safeParse({
+        prompt: 'Test',
+        mode: 'code',
+        model: 'claude-3',
+        repositorySource: 'empty-local',
+        shallow: false,
       }).success
     ).toBe(false);
   });

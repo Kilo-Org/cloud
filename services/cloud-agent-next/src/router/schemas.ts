@@ -147,6 +147,54 @@ export function validateGitSource<T extends { githubRepo?: unknown; gitUrl?: unk
   return (hasGithubRepo || hasGitUrl) && !(hasGithubRepo && hasGitUrl);
 }
 
+function validatePrepareSessionRepositorySource(
+  data: {
+    githubRepo?: unknown;
+    gitUrl?: unknown;
+    repositorySource?: 'empty-local';
+    gitToken?: unknown;
+    githubToken?: unknown;
+    platform?: unknown;
+    upstreamBranch?: unknown;
+    shallow?: unknown;
+    devcontainer?: unknown;
+  },
+  ctx: z.RefinementCtx
+): void {
+  const sourceCount = [
+    Boolean(data.githubRepo),
+    Boolean(data.gitUrl),
+    data.repositorySource === 'empty-local',
+  ].filter(Boolean).length;
+
+  if (sourceCount !== 1) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['githubRepo'],
+      message: "Must provide exactly one of githubRepo, gitUrl, or repositorySource: 'empty-local'",
+    });
+  }
+
+  if (data.repositorySource !== 'empty-local') return;
+
+  for (const field of [
+    'gitToken',
+    'githubToken',
+    'platform',
+    'upstreamBranch',
+    'shallow',
+    'devcontainer',
+  ] as const) {
+    if (data[field] !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [field],
+        message: `${field} cannot be used with repositorySource: 'empty-local'`,
+      });
+    }
+  }
+}
+
 const requiresAppendSystemPrompt = (data: {
   mode?: string | null;
   appendSystemPrompt?: string | null;
@@ -368,7 +416,7 @@ export const PrepareSessionInput = z
       .regex(/^[a-zA-Z]+$/)
       .optional(),
 
-    // Repository - one of these pairs required
+    // Repository - one source required
     githubRepo: githubRepoSchema
       .optional()
       .describe('GitHub repository in format org/repo (mutually exclusive with gitUrl)'),
@@ -387,6 +435,10 @@ export const PrepareSessionInput = z
       .describe(
         'Git token for generic git repositories. Ignored when platform selects a managed provider.'
       ),
+    repositorySource: z
+      .literal('empty-local')
+      .optional()
+      .describe('Create a brand-new local Git repository without a remote'),
     platform: z
       .enum(['github', 'gitlab'])
       .optional()
@@ -468,7 +520,6 @@ export const PrepareSessionInput = z
     shallow: z
       .boolean()
       .optional()
-      .default(false)
       .describe(
         'Perform a shallow clone (depth: 1) for faster checkout and reduced disk usage. Useful when full git history is not needed.'
       ),
@@ -500,7 +551,6 @@ export const PrepareSessionInput = z
     devcontainer: z
       .boolean()
       .optional()
-      .default(false)
       .describe(
         'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
       ),
@@ -508,16 +558,18 @@ export const PrepareSessionInput = z
       'Discriminated initial execution payload - command variant allows starting a session with a slash command instead of a free-text prompt'
     ),
   })
-  .refine(validateGitSource, {
-    message: 'Must provide either githubRepo or gitUrl, but not both',
-    path: ['githubRepo'],
-  })
+  .superRefine(validatePrepareSessionRepositorySource)
   .superRefine(rejectAmbiguousAttachments)
   .refine(requiresAppendSystemPrompt, {
     message: 'appendSystemPrompt is required when mode is custom',
     path: ['appendSystemPrompt'],
   })
-  .superRefine(validateModeAgainstInlineRuntimeAgents);
+  .superRefine(validateModeAgainstInlineRuntimeAgents)
+  .transform(input => ({
+    ...input,
+    shallow: input.shallow ?? false,
+    devcontainer: input.devcontainer ?? false,
+  }));
 
 /** Output schema for prepareSession endpoint */
 export const PrepareSessionOutput = z.object({
@@ -550,6 +602,7 @@ export const PrepareSessionOutput = z.object({
  * - `github`: uses `repo` (org/repo); cloud-agent-next resolves tokens.
  * - `gitlab`: uses clone `url`; cloud-agent-next resolves managed GitLab tokens.
  * - `git`: generic HTTPS clone URL with optional explicit token.
+ * - `empty-local`: initializes a brand-new local Git repository with no remote.
  */
 export const RepositoryInputSchema = z.discriminatedUnion('type', [
   z.object({
@@ -567,6 +620,9 @@ export const RepositoryInputSchema = z.discriminatedUnion('type', [
     url: gitUrlSchema.describe('Git repository HTTPS URL'),
     token: z.string().optional().describe('Git authentication token'),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
+  }),
+  z.object({
+    type: z.literal('empty-local'),
   }),
 ]);
 

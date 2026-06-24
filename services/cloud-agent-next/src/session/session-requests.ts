@@ -32,6 +32,9 @@ export type SessionRepositoryRequest =
       url: string;
       token?: string;
       branch?: string;
+    }
+  | {
+      type: 'empty-local';
     };
 
 export type SessionRuntimeIntent = {

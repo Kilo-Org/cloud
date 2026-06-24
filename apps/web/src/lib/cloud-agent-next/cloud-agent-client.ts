@@ -104,6 +104,8 @@ export type PrepareSessionInput = {
   // Generic git params for GitLab and other providers
   gitUrl?: string;
   gitToken?: string;
+  /** Explicit request for a brand-new local Git repository with no remote */
+  repositorySource?: 'empty-local';
   /** Explicit platform type for correct env var setup (avoids URL-based detection) */
   platform?: 'github' | 'gitlab';
   // Common params
@@ -610,6 +612,7 @@ export class CloudAgentNextClient {
     console.log('[CloudAgentNextClient.prepareSession] Starting request', {
       githubRepo: input.githubRepo,
       gitUrl: input.gitUrl,
+      repositorySource: input.repositorySource,
       kilocodeOrganizationId: input.kilocodeOrganizationId,
       mode: input.mode,
       model: input.model,

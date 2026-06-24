@@ -17,7 +17,6 @@ import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 const KILO_USAGE_AI_CLIENT_ID = 'internal:kilo-usage-ai';
 const KILO_USAGE_AI_CREATED_ON_PLATFORM = 'kilo-usage-ai';
 const KILO_USAGE_AI_MODEL = 'kilo-auto/balanced';
-const KILO_USAGE_AI_REPOSITORY_URL = 'https://github.com/Kilo-Org/KiloMan.git';
 const KILO_USAGE_AI_TOOL_NAME = 'kilo_usage_query_kilo_dataset';
 
 const usageAnalystPermission = {
@@ -98,7 +97,7 @@ export const adminKiloUsageAiRouter = createTRPCRouter({
 
     try {
       const session = await client.prepareSession({
-        gitUrl: KILO_USAGE_AI_REPOSITORY_URL,
+        repositorySource: 'empty-local',
         mode: 'usage-analyst',
         model: KILO_USAGE_AI_MODEL,
         prompt: blankUsageAnalysisPrompt,

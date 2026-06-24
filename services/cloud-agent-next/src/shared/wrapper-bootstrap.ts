@@ -26,6 +26,9 @@ export type WrapperBootstrapRepoSource =
       platform?: 'github' | 'gitlab';
       shallow?: boolean;
       refreshRemote?: boolean;
+    }
+  | {
+      kind: 'empty-local';
     };
 
 export type WrapperBootstrapWorkspace = {

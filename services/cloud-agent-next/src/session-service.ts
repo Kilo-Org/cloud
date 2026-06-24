@@ -37,7 +37,10 @@ import type {
   RuntimeSkill,
   RuntimeAgent,
 } from './persistence/types.js';
-import { parseSessionMetadata } from './persistence/session-metadata.js';
+import {
+  metadataRepositoryUpstreamBranch,
+  parseSessionMetadata,
+} from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
 import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import type { MCPSecretValue } from './router/schemas.js';
@@ -939,6 +942,7 @@ function gitRepository(metadata: CloudAgentSessionState) {
 function repositoryPlatform(metadata: CloudAgentSessionState): 'github' | 'gitlab' | undefined {
   const repository = metadata.repository;
   if (!repository) return undefined;
+  if (repository.type === 'empty-local') return undefined;
   if (repository.platform) return repository.platform;
   if (repository.type === 'github') return 'github';
   if (repository.type === 'gitlab') return 'gitlab';
@@ -1512,9 +1516,9 @@ export class SessionService {
     const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata);
     const workspacePath = getSessionWorkspacePath(orgId, userId, sessionId);
     const sessionHome = getSessionHomePath(sessionId);
+    const upstreamBranch = metadataRepositoryUpstreamBranch(metadata.repository);
     const branchName =
-      metadata.workspace?.branchName ??
-      determineBranchName(sessionId, metadata.repository?.upstreamBranch);
+      metadata.workspace?.branchName ?? determineBranchName(sessionId, upstreamBranch);
     const profile = readProfileBundle(metadata);
     const github = githubRepository(metadata);
     const git = gitRepository(metadata);
@@ -1534,7 +1538,7 @@ export class SessionService {
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
       glabIsOAuth2: resolvedTokens.glabIsOAuth2,
-      upstreamBranch: metadata.repository?.upstreamBranch,
+      upstreamBranch,
       branchName,
       envVars: profile.envVars,
       botId: metadata.identity.botId,
@@ -1580,7 +1584,7 @@ export class SessionService {
       userId,
       sessionId,
       wrapper,
-      upstreamBranch: metadata.repository?.upstreamBranch,
+      upstreamBranch,
     });
 
     const attachments =
@@ -1605,12 +1609,8 @@ export class SessionService {
         workspacePath,
         sessionHome,
         branchName,
-        ...(metadata.repository?.upstreamBranch
-          ? { upstreamBranch: metadata.repository.upstreamBranch }
-          : {}),
-        strictBranch: Boolean(
-          metadata.repository?.upstreamBranch && !metadata.lifecycle.preparedAt
-        ),
+        ...(upstreamBranch ? { upstreamBranch } : {}),
+        strictBranch: Boolean(upstreamBranch && !metadata.lifecycle.preparedAt),
         preferSnapshot: metadata.lifecycle.preparedAt !== undefined,
       },
       ...(repo ? { repo } : {}),
@@ -1690,6 +1690,10 @@ export class SessionService {
     metadata: CloudAgentSessionState,
     tokens: ResolvedWorkspaceTokens
   ): WrapperBootstrapRepoSource | undefined {
+    if (metadata.repository?.type === 'empty-local') {
+      return { kind: 'empty-local' };
+    }
+
     const git = gitRepository(metadata);
     if (git) {
       return {
@@ -1743,9 +1747,9 @@ export class SessionService {
 
     const workspacePath = getSessionWorkspacePath(orgId, userId, sessionId);
     const sessionHome = getSessionHomePath(sessionId);
+    const upstreamBranch = metadataRepositoryUpstreamBranch(metadata.repository);
     const branchName =
-      metadata.workspace?.branchName ??
-      determineBranchName(sessionId, metadata.repository?.upstreamBranch);
+      metadata.workspace?.branchName ?? determineBranchName(sessionId, upstreamBranch);
     const context = this.buildContext({
       sandboxId,
       orgId,
@@ -1759,7 +1763,7 @@ export class SessionService {
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
       glabIsOAuth2: resolvedTokens.glabIsOAuth2,
-      upstreamBranch: metadata.repository?.upstreamBranch,
+      upstreamBranch,
       branchName,
       envVars: readProfileBundle(metadata).envVars,
       botId: metadata.identity.botId,
@@ -2069,12 +2073,13 @@ export class SessionService {
     // session was first prepared, but the recorded session branch is the
     // source of truth now, so `manageBranch(..., strict=false)` falls back to
     // creating the branch locally if needed.
-    if (metadata.repository?.upstreamBranch && !metadata.lifecycle.preparedAt) {
+    const upstreamBranch = metadataRepositoryUpstreamBranch(metadata.repository);
+    if (upstreamBranch && !metadata.lifecycle.preparedAt) {
       await manageBranch(session, workspacePath, branchName, true);
       return;
     }
 
-    if (metadata.repository?.upstreamBranch || metadata.workspace?.branchName) {
+    if (upstreamBranch || metadata.workspace?.branchName) {
       await manageBranch(session, workspacePath, branchName, false);
       return;
     }

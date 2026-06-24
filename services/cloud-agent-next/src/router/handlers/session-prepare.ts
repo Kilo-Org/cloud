@@ -55,7 +55,6 @@ const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
   'linear',
   'discord',
   'app-builder',
-  'kilo-usage-ai',
   'webhook',
   'scheduled',
 ]);
@@ -191,14 +190,16 @@ export function assertModeAvailableForProfile(mode: string, profile: SessionProf
 
 export function prepareInputToSessionCreateRequest(input: PrepareInput): SessionCreateRequest {
   const gitUrl = input.gitUrl;
-  if (!input.githubRepo && !gitUrl) {
+  if (!input.githubRepo && !gitUrl && input.repositorySource !== 'empty-local') {
     throw new TRPCError({
       code: 'BAD_REQUEST',
-      message: 'Must provide either githubRepo or gitUrl',
+      message: "Must provide githubRepo, gitUrl, or repositorySource: 'empty-local'",
     });
   }
   let repository: SessionCreateRequest['repository'];
-  if (input.githubRepo) {
+  if (input.repositorySource === 'empty-local') {
+    repository = { type: 'empty-local' };
+  } else if (input.githubRepo) {
     repository = {
       type: 'github',
       repo: input.githubRepo,
@@ -208,7 +209,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
     if (!gitUrl) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: 'Must provide either githubRepo or gitUrl',
+        message: "Must provide githubRepo, gitUrl, or repositorySource: 'empty-local'",
       });
     }
     repository =

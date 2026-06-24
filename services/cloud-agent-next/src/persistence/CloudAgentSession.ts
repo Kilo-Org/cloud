@@ -8,6 +8,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { OperationResult } from './types.js';
 import {
+  metadataRepositoryUpstreamBranch,
   parseSessionMetadata,
   serializeSessionMetadata,
   type SessionMetadata,
@@ -230,6 +231,9 @@ type GroupedRegisterSessionInput = {
         url: string;
         token?: string;
         branch?: string;
+      }
+    | {
+        type: 'empty-local';
       };
   profile?: SessionProfileBundle;
   finalization?: SessionFinalization;
@@ -349,7 +353,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       ...(status === 'completed'
         ? {}
         : { clientError: projectTerminalClientError({ status, error }) }),
-      lastSeenBranch: metadata.repository?.upstreamBranch,
+      lastSeenBranch: metadataRepositoryUpstreamBranch(metadata.repository),
       kiloSessionId: metadata.auth.kiloSessionId,
       gateResult,
       lastAssistantMessageText,
@@ -1235,6 +1239,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (!metadata) {
       throw new Error('Cannot update upstreamBranch: session metadata not found');
     }
+    if (metadata.repository?.type === 'empty-local') {
+      return;
+    }
     if (!metadata.repository) {
       throw new Error('Cannot update upstreamBranch: session repository metadata not found');
     }
@@ -1628,7 +1635,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
                 token: input.repository.token,
                 upstreamBranch: input.repository.branch,
               }
-            : undefined;
+            : input.repository?.type === 'empty-local'
+              ? { type: 'empty-local' }
+              : undefined;
 
     const metadata: SessionMetadata = {
       metadataSchemaVersion: 2,

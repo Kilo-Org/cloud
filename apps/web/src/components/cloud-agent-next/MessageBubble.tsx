@@ -3,7 +3,6 @@
 import { useCallback } from 'react';
 import { Scissors, Image, FileText, AlertCircle, Clock } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
-import type { AssistantMessage } from '@/types/opencode.gen';
 import type { MessageDeliveryState } from '@/lib/cloud-agent-sdk';
 import type { StoredMessage, Part, CompactionPart } from './types';
 import {
@@ -21,6 +20,7 @@ import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { stripImageContext } from '@/lib/app-builder/message-utils';
 import { getDeliveryBadge, type DeliveryBadge } from './delivery-badge';
+import { getAssistantErrorMessage } from './assistant-error-message';
 
 import LinkifyIt from 'linkify-it';
 
@@ -135,16 +135,6 @@ function getAssistantTextContent(parts: Part[]): string {
     .map(p => p.text)
     .join('\n\n')
     .trim();
-}
-
-/**
- * Extract a human-readable error message from an AssistantMessage error field.
- */
-function getAssistantErrorMessage(error: NonNullable<AssistantMessage['error']>): string {
-  if ('data' in error && 'message' in error.data && typeof error.data.message === 'string') {
-    return error.data.message;
-  }
-  return 'An error occurred while generating a response';
 }
 
 function DeliveryStatusIcon({ badge }: { badge: DeliveryBadge }) {

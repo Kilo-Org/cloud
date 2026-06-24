@@ -7,11 +7,15 @@ import {
   organization_memberships,
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import type { User, Organization } from '@kilocode/db/schema';
+
+jest.mock('@/lib/organizations/organization-billing', () => ({
+  getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_admin_org'),
+}));
 
 let adminUser: User;
 let adminWithoutCreditAccess: User;
@@ -790,6 +794,127 @@ describe('organization admin router', () => {
               parentOrganization.id,
             ])
           );
+      }
+    });
+  });
+
+  describe('hierarchy management', () => {
+    it('creates an empty child organization under a parent organization', async () => {
+      const searchPrefix = `Admin Create Child Org ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const caller = await createCallerForUser(adminUser.id);
+      let childOrganizationId: string | null = null;
+
+      try {
+        const result = await caller.organizations.admin.create({
+          name: `${searchPrefix} child`,
+          parentOrganizationId: parentOrganization.id,
+        });
+        childOrganizationId = result.organization.id;
+
+        const [childOrganization] = await db
+          .select({
+            parent_organization_id: organizations.parent_organization_id,
+            member_count: sql<number>`(
+              SELECT COUNT(*)::int
+              FROM ${organization_memberships}
+              WHERE ${organization_memberships.organization_id} = ${organizations.id}
+            )`,
+          })
+          .from(organizations)
+          .where(eq(organizations.id, childOrganizationId));
+
+        expect(result.organization.parent_organization_id).toBe(parentOrganization.id);
+        expect(childOrganization.parent_organization_id).toBe(parentOrganization.id);
+        expect(childOrganization.member_count).toBe(0);
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.parent_organization_id, parentOrganization.id));
+        if (childOrganizationId) {
+          await db.delete(organizations).where(eq(organizations.id, childOrganizationId));
+        }
+        await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+      }
+    });
+
+    it('sets an existing organization as a child organization', async () => {
+      const searchPrefix = `Admin Set Child Org ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        await caller.organizations.admin.setParent({
+          organizationId: childOrganization.id,
+          parentOrganizationId: parentOrganization.id,
+        });
+
+        const hierarchy = await caller.organizations.admin.getHierarchy({
+          organizationId: parentOrganization.id,
+        });
+
+        expect(hierarchy.children).toContainEqual({
+          id: childOrganization.id,
+          name: childOrganization.name,
+        });
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, childOrganization.id));
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [childOrganization.id, parentOrganization.id]));
+      }
+    });
+
+    it('rejects hierarchy cycles', async () => {
+      const searchPrefix = `Admin Hierarchy Cycle ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parentOrganization.id })
+          .where(eq(organizations.id, childOrganization.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: parentOrganization.id,
+            parentOrganizationId: childOrganization.id,
+          })
+        ).rejects.toThrow('Cannot create a cycle in the organization hierarchy');
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(inArray(organizations.id, [childOrganization.id, parentOrganization.id]));
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [childOrganization.id, parentOrganization.id]));
+      }
+    });
+
+    it('rejects self-parenting', async () => {
+      const organization = await createOrganization(
+        `Admin Hierarchy Self Parent ${crypto.randomUUID()}`,
+        adminUser.id
+      );
+
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: organization.id,
+            parentOrganizationId: organization.id,
+          })
+        ).rejects.toThrow('An organization cannot be its own parent');
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
       }
     });
   });

@@ -98,6 +98,7 @@ const OrganizationSearchResultSchema = z.object({
 
 const OrganizationCreateInputSchema = z.object({
   name: z.string().min(1, 'Organization name is required').trim(),
+  parentOrganizationId: z.uuid().nullable().optional(),
 });
 
 const OrganizationIdInputSchema = z.object({
@@ -107,6 +108,11 @@ const OrganizationIdInputSchema = z.object({
 const UpdateCreatedByInputSchema = z.object({
   organizationId: z.uuid(),
   userId: z.string().uuid().nullable(),
+});
+
+const SetParentOrganizationInputSchema = z.object({
+  organizationId: z.uuid(),
+  parentOrganizationId: z.uuid().nullable(),
 });
 
 const UpdateFreeTrialEndAtInputSchema = z.object({
@@ -187,12 +193,115 @@ const AddMemberInputSchema = z.object({
   role: z.enum(['owner', 'member', 'billing_manager']),
 });
 
+async function validateParentOrganizationChange(
+  organizationId: string,
+  parentOrganizationId: string | null
+) {
+  const [organization] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+
+  if (!organization) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Organization not found',
+    });
+  }
+
+  if (!parentOrganizationId) {
+    return;
+  }
+
+  if (organizationId === parentOrganizationId) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'An organization cannot be its own parent',
+    });
+  }
+
+  let currentParentId: string | null = parentOrganizationId;
+  const visitedOrganizationIds = new Set<string>();
+
+  while (currentParentId) {
+    if (currentParentId === organizationId) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Cannot create a cycle in the organization hierarchy',
+      });
+    }
+
+    if (visitedOrganizationIds.has(currentParentId)) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Existing organization hierarchy contains a cycle',
+      });
+    }
+    visitedOrganizationIds.add(currentParentId);
+
+    const [parentOrganization] = await db
+      .select({ parent_organization_id: organizations.parent_organization_id })
+      .from(organizations)
+      .where(and(eq(organizations.id, currentParentId), isNull(organizations.deleted_at)))
+      .limit(1);
+
+    if (!parentOrganization) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Parent organization not found',
+      });
+    }
+
+    currentParentId = parentOrganization.parent_organization_id;
+  }
+}
+
 export const organizationAdminRouter = createTRPCRouter({
   create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async opts => {
+    const parentOrganizationId = opts.input.parentOrganizationId ?? null;
+    if (parentOrganizationId) {
+      const [parentOrganization] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(and(eq(organizations.id, parentOrganizationId), isNull(organizations.deleted_at)))
+        .limit(1);
+
+      if (!parentOrganization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Parent organization not found',
+        });
+      }
+    }
+
     const organization = await createOrganization(opts.input.name);
+
+    const organizationWithParent = parentOrganizationId
+      ? { ...organization, parent_organization_id: parentOrganizationId }
+      : organization;
+
+    if (parentOrganizationId) {
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parentOrganizationId })
+        .where(eq(organizations.id, organization.id));
+    }
+
     // create stripe customer id on org creation
     await getOrCreateStripeCustomerIdForOrganization(organization.id);
-    return { organization };
+    return { organization: organizationWithParent };
+  }),
+
+  setParent: adminProcedure.input(SetParentOrganizationInputSchema).mutation(async ({ input }) => {
+    await validateParentOrganizationChange(input.organizationId, input.parentOrganizationId);
+
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: input.parentOrganizationId })
+      .where(eq(organizations.id, input.organizationId));
+
+    return successResult();
   }),
 
   updateCreatedBy: adminProcedure.input(UpdateCreatedByInputSchema).mutation(async ({ input }) => {

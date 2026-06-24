@@ -926,10 +926,7 @@ describe('organization admin router', () => {
           childOfOrganizationId: parentOrganization.id,
         });
 
-        expect(results.map(organization => organization.id)).toEqual([
-          addableOrganization.id,
-          childOfCandidate.id,
-        ]);
+        expect(results.map(organization => organization.id)).toEqual([addableOrganization.id]);
       } finally {
         await db
           .update(organizations)

@@ -1269,9 +1269,7 @@ export const organizationAdminRouter = createTRPCRouter({
         }
 
         conditions.push(ne(organizations.id, childOfOrganizationId));
-        conditions.push(
-          sql`${organizations.parent_organization_id} IS DISTINCT FROM ${childOfOrganizationId}`
-        );
+        conditions.push(isNull(organizations.parent_organization_id));
         conditions.push(
           sql`NOT EXISTS (SELECT 1 FROM ${organizations} child_organizations WHERE child_organizations.parent_organization_id = ${organizations.id} AND child_organizations.deleted_at IS NULL)`
         );

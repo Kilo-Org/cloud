@@ -69,7 +69,7 @@ High-confidence findings have **concrete quality concerns** **and** **absent sub
 - **Size:** +24,510 / -59, 40 files, 15 commits
 - **Quality concern:** Adds a new database table (`user_github_app_tokens`), encryption-key plumbing, OAuth callback routes, a migration, GDPR soft-delete handling, and worker utilities. While the code appears structured, a feature of this security sensitivity (token encryption, user-to-server GitHub authorization) should not land without human security review.
 - **AI-assisted indicator:** Entirely bot-authored; multiple self-reported "Refinery code review passed" comments from the same bot.
-- **Human validation:** None. Latest reviews: none. Comments are exclusively from `kilo-code-bot` and `github-actions` stale warning.
+- **Human validation:** None. Reviews are exclusively from `kilo-code-bot` (multiple `COMMENTED` reviews) and the only other activity is a `github-actions` stale warning.
 - **Confidence:** High
 - **Recommended action:** Require human security and domain review before merge. Do not rely solely on bot self-review.
 
@@ -102,7 +102,7 @@ Medium-confidence findings have either a quality concern **or** a clear validati
 
 ### 4. Large human-authored feature PRs with no human review
 
-These PRs are authored by humans but have only bot activity. The code may be high quality, but the absence of human review for large architectural changes is itself a risk.
+These PRs are authored by humans but have no independent human review. Author self-comments and follow-up commits may be present, but no reviewer has engaged with the change. The code may be high quality, but the absence of human review for large architectural changes is itself a risk.
 
 | PR | Author | Title | Size | Notes |
 |---|---|---|---|---|

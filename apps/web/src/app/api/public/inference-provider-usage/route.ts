@@ -43,6 +43,7 @@ const PROVIDER_ALIASES: Record<string, string> = {
   directbyok: 'other',
   googleaistudio: 'google',
   inceptron: 'inception',
+  martian: 'stealth',
   seed: 'bytedance',
   togetherai: 'together',
   unknown: 'other',

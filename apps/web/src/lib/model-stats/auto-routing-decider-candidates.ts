@@ -3,6 +3,7 @@ import { readDb } from '@/lib/drizzle';
 import {
   AUTO_DECIDER_DEFAULT_MAX_COST_USD,
   AUTO_DECIDER_DEFAULT_MIN_COST_USD,
+  isVirtualAutoModelId,
 } from '@kilocode/auto-routing-contracts';
 import { ModelStatsBenchmarksSchema, modelStats } from '@kilocode/db/schema';
 import { unprefixKiloGatewayModelId } from '@kilocode/worker-utils/kilo-model-id';
@@ -62,8 +63,10 @@ export function summarizeAutoRoutingDeciderCandidates(
     ) {
       continue;
     }
+    const id = unprefixKiloGatewayModelId(row.openrouterId) ?? row.openrouterId;
+    if (isVirtualAutoModelId(id)) continue;
     candidates.push({
-      id: unprefixKiloGatewayModelId(row.openrouterId) ?? row.openrouterId,
+      id,
       avgAttemptCostUsd: bench.avgAttemptCostUsd,
     });
   }

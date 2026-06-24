@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createAssistantMessage,
   createEvalToolCall,
@@ -106,6 +106,18 @@ describe('agent conversation events', () => {
     );
 
     expect(nextKey).not.toBe(firstKey);
+  });
+
+  it('does not reuse event ids across extension reloads', async () => {
+    vi.resetModules();
+    const firstSession = await import('./agent-conversation');
+    const firstId = firstSession.createAssistantMessage('First session reply').id;
+
+    vi.resetModules();
+    const secondSession = await import('./agent-conversation');
+    const secondId = secondSession.createAssistantMessage('Second session reply').id;
+
+    expect(secondId).not.toBe(firstId);
   });
 
   it('changes the scroll key when a streamed thinking block grows in place', () => {

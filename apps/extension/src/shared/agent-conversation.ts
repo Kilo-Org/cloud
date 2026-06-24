@@ -84,10 +84,12 @@ interface CreateToolResultOptions {
   readonly value?: unknown;
 }
 
+// Per-session prefix so the reset-on-reload counter never reissues a restored id.
+const eventIdSession = crypto.randomUUID();
 let nextEventId = 1;
 
 const createEventId = (): string => {
-  const id = `event-${nextEventId}`;
+  const id = `event-${eventIdSession}-${nextEventId}`;
   nextEventId += 1;
   return id;
 };

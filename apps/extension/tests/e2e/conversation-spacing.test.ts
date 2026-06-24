@@ -15,6 +15,7 @@ const safeToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page
 const startConversationGapSampler = (sidePanel: Page): Promise<void> =>
   sidePanel.evaluate(() => {
     Reflect.set(globalThis, '__kiloMaxConversationGap', 0);
+    Reflect.set(globalThis, '__kiloMinConversationGap', 0);
     requestAnimationFrame(function sampleMessageGaps(): void {
       const rows = [
         ...document.querySelectorAll('section[aria-label="Agent conversation"] [data-index]'),
@@ -41,6 +42,11 @@ const startConversationGapSampler = (sidePanel: Page): Promise<void> =>
         globalThis,
         '__kiloMaxConversationGap',
         Math.max(Number(Reflect.get(globalThis, '__kiloMaxConversationGap')), ...gaps, 0)
+      );
+      Reflect.set(
+        globalThis,
+        '__kiloMinConversationGap',
+        Math.min(Number(Reflect.get(globalThis, '__kiloMinConversationGap')), ...gaps, 0)
       );
       requestAnimationFrame(sampleMessageGaps);
     });
@@ -71,7 +77,10 @@ const getConversationGaps = (sidePanel: Page): Promise<number[]> =>
 const getMaxObservedGap = (sidePanel: Page): Promise<number> =>
   sidePanel.evaluate(() => Number(Reflect.get(globalThis, '__kiloMaxConversationGap')));
 
-test('short virtualized messages stay compactly spaced while appended', async () => {
+const getMinObservedGap = (sidePanel: Page): Promise<number> =>
+  sidePanel.evaluate(() => Number(Reflect.get(globalThis, '__kiloMinConversationGap')));
+
+test('short messages stay compactly spaced while appended', async () => {
   const fixture = await startFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 
@@ -112,7 +121,84 @@ test('short virtualized messages stay compactly spaced while appended', async ()
       .toBeGreaterThanOrEqual(6);
 
     expect(await getMaxObservedGap(sidePanel)).toBeLessThanOrEqual(16);
+    expect(await getMinObservedGap(sidePanel)).toBeGreaterThanOrEqual(0);
     expect(Math.max(...(await getConversationGaps(sidePanel)))).toBeLessThanOrEqual(16);
+    expect(Math.min(...(await getConversationGaps(sidePanel)))).toBeGreaterThanOrEqual(0);
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('tool rows stay spaced without overlapping message bubbles', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      firstCompletionEvents: [
+        {
+          choices: [
+            {
+              delta: {
+                content: 'Let me take a look at the current page for you!',
+              },
+            },
+          ],
+        },
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    function: {
+                      arguments: JSON.stringify({}),
+                      name: 'get_viewport_screenshot',
+                    },
+                    id: 'call_screenshot_1',
+                    index: 0,
+                    type: 'function',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+      modelInputModalities: ['text', 'image'],
+      toolNames: [
+        'get_page_snapshot',
+        'get_element_details',
+        'find_in_page',
+        'get_viewport_screenshot',
+      ],
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.setViewportSize({ height: 720, width: 360 });
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await sidePanel.reload();
+    await startConversationGapSampler(sidePanel);
+
+    await sidePanel.getByLabel('Message agent').fill('What do you see?');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+
+    await expect(sidePanel.getByText('get_viewport_screenshot completed')).toBeVisible();
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
+    await expect
+      .poll(() => sidePanel.locator(messageRowSelector).count())
+      .toBeGreaterThanOrEqual(4);
+
+    const finalGaps = await getConversationGaps(sidePanel);
+
+    expect(await getMinObservedGap(sidePanel)).toBeGreaterThanOrEqual(0);
+    expect(Math.min(...finalGaps)).toBeGreaterThanOrEqual(0);
   } finally {
     await context.close();
     await fixture.close();

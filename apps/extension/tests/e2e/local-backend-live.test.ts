@@ -16,6 +16,11 @@ interface ChatRequestSummary {
   readonly toolNames: string[];
 }
 
+interface ChatRequestOutcome {
+  readonly errorText: string | undefined;
+  readonly status: 'failed' | 'finished';
+}
+
 interface ConversationSample {
   readonly activeTab: string;
   readonly lastRowBottom: number | null;
@@ -78,6 +83,22 @@ const recordChatRequests = (context: BrowserContext, requests: ChatRequestSummar
   });
 };
 
+const recordChatRequestOutcomes = (
+  context: BrowserContext,
+  outcomes: ChatRequestOutcome[]
+): void => {
+  context.on('requestfailed', request => {
+    if (request.url().includes('/api/gateway/v1/chat/completions')) {
+      outcomes.push({ errorText: request.failure()?.errorText, status: 'failed' });
+    }
+  });
+  context.on('requestfinished', request => {
+    if (request.url().includes('/api/gateway/v1/chat/completions')) {
+      outcomes.push({ errorText: undefined, status: 'finished' });
+    }
+  });
+};
+
 const signInWithLocalDeviceAuth = async ({
   context,
   extensionId,
@@ -88,12 +109,25 @@ const signInWithLocalDeviceAuth = async ({
   sidePanel: Page;
 }): Promise<void> => {
   await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-  await sidePanel.getByRole('button', { name: 'Sign in' }).click();
-
   const codeLocator = sidePanel.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/u).first();
-  await expect(codeLocator).toBeVisible({ timeout: 20_000 });
+  let codeText: string | null = null;
 
-  const codeText = await codeLocator.textContent();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await sidePanel.getByRole('button', { name: 'Sign in' }).click();
+
+    const didShowCode = await codeLocator
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (didShowCode) {
+      codeText = await codeLocator.textContent();
+      break;
+    }
+
+    await expect(sidePanel.getByText('Failed to start sign in. Try again.')).toBeVisible();
+  }
+
   const code = codeText?.trim();
 
   if (code === undefined || code === '') {
@@ -370,6 +404,45 @@ test('live local backend snapshots the selected target tab per send', async () =
     await context.close();
     await firstFixture.close();
     await secondFixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('live local backend aborts an active frontier request on logout', async () => {
+  const fixture = await startFixtureServer({ title: 'Kilo live logout abort target' });
+  const outcomes: ChatRequestOutcome[] = [];
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  recordChatRequestOutcomes(context, outcomes);
+
+  try {
+    const targetPage = await context.newPage();
+    await targetPage.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live logout abort target');
+    await selectFrontierModel(sidePanel);
+
+    await sidePanel
+      .getByLabel('Message agent')
+      .fill('LOCAL_LOGOUT_ABORT: write a very long answer with at least 1500 words.');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
+    await sidePanel.getByLabel('Settings').click();
+    await expect(sidePanel.getByText(localUserEmail)).toBeVisible();
+    await sidePanel.getByRole('button', { name: 'Sign out' }).click();
+    await expect(sidePanel.getByRole('button', { name: 'Sign in' })).toBeVisible();
+
+    await expect.poll(() => outcomes.length, { timeout: 30_000 }).toBeGreaterThan(0);
+    expect(outcomes.some(outcome => outcome.status === 'failed')).toBe(true);
+    expect(outcomes.some(outcome => outcome.status === 'finished')).toBe(false);
+    await expect(
+      getExtensionStorage(sidePanel, ['kiloAuth', 'kiloAgentConversations'])
+    ).resolves.toStrictEqual({});
+  } finally {
+    await context.close();
+    await fixture.close();
     await rm(userDataDir, { force: true, recursive: true });
   }
 });

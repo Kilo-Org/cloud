@@ -16,6 +16,7 @@ const getVirtualRowStyle = (start: number): CSSProperties => ({
 });
 const isScrolledToBottom = (element: HTMLElement): boolean =>
   element.scrollTop + element.clientHeight >= element.scrollHeight - 16;
+const virtualizedItemThreshold = 50;
 
 export const ConversationList = ({ items }: { items: GroupedConversationItem[] }): JSX.Element => {
   const listRef = useRef<HTMLElement | null>(null);
@@ -31,6 +32,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
     overscan: 8,
   });
   const totalSize = virtualizer.getTotalSize();
+  const isVirtualized = items.length > virtualizedItemThreshold;
 
   const setIsAutoScrollEnabled = useCallback((isEnabled: boolean): void => {
     isAutoScrollEnabledRef.current = isEnabled;
@@ -122,27 +124,37 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
         }}
         ref={listRef}
       >
-        <div className="relative w-full" style={getListSpacerStyle(totalSize)}>
-          {virtualItems.map(virtualItem => {
-            const item = items[virtualItem.index];
+        {isVirtualized ? (
+          <div className="relative w-full" style={getListSpacerStyle(totalSize)}>
+            {virtualItems.map(virtualItem => {
+              const item = items[virtualItem.index];
 
-            if (item === undefined) {
-              return null;
-            }
+              if (item === undefined) {
+                return null;
+              }
 
-            return (
-              <div
-                className="absolute left-0 top-0 w-full pb-3"
-                data-index={virtualItem.index}
-                key={getConversationItemKey(item)}
-                ref={virtualizer.measureElement}
-                style={getVirtualRowStyle(virtualItem.start)}
-              >
+              return (
+                <div
+                  className="absolute left-0 top-0 w-full pb-3"
+                  data-index={virtualItem.index}
+                  key={getConversationItemKey(item)}
+                  ref={virtualizer.measureElement}
+                  style={getVirtualRowStyle(virtualItem.start)}
+                >
+                  <AgentConversationItemView item={item} />
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="w-full">
+            {items.map((item, index) => (
+              <div className="pb-3" data-index={index} key={getConversationItemKey(item)}>
                 <AgentConversationItemView item={item} />
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </section>
       {isAutoScrollEnabled ? null : (
         <button

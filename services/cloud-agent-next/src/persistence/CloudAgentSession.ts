@@ -322,6 +322,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     attemptId: string;
     reason: WrapperStopReason;
   }) => Promise<StopWrappersResult>;
+  private sandboxSessionDeleter?: (reason: 'explicit' | 'retention-expired') => Promise<void>;
   private sharedSandboxFailoverRecorder?: (routeKey: SandboxId) => Promise<void>;
   private agentRuntime?: AgentRuntime;
   private messageSettlementOutbox?: MessageSettlementOutbox;
@@ -1579,6 +1580,19 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
   }
 
+  private async deleteSandboxSessionResources(
+    metadata: SessionMetadata,
+    reason: 'explicit' | 'retention-expired'
+  ): Promise<void> {
+    if (this.sandboxSessionDeleter) {
+      await this.sandboxSessionDeleter(reason);
+      return;
+    }
+    if (!this.orchestrator && (this.env.Sandbox || this.env.SandboxSmall)) {
+      await createAgentSandbox(this.env, metadata).delete(reason);
+    }
+  }
+
   private async finalizeSessionDeletion(
     reason: 'explicit' | 'retention-expired'
   ): Promise<boolean> {
@@ -1601,11 +1615,20 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         return false;
       }
       if (isWrapperCleanupExhausted(lease)) {
-        logger
-          .withFields({ sessionId: this.sessionId, attempts: lease.attempts, reason })
-          .warn('Deleting quarantined session without touching its sandbox');
-      } else if (!this.orchestrator && (this.env.Sandbox || this.env.SandboxSmall)) {
-        await createAgentSandbox(this.env, metadata).delete(reason);
+        try {
+          await this.deleteSandboxSessionResources(metadata, reason);
+        } catch (error) {
+          logger
+            .withFields({
+              sessionId: this.sessionId,
+              attempts: lease.attempts,
+              reason,
+              error: error instanceof Error ? error.message : String(error),
+            })
+            .warn('Best-effort quarantined sandbox session deletion failed');
+        }
+      } else {
+        await this.deleteSandboxSessionResources(metadata, reason);
       }
     }
 
@@ -1631,7 +1654,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
-   * Delete session only after physical wrapper absence has been verified.
+   * Delete session after physical wrapper absence is verified or cleanup is quarantined.
    */
   async deleteSession(): Promise<void> {
     logger.info('Explicit DELETE requested for Durable Object');

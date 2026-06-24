@@ -110,9 +110,13 @@ describe('session deletion physical cleanup', () => {
         model: 'test-model',
       });
       let stopAttempts = 0;
+      let sandboxDeleteAttempts = 0;
       instance['physicalWrapperStopper'] = async () => {
         stopAttempts += 1;
         return { status: 'inspection-failed', error: 'must not inspect quarantined sandbox' };
+      };
+      instance['sandboxSessionDeleter'] = async () => {
+        sandboxDeleteAttempts += 1;
       };
       await instance.ctx.storage.put('wrapper_lease', {
         state: 'stop_needed',
@@ -129,6 +133,7 @@ describe('session deletion physical cleanup', () => {
       await instance.deleteSession();
       return {
         stopAttempts,
+        sandboxDeleteAttempts,
         metadata: await instance.getMetadata(),
         alarm: await instance.ctx.storage.getAlarm(),
         lease: await getWrapperLease(instance.ctx.storage),
@@ -137,6 +142,7 @@ describe('session deletion physical cleanup', () => {
 
     expect(result).toEqual({
       stopAttempts: 0,
+      sandboxDeleteAttempts: 1,
       metadata: null,
       alarm: null,
       lease: { state: 'none', nextInstanceGeneration: 1 },

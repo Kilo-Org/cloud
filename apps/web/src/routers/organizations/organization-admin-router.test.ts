@@ -912,7 +912,9 @@ describe('organization admin router', () => {
             organizationId: parentOrganization.id,
             parentOrganizationId: childOrganization.id,
           })
-        ).rejects.toThrow('Cannot create a cycle in the organization hierarchy');
+        ).rejects.toThrow(
+          'Cannot add a parent to an organization that already has child organizations'
+        );
       } finally {
         await db
           .update(organizations)
@@ -921,6 +923,100 @@ describe('organization admin router', () => {
         await db
           .delete(organizations)
           .where(inArray(organizations.id, [childOrganization.id, parentOrganization.id]));
+      }
+    });
+
+    it('rejects adding child organizations to a child organization', async () => {
+      const searchPrefix = `Admin Child Parent ${crypto.randomUUID()}`;
+      const rootOrganization = await createOrganization(`${searchPrefix} root`, adminUser.id);
+      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+      const newChildOrganization = await createOrganization(
+        `${searchPrefix} new child`,
+        adminUser.id
+      );
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: rootOrganization.id })
+          .where(eq(organizations.id, childOrganization.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: newChildOrganization.id,
+            parentOrganizationId: childOrganization.id,
+          })
+        ).rejects.toThrow(
+          'Cannot add child organizations to an organization that is already a child'
+        );
+
+        await expect(
+          caller.organizations.admin.create({
+            name: `${searchPrefix} created child`,
+            parentOrganizationId: childOrganization.id,
+          })
+        ).rejects.toThrow(
+          'Cannot add child organizations to an organization that is already a child'
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(inArray(organizations.id, [childOrganization.id, newChildOrganization.id]));
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              newChildOrganization.id,
+              childOrganization.id,
+              rootOrganization.id,
+            ])
+          );
+      }
+    });
+
+    it('rejects adding a parent to an organization with child organizations', async () => {
+      const searchPrefix = `Admin Parent Child ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const existingParentOrganization = await createOrganization(
+        `${searchPrefix} existing parent`,
+        adminUser.id
+      );
+      const existingChildOrganization = await createOrganization(
+        `${searchPrefix} existing child`,
+        adminUser.id
+      );
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: existingParentOrganization.id })
+          .where(eq(organizations.id, existingChildOrganization.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.setParent({
+            organizationId: existingParentOrganization.id,
+            parentOrganizationId: parentOrganization.id,
+          })
+        ).rejects.toThrow(
+          'Cannot add a parent to an organization that already has child organizations'
+        );
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, existingChildOrganization.id));
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              existingChildOrganization.id,
+              existingParentOrganization.id,
+              parentOrganization.id,
+            ])
+          );
       }
     });
 

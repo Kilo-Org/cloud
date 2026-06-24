@@ -37,6 +37,12 @@ import { Label } from '@/components/ui/label';
 type OrganizationSearchResult = {
   id: string;
   name: string;
+  has_children: boolean;
+};
+
+type OrganizationSummary = {
+  id: string;
+  name: string;
 };
 
 type OrganizationAdminHierarchyManagementProps = {
@@ -68,7 +74,8 @@ export function OrganizationAdminHierarchyManagement({
     organization =>
       organization.id !== organizationId &&
       !childOrganizationIds.has(organization.id) &&
-      !ancestorOrganizationIds.has(organization.id)
+      !ancestorOrganizationIds.has(organization.id) &&
+      !organization.has_children
   );
 
   const handleCreateChild = (event: FormEvent<HTMLFormElement>) => {
@@ -116,7 +123,7 @@ export function OrganizationAdminHierarchyManagement({
     );
   };
 
-  const handleDetachChild = (child: OrganizationSearchResult) => {
+  const handleDetachChild = (child: OrganizationSummary) => {
     setParentOrganization.mutate(
       { organizationId: child.id, parentOrganizationId: null },
       {

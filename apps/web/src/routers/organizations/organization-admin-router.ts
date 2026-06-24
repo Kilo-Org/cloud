@@ -94,6 +94,7 @@ const OrganizationSearchInputSchema = z.object({
 const OrganizationSearchResultSchema = z.object({
   id: z.string(),
   name: z.string(),
+  has_children: z.boolean(),
 });
 
 const OrganizationCreateInputSchema = z.object({
@@ -223,6 +224,24 @@ async function validateParentOrganizationChange(
     });
   }
 
+  const [childOrganization] = await txn
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(
+      and(
+        eq(organizations.parent_organization_id, organizationId),
+        isNull(organizations.deleted_at)
+      )
+    )
+    .limit(1);
+
+  if (childOrganization) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Cannot add a parent to an organization that already has child organizations',
+    });
+  }
+
   let currentParentId: string | null = parentOrganizationId;
   const visitedOrganizationIds = new Set<string>();
 
@@ -255,6 +274,13 @@ async function validateParentOrganizationChange(
       });
     }
 
+    if (currentParentId === parentOrganizationId && parentOrganization.parent_organization_id) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Cannot add child organizations to an organization that is already a child',
+      });
+    }
+
     currentParentId = parentOrganization.parent_organization_id;
   }
 }
@@ -262,37 +288,41 @@ async function validateParentOrganizationChange(
 export const organizationAdminRouter = createTRPCRouter({
   create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async opts => {
     const parentOrganizationId = opts.input.parentOrganizationId ?? null;
-    if (parentOrganizationId) {
-      const [parentOrganization] = await db
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(and(eq(organizations.id, parentOrganizationId), isNull(organizations.deleted_at)))
-        .limit(1);
 
-      if (!parentOrganization) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Parent organization not found',
-        });
-      }
+    if (!parentOrganizationId) {
+      const organization = await createOrganization(opts.input.name);
+      await getOrCreateStripeCustomerIdForOrganization(organization.id);
+      return { organization };
     }
 
-    const organization = await createOrganization(opts.input.name);
+    const organization = await db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
 
-    const organizationWithParent = parentOrganizationId
-      ? { ...organization, parent_organization_id: parentOrganizationId }
-      : organization;
+      const now = new Date();
+      const trialEndDate = new Date(
+        now.getTime() + ORGANIZATION_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
+      );
+      const [createdOrganization] = await tx
+        .insert(organizations)
+        .values({
+          name: opts.input.name,
+          require_seats: true,
+          free_trial_end_at: trialEndDate.toISOString(),
+          parent_organization_id: parentOrganizationId,
+          settings: {
+            enable_usage_limits: false,
+            code_indexing_enabled: true,
+          },
+        })
+        .returning();
 
-    if (parentOrganizationId) {
-      await db
-        .update(organizations)
-        .set({ parent_organization_id: parentOrganizationId })
-        .where(eq(organizations.id, organization.id));
-    }
+      await validateParentOrganizationChange(createdOrganization.id, parentOrganizationId, tx);
+      return createdOrganization;
+    });
 
     // create stripe customer id on org creation
     await getOrCreateStripeCustomerIdForOrganization(organization.id);
-    return { organization: organizationWithParent };
+    return { organization };
   }),
 
   setParent: adminProcedure.input(SetParentOrganizationInputSchema).mutation(async ({ input }) => {
@@ -1229,6 +1259,10 @@ export const organizationAdminRouter = createTRPCRouter({
         .select({
           id: organizations.id,
           name: organizations.name,
+          has_children:
+            sql<boolean>`EXISTS (SELECT 1 FROM organizations child_organizations WHERE child_organizations.parent_organization_id = ${organizations.id} AND child_organizations.deleted_at IS NULL)`.as(
+              'has_children'
+            ),
         })
         .from(organizations)
         .where(and(or(...searchConditions), isNull(organizations.deleted_at)))

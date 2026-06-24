@@ -16,12 +16,17 @@ type QueryEnv = {
 
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
+const AnalyticsEngineNumberSchema = z.preprocess(
+  value => (typeof value === 'string' && value.trim() !== '' ? Number(value) : value),
+  z.number().finite().nonnegative().nullable()
+);
+
 const GastownHealthResponseSchema = z.object({
   data: z.array(
     z.object({
       town_id: z.string(),
-      weighted_failed_checks: z.number().nonnegative().nullable(),
-      weighted_successful_checks: z.number().nonnegative().nullable(),
+      weighted_failed_checks: AnalyticsEngineNumberSchema,
+      weighted_successful_checks: AnalyticsEngineNumberSchema,
       latest_event_timestamp: z.string().nullable(),
     })
   ),

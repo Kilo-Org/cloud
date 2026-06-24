@@ -112,6 +112,7 @@ export default function NewSessionScreen() {
   const showGitHubIntegrationPrompt = shouldShowGitHubIntegrationPrompt({
     isLoadingRepos,
     integrationInstalled: repoData?.integrationInstalled,
+    repositoryCount: repoData?.repositories.length,
   });
 
   const repositories = useMemo(() => {

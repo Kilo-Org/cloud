@@ -25,8 +25,19 @@ describe('agent GitHub integration helpers', () => {
       shouldShowGitHubIntegrationPrompt({
         isLoadingRepos: false,
         integrationInstalled: true,
+        repositoryCount: 1,
       })
     ).toBe(false);
+  });
+
+  it('shows the setup prompt when GitHub has no connected repositories', () => {
+    expect(
+      shouldShowGitHubIntegrationPrompt({
+        isLoadingRepos: false,
+        integrationInstalled: true,
+        repositoryCount: 0,
+      })
+    ).toBe(true);
   });
 
   it('builds personal and organization GitHub integration URLs', () => {

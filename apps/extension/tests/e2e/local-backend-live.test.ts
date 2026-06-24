@@ -63,7 +63,7 @@ test.skip(
   process.env['EXTENSION_LOCAL_BACKEND_E2E'] !== '1',
   'requires localhost backend, fl@fl.fl, and a build with VITE_KILO_API_BASE_URL=http://localhost:3000'
 );
-test.setTimeout(120_000);
+test.setTimeout(150_000);
 
 const recordChatRequests = (context: BrowserContext, requests: ChatRequestSummary[]): void => {
   context.on('request', request => {
@@ -440,6 +440,66 @@ test('live local backend aborts an active frontier request on logout', async () 
     await expect(
       getExtensionStorage(sidePanel, ['kiloAuth', 'kiloAgentConversations'])
     ).resolves.toStrictEqual({});
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('live local backend recovers after side panel reload during an active request', async () => {
+  const fixture = await startFixtureServer({ title: 'Kilo live reload recovery target' });
+  const outcomes: ChatRequestOutcome[] = [];
+  const requests: ChatRequestSummary[] = [];
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  recordChatRequestOutcomes(context, outcomes);
+  recordChatRequests(context, requests);
+
+  try {
+    const targetPage = await context.newPage();
+    await targetPage.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText(
+      'Kilo live reload recovery target'
+    );
+    await selectFrontierModel(sidePanel);
+
+    await sidePanel
+      .getByLabel('Message agent')
+      .fill('LOCAL_RELOAD_ABORT: write a very long answer with at least 1500 words.');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
+
+    await sidePanel.reload();
+    await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
+    await expect(
+      sidePanel.getByLabel('Agent conversation').getByText('LOCAL_RELOAD_ABORT')
+    ).toBeVisible();
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible();
+    await expect(sidePanel.getByLabel('Model')).toHaveValue(frontierModel);
+    await expect(
+      getExtensionStorage(sidePanel, ['kiloAuth', 'kiloAgentConversations'])
+    ).resolves.toHaveProperty('kiloAuth');
+
+    await expect.poll(() => outcomes.length, { timeout: 30_000 }).toBeGreaterThan(0);
+    expect(outcomes.some(outcome => outcome.status === 'failed')).toBe(true);
+
+    await sidePanel.getByLabel('Message agent').fill('LOCAL_RELOAD_FOLLOWUP: reply briefly.');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+      timeout: 120_000,
+    });
+
+    expect(
+      requests.some(
+        request =>
+          request.model === frontierModel &&
+          request.lastUserContent?.includes('LOCAL_RELOAD_FOLLOWUP') === true
+      )
+    ).toBe(true);
   } finally {
     await context.close();
     await fixture.close();

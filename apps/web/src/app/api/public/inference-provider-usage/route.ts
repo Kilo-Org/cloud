@@ -10,7 +10,7 @@ const INFERENCE_PROVIDER_USAGE_QUERY = `
 select
     to_char(mu.usage_date, 'YYYY-MM-DD') as usage_date
     , mu.inference_provider as provider
-    , sum(mu.total_input_tokens + mu.total_output_tokens) as tokens
+    , sum(coalesce(mu.total_input_tokens, 0) + coalesce(mu.total_output_tokens, 0)) as tokens
 from kilo_dw.dbt_prod.microdollar_usage_daily as mu
 where
     mu.usage_date >= dateadd(week, -1, current_date())
@@ -107,11 +107,11 @@ function parseAndAggregateUsage(rows: string[][]): InferenceProviderUsage[] {
     const [usageDate, rawProvider, tokenValue] = row;
     const tokens = Number(tokenValue);
 
-    if (!usageDate || !rawProvider || !Number.isFinite(tokens)) {
+    if (!usageDate || !Number.isFinite(tokens)) {
       throw new Error('Snowflake returned an invalid inference provider usage row');
     }
 
-    const provider = normalizeProvider(rawProvider);
+    const provider = normalizeProvider(rawProvider?.trim() || 'unknown');
     const aggregationKey = `${usageDate}\0${provider.key}`;
     const existing = usageByDateAndProvider.get(aggregationKey);
 

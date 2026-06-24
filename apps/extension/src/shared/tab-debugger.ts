@@ -741,12 +741,17 @@ export const getPageSnapshotInTabWithScripting = async ({
   readonly timeoutMs?: number;
 }): Promise<EvalTabResult> => {
   try {
-    const [response] = await scriptingApi.executeScript({
-      args: [String(timeoutMs)],
-      func: runInjectedPageSnapshot,
-      target: { tabId },
-      world: 'MAIN',
-    });
+    const [response] = await withTimeout(
+      Promise.resolve(
+        scriptingApi.executeScript({
+          args: [String(timeoutMs)],
+          func: runInjectedPageSnapshot,
+          target: { tabId },
+          world: 'MAIN',
+        })
+      ),
+      timeoutMs
+    );
 
     return { ok: true, value: response?.result };
   } catch (error) {

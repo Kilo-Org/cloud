@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import {
   evalInTab,
@@ -251,6 +252,21 @@ describe('tab debugger helpers', () => {
         world: 'MAIN',
       },
     ]);
+  });
+
+  it('times out Firefox scripting snapshot requests', async () => {
+    const scriptingApi: BrowserScriptingApi = {
+      // eslint-disable-next-line promise/prefer-await-to-then
+      executeScript: () => Promise.race([]),
+    };
+
+    await expect(
+      getPageSnapshotInTabWithScripting({
+        scriptingApi,
+        tabId: 7,
+        timeoutMs: 1,
+      })
+    ).resolves.toStrictEqual({ error: 'Page evaluation timed out.', ok: false });
   });
 
   it('captures a viewport screenshot for the selected tab and restores the active tab', async () => {

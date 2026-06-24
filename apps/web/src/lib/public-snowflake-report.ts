@@ -11,7 +11,9 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
-const CACHE_TTL_SECONDS = 60;
+
+const VERCEL_CACHE_TTL_SECONDS = 60;
+const REDIS_CACHE_TTL_SECONDS = 3600;
 
 type PublicSnowflakeReportOptions<Usage> = {
   cacheKey: RedisKey;
@@ -26,7 +28,7 @@ function successResponse<Usage>(usage: Usage): NextResponse {
   return NextResponse.json(usage, {
     headers: {
       ...CORS_HEADERS,
-      'Cache-Control': `public, s-maxage=${CACHE_TTL_SECONDS}`,
+      'Cache-Control': `public, s-maxage=${VERCEL_CACHE_TTL_SECONDS}, stale-while-revalidate=${VERCEL_CACHE_TTL_SECONDS}`,
     },
   });
 }
@@ -71,7 +73,7 @@ export async function getPublicSnowflakeReport<Usage>({
 
     try {
       await redisClient.set(cacheKey, JSON.stringify(usage), {
-        ex: CACHE_TTL_SECONDS,
+        ex: REDIS_CACHE_TTL_SECONDS,
       });
     } catch (error) {
       captureException(error, {

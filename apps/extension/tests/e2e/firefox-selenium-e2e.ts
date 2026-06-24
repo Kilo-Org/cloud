@@ -1241,6 +1241,9 @@ const scenarios: FirefoxScenario[] = [
 
             await sendMessage(session.driver, 'Wait before replying');
             await waitForText(session.driver, 'Stop');
+            await new Promise(resolve => {
+              setTimeout(resolve, 100);
+            });
 
             const scrolledUpState = await session.driver.executeScript(() => {
               const conversation = document.querySelector('[aria-label="Agent conversation"]');
@@ -1382,6 +1385,9 @@ const scenarios: FirefoxScenario[] = [
 
             await sendMessage(session.driver, 'Wait before first reply');
             await waitForText(session.driver, 'Stop');
+            await new Promise(resolve => {
+              setTimeout(resolve, 100);
+            });
 
             await session.driver.executeScript(() => {
               const conversation = document.querySelector('[aria-label="Agent conversation"]');

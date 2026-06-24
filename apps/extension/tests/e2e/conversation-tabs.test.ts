@@ -12,6 +12,19 @@ import {
 
 const safeToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
 
+const conversationStoreWithTitle = (title: string): unknown => ({
+  activeConversationId: 'conversation-1',
+  conversations: [
+    {
+      events: [],
+      id: 'conversation-1',
+      title,
+      updatedAt: '2026-06-24T10:00:00.000Z',
+    },
+  ],
+  openConversationIds: ['conversation-1'],
+});
+
 const clickNewConversationTimes = async (sidePanel: {
   getByLabel: (label: string) => { click: () => Promise<void> };
 }): Promise<void> => {
@@ -340,6 +353,86 @@ test('history virtualizes and pages large stored conversation lists', async () =
     });
     await sidePanel.getByRole('button', { name: 'Show 100 more conversations' }).click();
     await expect(sidePanel.getByText('Showing 200 of 250')).toBeVisible();
+  } finally {
+    await context.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('conversation remount loads current storage instead of cached query history', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+    await context.route('https://app.kilo.ai/api/device-auth/codes?app=1', route =>
+      route.fulfill({
+        json: { code: 'ABCD-2345', verificationUrl: 'https://app.kilo.ai/device-auth' },
+        status: 200,
+      })
+    );
+    await context.route('https://app.kilo.ai/api/device-auth/codes/ABCD-2345', route =>
+      route.fulfill({
+        json: { token: 'token-2', userEmail: 'user@kilo.ai' },
+        status: 200,
+      })
+    );
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await setExtensionStorage(sidePanel, {
+      kiloAgentConversations: conversationStoreWithTitle('Cached old conversation'),
+    });
+    await sidePanel.reload();
+
+    await sidePanel.getByLabel('History').click();
+    await expect(
+      sidePanel.getByLabel('Conversation history').getByText('Cached old conversation')
+    ).toBeVisible();
+    await sidePanel.getByLabel('Close history').click();
+
+    await sidePanel.getByLabel('Settings').click();
+    await sidePanel.getByRole('button', { name: 'Sign out' }).click();
+    await expect(sidePanel.getByRole('button', { name: 'Sign in' })).toBeVisible();
+    await setExtensionStorage(sidePanel, {
+      kiloAgentConversations: conversationStoreWithTitle('Fresh stored conversation'),
+    });
+    await sidePanel.evaluate(`
+      (() => {
+        const chromeApi = globalThis.chrome;
+        const browserApi = globalThis.browser;
+        const storageLocal = browserApi?.storage?.local;
+
+        if (chromeApi?.tabs) {
+          chromeApi.tabs.create = () => Promise.resolve();
+        }
+        if (browserApi?.tabs) {
+          browserApi.tabs.create = () => Promise.resolve();
+        }
+        if (typeof storageLocal?.get === "function") {
+          const originalGet = storageLocal.get.bind(storageLocal);
+
+          storageLocal.get = async (...args) => {
+            await new Promise(resolve => {
+              setTimeout(resolve, 100);
+            });
+
+            return originalGet(...args);
+          };
+        }
+      })()
+    `);
+
+    await sidePanel.getByRole('button', { name: 'Sign in' }).click();
+    await expect(sidePanel.getByRole('tab', { name: /Fresh stored conversation/u })).toBeVisible({
+      timeout: 10_000,
+    });
+    await sidePanel.getByLabel('History').click();
+
+    const historyPanel = sidePanel.getByLabel('Conversation history');
+
+    await expect(historyPanel.getByText('Fresh stored conversation')).toBeVisible();
+    await expect(historyPanel.getByText('Cached old conversation')).toBeHidden();
   } finally {
     await context.close();
     await rm(userDataDir, { force: true, recursive: true });

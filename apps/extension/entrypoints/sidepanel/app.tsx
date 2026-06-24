@@ -182,10 +182,14 @@ export const App = (): JSX.Element => {
         await clearStoredAuth(storage);
       } finally {
         queryClient.setQueryData(storedAuthQueryKey, undefined);
-        queryClient.removeQueries({ queryKey: ['side-panel', 'auth-validation'] });
+        if (storedAuth !== undefined) {
+          queryClient.setQueryData(getAuthValidationQueryKey(storedAuth.token), {
+            status: 'signedOut',
+          } satisfies AuthValidationData);
+        }
       }
     })();
-  }, [queryClient]);
+  }, [queryClient, storedAuth]);
 
   const retrySessionCheck = useCallback((): void => {
     if (storedAuth === undefined) {

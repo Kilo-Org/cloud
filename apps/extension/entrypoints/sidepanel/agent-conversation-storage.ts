@@ -7,10 +7,17 @@ import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
 import { normalizeStoredConversations } from '@/src/shared/agent-conversation-tabs';
 import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
 export {
+  closeStoredConversationTab,
   closeStoredConversation,
   createNextStoredConversation,
+  deleteStoredConversation,
   getActiveStoredConversation,
+  getOpenStoredConversations,
+  getSortedStoredConversationHistory,
   getStoredConversationTitle,
+  isStoredConversationEmpty,
+  isStoredConversationOpen,
+  openStoredConversation,
   setActiveStoredConversation,
   updateStoredConversationEvents,
 } from '@/src/shared/agent-conversation-tabs';
@@ -68,10 +75,12 @@ const storedConversationSchema = z.object({
   events: conversationEventsSchema,
   id: z.string(),
   title: z.string(),
+  updatedAt: z.string().optional(),
 });
 const storedConversationsSchema = z.object({
   activeConversationId: z.string(),
   conversations: z.array(storedConversationSchema),
+  openConversationIds: z.array(z.string()).optional(),
 });
 
 const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] | undefined => {
@@ -163,7 +172,9 @@ const normalizeStoredConversationStore = (
         events: normalizeConversationEvents(conversation.events) ?? [],
         id: conversation.id,
         title: conversation.title,
+        updatedAt: conversation.updatedAt ?? new Date().toISOString(),
       })),
+      openConversationIds: parsed.data.openConversationIds ?? [],
     },
   });
 };

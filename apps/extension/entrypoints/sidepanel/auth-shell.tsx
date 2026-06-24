@@ -29,12 +29,14 @@ const IconButton = ({
 
 const HeaderActions = ({
   auth,
+  beforeSettings,
   onOrganizationChange,
   onSignOut,
   organizationOptions,
   selectedOrganizationId,
 }: {
   auth: StoredAuth;
+  beforeSettings?: ReactNode;
   onOrganizationChange: (organizationId: string) => void;
   onSignOut: () => void;
   organizationOptions: KiloOrganizationOption[];
@@ -44,6 +46,7 @@ const HeaderActions = ({
 
   return (
     <div className="relative flex shrink-0 items-center justify-end gap-2">
+      {beforeSettings}
       <IconButton
         ariaLabel="Settings"
         onClick={() => {
@@ -79,12 +82,14 @@ const HeaderActions = ({
 
 const Header = ({
   auth,
+  headerBeforeSettings,
   onOrganizationChange,
   onSignOut,
   organizationOptions = emptyOrganizationOptions,
   selectedOrganizationId = '',
 }: {
   auth?: StoredAuth | undefined;
+  headerBeforeSettings?: ReactNode;
   onOrganizationChange?: ((organizationId: string) => void) | undefined;
   onSignOut?: (() => void) | undefined;
   organizationOptions?: KiloOrganizationOption[] | undefined;
@@ -99,6 +104,7 @@ const Header = ({
       onSignOut === undefined ? null : (
         <HeaderActions
           auth={auth}
+          beforeSettings={headerBeforeSettings}
           onOrganizationChange={onOrganizationChange}
           onSignOut={onSignOut}
           organizationOptions={organizationOptions}
@@ -112,6 +118,7 @@ const Header = ({
 export const Shell = ({
   auth,
   children,
+  headerBeforeSettings,
   onOrganizationChange,
   onSignOut,
   organizationOptions = emptyOrganizationOptions,
@@ -119,6 +126,7 @@ export const Shell = ({
 }: {
   auth?: StoredAuth | undefined;
   children: ReactNode;
+  headerBeforeSettings?: ReactNode;
   onOrganizationChange?: ((organizationId: string) => void) | undefined;
   onSignOut?: (() => void) | undefined;
   organizationOptions?: KiloOrganizationOption[] | undefined;
@@ -127,6 +135,7 @@ export const Shell = ({
   <main className="flex h-dvh min-h-0 flex-col overflow-hidden bg-zinc-950 text-zinc-50">
     <Header
       auth={auth}
+      headerBeforeSettings={headerBeforeSettings}
       onOrganizationChange={onOrganizationChange}
       onSignOut={onSignOut}
       organizationOptions={organizationOptions}

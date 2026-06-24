@@ -1,14 +1,17 @@
+/* eslint-disable max-lines */
 import type { AgentConversationEvent } from './agent-conversation';
 
 export interface StoredAgentConversation {
   readonly events: AgentConversationEvent[];
   readonly id: string;
   readonly title: string;
+  readonly updatedAt: string;
 }
 
 export interface StoredAgentConversationStore {
   readonly activeConversationId: string;
   readonly conversations: StoredAgentConversation[];
+  readonly openConversationIds: string[];
 }
 
 const conversationIdPrefix = 'conversation-';
@@ -34,19 +37,34 @@ const getNextConversationNumber = (conversations: StoredAgentConversation[]): nu
 const createConversationId = (number: number): string => `${conversationIdPrefix}${number}`;
 const createConversationTitle = (number: number): string =>
   `${defaultConversationTitlePrefix} ${number}`;
+const nowIso = (): string => new Date().toISOString();
+
+const isUserMessage = (event: AgentConversationEvent): boolean =>
+  event.type === 'message' && event.role === 'user';
+
+const getOpenConversationIds = (store: StoredAgentConversationStore): string[] =>
+  store.openConversationIds.filter(conversationId =>
+    store.conversations.some(conversation => conversation.id === conversationId)
+  );
 
 export const createDefaultStoredConversations = (
   defaultEvents: AgentConversationEvent[] = []
-): StoredAgentConversationStore => ({
-  activeConversationId: createConversationId(1),
-  conversations: [
-    {
-      events: defaultEvents,
-      id: createConversationId(1),
-      title: createConversationTitle(1),
-    },
-  ],
-});
+): StoredAgentConversationStore => {
+  const conversationId = createConversationId(1);
+
+  return {
+    activeConversationId: conversationId,
+    conversations: [
+      {
+        events: defaultEvents,
+        id: conversationId,
+        title: createConversationTitle(1),
+        updatedAt: nowIso(),
+      },
+    ],
+    openConversationIds: [conversationId],
+  };
+};
 
 const createStoredConversation = (
   number: number,
@@ -56,7 +74,60 @@ const createStoredConversation = (
   events: defaultEvents,
   id: createConversationId(number),
   title: createConversationTitle(titleNumber),
+  updatedAt: nowIso(),
 });
+
+const createFallbackOpenConversation = (
+  store: StoredAgentConversationStore,
+  defaultEvents: AgentConversationEvent[] = []
+): StoredAgentConversation => {
+  const nextNumber = getNextConversationNumber(store.conversations);
+
+  return createStoredConversation(nextNumber, defaultEvents, 1);
+};
+
+export const getOpenStoredConversations = (
+  store: StoredAgentConversationStore
+): StoredAgentConversation[] =>
+  getOpenConversationIds(store)
+    .map(conversationId =>
+      store.conversations.find(conversation => conversation.id === conversationId)
+    )
+    .filter((conversation): conversation is StoredAgentConversation => conversation !== undefined);
+
+export const getSortedStoredConversationHistory = (
+  store: StoredAgentConversationStore
+): StoredAgentConversation[] =>
+  store.conversations.toSorted((first, second) => second.updatedAt.localeCompare(first.updatedAt));
+
+export const isStoredConversationOpen = (
+  store: StoredAgentConversationStore,
+  conversationId: string
+): boolean => getOpenConversationIds(store).includes(conversationId);
+
+export const isStoredConversationEmpty = (conversation: StoredAgentConversation): boolean =>
+  !conversation.events.some(isUserMessage);
+
+const ensureOpenConversation = (
+  store: StoredAgentConversationStore,
+  defaultEvents: AgentConversationEvent[] = []
+): StoredAgentConversationStore => {
+  const openConversationIds = getOpenConversationIds(store);
+
+  if (openConversationIds.length > 0) {
+    return openConversationIds.includes(store.activeConversationId)
+      ? { ...store, openConversationIds }
+      : { ...store, activeConversationId: openConversationIds[0] ?? '', openConversationIds };
+  }
+
+  const conversation = createFallbackOpenConversation(store, defaultEvents);
+
+  return {
+    activeConversationId: conversation.id,
+    conversations: [...store.conversations, conversation],
+    openConversationIds: [conversation.id],
+  };
+};
 
 export const createNextStoredConversation = (
   store: StoredAgentConversationStore,
@@ -68,6 +139,7 @@ export const createNextStoredConversation = (
   return {
     activeConversationId: conversation.id,
     conversations: [...store.conversations, conversation],
+    openConversationIds: [...getOpenConversationIds(store), conversation.id],
   };
 };
 
@@ -78,14 +150,14 @@ export const getActiveStoredConversation = (
     conversation => conversation.id === store.activeConversationId
   );
 
-  return activeConversation ?? store.conversations[0] ?? createStoredConversation(1);
+  return activeConversation ?? getOpenStoredConversations(store)[0] ?? createStoredConversation(1);
 };
 
 export const setActiveStoredConversation = (
   store: StoredAgentConversationStore,
   conversationId: string
 ): StoredAgentConversationStore =>
-  store.conversations.some(conversation => conversation.id === conversationId)
+  isStoredConversationOpen(store, conversationId)
     ? { ...store, activeConversationId: conversationId }
     : store;
 
@@ -97,7 +169,7 @@ export const updateStoredConversationEvents = (
   ...store,
   conversations: store.conversations.map(conversation =>
     conversation.id === conversationId
-      ? { ...conversation, events: updateEvents(conversation.events) }
+      ? { ...conversation, events: updateEvents(conversation.events), updatedAt: nowIso() }
       : conversation
   ),
 });
@@ -108,7 +180,31 @@ export const updateActiveStoredConversationEvents = (
 ): StoredAgentConversationStore =>
   updateStoredConversationEvents(store, store.activeConversationId, () => events);
 
-export const closeStoredConversation = (
+export const closeStoredConversationTab = (
+  store: StoredAgentConversationStore,
+  conversationId: string,
+  defaultEvents: AgentConversationEvent[] = []
+): StoredAgentConversationStore => {
+  if (!isStoredConversationOpen(store, conversationId)) {
+    return store;
+  }
+
+  const openConversationIds = getOpenConversationIds(store).filter(
+    currentId => currentId !== conversationId
+  );
+  const nextStore = {
+    ...store,
+    activeConversationId:
+      store.activeConversationId === conversationId
+        ? (openConversationIds[0] ?? '')
+        : store.activeConversationId,
+    openConversationIds,
+  };
+
+  return ensureOpenConversation(nextStore, defaultEvents);
+};
+
+export const deleteStoredConversation = (
   store: StoredAgentConversationStore,
   conversationId: string,
   defaultEvents: AgentConversationEvent[] = []
@@ -117,35 +213,80 @@ export const closeStoredConversation = (
     return store;
   }
 
-  if (store.conversations.length === 1) {
-    const nextNumber = getNextConversationNumber(store.conversations);
-    const conversation = createStoredConversation(nextNumber, defaultEvents, 1);
+  const conversations = store.conversations.filter(
+    conversation => conversation.id !== conversationId
+  );
+  const openConversationIds = getOpenConversationIds(store).filter(
+    currentId => currentId !== conversationId
+  );
+
+  if (conversations.length === 0) {
+    const conversation = createFallbackOpenConversation(store, defaultEvents);
 
     return {
       activeConversationId: conversation.id,
       conversations: [conversation],
+      openConversationIds: [conversation.id],
     };
   }
 
-  const closedIndex = store.conversations.findIndex(
-    conversation => conversation.id === conversationId
-  );
-  const conversations = store.conversations.filter(
-    conversation => conversation.id !== conversationId
-  );
+  const nextStore = {
+    activeConversationId:
+      store.activeConversationId === conversationId
+        ? (openConversationIds[0] ?? '')
+        : store.activeConversationId,
+    conversations,
+    openConversationIds,
+  };
 
-  if (store.activeConversationId !== conversationId) {
-    return { ...store, conversations };
+  return ensureOpenConversation(nextStore, defaultEvents);
+};
+
+export const openStoredConversation = ({
+  conversationId,
+  isActiveConversationEmpty,
+  store,
+}: {
+  readonly conversationId: string;
+  readonly isActiveConversationEmpty: boolean;
+  readonly store: StoredAgentConversationStore;
+}): StoredAgentConversationStore => {
+  if (!store.conversations.some(conversation => conversation.id === conversationId)) {
+    return store;
   }
 
-  const nextActiveConversation =
-    conversations[Math.min(closedIndex, conversations.length - 1)] ?? conversations[0];
+  if (isStoredConversationOpen(store, conversationId)) {
+    return { ...store, activeConversationId: conversationId };
+  }
+
+  const { activeConversationId } = store;
+  const openConversationIds = getOpenConversationIds(store);
+
+  if (isActiveConversationEmpty && activeConversationId !== conversationId) {
+    return {
+      activeConversationId: conversationId,
+      conversations: store.conversations.filter(
+        conversation => conversation.id !== activeConversationId
+      ),
+      openConversationIds: [
+        ...openConversationIds.filter(currentId => currentId !== activeConversationId),
+        conversationId,
+      ],
+    };
+  }
 
   return {
-    activeConversationId: nextActiveConversation?.id ?? conversations[0]?.id ?? '',
-    conversations,
+    ...store,
+    activeConversationId: conversationId,
+    openConversationIds: [...openConversationIds, conversationId],
   };
 };
+
+export const closeStoredConversation = (
+  store: StoredAgentConversationStore,
+  conversationId: string,
+  defaultEvents: AgentConversationEvent[] = []
+): StoredAgentConversationStore => deleteStoredConversation(store, conversationId, defaultEvents);
 
 export const normalizeStoredConversations = ({
   defaultEvents = [],
@@ -157,25 +298,40 @@ export const normalizeStoredConversations = ({
   readonly store?: StoredAgentConversationStore | undefined;
 } = {}): StoredAgentConversationStore => {
   if (store !== undefined && store.conversations.length > 0) {
-    const hasActiveConversation = store.conversations.some(
-      conversation => conversation.id === store.activeConversationId
-    );
+    const conversations = store.conversations.map(conversation => ({
+      ...conversation,
+      updatedAt: conversation.updatedAt ?? nowIso(),
+    }));
+    const conversationIds = new Set(conversations.map(conversation => conversation.id));
+    const openConversationIds =
+      store.openConversationIds.length === 0
+        ? conversations.map(conversation => conversation.id)
+        : store.openConversationIds.filter(conversationId => conversationIds.has(conversationId));
+    const hasActiveConversation = openConversationIds.includes(store.activeConversationId);
 
-    return hasActiveConversation
-      ? store
-      : { ...store, activeConversationId: store.conversations[0]?.id ?? '' };
+    return ensureOpenConversation({
+      activeConversationId: hasActiveConversation
+        ? store.activeConversationId
+        : (openConversationIds[0] ?? conversations[0]?.id ?? ''),
+      conversations,
+      openConversationIds,
+    });
   }
 
   if (legacyEvents !== undefined) {
+    const conversationId = createConversationId(1);
+
     return {
-      activeConversationId: createConversationId(1),
+      activeConversationId: conversationId,
       conversations: [
         {
           events: legacyEvents,
-          id: createConversationId(1),
+          id: conversationId,
           title: createConversationTitle(1),
+          updatedAt: nowIso(),
         },
       ],
+      openConversationIds: [conversationId],
     };
   }
 

@@ -1,4 +1,5 @@
-import type { JSX } from 'react';
+import { useState } from 'react';
+import type { JSX, ReactNode } from 'react';
 import type { StoredAuth } from '@/src/shared/auth';
 import { AgentChatPanel } from './agent-chat-panel';
 import { Shell } from './auth-shell';
@@ -133,12 +134,14 @@ export const SignedInView = ({
   auth: StoredAuth;
   onSignOut: () => void;
 }): JSX.Element => {
+  const [headerBeforeSettings, setHeaderBeforeSettings] = useState<ReactNode>();
   const { organizationOptions, selectOrganization, selectedOrganizationId } =
     useOrganizationCreditAccount(auth.token);
 
   return (
     <Shell
       auth={auth}
+      headerBeforeSettings={headerBeforeSettings}
       onOrganizationChange={selectOrganization}
       onSignOut={onSignOut}
       organizationOptions={organizationOptions}
@@ -146,6 +149,7 @@ export const SignedInView = ({
     >
       <AgentChatPanel
         auth={auth}
+        onHeaderBeforeSettingsChange={setHeaderBeforeSettings}
         organizationId={selectedOrganizationId === '' ? undefined : selectedOrganizationId}
       />
     </Shell>

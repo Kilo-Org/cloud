@@ -470,6 +470,28 @@ const waitForTextGone = async (driver: WebDriver, text: string): Promise<void> =
   );
 };
 
+const acceptAlertWithText = async (driver: WebDriver, text: string): Promise<void> => {
+  await driver.wait(
+    async () => {
+      try {
+        const alert = await driver.switchTo().alert();
+        const alertText = await alert.getText();
+
+        if (!alertText.includes(text)) {
+          return false;
+        }
+
+        await alert.accept();
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    waitMs,
+    `Timed out waiting for alert text: ${text}`
+  );
+};
+
 const findManifestUrl = async (driver: WebDriver): Promise<string> => {
   await driver.get('about:debugging#/runtime/this-firefox');
   await waitForText(driver, 'Kilo Extension');
@@ -804,6 +826,18 @@ const clickButtonByLabel = async (driver: WebDriver, label: string): Promise<voi
   await driver.findElement(By.css(`button[aria-label="${label}"]`)).click();
 };
 
+const waitForButtonByLabel = async (driver: WebDriver, label: string): Promise<void> => {
+  await waitUntil(
+    driver,
+    async () => {
+      const elements = await driver.findElements(By.css(`button[aria-label="${label}"]`));
+
+      return elements.length > 0;
+    },
+    `Timed out waiting for button label: ${label}`
+  );
+};
+
 const waitForNoButtonByLabel = async (driver: WebDriver, label: string): Promise<void> => {
   await waitUntil(
     driver,
@@ -1035,8 +1069,13 @@ const scenarios: FirefoxScenario[] = [
           await waitForText(session.driver, 'Close this reply.');
 
           await clickButtonByLabel(session.driver, 'Close Close this');
+          await acceptAlertWithText(session.driver, 'Close this conversation tab?');
           await waitForTextGone(session.driver, 'Close this reply.');
           await waitForText(session.driver, 'Keep this reply.');
+
+          await clickButtonByLabel(session.driver, 'History');
+          await clickButtonByLabel(session.driver, 'Open Close this');
+          await waitForText(session.driver, 'Close this reply.');
         }
       ),
   },
@@ -1228,7 +1267,7 @@ const scenarios: FirefoxScenario[] = [
                 mountedMessageItems: true,
               })
               .parse(scrolledUpState);
-            await session.driver.findElement(By.css('button[aria-label="Jump to latest"]'));
+            await waitForButtonByLabel(session.driver, 'Jump to latest');
 
             releaseFirstCompletion();
             await waitForStoredFirefoxConversationText(
@@ -1354,7 +1393,7 @@ const scenarios: FirefoxScenario[] = [
               conversation.scrollTop = 0;
               conversation.dispatchEvent(new Event('scroll', { bubbles: true }));
             });
-            await session.driver.findElement(By.css('button[aria-label="Jump to latest"]'));
+            await waitForButtonByLabel(session.driver, 'Jump to latest');
 
             releaseFirstCompletion();
             await waitForStoredFirefoxConversationText(

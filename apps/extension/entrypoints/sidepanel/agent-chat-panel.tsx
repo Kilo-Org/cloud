@@ -1,6 +1,6 @@
-/* eslint-disable max-lines */
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent, JSX, KeyboardEvent } from 'react';
+/* eslint-disable import/max-dependencies, max-lines */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ChangeEvent, JSX, KeyboardEvent, ReactNode } from 'react';
 import {
   createAssistantMessage,
   createUserMessage,
@@ -11,10 +11,16 @@ import { defaultMode } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
 import {
-  closeStoredConversation,
+  closeStoredConversationTab,
   createNextStoredConversation,
+  deleteStoredConversation,
   getActiveStoredConversation,
+  getOpenStoredConversations,
+  getSortedStoredConversationHistory,
   getStoredConversationTitle,
+  isStoredConversationEmpty,
+  isStoredConversationOpen,
+  openStoredConversation,
   setActiveStoredConversation,
   updateStoredConversationEvents,
   useStoredAgentConversations,
@@ -24,6 +30,7 @@ import { AgentFooterControls } from './agent-footer-controls';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
+import { ConversationHistoryButton } from './conversation-history-button';
 import { useGatewayModels } from './use-gateway-models';
 
 const apiBaseUrl = getKiloApiBaseUrl();
@@ -145,9 +152,11 @@ const ConversationTabs = ({
 
 export const AgentChatPanel = ({
   auth,
+  onHeaderBeforeSettingsChange,
   organizationId,
 }: {
   auth: StoredAuth;
+  onHeaderBeforeSettingsChange?: (node?: ReactNode) => void;
   organizationId: string | undefined;
 }): JSX.Element => {
   const [draft, setDraft] = useState('');
@@ -177,6 +186,14 @@ export const AgentChatPanel = ({
     [model, modelOptions]
   );
   const { events, id: activeConversationId } = getActiveStoredConversation(conversationStore);
+  const openConversations = useMemo(
+    () => getOpenStoredConversations(conversationStore),
+    [conversationStore]
+  );
+  const historyConversations = useMemo(
+    () => getSortedStoredConversationHistory(conversationStore),
+    [conversationStore]
+  );
   const groupedEvents = useMemo(() => groupConversationEvents(events), [events]);
   const thinkingOptions = useMemo(
     () => (selectedModel === undefined ? [] : selectedModel.variants),
@@ -367,22 +384,89 @@ export const AgentChatPanel = ({
     setConversationStore(store => setActiveStoredConversation(store, conversationId));
   };
 
-  const closeConversation = (conversationId: string): void => {
+  const abortConversationRun = useCallback((conversationId: string): void => {
     runStatesRef.current.get(conversationId)?.abort.abort();
     runStatesRef.current.delete(conversationId);
     setRunningConversationIds(currentIds =>
       currentIds.filter(currentId => currentId !== conversationId)
     );
-    setConversationStore(store =>
-      closeStoredConversation(store, conversationId, createDefaultConversationEvents())
+  }, []);
+
+  const closeConversation = useCallback(
+    (conversationId: string): void => {
+      if (!globalThis.confirm('Close this conversation tab? It will stay in History.')) {
+        return;
+      }
+
+      abortConversationRun(conversationId);
+      setConversationStore(store =>
+        closeStoredConversationTab(store, conversationId, createDefaultConversationEvents())
+      );
+    },
+    [abortConversationRun, setConversationStore]
+  );
+
+  const deleteConversation = useCallback(
+    (conversationId: string): void => {
+      if (
+        isStoredConversationOpen(conversationStore, conversationId) &&
+        !globalThis.confirm('Delete this conversation and close its tab?')
+      ) {
+        return;
+      }
+
+      abortConversationRun(conversationId);
+      setConversationStore(store =>
+        deleteStoredConversation(store, conversationId, createDefaultConversationEvents())
+      );
+    },
+    [abortConversationRun, conversationStore, setConversationStore]
+  );
+
+  const openConversationFromHistory = useCallback(
+    (conversationId: string): void => {
+      setDraft('');
+      setConversationStore(store =>
+        openStoredConversation({
+          conversationId,
+          isActiveConversationEmpty:
+            !runningConversationIds.includes(store.activeConversationId) &&
+            isStoredConversationEmpty(getActiveStoredConversation(store)),
+          store,
+        })
+      );
+    },
+    [runningConversationIds, setConversationStore]
+  );
+
+  useEffect(() => {
+    onHeaderBeforeSettingsChange?.(
+      <ConversationHistoryButton
+        activeConversationId={activeConversationId}
+        conversations={historyConversations}
+        conversationStore={conversationStore}
+        onDeleteConversation={deleteConversation}
+        onOpenConversation={openConversationFromHistory}
+      />
     );
-  };
+
+    return () => {
+      onHeaderBeforeSettingsChange?.();
+    };
+  }, [
+    activeConversationId,
+    conversationStore,
+    deleteConversation,
+    historyConversations,
+    onHeaderBeforeSettingsChange,
+    openConversationFromHistory,
+  ]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ConversationTabs
         activeConversationId={activeConversationId}
-        conversations={conversationStore.conversations}
+        conversations={openConversations}
         onCloseConversation={closeConversation}
         onCreateConversation={createConversation}
         onSelectConversation={selectConversation}

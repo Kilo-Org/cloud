@@ -43,6 +43,7 @@ export type RestoreSessionOptions = {
 };
 
 const KILO_IMPORT_TIMEOUT_MS = 120_000;
+const IMPORT_EXCLUDED_ENV_KEYS = ['KILO_CONFIG_CONTENT', 'OPENCODE_CONFIG_CONTENT'] as const;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -91,6 +92,14 @@ function resolveKilocodeToken(): string | undefined {
   }
 
   return fs.readFileSync(tokenFile, 'utf8').replace(/[\r\n]+$/, '');
+}
+
+function buildKiloImportEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of IMPORT_EXCLUDED_ENV_KEYS) {
+    delete env[key];
+  }
+  return env;
 }
 
 type SnapshotInfoValidation = 'valid' | 'missing' | 'invalid';
@@ -590,8 +599,10 @@ export async function restoreSession(
     log(
       `running kilo import kiloSessionId=${kiloSessionId} input=${downloaded ? 'downloaded' : 'provided'} cwd=${workspacePath} home=${process.env.HOME ?? '(unset)'} tmpPath=${tmpPath}`
     );
+    log('running kilo import with runtime config env disabled');
     const importResult = await runProcess('kilo', ['import', tmpPath], {
       cwd: workspacePath,
+      env: buildKiloImportEnv(),
       timeoutMs: importTimeoutMs,
       signal: options.signal,
       terminationGraceMs: options.importTerminationGraceMs,

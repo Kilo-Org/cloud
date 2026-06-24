@@ -99,6 +99,23 @@ function writeSignalIgnoringDescendantMockKilo(binDir: string, descendantMarker:
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
 
+function writeImportEnvCheckingMockKilo(binDir: string): void {
+  const script = `#!/bin/sh
+if [ -n "$KILO_CONFIG_CONTENT" ]; then
+  echo "KILO_CONFIG_CONTENT leaked" >&2
+  exit 42
+fi
+if [ -n "$OPENCODE_CONFIG_CONTENT" ]; then
+  echo "OPENCODE_CONFIG_CONTENT leaked" >&2
+  exit 43
+fi
+printf clean > "$IMPORT_ENV_MARKER"
+exit 0
+`;
+  const kiloPath = path.join(binDir, 'kilo');
+  fs.writeFileSync(kiloPath, script, { mode: 0o755 });
+}
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -126,6 +143,9 @@ describe('restoreSession', () => {
       KILO_SESSION_INGEST_URL: process.env.KILO_SESSION_INGEST_URL,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
       KILOCODE_TOKEN_FILE: process.env.KILOCODE_TOKEN_FILE,
+      KILO_CONFIG_CONTENT: process.env.KILO_CONFIG_CONTENT,
+      OPENCODE_CONFIG_CONTENT: process.env.OPENCODE_CONFIG_CONTENT,
+      IMPORT_ENV_MARKER: process.env.IMPORT_ENV_MARKER,
       PATH: process.env.PATH,
     };
 
@@ -424,6 +444,22 @@ describe('restoreSession', () => {
     }
     expect(elapsedMs).toBeGreaterThanOrEqual(600);
     expect(fs.existsSync(descendantMarker)).toBe(false);
+  });
+
+  it('does not expose runtime config content to kilo import', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const marker = path.join(tmpDir, 'import-env-marker');
+    process.env.KILO_CONFIG_CONTENT = '{"mcp":{"kilo_usage":{}}}';
+    process.env.OPENCODE_CONFIG_CONTENT = '{"mcp":{"kilo_usage":{}}}';
+    process.env.IMPORT_ENV_MARKER = marker;
+    writeImportEnvCheckingMockKilo(binDir);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(true);
+    expect(fs.readFileSync(marker, 'utf8')).toBe('clean');
+    expect(process.env.KILO_CONFIG_CONTENT).toBe('{"mcp":{"kilo_usage":{}}}');
+    expect(process.env.OPENCODE_CONFIG_CONTENT).toBe('{"mcp":{"kilo_usage":{}}}');
   });
 
   // ---- Happy paths ----

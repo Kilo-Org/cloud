@@ -234,7 +234,7 @@ The following substantive feature/fix PRs have no linked issue. The list exclude
 
 **Confidence:** medium  
 **PR:** [#3353](https://github.com/Kilo-Org/cloud/pull/3353) chore(gastown): stage release updates  
-**Evidence:** Substantive feature/fix PR (62 files changed, 4395 line changes) with no issue reference.  
+**Evidence:** Substantive feature/fix PR (61 files changed, 4395 line changes) with no issue reference.  
 **Suggested action:** Create a tracking issue and link it in the PR description, or document why none is needed.
 
 **Confidence:** medium  

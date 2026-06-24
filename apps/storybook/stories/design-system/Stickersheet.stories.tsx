@@ -5,6 +5,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const meta: Meta = {
   title: 'Design System/Stickersheet',
@@ -215,6 +223,93 @@ function StickersheetPage() {
             Beta
           </Badge>
           <Badge variant="destructive">Action needed</Badge>
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="06"
+        title="Overlays"
+        description="Overlay surfaces keep distinct radius and padding so popovers, dialogs, and sheets read as separate layers."
+      >
+        <div className="grid gap-4 lg:grid-cols-[minmax(14rem,1fr)_minmax(18rem,1.25fr)_minmax(14rem,1fr)]">
+          <div className="rounded-lg border border-border bg-popover p-3 text-popover-foreground">
+            <p className="type-label">Popover</p>
+            <p className="type-body text-muted-foreground mt-1">
+              Quick filters and compact actions.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-6 text-card-foreground">
+            <p className="type-heading">Dialog</p>
+            <p className="type-body text-muted-foreground mt-2">
+              Confirm changes before applying organization policy updates.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="secondary">Cancel</Button>
+              <Button>Apply</Button>
+            </div>
+          </div>
+          <div className="border-border bg-card text-card-foreground flex min-h-40 flex-col border-l p-6">
+            <p className="type-heading">Sheet</p>
+            <p className="type-body text-muted-foreground mt-2">Session settings</p>
+            <Button className="mt-auto" variant="outline">
+              Save changes
+            </Button>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="07"
+        title="Tables"
+        description="Rows use 48px height, visible hover affordance, and selected surface state for persistent selection."
+      >
+        <div className="rounded-xl border border-border bg-card p-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Run</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow data-state="selected">
+                <TableCell className="font-medium">Primitive audit</TableCell>
+                <TableCell>Reviewing</TableCell>
+                <TableCell className="text-right tabular-nums">$4.20</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Storybook QA</TableCell>
+                <TableCell>Ready</TableCell>
+                <TableCell className="text-right tabular-nums">$1.88</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="08"
+        title="Sidebar"
+        description="Sidebar samples preserve dark navigation surfaces, selected row contrast, and compact action spacing."
+      >
+        <div className="max-w-sm rounded-xl border border-sidebar-border bg-sidebar p-2 text-sidebar-foreground">
+          <div className="px-2 py-2">
+            <p className="type-label text-sidebar-foreground/70">Workspace</p>
+          </div>
+          <div className="grid gap-1">
+            <div className="flex h-8 items-center justify-between rounded-md bg-sidebar-accent px-2 text-sidebar-accent-foreground">
+              <span className="type-body">Dashboard</span>
+              <Badge variant="secondary">4</Badge>
+            </div>
+            <div className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-8 items-center justify-between rounded-md px-2 transition-colors">
+              <span className="type-body">Cloud sessions</span>
+              <Badge variant="secondary-outline">12</Badge>
+            </div>
+            <div className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex h-8 items-center rounded-md px-2 transition-colors">
+              <span className="type-body">Billing</span>
+            </div>
+          </div>
         </div>
       </Section>
     </StoryCanvas>

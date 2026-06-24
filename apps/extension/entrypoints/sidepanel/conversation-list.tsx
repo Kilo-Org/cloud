@@ -16,7 +16,52 @@ const getVirtualRowStyle = (start: number): CSSProperties => ({
 });
 const isScrolledToBottom = (element: HTMLElement): boolean =>
   element.scrollTop + element.clientHeight >= element.scrollHeight - 16;
-const virtualizedItemThreshold = 50;
+
+const ConversationVirtualRow = ({
+  index,
+  item,
+  measureElement,
+  start,
+}: {
+  index: number;
+  item: GroupedConversationItem;
+  measureElement: (element: HTMLElement) => void;
+  start: number;
+}): JSX.Element => {
+  const rowRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+
+    if (row === null) {
+      return;
+    }
+
+    measureElement(row);
+
+    const observer = new ResizeObserver(() => {
+      measureElement(row);
+    });
+
+    observer.observe(row);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [measureElement]);
+
+  return (
+    <div
+      className="absolute left-0 top-0 w-full pb-2"
+      data-index={index}
+      key={getConversationItemKey(item)}
+      ref={rowRef}
+      style={getVirtualRowStyle(start)}
+    >
+      <AgentConversationItemView item={item} />
+    </div>
+  );
+};
 
 export const ConversationList = ({ items }: { items: GroupedConversationItem[] }): JSX.Element => {
   const listRef = useRef<HTMLElement | null>(null);
@@ -32,7 +77,6 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
     overscan: 8,
   });
   const totalSize = virtualizer.getTotalSize();
-  const isVirtualized = items.length > virtualizedItemThreshold;
 
   const setIsAutoScrollEnabled = useCallback((isEnabled: boolean): void => {
     isAutoScrollEnabledRef.current = isEnabled;
@@ -60,7 +104,6 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
 
     const scrollToLastMeasuredRow = (): void => {
       markProgrammaticScroll();
-      virtualizer.measure();
       virtualizer.scrollToIndex(items.length - 1, { align: 'end' });
 
       const scrollElement = listRef.current;
@@ -122,39 +165,32 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
             setIsAutoScrollEnabled(isScrolledToBottom(event.currentTarget));
           }
         }}
+        onWheel={event => {
+          if (event.deltaY < 0) {
+            setIsAutoScrollEnabled(false);
+          }
+        }}
         ref={listRef}
       >
-        {isVirtualized ? (
-          <div className="relative w-full" style={getListSpacerStyle(totalSize)}>
-            {virtualItems.map(virtualItem => {
-              const item = items[virtualItem.index];
+        <div className="relative w-full" style={getListSpacerStyle(totalSize)}>
+          {virtualItems.map(virtualItem => {
+            const item = items[virtualItem.index];
 
-              if (item === undefined) {
-                return null;
-              }
+            if (item === undefined) {
+              return null;
+            }
 
-              return (
-                <div
-                  className="absolute left-0 top-0 w-full pb-3"
-                  data-index={virtualItem.index}
-                  key={getConversationItemKey(item)}
-                  ref={virtualizer.measureElement}
-                  style={getVirtualRowStyle(virtualItem.start)}
-                >
-                  <AgentConversationItemView item={item} />
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="w-full">
-            {items.map((item, index) => (
-              <div className="pb-3" data-index={index} key={getConversationItemKey(item)}>
-                <AgentConversationItemView item={item} />
-              </div>
-            ))}
-          </div>
-        )}
+            return (
+              <ConversationVirtualRow
+                index={virtualItem.index}
+                item={item}
+                key={getConversationItemKey(item)}
+                measureElement={virtualizer.measureElement}
+                start={virtualItem.start}
+              />
+            );
+          })}
+        </div>
       </section>
       {isAutoScrollEnabled ? null : (
         <button

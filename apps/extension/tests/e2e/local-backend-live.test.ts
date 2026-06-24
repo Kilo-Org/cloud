@@ -297,6 +297,21 @@ const getExtensionStorage = (page: Page, keys: string[]): Promise<Record<string,
     return storage.get(storageKeys);
   }, keys);
 
+const getStoredConversationSnapshot = async (page: Page): Promise<string> => {
+  const storage = await getExtensionStorage(page, ['kiloAgentConversations']);
+
+  return JSON.stringify(storage['kiloAgentConversations'] ?? null);
+};
+
+const waitForStoredConversationSnapshot = async (
+  page: Page,
+  predicate: (snapshot: string) => boolean
+): Promise<void> => {
+  await expect
+    .poll(async () => predicate(await getStoredConversationSnapshot(page)), { timeout: 30_000 })
+    .toBe(true);
+};
+
 test('live local backend keeps frontier conversations stable across modes, reload, and logout', async ({
   page: _page,
 }, testInfo) => {
@@ -350,6 +365,13 @@ test('live local backend keeps frontier conversations stable across modes, reloa
     await sidePanel.getByRole('button', { name: /^Safe/u }).click();
     await sidePanel.getByRole('tab').nth(0).click();
     await expect(sidePanel.getByLabel(/Danger mode/u)).toBeVisible();
+    await waitForStoredConversationSnapshot(
+      sidePanel,
+      snapshot =>
+        snapshot.includes(frontierModel) &&
+        snapshot.includes('"mode":"dangerous"') &&
+        snapshot.includes('Use eval if useful')
+    );
 
     await sidePanel.reload();
     await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
@@ -507,6 +529,9 @@ test('live local backend recovers after side panel reload during an active reque
       .fill('LOCAL_RELOAD_ABORT: write a very long answer with at least 1500 words.');
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
+    await waitForStoredConversationSnapshot(sidePanel, snapshot =>
+      snapshot.includes('LOCAL_RELOAD_ABORT')
+    );
 
     await sidePanel.reload();
     await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
@@ -599,6 +624,9 @@ test('live local backend preserves and deletes frontier conversations through hi
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
       timeout: 120_000,
     });
+    await waitForStoredConversationSnapshot(sidePanel, snapshot =>
+      snapshot.includes('LOCAL_HISTORY_REOPEN')
+    );
 
     await sidePanel.getByLabel('New conversation').click();
     await sidePanel.getByLabel('Message agent').fill('LOCAL_HISTORY_DELETE: reply briefly.');
@@ -606,6 +634,9 @@ test('live local backend preserves and deletes frontier conversations through hi
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
       timeout: 120_000,
     });
+    await waitForStoredConversationSnapshot(sidePanel, snapshot =>
+      snapshot.includes('LOCAL_HISTORY_DELETE')
+    );
 
     sidePanel.once('dialog', dialog => {
       expect(dialog.message()).toContain('Close this conversation tab?');
@@ -632,6 +663,11 @@ test('live local backend preserves and deletes frontier conversations through hi
     await expect(
       sidePanel.getByLabel('Agent conversation').getByText('LOCAL_HISTORY_REOPEN')
     ).toBeVisible();
+    await waitForStoredConversationSnapshot(
+      sidePanel,
+      snapshot =>
+        snapshot.includes('LOCAL_HISTORY_REOPEN') && !snapshot.includes('LOCAL_HISTORY_DELETE')
+    );
 
     const storageSnapshot = JSON.stringify(
       await getExtensionStorage(sidePanel, ['kiloAgentConversations'])
@@ -639,6 +675,55 @@ test('live local backend preserves and deletes frontier conversations through hi
 
     expect(storageSnapshot).toContain('LOCAL_HISTORY_REOPEN');
     expect(storageSnapshot).not.toContain('LOCAL_HISTORY_DELETE');
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('live local backend dangerous mode eval can update the selected page', async () => {
+  const fixture = await startFixtureServer({ title: 'Kilo live eval target' });
+  const requests: ChatRequestSummary[] = [];
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  recordChatRequests(context, requests);
+
+  try {
+    const targetPage = await context.newPage();
+    await targetPage.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live eval target');
+    await selectFrontierModel(sidePanel);
+    await sidePanel.getByLabel('Target tab').selectOption({ label: 'Kilo live eval target' });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live eval target');
+    await sidePanel.getByLabel(/Safe mode/u).click();
+    await sidePanel.getByRole('button', { name: /Dangerous/u }).click();
+
+    await sidePanel
+      .getByLabel('Message agent')
+      .fill(
+        'LOCAL_DANGEROUS_EVAL: use eval to run exactly this JavaScript in the selected page, then reply briefly with the resulting value: document.body.dataset.kiloLiveEval = "done"; return document.body.dataset.kiloLiveEval;'
+      );
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText('eval completed')).toBeVisible({ timeout: 120_000 });
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+      timeout: 120_000,
+    });
+
+    await expect
+      .poll(() => targetPage.evaluate(() => document.body.dataset['kiloLiveEval']))
+      .toBe('done');
+    expect(
+      requests.some(
+        request =>
+          request.model === frontierModel &&
+          request.lastUserContent?.includes('LOCAL_DANGEROUS_EVAL') === true &&
+          request.toolNames.includes('eval')
+      )
+    ).toBe(true);
   } finally {
     await context.close();
     await fixture.close();

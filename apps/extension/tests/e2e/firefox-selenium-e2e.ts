@@ -966,10 +966,10 @@ const scenarios: FirefoxScenario[] = [
         await openAuthenticatedPanel(session);
         await waitForModel(session.driver);
         await setSelectByText(session.driver, 'Target tab', 'Second target tab');
-        assert.match(await getSelectText(session.driver, 'Target tab'), /Second target tab/u);
+        await waitForTargetTab(session.driver, 'Second target tab');
 
         await clickButtonByLabel(session.driver, 'New conversation');
-        assert.match(await getSelectText(session.driver, 'Target tab'), /Second target tab/u);
+        await waitForTargetTab(session.driver, 'Second target tab');
       }),
   },
   {

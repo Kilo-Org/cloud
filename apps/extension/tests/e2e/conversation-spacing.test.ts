@@ -74,6 +74,34 @@ const getConversationGaps = (sidePanel: Page): Promise<number[]> =>
       .slice(1);
   });
 
+const getConversationVisualGaps = (sidePanel: Page): Promise<number[]> =>
+  sidePanel.locator(messageRowSelector).evaluateAll(elements => {
+    const rows = elements
+      .flatMap(element => {
+        const visualElement = element.firstElementChild;
+
+        if (!(visualElement instanceof HTMLElement)) {
+          return [];
+        }
+
+        const rect = visualElement.getBoundingClientRect();
+
+        return [{ bottom: rect.bottom, top: rect.top }];
+      })
+      .toSorted((first, second) => first.top - second.top);
+    let previousBottom = 0;
+
+    return rows
+      .map(row => {
+        const gap = row.top - previousBottom;
+
+        previousBottom = row.bottom;
+
+        return gap;
+      })
+      .slice(1);
+  });
+
 const getMaxObservedGap = (sidePanel: Page): Promise<number> =>
   sidePanel.evaluate(() => Number(Reflect.get(globalThis, '__kiloMaxConversationGap')));
 
@@ -120,10 +148,11 @@ test('short messages stay compactly spaced while appended', async () => {
       .poll(() => sidePanel.locator(messageRowSelector).count())
       .toBeGreaterThanOrEqual(6);
 
-    expect(await getMaxObservedGap(sidePanel)).toBeLessThanOrEqual(16);
+    expect(await getMaxObservedGap(sidePanel)).toBeLessThanOrEqual(12);
     expect(await getMinObservedGap(sidePanel)).toBeGreaterThanOrEqual(0);
-    expect(Math.max(...(await getConversationGaps(sidePanel)))).toBeLessThanOrEqual(16);
+    expect(Math.max(...(await getConversationGaps(sidePanel)))).toBeLessThanOrEqual(12);
     expect(Math.min(...(await getConversationGaps(sidePanel)))).toBeGreaterThanOrEqual(0);
+    expect(Math.min(...(await getConversationVisualGaps(sidePanel)))).toBeGreaterThanOrEqual(7);
   } finally {
     await context.close();
     await fixture.close();
@@ -196,9 +225,12 @@ test('tool rows stay spaced without overlapping message bubbles', async () => {
       .toBeGreaterThanOrEqual(4);
 
     const finalGaps = await getConversationGaps(sidePanel);
+    const visualGaps = await getConversationVisualGaps(sidePanel);
 
     expect(await getMinObservedGap(sidePanel)).toBeGreaterThanOrEqual(0);
     expect(Math.min(...finalGaps)).toBeGreaterThanOrEqual(0);
+    expect(Math.min(...visualGaps)).toBeGreaterThanOrEqual(7);
+    expect(Math.max(...visualGaps)).toBeLessThanOrEqual(12);
   } finally {
     await context.close();
     await fixture.close();

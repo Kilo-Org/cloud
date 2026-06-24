@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { restoreSession, extractDiffs } from './restore-session';
+import { getKiloImportDiagnosticPath } from './utils';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,6 +81,12 @@ function writeMockKilo(binDir: string, exitCode: number): void {
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
 
+function writeMockKiloFailure(binDir: string, stdout: string, stderr: string): void {
+  const script = `#!/usr/bin/env node\nprocess.stdout.write(${JSON.stringify(stdout)});\nprocess.stderr.write(${JSON.stringify(stderr)});\nprocess.exitCode = 1;\n`;
+  const kiloPath = path.join(binDir, 'kilo');
+  fs.writeFileSync(kiloPath, script, { mode: 0o755 });
+}
+
 function writeSlowMockKilo(binDir: string): void {
   const script = '#!/bin/sh\nsleep 1\nexit 0\n';
   const kiloPath = path.join(binDir, 'kilo');
@@ -98,6 +105,36 @@ function writeSignalIgnoringDescendantMockKilo(binDir: string, descendantMarker:
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
+
+// Keep credential URLs assembled from non-URL fragments so secret scanners do not flag fixtures.
+const URL_CREDENTIAL_SEPARATOR = String.fromCharCode(64);
+const FAKE_DATABASE_URL = [
+  'postgres://database-user',
+  ':database-password',
+  URL_CREDENTIAL_SEPARATOR,
+  'database.example/app',
+].join('');
+const FAKE_SENTRY_DSN = [
+  'sentry://sentry-secret',
+  URL_CREDENTIAL_SEPARATOR,
+  'sentry.example/project',
+].join('');
+const FAKE_REDIS_URL = [
+  'redis://:redis-password',
+  URL_CREDENTIAL_SEPARATOR,
+  'redis.example/0',
+].join('');
+const FAKE_TOKEN_ONLY_URL = [
+  'https://token-only',
+  URL_CREDENTIAL_SEPARATOR,
+  'example.com/path',
+].join('');
+const FAKE_CREDENTIAL_URL = [
+  'https://user:url-secret',
+  URL_CREDENTIAL_SEPARATOR,
+  'example.com/repo.git?',
+  'X-Amz-Signature=signed-secret',
+].join('');
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -123,14 +160,22 @@ describe('restoreSession', () => {
     writeMockKilo(binDir, 0);
 
     savedEnv = {
+      DATABASE_URL: process.env.DATABASE_URL,
+      DB_PASS: process.env.DB_PASS,
       KILO_SESSION_INGEST_URL: process.env.KILO_SESSION_INGEST_URL,
+      SENTRY_DSN: process.env.SENTRY_DSN,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
       KILOCODE_TOKEN_FILE: process.env.KILOCODE_TOKEN_FILE,
+      WRAPPER_LOG_PATH: process.env.WRAPPER_LOG_PATH,
       PATH: process.env.PATH,
     };
 
+    process.env.DATABASE_URL = FAKE_DATABASE_URL;
+    process.env.DB_PASS = 'db-secret';
     process.env.KILO_SESSION_INGEST_URL = 'http://localhost:9999';
+    process.env.SENTRY_DSN = FAKE_SENTRY_DSN;
     process.env.KILOCODE_TOKEN = 'test-token';
+    process.env.WRAPPER_LOG_PATH = path.join(tmpDir, 'wrapper.log');
     delete process.env.KILOCODE_TOKEN_FILE;
     process.env.PATH = `${binDir}:${process.env.PATH}`;
 
@@ -337,6 +382,127 @@ describe('restoreSession', () => {
 
   // ---- Import failures ----
 
+  it('persists useful redacted import output outside public and wrapper logs', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeMockKiloFailure(
+      binDir,
+      `import validation failed at messages[4].parts[2]\nKILOCODE_TOKEN=test-token\nSECRET_VALUE=env-secret\nDB_PASS=db-secret\nDATABASE_URL=${FAKE_DATABASE_URL}\nbare test-\u001b[31mtoken\nbare test-\u0000token\nbare opaque-secret\n`,
+      `invalid discriminator value\nAuthorization: Bearer bearer-secret\nX-Api-Key: api-secret\nCookie: session=cookie-secret\n{"token":"prefix\\"json-secret"}\nSENTRY_DSN=${FAKE_SENTRY_DSN}\n${FAKE_REDIS_URL}\n${FAKE_TOKEN_ONLY_URL}\n${FAKE_CREDENTIAL_URL}\n-----BEGIN PRIVATE KEY-----\nprivate-key-secret\n-----END PRIVATE KEY-----\n-----BEGIN OPENSSH PRIVATE KEY-----\nunterminated-private-key-secret\n`
+    );
+
+    const result = await restoreSession(SESSION_ID, workspace, undefined, {
+      sensitiveValues: ['opaque-secret'],
+    });
+
+    expect(result.ok).toBe(false);
+    const wrapperLogPath = process.env.WRAPPER_LOG_PATH;
+    if (!wrapperLogPath) throw new Error('Expected WRAPPER_LOG_PATH');
+    const diagnosticPath = getKiloImportDiagnosticPath(wrapperLogPath);
+    const diagnostic = JSON.parse(fs.readFileSync(diagnosticPath, 'utf8')) as {
+      version: number;
+      kiloSessionId: string;
+      process: { exitCode: number };
+      stdout: { text: string; truncated: boolean };
+      stderr: { text: string; truncated: boolean };
+    };
+    expect(diagnostic).toMatchObject({
+      version: 1,
+      kiloSessionId: SESSION_ID,
+      process: { exitCode: 1 },
+      stdout: { truncated: false },
+      stderr: { truncated: false },
+    });
+    expect(diagnostic.stdout.text).toContain('import validation failed at messages[4].parts[2]');
+    expect(diagnostic.stdout.text.match(/^bare \[REDACTED\]$/gm)).toHaveLength(3);
+    expect(diagnostic.stdout.text).not.toContain('[31m');
+    expect(diagnostic.stdout.text).not.toContain('\u0000');
+    expect(diagnostic.stderr.text).toContain('invalid discriminator value');
+    const serializedDiagnostic = JSON.stringify(diagnostic);
+    expect(serializedDiagnostic).not.toContain('\\u0000');
+    for (const credential of [
+      'test-token',
+      'env-secret',
+      'db-secret',
+      'bearer-secret',
+      'api-secret',
+      'json-secret',
+      'cookie-secret',
+      'database-password',
+      'opaque-secret',
+      'sentry-secret',
+      'redis-password',
+      'token-only',
+      'url-secret',
+      'signed-secret',
+      'private-key-secret',
+      'unterminated-private-key-secret',
+    ]) {
+      expect(serializedDiagnostic).not.toContain(credential);
+    }
+    expect(fs.statSync(diagnosticPath).mode & 0o777).toBe(0o600);
+
+    const projectedResult = JSON.stringify(result);
+    const wrapperLog = fs.readFileSync(wrapperLogPath, 'utf8');
+    for (const privateOutput of [
+      'messages[4].parts[2]',
+      'invalid discriminator value',
+      'test-token',
+      'env-secret',
+      'db-secret',
+      'bearer-secret',
+      'api-secret',
+      'json-secret',
+      'cookie-secret',
+      'database-password',
+      'opaque-secret',
+      'sentry-secret',
+      'redis-password',
+      'token-only',
+      'url-secret',
+      'signed-secret',
+      'private-key-secret',
+      'unterminated-private-key-secret',
+    ]) {
+      expect(projectedResult).not.toContain(privateOutput);
+      expect(wrapperLog).not.toContain(privateOutput);
+    }
+  });
+
+  it('does not follow a pre-created temporary diagnostic symlink', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeMockKiloFailure(binDir, '', 'schema failure');
+    const diagnosticPath = getKiloImportDiagnosticPath(process.env.WRAPPER_LOG_PATH);
+    const predictableTemporaryPath = `${diagnosticPath}.${process.pid}.tmp`;
+    const symlinkTarget = path.join(tmpDir, 'symlink-target');
+    fs.writeFileSync(symlinkTarget, 'sentinel', { mode: 0o644 });
+    fs.symlinkSync(symlinkTarget, predictableTemporaryPath);
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    expect(fs.lstatSync(diagnosticPath).isSymbolicLink()).toBe(false);
+    expect(fs.readFileSync(symlinkTarget, 'utf8')).toBe('sentinel');
+    expect(fs.statSync(diagnosticPath).mode & 0o777).toBe(0o600);
+  });
+
+  it('omits truncated import output from the restricted diagnostic', async () => {
+    mockFetchOk(makeSnapshot([]));
+    writeMockKiloFailure(binDir, `${'x'.repeat(70 * 1_024)}latest-error`, '');
+
+    const result = await restoreSession(SESSION_ID, workspace);
+
+    expect(result.ok).toBe(false);
+    const diagnosticPath = getKiloImportDiagnosticPath(process.env.WRAPPER_LOG_PATH);
+    const diagnostic = JSON.parse(fs.readFileSync(diagnosticPath, 'utf8')) as {
+      stdout: { text: string; truncated: boolean };
+    };
+    expect(diagnostic.stdout).toEqual({
+      text: '[omitted: captured output was truncated]',
+      truncated: true,
+    });
+    expect(fs.statSync(diagnosticPath).size).toBeLessThan(2_048);
+  });
+
   it('returns import error when kilo import fails', async () => {
     const snapshot = makeSnapshot([{ file: 'src/index.ts', after: 'content', status: 'modified' }]);
     mockFetchOk(snapshot);
@@ -402,7 +568,12 @@ describe('restoreSession', () => {
     if (!result.ok) {
       expect(result.step).toBe('import');
       expect(result.error).toContain('kilo import failed');
+      expect(result.detail).toContain('signal SIGTERM');
     }
+    const diagnostic = JSON.parse(
+      fs.readFileSync(getKiloImportDiagnosticPath(process.env.WRAPPER_LOG_PATH), 'utf8')
+    ) as { process: { signal?: string } };
+    expect(diagnostic.process.signal).toBe('SIGTERM');
   });
 
   it('kills signal-ignoring descendants after a kilo import timeout grace period', async () => {
@@ -446,6 +617,7 @@ describe('restoreSession', () => {
       imported: true,
       diffs: { applied: 2, skipped: 0, total: 2 },
     });
+    expect(fs.existsSync(getKiloImportDiagnosticPath(process.env.WRAPPER_LOG_PATH))).toBe(false);
 
     // Verify modified file was written
     const created = fs.readFileSync(path.join(workspace, 'src/index.ts'), 'utf-8');

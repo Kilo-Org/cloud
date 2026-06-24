@@ -51,6 +51,9 @@ export type IngestEvent = {
   data: unknown;
 };
 
+export const WRAPPER_FINAL_LOG_UPLOAD_TIMEOUT_MS = 32_000;
+export const WRAPPER_GRACEFUL_STOP_TIMEOUT_MS = WRAPPER_FINAL_LOG_UPLOAD_TIMEOUT_MS + 3_000;
+
 export const WrapperTerminalFailureCodes = ['payment_required', 'model_missing'] as const;
 export type WrapperTerminalFailureCode = (typeof WrapperTerminalFailureCodes)[number];
 

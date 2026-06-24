@@ -38,6 +38,7 @@ import {
 } from '../../sandbox-timeout-logging.js';
 import { SANDBOX_WORKSPACE_PROBE_TIMEOUT_MESSAGE } from '../../sandbox-recovery.js';
 import { withTimeout } from '@kilocode/worker-utils';
+import { WRAPPER_GRACEFUL_STOP_TIMEOUT_MS } from '../../shared/protocol.js';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
 import { ExecutionError } from '../../execution/errors.js';
 import {
@@ -47,7 +48,15 @@ import {
 } from '../../workspace-errors.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
-const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
+const EARLY_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000, 2_000, 5_000, 10_000];
+const EARLY_STOP_OBSERVATION_WINDOW_MS = EARLY_STOP_OBSERVATION_DELAYS_MS.reduce(
+  (total, delayMs) => total + delayMs,
+  0
+);
+const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [
+  ...EARLY_STOP_OBSERVATION_DELAYS_MS,
+  WRAPPER_GRACEFUL_STOP_TIMEOUT_MS - EARLY_STOP_OBSERVATION_WINDOW_MS,
+];
 
 function withWorkspacePreparationTimeout<T>(operation: Promise<T>, step: string): Promise<T> {
   return withTimeout(

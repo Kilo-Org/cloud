@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Env, SandboxInstance } from '../../types.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { WrapperClient } from '../../kilo/wrapper-client.js';
+import { WRAPPER_FINAL_LOG_UPLOAD_TIMEOUT_MS } from '../../shared/protocol.js';
 import { WRAPPER_VERSION } from '../../shared/wrapper-version.js';
 import type { EnsureWrapperRequest } from '../protocol.js';
 import { CloudflareAgentSandbox } from './cloudflare-agent-sandbox.js';
@@ -539,6 +540,36 @@ describe('CloudflareAgentSandbox', () => {
     expect(exec).toHaveBeenCalledWith(expect.stringContaining('pkill -f --'));
     expect(exec).toHaveBeenCalledWith(expect.stringContaining('pkill -9 -f --'));
     expect(exec).toHaveBeenCalledWith(expect.stringContaining('--agent-session agent_cloudflare'));
+  });
+
+  it('allows the wrapper final-log deadline before force stopping', async () => {
+    const observedProcess = {
+      id: 'wrapper-target',
+      command:
+        'WRAPPER_PORT=5000 kilocode-wrapper --agent-session agent_cloudflare --wrapper-instance-id instance_1 --wrapper-instance-generation 2',
+      status: 'running',
+    };
+    const listProcesses = vi.fn().mockResolvedValue([observedProcess]);
+    const sleep = vi.fn().mockResolvedValue(undefined);
+    const sandbox = new CloudflareAgentSandbox({} as Env, metadata(), {
+      resolveSandbox: () =>
+        ({
+          listProcesses,
+          exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: '' }),
+        }) as unknown as SandboxInstance,
+      sleep,
+    });
+
+    await expect(
+      sandbox.stopWrappers({
+        target: { kind: 'instance', instance: { instanceId: 'instance_1', instanceGeneration: 2 } },
+        attemptId: 'attempt_graceful_flush',
+        reason: 'readiness-failed',
+      })
+    ).resolves.toMatchObject({ status: 'still-present' });
+
+    const gracefulStopWindowMs = sleep.mock.calls.reduce((total, [delayMs]) => total + delayMs, 0);
+    expect(gracefulStopWindowMs).toBeGreaterThan(WRAPPER_FINAL_LOG_UPLOAD_TIMEOUT_MS);
   });
 
   it('returns still-present when targeted forceful cleanup remains observable', async () => {

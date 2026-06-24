@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { basename, dirname } from 'node:path';
 import { spawn } from 'node:child_process';
-import { logToFile } from './utils.js';
+import { getKiloImportDiagnosticPath, logToFile } from './utils.js';
 
 type LogUploaderOpts = {
   workerBaseUrl: string;
@@ -17,6 +17,7 @@ type LogUploaderOpts = {
 export type LogUploader = {
   start: (intervalMs?: number) => void;
   uploadNow: () => Promise<void>;
+  flushNow: () => Promise<void>;
   stop: () => void;
 };
 
@@ -81,21 +82,20 @@ function createTarStream(paths: Array<string>): TarStream | undefined {
 
 export function createLogUploader(opts: LogUploaderOpts): LogUploader {
   let intervalId: ReturnType<typeof setInterval> | undefined;
-  let isUploading = false;
+  let uploadQueue = Promise.resolve();
 
-  async function uploadNow(): Promise<void> {
-    if (isUploading) return;
-    isUploading = true;
-    const tar = createTarStream([opts.cliLogDir, opts.wrapperLogPath]);
-    if (!tar) {
-      isUploading = false;
-      return;
-    }
+  async function performUpload(executionId: string): Promise<void> {
+    const tar = createTarStream([
+      opts.cliLogDir,
+      opts.wrapperLogPath,
+      getKiloImportDiagnosticPath(opts.wrapperLogPath),
+    ]);
+    if (!tar) return;
 
     const abort = new AbortController();
     const timer = setTimeout(() => abort.abort(), UPLOAD_TIMEOUT_MS);
     try {
-      const url = `${opts.workerBaseUrl}/sessions/${encodeURIComponent(opts.userId)}/${encodeURIComponent(opts.sessionId)}/logs/${encodeURIComponent(opts.executionId)}/logs.tar.gz`;
+      const url = `${opts.workerBaseUrl}/sessions/${encodeURIComponent(opts.userId)}/${encodeURIComponent(opts.sessionId)}/logs/${encodeURIComponent(executionId)}/logs.tar.gz`;
       const response = await fetch(url, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${opts.workerAuthToken}` },
@@ -116,8 +116,17 @@ export function createLogUploader(opts: LogUploaderOpts): LogUploader {
     } finally {
       clearTimeout(timer);
       tar.kill();
-      isUploading = false;
     }
+  }
+
+  function enqueueUpload(executionId: string): Promise<void> {
+    const upload = uploadQueue.then(() => performUpload(executionId));
+    uploadQueue = upload.catch(() => {});
+    return upload;
+  }
+
+  function uploadNow(): Promise<void> {
+    return enqueueUpload(opts.executionId);
   }
 
   function start(intervalMs = 30_000): void {
@@ -134,5 +143,10 @@ export function createLogUploader(opts: LogUploaderOpts): LogUploader {
     }
   }
 
-  return { start, uploadNow, stop };
+  function flushNow(): Promise<void> {
+    stop();
+    return enqueueUpload(`${opts.executionId}-final`);
+  }
+
+  return { start, uploadNow, flushNow, stop };
 }

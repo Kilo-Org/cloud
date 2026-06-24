@@ -8,7 +8,9 @@ import {
 } from '../../src/shared/wrapper-bootstrap.js';
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
 import {
+  applyMaterializedEnvironment,
   createSafeProcessDiagnostic,
+  getKiloImportDiagnosticPath,
   git,
   isTimeoutTermination,
   logToFile,
@@ -443,9 +445,38 @@ async function writeRuntimeSkills(request: WrapperSessionReadyRequest): Promise<
   }
 }
 
+function collectNestedStringValues(value: unknown, values: Set<string>): void {
+  if (typeof value === 'string') {
+    if (value.length >= 4) values.add(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) collectNestedStringValues(entry, values);
+    return;
+  }
+  if (typeof value === 'object' && value !== null) {
+    for (const entry of Object.values(value)) collectNestedStringValues(entry, values);
+  }
+}
+
+function collectMaterializedSensitiveValues(env: Record<string, string>): string[] {
+  const values = new Set<string>();
+  for (const serialized of Object.values(env)) {
+    if (serialized.length >= 4) values.add(serialized);
+    try {
+      const parsed: unknown = JSON.parse(serialized);
+      collectNestedStringValues(parsed, values);
+    } catch {
+      // Non-JSON environment values are already included verbatim.
+    }
+  }
+  return [...values];
+}
+
 async function bootstrapEmptyKiloSession(
   request: WrapperSessionReadyRequest,
-  restore: typeof restoreSession
+  restore: typeof restoreSession,
+  diagnosticPath: string
 ): Promise<void> {
   const now = Date.now();
   const minimalSessionJson = JSON.stringify({
@@ -468,7 +499,11 @@ async function bootstrapEmptyKiloSession(
   const result = await restore(
     request.kiloSessionId,
     request.workspace.workspacePath,
-    importFilePath
+    importFilePath,
+    {
+      diagnosticPath,
+      sensitiveValues: collectMaterializedSensitiveValues(request.materialized.env),
+    }
   );
   if (!result.ok) {
     logToFile(
@@ -489,13 +524,22 @@ async function bootstrapEmptyKiloSession(
 
 async function restoreOrBootstrapKiloSession(
   request: WrapperSessionReadyRequest,
-  restore: typeof restoreSession
+  restore: typeof restoreSession,
+  diagnosticPath: string
 ): Promise<void> {
   if (request.workspace.preferSnapshot) {
     logToFile(
       `bootstrap snapshot restore starting kiloSessionId=${request.kiloSessionId} workspacePath=${request.workspace.workspacePath}`
     );
-    const result = await restore(request.kiloSessionId, request.workspace.workspacePath);
+    const result = await restore(
+      request.kiloSessionId,
+      request.workspace.workspacePath,
+      undefined,
+      {
+        diagnosticPath,
+        sensitiveValues: collectMaterializedSensitiveValues(request.materialized.env),
+      }
+    );
     if (result.ok) {
       logToFile(
         `bootstrap snapshot restore ready kiloSessionId=${request.kiloSessionId} downloaded=${result.downloaded} diffsApplied=${result.diffs.applied} diffsSkipped=${result.diffs.skipped} diffsTotal=${result.diffs.total}`
@@ -520,7 +564,7 @@ async function restoreOrBootstrapKiloSession(
   } else {
     logToFile(`bootstrap fresh session using empty import kiloSessionId=${request.kiloSessionId}`);
   }
-  await bootstrapEmptyKiloSession(request, restore);
+  await bootstrapEmptyKiloSession(request, restore, diagnosticPath);
 }
 
 async function runSetupCommands(
@@ -630,8 +674,9 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
   const runGit = deps.git ?? git;
   const run = deps.runProcess ?? runProcess;
   const restore = deps.restoreSession ?? restoreSession;
+  const diagnosticPath = getKiloImportDiagnosticPath();
 
-  Object.assign(process.env, request.materialized.env);
+  applyMaterializedEnvironment(request.materialized.env);
 
   let workspaceWasWarm = false;
   let workspaceNeedsBootstrap = true;
@@ -687,7 +732,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
         'kilo_session',
         request.workspace.preferSnapshot ? 'Restoring session...' : 'Importing session...'
       );
-      await restoreOrBootstrapKiloSession(request, restore);
+      await restoreOrBootstrapKiloSession(request, restore, diagnosticPath);
 
       if (request.materialized.setupCommands?.length) {
         progress?.('setup_commands', 'Running setup commands...');

@@ -13,6 +13,7 @@ import type {
   WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap';
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
+import { getKiloImportDiagnosticPath } from './utils.js';
 
 function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyRequest> = {}) {
   const request: WrapperSessionReadyRequest = {
@@ -75,7 +76,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       HOME: process.env.HOME,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
       GH_TOKEN: process.env.GH_TOKEN,
+      WRAPPER_LOG_PATH: process.env.WRAPPER_LOG_PATH,
     };
+    process.env.WRAPPER_LOG_PATH = path.join(tmpDir, 'trusted-wrapper.log');
   });
 
   afterEach(() => {
@@ -153,6 +156,45 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
+  });
+
+  it('passes materialized environment values to import diagnostics', async () => {
+    const request = makeRequest(tmpDir);
+    request.materialized.setupCommands = [];
+    request.materialized.env.OPAQUE_NAME = JSON.stringify({
+      token: 'nested-secret',
+      nested: { value: 'deep-secret' },
+    });
+    request.materialized.env.WRAPPER_LOG_PATH = path.join(tmpDir, 'untrusted-wrapper.log');
+    let diagnosticPath: string | undefined;
+    let sensitiveValues: string[] | undefined;
+
+    await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+        }
+        return { stdout: '', stderr: '', exitCode: args[0] === 'rev-parse' ? 1 : 0 };
+      },
+      restoreSession: async (_kiloSessionId, _workspacePath, _filePath, options) => {
+        diagnosticPath = options?.diagnosticPath;
+        sensitiveValues = options?.sensitiveValues;
+        return {
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        };
+      },
+    });
+
+    expect(diagnosticPath).toBe(
+      getKiloImportDiagnosticPath(path.join(tmpDir, 'trusted-wrapper.log'))
+    );
+    expect(process.env.WRAPPER_LOG_PATH).toBe(path.join(tmpDir, 'trusted-wrapper.log'));
+    expect(new Set(sensitiveValues)).toEqual(
+      new Set([...Object.values(request.materialized.env), 'nested-secret', 'deep-secret'])
+    );
   });
 
   it('uses activity watchdogs and reports sanitized progress for long git operations', async () => {

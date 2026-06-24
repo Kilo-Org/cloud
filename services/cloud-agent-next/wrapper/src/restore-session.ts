@@ -4,9 +4,11 @@ import path from 'node:path';
 import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
 import {
   createSafeProcessDiagnostic,
+  getKiloImportDiagnosticPath,
   isTimeoutTermination,
   logToFile,
   runProcess,
+  type ExecResult,
 } from './utils.js';
 
 // ---------------------------------------------------------------------------
@@ -39,10 +41,19 @@ type SnapshotDiff = {
 export type RestoreSessionOptions = {
   importTimeoutMs?: number;
   importTerminationGraceMs?: number;
+  diagnosticPath?: string;
+  sensitiveValues?: string[];
   signal?: AbortSignal;
 };
 
 const KILO_IMPORT_TIMEOUT_MS = 120_000;
+const OMITTED_TRUNCATED_OUTPUT = '[omitted: captured output was truncated]';
+const REDACTED = '[REDACTED]';
+const ANSI_ESCAPE_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`, 'g');
+const SENSITIVE_ENV_NAME =
+  /(?:AUTH|COOKIE|CREDENTIAL|DSN|KEY|PASS|PRIVATE|SECRET|SIGNATURE|TOKEN|URL)/i;
+const SENSITIVE_OUTPUT_LINE =
+  /(?:\b(?:authorization|cookie|set-cookie|x-api-key)\s*:|(?:^|[\s"'{}[\],?&])(?:["']?[a-z0-9_-]*(?:auth|cookie|credential|dsn|key|pass|private|secret|signature|token|url)[a-z0-9_-]*["']?)\s*(?:=|:)|--[a-z0-9-]*(?:auth|cookie|credential|dsn|key|pass|private|secret|signature|token|url)[a-z0-9-]*(?:=|\s+))/i;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -91,6 +102,104 @@ function resolveKilocodeToken(): string | undefined {
   }
 
   return fs.readFileSync(tokenFile, 'utf8').replace(/[\r\n]+$/, '');
+}
+
+function stripUnsupportedControlCharacters(value: string): string {
+  return Array.from(value)
+    .filter(character => {
+      const code = character.charCodeAt(0);
+      return (
+        character === '\t' ||
+        character === '\n' ||
+        character === '\r' ||
+        (code >= 32 && code !== 127)
+      );
+    })
+    .join('');
+}
+
+function redactImportOutput(
+  output: string,
+  truncated: boolean,
+  additionalSensitiveValues: string[]
+): string {
+  if (truncated) return OMITTED_TRUNCATED_OUTPUT;
+
+  const environmentSecrets = Object.entries(process.env).flatMap(([name, value]) =>
+    SENSITIVE_ENV_NAME.test(name) && typeof value === 'string' && value.length >= 4 ? [value] : []
+  );
+  let redacted = stripUnsupportedControlCharacters(output.replace(ANSI_ESCAPE_PATTERN, ''));
+  for (const value of [...environmentSecrets, ...additionalSensitiveValues]
+    .filter(value => value.length >= 4)
+    .sort((left, right) => right.length - left.length)) {
+    redacted = redacted.split(value).join(REDACTED);
+  }
+
+  redacted = redacted.replace(
+    /-----BEGIN [^-\r\n]*PRIVATE KEY-----[\s\S]*?(?:-----END [^-\r\n]*PRIVATE KEY-----|$)/gi,
+    REDACTED
+  );
+  redacted = redacted
+    .split('\n')
+    .map(line => (SENSITIVE_OUTPUT_LINE.test(line) ? REDACTED : line))
+    .join('\n')
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]*@/gi, `$1${REDACTED}@`)
+    .replace(
+      /([?&](?:access[_-]?token|api[_-]?key|key|secret|signature|token)=)[^&#\s]+/gi,
+      `$1${REDACTED}`
+    );
+  return stripUnsupportedControlCharacters(redacted);
+}
+
+function persistImportFailureDiagnostic(
+  diagnosticPath: string,
+  kiloSessionId: string,
+  result: ExecResult,
+  additionalSensitiveValues: string[]
+): boolean {
+  const diagnostic = {
+    version: 1,
+    recordedAt: new Date().toISOString(),
+    kiloSessionId,
+    process: {
+      exitCode: result.exitCode,
+      ...(result.signal ? { signal: result.signal } : {}),
+      ...(result.terminationReason ? { terminationReason: result.terminationReason } : {}),
+      ...(result.elapsedMs === undefined ? {} : { elapsedMs: result.elapsedMs }),
+    },
+    stdout: {
+      text: redactImportOutput(
+        result.stdout,
+        result.stdoutTruncated === true,
+        additionalSensitiveValues
+      ),
+      truncated: result.stdoutTruncated === true,
+    },
+    stderr: {
+      text: redactImportOutput(
+        result.stderr,
+        result.stderrTruncated === true,
+        additionalSensitiveValues
+      ),
+      truncated: result.stderrTruncated === true,
+    },
+  };
+
+  let temporaryDirectory: string | undefined;
+  try {
+    temporaryDirectory = fs.mkdtempSync(`${diagnosticPath}.tmp-`);
+    const temporaryPath = path.join(temporaryDirectory, 'diagnostic.json');
+    fs.writeFileSync(temporaryPath, `${JSON.stringify(diagnostic, null, 2)}\n`, {
+      flag: 'wx',
+      mode: 0o600,
+    });
+    fs.renameSync(temporaryPath, diagnosticPath);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (temporaryDirectory) fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
 }
 
 type SnapshotInfoValidation = 'valid' | 'missing' | 'invalid';
@@ -498,6 +607,8 @@ export async function restoreSession(
   const tmpPath = filePath ?? `/tmp/kilo-session-export-${kiloSessionId}.json`;
   const downloaded = !filePath;
   const importTimeoutMs = options.importTimeoutMs ?? KILO_IMPORT_TIMEOUT_MS;
+  const diagnosticPath = options.diagnosticPath ?? getKiloImportDiagnosticPath();
+  let kilocodeToken: string | undefined;
 
   log(
     `starting kiloSessionId=${kiloSessionId} workspace=${workspacePath} input=${downloaded ? 'downloaded' : 'provided'} tmpPath=${tmpPath} home=${process.env.HOME ?? '(unset)'}`
@@ -505,15 +616,14 @@ export async function restoreSession(
 
   if (!filePath) {
     const ingestUrl = process.env.KILO_SESSION_INGEST_URL;
-    let token: string | undefined;
     try {
-      token = resolveKilocodeToken();
+      kilocodeToken = resolveKilocodeToken();
     } catch {
       return fail('failed to read KILOCODE_TOKEN_FILE', null, 'download');
     }
 
-    if (!ingestUrl || !token) {
-      const missing = [!ingestUrl && 'KILO_SESSION_INGEST_URL', !token && 'KILOCODE_TOKEN']
+    if (!ingestUrl || !kilocodeToken) {
+      const missing = [!ingestUrl && 'KILO_SESSION_INGEST_URL', !kilocodeToken && 'KILOCODE_TOKEN']
         .filter(Boolean)
         .join(', ');
       return fail(`missing env vars: ${missing}`, null, 'download');
@@ -530,7 +640,7 @@ export async function restoreSession(
         ? AbortSignal.any([options.signal, downloadTimeoutSignal])
         : downloadTimeoutSignal;
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${kilocodeToken}` },
         signal: downloadSignal,
       });
 
@@ -597,6 +707,18 @@ export async function restoreSession(
       terminationGraceMs: options.importTerminationGraceMs,
     });
     const importElapsedMs = Date.now() - importStartedAt;
+
+    if (importResult.exitCode !== 0) {
+      const diagnosticPersisted = persistImportFailureDiagnostic(
+        diagnosticPath,
+        kiloSessionId,
+        importResult,
+        [...(options.sensitiveValues ?? []), ...(kilocodeToken ? [kilocodeToken] : [])]
+      );
+      log(
+        `kilo import diagnostic ${diagnosticPersisted ? 'persisted' : 'persistence failed'} kiloSessionId=${kiloSessionId}`
+      );
+    }
 
     if (isTimeoutTermination(importResult)) {
       log(

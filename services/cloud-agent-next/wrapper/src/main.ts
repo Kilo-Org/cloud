@@ -12,7 +12,11 @@
  */
 
 import { createKilo } from '@kilocode/sdk';
-import { SESSION_ID_RE } from '../../src/shared/protocol.js';
+import {
+  SESSION_ID_RE,
+  WRAPPER_FINAL_LOG_UPLOAD_TIMEOUT_MS,
+  WRAPPER_GRACEFUL_STOP_TIMEOUT_MS,
+} from '../../src/shared/protocol.js';
 import { WRAPPER_VERSION } from '../../src/shared/wrapper-version.js';
 import { WrapperState } from './state.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from './kilo-api.js';
@@ -21,7 +25,7 @@ import { createLifecycleManager } from './lifecycle.js';
 import { bindSessionContext, createServer } from './server.js';
 import { openKiloGlobalFeed } from './global-feed.js';
 import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-feed-manager.js';
-import { logToFile } from './utils.js';
+import { applyMaterializedEnvironment, logToFile } from './utils.js';
 import {
   kiloServerBootstrapError,
   kiloServerStartupError,
@@ -41,8 +45,8 @@ import {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Grace period before force exit during shutdown (20 seconds) */
-const SHUTDOWN_TIMEOUT_MS = 20_000;
+/** Grace period before force exit during shutdown. */
+const SHUTDOWN_TIMEOUT_MS = WRAPPER_GRACEFUL_STOP_TIMEOUT_MS + 30_000;
 
 /** Timeout for createKilo() server startup */
 const KILO_STARTUP_TIMEOUT_MS = 30_000;
@@ -508,9 +512,9 @@ async function main() {
 
   async function updateRuntimeEnvironment(env: Record<string, string>): Promise<void> {
     const environmentChanged = Object.entries(env).some(
-      ([name, value]) => process.env[name] !== value
+      ([name, value]) => name !== 'WRAPPER_LOG_PATH' && process.env[name] !== value
     );
-    Object.assign(process.env, env);
+    applyMaterializedEnvironment(env);
     if (runtimeWorkspacePath && (environmentChanged || !kiloClient)) {
       await startKiloRuntime(runtimeWorkspacePath, kiloSessionId || undefined, true);
     }
@@ -693,6 +697,8 @@ async function main() {
 
     logToFile(`shutdown signal: ${signal}`);
     console.error(`Received ${signal}, shutting down...`);
+    const uploader = state.logUploader;
+    uploader?.stop();
 
     // Force exit after timeout
     setTimeout(() => {
@@ -728,11 +734,11 @@ async function main() {
     globalFeedManager.close();
 
     // Best-effort final log upload
-    const uploader = state.logUploader;
     if (uploader) {
-      const uploadTimeout = new Promise<void>(resolve => setTimeout(resolve, 5_000));
-      await Promise.race([uploader.uploadNow().catch(() => {}), uploadTimeout]);
-      uploader.stop();
+      const uploadTimeout = new Promise<void>(resolve =>
+        setTimeout(resolve, WRAPPER_FINAL_LOG_UPLOAD_TIMEOUT_MS)
+      );
+      await Promise.race([uploader.flushNow().catch(() => {}), uploadTimeout]);
     }
 
     // Abort kilo session if running
@@ -778,9 +784,10 @@ async function main() {
 
     const uploader = state.logUploader;
     if (uploader) {
-      const timeout = new Promise<void>(resolve => setTimeout(resolve, 5_000));
-      void Promise.race([uploader.uploadNow().catch(() => {}), timeout]).finally(() => {
-        uploader.stop();
+      const timeout = new Promise<void>(resolve =>
+        setTimeout(resolve, WRAPPER_FINAL_LOG_UPLOAD_TIMEOUT_MS)
+      );
+      void Promise.race([uploader.flushNow().catch(() => {}), timeout]).finally(() => {
         process.exit(1);
       });
     } else {

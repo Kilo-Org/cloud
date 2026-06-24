@@ -3,6 +3,7 @@ import { WrapperState } from './state';
 import { createLifecycleManager } from './lifecycle';
 import type { IngestEvent } from '../../src/shared/protocol';
 import type { WrapperKiloClient } from './kilo-api';
+import type { LogUploader } from './log-uploader';
 
 const sessionContext = {
   kiloSessionId: 'kilo_sess_test',
@@ -19,6 +20,53 @@ function wait(ms: number): Promise<void> {
 }
 
 describe('wrapper lifecycle drain races', () => {
+  it('flushes immutable logs before emitting completion', async () => {
+    const state = new WrapperState();
+    const events: IngestEvent[] = [];
+    const order: string[] = [];
+    let releaseFlush: (() => void) | undefined;
+    const flushGate = new Promise<void>(resolve => {
+      releaseFlush = resolve;
+    });
+    const uploader: LogUploader = {
+      start: () => {},
+      uploadNow: async () => {},
+      flushNow: async () => {
+        order.push('flush-started');
+        await flushGate;
+        order.push('flush-finished');
+      },
+      stop: () => {},
+    };
+    state.bindSession(sessionContext);
+    state.setSendToIngestFn(event => {
+      events.push(event);
+      if (event.streamEventType === 'complete') order.push('complete');
+    });
+    state.setLogUploader(uploader);
+    const lifecycle = createLifecycleManager(
+      { workspacePath: '/tmp' },
+      {
+        state,
+        kiloClient: {} as WrapperKiloClient,
+        closeConnections: async () => {},
+        isConnected: () => true,
+        reconnectEventSubscription: () => {},
+      }
+    );
+
+    lifecycle.triggerDrainAndClose();
+    while (!order.includes('flush-started')) await wait(1);
+    expect(events.map(event => event.streamEventType)).not.toContain('complete');
+
+    const release = releaseFlush;
+    if (!release) throw new Error('Expected final log flush to start');
+    release();
+    while (!order.includes('complete')) await wait(1);
+
+    expect(order).toEqual(['flush-started', 'flush-finished', 'complete']);
+  });
+
   it('clears aborted state when activity cancels an aborted drain', async () => {
     const state = new WrapperState();
     const events: IngestEvent[] = [];

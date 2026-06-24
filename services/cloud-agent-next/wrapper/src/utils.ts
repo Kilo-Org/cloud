@@ -5,6 +5,7 @@ export type ExecResult = {
   stdout: string;
   stderr: string;
   exitCode: number;
+  signal?: NodeJS.Signals;
   elapsedMs?: number;
   terminationReason?: TerminationReason;
   stdoutTruncated?: boolean;
@@ -41,9 +42,25 @@ const EXEC_INACTIVITY_TIMEOUT_MESSAGE = 'exec inactivity timeout reached';
 const EXEC_HARD_TIMEOUT_MESSAGE = 'exec hard timeout reached';
 const EXEC_ABORTED_MESSAGE = 'exec aborted';
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1_024;
+const DEFAULT_WRAPPER_LOG_PATH = '/tmp/kilocode-wrapper.log';
+const KILO_IMPORT_DIAGNOSTIC_SUFFIX = '.kilo-import-failure.json';
 const TRUNCATION_MARKER = 'output truncated';
 
 export type TerminationReason = 'timeout' | 'inactivity_timeout' | 'hard_timeout' | 'abort';
+
+export function getKiloImportDiagnosticPath(wrapperLogPath?: string): string {
+  return `${wrapperLogPath ?? process.env.WRAPPER_LOG_PATH ?? DEFAULT_WRAPPER_LOG_PATH}${KILO_IMPORT_DIAGNOSTIC_SUFFIX}`;
+}
+
+export function applyMaterializedEnvironment(env: Record<string, string>): void {
+  const wrapperLogPath = process.env.WRAPPER_LOG_PATH;
+  Object.assign(process.env, env);
+  if (wrapperLogPath === undefined) {
+    delete process.env.WRAPPER_LOG_PATH;
+  } else {
+    process.env.WRAPPER_LOG_PATH = wrapperLogPath;
+  }
+}
 
 export function isTimeoutTermination(result: ExecResult): boolean {
   return (
@@ -80,6 +97,7 @@ export function createSafeProcessDiagnostic(result: ExecResult): string {
     result.terminationReason === undefined && result.exitCode !== 0
       ? `exit code ${result.exitCode}`
       : undefined,
+    result.signal === undefined ? undefined : `signal ${result.signal}`,
     result.elapsedMs === undefined ? undefined : `elapsed ${result.elapsedMs}ms`,
     result.stdoutTruncated === true || result.stderrTruncated === true
       ? TRUNCATION_MARKER
@@ -277,6 +295,7 @@ export function runProcess(
         stdout,
         stderr,
         exitCode: code ?? (signal === null ? 0 : 1),
+        ...(signal === null ? {} : { signal }),
         elapsedMs: Date.now() - startedAt,
         ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
         ...(stderrTruncated ? { stderrTruncated: true } : {}),

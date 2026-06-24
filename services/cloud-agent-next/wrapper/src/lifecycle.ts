@@ -173,13 +173,12 @@ export function createLifecycleManager(
         const uploader = state.logUploader;
         if (uploader) {
           try {
-            await uploader.uploadNow();
+            await uploader.flushNow();
           } catch (error) {
             logToFile(
               `final log upload failed: ${error instanceof Error ? error.message : String(error)}`
             );
           }
-          uploader.stop();
         }
       } finally {
         const currentSession = state.currentSession;

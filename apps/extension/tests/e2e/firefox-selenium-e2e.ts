@@ -23,6 +23,8 @@ const chromeWorkflowNames = [
   'conversation tab bar scrolls horizontally',
   'assistant messages render markdown',
   'only the message pane scrolls virtualized overflowing conversation content',
+  'manual scroll up shows jump to latest without following new messages',
+  'scrolling back to bottom reactivates automatic scroll to new messages',
   'settings organization picker sends org context to the gateway',
   'native side panel is outside the page DOM',
   'dangerous mode conversation can eval against a normal tab',
@@ -802,6 +804,18 @@ const clickButtonByLabel = async (driver: WebDriver, label: string): Promise<voi
   await driver.findElement(By.css(`button[aria-label="${label}"]`)).click();
 };
 
+const waitForNoButtonByLabel = async (driver: WebDriver, label: string): Promise<void> => {
+  await waitUntil(
+    driver,
+    async () => {
+      const elements = await driver.findElements(By.css(`button[aria-label="${label}"]`));
+
+      return elements.length === 0;
+    },
+    `Timed out waiting for button label to disappear: ${label}`
+  );
+};
+
 const switchToDangerousMode = async (driver: WebDriver): Promise<void> => {
   await driver.findElement(By.css('button[aria-label^="Safe mode"]')).click();
   await clickButtonByText(driver, 'Dangerous');
@@ -1152,6 +1166,249 @@ const scenarios: FirefoxScenario[] = [
             parsedScrollState.messagePaneScrollHeight - 4
         );
       }),
+  },
+  {
+    name: 'manual scroll up shows jump to latest without following new messages',
+    run: context => {
+      const { promise: pendingFirstCompletion, resolve: releaseFirstCompletion } =
+        Promise.withResolvers<void>();
+
+      return withSession(
+        context.api,
+        {
+          beforeFirstCompletion: () => pendingFirstCompletion,
+          firstCompletionEvents: [
+            { choices: [{ delta: { content: 'Delayed Firefox reply arrived.' } }] },
+          ],
+          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+        },
+        async session => {
+          try {
+            await session.openTargetPage();
+            await openAuthenticatedPanel(session);
+            await waitForModel(session.driver);
+            await session.driver.manage().window().setRect({ height: 420, width: 360, x: 0, y: 0 });
+            await seedFirefoxConversation(
+              session.driver,
+              Array.from({ length: 80 }, (_value, index) => ({
+                id: `manual-scroll-${index}`,
+                role: 'assistant',
+                text: `Manual scroll content ${index}`,
+                type: 'message',
+              }))
+            );
+            await session.driver.navigate().refresh();
+            await waitForText(session.driver, 'Manual scroll content 79');
+
+            await sendMessage(session.driver, 'Wait before replying');
+            await waitForText(session.driver, 'Stop');
+
+            const scrolledUpState = await session.driver.executeScript(() => {
+              const conversation = document.querySelector('[aria-label="Agent conversation"]');
+
+              if (!(conversation instanceof HTMLElement)) {
+                throw new Error('Agent conversation pane was not found.');
+              }
+
+              conversation.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: -2400 }));
+              conversation.scrollTop = 0;
+              conversation.dispatchEvent(new Event('scroll', { bubbles: true }));
+
+              return {
+                messagePaneClientHeight: conversation.clientHeight,
+                messagePaneScrollHeight: conversation.scrollHeight,
+                messagePaneScrollTop: conversation.scrollTop,
+              };
+            });
+
+            const parsedScrolledUpState = scrollStateSchema
+              .omit({
+                documentClientHeight: true,
+                documentScrollHeight: true,
+                mountedMessageItems: true,
+              })
+              .parse(scrolledUpState);
+            await session.driver.findElement(By.css('button[aria-label="Jump to latest"]'));
+
+            releaseFirstCompletion();
+            await waitForStoredFirefoxConversationText(
+              session.driver,
+              'Delayed Firefox reply arrived.'
+            );
+
+            const finalScrollState = await session.driver.executeScript(() => {
+              const conversation = document.querySelector('[aria-label="Agent conversation"]');
+
+              if (!(conversation instanceof HTMLElement)) {
+                throw new Error('Agent conversation pane was not found.');
+              }
+
+              return {
+                messagePaneClientHeight: conversation.clientHeight,
+                messagePaneScrollHeight: conversation.scrollHeight,
+                messagePaneScrollTop: conversation.scrollTop,
+              };
+            });
+
+            const parsedFinalScrollState = scrollStateSchema
+              .omit({
+                documentClientHeight: true,
+                documentScrollHeight: true,
+                mountedMessageItems: true,
+              })
+              .parse(finalScrollState);
+
+            assert.ok(
+              parsedFinalScrollState.messagePaneScrollTop <=
+                parsedScrolledUpState.messagePaneScrollTop + 4
+            );
+            assert.ok(
+              parsedFinalScrollState.messagePaneScrollTop +
+                parsedFinalScrollState.messagePaneClientHeight <
+                parsedFinalScrollState.messagePaneScrollHeight - 16
+            );
+
+            await clickButtonByLabel(session.driver, 'Jump to latest');
+            await waitForText(session.driver, 'Delayed Firefox reply arrived.');
+            await waitForNoButtonByLabel(session.driver, 'Jump to latest');
+
+            const jumpedScrollState = await session.driver.executeScript(() => {
+              const conversation = document.querySelector('[aria-label="Agent conversation"]');
+
+              if (!(conversation instanceof HTMLElement)) {
+                throw new Error('Agent conversation pane was not found.');
+              }
+
+              return {
+                messagePaneClientHeight: conversation.clientHeight,
+                messagePaneScrollHeight: conversation.scrollHeight,
+                messagePaneScrollTop: conversation.scrollTop,
+              };
+            });
+            const parsedJumpedScrollState = scrollStateSchema
+              .omit({
+                documentClientHeight: true,
+                documentScrollHeight: true,
+                mountedMessageItems: true,
+              })
+              .parse(jumpedScrollState);
+
+            assert.ok(
+              parsedJumpedScrollState.messagePaneScrollTop +
+                parsedJumpedScrollState.messagePaneClientHeight >=
+                parsedJumpedScrollState.messagePaneScrollHeight - 16
+            );
+          } finally {
+            releaseFirstCompletion();
+          }
+        }
+      );
+    },
+  },
+  {
+    name: 'scrolling back to bottom reactivates automatic scroll to new messages',
+    run: context => {
+      const { promise: pendingFirstCompletion, resolve: releaseFirstCompletion } =
+        Promise.withResolvers<void>();
+
+      return withSession(
+        context.api,
+        {
+          beforeFirstCompletion: () => pendingFirstCompletion,
+          firstCompletionEvents: [
+            { choices: [{ delta: { content: 'First delayed Firefox reply.' } }] },
+          ],
+          secondCompletionEvents: [
+            { choices: [{ delta: { content: 'Second Firefox reply after bottom.' } }] },
+          ],
+          toolNames: ['get_page_snapshot', 'get_element_details', 'find_in_page'],
+        },
+        async session => {
+          try {
+            await session.openTargetPage();
+            await openAuthenticatedPanel(session);
+            await waitForModel(session.driver);
+            await session.driver.manage().window().setRect({ height: 420, width: 360, x: 0, y: 0 });
+            await seedFirefoxConversation(
+              session.driver,
+              Array.from({ length: 80 }, (_value, index) => ({
+                id: `bottom-reactivation-${index}`,
+                role: 'assistant',
+                text: `Bottom reactivation content ${index}`,
+                type: 'message',
+              }))
+            );
+            await session.driver.navigate().refresh();
+            await waitForText(session.driver, 'Bottom reactivation content 79');
+
+            await sendMessage(session.driver, 'Wait before first reply');
+            await waitForText(session.driver, 'Stop');
+
+            await session.driver.executeScript(() => {
+              const conversation = document.querySelector('[aria-label="Agent conversation"]');
+
+              if (!(conversation instanceof HTMLElement)) {
+                throw new Error('Agent conversation pane was not found.');
+              }
+
+              conversation.scrollTop = 0;
+              conversation.dispatchEvent(new Event('scroll', { bubbles: true }));
+            });
+            await session.driver.findElement(By.css('button[aria-label="Jump to latest"]'));
+
+            releaseFirstCompletion();
+            await waitForStoredFirefoxConversationText(
+              session.driver,
+              'First delayed Firefox reply.'
+            );
+
+            await session.driver.executeScript(() => {
+              const conversation = document.querySelector('[aria-label="Agent conversation"]');
+
+              if (!(conversation instanceof HTMLElement)) {
+                throw new Error('Agent conversation pane was not found.');
+              }
+
+              conversation.scrollTop = conversation.scrollHeight;
+              conversation.dispatchEvent(new Event('scroll', { bubbles: true }));
+            });
+            await waitForNoButtonByLabel(session.driver, 'Jump to latest');
+
+            await sendMessage(session.driver, 'Reply after bottom');
+            await waitForText(session.driver, 'Second Firefox reply after bottom.');
+
+            const finalScrollState = await session.driver.executeScript(() => {
+              const conversation = document.querySelector('[aria-label="Agent conversation"]');
+
+              if (!(conversation instanceof HTMLElement)) {
+                throw new Error('Agent conversation pane was not found.');
+              }
+
+              return {
+                messagePaneClientHeight: conversation.clientHeight,
+                messagePaneScrollHeight: conversation.scrollHeight,
+                messagePaneScrollTop: conversation.scrollTop,
+              };
+            });
+            const parsedFinalScrollState = scrollStateSchema
+              .omit({
+                documentClientHeight: true,
+                documentScrollHeight: true,
+                mountedMessageItems: true,
+              })
+              .parse(finalScrollState);
+
+            assert.ok(
+              parsedFinalScrollState.messagePaneScrollTop +
+                parsedFinalScrollState.messagePaneClientHeight >=
+                parsedFinalScrollState.messagePaneScrollHeight - 16
+            );
+          } finally {
+            releaseFirstCompletion();
+          }
+        }
+      );
+    },
   },
   {
     name: 'settings organization picker sends org context to the gateway',

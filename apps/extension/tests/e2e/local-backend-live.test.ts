@@ -580,3 +580,68 @@ test('live local backend keeps real tool rows from overlapping', async () => {
     await rm(userDataDir, { force: true, recursive: true });
   }
 });
+
+test('live local backend preserves and deletes frontier conversations through history', async () => {
+  const fixture = await startFixtureServer({ title: 'Kilo live history target' });
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    const targetPage = await context.newPage();
+    await targetPage.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live history target');
+    await selectFrontierModel(sidePanel);
+
+    await sidePanel.getByLabel('Message agent').fill('LOCAL_HISTORY_REOPEN: reply briefly.');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+      timeout: 120_000,
+    });
+
+    await sidePanel.getByLabel('New conversation').click();
+    await sidePanel.getByLabel('Message agent').fill('LOCAL_HISTORY_DELETE: reply briefly.');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+      timeout: 120_000,
+    });
+
+    sidePanel.once('dialog', dialog => {
+      expect(dialog.message()).toContain('Close this conversation tab?');
+      void dialog.accept();
+    });
+    await sidePanel.getByLabel(/Close LOCAL_HISTORY_DELETE/u).click();
+    await expect(sidePanel.getByRole('tab', { name: /LOCAL_HISTORY_DELETE/u })).toBeHidden();
+
+    await sidePanel.getByRole('button', { exact: true, name: 'History' }).click();
+    await sidePanel.getByLabel(/Delete LOCAL_HISTORY_DELETE/u).click();
+    await expect(sidePanel.getByLabel(/Open LOCAL_HISTORY_DELETE/u)).toBeHidden();
+    await sidePanel.getByLabel('Close history').click();
+
+    sidePanel.once('dialog', dialog => {
+      expect(dialog.message()).toContain('Close this conversation tab?');
+      void dialog.accept();
+    });
+    await sidePanel.getByLabel(/Close LOCAL_HISTORY_REOPEN/u).click();
+    await expect(sidePanel.getByRole('tab', { name: /LOCAL_HISTORY_REOPEN/u })).toBeHidden();
+
+    await sidePanel.getByRole('button', { exact: true, name: 'History' }).click();
+    await sidePanel.getByLabel(/Open LOCAL_HISTORY_REOPEN/u).click();
+    await expect(sidePanel.getByRole('tab', { name: /LOCAL_HISTORY_REOPEN/u })).toBeVisible();
+    await expect(
+      sidePanel.getByLabel('Agent conversation').getByText('LOCAL_HISTORY_REOPEN')
+    ).toBeVisible();
+
+    const storageSnapshot = JSON.stringify(
+      await getExtensionStorage(sidePanel, ['kiloAgentConversations'])
+    );
+
+    expect(storageSnapshot).toContain('LOCAL_HISTORY_REOPEN');
+    expect(storageSnapshot).not.toContain('LOCAL_HISTORY_DELETE');
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});

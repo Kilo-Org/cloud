@@ -144,6 +144,7 @@ const OrganizationHierarchySummarySchema = z.object({
 
 const AdminOrganizationHierarchySchema = z.object({
   parent: OrganizationHierarchySummarySchema.nullable(),
+  ancestors: z.array(OrganizationHierarchySummarySchema),
   children: z.array(OrganizationHierarchySummarySchema),
 });
 
@@ -453,6 +454,34 @@ export const organizationAdminRouter = createTRPCRouter({
         });
       }
 
+      const ancestors: Array<z.infer<typeof OrganizationHierarchySummarySchema>> = [];
+      const visitedAncestorIds = new Set<string>();
+      let currentParentId = organizationHierarchy.parent_id;
+
+      while (currentParentId) {
+        if (visitedAncestorIds.has(currentParentId)) {
+          break;
+        }
+        visitedAncestorIds.add(currentParentId);
+
+        const [ancestor] = await db
+          .select({
+            id: organizations.id,
+            name: organizations.name,
+            parent_organization_id: organizations.parent_organization_id,
+          })
+          .from(organizations)
+          .where(eq(organizations.id, currentParentId))
+          .limit(1);
+
+        if (!ancestor) {
+          break;
+        }
+
+        ancestors.push({ id: ancestor.id, name: ancestor.name });
+        currentParentId = ancestor.parent_organization_id;
+      }
+
       const children = await db
         .select({
           id: organizations.id,
@@ -469,6 +498,7 @@ export const organizationAdminRouter = createTRPCRouter({
               name: organizationHierarchy.parent_name ?? 'Unknown organization',
             }
           : null,
+        ancestors,
         children,
       };
     }),

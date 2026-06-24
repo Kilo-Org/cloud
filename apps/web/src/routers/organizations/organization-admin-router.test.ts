@@ -752,11 +752,19 @@ describe('organization admin router', () => {
   describe('getHierarchy', () => {
     it('returns parent and child organization summaries', async () => {
       const searchPrefix = `Admin Org Hierarchy ${crypto.randomUUID()}`;
+      const grandparentOrganization = await createOrganization(
+        `${searchPrefix} grandparent`,
+        adminUser.id
+      );
       const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
       const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
       const siblingOrganization = await createOrganization(`${searchPrefix} sibling`, adminUser.id);
 
       try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: grandparentOrganization.id })
+          .where(eq(organizations.id, parentOrganization.id));
         await db
           .update(organizations)
           .set({ parent_organization_id: parentOrganization.id })
@@ -774,8 +782,18 @@ describe('organization admin router', () => {
           id: parentOrganization.id,
           name: parentOrganization.name,
         });
+        expect(childHierarchy.ancestors).toEqual([
+          { id: parentOrganization.id, name: parentOrganization.name },
+          { id: grandparentOrganization.id, name: grandparentOrganization.name },
+        ]);
         expect(childHierarchy.children).toEqual([]);
-        expect(parentHierarchy.parent).toBeNull();
+        expect(parentHierarchy.parent).toEqual({
+          id: grandparentOrganization.id,
+          name: grandparentOrganization.name,
+        });
+        expect(parentHierarchy.ancestors).toEqual([
+          { id: grandparentOrganization.id, name: grandparentOrganization.name },
+        ]);
         expect(parentHierarchy.children).toEqual([
           { id: childOrganization.id, name: childOrganization.name },
           { id: siblingOrganization.id, name: siblingOrganization.name },
@@ -784,7 +802,13 @@ describe('organization admin router', () => {
         await db
           .update(organizations)
           .set({ parent_organization_id: null })
-          .where(inArray(organizations.id, [childOrganization.id, siblingOrganization.id]));
+          .where(
+            inArray(organizations.id, [
+              childOrganization.id,
+              siblingOrganization.id,
+              parentOrganization.id,
+            ])
+          );
         await db
           .delete(organizations)
           .where(
@@ -792,6 +816,7 @@ describe('organization admin router', () => {
               childOrganization.id,
               siblingOrganization.id,
               parentOrganization.id,
+              grandparentOrganization.id,
             ])
           );
       }

@@ -61,8 +61,14 @@ export function OrganizationAdminHierarchyManagement({
   const childOrganizations = hierarchyQuery.data?.children ?? [];
   const organizationName = organizationDetailsQuery.data?.name ?? organizationId;
   const childOrganizationIds = new Set(childOrganizations.map(child => child.id));
+  const ancestorOrganizationIds = new Set(
+    (hierarchyQuery.data?.ancestors ?? []).map(ancestor => ancestor.id)
+  );
   const searchResults = (organizationSearchQuery.data ?? []).filter(
-    organization => organization.id !== organizationId && !childOrganizationIds.has(organization.id)
+    organization =>
+      organization.id !== organizationId &&
+      !childOrganizationIds.has(organization.id) &&
+      !ancestorOrganizationIds.has(organization.id)
   );
 
   const handleCreateChild = (event: FormEvent<HTMLFormElement>) => {

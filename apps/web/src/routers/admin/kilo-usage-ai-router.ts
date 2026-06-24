@@ -13,7 +13,6 @@ import { createGatewayServices } from '@/lib/mcp-gateway/services';
 import { findEligibleNativeMcpUser } from '@/lib/native-mcp/oauth/native-token-verifier';
 import { generateCloudAgentToken } from '@/lib/tokens';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
 
 const KILO_USAGE_AI_CLIENT_ID = 'internal:kilo-usage-ai';
 const KILO_USAGE_AI_CREATED_ON_PLATFORM = 'kilo-usage-ai';
@@ -63,7 +62,7 @@ Datasets and useful fields:
 
 Use aggregate mode for totals and grouped breakdowns. Use timeseries mode with a day bucket for trend questions unless the user asks for hour or week. Explain answers compactly and cite the returned dataset, metric, grouping, and date range in prose.`;
 
-const initialUsageAnalysisPrompt = `Create a compact 30-day overview of my own Kilo activity. Include daily USD cost, cost by model, error/request breakdown, Cloud Agent session count, and Code Reviewer status. Use MCP data for every factual claim, then write a short evidence-based summary.`;
+const blankUsageAnalysisPrompt = 'Blank Ask Usage session. Wait for the user to ask a question.';
 
 export const adminKiloUsageAiRouter = createTRPCRouter({
   start: adminProcedure.mutation(async ({ ctx }) => {
@@ -102,10 +101,9 @@ export const adminKiloUsageAiRouter = createTRPCRouter({
         gitUrl: KILO_USAGE_AI_REPOSITORY_URL,
         mode: 'usage-analyst',
         model: KILO_USAGE_AI_MODEL,
-        prompt: initialUsageAnalysisPrompt,
+        prompt: blankUsageAnalysisPrompt,
         autoCommit: false,
-        autoInitiate: true,
-        initialMessageId: generateMessageId(),
+        autoInitiate: false,
         createdOnPlatform: KILO_USAGE_AI_CREATED_ON_PLATFORM,
         mcpServers: {
           kilo_usage: {

@@ -1,28 +1,31 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { cardClassName, cardDescriptionClassName, cardTitleClassName } from '@/components/ui/card';
-import { inputClassName } from '@/components/ui/input';
-import { textareaClassName } from '@/components/ui/textarea';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { badgeVariants } from '@/components/ui/badge-variants';
-import { popoverContentClassName } from '@/components/ui/popover';
-import { hoverCardContentClassName } from '@/components/ui/hover-card';
 import {
+  cardClassName,
+  cardDescriptionClassName,
+  cardTitleClassName,
   dialogContentClassName,
   dialogDescriptionClassName,
   dialogOverlayClassName,
   dialogTitleClassName,
-} from '@/components/ui/dialog';
-import {
+  hoverCardContentClassName,
+  inputClassName,
+  popoverContentClassName,
+  sidebarMenuButtonVariants,
+  sidebarMenuSubButtonClassName,
   sheetContentClassName,
   sheetDescriptionClassName,
   sheetDismissibleOverlayClassName,
   sheetOverlayClassName,
   sheetTitleClassName,
-} from '@/components/ui/sheet';
-import { tableCellClassName, tableHeadClassName, tableRowClassName } from '@/components/ui/table';
-import { sidebarMenuButtonVariants, sidebarMenuSubButtonClassName } from '@/components/ui/sidebar';
+  tableCellClassName,
+  tableHeadClassName,
+  tableRowClassName,
+  textareaClassName,
+} from '@/components/ui/primitive-classnames';
 
 const expectClasses = (className: string, expectedClasses: string[]) => {
   for (const expectedClass of expectedClasses) {

@@ -4,19 +4,17 @@ import * as React from 'react';
 import * as SheetPrimitive from '@radix-ui/react-dialog';
 import { XIcon } from 'lucide-react';
 
+import {
+  sheetCloseClassName,
+  sheetContentClassName,
+  sheetDescriptionClassName,
+  sheetDismissibleOverlayClassName,
+  sheetFooterClassName,
+  sheetHeaderClassName,
+  sheetOverlayClassName,
+  sheetTitleClassName,
+} from '@/components/ui/primitive-classnames';
 import { cn } from '@/lib/utils';
-
-const sheetOverlayClassName =
-  'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-surface-inset/70';
-const sheetDismissibleOverlayClassName = 'absolute inset-0 z-50 cursor-default bg-surface-inset/70';
-const sheetContentClassName =
-  'bg-card text-card-foreground data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 border-border shadow-none transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500';
-const sheetCloseClassName =
-  'focus-visible:ring-ring/50 data-[state=open]:bg-accent absolute top-4 right-4 flex size-control-default items-center justify-center rounded-md opacity-70 transition-opacity hover:bg-accent hover:opacity-100 focus-visible:ring-[3px] focus-visible:outline-none disabled:pointer-events-none';
-const sheetHeaderClassName = 'flex flex-col gap-1.5 p-6 pb-2';
-const sheetFooterClassName = 'mt-auto flex flex-col gap-2 p-6 pt-2';
-const sheetTitleClassName = 'type-heading text-foreground';
-const sheetDescriptionClassName = 'type-body text-muted-foreground';
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -148,12 +146,4 @@ export {
   SheetFooter,
   SheetTitle,
   SheetDescription,
-  sheetOverlayClassName,
-  sheetDismissibleOverlayClassName,
-  sheetContentClassName,
-  sheetCloseClassName,
-  sheetHeaderClassName,
-  sheetFooterClassName,
-  sheetTitleClassName,
-  sheetDescriptionClassName,
 };

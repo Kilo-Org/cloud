@@ -1,13 +1,14 @@
 import * as React from 'react';
 
+import {
+  cardClassName,
+  cardContentClassName,
+  cardDescriptionClassName,
+  cardFooterClassName,
+  cardHeaderClassName,
+  cardTitleClassName,
+} from '@/components/ui/primitive-classnames';
 import { cn } from '@/lib/utils';
-
-const cardClassName = 'bg-card text-card-foreground rounded-xl border border-border';
-const cardHeaderClassName = 'flex flex-col gap-1.5 p-6 pb-2';
-const cardTitleClassName = 'type-heading';
-const cardDescriptionClassName = 'type-body text-muted-foreground';
-const cardContentClassName = 'p-6 pt-0';
-const cardFooterClassName = 'flex items-center p-6 pt-0';
 
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
@@ -51,17 +52,4 @@ const CardFooter = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 );
 CardFooter.displayName = 'CardFooter';
 
-export {
-  Card,
-  CardHeader,
-  CardFooter,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  cardClassName,
-  cardHeaderClassName,
-  cardTitleClassName,
-  cardDescriptionClassName,
-  cardContentClassName,
-  cardFooterClassName,
-};
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent };

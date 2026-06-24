@@ -1,3 +1,4 @@
+import { withTimeout } from '@kilocode/worker-utils';
 import { logger } from './logger.js';
 import { deriveSharedSandboxId, isGeneratedSharedSandboxId } from './sandbox-id.js';
 import type { SandboxId } from './types.js';
@@ -5,6 +6,7 @@ import type { SandboxId } from './types.js';
 export const SHARED_SANDBOX_FAILOVER_SUFFIX = 'shared-slot-v1';
 
 const SHARED_SANDBOX_ROUTE_KEY_PREFIX = 'shared-sandbox-route:';
+const SHARED_SANDBOX_OVERRIDE_TIMEOUT_MS = 5_000;
 
 export type SharedSandboxSuffix = typeof SHARED_SANDBOX_FAILOVER_SUFFIX;
 
@@ -22,6 +24,26 @@ function routeOverrideKey(routeKey: SandboxId): string {
   return `${SHARED_SANDBOX_ROUTE_KEY_PREFIX}${routeKey}`;
 }
 
+function readRouteOverride(store: SharedSandboxOverrideStore, key: string): Promise<string | null> {
+  return withTimeout(
+    store.get(key),
+    SHARED_SANDBOX_OVERRIDE_TIMEOUT_MS,
+    `Shared sandbox override KV read timed out after ${SHARED_SANDBOX_OVERRIDE_TIMEOUT_MS}ms`
+  );
+}
+
+function writeRouteOverride(
+  store: SharedSandboxOverrideStore,
+  key: string,
+  value: SharedSandboxSuffix
+): Promise<void> {
+  return withTimeout(
+    store.put(key, value),
+    SHARED_SANDBOX_OVERRIDE_TIMEOUT_MS,
+    `Shared sandbox override KV write timed out after ${SHARED_SANDBOX_OVERRIDE_TIMEOUT_MS}ms`
+  );
+}
+
 export async function resolveSharedSandboxAssignment(
   store: SharedSandboxOverrideStore,
   routeKey: SandboxId
@@ -30,7 +52,7 @@ export async function resolveSharedSandboxAssignment(
     throw new Error('Shared sandbox route key must be a generated shared sandbox ID');
   }
 
-  const suffix = await store.get(routeOverrideKey(routeKey));
+  const suffix = await readRouteOverride(store, routeOverrideKey(routeKey));
   if (suffix === null) return { sandboxId: routeKey };
   if (suffix !== SHARED_SANDBOX_FAILOVER_SUFFIX) {
     logger
@@ -58,10 +80,10 @@ export async function recordSharedSandboxFailover(
   }
 
   const key = routeOverrideKey(routeKey);
-  const existing = await store.get(key);
+  const existing = await readRouteOverride(store, key);
   if (existing === SHARED_SANDBOX_FAILOVER_SUFFIX) return;
   if (existing !== null) {
     throw new Error('Invalid shared sandbox override');
   }
-  await store.put(key, SHARED_SANDBOX_FAILOVER_SUFFIX);
+  await writeRouteOverride(store, key, SHARED_SANDBOX_FAILOVER_SUFFIX);
 }

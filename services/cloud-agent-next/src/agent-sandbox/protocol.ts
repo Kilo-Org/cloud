@@ -54,7 +54,11 @@ export type WrapperStopReason =
 export type StopWrappersResult =
   | { status: 'absent'; stoppedInstanceIds?: string[] }
   | { status: 'still-present'; observed: ObservedWrapper[]; error?: string }
-  | { status: 'inspection-failed'; error: string };
+  | {
+      status: 'inspection-failed';
+      error: string;
+      reason?: WrapperInspectionFailureReason;
+    };
 
 export type TerminalClientResult =
   | { status: 'ready'; client: TerminalWrapperClient }

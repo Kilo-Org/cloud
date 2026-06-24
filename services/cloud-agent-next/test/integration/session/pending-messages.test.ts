@@ -26,7 +26,10 @@ import {
   queueUserMessageInput,
   registerReadySession,
 } from '../../helpers/session-setup.js';
-import { getWrapperLease } from '../../../src/session/wrapper-runtime-state.js';
+import {
+  getSandboxRecoveryState,
+  getWrapperLease,
+} from '../../../src/session/wrapper-runtime-state.js';
 
 const createMessage = (overrides: Partial<PendingSessionMessage>): PendingSessionMessage => ({
   messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
@@ -660,6 +663,7 @@ describe('pending session messages', () => {
         attemptFinishedAt,
         pending: await listPendingSessionMessages(instance.ctx.storage),
         lease: await getWrapperLease(instance.ctx.storage),
+        recovery: await getSandboxRecoveryState(instance.ctx.storage),
         alarm: await instance.ctx.storage.getAlarm(),
       };
     });
@@ -672,9 +676,6 @@ describe('pending session messages', () => {
       'Sandbox connection failed during wrapper discovery'
     );
     expect(result.pending[0]?.lastFlushFailureCode).toBe('SANDBOX_CONNECT_FAILED');
-    expect(result.pending[0]?.lastSandboxConnectFailureReason).toBe(
-      'wrapper_discovery_list_processes_timeout'
-    );
     expect(result.pending[0]?.nextFlushAttemptAt).toBeGreaterThanOrEqual(
       result.attemptStartedAt + 5_000
     );
@@ -690,6 +691,7 @@ describe('pending session messages', () => {
       reason: 'observation-failed',
       attempts: 0,
     });
+    expect(result.recovery).toMatchObject({ listProcessesTimeouts: 1 });
   });
 
   it('terminalizes isolated discovery retry exhaustion without shared route reporting', async () => {
@@ -727,6 +729,7 @@ describe('pending session messages', () => {
         attemptDeadlineAt: now + 60_000,
         attempts: 1,
       });
+      await instance.ctx.storage.put('sandbox_recovery_state', { listProcessesTimeouts: 2 });
       await storePendingSessionMessage(
         instance.ctx.storage,
         createMessage({
@@ -737,7 +740,6 @@ describe('pending session messages', () => {
           nextFlushAttemptAt: now - 1,
           lastFlushError: 'Sandbox connection failed during wrapper discovery',
           lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-          lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
         })
       );
 
@@ -805,6 +807,7 @@ describe('pending session messages', () => {
         attemptDeadlineAt: now + 60_000,
         attempts: 1,
       });
+      await instance.ctx.storage.put('sandbox_recovery_state', { listProcessesTimeouts: 2 });
       await storePendingSessionMessage(
         instance.ctx.storage,
         createMessage({
@@ -815,7 +818,6 @@ describe('pending session messages', () => {
           nextFlushAttemptAt: now - 1,
           lastFlushError: 'Sandbox connection failed during wrapper discovery',
           lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-          lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
         })
       );
 
@@ -823,10 +825,16 @@ describe('pending session messages', () => {
       return {
         failoverRouteKeys,
         pending: await listPendingSessionMessages(instance.ctx.storage),
+        metadata: await instance.getMetadata(),
       };
     });
 
     expect(result.failoverRouteKeys).toEqual([sandboxId]);
+    expect(result.metadata?.workspace?.sandboxId).toBe(sandboxId);
+    expect(result.metadata?.workspace?.sandboxRoute).toEqual({
+      kind: 'shared',
+      routeKey: sandboxId,
+    });
     expect(result.pending).toHaveLength(0);
   });
 

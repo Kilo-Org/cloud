@@ -28,10 +28,12 @@ import {
   createQueuedSessionMessageState,
   getSessionMessageState,
   putSessionMessageState,
-  type SessionMessageState,
   type TerminalizeParams,
 } from './session-message-state.js';
-import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
+import {
+  WrapperCleanupBlockedError,
+  type WrapperCleanupBlock,
+} from './wrapper-cleanup-blocked-error.js';
 
 type QueueEvent = {
   sessionId: string;
@@ -124,17 +126,8 @@ function createQueueHarness(options?: {
   failQueuedEventOnce?: boolean;
   failAlarmOnce?: boolean;
   failTerminalizationOnce?: boolean;
-  terminalTransitionChanged?: boolean;
-  terminalTransitionState?: Pick<
-    SessionMessageState,
-    'status' | 'completionSource' | 'failureCode' | 'failureReason' | 'attempts'
-  >;
   ensureAcceptedMessageEffects?: (messageId: string) => Promise<void>;
-  getDeliveryBlock?: () => Promise<{ retryAt: number } | null>;
-  onWrapperDiscoveryRetriesExhausted?: (params: {
-    messageId: string;
-    attempts: number;
-  }) => Promise<void>;
+  getDeliveryBlock?: () => Promise<WrapperCleanupBlock | null>;
 }) {
   const storage = options?.storage ?? createMemoryStorage();
   const events: QueueEvent[] = [];
@@ -184,22 +177,13 @@ function createQueueHarness(options?: {
       },
       ensureAcceptedMessageEffects:
         options?.ensureAcceptedMessageEffects ?? (async () => undefined),
-      persistTerminalTransition: async (messageId, params, transitionOptions) => {
+      persistTerminalTransition: async (messageId, params, options) => {
         if (failTerminalization) {
           failTerminalization = false;
           throw new Error('terminal transition failed');
         }
-        terminalizations.push({ messageId, params, options: transitionOptions });
-        return {
-          changed: options?.terminalTransitionChanged ?? true,
-          state: options?.terminalTransitionState ?? {
-            status: params.kind,
-            completionSource: params.completionSource,
-            failureCode: params.kind === 'failed' ? params.failureCode : undefined,
-            failureReason: params.kind === 'failed' ? params.reason : undefined,
-            attempts: params.kind === 'failed' ? params.attempts : undefined,
-          },
-        };
+        terminalizations.push({ messageId, params, options });
+        return { changed: true, state: { status: params.kind } };
       },
       repairTerminalMessageEffects: async () => undefined,
       finalizeTerminalCallbackEffects: async options => {
@@ -212,7 +196,6 @@ function createQueueHarness(options?: {
         }
         alarmDeadlines.push(deadline);
       },
-      onWrapperDiscoveryRetriesExhausted: options?.onWrapperDiscoveryRetriesExhausted,
       getSessionIdForLogs: () => metadata?.identity.sessionId,
     }),
   };
@@ -612,7 +595,7 @@ describe('SessionMessageQueue', () => {
   it('repairs queued effects without consuming delivery attempts while delivery is blocked', async () => {
     const retryAt = 50_000;
     const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt }),
+      getDeliveryBlock: async () => ({ kind: 'retryable', retryAt }),
     });
     await storePendingSessionMessage(
       harness.storage,
@@ -634,55 +617,22 @@ describe('SessionMessageQueue', () => {
     expect(pending?.lastFlushError).toBeUndefined();
   });
 
-  it('persists discovery timeout provenance without invoking the exhaustion handler', async () => {
-    const onRetriesExhausted = vi.fn().mockResolvedValue(undefined);
-    const harness = createQueueHarness({
-      deliver: async () => {
-        throw ExecutionError.sandboxConnectFailed(
-          'Sandbox connection failed during wrapper discovery',
-          undefined,
-          'wrapper_discovery_list_processes_timeout'
-        );
-      },
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
-    });
-    await harness.queue.admitSubmittedMessage({
-      userId: 'user_test' as UserId,
-      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'retry discovery' },
-    });
-
-    const drain = await harness.queue.drainNextPendingMessage();
-    const [pending] = await listPendingSessionMessages(harness.storage);
-
-    expect(drain.retryAt).toBeTypeOf('number');
-    expect(drain.remainingPendingCount).toBe(1);
-    expect(onRetriesExhausted).not.toHaveBeenCalled();
-    expect(pending).toMatchObject({
-      flushAttempts: 1,
-      lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-      lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
-    });
-  });
-
-  it('invokes the exhaustion handler when discovery retries exhaust behind cleanup', async () => {
+  it('fails the second sandbox attempt when wrapper cleanup remains blocked', async () => {
     const now = 200_000;
-    const onRetriesExhausted = vi.fn().mockResolvedValue(undefined);
     const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
+      getDeliveryBlock: async () => ({ kind: 'retryable', retryAt: now + 300_000 }),
     });
     await storePendingSessionMessage(
       harness.storage,
       createPendingSessionMessage({
         messageId: FIRST_MESSAGE_ID,
         role: 'user',
-        content: 'recover blocked sandbox retry',
+        content: 'fail blocked sandbox retry',
         createdAt: 100_000,
         flushAttempts: 1,
         nextFlushAttemptAt: now,
         lastFlushError: 'Sandbox connection failed during wrapper discovery',
         lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-        lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
       })
     );
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
@@ -695,8 +645,6 @@ describe('SessionMessageQueue', () => {
     }
 
     expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
-    expect(onRetriesExhausted).toHaveBeenCalledOnce();
-    expect(onRetriesExhausted).toHaveBeenCalledWith({ messageId: FIRST_MESSAGE_ID, attempts: 2 });
     expect(harness.deliver).not.toHaveBeenCalled();
     expect(harness.terminalizations).toHaveLength(1);
     expect(harness.terminalizations[0]?.params).toMatchObject({
@@ -707,233 +655,11 @@ describe('SessionMessageQueue', () => {
     await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
   });
 
-  it('waits for successful terminalization before invoking the exhaustion handler', async () => {
-    const now = 200_000;
-    const onRetriesExhausted = vi.fn().mockResolvedValue(undefined);
-    const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
-      failTerminalizationOnce: true,
-    });
-    await storePendingSessionMessage(
-      harness.storage,
-      createPendingSessionMessage({
-        messageId: FIRST_MESSAGE_ID,
-        role: 'user',
-        content: 'recover once across replay',
-        createdAt: 100_000,
-        flushAttempts: 1,
-        nextFlushAttemptAt: now,
-        lastFlushError: 'Sandbox connection failed during wrapper discovery',
-        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-        lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
-      })
-    );
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
-
-    try {
-      await expect(harness.queue.drainNextPendingMessage()).rejects.toThrow(
-        'terminal transition failed'
-      );
-      await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
-        retryAt: undefined,
-        remainingPendingCount: 0,
-      });
-    } finally {
-      clock.mockRestore();
-    }
-
-    expect(onRetriesExhausted).toHaveBeenCalledOnce();
-    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
-  });
-
-  it('replays the exhaustion handler after the matching terminal transition', async () => {
-    const now = 200_000;
-    const onRetriesExhausted = vi.fn().mockResolvedValue(undefined);
-    const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
-      terminalTransitionChanged: false,
-    });
-    await storePendingSessionMessage(
-      harness.storage,
-      createPendingSessionMessage({
-        messageId: FIRST_MESSAGE_ID,
-        role: 'user',
-        content: 'replay matching recovery transition',
-        createdAt: 100_000,
-        flushAttempts: 1,
-        nextFlushAttemptAt: now,
-        lastFlushError: 'Sandbox connection failed during wrapper discovery',
-        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-        lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
-      })
-    );
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
-
-    try {
-      await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
-        retryAt: undefined,
-        remainingPendingCount: 0,
-      });
-    } finally {
-      clock.mockRestore();
-    }
-
-    expect(onRetriesExhausted).toHaveBeenCalledOnce();
-    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
-  });
-
-  it('does not invoke the exhaustion handler when another terminal outcome won', async () => {
-    const now = 200_000;
-    const onRetriesExhausted = vi.fn().mockResolvedValue(undefined);
-    const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
-      terminalTransitionChanged: false,
-      terminalTransitionState: {
-        status: 'completed',
-        completionSource: 'assistant_message_event',
-      },
-    });
-    await storePendingSessionMessage(
-      harness.storage,
-      createPendingSessionMessage({
-        messageId: FIRST_MESSAGE_ID,
-        role: 'user',
-        content: 'preserve completed outcome',
-        createdAt: 100_000,
-        flushAttempts: 1,
-        nextFlushAttemptAt: now,
-        lastFlushError: 'Sandbox connection failed during wrapper discovery',
-        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-        lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
-      })
-    );
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
-
-    try {
-      await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
-        retryAt: undefined,
-        remainingPendingCount: 0,
-      });
-    } finally {
-      clock.mockRestore();
-    }
-
-    expect(onRetriesExhausted).not.toHaveBeenCalled();
-    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
-  });
-
-  it('retries the exhaustion handler before deleting the pending message', async () => {
-    const now = 200_000;
-    const onRetriesExhausted = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('KV unavailable'))
-      .mockResolvedValueOnce(undefined);
-    const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
-    });
-    await storePendingSessionMessage(
-      harness.storage,
-      createPendingSessionMessage({
-        messageId: FIRST_MESSAGE_ID,
-        role: 'user',
-        content: 'retry failover publication',
-        createdAt: 100_000,
-        flushAttempts: 1,
-        nextFlushAttemptAt: now,
-        lastFlushError: 'Sandbox connection failed during wrapper discovery',
-        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-        lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
-      })
-    );
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
-
-    try {
-      await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
-        retryAt: now + 2_000,
-        remainingPendingCount: 1,
-      });
-      await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(1);
-      await putSessionMessageState(harness.storage, {
-        ...createQueuedSessionMessageState({
-          turn: {
-            type: 'prompt',
-            messageId: FIRST_MESSAGE_ID,
-            prompt: 'retry failover publication',
-          },
-          agent: { mode: 'code', model: 'default-model' },
-        }),
-        status: 'failed',
-        terminalAt: now,
-        completionSource: 'delivery_failure',
-        failureReason: 'exhausted',
-        failureCode: 'sandbox_connect_failed',
-        attempts: 2,
-      });
-      await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
-        retryAt: undefined,
-        remainingPendingCount: 0,
-      });
-    } finally {
-      clock.mockRestore();
-    }
-
-    expect(onRetriesExhausted).toHaveBeenCalledTimes(2);
-    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
-  });
-
-  it('stops retrying failover publication after three delayed retries', async () => {
-    let now = 200_000;
-    const onRetriesExhausted = vi.fn().mockRejectedValue(new Error('KV unavailable'));
-    const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
-    });
-    await storePendingSessionMessage(
-      harness.storage,
-      createPendingSessionMessage({
-        messageId: FIRST_MESSAGE_ID,
-        role: 'user',
-        content: 'bound failover publication retries',
-        createdAt: 100_000,
-        flushAttempts: 1,
-        nextFlushAttemptAt: now,
-        lastFlushError: 'Sandbox connection failed during wrapper discovery',
-        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-        lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
-      })
-    );
-    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now);
-
-    try {
-      for (const retryDelay of [2_000, 4_000, 8_000]) {
-        await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
-          retryAt: now + retryDelay,
-          remainingPendingCount: 1,
-        });
-        await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(1);
-        now += retryDelay;
-      }
-      await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
-        retryAt: undefined,
-        remainingPendingCount: 0,
-      });
-    } finally {
-      clock.mockRestore();
-    }
-
-    expect(onRetriesExhausted).toHaveBeenCalledTimes(4);
-    await expect(listPendingSessionMessages(harness.storage)).resolves.toHaveLength(0);
-  });
-
   it('keeps the fixed five-second sandbox retry deadline ahead of cleanup backoff', async () => {
     const now = 200_000;
     const retryAt = now + 5_000;
     const harness = createQueueHarness({
-      getDeliveryBlock: async () => ({ retryAt: now + 300_000 }),
+      getDeliveryBlock: async () => ({ kind: 'retryable', retryAt: now + 300_000 }),
     });
     await storePendingSessionMessage(
       harness.storage,
@@ -965,7 +691,7 @@ describe('SessionMessageQueue', () => {
     const retryAt = 50_000;
     const harness = createQueueHarness({
       deliver: async () => {
-        throw new WrapperCleanupBlockedError(retryAt);
+        throw new WrapperCleanupBlockedError({ kind: 'retryable', retryAt });
       },
     });
     await harness.queue.admitSubmittedMessage({
@@ -982,126 +708,32 @@ describe('SessionMessageQueue', () => {
     expect(pending?.lastFlushError).toBeUndefined();
   });
 
-  it('invokes the exhaustion handler when the final retry encounters blocked cleanup', async () => {
-    const now = 200_000;
-    const onRetriesExhausted = vi.fn().mockResolvedValue(undefined);
+  it('retains a queued message without scheduling another cleanup after quarantine', async () => {
     const harness = createQueueHarness({
       deliver: async () => {
-        throw new WrapperCleanupBlockedError(now + 300_000);
+        throw new WrapperCleanupBlockedError({ kind: 'exhausted' });
       },
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
     });
-    await storePendingSessionMessage(
-      harness.storage,
-      createPendingSessionMessage({
-        messageId: FIRST_MESSAGE_ID,
-        role: 'user',
-        content: 'recover timeout after delivery block',
-        createdAt: 100_000,
-        flushAttempts: 1,
-        nextFlushAttemptAt: now,
-        lastFlushError: 'Sandbox connection failed during wrapper discovery',
-        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-        lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
-      })
-    );
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    await harness.queue.admitSubmittedMessage({
+      userId: 'user_test' as UserId,
+      turn: { type: 'prompt', id: FIRST_MESSAGE_ID, prompt: 'wait in quarantine' },
+    });
 
-    try {
-      await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
-        retryAt: undefined,
-        remainingPendingCount: 0,
-      });
-    } finally {
-      clock.mockRestore();
-    }
+    const drain = await harness.queue.drainNextPendingMessage();
+    const [pending] = await listPendingSessionMessages(harness.storage);
 
-    expect(onRetriesExhausted).toHaveBeenCalledOnce();
-    expect(onRetriesExhausted).toHaveBeenCalledWith({ messageId: FIRST_MESSAGE_ID, attempts: 2 });
+    expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 1 });
+    expect(pending?.messageId).toBe(FIRST_MESSAGE_ID);
+    expect(pending?.flushAttempts).toBeUndefined();
+    expect(pending?.lastFlushError).toBeUndefined();
   });
 
-  it('does not invoke the exhaustion handler after an unrelated unknown failure', async () => {
+  it('fails the second sandbox attempt when delivery discovers blocked cleanup', async () => {
     const now = 200_000;
-    const onRetriesExhausted = vi.fn().mockResolvedValue(undefined);
     const harness = createQueueHarness({
       deliver: async () => {
-        throw new Error('Secondary delivery failure');
+        throw new WrapperCleanupBlockedError({ kind: 'retryable', retryAt: now + 300_000 });
       },
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
-    });
-    await storePendingSessionMessage(
-      harness.storage,
-      createPendingSessionMessage({
-        messageId: FIRST_MESSAGE_ID,
-        role: 'user',
-        content: 'preserve discovery timeout provenance',
-        createdAt: 100_000,
-        flushAttempts: 1,
-        nextFlushAttemptAt: now,
-        lastFlushError: 'Sandbox connection failed during wrapper discovery',
-        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-        lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
-      })
-    );
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
-
-    try {
-      await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
-        retryAt: undefined,
-        remainingPendingCount: 0,
-      });
-    } finally {
-      clock.mockRestore();
-    }
-
-    expect(onRetriesExhausted).not.toHaveBeenCalled();
-  });
-
-  it('clears stale timeout provenance when the final sandbox failure has no timeout reason', async () => {
-    const now = 200_000;
-    const onRetriesExhausted = vi.fn().mockResolvedValue(undefined);
-    const harness = createQueueHarness({
-      deliver: async () => {
-        throw ExecutionError.sandboxConnectFailed('Generic sandbox connection failure');
-      },
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
-    });
-    await storePendingSessionMessage(
-      harness.storage,
-      createPendingSessionMessage({
-        messageId: FIRST_MESSAGE_ID,
-        role: 'user',
-        content: 'replace stale timeout provenance',
-        createdAt: 100_000,
-        flushAttempts: 1,
-        nextFlushAttemptAt: now,
-        lastFlushError: 'Sandbox connection failed during wrapper discovery',
-        lastFlushFailureCode: 'SANDBOX_CONNECT_FAILED',
-        lastSandboxConnectFailureReason: 'wrapper_discovery_list_processes_timeout',
-      })
-    );
-    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
-
-    try {
-      await expect(harness.queue.drainNextPendingMessage()).resolves.toEqual({
-        retryAt: undefined,
-        remainingPendingCount: 0,
-      });
-    } finally {
-      clock.mockRestore();
-    }
-
-    expect(onRetriesExhausted).not.toHaveBeenCalled();
-  });
-
-  it('does not invoke the exhaustion handler for a generic sandbox retry', async () => {
-    const now = 200_000;
-    const onRetriesExhausted = vi.fn().mockResolvedValue(undefined);
-    const harness = createQueueHarness({
-      deliver: async () => {
-        throw new WrapperCleanupBlockedError(now + 300_000);
-      },
-      onWrapperDiscoveryRetriesExhausted: onRetriesExhausted,
     });
     await storePendingSessionMessage(
       harness.storage,
@@ -1126,7 +758,6 @@ describe('SessionMessageQueue', () => {
     }
 
     expect(drain).toEqual({ retryAt: undefined, remainingPendingCount: 0 });
-    expect(onRetriesExhausted).not.toHaveBeenCalled();
     expect(harness.terminalizations).toHaveLength(1);
     expect(harness.terminalizations[0]?.params).toMatchObject({
       kind: 'failed',

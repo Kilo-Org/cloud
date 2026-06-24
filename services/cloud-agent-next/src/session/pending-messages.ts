@@ -5,10 +5,6 @@ import type {
   SessionMessageIntent,
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
-import {
-  WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON,
-  type WrapperInspectionFailureReason,
-} from '../agent-sandbox/protocol.js';
 import { logger } from '../logger.js';
 import { AttachmentsSchema, CallbackTargetSchema } from '../persistence/schemas.js';
 import { Limits } from '../schema.js';
@@ -88,9 +84,6 @@ const PendingFlushFailureCodeSchema = z.enum([
 ]);
 export type PendingFlushFailureCode = z.infer<typeof PendingFlushFailureCodeSchema>;
 const WorkspaceFailureSubtypeSchema = z.custom<WorkspaceFailureSubtype>(isWorkspaceFailureSubtype);
-const SandboxConnectFailureReasonSchema = z.literal(
-  WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON
-);
 const SafeFailureMessageSchema = z.string().max(WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH);
 const PendingDeliverySchema = z.object({
   queuedAt: z.number(),
@@ -99,8 +92,6 @@ const PendingDeliverySchema = z.object({
   lastFlushError: z.string().optional(),
   lastFlushFailureCode: PendingFlushFailureCodeSchema.optional(),
   lastFlushFailureSubtype: WorkspaceFailureSubtypeSchema.optional(),
-  lastSandboxConnectFailureReason: SandboxConnectFailureReasonSchema.optional(),
-  sharedSandboxFailoverPublishAttempts: z.number().int().min(0).optional(),
   safeFailureMessage: SafeFailureMessageSchema.optional(),
   disposition: PendingDeliveryDispositionSchema.optional(),
 });
@@ -149,8 +140,6 @@ const LegacyPendingSessionMessageSchema = z
     lastFlushError: z.string().optional(),
     lastFlushFailureCode: PendingFlushFailureCodeSchema.optional(),
     lastFlushFailureSubtype: WorkspaceFailureSubtypeSchema.optional(),
-    lastSandboxConnectFailureReason: SandboxConnectFailureReasonSchema.optional(),
-    sharedSandboxFailoverPublishAttempts: z.number().int().min(0).optional(),
     safeFailureMessage: SafeFailureMessageSchema.optional(),
     deliveryDisposition: PendingDeliveryDispositionSchema.optional(),
   })
@@ -172,8 +161,6 @@ export type PendingSessionMessage = {
   lastFlushError?: string;
   lastFlushFailureCode?: PendingFlushFailureCode;
   lastFlushFailureSubtype?: WorkspaceFailureSubtype;
-  lastSandboxConnectFailureReason?: WrapperInspectionFailureReason;
-  sharedSandboxFailoverPublishAttempts?: number;
   safeFailureMessage?: string;
   deliveryDisposition?: 'terminalization-pending';
   clientRequestId?: string;
@@ -273,8 +260,6 @@ function decodeLegacyPendingMessage(
     lastFlushError: message.lastFlushError,
     lastFlushFailureCode: message.lastFlushFailureCode,
     lastFlushFailureSubtype: message.lastFlushFailureSubtype,
-    lastSandboxConnectFailureReason: message.lastSandboxConnectFailureReason,
-    sharedSandboxFailoverPublishAttempts: message.sharedSandboxFailoverPublishAttempts,
     safeFailureMessage: message.safeFailureMessage,
     deliveryDisposition: message.deliveryDisposition,
     clientRequestId: message.clientRequestId,
@@ -306,8 +291,6 @@ function decodePendingMessage(
       lastFlushError: message.delivery.lastFlushError,
       lastFlushFailureCode: message.delivery.lastFlushFailureCode,
       lastFlushFailureSubtype: message.delivery.lastFlushFailureSubtype,
-      lastSandboxConnectFailureReason: message.delivery.lastSandboxConnectFailureReason,
-      sharedSandboxFailoverPublishAttempts: message.delivery.sharedSandboxFailoverPublishAttempts,
       safeFailureMessage: message.delivery.safeFailureMessage,
       deliveryDisposition: message.delivery.disposition,
     };
@@ -347,8 +330,6 @@ export function createPendingSessionMessage(params: {
   lastFlushError?: string;
   lastFlushFailureCode?: PendingFlushFailureCode;
   lastFlushFailureSubtype?: WorkspaceFailureSubtype;
-  lastSandboxConnectFailureReason?: WrapperInspectionFailureReason;
-  sharedSandboxFailoverPublishAttempts?: number;
   safeFailureMessage?: string;
   deliveryDisposition?: 'terminalization-pending';
 }): PendingSessionMessage {
@@ -413,8 +394,6 @@ function serializePendingSessionMessage(
           lastFlushError: normalized.lastFlushError,
           lastFlushFailureCode: normalized.lastFlushFailureCode,
           lastFlushFailureSubtype: normalized.lastFlushFailureSubtype,
-          lastSandboxConnectFailureReason: normalized.lastSandboxConnectFailureReason,
-          sharedSandboxFailoverPublishAttempts: normalized.sharedSandboxFailoverPublishAttempts,
           safeFailureMessage: normalized.safeFailureMessage,
           disposition: normalized.deliveryDisposition,
         },
@@ -433,8 +412,6 @@ function serializePendingSessionMessage(
         lastFlushError: normalized.lastFlushError,
         lastFlushFailureCode: normalized.lastFlushFailureCode,
         lastFlushFailureSubtype: normalized.lastFlushFailureSubtype,
-        lastSandboxConnectFailureReason: normalized.lastSandboxConnectFailureReason,
-        sharedSandboxFailoverPublishAttempts: normalized.sharedSandboxFailoverPublishAttempts,
         safeFailureMessage: normalized.safeFailureMessage,
         deliveryDisposition: normalized.deliveryDisposition,
       });
@@ -502,18 +479,6 @@ async function replaceStoredPendingSessionMessage(
   }
 }
 
-export async function recordPendingSharedSandboxFailoverPublishFailure(
-  storage: SessionQueueStorage,
-  message: PendingSessionMessage
-): Promise<number> {
-  const attempts = (message.sharedSandboxFailoverPublishAttempts ?? 0) + 1;
-  await replaceStoredPendingSessionMessage(storage, message, {
-    ...message,
-    sharedSandboxFailoverPublishAttempts: attempts,
-  });
-  return attempts;
-}
-
 export function shouldSkipPendingFlush(message: PendingSessionMessage, now: number): boolean {
   return message.nextFlushAttemptAt !== undefined && message.nextFlushAttemptAt > now;
 }
@@ -535,7 +500,6 @@ export async function recordPendingFlushFailure(
       | 'UNKNOWN';
     subtype?: WorkspaceFailureSubtype;
     safeFailureMessage?: string;
-    sandboxConnectFailureReason?: WrapperInspectionFailureReason;
     retryable?: boolean;
   }
 ): Promise<PendingFlushFailureResult> {
@@ -589,10 +553,6 @@ export async function recordPendingFlushFailure(
     lastFlushError: flushError,
     lastFlushFailureCode: flushFailureCode,
     lastFlushFailureSubtype: failureSubtype,
-    lastSandboxConnectFailureReason:
-      flushFailureCode === 'SANDBOX_CONNECT_FAILED'
-        ? options.sandboxConnectFailureReason
-        : undefined,
     safeFailureMessage,
     deliveryDisposition: exhausted ? 'terminalization-pending' : undefined,
   };

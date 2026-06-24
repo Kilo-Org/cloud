@@ -99,12 +99,13 @@ import {
 } from '../session/session-message-queue.js';
 import {
   clearWrapperRuntimeIdentity,
+  getSandboxRecoveryState,
   getWrapperLease,
   getWrapperRuntimeState,
+  isWrapperCleanupExhausted,
   isWrapperDeliveryHeld,
   isWrapperRunFinalizing,
   nextWrapperCleanupDeadline,
-  nextWrapperLeaseDeadline,
 } from '../session/wrapper-runtime-state.js';
 import {
   kiloGlobalFeedValidationSchema,
@@ -608,6 +609,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             return { status: 'inspection-failed', error: 'Session metadata unavailable' };
           return createAgentSandbox(this.env, metadata).stopWrappers(request);
         },
+        recordSharedSandboxFailover: routeKey =>
+          this.sharedSandboxFailoverRecorder
+            ? this.sharedSandboxFailoverRecorder(routeKey)
+            : recordSharedSandboxFailover(this.env.SHARED_SANDBOX_OVERRIDES, routeKey),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         getSessionIdForLogs: () => this.sessionId,
       });
@@ -649,8 +654,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         validateModeAgainstRuntimeAgents,
         getDeliveryContext: () => this.getPendingMessageDeliveryContext(),
         getDeliveryBlock: async () => {
-          const retryAt = nextWrapperCleanupDeadline(await getWrapperLease(this.ctx.storage));
-          return retryAt === undefined ? null : { retryAt };
+          const lease = await getWrapperLease(this.ctx.storage);
+          if (isWrapperCleanupExhausted(lease)) return { kind: 'exhausted' };
+          const retryAt = nextWrapperCleanupDeadline(lease);
+          return retryAt === undefined ? null : { kind: 'retryable', retryAt };
         },
         deliver: plan => this.executeDirectly(plan),
         isDeliveryHeld: async () =>
@@ -672,26 +679,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         finalizeTerminalCallbackEffects: options =>
           this.getMessageSettlementOutbox().finalizeIdleBatchCallbackIfReady(options),
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
-        onWrapperDiscoveryRetriesExhausted: async ({ messageId }) => {
-          const context = await this.getPendingMessageDeliveryContext();
-          if (!context) return;
-          const route = context.metadata.workspace?.sandboxRoute;
-          if (route?.kind !== 'shared' || route.suffix) return;
-
-          if (this.sharedSandboxFailoverRecorder) {
-            await this.sharedSandboxFailoverRecorder(route.routeKey);
-          } else {
-            await recordSharedSandboxFailover(this.env.SHARED_SANDBOX_OVERRIDES, route.routeKey);
-          }
-          logger
-            .withFields({
-              routeKey: route.routeKey,
-              sessionId: context.sessionId,
-              messageId,
-              logTag: 'shared_sandbox_failover_recorded',
-            })
-            .warn('Recorded one-way shared sandbox failover');
-        },
         getSessionIdForLogs: () => this.sessionId,
       });
     }
@@ -1582,10 +1569,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   private async schedulePhysicalWrapperCleanupRetry(): Promise<void> {
-    const deadline =
-      nextWrapperLeaseDeadline(await getWrapperLease(this.ctx.storage)) ??
-      Date.now() + REAPER_INTERVAL_MS_DEFAULT;
-    await this.ctx.storage.setAlarm(deadline);
+    const deadlines = await this.getWrapperSupervisor().nextMaintenanceDeadlines();
+    if (deadlines.length > 0) {
+      await this.ctx.storage.setAlarm(Math.min(...deadlines));
+      return;
+    }
+    if (!isWrapperCleanupExhausted(await getWrapperLease(this.ctx.storage))) {
+      await this.ctx.storage.setAlarm(Date.now() + REAPER_INTERVAL_MS_DEFAULT);
+    }
   }
 
   private async finalizeSessionDeletion(
@@ -1593,7 +1584,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   ): Promise<boolean> {
     const metadata = await this.getMetadata();
     if (!metadata) {
-      if ((await getWrapperLease(this.ctx.storage)).state !== 'none') {
+      const lease = await getWrapperLease(this.ctx.storage);
+      if (lease.state !== 'none' && !isWrapperCleanupExhausted(lease)) {
         await this.schedulePhysicalWrapperCleanupRetry();
         return false;
       }
@@ -1601,15 +1593,26 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const supervisor = this.getWrapperSupervisor();
       await supervisor.requestPhysicalWrapperStop('session-delete', { kind: 'session' });
       await supervisor.runMaintenance(Date.now());
-      if ((await getWrapperLease(this.ctx.storage)).state !== 'none') {
+      const lease = await getWrapperLease(this.ctx.storage);
+      if (lease.state !== 'none' && !isWrapperCleanupExhausted(lease)) {
         if (reason === 'explicit') {
           await this.schedulePhysicalWrapperCleanupRetry();
         }
         return false;
       }
-      if (!this.orchestrator && (this.env.Sandbox || this.env.SandboxSmall)) {
+      if (isWrapperCleanupExhausted(lease)) {
+        logger
+          .withFields({ sessionId: this.sessionId, attempts: lease.attempts, reason })
+          .warn('Deleting quarantined session without touching its sandbox');
+      } else if (!this.orchestrator && (this.env.Sandbox || this.env.SandboxSmall)) {
         await createAgentSandbox(this.env, metadata).delete(reason);
       }
+    }
+
+    const recovery = await getSandboxRecoveryState(this.ctx.storage);
+    if (recovery?.failoverPublication?.status === 'pending') {
+      if (reason === 'explicit') await this.schedulePhysicalWrapperCleanupRetry();
+      return false;
     }
 
     await this.ctx.storage.deleteAlarm();

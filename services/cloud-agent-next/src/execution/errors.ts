@@ -6,7 +6,6 @@
  * - 4xx/5xx: Non-retryable errors
  */
 
-import type { WrapperInspectionFailureReason } from '../agent-sandbox/protocol.js';
 import type { WorkspaceFailureSubtype } from '../shared/wrapper-bootstrap.js';
 
 /**
@@ -43,7 +42,6 @@ export type ExecutionErrorOptions = {
   cause?: unknown;
   workspaceFailureSubtype?: WorkspaceFailureSubtype;
   safeFailureMessage?: string;
-  sandboxConnectFailureReason?: WrapperInspectionFailureReason;
 };
 
 /**
@@ -55,7 +53,6 @@ export class ExecutionError extends Error {
   readonly retryable: boolean;
   readonly workspaceFailureSubtype?: WorkspaceFailureSubtype;
   readonly safeFailureMessage?: string;
-  readonly sandboxConnectFailureReason?: WrapperInspectionFailureReason;
 
   constructor(code: ExecutionErrorCode, message: string, options: ExecutionErrorOptions) {
     super(message, { cause: options.cause });
@@ -64,22 +61,13 @@ export class ExecutionError extends Error {
     this.retryable = options.retryable;
     this.workspaceFailureSubtype = options.workspaceFailureSubtype;
     this.safeFailureMessage = options.safeFailureMessage;
-    this.sandboxConnectFailureReason = options.sandboxConnectFailureReason;
   }
 
   /**
    * Create a retryable error for sandbox connection failures.
    */
-  static sandboxConnectFailed(
-    message: string,
-    cause?: unknown,
-    sandboxConnectFailureReason?: WrapperInspectionFailureReason
-  ): ExecutionError {
-    return new ExecutionError('SANDBOX_CONNECT_FAILED', message, {
-      retryable: true,
-      cause,
-      sandboxConnectFailureReason,
-    });
+  static sandboxConnectFailed(message: string, cause?: unknown): ExecutionError {
+    return new ExecutionError('SANDBOX_CONNECT_FAILED', message, { retryable: true, cause });
   }
 
   /**

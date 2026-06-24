@@ -145,7 +145,11 @@ const screenshotValueSchema = {
   },
 };
 
-const getToolResultValue = (event: ToolResultEvent, toolCall: ToolCallEvent): unknown => {
+const getToolResultValue = (
+  event: ToolResultEvent,
+  toolCall: ToolCallEvent,
+  supportsImages: boolean
+): unknown => {
   if (toolCall.name !== 'get_viewport_screenshot') {
     return event.value;
   }
@@ -155,15 +159,21 @@ const getToolResultValue = (event: ToolResultEvent, toolCall: ToolCallEvent): un
   return screenshot.success
     ? {
         mediaType: screenshot.data.mediaType,
-        note: 'Viewport screenshot attached as an image input.',
+        note: supportsImages
+          ? 'Viewport screenshot attached as an image input.'
+          : 'Viewport screenshot captured, but this model cannot receive image inputs.',
       }
     : event.value;
 };
 
-const toToolResultContent = (event: ToolResultEvent, toolCall: ToolCallEvent): string =>
+const toToolResultContent = (
+  event: ToolResultEvent,
+  toolCall: ToolCallEvent,
+  supportsImages: boolean
+): string =>
   JSON.stringify(
     event.ok
-      ? { ok: true, value: getToolResultValue(event, toolCall) }
+      ? { ok: true, value: getToolResultValue(event, toolCall, supportsImages) }
       : { error: event.error ?? 'Eval failed.', ok: false }
   );
 
@@ -200,7 +210,7 @@ const appendToolResultMessages = ({
   readonly toolCall: ToolCallEvent;
 }): void => {
   messages.push({
-    content: toToolResultContent(event, toolCall),
+    content: toToolResultContent(event, toolCall, supportsImages),
     role: 'tool',
     tool_call_id: getProviderToolCallId(toolCall),
   });

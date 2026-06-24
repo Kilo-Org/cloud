@@ -236,7 +236,7 @@ describe('agent LLM harness', () => {
       },
       {
         content:
-          '{"ok":true,"value":{"mediaType":"image/png","note":"Viewport screenshot attached as an image input."}}',
+          '{"ok":true,"value":{"mediaType":"image/png","note":"Viewport screenshot captured, but this model cannot receive image inputs."}}',
         role: 'tool',
         tool_call_id: 'call_screenshot_1',
       },

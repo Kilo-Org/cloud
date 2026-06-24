@@ -551,7 +551,7 @@ export function ChatInput({
                       </TooltipContent>
                     )}
                   </Tooltip>
-                ) : (
+                ) : onModelChange ? (
                   <ModelCombobox
                     models={modelOptions}
                     value={model}
@@ -561,7 +561,7 @@ export function ChatInput({
                     disabled={disabled || isStreaming}
                     className="min-w-0"
                   />
-                )}
+                ) : null}
                 {variantPickerDisabled
                   ? variant && (
                       <Tooltip>

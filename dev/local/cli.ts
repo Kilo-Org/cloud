@@ -74,6 +74,21 @@ const DIM = '\x1b[2m';
 const GREEN = '\x1b[32m';
 const CAPTURE_TIMEOUT_MS = 30_000;
 
+const WORKTREE_ENV_OVERRIDES = [
+  'POSTGRES_URL',
+  'NEXTAUTH_SECRET',
+  'INTERNAL_API_SECRET',
+  'OPENROUTER_API_KEY',
+  'OPENROUTER_ORG_ID',
+  'VERCEL_AI_GATEWAY_API_KEY',
+  'ALIBABA_API_KEY',
+  'BYTEDANCE_API_KEY',
+  'MARTIAN_API_KEY',
+  'MISTRAL_API_KEY',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
+] as const;
+
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
@@ -232,6 +247,14 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
     process.env.NEXT_PUBLIC_POSTHOG_KEY !== ''
   ) {
     sessionEnv.NEXT_PUBLIC_POSTHOG_KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  }
+  if (envLocalExists) {
+    for (const key of WORKTREE_ENV_OVERRIDES) {
+      const value = readEnvValue(envLocalPath, key);
+      if (value !== undefined && value !== '') {
+        sessionEnv[key] = value;
+      }
+    }
   }
   createSession(sessionName, sessionEnv);
 

@@ -408,6 +408,16 @@ function normalizeCloudAgentProtocolError(error: unknown): unknown {
     return error;
   }
 
+  if (isLocalCloudAgentFetchFailure(error)) {
+    const target = CLOUD_AGENT_NEXT_API_URL || 'CLOUD_AGENT_NEXT_API_URL';
+    const normalized = new Error(
+      `Cloud Agent Next is not reachable at ${target}. For local development, start the agent services with \`pnpm dev:start agents\` or \`pnpm dev:start cloud-agent-next\` before using Cloud Agent or Ask Usage.`,
+      { cause: error }
+    );
+    normalized.name = 'CloudAgentUnavailableError';
+    return normalized;
+  }
+
   if (!error.message.includes('is not valid JSON')) {
     return error;
   }
@@ -415,6 +425,22 @@ function normalizeCloudAgentProtocolError(error: unknown): unknown {
   const normalized = new Error('Cloud agent returned a non-JSON error response', { cause: error });
   normalized.name = 'CloudAgentProtocolError';
   return normalized;
+}
+
+function isLocalCloudAgentFetchFailure(error: Error): boolean {
+  if (process.env.NODE_ENV !== 'development') return false;
+  if (!isLocalCloudAgentUrl(CLOUD_AGENT_NEXT_API_URL)) return false;
+  return error.message === 'fetch failed' || error.message.includes('fetch failed');
+}
+
+function isLocalCloudAgentUrl(value: string): boolean {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    return ['localhost', '127.0.0.1', '0.0.0.0'].includes(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -17,16 +17,14 @@ type QueryEnv = {
 type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 
 const GastownHealthResponseSchema = z.object({
-  data: z
-    .array(
-      z.object({
-        weighted_failed_checks: z.number().nonnegative().nullable(),
-        weighted_successful_checks: z.number().nonnegative().nullable(),
-        affected_town_count: z.number().int().nonnegative().nullable(),
-        latest_event_timestamp: z.string().nullable(),
-      })
-    )
-    .max(1),
+  data: z.array(
+    z.object({
+      town_id: z.string(),
+      weighted_failed_checks: z.number().nonnegative().nullable(),
+      weighted_successful_checks: z.number().nonnegative().nullable(),
+      latest_event_timestamp: z.string().nullable(),
+    })
+  ),
 });
 
 const CF_API_BASE = 'https://api.cloudflare.com/client/v4';
@@ -49,13 +47,14 @@ export async function queryGastownHealth(
 
   const sql = `
     SELECT
+      blob6 AS town_id,
       SUM(IF(blob5 != '', _sample_interval, 0)) AS weighted_failed_checks,
       SUM(IF(blob5 = '', _sample_interval, 0)) AS weighted_successful_checks,
-      uniqExactIf(blob6, blob5 != '' AND blob6 != '') AS affected_town_count,
       MAX(timestamp) AS latest_event_timestamp
     FROM gastown_events
     WHERE timestamp > NOW() - INTERVAL '${GASTOWN_HEALTH_WINDOW_MINUTES}' MINUTE
       AND blob1 = 'container.health_ping'
+    GROUP BY blob6
     FORMAT JSON
   `;
 
@@ -73,29 +72,33 @@ export async function queryGastownHealth(
     throw new Error(`Gastown health Analytics Engine query failed (${response.status})`);
   }
 
-  const parsed = GastownHealthResponseSchema.parse(await response.json());
-  const row = parsed.data[0];
-  if (!row) {
-    return {
-      weightedFailedChecks: 0,
-      weightedSuccessfulChecks: 0,
-      affectedTownCount: 0,
-      latestEventTimestamp: null,
-    };
-  }
+  const { data } = GastownHealthResponseSchema.parse(await response.json());
+  let weightedFailedChecks = 0;
+  let weightedSuccessfulChecks = 0;
+  let affectedTownCount = 0;
+  let latestEventTimestamp: Date | null = null;
 
-  const latestEventTimestamp =
-    row.latest_event_timestamp === null
-      ? null
-      : new Date(toUtcIsoString(row.latest_event_timestamp));
-  if (latestEventTimestamp !== null && Number.isNaN(latestEventTimestamp.getTime())) {
-    throw new Error('Gastown health Analytics Engine response contains an invalid timestamp');
+  for (const row of data) {
+    const failedChecks = row.weighted_failed_checks ?? 0;
+    weightedFailedChecks += failedChecks;
+    weightedSuccessfulChecks += row.weighted_successful_checks ?? 0;
+    if (row.town_id !== '' && failedChecks > 0) affectedTownCount += 1;
+
+    if (row.latest_event_timestamp !== null) {
+      const rowTimestamp = new Date(toUtcIsoString(row.latest_event_timestamp));
+      if (Number.isNaN(rowTimestamp.getTime())) {
+        throw new Error('Gastown health Analytics Engine response contains an invalid timestamp');
+      }
+      if (latestEventTimestamp === null || rowTimestamp > latestEventTimestamp) {
+        latestEventTimestamp = rowTimestamp;
+      }
+    }
   }
 
   return {
-    weightedFailedChecks: row.weighted_failed_checks ?? 0,
-    weightedSuccessfulChecks: row.weighted_successful_checks ?? 0,
-    affectedTownCount: row.affected_town_count ?? 0,
+    weightedFailedChecks,
+    weightedSuccessfulChecks,
+    affectedTownCount,
     latestEventTimestamp,
   };
 }

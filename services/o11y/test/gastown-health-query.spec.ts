@@ -30,19 +30,31 @@ describe('queryGastownHealth', () => {
       return Response.json({
         data: [
           {
-            weighted_failed_checks: 24,
-            weighted_successful_checks: 150,
-            affected_town_count: 4,
+            town_id: 'town-1',
+            weighted_failed_checks: 20,
+            weighted_successful_checks: 100,
+            latest_event_timestamp: '2026-06-24 15:09:00.000',
+          },
+          {
+            town_id: 'town-2',
+            weighted_failed_checks: 4,
+            weighted_successful_checks: 50,
             latest_event_timestamp: '2026-06-24 15:10:00.000',
+          },
+          {
+            town_id: '',
+            weighted_failed_checks: 3,
+            weighted_successful_checks: 2,
+            latest_event_timestamp: '2026-06-24 15:08:00.000',
           },
         ],
       });
     };
 
     await expect(queryGastownHealth(makeEnv(), fetchFn)).resolves.toEqual({
-      weightedFailedChecks: 24,
-      weightedSuccessfulChecks: 150,
-      affectedTownCount: 4,
+      weightedFailedChecks: 27,
+      weightedSuccessfulChecks: 152,
+      affectedTownCount: 2,
       latestEventTimestamp: new Date('2026-06-24T15:10:00.000Z'),
     });
     expect(calledUrl).toBe(
@@ -57,8 +69,9 @@ describe('queryGastownHealth', () => {
     expect(sql).toContain("blob1 = 'container.health_ping'");
     expect(sql).toContain("SUM(IF(blob5 != '', _sample_interval, 0))");
     expect(sql).toContain("SUM(IF(blob5 = '', _sample_interval, 0))");
-    expect(sql).toContain("uniqExactIf(blob6, blob5 != '' AND blob6 != '')");
-    expect(sql).not.toContain('COUNT(');
+    expect(sql).toContain('blob6 AS town_id');
+    expect(sql).toContain('GROUP BY blob6');
+    expect(sql).not.toContain('uniqExactIf');
   });
 
   it('maps an empty Analytics Engine result to no telemetry', async () => {
@@ -77,9 +90,9 @@ describe('queryGastownHealth', () => {
       Response.json({
         data: [
           {
+            town_id: '',
             weighted_failed_checks: null,
             weighted_successful_checks: null,
-            affected_town_count: 0,
             latest_event_timestamp: null,
           },
         ],
@@ -100,12 +113,12 @@ describe('queryGastownHealth', () => {
     await expect(queryGastownHealth(makeEnv(), fetchFn)).rejects.toThrow();
   });
 
-  it('rejects non-2xx Analytics Engine responses without exposing response content', async () => {
+  it('rejects invalid Analytics Engine queries without exposing response content', async () => {
     const fetchFn: FetchFn = async () =>
-      new Response('sensitive provider response', { status: 403 });
+      new Response('sensitive provider response', { status: 422 });
 
     await expect(queryGastownHealth(makeEnv(), fetchFn)).rejects.toThrow(
-      'Gastown health Analytics Engine query failed (403)'
+      'Gastown health Analytics Engine query failed (422)'
     );
   });
 

@@ -9,7 +9,7 @@ import { LEADERBOARD_MODEL_USAGE_REDIS_KEY } from '@/lib/redis-keys';
 const LEADERBOARD_MODEL_USAGE_QUERY = `
 select
     to_char(mu.usage_date, 'YYYY-MM-DD') as usage_date
-    , mu.requested_model as "model"
+    , coalesce(mu.requested_model, mu.model) as "model"
     , case
         when mu.feature ilike '%claw%' then 'kiloclaw'
         when mu.mode ilike '%code%' then 'code'

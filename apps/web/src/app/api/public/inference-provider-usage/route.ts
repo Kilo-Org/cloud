@@ -1,10 +1,10 @@
-import { captureException } from '@sentry/nextjs';
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-import { redisClient } from '@/lib/redis';
+import {
+  getPublicSnowflakeReport,
+  publicSnowflakeReportOptions,
+} from '@/lib/public-snowflake-report';
 import { INFERENCE_PROVIDER_USAGE_REDIS_KEY } from '@/lib/redis-keys';
-import { executeSnowflakeStatement, resolveSnowflakeConfig } from '@/lib/snowflake';
 
 const INFERENCE_PROVIDER_USAGE_QUERY = `
 select
@@ -19,13 +19,6 @@ group by
     mu.usage_date
     , mu.inference_provider;
 `;
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-const CACHE_TTL_SECONDS = 60;
 
 const inferenceProviderUsageSchema = z.array(
   z.object({
@@ -136,74 +129,15 @@ function parseAndAggregateUsage(rows: string[][]): InferenceProviderUsage[] {
   );
 }
 
-function successResponse(usage: InferenceProviderUsage[]): NextResponse {
-  return NextResponse.json(usage, {
-    headers: {
-      ...CORS_HEADERS,
-      'Cache-Control': `public, s-maxage=${CACHE_TTL_SECONDS}`,
-    },
+export async function GET() {
+  return getPublicSnowflakeReport({
+    cacheKey: INFERENCE_PROVIDER_USAGE_REDIS_KEY,
+    errorMessage: 'Failed to fetch inference provider usage',
+    parseRows: parseAndAggregateUsage,
+    query: INFERENCE_PROVIDER_USAGE_QUERY,
+    schema: inferenceProviderUsageSchema,
+    source: 'public-inference-provider-usage-api',
   });
 }
 
-export async function GET(): Promise<NextResponse> {
-  try {
-    const cached = await redisClient.get<string>(INFERENCE_PROVIDER_USAGE_REDIS_KEY);
-    if (cached !== null) {
-      return successResponse(inferenceProviderUsageSchema.parse(JSON.parse(cached)));
-    }
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'public-inference-provider-usage-api', operation: 'redis-read' },
-    });
-  }
-
-  const config = resolveSnowflakeConfig();
-  if (!config) {
-    return NextResponse.json(
-      { error: 'Snowflake is not configured' },
-      {
-        status: 503,
-        headers: { ...CORS_HEADERS, 'Cache-Control': 'no-store' },
-      }
-    );
-  }
-
-  try {
-    const rows = await executeSnowflakeStatement({
-      config,
-      statement: INFERENCE_PROVIDER_USAGE_QUERY,
-      timeoutSeconds: 30,
-    });
-    const usage = parseAndAggregateUsage(rows);
-
-    try {
-      await redisClient.set(INFERENCE_PROVIDER_USAGE_REDIS_KEY, JSON.stringify(usage), {
-        ex: CACHE_TTL_SECONDS,
-      });
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'public-inference-provider-usage-api', operation: 'redis-write' },
-      });
-    }
-
-    return successResponse(usage);
-  } catch (error) {
-    captureException(error, {
-      tags: { source: 'public-inference-provider-usage-api' },
-    });
-    return NextResponse.json(
-      { error: 'Failed to fetch inference provider usage' },
-      {
-        status: 502,
-        headers: { ...CORS_HEADERS, 'Cache-Control': 'no-store' },
-      }
-    );
-  }
-}
-
-export async function OPTIONS(): Promise<NextResponse> {
-  return new NextResponse(null, {
-    status: 204,
-    headers: CORS_HEADERS,
-  });
-}
+export const OPTIONS = publicSnowflakeReportOptions;

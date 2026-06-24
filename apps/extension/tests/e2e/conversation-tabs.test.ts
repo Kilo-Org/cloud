@@ -6,6 +6,7 @@ import {
   launchExtensionContext,
   seedExtensionAuth,
   startFixtureServer,
+  waitForStoredConversationText,
 } from './extension-context-fixture';
 
 const safeToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
@@ -93,6 +94,7 @@ test('conversation tabs persist across side panel reloads', async () => {
     await sidePanel.getByLabel('Message agent').fill('Second persisted');
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(sidePanel.getByText('Second persisted reply.')).toBeVisible();
+    await waitForStoredConversationText(sidePanel, 'Second persisted reply.');
 
     await sidePanel.reload();
 

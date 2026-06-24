@@ -988,6 +988,7 @@ const scenarios: FirefoxScenario[] = [
           await clickButtonByLabel(session.driver, 'New conversation');
           await sendMessage(session.driver, 'Second persisted');
           await waitForText(session.driver, 'Second persisted reply.');
+          await waitForStoredFirefoxConversationText(session.driver, 'Second persisted reply.');
 
           await session.driver.navigate().refresh();
           await waitForText(session.driver, 'Second persisted reply.');

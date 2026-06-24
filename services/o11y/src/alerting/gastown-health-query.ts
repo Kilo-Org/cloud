@@ -45,16 +45,18 @@ export async function queryGastownHealth(
     throw new Error('O11Y_CF_AE_API_TOKEN secret is not configured');
   }
 
+  // Collapse healthy towns into one row so normal fleet size does not inflate the
+  // scheduled Worker's Analytics Engine response and Cloudflare trace payload.
   const sql = `
     SELECT
-      blob6 AS town_id,
+      IF(blob5 != '' AND blob6 != '', blob6, '') AS town_id,
       SUM(IF(blob5 != '', _sample_interval, 0)) AS weighted_failed_checks,
       SUM(IF(blob5 = '', _sample_interval, 0)) AS weighted_successful_checks,
       MAX(timestamp) AS latest_event_timestamp
     FROM gastown_events
     WHERE timestamp > NOW() - INTERVAL '${GASTOWN_HEALTH_WINDOW_MINUTES}' MINUTE
       AND blob1 = 'container.health_ping'
-    GROUP BY blob6
+    GROUP BY IF(blob5 != '' AND blob6 != '', blob6, '')
     FORMAT JSON
   `;
 

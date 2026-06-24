@@ -69,8 +69,9 @@ describe('queryGastownHealth', () => {
     expect(sql).toContain("blob1 = 'container.health_ping'");
     expect(sql).toContain("SUM(IF(blob5 != '', _sample_interval, 0))");
     expect(sql).toContain("SUM(IF(blob5 = '', _sample_interval, 0))");
-    expect(sql).toContain('blob6 AS town_id');
-    expect(sql).toContain('GROUP BY blob6');
+    expect(sql).toContain("IF(blob5 != '' AND blob6 != '', blob6, '') AS town_id");
+    expect(sql).toContain("GROUP BY IF(blob5 != '' AND blob6 != '', blob6, '')");
+    expect(sql).not.toContain('GROUP BY blob6');
     expect(sql).not.toContain('uniqExactIf');
   });
 

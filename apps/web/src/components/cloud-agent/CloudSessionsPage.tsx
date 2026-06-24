@@ -618,7 +618,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
               selectedOverrideProfileId={selectedProfileId}
               onOverrideProfileSelect={setSelectedProfileId}
               repoFullName={selectedRepo || undefined}
-              platform={selectedPlatform}
+              platform={selectedPlatform === 'bitbucket' ? undefined : selectedPlatform}
             />
           </div>
 

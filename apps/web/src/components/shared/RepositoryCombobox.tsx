@@ -16,8 +16,9 @@ import {
 import { ChevronsUpDown, Check, Lock, Unlock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GitLabLogo } from '@/components/auth/GitLabLogo';
+import { BitbucketLogo } from '@/components/auth/BitbucketLogo';
 
-export type RepositoryPlatform = 'github' | 'gitlab';
+export type RepositoryPlatform = 'github' | 'gitlab' | 'bitbucket';
 
 export type RepositoryOption = {
   id: string | number;
@@ -25,6 +26,7 @@ export type RepositoryOption = {
   private?: boolean;
   description?: string;
   platform?: RepositoryPlatform;
+  workspaceUuid?: string;
 };
 
 export type RepositoryComboboxProps = {
@@ -70,6 +72,9 @@ function PlatformIcon({
   }
   if (platform === 'gitlab') {
     return <GitLabLogo className={className} />;
+  }
+  if (platform === 'bitbucket') {
+    return <BitbucketLogo className={className} />;
   }
   return null;
 }
@@ -186,6 +191,7 @@ export function RepositoryCombobox({
   // Group repositories by platform when groupByPlatform is enabled
   const githubRepos = repositories.filter(r => r.platform === 'github');
   const gitlabRepos = repositories.filter(r => r.platform === 'gitlab');
+  const bitbucketRepos = repositories.filter(r => r.platform === 'bitbucket');
   const otherRepos = repositories.filter(r => !r.platform);
 
   const renderGroupedList = () => (
@@ -206,6 +212,19 @@ export function RepositoryCombobox({
       {gitlabRepos.length > 0 && (
         <CommandGroup heading="GitLab">
           {gitlabRepos.map(repo => (
+            <RepositoryItem
+              key={repo.id}
+              repo={repo}
+              value={value}
+              onSelect={handleSelect}
+              showPlatformIcon={false}
+            />
+          ))}
+        </CommandGroup>
+      )}
+      {bitbucketRepos.length > 0 && (
+        <CommandGroup heading="Bitbucket">
+          {bitbucketRepos.map(repo => (
             <RepositoryItem
               key={repo.id}
               repo={repo}

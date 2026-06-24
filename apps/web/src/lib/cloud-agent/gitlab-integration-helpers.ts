@@ -7,7 +7,10 @@ import {
 import { getGitLabIntegration, getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { fetchGitLabProjects } from '@/lib/integrations/platforms/gitlab/adapter';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import type { PlatformRepository } from '@/lib/integrations/core/types';
+import {
+  requireNumericPlatformRepositories,
+  type PlatformRepository,
+} from '@/lib/integrations/core/types';
 
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
 
@@ -115,8 +118,9 @@ export async function fetchGitLabRepositoriesForOrganization(
   const instanceUrl = metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
 
   try {
+    const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
     // If forceRefresh or no cached repos, fetch from GitLab and update cache
-    if (forceRefresh || !integration.repositories?.length) {
+    if (forceRefresh || !cachedRepositories?.length) {
       const accessToken = await getValidGitLabToken(integration);
       const repositories = await fetchGitLabProjects(accessToken, instanceUrl);
       await updateRepositoriesForIntegration(integration.id, repositories);
@@ -131,7 +135,7 @@ export async function fetchGitLabRepositoriesForOrganization(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(integration.repositories),
+      repositories: mapRepositories(cachedRepositories),
       syncedAt: integration.repositories_synced_at,
       instanceUrl,
     };
@@ -161,8 +165,9 @@ export async function fetchGitLabRepositoriesForUser(
   const instanceUrl = metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
 
   try {
+    const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
     // If forceRefresh or no cached repos, fetch from GitLab and update cache
-    if (forceRefresh || !integration.repositories?.length) {
+    if (forceRefresh || !cachedRepositories?.length) {
       const accessToken = await getValidGitLabToken(integration);
       const repositories = await fetchGitLabProjects(accessToken, instanceUrl);
       await updateRepositoriesForIntegration(integration.id, repositories);
@@ -177,7 +182,7 @@ export async function fetchGitLabRepositoriesForUser(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(integration.repositories),
+      repositories: mapRepositories(cachedRepositories),
       syncedAt: integration.repositories_synced_at,
       instanceUrl,
     };

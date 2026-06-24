@@ -5,6 +5,7 @@ import {
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
+import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 import {
   getSecurityAgentConfigWithStatus,
   upsertSecurityAgentConfig,
@@ -140,7 +141,7 @@ function getRepoFullNamesInScope(
   integration: Integration,
   config: { repository_selection_mode?: 'all' | 'selected'; selected_repository_ids?: number[] }
 ): string[] {
-  const repositories = integration?.repositories ?? [];
+  const repositories = requireNumericPlatformRepositories(integration?.repositories ?? null) ?? [];
   if (config.repository_selection_mode === 'all') {
     return repositories.map(repo => repo.full_name).filter((name): name is string => !!name);
   }
@@ -729,7 +730,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         if (input.isEnabled && integration) {
           const installationId = integration.platform_installation_id;
           if (installationId) {
-            const allRepos = integration.repositories || [];
+            const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
 
             let repositoriesToSync: string[];
 
@@ -834,7 +835,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       }
 
       // Auto-fetch repositories from GitHub if not cached
-      let repos = integration.repositories || [];
+      let repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
       if (repos.length === 0 && integration.platform_installation_id) {
         const appType = integration.github_app_type || 'standard';
         const fetchedRepos = await fetchGitHubRepositories(
@@ -1020,7 +1021,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        const allRepos = integration.repositories || [];
+        const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
 
         // If a specific repo is provided, sync only that one
         if (input.repoFullName) {
@@ -1521,7 +1522,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
       // Get list of accessible repository full names
       const accessibleRepoFullNames: string[] = [];
       if (integration && integration.integration_status === 'active') {
-        const repos = integration.repositories || [];
+        const repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
         for (const repo of repos) {
           if (repo.full_name) {
             accessibleRepoFullNames.push(repo.full_name);

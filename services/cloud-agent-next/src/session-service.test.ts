@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DevContainerModule from './kilo/devcontainer.js';
+import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
 
 vi.mock('./logger.js', () => ({
   logger: {
@@ -41,6 +42,7 @@ vi.mock('./workspace.js', () => ({
 
 const tokenMocks = vi.hoisted(() => ({
   resolveCloudAgentGitHubAuthForRepo: vi.fn(),
+  resolveManagedBitbucketToken: vi.fn(),
   resolveManagedGitLabToken: vi.fn(),
 }));
 const devcontainerMocks = vi.hoisted(() => ({
@@ -54,7 +56,10 @@ const attachmentMocks = vi.hoisted(() => ({
   buildSignedPromptAttachments: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock('./services/git-token-service-client.js', () => tokenMocks);
+vi.mock('./services/git-token-service-client.js', async importActual => ({
+  ...(await importActual<typeof GitTokenServiceClientModule>()),
+  ...tokenMocks,
+}));
 vi.mock('./kilo/devcontainer.js', async importActual => ({
   ...(await importActual<typeof DevContainerModule>()),
   bringUpDevContainer: devcontainerMocks.bringUpDevContainer,
@@ -280,6 +285,83 @@ function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
     lifecycle: { version: 1, timestamp: 1 },
   });
 }
+
+function createBitbucketMetadata(orgId?: string): CloudAgentSessionState {
+  return parseSessionMetadata({
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: 'agent_bitbucket',
+      userId: 'user_test',
+      ...(orgId ? { orgId } : {}),
+    },
+    auth: {},
+    repository: {
+      type: 'bitbucket',
+      url: 'https://bitbucket.org/acme/repo.git',
+      platform: 'bitbucket',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    },
+    lifecycle: { version: 1, timestamp: 1 },
+  });
+}
+
+describe('SessionService.resolveWorkspaceTokens', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tokenMocks.resolveManagedBitbucketToken.mockResolvedValue({
+      success: true,
+      token: 'opaque-workspace-token',
+    });
+  });
+
+  it('fails closed for replayed Bitbucket metadata without an organization', async () => {
+    await expect(
+      new SessionService().resolveWorkspaceTokens(createEnv(), createBitbucketMetadata())
+    ).rejects.toMatchObject({
+      code: 'INVALID_REQUEST',
+      retryable: false,
+      message: 'Bitbucket repositories require an organization',
+    });
+    expect(tokenMocks.resolveManagedBitbucketToken).not.toHaveBeenCalled();
+  });
+
+  it('re-resolves an organization token with exact persisted repository identity', async () => {
+    const orgId = '123e4567-e89b-12d3-a456-426614174030';
+
+    await expect(
+      new SessionService().resolveWorkspaceTokens(createEnv(), createBitbucketMetadata(orgId))
+    ).resolves.toMatchObject({
+      gitToken: 'opaque-workspace-token',
+      bitbucketTokenManaged: true,
+    });
+    expect(tokenMocks.resolveManagedBitbucketToken).toHaveBeenCalledWith(expect.any(Object), {
+      userId: 'user_test',
+      orgId,
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      repositoryUrl: 'https://bitbucket.org/acme/repo.git',
+    });
+  });
+
+  it('keeps temporary runtime token resolution failures retryable', async () => {
+    tokenMocks.resolveManagedBitbucketToken.mockResolvedValue({
+      success: false,
+      reason: 'temporarily_unavailable',
+    });
+
+    await expect(
+      new SessionService().resolveWorkspaceTokens(
+        createEnv(),
+        createBitbucketMetadata('123e4567-e89b-12d3-a456-426614174030')
+      )
+    ).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      retryable: true,
+      message: 'Bitbucket repository authorization failed (temporarily_unavailable).',
+    });
+  });
+});
 
 describe('writeGlobalRules', () => {
   it('writes the shared Cloud Agent rules for the session', async () => {

@@ -89,6 +89,7 @@ export function OnboardingStepRepo() {
       if (!repo) return;
 
       const platform = repo.platform ?? 'github';
+      if (platform === 'bitbucket') return;
       const gitlabInstanceUrl = (gitlabReposQuery.data as { instanceUrl?: string } | undefined)
         ?.instanceUrl;
       const gitUrl = resolveGitUrlFromRepo(platform, fullName, gitlabInstanceUrl);

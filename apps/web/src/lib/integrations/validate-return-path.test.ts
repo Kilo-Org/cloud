@@ -31,6 +31,14 @@ describe('validateReturnPath', () => {
     expect(validateReturnPath('/foo\nbar')).toBeNull();
   });
 
+  it('rejects paths with tabs that URL parsing would treat as an external redirect', () => {
+    expect(validateReturnPath('/\t/evil.example/path')).toBeNull();
+  });
+
+  it('rejects paths that normalize to a protocol-relative URL', () => {
+    expect(validateReturnPath('/..//evil.example/path')).toBeNull();
+  });
+
   it('rejects paths without leading slash', () => {
     expect(validateReturnPath('foo/bar')).toBeNull();
   });

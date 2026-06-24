@@ -1,6 +1,9 @@
 import type { PlatformId } from './platforms';
 
-type SetupStatusPlatformId = Exclude<PlatformId, 'microsoft-teams' | 'google-chat'> | 'dolthub';
+type SetupStatusPlatformId =
+  | Exclude<PlatformId, 'microsoft-teams' | 'google-chat'>
+  | 'bitbucket'
+  | 'dolthub';
 
 export type PlatformInstallation = {
   platform: SetupStatusPlatformId;

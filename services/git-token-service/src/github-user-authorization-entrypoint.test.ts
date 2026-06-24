@@ -1,4 +1,4 @@
-import { signKiloToken } from '@kilocode/worker-utils';
+import { BITBUCKET_REPOSITORY_LIST_AUDIENCE, signKiloToken } from '@kilocode/worker-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const serviceMocks = vi.hoisted(() => ({
@@ -156,12 +156,13 @@ describe('fetch disconnect endpoint', () => {
   const env = {
     NEXTAUTH_SECRET: { get: async () => jwtSecret } as SecretsStoreSecret,
   } as CloudflareEnv;
-  const authorizationHeader = async (userId: string): Promise<string> => {
+  const authorizationHeader = async (userId: string, audience?: string): Promise<string> => {
     const { token } = await signKiloToken({
       userId,
       pepper: null,
       secret: jwtSecret,
       expiresInSeconds: 60 * 60,
+      ...(audience ? { audience } : {}),
     });
     return `Bearer ${token}`;
   };
@@ -186,6 +187,24 @@ describe('fetch disconnect endpoint', () => {
       expect(serviceMocks.disconnectUserAuthorization).not.toHaveBeenCalled();
     }
   );
+
+  it('rejects a token issued for the Bitbucket repository-list endpoint', async () => {
+    const response = await handler.fetch(
+      new Request(
+        'https://git-token-service.kilosessions.ai/internal/github-user-authorizations/disconnect',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: await authorizationHeader('user_1', BITBUCKET_REPOSITORY_LIST_AUDIENCE),
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.disconnectUserAuthorization).not.toHaveBeenCalled();
+  });
 
   it('returns a sanitized availability error when JWT secret resolution fails', async () => {
     const unavailableEnv = {

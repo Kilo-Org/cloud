@@ -62,6 +62,12 @@ describe('platformIntegrationsRouter', () => {
       platformAccountLogin: 'kilocode',
       status: INTEGRATION_STATUS.ACTIVE,
     });
+    await insertPlatformIntegration({
+      userId: ownerUser.id,
+      platform: PLATFORM.BITBUCKET,
+      platformAccountLogin: 'personal-workspace',
+      status: INTEGRATION_STATUS.ACTIVE,
+    });
 
     const caller = await createCallerForUser(ownerUser.id);
     const result = await caller.platformIntegrations.listSetupStatus();
@@ -92,6 +98,13 @@ describe('platformIntegrationsRouter', () => {
       platformAccountLogin: 'kilocode',
       status: INTEGRATION_STATUS.ACTIVE,
     });
+    await insertPlatformIntegration({
+      organizationId: organization.id,
+      platform: PLATFORM.BITBUCKET,
+      platformAccountLogin: 'acme',
+      status: INTEGRATION_STATUS.ACTIVE,
+      integrationType: 'workspace_access_token',
+    });
 
     const caller = await createCallerForUser(memberUser.id);
     const result = await caller.platformIntegrations.listSetupStatus({
@@ -103,6 +116,34 @@ describe('platformIntegrationsRouter', () => {
         platform: PLATFORM.GITLAB,
         installed: true,
         installation: { accountLogin: 'kilocode' },
+      },
+      {
+        platform: PLATFORM.BITBUCKET,
+        installed: true,
+        installation: { accountLogin: 'acme' },
+      },
+    ]);
+  });
+
+  test('includes organization Bitbucket OAuth setup status', async () => {
+    await insertPlatformIntegration({
+      organizationId: organization.id,
+      platform: PLATFORM.BITBUCKET,
+      platformAccountLogin: 'oauth-workspace',
+      status: INTEGRATION_STATUS.ACTIVE,
+      integrationType: 'oauth',
+    });
+
+    const caller = await createCallerForUser(memberUser.id);
+    const result = await caller.platformIntegrations.listSetupStatus({
+      organizationId: organization.id,
+    });
+
+    expect(result).toEqual([
+      {
+        platform: PLATFORM.BITBUCKET,
+        installed: true,
+        installation: { accountLogin: 'oauth-workspace' },
       },
     ]);
   });
@@ -122,18 +163,20 @@ async function insertPlatformIntegration({
   platform,
   platformAccountLogin,
   status,
+  integrationType = 'app',
 }: {
   userId?: string;
   organizationId?: string;
   platform: string;
   platformAccountLogin: string;
   status: string;
+  integrationType?: string;
 }) {
   await db.insert(platform_integrations).values({
     owned_by_user_id: userId ?? null,
     owned_by_organization_id: organizationId ?? null,
     platform,
-    integration_type: 'app',
+    integration_type: integrationType,
     platform_installation_id: `${platform}-${crypto.randomUUID()}`,
     platform_account_login: platformAccountLogin,
     repository_access: 'all',

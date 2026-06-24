@@ -1,5 +1,21 @@
 // Core types for the integrations system
+import type { PlatformRepository } from '@kilocode/db/schema-types';
+
 export type { IntegrationPermissions, PlatformRepository } from '@kilocode/db/schema-types';
+
+export function requireNumericPlatformRepositories(
+  repositories: PlatformRepository<number | string>[] | null
+): PlatformRepository[] | null {
+  if (!repositories) return null;
+  if (
+    !repositories.every(
+      (repository): repository is PlatformRepository => typeof repository.id === 'number'
+    )
+  ) {
+    throw new Error('Expected numeric platform repository IDs');
+  }
+  return repositories;
+}
 
 /**
  * Represents ownership of an integration

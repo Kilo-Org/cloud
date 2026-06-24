@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { toast } from 'sonner';
 import {
@@ -14,6 +14,7 @@ import {
   Circle,
   CodeXml,
   ExternalLink,
+  Mail,
   Github,
   GitBranch,
   Loader2,
@@ -26,6 +27,12 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { InviteMemberDialog } from '@/components/organizations/members/InviteMemberDialog';
+import { Switch } from '@/components/ui/switch';
+import {
+  useOrganizationWithMembers,
+  useUpdateRecommendationsDigest,
+} from '@/app/api/organizations/hooks';
+import { useUserOrganizationRole } from '@/components/organizations/OrganizationContext';
 import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
 import { GitLabIntegrationDetails } from '@/components/integrations/GitLabIntegrationDetails';
 import { GitLabIcon } from '@/app/collab/_components/icons/GitLabIcon';
@@ -92,10 +99,12 @@ type OrganizationSetupWizardProps = {
 
 export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWizardProps) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefersReducedMotion = useReducedMotion();
+  const userRole = useUserOrganizationRole();
+  const organizationQuery = useOrganizationWithMembers(organizationId);
+  const updateRecommendationsDigest = useUpdateRecommendationsDigest();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const handledReturnRef = useRef<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -204,7 +213,6 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   };
 
   const handleSourceControlDetected = async (provider: SourceControlProvider) => {
-    await queryClient.invalidateQueries({ queryKey: checklistQueryOptions.queryKey });
     const result = await checklistQuery.refetch();
     const completed = result.data?.steps.find(step => step.key === 'source-control')?.done ?? false;
     if (completed) {
@@ -221,7 +229,6 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
         platform: checklistQuery.data?.connectedPlatform ?? sourceControlProvider ?? 'github',
         isEnabled: true,
       });
-      await queryClient.invalidateQueries({ queryKey: checklistQueryOptions.queryKey });
       const result = await checklistQuery.refetch();
       const completed =
         result.data?.steps.find(step => step.key === 'code-reviewer')?.done ?? false;
@@ -244,7 +251,6 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   };
 
   const handleInvitationSuccess = async () => {
-    await queryClient.invalidateQueries({ queryKey: checklistQueryOptions.queryKey });
     const result = await checklistQuery.refetch();
     const completed = result.data?.steps.find(step => step.key === 'invite-team')?.done ?? false;
     if (completed) {
@@ -358,6 +364,32 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
                     completedCount={checklist.completedCount}
                     totalCount={checklist.totalCount}
                     organizationId={organizationId}
+                    showRecommendationsDigest={
+                      organizationQuery.data?.plan === 'enterprise' && userRole === 'owner'
+                    }
+                    recommendationsDigestEnabled={
+                      organizationQuery.data?.settings?.recommendations_digest_enabled === true
+                    }
+                    recommendationsDigestPending={updateRecommendationsDigest.isPending}
+                    onRecommendationsDigestChange={enabled => {
+                      updateRecommendationsDigest.mutate(
+                        { organizationId, enabled },
+                        {
+                          onSuccess: () => {
+                            toast.success(
+                              enabled
+                                ? 'Weekly recommendations email enabled'
+                                : 'Weekly recommendations email disabled'
+                            );
+                          },
+                          onError: error => {
+                            toast.error('Could not update weekly recommendations email', {
+                              description: error.message,
+                            });
+                          },
+                        }
+                      );
+                    }}
                     onBack={() => navigate('invite-team')}
                   />
                 ) : (
@@ -680,12 +712,20 @@ function CompletionScreen({
   completedCount,
   totalCount,
   organizationId,
+  showRecommendationsDigest,
+  recommendationsDigestEnabled,
+  recommendationsDigestPending,
+  onRecommendationsDigestChange,
   onBack,
 }: {
   headingRef: React.RefObject<HTMLHeadingElement | null>;
   completedCount: number;
   totalCount: number;
   organizationId: string;
+  showRecommendationsDigest: boolean;
+  recommendationsDigestEnabled: boolean;
+  recommendationsDigestPending: boolean;
+  onRecommendationsDigestChange: (enabled: boolean) => void;
   onBack: () => void;
 }) {
   const complete = completedCount === totalCount;
@@ -727,15 +767,43 @@ function CompletionScreen({
                 incomplete setup tasks.
               </p>
             </div>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button asChild className="min-h-control-touch sm:min-h-0">
-                <Link href={`/organizations/${organizationId}`}>Open organization</Link>
-              </Button>
-              <Button asChild variant="secondary" className="min-h-control-touch sm:min-h-0">
-                <Link href={`/organizations/${organizationId}/payment-details`}>
-                  Add usage credits
-                </Link>
-              </Button>
+            <div className="mt-8 space-y-5">
+              {showRecommendationsDigest && (
+                <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-surface-inset p-4">
+                  <div className="flex items-start gap-3">
+                    <Mail className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="onboarding-recommendations-digest"
+                        className="type-body font-medium text-foreground"
+                      >
+                        Weekly recommendations email
+                      </label>
+                      <p className="type-label max-w-lg text-muted-foreground">
+                        Email organization owners a weekly summary of open recommendations and
+                        feature setup.
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="onboarding-recommendations-digest"
+                    checked={recommendationsDigestEnabled}
+                    disabled={recommendationsDigestPending}
+                    onCheckedChange={onRecommendationsDigestChange}
+                    aria-label="Weekly recommendations email"
+                  />
+                </div>
+              )}
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button asChild className="min-h-control-touch sm:min-h-0">
+                  <Link href={`/organizations/${organizationId}`}>Open organization</Link>
+                </Button>
+                <Button asChild variant="secondary" className="min-h-control-touch sm:min-h-0">
+                  <Link href={`/organizations/${organizationId}/payment-details`}>
+                    Add usage credits
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
 

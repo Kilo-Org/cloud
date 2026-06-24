@@ -1,7 +1,4 @@
-import type {
-  OrganizationOnboardingChecklist,
-  OrganizationOnboardingStepKey,
-} from '@/lib/organizations/onboarding-checklist';
+import type { OrganizationOnboardingChecklist } from '@/lib/organizations/onboarding-checklist';
 
 export const ORGANIZATION_ONBOARDING_SCREENS = [
   'source-control',
@@ -64,10 +61,4 @@ export function getPreviousOnboardingScreen(
 ): OrganizationOnboardingScreen | null {
   const index = ORGANIZATION_ONBOARDING_SCREENS.indexOf(screen);
   return index > 0 ? ORGANIZATION_ONBOARDING_SCREENS[index - 1] : null;
-}
-
-export function isOnboardingStepKey(
-  screen: OrganizationOnboardingScreen
-): screen is OrganizationOnboardingStepKey {
-  return screen !== 'complete';
 }

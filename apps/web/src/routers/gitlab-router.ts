@@ -67,7 +67,7 @@ export const gitlabRouter = createTRPCRouter({
    */
   getInstallation: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+      await ensureOrganizationAccess(ctx, input.organizationId);
     }
     const owner = resolveOwner(ctx, input?.organizationId);
     const integration = await gitlabService.getGitLabIntegration(owner);
@@ -85,7 +85,10 @@ export const gitlabRouter = createTRPCRouter({
       auth_type?: 'oauth' | 'pat';
     } | null;
 
-    const isInstalled = integration.integration_status === 'active';
+    const isInstalled =
+      integration.integration_status === 'active' &&
+      integration.suspended_at === null &&
+      integration.auth_invalid_at === null;
 
     return {
       installed: isInstalled,

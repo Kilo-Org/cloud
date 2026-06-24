@@ -167,9 +167,6 @@ export function GitLabIntegrationDetails({
         setPatToken('');
         setPATValidation({ status: 'idle' });
         setConnectionMethod('oauth');
-        await queryClient.invalidateQueries({
-          queryKey: trpc.gitlab.getInstallation.queryKey(input),
-        });
         await refetch();
       },
       onError: err => {

@@ -1539,7 +1539,7 @@ export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 export const EndpointSchema = z.object({
   tag: z.string().optional(),
   provider_name: z.string().optional(),
-  context_length: z.number(),
+  context_length: z.number().optional(),
   pricing: z
     .object({
       prompt: z.string(),

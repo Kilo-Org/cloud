@@ -37,7 +37,6 @@ import { Label } from '@/components/ui/label';
 type OrganizationSearchResult = {
   id: string;
   name: string;
-  has_children: boolean;
 };
 
 type OrganizationSummary = {
@@ -62,21 +61,16 @@ export function OrganizationAdminHierarchyManagement({
   const [isCreateNewDialogOpen, setIsCreateNewDialogOpen] = useState(false);
   const [pendingChild, setPendingChild] = useState<OrganizationSearchResult | null>(null);
   const deferredChildSearch = useDeferredValue(childSearch.trim());
-  const organizationSearchQuery = useSearchAdminOrganizations(deferredChildSearch);
+  const organizationSearchQuery = useSearchAdminOrganizations(
+    deferredChildSearch,
+    10,
+    organizationId
+  );
 
   const childOrganizations = hierarchyQuery.data?.children ?? [];
   const organizationName = organizationDetailsQuery.data?.name ?? organizationId;
-  const childOrganizationIds = new Set(childOrganizations.map(child => child.id));
-  const ancestorOrganizationIds = new Set(
-    (hierarchyQuery.data?.ancestors ?? []).map(ancestor => ancestor.id)
-  );
-  const searchResults = (organizationSearchQuery.data ?? []).filter(
-    organization =>
-      organization.id !== organizationId &&
-      !childOrganizationIds.has(organization.id) &&
-      !ancestorOrganizationIds.has(organization.id) &&
-      !organization.has_children
-  );
+  const canManageChildren = hierarchyQuery.data?.parent === null;
+  const searchResults = organizationSearchQuery.data ?? [];
 
   const handleCreateChild = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -156,15 +150,29 @@ export function OrganizationAdminHierarchyManagement({
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button type="button" onClick={() => setIsAddExistingDialogOpen(true)}>
+            <Button
+              type="button"
+              onClick={() => setIsAddExistingDialogOpen(true)}
+              disabled={!canManageChildren}
+            >
               <Plus className="mr-2 size-4" />
               Add Existing
             </Button>
-            <Button type="button" variant="outline" onClick={() => setIsCreateNewDialogOpen(true)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCreateNewDialogOpen(true)}
+              disabled={!canManageChildren}
+            >
               <Plus className="mr-2 size-4" />
               Create New
             </Button>
           </div>
+          {!canManageChildren ? (
+            <p className="text-muted-foreground text-sm">
+              Child organizations cannot have their own child organizations yet.
+            </p>
+          ) : null}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-3">

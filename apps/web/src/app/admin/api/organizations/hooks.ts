@@ -137,13 +137,18 @@ export function useAdminOrganizationHierarchy(organizationId: string, enabled: b
   );
 }
 
-export function useSearchAdminOrganizations(search: string, limit = 10) {
+export function useSearchAdminOrganizations(
+  search: string,
+  limit = 10,
+  childOfOrganizationId?: string
+) {
   const trpc = useTRPC();
   return useQuery(
     trpc.organizations.admin.search.queryOptions(
       {
         search,
         limit,
+        childOfOrganizationId,
       },
       { enabled: search.trim().length > 0 }
     )

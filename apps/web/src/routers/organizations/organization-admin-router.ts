@@ -89,12 +89,12 @@ const OrganizationListInputSchema = z.object({
 const OrganizationSearchInputSchema = z.object({
   search: z.string().min(1),
   limit: z.number().int().min(1).max(50).default(10),
+  childOfOrganizationId: z.uuid().optional(),
 });
 
 const OrganizationSearchResultSchema = z.object({
   id: z.string(),
   name: z.string(),
-  has_children: z.boolean(),
 });
 
 const OrganizationCreateInputSchema = z.object({
@@ -1242,7 +1242,7 @@ export const organizationAdminRouter = createTRPCRouter({
     .input(OrganizationSearchInputSchema)
     .output(z.array(OrganizationSearchResultSchema))
     .query(async ({ input }) => {
-      const { search, limit } = input;
+      const { search, limit, childOfOrganizationId } = input;
       const searchTerm = search.trim();
 
       if (!searchTerm) {
@@ -1255,17 +1255,35 @@ export const organizationAdminRouter = createTRPCRouter({
         searchConditions.push(eq(organizations.id, searchTerm));
       }
 
+      const conditions = [or(...searchConditions), isNull(organizations.deleted_at)];
+
+      if (childOfOrganizationId) {
+        const [parentOrganization] = await db
+          .select({ parent_organization_id: organizations.parent_organization_id })
+          .from(organizations)
+          .where(and(eq(organizations.id, childOfOrganizationId), isNull(organizations.deleted_at)))
+          .limit(1);
+
+        if (!parentOrganization || parentOrganization.parent_organization_id) {
+          return [];
+        }
+
+        conditions.push(ne(organizations.id, childOfOrganizationId));
+        conditions.push(
+          sql`${organizations.parent_organization_id} IS DISTINCT FROM ${childOfOrganizationId}`
+        );
+        conditions.push(
+          sql`NOT EXISTS (SELECT 1 FROM ${organizations} child_organizations WHERE child_organizations.parent_organization_id = ${organizations.id} AND child_organizations.deleted_at IS NULL)`
+        );
+      }
+
       const results = await db
         .select({
           id: organizations.id,
           name: organizations.name,
-          has_children:
-            sql<boolean>`EXISTS (SELECT 1 FROM organizations child_organizations WHERE child_organizations.parent_organization_id = ${organizations.id} AND child_organizations.deleted_at IS NULL)`.as(
-              'has_children'
-            ),
         })
         .from(organizations)
-        .where(and(or(...searchConditions), isNull(organizations.deleted_at)))
+        .where(and(...conditions))
         .orderBy(asc(organizations.name))
         .limit(limit);
 

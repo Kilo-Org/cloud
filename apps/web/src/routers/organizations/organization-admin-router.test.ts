@@ -895,6 +895,100 @@ describe('organization admin router', () => {
       }
     });
 
+    it('only returns addable organizations from child autocomplete search', async () => {
+      const searchPrefix = `Admin Addable Child Search ${crypto.randomUUID()}`;
+      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const directChildOrganization = await createOrganization(
+        `${searchPrefix} direct child`,
+        adminUser.id
+      );
+      const parentCandidate = await createOrganization(`${searchPrefix} has child`, adminUser.id);
+      const childOfCandidate = await createOrganization(
+        `${searchPrefix} child of candidate`,
+        adminUser.id
+      );
+      const addableOrganization = await createOrganization(`${searchPrefix} addable`, adminUser.id);
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parentOrganization.id })
+          .where(eq(organizations.id, directChildOrganization.id));
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parentCandidate.id })
+          .where(eq(organizations.id, childOfCandidate.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        const results = await caller.organizations.admin.search({
+          search: searchPrefix,
+          limit: 20,
+          childOfOrganizationId: parentOrganization.id,
+        });
+
+        expect(results.map(organization => organization.id)).toEqual([
+          addableOrganization.id,
+          childOfCandidate.id,
+        ]);
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(inArray(organizations.id, [directChildOrganization.id, childOfCandidate.id]));
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              addableOrganization.id,
+              childOfCandidate.id,
+              parentCandidate.id,
+              directChildOrganization.id,
+              parentOrganization.id,
+            ])
+          );
+      }
+    });
+
+    it('returns no addable autocomplete results when the target parent is a child', async () => {
+      const searchPrefix = `Admin Child Target Search ${crypto.randomUUID()}`;
+      const rootOrganization = await createOrganization(`${searchPrefix} root`, adminUser.id);
+      const childOrganization = await createOrganization(`${searchPrefix} child`, adminUser.id);
+      const candidateOrganization = await createOrganization(
+        `${searchPrefix} candidate`,
+        adminUser.id
+      );
+
+      try {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: rootOrganization.id })
+          .where(eq(organizations.id, childOrganization.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        const results = await caller.organizations.admin.search({
+          search: searchPrefix,
+          limit: 20,
+          childOfOrganizationId: childOrganization.id,
+        });
+
+        expect(results).toEqual([]);
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, childOrganization.id));
+        await db
+          .delete(organizations)
+          .where(
+            inArray(organizations.id, [
+              candidateOrganization.id,
+              childOrganization.id,
+              rootOrganization.id,
+            ])
+          );
+      }
+    });
+
     it('rejects hierarchy cycles', async () => {
       const searchPrefix = `Admin Hierarchy Cycle ${crypto.randomUUID()}`;
       const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);

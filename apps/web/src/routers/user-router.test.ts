@@ -174,14 +174,14 @@ describe('user router - getAutoTopUpPaymentMethod', () => {
     await db.insert(auto_top_up_configs).values({
       owned_by_user_id: user.id,
       stripe_payment_method_id: 'pm_missing',
-      amount_cents: 2500,
+      amount_cents: 10000,
     });
     mockRetrievePaymentMethodInfo.mockResolvedValue(null);
     const caller = await createCallerForUser(user.id);
 
     await expect(caller.user.getAutoTopUpPaymentMethod()).resolves.toEqual({
       enabled: false,
-      amountCents: 2500,
+      amountCents: 10000,
       thresholdCents: 500,
       configured: true,
       paymentMethod: null,

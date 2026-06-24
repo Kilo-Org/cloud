@@ -31,10 +31,6 @@ import {
 } from '@/lib/autoTopUpConstants';
 import { formatCents, formatPaymentMethodDescription } from '@/lib/utils';
 
-function isAutoTopUpAmount(value: number): value is AutoTopUpAmountCents {
-  return AUTO_TOP_UP_AMOUNTS_CENTS.some(amount => amount === value);
-}
-
 export function AutoTopUpToggle() {
   const [configureModalOpen, setConfigureModalOpen] = useState(false);
   const trpc = useTRPC();
@@ -44,16 +40,13 @@ export function AutoTopUpToggle() {
   });
   const enabled = autoTopUpInfo?.enabled ?? false;
   const currentAmount = autoTopUpInfo?.amountCents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
-  const selectableAmount = isAutoTopUpAmount(currentAmount)
-    ? currentAmount
-    : DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
   const paymentMethodInfo = autoTopUpInfo?.paymentMethod;
-  const [selectedAmount, setSelectedAmount] = useState<AutoTopUpAmountCents>(selectableAmount);
+  const [selectedAmount, setSelectedAmount] = useState<AutoTopUpAmountCents>(currentAmount);
 
   // Sync selectedAmount when modal opens (to pick up server value)
   const handleOpenChange = (open: boolean) => {
     if (open) {
-      setSelectedAmount(selectableAmount);
+      setSelectedAmount(currentAmount);
     }
     setConfigureModalOpen(open);
   };

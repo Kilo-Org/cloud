@@ -28,7 +28,8 @@ import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
-import { retrievePaymentMethodInfo, type PaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
+import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
+import type { AutoTopUpAmountCents } from '@/lib/autoTopUpConstants';
 import {
   AUTO_TOP_UP_THRESHOLD_CENTS,
   AutoTopUpAmountCentsSchema,
@@ -73,22 +74,6 @@ const AutocompleteMetricsOutputSchema = z.object({
   cost: z.number(),
   requests: z.number(),
   tokens: z.number(),
-});
-
-const AutoTopUpPaymentMethodOutputSchema = z.object({
-  enabled: z.boolean(),
-  amountCents: z.number().int().nonnegative(),
-  thresholdCents: z.number().int().nonnegative(),
-  configured: z.boolean(),
-  paymentMethod: z
-    .object({
-      type: z.custom<PaymentMethodInfo['type']>(value => typeof value === 'string'),
-      last4: z.string().nullable(),
-      brand: z.string().nullable(),
-      linkEmail: z.string().nullable(),
-      stripePaymentMethodId: z.string(),
-    })
-    .nullable(),
 });
 
 const LinkAuthProviderInputSchema = z.object({
@@ -510,22 +495,21 @@ export const userRouter = createTRPCRouter({
       return { redirectUrl };
     }),
 
-  getAutoTopUpPaymentMethod: baseProcedure
-    .output(AutoTopUpPaymentMethodOutputSchema)
-    .query(async ({ ctx }) => {
-      const config = await db.query.auto_top_up_configs.findFirst({
-        where: eq(auto_top_up_configs.owned_by_user_id, ctx.user.id),
-      });
-      const paymentMethod = await retrievePaymentMethodInfo(config?.stripe_payment_method_id);
-      const amountCents = config?.amount_cents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
-      return {
-        enabled: ctx.user.auto_top_up_enabled,
-        amountCents,
-        thresholdCents: AUTO_TOP_UP_THRESHOLD_CENTS,
-        configured: config !== undefined,
-        paymentMethod,
-      };
-    }),
+  getAutoTopUpPaymentMethod: baseProcedure.query(async ({ ctx }) => {
+    const config = await db.query.auto_top_up_configs.findFirst({
+      where: eq(auto_top_up_configs.owned_by_user_id, ctx.user.id),
+    });
+    const paymentMethod = await retrievePaymentMethodInfo(config?.stripe_payment_method_id);
+    const amountCents =
+      (config?.amount_cents as AutoTopUpAmountCents) ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
+    return {
+      enabled: ctx.user.auto_top_up_enabled,
+      amountCents,
+      thresholdCents: AUTO_TOP_UP_THRESHOLD_CENTS,
+      configured: config !== undefined,
+      paymentMethod,
+    };
+  }),
 
   updateAutoTopUpAmount: baseProcedure
     .input(z.object({ amountCents: AutoTopUpAmountCentsSchema }))

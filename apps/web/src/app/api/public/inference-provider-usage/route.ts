@@ -81,6 +81,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   other: 'Other',
   sambanova: 'SambaNova',
   siliconflow: 'SiliconFlow',
+  stealth: 'Stealth',
   stepfun: 'StepFun',
   streamlake: 'StreamLake',
   together: 'Together AI',

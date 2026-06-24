@@ -36,6 +36,26 @@ const getConversationScrollState = (
       }),
     };
   });
+const getExtensionStorage = (page: Page, keys: string[]): Promise<Record<string, unknown>> =>
+  page.evaluate(storageKeys => {
+    const storage = (
+      globalThis as typeof globalThis & {
+        chrome?: {
+          storage?: {
+            local?: {
+              get: (keys: string[]) => Promise<Record<string, unknown>>;
+            };
+          };
+        };
+      }
+    ).chrome?.storage?.local;
+
+    if (storage === undefined) {
+      throw new Error('Extension runtime storage is unavailable.');
+    }
+
+    return storage.get(storageKeys);
+  }, keys);
 const installTimedChatStream = async (page: Page, chunks: string[]): Promise<void> => {
   await page.evaluate(streamChunks => {
     const originalFetch = globalThis.fetch.bind(globalThis);
@@ -745,6 +765,7 @@ test('conversation remount loads current storage instead of cached query history
     await seedExtensionAuth(sidePanel);
     await setExtensionStorage(sidePanel, {
       kiloAgentConversations: conversationStoreWithTitle('Cached old conversation'),
+      kiloLogoutSentinel: { retained: true },
     });
     await sidePanel.reload();
 
@@ -757,6 +778,11 @@ test('conversation remount loads current storage instead of cached query history
     await sidePanel.getByLabel('Settings').click();
     await sidePanel.getByRole('button', { name: 'Sign out' }).click();
     await expect(sidePanel.getByRole('button', { name: 'Sign in' })).toBeVisible();
+    await expect
+      .poll(() =>
+        getExtensionStorage(sidePanel, ['kiloAuth', 'kiloAgentConversations', 'kiloLogoutSentinel'])
+      )
+      .toStrictEqual({});
     await setExtensionStorage(sidePanel, {
       kiloAgentConversations: conversationStoreWithTitle('Fresh stored conversation'),
     });

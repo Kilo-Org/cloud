@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import {
   clearStoredAuth,
+  clearStoredSession,
   createDeviceAuthRequest,
   getKiloApiBaseUrl,
   loadStoredAuth,
@@ -179,7 +180,7 @@ export const App = (): JSX.Element => {
     setSignedOutMessage(undefined);
     void (async (): Promise<void> => {
       try {
-        await clearStoredAuth(storage);
+        await clearStoredSession(storage);
       } finally {
         queryClient.setQueryData(storedAuthQueryKey, undefined);
         if (storedAuth !== undefined) {

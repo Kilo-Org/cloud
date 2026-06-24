@@ -3,6 +3,7 @@ import {
   AUTH_STORAGE_KEY,
   DEFAULT_KILO_API_BASE_URL,
   DEFAULT_LOCAL_KILO_API_BASE_URL,
+  clearStoredSession,
   clearStoredAuth,
   createDeviceAuthRequest,
   getKiloApiBaseUrl,
@@ -37,6 +38,22 @@ const createStorage = (initialValue?: unknown): AuthStorageArea & { value: unkno
     },
     get value() {
       return storedValue;
+    },
+  };
+};
+
+const createSessionStorage = (): {
+  readonly clearCalls: string[];
+  readonly storage: Parameters<typeof clearStoredSession>[0];
+} => {
+  const clearCalls: string[] = [];
+
+  return {
+    clearCalls,
+    storage: {
+      clear: base => {
+        clearCalls.push(base);
+      },
     },
   };
 };
@@ -102,6 +119,14 @@ describe('extension auth storage', () => {
 
     await clearStoredAuth(storage);
     expect(storage.value).toBeUndefined();
+  });
+
+  it('clears all local extension storage for explicit logout', async () => {
+    const { clearCalls, storage } = createSessionStorage();
+
+    await clearStoredSession(storage);
+
+    expect(clearCalls).toStrictEqual(['local']);
   });
 });
 

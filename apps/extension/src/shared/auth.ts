@@ -16,6 +16,9 @@ export interface AuthStorageArea {
   removeItem(key: typeof AUTH_STORAGE_KEY): MaybePromise<void>;
   setItem(key: typeof AUTH_STORAGE_KEY, value: StoredAuth): MaybePromise<void>;
 }
+export interface SessionStorageArea {
+  clear(base: 'local'): MaybePromise<void>;
+}
 
 export type FetchLike = (input: string, init?: RequestInit) => MaybePromise<Response>;
 
@@ -107,6 +110,10 @@ export const saveStoredAuth = async (
 
 export const clearStoredAuth = async (storageArea: AuthStorageArea): Promise<void> => {
   await storageArea.removeItem(AUTH_STORAGE_KEY);
+};
+
+export const clearStoredSession = async (storageArea: SessionStorageArea): Promise<void> => {
+  await storageArea.clear('local');
 };
 
 const parseDeviceAuthRequest = (value: unknown): DeviceAuthRequest => {

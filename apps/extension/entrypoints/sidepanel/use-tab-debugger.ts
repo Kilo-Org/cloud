@@ -31,6 +31,7 @@ export const useTabDebugger = (): {
   readonly inspectableTabs: InspectableTab[];
   readonly isLoadingTabs: boolean;
   readonly loadInspectableTabs: (options?: { readonly showLoading?: boolean }) => Promise<void>;
+  readonly selectDefaultTab: () => void;
   readonly selectTab: (tabId: number) => void;
   readonly selectedTabId: number | undefined;
   readonly tabDebuggerError: string | undefined;
@@ -104,10 +105,18 @@ export const useTabDebugger = (): {
     setSelectedTabId(tabId);
   }, []);
 
+  const selectDefaultTab = useCallback((): void => {
+    const nextTabId = inspectableTabs[0]?.id;
+
+    rememberedSelectedTabId = nextTabId ?? null;
+    setSelectedTabId(nextTabId);
+  }, [inspectableTabs]);
+
   return {
     inspectableTabs,
     isLoadingTabs: isLoading,
     loadInspectableTabs,
+    selectDefaultTab,
     selectTab,
     selectedTabId,
     tabDebuggerError,

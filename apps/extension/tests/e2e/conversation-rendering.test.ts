@@ -1,5 +1,6 @@
 /* eslint-disable import/no-nodejs-modules */
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
 import {
@@ -9,7 +10,16 @@ import {
   startFixtureServer,
 } from './extension-context-fixture';
 
-test('new conversation keeps the selected target tab', async () => {
+const getSelectedTargetTabLabel = (sidePanel: Page): Promise<string> =>
+  sidePanel.locator('select[aria-label="Target tab"]').evaluate(element => {
+    if (!(element instanceof HTMLSelectElement)) {
+      throw new Error('Target tab select was not found.');
+    }
+
+    return element.selectedOptions[0]?.textContent?.trim() ?? '';
+  });
+
+test('new conversation preselects the active target tab', async () => {
   const firstFixture = await startFixtureServer({ title: 'First target tab' });
   const secondFixture = await startFixtureServer({ title: 'Second target tab' });
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -21,18 +31,22 @@ test('new conversation keeps the selected target tab', async () => {
     await firstPage.goto(firstFixture.url);
     const secondPage = await context.newPage();
     await secondPage.goto(secondFixture.url);
+    await firstPage.bringToFront();
 
     const sidePanel = await context.newPage();
     await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
     await seedExtensionAuth(sidePanel);
     await sidePanel.reload();
 
-    await sidePanel.getByLabel('Target tab').selectOption({ label: 'Second target tab' });
-    await expect(sidePanel.getByLabel('Target tab')).toContainText('Second target tab');
+    const targetTabSelect = sidePanel.getByLabel('Target tab');
+
+    await expect.poll(() => getSelectedTargetTabLabel(sidePanel)).toBe('First target tab');
+    await targetTabSelect.selectOption({ label: 'Second target tab' });
+    await expect.poll(() => getSelectedTargetTabLabel(sidePanel)).toBe('Second target tab');
 
     await sidePanel.getByLabel('New conversation').click();
 
-    await expect(sidePanel.getByLabel('Target tab')).toContainText('Second target tab');
+    await expect.poll(() => getSelectedTargetTabLabel(sidePanel)).toBe('First target tab');
   } finally {
     await context.close();
     await firstFixture.close();

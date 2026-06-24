@@ -160,8 +160,14 @@ export const AgentChatPanel = ({
   const [thinkingEffort, setThinkingEffort] = useState('');
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
-  const { inspectableTabs, isLoadingTabs, selectTab, selectedTabId, tabDebuggerError } =
-    useTabDebugger();
+  const {
+    inspectableTabs,
+    isLoadingTabs,
+    selectDefaultTab,
+    selectTab,
+    selectedTabId,
+    tabDebuggerError,
+  } = useTabDebugger();
   const { modelLoadError, modelOptions, refetchModels } = useGatewayModels({
     auth,
     organizationId,
@@ -351,6 +357,7 @@ export const AgentChatPanel = ({
 
   const createConversation = (): void => {
     setDraft('');
+    selectDefaultTab();
     setConversationStore(store =>
       createNextStoredConversation(store, createDefaultConversationEvents())
     );

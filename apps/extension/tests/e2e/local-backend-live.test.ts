@@ -570,10 +570,9 @@ test('live local backend runs parallel frontier conversations without switching 
     ).toBeVisible();
     const firstStopButton = sidePanel.getByRole('button', { exact: true, name: 'Stop' });
 
-    if (await firstStopButton.isVisible()) {
-      await firstStopButton.click();
-      await expect(sidePanel.getByText('Stopped.')).toBeVisible({ timeout: 30_000 });
-    }
+    await expect(firstStopButton).toBeVisible();
+    await firstStopButton.click();
+    await expect(sidePanel.getByText('Stopped.')).toBeVisible({ timeout: 30_000 });
 
     await sidePanel.getByRole('tab', { name: /LOCAL_PARALLEL_SECOND/u }).click();
     await expect(

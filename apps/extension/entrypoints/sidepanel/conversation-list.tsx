@@ -26,7 +26,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
   const scrollKey = getConversationScrollKey(items);
   const virtualizer = useVirtualizer({
     count: items.length,
-    estimateSize: () => 88,
+    estimateSize: () => 52,
     getScrollElement: () => listRef.current,
     overscan: 8,
   });

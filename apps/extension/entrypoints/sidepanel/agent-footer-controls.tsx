@@ -131,6 +131,7 @@ const ModeControl = ({
 export const AgentFooterControls = ({
   inspectableTabs,
   isLoadingTabs,
+  isConversationStoreLoaded,
   isRunning,
   isModelSelectDisabled,
   isThinkingSelectDisabled,
@@ -150,6 +151,7 @@ export const AgentFooterControls = ({
 }: {
   inspectableTabs: InspectableTab[];
   isLoadingTabs: boolean;
+  isConversationStoreLoaded: boolean;
   isRunning: boolean;
   isModelSelectDisabled: boolean;
   isThinkingSelectDisabled: boolean;
@@ -166,89 +168,102 @@ export const AgentFooterControls = ({
   tabDebuggerError: string | undefined;
   thinkingEffort: string;
   thinkingOptions: string[];
-}): JSX.Element => (
-  <div className="grid gap-2">
-    <div className="flex min-w-0 items-center gap-2">
-      <CompactSelectControl
-        ariaLabel="Target tab"
-        className="min-w-0 flex-1 pl-2 pr-6"
-        disabled={isRunning || isLoadingTabs || inspectableTabs.length === 0}
-        onChange={value => {
-          const tabId = Number(value);
+}): JSX.Element => {
+  const isConversationControlDisabled = !isConversationStoreLoaded;
 
-          if (Number.isInteger(tabId)) {
-            onSelectedTabChange(tabId);
+  return (
+    <div className="grid gap-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <CompactSelectControl
+          ariaLabel="Target tab"
+          className="min-w-0 flex-1 pl-2 pr-6"
+          disabled={
+            isConversationControlDisabled ||
+            isRunning ||
+            isLoadingTabs ||
+            inspectableTabs.length === 0
           }
-        }}
-        value={selectedTabId === undefined ? '' : String(selectedTabId)}
-      >
-        {inspectableTabs.length === 0 ? (
-          <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tab selected'}</option>
-        ) : (
-          <>
-            {selectedTabId === undefined ? <option value="">No tab selected</option> : null}
-            {inspectableTabs.map(tab => (
-              <option key={tab.id} value={tab.id}>
-                {tab.title}
-              </option>
-            ))}
-          </>
-        )}
-      </CompactSelectControl>
-    </div>
-    {tabDebuggerError === undefined ? null : (
-      <p className="text-xs leading-4 text-red-300">{tabDebuggerError}</p>
-    )}
-    <div className="flex min-w-0 items-center gap-2">
-      <ModeControl disabled={isRunning} mode={mode} onChange={onModeChange} />
-      <CompactSelectControl
-        ariaLabel="Model"
-        className="flex-1 pl-2 pr-6"
-        disabled={isModelSelectDisabled}
-        onChange={onModelChange}
-        value={model}
-      >
-        {modelOptions.length === 0 ? (
-          <option value="">Loading models...</option>
-        ) : (
-          modelOptions.map(option => (
-            <option key={option.id} value={option.id}>
-              {option.name}
-            </option>
-          ))
-        )}
-      </CompactSelectControl>
-      <CompactSelectControl
-        ariaLabel="Thinking effort"
-        className="w-24 pl-2 pr-6"
-        disabled={isThinkingSelectDisabled}
-        onChange={onThinkingEffortChange}
-        value={thinkingEffort}
-      >
-        {thinkingOptions.length === 0 ? (
-          <option value="">...</option>
-        ) : (
-          thinkingOptions.map(option => (
-            <option key={option} value={option}>
-              {thinkingEffortLabel(option)}
-            </option>
-          ))
-        )}
-      </CompactSelectControl>
-    </div>
-    {modelLoadError === undefined ? null : (
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs leading-4 text-red-300">{modelLoadError}</p>
-        <button
-          className="h-7 shrink-0 rounded-md border border-zinc-700 px-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
-          onClick={() => {
-            void onRetryModels();
+          onChange={value => {
+            const tabId = Number(value);
+
+            if (Number.isInteger(tabId)) {
+              onSelectedTabChange(tabId);
+            }
           }}
-          type="button"
+          value={selectedTabId === undefined ? '' : String(selectedTabId)}
         >
-          Retry models
-        </button>
+          {inspectableTabs.length === 0 ? (
+            <option value="">{isLoadingTabs ? 'Loading tabs...' : 'No tab selected'}</option>
+          ) : (
+            <>
+              {selectedTabId === undefined ? <option value="">No tab selected</option> : null}
+              {inspectableTabs.map(tab => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.title}
+                </option>
+              ))}
+            </>
+          )}
+        </CompactSelectControl>
       </div>
-    )}
-  </div>
-);
+      {tabDebuggerError === undefined ? null : (
+        <p className="text-xs leading-4 text-red-300">{tabDebuggerError}</p>
+      )}
+      <div className="flex min-w-0 items-center gap-2">
+        <ModeControl
+          disabled={isConversationControlDisabled || isRunning}
+          mode={mode}
+          onChange={onModeChange}
+        />
+        <CompactSelectControl
+          ariaLabel="Model"
+          className="flex-1 pl-2 pr-6"
+          disabled={isConversationControlDisabled || isModelSelectDisabled}
+          onChange={onModelChange}
+          value={model}
+        >
+          {modelOptions.length === 0 ? (
+            <option value="">Loading models...</option>
+          ) : (
+            modelOptions.map(option => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))
+          )}
+        </CompactSelectControl>
+        <CompactSelectControl
+          ariaLabel="Thinking effort"
+          className="w-24 pl-2 pr-6"
+          disabled={isConversationControlDisabled || isThinkingSelectDisabled}
+          onChange={onThinkingEffortChange}
+          value={thinkingEffort}
+        >
+          {thinkingOptions.length === 0 ? (
+            <option value="">...</option>
+          ) : (
+            thinkingOptions.map(option => (
+              <option key={option} value={option}>
+                {thinkingEffortLabel(option)}
+              </option>
+            ))
+          )}
+        </CompactSelectControl>
+      </div>
+      {modelLoadError === undefined ? null : (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs leading-4 text-red-300">{modelLoadError}</p>
+          <button
+            className="h-7 shrink-0 rounded-md border border-zinc-700 px-2 text-xs font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+            onClick={() => {
+              void onRetryModels();
+            }}
+            type="button"
+          >
+            Retry models
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};

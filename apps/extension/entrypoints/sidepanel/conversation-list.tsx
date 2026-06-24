@@ -1,5 +1,5 @@
 import { ArrowDown } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { getConversationScrollKey } from '@/src/shared/agent-conversation';
@@ -30,6 +30,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
     getScrollElement: () => listRef.current,
     overscan: 8,
   });
+  const totalSize = virtualizer.getTotalSize();
 
   const setIsAutoScrollEnabled = useCallback((isEnabled: boolean): void => {
     isAutoScrollEnabledRef.current = isEnabled;
@@ -57,6 +58,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
 
     const scrollToLastMeasuredRow = (): void => {
       markProgrammaticScroll();
+      virtualizer.measure();
       virtualizer.scrollToIndex(items.length - 1, { align: 'end' });
 
       const scrollElement = listRef.current;
@@ -65,17 +67,22 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     };
-    const scheduleScrollToLastMeasuredRow = (): void => {
-      if (isAutoScrollEnabledRef.current) {
+    const scheduleScrollToLastMeasuredRow = (remainingPasses: number): void => {
+      requestAnimationFrame(() => {
+        if (!isAutoScrollEnabledRef.current) {
+          return;
+        }
+
         scrollToLastMeasuredRow();
-      }
+
+        if (remainingPasses > 0) {
+          scheduleScrollToLastMeasuredRow(remainingPasses - 1);
+        }
+      });
     };
 
     scrollToLastMeasuredRow();
-    requestAnimationFrame(() => {
-      scheduleScrollToLastMeasuredRow();
-      requestAnimationFrame(scheduleScrollToLastMeasuredRow);
-    });
+    scheduleScrollToLastMeasuredRow(4);
   }, [items.length, markProgrammaticScroll, virtualizer]);
 
   useEffect(
@@ -87,19 +94,19 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
     []
   );
 
-  useEffect(() => {
-    if (items.length > 0) {
-      requestAnimationFrame(() => {
-        if (isAutoScrollEnabledRef.current) {
-          scrollToLatest();
-        }
-      });
+  useLayoutEffect(() => {
+    if (items.length > 0 && isAutoScrollEnabledRef.current) {
+      scrollToLatest();
     }
-  }, [items.length, scrollKey, scrollToLatest]);
+  }, [items.length, scrollKey, scrollToLatest, totalSize]);
 
   const jumpToLatest = (): void => {
     setIsAutoScrollEnabled(true);
-    requestAnimationFrame(scrollToLatest);
+    requestAnimationFrame(() => {
+      if (isAutoScrollEnabledRef.current) {
+        scrollToLatest();
+      }
+    });
   };
   const virtualItems = virtualizer.getVirtualItems();
 
@@ -115,7 +122,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
         }}
         ref={listRef}
       >
-        <div className="relative w-full" style={getListSpacerStyle(virtualizer.getTotalSize())}>
+        <div className="relative w-full" style={getListSpacerStyle(totalSize)}>
           {virtualItems.map(virtualItem => {
             const item = items[virtualItem.index];
 

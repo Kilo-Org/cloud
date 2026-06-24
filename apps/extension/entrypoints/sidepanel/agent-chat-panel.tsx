@@ -86,6 +86,7 @@ export const formatSelectedTabSystemEnvironment = ({
 const ConversationTabs = ({
   activeConversationId,
   conversations,
+  isDisabled,
   onCloseConversation,
   onCreateConversation,
   onSelectConversation,
@@ -93,6 +94,7 @@ const ConversationTabs = ({
 }: {
   activeConversationId: string;
   conversations: StoredAgentConversation[];
+  isDisabled: boolean;
   onCloseConversation: (conversationId: string) => void;
   onCreateConversation: () => void;
   onSelectConversation: (conversationId: string) => void;
@@ -120,7 +122,8 @@ const ConversationTabs = ({
           >
             <button
               aria-selected={isActive}
-              className="flex h-full min-w-0 items-center gap-1.5 px-2 text-left text-xs font-medium outline-none focus:ring-2 focus:ring-[#EDFF00]/50"
+              className="flex h-full min-w-0 items-center gap-1.5 px-2 text-left text-xs font-medium outline-none focus:ring-2 focus:ring-[#EDFF00]/50 disabled:cursor-not-allowed disabled:text-zinc-600"
+              disabled={isDisabled}
               onClick={() => {
                 onSelectConversation(conversation.id);
               }}
@@ -139,6 +142,7 @@ const ConversationTabs = ({
             <button
               aria-label={`Close ${title}`}
               className="mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-zinc-500 outline-none transition hover:bg-zinc-800 hover:text-zinc-100 focus:ring-2 focus:ring-[#EDFF00]/50"
+              disabled={isDisabled}
               onClick={() => {
                 onCloseConversation(conversation.id);
               }}
@@ -153,7 +157,8 @@ const ConversationTabs = ({
       })}
       <button
         aria-label="New conversation"
-        className="flex size-8 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 outline-none transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:ring-2 focus:ring-[#EDFF00]/50"
+        className="flex size-8 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 outline-none transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:ring-2 focus:ring-[#EDFF00]/50 disabled:cursor-not-allowed disabled:text-zinc-600"
+        disabled={isDisabled}
         onClick={onCreateConversation}
         type="button"
       >
@@ -330,6 +335,10 @@ export const AgentChatPanel = ({
   const updateActiveConversationSettings = (
     settings: Parameters<typeof updateStoredConversationSettings>[2]
   ): void => {
+    if (!isConversationStoreLoaded) {
+      return;
+    }
+
     conversationStoreRef.current = updateStoredConversationSettings(
       conversationStoreRef.current,
       conversationStoreRef.current.activeConversationId,
@@ -455,6 +464,10 @@ export const AgentChatPanel = ({
   };
 
   const createConversation = (): void => {
+    if (!isConversationStoreLoaded) {
+      return;
+    }
+
     const settings = {
       mode,
       model,
@@ -472,6 +485,10 @@ export const AgentChatPanel = ({
   };
 
   const selectConversation = (conversationId: string): void => {
+    if (!isConversationStoreLoaded) {
+      return;
+    }
+
     conversationStoreRef.current = setActiveStoredConversation(
       conversationStoreRef.current,
       conversationId
@@ -489,6 +506,10 @@ export const AgentChatPanel = ({
 
   const closeConversation = useCallback(
     (conversationId: string): void => {
+      if (!isConversationStoreLoaded) {
+        return;
+      }
+
       if (!globalThis.confirm('Close this conversation tab? It will stay in History.')) {
         return;
       }
@@ -498,11 +519,15 @@ export const AgentChatPanel = ({
         closeStoredConversationTab(store, conversationId, createDefaultConversationEvents())
       );
     },
-    [abortConversationRun, setConversationStore]
+    [abortConversationRun, isConversationStoreLoaded, setConversationStore]
   );
 
   const deleteConversation = useCallback(
     (conversationId: string): void => {
+      if (!isConversationStoreLoaded) {
+        return;
+      }
+
       if (
         isStoredConversationOpen(conversationStore, conversationId) &&
         !globalThis.confirm('Delete this conversation and close its tab?')
@@ -515,11 +540,15 @@ export const AgentChatPanel = ({
         deleteStoredConversation(store, conversationId, createDefaultConversationEvents())
       );
     },
-    [abortConversationRun, conversationStore, setConversationStore]
+    [abortConversationRun, conversationStore, isConversationStoreLoaded, setConversationStore]
   );
 
   const openConversationFromHistory = useCallback(
     (conversationId: string): void => {
+      if (!isConversationStoreLoaded) {
+        return;
+      }
+
       setDraft('');
       setConversationStore(store =>
         openStoredConversation({
@@ -531,10 +560,18 @@ export const AgentChatPanel = ({
         })
       );
     },
-    [runningConversationIds, setConversationStore]
+    [isConversationStoreLoaded, runningConversationIds, setConversationStore]
   );
 
   useEffect(() => {
+    if (!isConversationStoreLoaded) {
+      onHeaderBeforeSettingsChange?.();
+
+      return () => {
+        onHeaderBeforeSettingsChange?.();
+      };
+    }
+
     onHeaderBeforeSettingsChange?.(
       <ConversationHistoryButton
         activeConversationId={activeConversationId}
@@ -553,6 +590,7 @@ export const AgentChatPanel = ({
     conversationStore,
     deleteConversation,
     historyConversations,
+    isConversationStoreLoaded,
     onHeaderBeforeSettingsChange,
     openConversationFromHistory,
   ]);
@@ -562,6 +600,7 @@ export const AgentChatPanel = ({
       <ConversationTabs
         activeConversationId={activeConversationId}
         conversations={openConversations}
+        isDisabled={!isConversationStoreLoaded}
         onCloseConversation={closeConversation}
         onCreateConversation={createConversation}
         onSelectConversation={selectConversation}
@@ -610,6 +649,7 @@ export const AgentChatPanel = ({
         <AgentFooterControls
           inspectableTabs={inspectableTabs}
           isLoadingTabs={isLoadingTabs}
+          isConversationStoreLoaded={isConversationStoreLoaded}
           isModelSelectDisabled={isModelSelectDisabled}
           isRunning={isRunning}
           isThinkingSelectDisabled={isThinkingSelectDisabled}

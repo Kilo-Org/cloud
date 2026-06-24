@@ -19,6 +19,49 @@ const getSelectedTargetTabLabel = (sidePanel: Page): Promise<string> =>
     return element.selectedOptions[0]?.textContent?.trim() ?? '';
   });
 
+const delayConversationStoreHydration = (sidePanel: Page): Promise<void> =>
+  sidePanel.addInitScript(() => {
+    const pageGlobal = globalThis as typeof globalThis & {
+      __resolveKiloConversationStoreHydration?: () => void;
+      browser?: {
+        storage?: {
+          local?: {
+            get: (keys: unknown) => Promise<unknown>;
+          };
+        };
+      };
+    };
+    const storageLocal = pageGlobal.browser?.storage?.local;
+
+    if (storageLocal === undefined) {
+      return;
+    }
+
+    const originalGet = storageLocal.get.bind(storageLocal);
+    let isDelayed = false;
+
+    storageLocal.get = async keys => {
+      if (!isDelayed && JSON.stringify(keys).includes('kiloAgentConversations')) {
+        isDelayed = true;
+        const { promise, resolve } = Promise.withResolvers<void>();
+
+        pageGlobal.__resolveKiloConversationStoreHydration = resolve;
+        await promise;
+      }
+
+      return originalGet(keys);
+    };
+  });
+
+const releaseConversationStoreHydration = (sidePanel: Page): Promise<void> =>
+  sidePanel.evaluate(() => {
+    (
+      globalThis as typeof globalThis & {
+        __resolveKiloConversationStoreHydration?: () => void;
+      }
+    ).__resolveKiloConversationStoreHydration?.();
+  });
+
 test('new conversation inherits the selected target tab', async () => {
   const firstFixture = await startFixtureServer({ title: 'First target tab' });
   const secondFixture = await startFixtureServer({ title: 'Second target tab' });
@@ -50,6 +93,59 @@ test('new conversation inherits the selected target tab', async () => {
     await context.close();
     await firstFixture.close();
     await secondFixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('conversation controls wait for stored conversations to hydrate', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await setExtensionStorage(sidePanel, {
+      kiloAgentConversations: {
+        activeConversationId: 'conversation-1',
+        conversations: [
+          {
+            events: [
+              {
+                id: 'persisted-message',
+                role: 'assistant',
+                text: 'Persisted conversation after hydration',
+                type: 'message',
+              },
+            ],
+            id: 'conversation-1',
+            title: 'Persisted conversation',
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+        openConversationIds: ['conversation-1'],
+      },
+    });
+    await delayConversationStoreHydration(sidePanel);
+    await sidePanel.reload();
+
+    await expect(sidePanel.getByLabel('Settings')).toBeVisible();
+    await expect(sidePanel.getByLabel('New conversation')).toBeDisabled();
+    await expect(sidePanel.getByLabel('Target tab')).toBeDisabled();
+    await expect(sidePanel.getByRole('button', { name: /Safe mode/u })).toBeDisabled();
+
+    await releaseConversationStoreHydration(sidePanel);
+
+    await expect(sidePanel.getByText('Persisted conversation after hydration')).toBeVisible();
+    await expect(sidePanel.getByLabel('New conversation')).toBeEnabled();
+  } finally {
+    await context.close();
+    await fixture.close();
     await rm(userDataDir, { force: true, recursive: true });
   }
 });

@@ -27,6 +27,41 @@ interface ConversationSample {
   readonly scrollTop: number;
 }
 
+const startConversationGapSampler = (page: Page): Promise<void> =>
+  page.evaluate(() => {
+    Reflect.set(globalThis, '__kiloMinConversationGap', 0);
+    requestAnimationFrame(function sampleConversationGaps(): void {
+      const rows = [...document.querySelectorAll('[aria-label="Agent conversation"] [data-index]')]
+        .map(element => {
+          const rect = element.getBoundingClientRect();
+
+          return { bottom: rect.bottom, top: rect.top };
+        })
+        .toSorted((first, second) => first.top - second.top);
+      let previousBottom = 0;
+
+      const gaps = rows
+        .map(row => {
+          const gap = row.top - previousBottom;
+
+          previousBottom = row.bottom;
+
+          return gap;
+        })
+        .slice(1);
+
+      Reflect.set(
+        globalThis,
+        '__kiloMinConversationGap',
+        Math.min(Number(Reflect.get(globalThis, '__kiloMinConversationGap')), ...gaps, 0)
+      );
+      requestAnimationFrame(sampleConversationGaps);
+    });
+  });
+
+const getMinConversationGap = (page: Page): Promise<number> =>
+  page.evaluate(() => Number(Reflect.get(globalThis, '__kiloMinConversationGap')));
+
 const chatRequestSchema = z.object({
   messages: z
     .array(
@@ -500,6 +535,45 @@ test('live local backend recovers after side panel reload during an active reque
           request.lastUserContent?.includes('LOCAL_RELOAD_FOLLOWUP') === true
       )
     ).toBe(true);
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('live local backend keeps real tool rows from overlapping', async () => {
+  const fixture = await startFixtureServer({ title: 'Kilo live tool spacing target' });
+  const requests: ChatRequestSummary[] = [];
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  recordChatRequests(context, requests);
+
+  try {
+    const targetPage = await context.newPage();
+    await targetPage.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live tool spacing target');
+    await selectFrontierModel(sidePanel);
+    await startConversationGapSampler(sidePanel);
+
+    await sidePanel
+      .getByLabel('Message agent')
+      .fill(
+        'LOCAL_TOOL_SPACING: use get_page_snapshot and get_viewport_screenshot before answering. Keep the final answer short.'
+      );
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+      timeout: 120_000,
+    });
+
+    expect(requests.some(request => request.model === frontierModel)).toBe(true);
+    expect(requests.some(request => request.toolNames.includes('get_viewport_screenshot'))).toBe(
+      true
+    );
+    expect(await getMinConversationGap(sidePanel)).toBeGreaterThanOrEqual(0);
   } finally {
     await context.close();
     await fixture.close();

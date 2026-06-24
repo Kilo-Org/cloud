@@ -19,7 +19,7 @@ const getSelectedTargetTabLabel = (sidePanel: Page): Promise<string> =>
     return element.selectedOptions[0]?.textContent?.trim() ?? '';
   });
 
-test('new conversation preselects the active target tab', async () => {
+test('new conversation inherits the selected target tab', async () => {
   const firstFixture = await startFixtureServer({ title: 'First target tab' });
   const secondFixture = await startFixtureServer({ title: 'Second target tab' });
   const { context, extensionId, userDataDir } = await launchExtensionContext();
@@ -40,13 +40,12 @@ test('new conversation preselects the active target tab', async () => {
 
     const targetTabSelect = sidePanel.getByLabel('Target tab');
 
-    await expect.poll(() => getSelectedTargetTabLabel(sidePanel)).toBe('First target tab');
     await targetTabSelect.selectOption({ label: 'Second target tab' });
     await expect.poll(() => getSelectedTargetTabLabel(sidePanel)).toBe('Second target tab');
 
     await sidePanel.getByLabel('New conversation').click();
 
-    await expect.poll(() => getSelectedTargetTabLabel(sidePanel)).toBe('First target tab');
+    await expect.poll(() => getSelectedTargetTabLabel(sidePanel)).toBe('Second target tab');
   } finally {
     await context.close();
     await firstFixture.close();

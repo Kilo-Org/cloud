@@ -17,6 +17,7 @@ const toolDefinitionSchema = z.object({
 });
 const chatRequestSchema = z.object({
   messages: z.array(z.unknown()).optional(),
+  model: z.string().min(1),
   tools: z.array(z.unknown()).optional(),
 });
 const toolResultSchema = z.object({
@@ -155,11 +156,17 @@ export const mockKiloApi = async (
     options.seenChatBodies?.push(body);
     const parsedBody = chatRequestSchema.safeParse(body);
     const messages = parsedBody.success ? (parsedBody.data.messages ?? []) : [];
+    const expectedModelIds = options.models?.map(model => model.id) ?? [
+      'anthropic/claude-sonnet-4',
+    ];
 
     const toolNames =
       options.toolNamesByCall?.[chatCompletionCalls - 1] ?? options.toolNames ?? dangerousToolNames;
 
     expect(body).toMatchObject({ stream: true, tool_choice: 'auto' });
+    expect(parsedBody.success ? expectedModelIds.includes(parsedBody.data.model) : false).toBe(
+      true
+    );
     expect(
       parsedBody.success && parsedBody.data.tools !== undefined
         ? parsedBody.data.tools.map(tool => {

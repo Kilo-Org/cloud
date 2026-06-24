@@ -18,8 +18,10 @@ export interface StoredAgentConversationStore {
   readonly openConversationIds: string[];
 }
 type StoredConversationSettings = Partial<
-  Pick<StoredAgentConversation, 'mode' | 'model' | 'selectedTabId' | 'thinkingEffort'>
->;
+  Pick<StoredAgentConversation, 'mode' | 'model' | 'thinkingEffort'>
+> & {
+  readonly selectedTabId?: number | undefined;
+};
 interface CreateStoredConversationOptions {
   readonly defaultEvents?: AgentConversationEvent[];
   readonly number: number;
@@ -51,6 +53,38 @@ const createConversationId = (number: number): string => `${conversationIdPrefix
 const createConversationTitle = (number: number): string =>
   `${defaultConversationTitlePrefix} ${number}`;
 const nowIso = (): string => new Date().toISOString();
+
+const removeSelectedTabId = (conversation: StoredAgentConversation): StoredAgentConversation => ({
+  events: conversation.events,
+  id: conversation.id,
+  ...(conversation.mode === undefined ? {} : { mode: conversation.mode }),
+  ...(conversation.model === undefined ? {} : { model: conversation.model }),
+  ...(conversation.thinkingEffort === undefined
+    ? {}
+    : { thinkingEffort: conversation.thinkingEffort }),
+  title: conversation.title,
+  updatedAt: conversation.updatedAt,
+});
+
+const applyStoredConversationSettings = (
+  conversation: StoredAgentConversation,
+  settings: StoredConversationSettings
+): StoredAgentConversation => {
+  const conversationWithSettings: StoredAgentConversation = {
+    ...conversation,
+    ...(settings.mode === undefined ? {} : { mode: settings.mode }),
+    ...(settings.model === undefined ? {} : { model: settings.model }),
+    ...(settings.thinkingEffort === undefined ? {} : { thinkingEffort: settings.thinkingEffort }),
+  };
+
+  if (!('selectedTabId' in settings)) {
+    return conversationWithSettings;
+  }
+
+  return settings.selectedTabId === undefined
+    ? removeSelectedTabId(conversationWithSettings)
+    : { ...conversationWithSettings, selectedTabId: settings.selectedTabId };
+};
 
 const isUserMessage = (event: AgentConversationEvent): boolean =>
   event.type === 'message' && event.role === 'user';
@@ -84,13 +118,16 @@ const createStoredConversation = ({
   number,
   settings = {},
   titleNumber = number,
-}: CreateStoredConversationOptions): StoredAgentConversation => ({
-  events: defaultEvents,
-  id: createConversationId(number),
-  ...settings,
-  title: createConversationTitle(titleNumber),
-  updatedAt: nowIso(),
-});
+}: CreateStoredConversationOptions): StoredAgentConversation =>
+  applyStoredConversationSettings(
+    {
+      events: defaultEvents,
+      id: createConversationId(number),
+      title: createConversationTitle(titleNumber),
+      updatedAt: nowIso(),
+    },
+    settings
+  );
 
 const createFallbackOpenConversation = (
   store: StoredAgentConversationStore,
@@ -201,7 +238,9 @@ export const updateStoredConversationSettings = (
 ): StoredAgentConversationStore => ({
   ...store,
   conversations: store.conversations.map(conversation =>
-    conversation.id === conversationId ? { ...conversation, ...settings } : conversation
+    conversation.id === conversationId
+      ? applyStoredConversationSettings(conversation, settings)
+      : conversation
   ),
 });
 

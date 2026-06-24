@@ -1,12 +1,19 @@
 import { ArrowDown } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { JSX } from 'react';
+import type { CSSProperties, JSX } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { getConversationScrollKey } from '@/src/shared/agent-conversation';
 import type { GroupedConversationItem } from '@/src/shared/agent-conversation';
 import { AgentConversationItemView } from './agent-conversation-events';
 
 const getConversationItemKey = (item: GroupedConversationItem): string =>
   item.type === 'event' ? item.event.id : item.toolCall.id;
+const getListSpacerStyle = (height: number): CSSProperties => ({
+  height: `${height}px`,
+});
+const getVirtualRowStyle = (start: number): CSSProperties => ({
+  transform: `translateY(${start}px)`,
+});
 const isScrolledToBottom = (element: HTMLElement): boolean =>
   element.scrollTop + element.clientHeight >= element.scrollHeight - 16;
 
@@ -17,6 +24,12 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
   const programmaticScrollFrameRef = useRef<number | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabledState] = useState(true);
   const scrollKey = getConversationScrollKey(items);
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    estimateSize: () => 88,
+    getScrollElement: () => listRef.current,
+    overscan: 8,
+  });
 
   const setIsAutoScrollEnabled = useCallback((isEnabled: boolean): void => {
     isAutoScrollEnabledRef.current = isEnabled;
@@ -42,15 +55,28 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
       return;
     }
 
-    const list = listRef.current;
+    const scrollToLastMeasuredRow = (): void => {
+      markProgrammaticScroll();
+      virtualizer.scrollToIndex(items.length - 1, { align: 'end' });
 
-    if (list === null) {
-      return;
-    }
+      const scrollElement = listRef.current;
 
-    markProgrammaticScroll();
-    list.scrollTop = list.scrollHeight;
-  }, [items.length, markProgrammaticScroll]);
+      if (scrollElement !== null) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
+    };
+    const scheduleScrollToLastMeasuredRow = (): void => {
+      if (isAutoScrollEnabledRef.current) {
+        scrollToLastMeasuredRow();
+      }
+    };
+
+    scrollToLastMeasuredRow();
+    requestAnimationFrame(() => {
+      scheduleScrollToLastMeasuredRow();
+      requestAnimationFrame(scheduleScrollToLastMeasuredRow);
+    });
+  }, [items.length, markProgrammaticScroll, virtualizer]);
 
   useEffect(
     () => () => {
@@ -75,6 +101,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
     setIsAutoScrollEnabled(true);
     requestAnimationFrame(scrollToLatest);
   };
+  const virtualItems = virtualizer.getVirtualItems();
 
   return (
     <div className="relative min-h-0 flex-1">
@@ -88,11 +115,27 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
         }}
         ref={listRef}
       >
-        {items.map(item => (
-          <div className="pb-3" key={getConversationItemKey(item)}>
-            <AgentConversationItemView item={item} />
-          </div>
-        ))}
+        <div className="relative w-full" style={getListSpacerStyle(virtualizer.getTotalSize())}>
+          {virtualItems.map(virtualItem => {
+            const item = items[virtualItem.index];
+
+            if (item === undefined) {
+              return null;
+            }
+
+            return (
+              <div
+                className="absolute left-0 top-0 w-full pb-3"
+                data-index={virtualItem.index}
+                key={getConversationItemKey(item)}
+                ref={virtualizer.measureElement}
+                style={getVirtualRowStyle(virtualItem.start)}
+              >
+                <AgentConversationItemView item={item} />
+              </div>
+            );
+          })}
+        </div>
       </section>
       {isAutoScrollEnabled ? null : (
         <button

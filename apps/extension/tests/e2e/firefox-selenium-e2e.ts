@@ -16,7 +16,7 @@ const waitMs = 15_000;
 
 const chromeWorkflowNames = [
   'conversation automatically continues through another eval request',
-  'new conversation preselects the active target tab',
+  'new conversation inherits the selected target tab',
   'conversation tabs can run in parallel',
   'conversation tabs persist across side panel reloads',
   'closing a conversation removes only that tab',
@@ -958,19 +958,18 @@ const scenarios: FirefoxScenario[] = [
       ),
   },
   {
-    name: 'new conversation preselects the active target tab',
+    name: 'new conversation inherits the selected target tab',
     run: context =>
       withSession(context.api, {}, async session => {
         await session.openTargetPage('First target tab');
         await session.openTargetPage('Second target tab');
         await openAuthenticatedPanel(session);
         await waitForModel(session.driver);
-        assert.match(await getSelectText(session.driver, 'Target tab'), /First target tab/u);
         await setSelectByText(session.driver, 'Target tab', 'Second target tab');
         assert.match(await getSelectText(session.driver, 'Target tab'), /Second target tab/u);
 
         await clickButtonByLabel(session.driver, 'New conversation');
-        assert.match(await getSelectText(session.driver, 'Target tab'), /First target tab/u);
+        assert.match(await getSelectText(session.driver, 'Target tab'), /Second target tab/u);
       }),
   },
   {

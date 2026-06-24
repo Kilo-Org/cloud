@@ -46,6 +46,20 @@ interface ConversationRunState {
   readonly token: number;
 }
 
+const getSelectedInspectableTabId = ({
+  inspectableTabs,
+  selectedTabId,
+}: {
+  readonly inspectableTabs: readonly { readonly id: number }[];
+  readonly selectedTabId: number | undefined;
+}): number | undefined => {
+  if (selectedTabId !== undefined && inspectableTabs.some(tab => tab.id === selectedTabId)) {
+    return selectedTabId;
+  }
+
+  return inspectableTabs[0]?.id;
+};
+
 const sanitizeTabContextText = (text: string): string =>
   text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 const sanitizeTabContextUrl = (url: string): string => {
@@ -173,12 +187,11 @@ export const AgentChatPanel = ({
     organizationId,
   });
   const activeConversation = getActiveStoredConversation(conversationStore);
-  const {
-    events,
-    id: activeConversationId,
-    mode = defaultMode,
-    selectedTabId = inspectableTabs[0]?.id,
-  } = activeConversation;
+  const { events, id: activeConversationId, mode = defaultMode } = activeConversation;
+  const selectedTabId = getSelectedInspectableTabId({
+    inspectableTabs,
+    selectedTabId: activeConversation.selectedTabId,
+  });
   const model = activeConversation.model ?? modelOptions[0]?.id ?? '';
   const selectedModel = useMemo(
     () => modelOptions.find(option => option.id === model),
@@ -234,28 +247,20 @@ export const AgentChatPanel = ({
   }, [inspectableTabs, isLoadingTabs]);
 
   useEffect(() => {
-    if (inspectableTabs.length === 0) {
+    const nextSelectedTabId = getSelectedInspectableTabId({
+      inspectableTabs,
+      selectedTabId: activeConversation.selectedTabId,
+    });
+
+    if (activeConversation.selectedTabId === nextSelectedTabId) {
       return;
     }
 
-    const inspectableTabIds = new Set(inspectableTabs.map(tab => tab.id));
-
-    if (
-      activeConversation.selectedTabId === undefined ||
-      !inspectableTabIds.has(activeConversation.selectedTabId)
-    ) {
-      const nextSelectedTabId = inspectableTabs[0]?.id;
-
-      if (nextSelectedTabId === undefined) {
-        return;
-      }
-
-      setConversationStore(store =>
-        updateStoredConversationSettings(store, activeConversationId, {
-          selectedTabId: nextSelectedTabId,
-        })
-      );
-    }
+    setConversationStore(store =>
+      updateStoredConversationSettings(store, activeConversationId, {
+        selectedTabId: nextSelectedTabId,
+      })
+    );
   }, [
     activeConversation.selectedTabId,
     activeConversationId,
@@ -343,7 +348,10 @@ export const AgentChatPanel = ({
     const runSelectedModel = modelOptions.find(option => option.id === runModel);
     const runThinkingOptions = runSelectedModel?.variants ?? [];
     const runThinkingEffort = conversation.thinkingEffort ?? runThinkingOptions[0] ?? '';
-    const runSelectedTabId = conversation.selectedTabId ?? inspectableTabs[0]?.id;
+    const runSelectedTabId = getSelectedInspectableTabId({
+      inspectableTabs,
+      selectedTabId: conversation.selectedTabId,
+    });
     const selectedTab = inspectableTabs.find(tab => tab.id === runSelectedTabId);
     const userEvent = createUserMessage(
       text,
@@ -422,7 +430,10 @@ export const AgentChatPanel = ({
     const text = draft.trim();
     const conversation = getActiveStoredConversation(conversationStoreRef.current);
     const conversationModel = conversation.model ?? modelOptions[0]?.id ?? '';
-    const conversationSelectedTabId = conversation.selectedTabId ?? inspectableTabs[0]?.id;
+    const conversationSelectedTabId = getSelectedInspectableTabId({
+      inspectableTabs,
+      selectedTabId: conversation.selectedTabId,
+    });
     const isConversationRunning = runningConversationIds.includes(conversation.id);
 
     if (

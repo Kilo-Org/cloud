@@ -57,6 +57,8 @@ describe('design primitive defaults', () => {
     expectClasses(inputClassName, [
       'bg-input-background',
       'border-input',
+      'text-base',
+      'md:text-sm',
       'h-control-default',
       'focus-visible:border-ring',
       'focus-visible:ring-ring/50',
@@ -64,6 +66,7 @@ describe('design primitive defaults', () => {
     ]);
     expect(inputClassName).not.toContain('bg-input/30');
     expect(inputClassName).not.toContain('shadow-xs');
+    expect(inputClassName).not.toContain('type-body');
 
     expectClasses(textareaClassName, [
       'bg-input-background',

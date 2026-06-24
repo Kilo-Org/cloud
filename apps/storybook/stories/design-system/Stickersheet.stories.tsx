@@ -298,7 +298,7 @@ function StickersheetPage() {
             <p className="type-label text-sidebar-foreground/70">Workspace</p>
           </div>
           <div className="grid gap-1">
-            <div className="flex h-8 items-center justify-between rounded-md bg-sidebar-accent px-2 text-sidebar-accent-foreground">
+            <div className="flex h-8 items-center justify-between rounded-md bg-surface-selected px-2 text-sidebar-accent-foreground">
               <span className="type-body">Dashboard</span>
               <Badge variant="secondary">4</Badge>
             </div>

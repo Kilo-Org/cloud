@@ -1467,7 +1467,7 @@ const scenarios: FirefoxScenario[] = [
           await waitForTargetTab(session.driver, 'Kilo extension fixture');
           await clickButtonByLabel(session.driver, 'Settings');
           await setSelectByValue(session.driver, 'Credit account', 'org-1');
-          await clickButtonByLabel(session.driver, 'Settings');
+          await clickButtonByLabel(session.driver, 'Close settings');
           await switchToDangerousMode(session.driver);
           await sendMessage(session.driver, 'Inspect this tab');
           await waitForTextMatch(session.driver, /The selected tab HTML length is [0-9]+\./u);
@@ -1789,6 +1789,7 @@ const scenarios: FirefoxScenario[] = [
             await clickButtonByLabel(session.driver, 'Settings');
             await setSelectByValue(session.driver, 'Credit account', 'org-2');
             await orgTwoModelsRequested;
+            await clickButtonByLabel(session.driver, 'Close settings');
             assert.equal(
               await isControlDisabled(session.driver, 'select[aria-label="Model"]'),
               true
@@ -1843,10 +1844,13 @@ const scenarios: FirefoxScenario[] = [
             await openAuthenticatedPanel(session);
             await clickButtonByLabel(session.driver, 'Settings');
             await setSelectByValue(session.driver, 'Credit account', 'org-1');
+            await clickButtonByLabel(session.driver, 'Close settings');
             await waitForText(session.driver, 'Could not load models.');
             await clickButtonByText(session.driver, 'Retry models');
             await orgOneModelsRequested;
+            await clickButtonByLabel(session.driver, 'Settings');
             await setSelectByValue(session.driver, 'Credit account', 'org-2');
+            await clickButtonByLabel(session.driver, 'Close settings');
             await waitForModel(session.driver, 'Org Two Model');
             releaseOrgOneModels();
             await new Promise(resolve => {

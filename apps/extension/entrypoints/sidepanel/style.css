@@ -13,6 +13,14 @@ body {
   margin: 0;
 }
 
+:where(a[href], button, select, summary, [role='button'], [role='tab']) {
+  cursor: pointer;
+}
+
+:where(button, select):disabled {
+  cursor: not-allowed;
+}
+
 .agent-conversation-scrollbar {
   scrollbar-color: #52525b #09090b;
   scrollbar-width: thin;

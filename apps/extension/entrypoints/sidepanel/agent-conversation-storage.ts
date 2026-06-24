@@ -1,4 +1,5 @@
 import { storage } from '#imports';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { z } from 'zod';
@@ -25,6 +26,7 @@ export type { StoredAgentConversation } from '@/src/shared/agent-conversation-ta
 
 const legacyConversationStorageKey = 'local:kiloAgentConversation';
 const conversationStorageKey = 'local:kiloAgentConversations';
+const conversationStoreQueryKey = ['side-panel', 'agent-conversations'] as const;
 const conversationEventSchema = z.union([
   z.object({
     id: z.string(),
@@ -189,6 +191,23 @@ const toPersistedConversationStore = (
   })),
 });
 
+const loadStoredConversationStore = async (
+  createDefaultEvents: () => AgentConversationEvent[]
+): Promise<StoredAgentConversationStore> => {
+  const storedConversations = normalizeStoredConversationStore(
+    await storage.getItem(conversationStorageKey)
+  );
+  const legacyEvents = normalizeConversationEvents(
+    await storage.getItem(legacyConversationStorageKey)
+  );
+
+  return normalizeStoredConversations({
+    defaultEvents: createDefaultEvents(),
+    legacyEvents,
+    store: storedConversations,
+  });
+};
+
 export const useStoredAgentConversations = (
   createDefaultEvents: () => AgentConversationEvent[]
 ): readonly [
@@ -199,36 +218,17 @@ export const useStoredAgentConversations = (
     normalizeStoredConversations({ defaultEvents: createDefaultEvents() })
   );
   const [isLoaded, setIsLoaded] = useState(false);
+  const { data: loadedStore, isSuccess } = useQuery({
+    queryFn: () => loadStoredConversationStore(createDefaultEvents),
+    queryKey: conversationStoreQueryKey,
+  });
 
   useEffect(() => {
-    let isCurrent = true;
-
-    void (async (): Promise<void> => {
-      const storedConversations = normalizeStoredConversationStore(
-        await storage.getItem(conversationStorageKey)
-      );
-      const legacyEvents = normalizeConversationEvents(
-        await storage.getItem(legacyConversationStorageKey)
-      );
-
-      if (!isCurrent) {
-        return;
-      }
-
-      setStore(
-        normalizeStoredConversations({
-          defaultEvents: createDefaultEvents(),
-          legacyEvents,
-          store: storedConversations,
-        })
-      );
+    if (isSuccess && loadedStore !== undefined) {
+      setStore(loadedStore);
       setIsLoaded(true);
-    })();
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [createDefaultEvents]);
+    }
+  }, [isSuccess, loadedStore]);
 
   useEffect(() => {
     if (isLoaded) {

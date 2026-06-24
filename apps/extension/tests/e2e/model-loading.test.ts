@@ -161,6 +161,7 @@ test('switching credit accounts clears the model while the next catalog loads', 
     await sidePanel.getByLabel('Settings').click();
     await sidePanel.getByLabel('Credit account').selectOption(orgTwoId);
     await orgTwoModelsRequested;
+    await sidePanel.getByLabel('Close settings').click();
 
     await expect(sidePanel.getByLabel('Model')).toBeDisabled();
     await expect(sidePanel.getByLabel('Model')).toContainText('Loading models...');
@@ -211,10 +212,13 @@ test('stale organization model loads cannot overwrite the current catalog', asyn
 
     await sidePanel.getByLabel('Settings').click();
     await sidePanel.getByLabel('Credit account').selectOption(orgOneId);
+    await sidePanel.getByLabel('Close settings').click();
     await expect(sidePanel.getByText('Could not load models.')).toBeVisible();
     await sidePanel.getByRole('button', { name: 'Retry models' }).click();
     await orgOneModelsRequested;
+    await sidePanel.getByLabel('Settings').click();
     await sidePanel.getByLabel('Credit account').selectOption(orgTwoId);
+    await sidePanel.getByLabel('Close settings').click();
     await expect(sidePanel.getByLabel('Model')).toContainText('Org Two Model');
 
     releaseOrgOneModels();

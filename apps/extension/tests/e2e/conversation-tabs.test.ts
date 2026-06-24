@@ -5,6 +5,7 @@ import { mockKiloApi } from './kilo-api-fixture';
 import {
   launchExtensionContext,
   seedExtensionAuth,
+  setExtensionStorage,
   startFixtureServer,
   waitForStoredConversationText,
 } from './extension-context-fixture';
@@ -291,6 +292,56 @@ test('history confirms and aborts before deleting an open running conversation',
     releaseCompletion();
     await context.close();
     await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('history virtualizes and pages large stored conversation lists', async () => {
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.setViewportSize({ height: 520, width: 320 });
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await setExtensionStorage(sidePanel, {
+      kiloAgentConversations: {
+        activeConversationId: 'conversation-1',
+        conversations: Array.from({ length: 250 }, (_value, index) => {
+          const conversationNumber = index + 1;
+
+          return {
+            events: [],
+            id: `conversation-${conversationNumber}`,
+            title: `Seeded conversation ${conversationNumber}`,
+            updatedAt: new Date(2026, 0, conversationNumber).toISOString(),
+          };
+        }),
+        openConversationIds: ['conversation-1'],
+      },
+    });
+    await sidePanel.reload();
+
+    await sidePanel.getByLabel('History').click();
+    const historyPanel = sidePanel.getByLabel('Conversation history');
+    await expect(historyPanel).toBeVisible();
+    await expect(sidePanel.getByText('250 conversations')).toBeVisible();
+    await expect(sidePanel.getByText('Seeded conversation 250')).toBeVisible();
+    await expect(sidePanel.getByLabel('Open Seeded conversation 120')).toBeHidden();
+
+    const firstMountedRows = await historyPanel.locator('[data-history-index]').count();
+
+    expect(firstMountedRows).toBeLessThan(100);
+
+    await historyPanel.evaluate(element => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await sidePanel.getByRole('button', { name: 'Show 100 more conversations' }).click();
+    await expect(sidePanel.getByText('Showing 200 of 250')).toBeVisible();
+  } finally {
+    await context.close();
     await rm(userDataDir, { force: true, recursive: true });
   }
 });

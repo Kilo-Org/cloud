@@ -115,7 +115,7 @@ test('dangerous mode conversation can eval against a normal tab', async () => {
     await expect(sidePanel.getByText('user@kilo.ai')).toBeHidden();
     await sidePanel.getByLabel('Settings').click();
     await expect(sidePanel.getByText('user@kilo.ai')).toBeVisible();
-    await sidePanel.getByLabel('Settings').click();
+    await sidePanel.getByLabel('Close settings').click();
     await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo extension fixture');
 
     await sidePanel.getByRole('button', { name: /Safe mode/u }).click();

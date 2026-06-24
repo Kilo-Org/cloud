@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { JSX, ReactNode } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, X } from 'lucide-react';
 import type { StoredAuth } from '@/src/shared/auth';
 import type { KiloOrganizationOption } from '@/src/shared/kilo-api-client';
 import { KiloLogo } from '@/src/shared/kilo-logo';
@@ -57,23 +57,46 @@ const HeaderActions = ({
       </IconButton>
 
       {isSettingsOpen ? (
-        <div className="absolute right-0 top-10 z-20 grid w-56 gap-3 rounded-md border border-zinc-800 bg-zinc-950 p-3 shadow-xl shadow-black/30">
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-zinc-500">Signed in</p>
-            <p className="mt-1 truncate text-sm text-zinc-200">{auth.userEmail ?? 'Kilo user'}</p>
+        <div
+          aria-label="Settings panel"
+          aria-modal="true"
+          className="fixed inset-0 z-30 flex flex-col bg-zinc-950"
+          role="dialog"
+        >
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-zinc-800 px-4">
+            <p className="text-sm font-semibold text-zinc-100">Settings</p>
+            <button
+              aria-label="Close settings"
+              className="flex size-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+              onClick={() => {
+                setIsSettingsOpen(false);
+              }}
+              type="button"
+            >
+              <X aria-hidden="true" className="size-4" />
+            </button>
           </div>
-          <OrganizationCreditAccountSelect
-            onChange={onOrganizationChange}
-            organizationOptions={organizationOptions}
-            selectedOrganizationId={selectedOrganizationId}
-          />
-          <button
-            className="h-8 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
-            onClick={onSignOut}
-            type="button"
-          >
-            Sign out
-          </button>
+          <div className="agent-conversation-scrollbar grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-4 py-4">
+            <div className="min-w-0 rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
+              <p className="text-xs font-medium text-zinc-500">Signed in</p>
+              <p className="mt-1 truncate text-sm text-zinc-200">{auth.userEmail ?? 'Kilo user'}</p>
+            </div>
+            <OrganizationCreditAccountSelect
+              onChange={onOrganizationChange}
+              organizationOptions={organizationOptions}
+              selectedOrganizationId={selectedOrganizationId}
+            />
+            <button
+              className="h-9 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
+              onClick={() => {
+                setIsSettingsOpen(false);
+                onSignOut();
+              }}
+              type="button"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       ) : null}
     </div>

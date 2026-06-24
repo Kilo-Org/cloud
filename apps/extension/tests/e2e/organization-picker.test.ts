@@ -29,7 +29,7 @@ test('settings organization picker sends org context to the gateway', async () =
 
     await sidePanel.getByLabel('Settings').click();
     await sidePanel.getByLabel('Credit account').selectOption('org-1');
-    await sidePanel.getByLabel('Settings').click();
+    await sidePanel.getByLabel('Close settings').click();
 
     await sidePanel.getByRole('button', { name: /Safe mode/u }).click();
     await sidePanel.getByRole('button', { name: 'Dangerous' }).click();

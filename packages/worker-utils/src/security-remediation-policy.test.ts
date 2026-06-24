@@ -263,6 +263,87 @@ describe('decideSecurityRemediationEligibility', () => {
     expect(decision).toMatchObject({ eligible: true, reason: 'eligible' });
   });
 
+  it('allows manual remediation for an unreachable finding with a patched version', () => {
+    const unreachableFinding = withCurrentFindingDataSnapshot({
+      ...baseFinding,
+      manifest_path: null,
+      analysis: {
+        ...baseFinding.analysis,
+        sandboxAnalysis: {
+          ...baseFinding.analysis!.sandboxAnalysis!,
+          isExploitable: false,
+          suggestedAction: 'dismiss',
+          suggestedFix: null,
+          usageLocations: [],
+        },
+      },
+    });
+
+    const decision = decideSecurityRemediationEligibility({
+      finding: unreachableFinding,
+      config: baseConfig,
+      isAgentEnabled: true,
+      repoFullNamesInScope: ['kilo/repo'],
+      origin: 'manual',
+      blockState: emptyBlockState,
+    });
+
+    expect(decision).toMatchObject({ eligible: true, reason: 'eligible' });
+  });
+
+  it('requires a concrete fix path for manual remediation of an unreachable finding', () => {
+    const decision = decideSecurityRemediationEligibility({
+      finding: withCurrentFindingDataSnapshot({
+        ...baseFinding,
+        patched_version: null,
+        manifest_path: null,
+        analysis: {
+          ...baseFinding.analysis,
+          sandboxAnalysis: {
+            ...baseFinding.analysis!.sandboxAnalysis!,
+            isExploitable: false,
+            suggestedAction: 'dismiss',
+            suggestedFix: null,
+            usageLocations: [],
+          },
+        },
+      }),
+      config: baseConfig,
+      isAgentEnabled: true,
+      repoFullNamesInScope: ['kilo/repo'],
+      origin: 'manual',
+      blockState: emptyBlockState,
+    });
+
+    expect(decision).toMatchObject({ eligible: false, reason: 'action_not_concrete' });
+  });
+
+  it.each(['auto_policy', 'bulk_existing'] as const)(
+    'keeps %s remediation blocked for unreachable findings',
+    origin => {
+      const decision = decideSecurityRemediationEligibility({
+        finding: withCurrentFindingDataSnapshot({
+          ...baseFinding,
+          analysis: {
+            ...baseFinding.analysis,
+            sandboxAnalysis: {
+              ...baseFinding.analysis!.sandboxAnalysis!,
+              isExploitable: false,
+              suggestedAction: 'dismiss',
+            },
+          },
+        }),
+        config: baseConfig,
+        isAgentEnabled: true,
+        repoFullNamesInScope: ['kilo/repo'],
+        origin,
+        blockState: emptyBlockState,
+      });
+
+      expect(decision).toMatchObject({ eligible: false, reason: 'not_exploitable' });
+    }
+  );
+
   it('keeps automatic remediation blocked for manual-review analysis', () => {
     const decision = decideSecurityRemediationEligibility({
       finding: {

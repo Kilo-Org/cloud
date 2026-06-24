@@ -59,6 +59,23 @@ describe('Security Finding list presentation', () => {
     });
   });
 
+  it('uses a terse label when analysis finds no reachable path', () => {
+    const finding = findingWith({
+      analysis_status: 'completed',
+      analysis: {
+        sandboxAnalysis: {
+          isExploitable: false,
+          summary: 'No reachable vulnerable path found.',
+        },
+      } as SecurityFindingWithRemediation['analysis'],
+    });
+
+    expect(getAnalysisPresentation(finding)).toMatchObject({
+      label: 'Unreachable',
+      tone: 'success',
+    });
+  });
+
   it('uses shared review states for failed extraction and unknown exploitability', () => {
     const extractionFailed = findingWith({
       analysis_status: 'completed',

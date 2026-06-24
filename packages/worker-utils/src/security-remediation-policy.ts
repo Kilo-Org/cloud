@@ -289,15 +289,9 @@ function hasConcreteRemediationPath(finding: SecurityRemediationFinding): boolea
   const sandbox = finding.analysis?.sandboxAnalysis;
   if (!sandbox) return false;
   const hasPatchedPackagePath =
-    Boolean(finding.patched_version?.trim()) &&
-    Boolean(finding.package_name?.trim()) &&
-    Boolean(finding.manifest_path?.trim());
+    Boolean(finding.patched_version?.trim()) && Boolean(finding.package_name?.trim());
   const hasSuggestedFix = Boolean(sandbox.suggestedFix?.trim());
-  const hasUsageAndFix =
-    Array.isArray(sandbox.usageLocations) &&
-    sandbox.usageLocations.length > 0 &&
-    Boolean(sandbox.suggestedFix?.trim());
-  return hasPatchedPackagePath || hasSuggestedFix || hasUsageAndFix;
+  return hasPatchedPackagePath || hasSuggestedFix;
 }
 
 function isAnalysisFresh(finding: SecurityRemediationFinding, completedAt: string): boolean {
@@ -343,14 +337,17 @@ export function decideSecurityRemediationEligibility(
   if (!sandbox) return reject('sandbox_analysis_required');
   if (!analysisCompletedAt || !analysisFingerprint) return reject('analysis_required');
   if (!isAnalysisFresh(params.finding, analysisCompletedAt)) return reject('stale_analysis');
-  if (sandbox.isExploitable === false) return reject('not_exploitable');
   const hasConcretePath = hasConcreteRemediationPath(params.finding);
   if (params.blockState.hasActiveAttempt) return reject('remediation_active');
   if (params.blockState.hasPrOpened) return reject('pr_already_opened');
 
   if (params.origin === 'manual') {
     if (sandbox.suggestedAction === 'monitor') return reject('monitor_required');
-    if (sandbox.suggestedAction !== 'open_pr' && sandbox.suggestedAction !== 'manual_review') {
+    if (
+      sandbox.isExploitable !== false &&
+      sandbox.suggestedAction !== 'open_pr' &&
+      sandbox.suggestedAction !== 'manual_review'
+    ) {
       return reject(sandbox.isExploitable === 'unknown' ? 'exploitability_unknown' : 'triage_only');
     }
     if (!hasConcretePath) return reject('action_not_concrete');
@@ -370,6 +367,7 @@ export function decideSecurityRemediationEligibility(
     };
   }
 
+  if (sandbox.isExploitable === false) return reject('not_exploitable');
   if (sandbox.isExploitable === 'unknown') return reject('exploitability_unknown');
   if (sandbox.suggestedAction === 'manual_review') return reject('manual_review_required');
   if (sandbox.suggestedAction === 'monitor') return reject('monitor_required');

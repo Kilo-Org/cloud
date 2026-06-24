@@ -3,13 +3,14 @@ import type { User } from '@kilocode/db/schema';
 import { createCallerFactory } from '@/lib/trpc/init';
 
 const mockMintAccessToken = jest.fn<() => Promise<{ token: string }>>();
-const mockPrepareSession = jest.fn<
-  (input: {
-    prompt: string;
-    autoInitiate?: boolean;
-    mcpServers?: Record<string, unknown>;
-  }) => Promise<{ cloudAgentSessionId: string; kiloSessionId: string }>
->();
+const mockPrepareSession =
+  jest.fn<
+    (input: {
+      prompt: string;
+      autoInitiate?: boolean;
+      mcpServers?: Record<string, unknown>;
+    }) => Promise<{ cloudAgentSessionId: string; kiloSessionId: string }>
+  >();
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   prepareSession: mockPrepareSession,
 }));

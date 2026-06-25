@@ -2661,6 +2661,10 @@ export const organizations = pgTable(
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
     check(
+      'organizations_slug_max_length_check',
+      sql`${table.slug} IS NULL OR length(${table.slug}) <= 32`
+    ),
+    check(
       'organizations_not_parented_by_self_check',
       sql`${table.parent_organization_id} IS NULL OR ${table.parent_organization_id} <> ${table.id}`
     ),

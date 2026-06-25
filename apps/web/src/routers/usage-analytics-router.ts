@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { and, asc, eq, inArray, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import { readDb } from '@/lib/drizzle';
 import { getEnvVariable } from '@/lib/dotenvx';
@@ -1032,17 +1032,24 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const [org] = await readDb
         .select({ id: organizations.id, name: organizations.name })
         .from(organizations)
-        .where(eq(organizations.id, input.organizationId))
+        .where(and(eq(organizations.id, input.organizationId), isNull(organizations.deleted_at)))
         .limit(1);
 
       if (!org) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
       }
 
+      // Exclude soft-deleted children so they never appear in the scope list or
+      // get folded into the All Organizations aggregate.
       const children = await readDb
         .select({ id: organizations.id, name: organizations.name })
         .from(organizations)
-        .where(eq(organizations.parent_organization_id, input.organizationId))
+        .where(
+          and(
+            eq(organizations.parent_organization_id, input.organizationId),
+            isNull(organizations.deleted_at)
+          )
+        )
         .orderBy(asc(organizations.name));
 
       return {

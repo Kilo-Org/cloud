@@ -190,8 +190,17 @@ export function UsageAnalyticsDashboard({
   // Clamp the stored scope to something the caller may actually see. Non-admins
   // and any stale/unknown scope (e.g. a deep link to a sibling org) collapse to
   // "My Usage". The server independently enforces access regardless.
-  const resolvedOrgScope =
-    isOrgAdmin && validOrgScopeValues.has(orgScope) ? orgScope : ORG_SCOPE_SELF;
+  //
+  // While the scope list is still loading we optimistically honor the URL scope
+  // rather than clamp: otherwise a deep link like `?scope=<child-id>&group=user`
+  // would momentarily resolve to 'self', and the cleanup effect below would wipe
+  // (and persist) the deep-linked grouping/user filters before validation runs.
+  const scopeListPending = isOrgAdmin && !!organizationId && !scopeOrgs;
+  const resolvedOrgScope = !isOrgAdmin
+    ? ORG_SCOPE_SELF
+    : scopeListPending || validOrgScopeValues.has(orgScope)
+      ? orgScope
+      : ORG_SCOPE_SELF;
   const isAllOrgsScope = isOrgContext && resolvedOrgScope === ORG_SCOPE_ALL_ORGS;
   const isSelfOrgScope = resolvedOrgScope === ORG_SCOPE_SELF;
 

@@ -23,6 +23,7 @@ select
 from kilo_dw.dbt_prod.microdollar_usage_daily as mu
 where
     mu.usage_date >= dateadd(week, -1, current_date())
+    and mu.usage_date < current_date()
     and mu.provider not in ('custom', 'direct-byok')
     and mu.total_output_tokens > 0
     and mu.is_user_byok = false

@@ -64,7 +64,7 @@ function metricAlias(metric: QueryKiloDatasetInput['metrics'][number]): string {
   return metric.operation === 'count' ? 'count' : `${metric.operation}_${metric.field}`;
 }
 
-function isKiloDatasetQueryTool(toolPart: ToolPart): boolean {
+export function isKiloDatasetQueryTool(toolPart: ToolPart): boolean {
   if (toolPart.tool === KILO_DATASET_TOOL_NAME) return true;
   if (toolPart.tool !== 'mcp') return false;
 

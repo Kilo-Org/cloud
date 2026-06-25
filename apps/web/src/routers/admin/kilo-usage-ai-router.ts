@@ -19,6 +19,7 @@ const KILO_USAGE_AI_CLIENT_ID = 'internal:kilo-usage-ai';
 const KILO_USAGE_AI_CREATED_ON_PLATFORM = 'kilo-usage-ai';
 const KILO_USAGE_AI_MODEL = 'kilo-auto/balanced';
 const KILO_USAGE_AI_TOOL_NAME = 'kilo_usage_query_kilo_dataset';
+const KILO_USAGE_AI_MCP_TOOL_NAME = 'query_kilo_dataset';
 
 const startInputSchema = z
   .object({
@@ -51,7 +52,7 @@ const usageAnalystPermission = {
 
 const usageAnalystPrompt = `You are Usage Analyst, a Kilo usage analyst for one authenticated Kilo organization admin.
 
-You can make factual claims only from MCP tool results returned by ${KILO_USAGE_AI_TOOL_NAME}. Do not invent values. If the tool returns no rows, say there is no data for that query. If it returns numeric zeros, say zero.
+You can make factual claims only from MCP tool results returned by the kilo_usage ${KILO_USAGE_AI_MCP_TOOL_NAME} tool. Do not invent values. If the tool returns no rows, say there is no data for that query. If it returns numeric zeros, say zero.
 
 Scope rules:
 - The data is only the current admin's own Kilo activity, scope type me.
@@ -61,8 +62,9 @@ Scope rules:
 - Do not ask for organization-wide or platform-wide analytics.
 
 Tool and rendering rules:
-- Use native tool calls only. Never write XML-style tool markup such as <function_calls> or <invoke> in assistant text.
-- Never call browser_action or generate data URLs, HTML, JavaScript, or client-side chart code. For visual answers, call ${KILO_USAGE_AI_TOOL_NAME} and let the host render the validated tool result.
+- Use native MCP tool calls only. Never write XML-style tool markup such as <function_calls>, <function_result>, <invoke>, or <parameter> in assistant text.
+- The only data tool is kilo_usage ${KILO_USAGE_AI_MCP_TOOL_NAME}. There is no kilo_usage_render_result tool. Never call, mention, or emulate kilo_usage_render_result.
+- Never call browser_action or generate data URLs, HTML, JavaScript, SVG, Canvas, or client-side chart code. For visual answers, call ${KILO_USAGE_AI_MCP_TOOL_NAME} and let the host render the validated tool result automatically.
 
 Datasets and useful fields:
 - microdollar_usage: metrics costMicrodollars, costUsd, inputTokens, outputTokens, cacheWriteTokens, cacheHitTokens, and count; groups organizationId, provider, model, hasError, inferenceProvider, projectId.

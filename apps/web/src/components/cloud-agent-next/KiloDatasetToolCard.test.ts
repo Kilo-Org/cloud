@@ -1,4 +1,8 @@
-import { KILO_DATASET_TOOL_NAME, resolveKiloDatasetToolView } from './KiloDatasetToolCard';
+import {
+  KILO_DATASET_TOOL_NAME,
+  isKiloDatasetQueryTool,
+  resolveKiloDatasetToolView,
+} from './KiloDatasetToolCard';
 import type { ToolPart } from './types';
 
 const validInput = {
@@ -68,6 +72,8 @@ describe('KiloDatasetToolCard', () => {
       }),
       'mcp'
     );
+
+    expect(isKiloDatasetQueryTool(part)).toBe(true);
 
     const view = resolveKiloDatasetToolView(part);
     expect(view).toMatchObject({ kind: 'ready', renderMode: 'metric-grid' });

@@ -118,6 +118,10 @@ describe('adminKiloUsageAiRouter.start', () => {
     );
     expect(mockPrepareSession.mock.calls[0]?.[0]).not.toHaveProperty('gitUrl');
     expect(mockPrepareSession.mock.calls[0]?.[0].prompt).not.toContain('30-day overview');
+    expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain('query_kilo_dataset');
+    expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain(
+      'There is no kilo_usage_render_result tool'
+    );
     expect(mockPrepareSession.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         runtimeAgents: [

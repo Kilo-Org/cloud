@@ -18,9 +18,10 @@ import { TodoWriteToolCard } from './TodoWriteToolCard';
 import { QuestionToolStatus } from './QuestionToolStatus';
 import { SuggestToolCard } from './SuggestToolCard';
 import { SkillToolCard } from './SkillToolCard';
-import { KILO_DATASET_TOOL_NAME, KiloDatasetToolCard } from './KiloDatasetToolCard';
+import { isKiloDatasetQueryTool, KiloDatasetToolCard } from './KiloDatasetToolCard';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
 import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
+import { AskUsageRawRenderResultCard } from './AskUsageRawRenderResultCard';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
@@ -36,7 +37,7 @@ import {
   isPatchPart,
   isPartStreaming,
 } from './types';
-import { stripRawToolCallMarkup } from './raw-tool-call-markup';
+import { extractRawUsageRenderResults, stripRawToolCallMarkup } from './raw-tool-call-markup';
 
 // ============================================================================
 // Types
@@ -81,14 +82,24 @@ function TextPartRenderer({
   part: Extract<Part, { type: 'text' }>;
   suppressRawToolCallText?: boolean;
 }) {
+  const rawUsageRenderResults = suppressRawToolCallText
+    ? extractRawUsageRenderResults(part.text)
+    : [];
   const text = suppressRawToolCallText ? stripRawToolCallMarkup(part.text) : part.text;
-  if (!text) return null;
+  if (!text && rawUsageRenderResults.length === 0) return null;
 
   return (
-    <div className="prose prose-sm prose-invert max-w-none overflow-hidden">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-        {text}
-      </ReactMarkdown>
+    <div className="space-y-3">
+      {rawUsageRenderResults.map((result, index) => (
+        <AskUsageRawRenderResultCard key={index} result={result} />
+      ))}
+      {text && (
+        <div className="prose prose-sm prose-invert max-w-none overflow-hidden">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {text}
+          </ReactMarkdown>
+        </div>
+      )}
     </div>
   );
 }
@@ -176,7 +187,7 @@ function ToolPartRenderer({
     return null;
   }
 
-  if (part.tool === KILO_DATASET_TOOL_NAME) {
+  if (isKiloDatasetQueryTool(part)) {
     return <KiloDatasetToolCard toolPart={part} />;
   }
 

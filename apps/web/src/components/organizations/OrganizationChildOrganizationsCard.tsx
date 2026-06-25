@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { Building2, ChevronRight } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { useOrganizationChildren } from '@/app/api/organizations/hooks';
 
 type Props = {
@@ -47,6 +55,16 @@ export function OrganizationChildOrganizationsCard({ organizationId }: Props) {
           ))}
         </div>
       </CardContent>
+      <CardFooter>
+        <Button asChild variant="secondary" size="sm">
+          <Link
+            prefetch={false}
+            href={`/organizations/${encodeURIComponent(organizationId)}/distribute-funds`}
+          >
+            Distribute funds
+          </Link>
+        </Button>
+      </CardFooter>
     </Card>
   );
 }

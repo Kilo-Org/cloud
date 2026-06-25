@@ -39,6 +39,36 @@ export function useOrganizationChildren(id: string) {
   );
 }
 
+export function useOrganizationChildBalances(id: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.funds.childBalances.queryOptions(
+      { organizationId: id },
+      {
+        trpc: {
+          context: {
+            skipBatch: true,
+          },
+        },
+      }
+    )
+  );
+}
+
+export function useDistributeFundsToChildren() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.funds.distribute.mutationOptions({
+      onSuccess: async () => {
+        // Balances change on both the parent and the children, so refresh all
+        // organization-scoped queries.
+        await queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
 const useInvalidateOrganizationAndMembers = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

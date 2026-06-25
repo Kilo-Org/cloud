@@ -64,6 +64,7 @@ import { organizationAutoFixRouter } from '@/routers/organizations/organization-
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
 import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
+import { organizationFundsRouter } from '@/routers/organizations/organization-funds-router';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -120,6 +121,7 @@ export const organizationsRouter = createTRPCRouter({
   autoTopUp: organizationAutoTopUpRouter,
   kiloclaw: organizationKiloclawRouter,
   bitbucket: organizationBitbucketRouter,
+  funds: organizationFundsRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;

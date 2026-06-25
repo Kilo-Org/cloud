@@ -31,7 +31,6 @@ import { successResult } from '@/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
-import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 
 const MAX_DAILY_LIMIT_USD = 2000;
 
@@ -188,9 +187,6 @@ export const organizationsMembersRouter = createTRPCRouter({
       const childOrganizations = await db
         .select({
           id: organizations.id,
-          name: organizations.name,
-          plan: organizations.plan,
-          requireSeats: organizations.require_seats,
         })
         .from(organizations)
         .where(
@@ -238,38 +234,6 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       for (const childOrganizationId of childOrganizationIds) {
         if (existingMembershipsByOrganizationId.has(childOrganizationId)) continue;
-
-        const childOrganization = childOrganizationsById.get(childOrganizationId);
-        if (!childOrganization) continue;
-
-        const [pendingInvitation] = await db
-          .select({ id: organization_invitations.id })
-          .from(organization_invitations)
-          .where(
-            and(
-              eq(organization_invitations.organization_id, childOrganizationId),
-              eq(organization_invitations.email, parentMember.email),
-              isNull(organization_invitations.accepted_at),
-              sql`${organization_invitations.expires_at} > NOW()`
-            )
-          )
-          .limit(1);
-        if (pendingInvitation) {
-          throw new TRPCError({
-            code: 'CONFLICT',
-            message: `${parentMember.email} already has a pending invitation for ${childOrganization.name}`,
-          });
-        }
-
-        if (childOrganization.requireSeats && childOrganization.plan !== 'enterprise') {
-          const seatUsage = await getOrganizationSeatUsage(childOrganizationId);
-          if (seatUsage.used >= seatUsage.total) {
-            throw new TRPCError({
-              code: 'PRECONDITION_FAILED',
-              message: `${childOrganization.name} has no available seats`,
-            });
-          }
-        }
 
         const wasAdded = await addUserToOrganization(childOrganizationId, memberId, 'member');
         if (wasAdded) {

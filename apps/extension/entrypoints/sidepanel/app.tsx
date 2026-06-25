@@ -79,8 +79,7 @@ export const App = (): JSX.Element => {
       }
 
       if (result.status === 'invalid') {
-        // Clear all account-scoped state (conversations included), like sign-out, so a later
-        // account on this profile never loads the expired user's data. Message returned below.
+        // Clear all account-scoped state (conversations included) like sign-out so a later account on this profile never loads the expired user's data. Message returned below.
         await clearStoredSession(storage);
         return { message: 'Your session expired. Sign in again.', status: 'signedOut' };
       }

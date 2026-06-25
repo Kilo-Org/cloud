@@ -52,8 +52,7 @@ const createDebuggerApi = ({
 const restoreFailingPngDataUrl =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
-// Activating the target tab (7) succeeds; restoring the previous tab (1) throws. Tracks the active
-// tab so the capture-time re-verification sees the requested tab.
+// Activating the target tab (7) succeeds; restoring the previous tab (1) throws. Tracks the active tab so the capture-time re-verification sees the requested tab.
 const createRestoreFailingTabsApi = (): BrowserTabsApi => {
   let activeTabId = 1;
 
@@ -416,25 +415,15 @@ describe('tab debugger helpers', () => {
 
   it('serializes concurrent captures so they cannot interleave', async () => {
     const events: string[] = [];
-    let resolveCaptureStarted = (): void => {};
-    const captureStarted = new Promise<void>(resolve => {
-      resolveCaptureStarted = resolve;
-    });
-    let releaseFirstCapture = (): void => {};
-    const firstCaptureReleased = new Promise<void>(resolve => {
-      releaseFirstCapture = resolve;
-    });
-    const createApi = (label: string, blockOnCapture: boolean): BrowserTabsApi => {
+    const captureStarted = Promise.withResolvers<void>();
+    const firstCaptureReleased = Promise.withResolvers<void>();
+    const createApi = (label: string, onCapture?: () => Promise<void>): BrowserTabsApi => {
       let activeTabId = 1;
 
       return {
         captureVisibleTab: async () => {
           events.push(`capture:${label}`);
-          if (blockOnCapture) {
-            resolveCaptureStarted();
-            await firstCaptureReleased;
-          }
-
+          await onCapture?.();
           return restoreFailingPngDataUrl;
         },
         get: tabId => ({ id: tabId, title: 'Target', url: 'https://example.com/', windowId: 3 }),
@@ -447,13 +436,19 @@ describe('tab debugger helpers', () => {
       };
     };
 
-    const first = getViewportScreenshotWithTabsApi({ tabId: 7, tabsApi: createApi('A', true) });
-    const second = getViewportScreenshotWithTabsApi({ tabId: 8, tabsApi: createApi('B', false) });
+    const first = getViewportScreenshotWithTabsApi({
+      tabId: 7,
+      tabsApi: createApi('A', async () => {
+        captureStarted.resolve();
+        await firstCaptureReleased.promise;
+      }),
+    });
+    const second = getViewportScreenshotWithTabsApi({ tabId: 8, tabsApi: createApi('B') });
 
-    await captureStarted;
+    await captureStarted.promise;
     expect(events).toStrictEqual(['update:A:7', 'capture:A']);
 
-    releaseFirstCapture();
+    firstCaptureReleased.resolve();
     await Promise.all([first, second]);
 
     // A fully finishes (capture + restore) before B touches its tab.

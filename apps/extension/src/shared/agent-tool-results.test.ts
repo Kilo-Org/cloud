@@ -30,10 +30,10 @@ describe('agent tool results', () => {
 
     const results = await runToolCalls(
       [firstToolCall, secondToolCall],
-      async toolCall => {
+      toolCall => {
         events.push(toolCall.code);
         controller.abort();
-        return { ok: true, value: toolCall.code };
+        return Promise.resolve({ ok: true, value: toolCall.code });
       },
       controller.signal
     );

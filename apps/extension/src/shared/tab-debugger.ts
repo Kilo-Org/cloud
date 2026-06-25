@@ -304,24 +304,22 @@ const getPngDimensions = (dataUrl: string): { height: number; width: number } | 
   }
 };
 
-// ponytail: one global capture lock. captureVisibleTab grabs whichever tab is active in a window,
-// so the activate->capture->restore window must not interleave. Screenshots are rare and
-// user-driven, so a single chain is fine; key it per-window only if capture throughput matters.
+// Ponytail: one global capture lock since captureVisibleTab grabs whichever tab is active in a window, so the activate/capture/restore window must not interleave (screenshots are rare; key per-window only if throughput matters).
+const ignoreSettled = (): void => {};
+// eslint-disable-next-line promise/prefer-await-to-then
 let screenshotCaptureChain: Promise<unknown> = Promise.resolve();
-const runScreenshotCaptureExclusively = async <Result>(
-  task: () => Promise<Result>
-): Promise<Result> => {
+const runScreenshotCaptureExclusively = <Result>(task: () => Promise<Result>): Promise<Result> => {
+  // The promise chain is the mutex; keep it alive after either outcome.
+  // eslint-disable-next-line promise/prefer-await-to-then
   const run = screenshotCaptureChain.then(task, task);
 
-  screenshotCaptureChain = run.then(
-    () => undefined,
-    () => undefined
-  );
+  // eslint-disable-next-line promise/prefer-await-to-then
+  screenshotCaptureChain = run.then(ignoreSettled, ignoreSettled);
 
   return run;
 };
 
-export const getViewportScreenshotWithTabsApi = async ({
+export const getViewportScreenshotWithTabsApi = ({
   tabId,
   tabsApi,
 }: {
@@ -334,7 +332,7 @@ export const getViewportScreenshotWithTabsApi = async ({
   const queryTabs = tabsApi.query.bind(tabsApi);
 
   if (captureVisibleTab === undefined || getTab === undefined || updateTab === undefined) {
-    return { error: 'Viewport screenshot API is unavailable.', ok: false };
+    return Promise.resolve({ error: 'Viewport screenshot API is unavailable.', ok: false });
   }
 
   return runScreenshotCaptureExclusively(async () => {
@@ -348,8 +346,7 @@ export const getViewportScreenshotWithTabsApi = async ({
       await updateTab(tabId, { active: true });
       const [activeTab] = await queryTabs(activeTabQuery);
 
-      // A manual tab switch can land between activation and capture; refuse rather than capture
-      // (and upload) a different tab's contents.
+      // A manual tab switch can land between activation and capture; refuse rather than capture and upload a different tab's contents.
       if (getTabId(activeTab) !== tabId) {
         return { error: 'The selected tab was not active at capture time.', ok: false };
       }
@@ -496,8 +493,7 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
   };
   const nonRenderedTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'HEAD', 'TITLE']);
   const isRenderedTextNode = (textNode: Node): boolean => {
-    // Walk ancestors so hidden/non-content text (script JSON, inline styles, display:none modals,
-    // aria-hidden subtrees) is never surfaced as "visible page text".
+    // Walk ancestors so hidden/non-content text (script JSON, inline styles, display:none modals, aria-hidden subtrees) is never surfaced as "visible page text".
     for (let element = textNode.parentElement; element !== null; element = element.parentElement) {
       if (nonRenderedTags.has(element.tagName) || element.getAttribute('aria-hidden') === 'true') {
         return false;

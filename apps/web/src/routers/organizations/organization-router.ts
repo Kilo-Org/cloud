@@ -76,6 +76,11 @@ const OrganizationSeatsUpdateSchema = OrganizationIdInputSchema.extend({
   seatsRequired: z.boolean(),
 });
 
+const OrganizationOnboardingSummarySchema = z.object({
+  balanceMicrodollars: z.number(),
+  recommendationsDigestEnabled: z.boolean(),
+});
+
 const OrganizationInvoicesInputSchema = OrganizationIdInputSchema.extend({
   period: TimePeriodSchema.optional().default('month'),
 });
@@ -186,6 +191,43 @@ export const organizationsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const state = await getOrganizationOnboardingState(input.organizationId);
       return buildOrganizationOnboardingChecklist(state);
+    }),
+
+  getOnboardingSummary: organizationBillingProcedure
+    .input(OrganizationIdInputSchema)
+    .output(OrganizationOnboardingSummarySchema)
+    .query(async ({ input }) => {
+      let organization = await getOrganizationById(input.organizationId);
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      if (
+        organization.next_credit_expiration_at &&
+        new Date() >= new Date(organization.next_credit_expiration_at)
+      ) {
+        const expiryResult = await processOrganizationExpirations(
+          {
+            id: input.organizationId,
+            microdollars_used: organization.microdollars_used,
+            next_credit_expiration_at: organization.next_credit_expiration_at,
+            total_microdollars_acquired: organization.total_microdollars_acquired,
+          },
+          new Date()
+        );
+        if (expiryResult) {
+          organization = (await getOrganizationById(input.organizationId)) ?? organization;
+        }
+      }
+
+      return {
+        balanceMicrodollars:
+          organization.total_microdollars_acquired - organization.microdollars_used,
+        recommendationsDigestEnabled: organization.settings.recommendations_digest_enabled === true,
+      };
     }),
 
   updateCompanyDomain: organizationBillingMutationProcedure

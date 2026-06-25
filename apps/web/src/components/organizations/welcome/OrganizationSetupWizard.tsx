@@ -37,7 +37,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { InviteMemberDialog } from '@/components/organizations/members/InviteMemberDialog';
-import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useUserOrganizationRole } from '@/components/organizations/OrganizationContext';
 import { OpenInExtensionButton } from '@/components/auth/OpenInExtensionButton';
 import Image from 'next/image';
@@ -144,7 +143,8 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     (checklistQuery.data
       ? getFirstIncompleteOnboardingScreen(checklistQuery.data)
       : 'source-control');
-  const organizationQuery = useOrganizationWithMembers(organizationId, {
+  const organizationSummaryQuery = useQuery({
+    ...trpc.organizations.getOnboardingSummary.queryOptions({ organizationId }),
     enabled: currentScreen === 'complete',
   });
   const stepState = useMemo(
@@ -381,14 +381,11 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
                     completedCount={checklist.completedCount}
                     totalCount={checklist.totalCount}
                     organizationId={organizationId}
-                    balanceMicrodollars={
-                      (organizationQuery.data?.total_microdollars_acquired ?? 0) -
-                      (organizationQuery.data?.microdollars_used ?? 0)
-                    }
-                    organizationLoading={organizationQuery.isLoading}
+                    balanceMicrodollars={organizationSummaryQuery.data?.balanceMicrodollars ?? 0}
+                    organizationLoading={organizationSummaryQuery.isLoading}
                     userRole={userRole}
                     recommendationsDigestEnabled={
-                      organizationQuery.data?.settings?.recommendations_digest_enabled === true
+                      organizationSummaryQuery.data?.recommendationsDigestEnabled ?? false
                     }
                     onBack={() => navigate('invite-team')}
                   />

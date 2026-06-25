@@ -819,6 +819,78 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(failedStatusUpdates).toHaveLength(0);
   });
 
+  it('retries initiateFromPreparedSession with the failed session pinned', async () => {
+    const stub = getReviewStub();
+    const failedSessionId = 'agent-failed-initiate';
+    const retrySessionId = 'agent-retry-after-initiate';
+    let prepareCalls = 0;
+    let initiateCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        if (prepareCalls === 1) {
+          return trpcSuccess({
+            cloudAgentSessionId: failedSessionId,
+            kiloSessionId: 'ses_failed_initiate',
+          });
+        }
+        return trpcSuccess({
+          cloudAgentSessionId: retrySessionId,
+          kiloSessionId: 'ses_retry_after_initiate',
+          sandboxRetryPrepared: true,
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        initiateCalls += 1;
+        if (initiateCalls === 1) {
+          return trpcError(500, 'SandboxError: HTTP error! status: 500 during launch');
+        }
+        return trpcSuccess({ executionId: 'exec-retry-after-initiate', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const retrySchedulingStartedAt = Date.now();
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'queued',
+      sandboxRetryAttempted: true,
+      sandboxRetryOfCloudAgentSessionId: failedSessionId,
+    });
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({
+      status: 'running',
+      sessionId: retrySessionId,
+      cliSessionId: 'ses_retry_after_initiate',
+    });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(2);
+
+    const prepareFetchCalls = fetchCalls(fetchMock, '/trpc/prepareSession');
+    const firstPrepareBody = JSON.parse(String(prepareFetchCalls[0]?.[1]?.body));
+    const retryPrepareBody = JSON.parse(String(prepareFetchCalls[1]?.[1]?.body));
+    expect(firstPrepareBody).not.toHaveProperty('sandboxRetryOfCloudAgentSessionId');
+    expect(retryPrepareBody.sandboxRetryOfCloudAgentSessionId).toBe(failedSessionId);
+  });
+
   it('retries prepareSession from a structured workspace mkdir retry marker', async () => {
     const stub = getReviewStub();
     let prepareCalls = 0;
@@ -1974,6 +2046,7 @@ describe('CodeReviewOrchestrator recovery', () => {
         return trpcSuccess({
           cloudAgentSessionId: 'agent-fresh-after-sandbox-500',
           kiloSessionId: 'ses_fresh_after_sandbox_500',
+          sandboxRetryPrepared: true,
         });
       }
       if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
@@ -2006,6 +2079,11 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
     await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'queued',
+      sandboxRetryAttempted: true,
+      sandboxRetryOfCloudAgentSessionId: previousSessionId,
+    });
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);
@@ -2019,6 +2097,10 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+
+    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
+    const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
+    expect(prepareBody.sandboxRetryOfCloudAgentSessionId).toBe(previousSessionId);
 
     const stored = await storedReview(stub);
     expect(stored).toMatchObject({
@@ -2076,6 +2158,11 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(0);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
     await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'queued',
+      sandboxRetryAttempted: true,
+      sandboxRetryOfCloudAgentSessionId: previousSessionId,
+    });
 
     const retryRan = await runDurableObjectAlarm(stub);
     expect(retryRan).toBe(true);
@@ -2086,6 +2173,9 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(1);
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
+    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
+    const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
+    expect(prepareBody.sandboxRetryOfCloudAgentSessionId).toBe(previousSessionId);
   });
 
   it('aborts alarm recovery before cloud-agent calls when DB is already terminal', async () => {

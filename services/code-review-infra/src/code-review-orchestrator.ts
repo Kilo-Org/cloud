@@ -492,7 +492,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   private async tryRetryFreshSessionAfterSandboxError(
     source: string,
     error: unknown,
-    classification: CloudAgentNextFreshRetryClassification
+    classification: CloudAgentNextFreshRetryClassification,
+    failedCloudAgentSessionId?: string
   ): Promise<boolean> {
     if (this.state.sandboxRetryAttempted === true) {
       this.logCloudAgentNextFreshSessionRetrySkipped(
@@ -531,6 +532,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     const previousSandboxId = this.state.sandboxId;
 
     this.state.sandboxRetryAttempted = true;
+    this.state.sandboxRetryOfCloudAgentSessionId = failedCloudAgentSessionId;
     this.state.previousCloudAgentSessionId = undefined;
     this.state.sessionId = undefined;
     this.state.cliSessionId = undefined;
@@ -551,6 +553,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         previousSessionId,
         previousCliSessionId,
         previousSandboxId,
+        failedCloudAgentSessionId,
         sandboxRetryAttempted: true,
         retryOutcome: 'scheduled',
         retryDelayMs,
@@ -1261,6 +1264,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
   private async runWithCloudAgentNext(): Promise<void> {
     const runStartTime = Date.now();
     const client = this.getCloudAgentNextClient();
+    let preparedCloudAgentSessionId: string | undefined;
 
     try {
       const statusUpdateResult = await this.updateStatus('running');
@@ -1320,6 +1324,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         internalHeaders,
         prepareInput
       );
+      preparedCloudAgentSessionId = cloudAgentSessionId;
 
       const repositorySize = this.state.repositorySize ?? null;
 
@@ -1378,7 +1383,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
           await this.tryRetryFreshSessionAfterSandboxError(
             'cloud-agent-next-fresh',
             error,
-            retryClassification
+            retryClassification,
+            preparedCloudAgentSessionId
           )
         ) {
           return;
@@ -1580,7 +1586,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
           await this.tryRetryFreshSessionAfterSandboxError(
             'cloud-agent-next-followup',
             error,
-            retryClassification
+            retryClassification,
+            previousSessionId
           )
         ) {
           return;

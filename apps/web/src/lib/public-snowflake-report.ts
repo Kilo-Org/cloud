@@ -13,7 +13,7 @@ const CORS_HEADERS = {
 };
 
 const VERCEL_CACHE_TTL_SECONDS = 60;
-const REDIS_CACHE_TTL_SECONDS = 5;
+const REDIS_CACHE_TTL_SECONDS = 3600;
 
 type PublicSnowflakeReportOptions<Usage> = {
   cacheKey: RedisKey;

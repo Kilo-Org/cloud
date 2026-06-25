@@ -85,6 +85,9 @@ import {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
+  CostInsightSpendCategory,
+  CostInsightSpendSource,
+  CostInsightRollupDegradedReason,
   CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
   CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
   CodeReviewAnalyticsCaptureStatus,
@@ -237,6 +240,9 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
+  CostInsightSpendCategory,
+  CostInsightSpendSource,
+  CostInsightRollupDegradedReason,
   CodeReviewAnalyticsCaptureStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
@@ -2673,6 +2679,251 @@ export const organizations = pgTable(
 );
 
 export type Organization = typeof organizations.$inferSelect;
+
+export const cost_insight_owner_hour_totals = pgTable(
+  'cost_insight_owner_hour_totals',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    spend_category: text().$type<CostInsightSpendCategory>().notNull(),
+    total_microdollars: bigint({ mode: 'number' }).notNull(),
+    spend_record_count: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_owner_hour_totals_user')
+      .on(table.owned_by_user_id, table.hour_start, table.spend_category)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_owner_hour_totals_org')
+      .on(table.owned_by_organization_id, table.hour_start, table.spend_category)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_owner_hour_totals_hour').on(table.hour_start),
+    check(
+      'cost_insight_owner_hour_totals_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_hour_check',
+      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
+    ),
+    enumCheck(
+      'cost_insight_owner_hour_totals_category_check',
+      table.spend_category,
+      CostInsightSpendCategory
+    ),
+    check(
+      'cost_insight_owner_hour_totals_amount_positive_check',
+      sql`${table.total_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_amount_safe_check',
+      sql`${table.total_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_count_positive_check',
+      sql`${table.spend_record_count} > 0`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_count_safe_check',
+      sql`${table.spend_record_count} <= 9007199254740991`
+    ),
+  ]
+);
+
+export type CostInsightOwnerHourTotal = typeof cost_insight_owner_hour_totals.$inferSelect;
+
+export const cost_insight_owner_hour_driver_buckets = pgTable(
+  'cost_insight_owner_hour_driver_buckets',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    spend_category: text().$type<CostInsightSpendCategory>().notNull(),
+    driver_key: text().notNull(),
+    source: text().$type<CostInsightSpendSource>().notNull(),
+    product_key: text().notNull(),
+    feature_key: text().notNull(),
+    model_or_plan_key: text().notNull(),
+    provider_key: text().notNull(),
+    actor_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onUpdate: 'cascade' }),
+    total_microdollars: bigint({ mode: 'number' }).notNull(),
+    spend_record_count: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_driver_buckets_user')
+      .on(table.owned_by_user_id, table.hour_start, table.spend_category, table.driver_key)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_driver_buckets_org')
+      .on(table.owned_by_organization_id, table.hour_start, table.spend_category, table.driver_key)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_driver_buckets_hour').on(table.hour_start),
+    check(
+      'cost_insight_driver_buckets_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_driver_buckets_hour_check',
+      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
+    ),
+    enumCheck(
+      'cost_insight_driver_buckets_category_check',
+      table.spend_category,
+      CostInsightSpendCategory
+    ),
+    enumCheck('cost_insight_driver_buckets_source_check', table.source, CostInsightSpendSource),
+    check(
+      'cost_insight_driver_buckets_driver_key_check',
+      sql`${table.driver_key} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      'cost_insight_driver_buckets_product_key_check',
+      sql`char_length(${table.product_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_feature_key_check',
+      sql`char_length(${table.feature_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_model_key_check',
+      sql`char_length(${table.model_or_plan_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_provider_key_check',
+      sql`char_length(${table.provider_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_amount_positive_check',
+      sql`${table.total_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_driver_buckets_amount_safe_check',
+      sql`${table.total_microdollars} <= 9007199254740991`
+    ),
+    check('cost_insight_driver_buckets_count_positive_check', sql`${table.spend_record_count} > 0`),
+    check(
+      'cost_insight_driver_buckets_count_safe_check',
+      sql`${table.spend_record_count} <= 9007199254740991`
+    ),
+  ]
+);
+
+export type CostInsightOwnerHourDriverBucket =
+  typeof cost_insight_owner_hour_driver_buckets.$inferSelect;
+
+export const cost_insight_rollup_coverage = pgTable(
+  'cost_insight_rollup_coverage',
+  {
+    rollup_version: smallint().primaryKey().notNull(),
+    live_capture_start_hour: timestamp({ withTimezone: true, mode: 'string' }),
+    coverage_start_hour: timestamp({ withTimezone: true, mode: 'string' }),
+    last_reconciled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check('cost_insight_rollup_coverage_version_check', sql`${table.rollup_version} > 0`),
+    check(
+      'cost_insight_rollup_coverage_live_hour_check',
+      sql`${table.live_capture_start_hour} IS NULL OR ${table.live_capture_start_hour} = date_trunc('hour', ${table.live_capture_start_hour}, 'UTC')`
+    ),
+    check(
+      'cost_insight_rollup_coverage_start_hour_check',
+      sql`${table.coverage_start_hour} IS NULL OR ${table.coverage_start_hour} = date_trunc('hour', ${table.coverage_start_hour}, 'UTC')`
+    ),
+    check(
+      'cost_insight_rollup_coverage_range_check',
+      sql`${table.coverage_start_hour} IS NULL OR (${table.live_capture_start_hour} IS NOT NULL AND ${table.coverage_start_hour} <= ${table.live_capture_start_hour})`
+    ),
+  ]
+);
+
+export type CostInsightRollupCoverage = typeof cost_insight_rollup_coverage.$inferSelect;
+
+export const cost_insight_rollup_degraded_intervals = pgTable(
+  'cost_insight_rollup_degraded_intervals',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    start_hour: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    end_hour_exclusive: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    source: text().$type<CostInsightSpendSource>(),
+    reason: text().$type<CostInsightRollupDegradedReason>().notNull(),
+    detected_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    resolved_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_cost_insight_degraded_intervals_unresolved')
+      .on(table.start_hour, table.end_hour_exclusive)
+      .where(isNull(table.resolved_at)),
+    check(
+      'cost_insight_degraded_intervals_start_hour_check',
+      sql`${table.start_hour} = date_trunc('hour', ${table.start_hour}, 'UTC')`
+    ),
+    check(
+      'cost_insight_degraded_intervals_end_hour_check',
+      sql`${table.end_hour_exclusive} = date_trunc('hour', ${table.end_hour_exclusive}, 'UTC')`
+    ),
+    check(
+      'cost_insight_degraded_intervals_range_check',
+      sql`${table.end_hour_exclusive} > ${table.start_hour}`
+    ),
+    check(
+      'cost_insight_degraded_intervals_resolution_check',
+      sql`${table.resolved_at} IS NULL OR ${table.resolved_at} >= ${table.detected_at}`
+    ),
+    enumCheck('cost_insight_degraded_intervals_source_check', table.source, CostInsightSpendSource),
+    enumCheck(
+      'cost_insight_degraded_intervals_reason_check',
+      table.reason,
+      CostInsightRollupDegradedReason
+    ),
+  ]
+);
+
+export type CostInsightRollupDegradedInterval =
+  typeof cost_insight_rollup_degraded_intervals.$inferSelect;
 
 export const organization_memberships = pgTable(
   'organization_memberships',

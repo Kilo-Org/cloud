@@ -15,6 +15,11 @@ import {
   type KiloClawSubscriptionChangeActor,
 } from '@kilocode/db';
 import {
+  captureCostInsightSpend,
+  COST_INSIGHT_DRIVER_FALLBACK,
+  COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
+} from '@kilocode/db/cost-insights-rollups';
+import {
   credit_transactions,
   kilocode_users,
   kiloclaw_email_log,
@@ -1519,6 +1524,7 @@ export async function enrollWithCredits(params: {
         credit_category: deductionCategory,
         check_category_uniqueness: true,
         original_baseline_microdollars_used: user.microdollars_used,
+        created_at: periodStartIso,
       })
       .onConflictDoNothing();
 
@@ -1534,6 +1540,19 @@ export async function enrollWithCredits(params: {
       deductionWasDuplicate = true;
       return;
     }
+
+    await captureCostInsightSpend(tx, {
+      owner: { type: 'user', id: userId },
+      actorUserId: userId,
+      occurredAt: periodStartIso,
+      amountMicrodollars: costMicrodollars,
+      category: 'scheduled',
+      source: 'kiloclaw',
+      productKey: COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
+      featureKey: 'enrollment',
+      modelOrPlanKey: plan,
+      providerKey: COST_INSIGHT_DRIVER_FALLBACK,
+    });
 
     if (
       currentSubscription?.status === 'canceled' &&

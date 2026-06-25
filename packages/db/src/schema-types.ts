@@ -595,6 +595,35 @@ export const CodingPlanTermKind = {
 
 export type CodingPlanTermKind = (typeof CodingPlanTermKind)[keyof typeof CodingPlanTermKind];
 
+// --- Cost Insights enums ---
+
+export const CostInsightSpendCategory = {
+  Variable: 'variable',
+  Scheduled: 'scheduled',
+} as const;
+
+export type CostInsightSpendCategory =
+  (typeof CostInsightSpendCategory)[keyof typeof CostInsightSpendCategory];
+
+export const CostInsightSpendSource = {
+  AiGateway: 'ai_gateway',
+  KiloClaw: 'kiloclaw',
+  CodingPlan: 'coding_plan',
+  Other: 'other',
+} as const;
+
+export type CostInsightSpendSource =
+  (typeof CostInsightSpendSource)[keyof typeof CostInsightSpendSource];
+
+export const CostInsightRollupDegradedReason = {
+  CaptureBypass: 'capture_bypass',
+  ReconciliationMismatch: 'reconciliation_mismatch',
+  LateSourceData: 'late_source_data',
+} as const;
+
+export type CostInsightRollupDegradedReason =
+  (typeof CostInsightRollupDegradedReason)[keyof typeof CostInsightRollupDegradedReason];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',

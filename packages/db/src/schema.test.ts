@@ -606,6 +606,13 @@ describe('database schema', () => {
       ],
       CodingPlanSubscriptionStatus: ['active', 'past_due', 'canceled'],
       CodingPlanTermKind: ['activation', 'extension', 'renewal'],
+      CostInsightSpendCategory: ['variable', 'scheduled'],
+      CostInsightSpendSource: ['ai_gateway', 'kiloclaw', 'coding_plan', 'other'],
+      CostInsightRollupDegradedReason: [
+        'capture_bypass',
+        'reconciliation_mismatch',
+        'late_source_data',
+      ],
       CodeReviewAnalyticsCaptureStatus: ['captured', 'missing', 'invalid', 'omitted'],
       CodeReviewAnalyticsChangeType: [
         'bug_fix',

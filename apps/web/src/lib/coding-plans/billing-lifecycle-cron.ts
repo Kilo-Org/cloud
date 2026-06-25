@@ -9,6 +9,10 @@ import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@/lib/utils.server';
 import {
+  captureCostInsightSpend,
+  COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
+} from '@kilocode/db/cost-insights-rollups';
+import {
   byok_api_keys,
   coding_plan_key_inventory,
   coding_plan_subscriptions,
@@ -38,6 +42,7 @@ type RenewalRow = {
   installed_byok_key_id: string | null;
   key_inventory_id: string | null;
   plan_id: string;
+  provider_id: string;
   status: 'active' | 'past_due';
   cost_microdollars: number;
   billing_period_days: number;
@@ -178,6 +183,7 @@ async function sweepRenewals(
       installed_byok_key_id: coding_plan_subscriptions.installed_byok_key_id,
       key_inventory_id: coding_plan_subscriptions.key_inventory_id,
       plan_id: coding_plan_subscriptions.plan_id,
+      provider_id: coding_plan_subscriptions.provider_id,
       status: coding_plan_subscriptions.status,
       cost_microdollars: coding_plan_subscriptions.cost_microdollars,
       billing_period_days: coding_plan_subscriptions.billing_period_days,
@@ -282,6 +288,7 @@ async function processRenewal(
         installed_byok_key_id: coding_plan_subscriptions.installed_byok_key_id,
         key_inventory_id: coding_plan_subscriptions.key_inventory_id,
         plan_id: coding_plan_subscriptions.plan_id,
+        provider_id: coding_plan_subscriptions.provider_id,
         status: coding_plan_subscriptions.status,
         cost_microdollars: coding_plan_subscriptions.cost_microdollars,
         billing_period_days: coding_plan_subscriptions.billing_period_days,
@@ -328,6 +335,7 @@ async function processRenewal(
         row.billing_period_days
       ).toISOString();
       const transactionId = crypto.randomUUID();
+      const occurredAt = new Date().toISOString();
       const plan = getCodingPlanPrice(row.plan_id);
       const renewalDescription = plan
         ? `Coding plan renewal: ${plan.providerName} ${plan.name}`
@@ -341,6 +349,19 @@ async function processRenewal(
         credit_category: `coding-plan:${renewalKey}`,
         check_category_uniqueness: true,
         original_baseline_microdollars_used: row.microdollars_used,
+        created_at: occurredAt,
+      });
+      await captureCostInsightSpend(tx, {
+        owner: { type: 'user', id: row.user_id },
+        actorUserId: row.user_id,
+        occurredAt,
+        amountMicrodollars: row.cost_microdollars,
+        category: 'scheduled',
+        source: 'coding_plan',
+        productKey: COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
+        featureKey: 'renewal',
+        modelOrPlanKey: row.plan_id,
+        providerKey: row.provider_id,
       });
       await tx.insert(coding_plan_terms).values({
         subscription_id: row.id,

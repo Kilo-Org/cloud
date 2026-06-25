@@ -1,10 +1,19 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { db } from '@/lib/drizzle';
-import { exa_monthly_usage, exa_usage_log, kilocode_users } from '@kilocode/db/schema';
+import {
+  cost_insight_owner_hour_driver_buckets,
+  cost_insight_owner_hour_totals,
+  exa_monthly_usage,
+  exa_usage_log,
+  kilocode_users,
+  organization_user_usage,
+  organizations,
+} from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from './exa-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 
 // Mock next/server's after function which requires request context
 jest.mock('next/server', () => ({
@@ -97,6 +106,12 @@ describe('Exa Usage Tracking', () => {
       expect(rows[0].total_charged_microdollars).toBe(0);
       expect(rows[0].request_count).toBe(1);
       expect(rows[0].free_allowance_microdollars).toBe(10_000_000);
+
+      const totals = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
+      expect(totals).toHaveLength(0);
     });
 
     test('increments existing counter on subsequent requests', async () => {
@@ -215,6 +230,146 @@ describe('Exa Usage Tracking', () => {
         .where(eq(kilocode_users.id, user.id));
 
       expect(updated.microdollars_used).toBe(7000);
+
+      const [source] = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.kilo_user_id, user.id));
+      const [total] = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
+      expect(total).toBeDefined();
+      const sourceHour = new Date(source.created_at);
+      sourceHour.setUTCMinutes(0, 0, 0);
+      expect(new Date(total.hour_start).toISOString()).toBe(sourceHour.toISOString());
+      expect(total).toMatchObject({
+        owned_by_organization_id: null,
+        spend_category: 'variable',
+        total_microdollars: 7000,
+        spend_record_count: 1,
+      });
+
+      const [driver] = await db
+        .select()
+        .from(cost_insight_owner_hour_driver_buckets)
+        .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, user.id));
+      expect(driver).toMatchObject({
+        source: 'other',
+        product_key: 'exa',
+        feature_key: 'search',
+        model_or_plan_key: 'other',
+        provider_key: 'exa',
+        actor_user_id: user.id,
+        total_microdollars: 7000,
+        spend_record_count: 1,
+      });
+    });
+
+    test('charges organization, tracks member usage, and captures spend atomically', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Exa usage organization', user.id, 50_000);
+
+      await recordExaUsage({
+        userId: user.id,
+        organizationId: organization.id,
+        path: '/contents',
+        costMicrodollars: 9000,
+        chargedToBalance: true,
+        freeAllowanceMicrodollars: 10_000_000,
+      });
+
+      const [chargedOrganization] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+      expect(chargedOrganization.microdollars_used).toBe(9000);
+
+      const [memberUsage] = await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+      expect(memberUsage).toMatchObject({
+        kilo_user_id: user.id,
+        microdollar_usage: 9000,
+      });
+
+      const [total] = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_organization_id, organization.id));
+      expect(total).toMatchObject({
+        owned_by_user_id: null,
+        spend_category: 'variable',
+        total_microdollars: 9000,
+        spend_record_count: 1,
+      });
+
+      const [driver] = await db
+        .select()
+        .from(cost_insight_owner_hour_driver_buckets)
+        .where(
+          eq(cost_insight_owner_hour_driver_buckets.owned_by_organization_id, organization.id)
+        );
+      expect(driver).toMatchObject({
+        source: 'other',
+        product_key: 'exa',
+        feature_key: 'contents',
+        model_or_plan_key: 'other',
+        provider_key: 'exa',
+        actor_user_id: user.id,
+        total_microdollars: 9000,
+      });
+    });
+
+    test('maps unsupported Exa paths to the controlled other feature', async () => {
+      const user = await insertTestUser();
+
+      await recordExaUsage({
+        userId: user.id,
+        organizationId: undefined,
+        path: '/unsupported-client-path',
+        costMicrodollars: 1000,
+        chargedToBalance: true,
+        freeAllowanceMicrodollars: 10_000_000,
+      });
+
+      const [driver] = await db
+        .select()
+        .from(cost_insight_owner_hour_driver_buckets)
+        .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, user.id));
+      expect(driver.feature_key).toBe('other');
+    });
+
+    test('rolls back Exa source and monthly rows when mandatory capture fails', async () => {
+      const missingUserId = `missing-exa-user-${crypto.randomUUID()}`;
+
+      await expect(
+        recordExaUsage({
+          userId: missingUserId,
+          organizationId: undefined,
+          path: '/search',
+          costMicrodollars: 1000,
+          chargedToBalance: true,
+          freeAllowanceMicrodollars: 10_000_000,
+        })
+      ).rejects.toThrow();
+
+      const sourceRows = await db
+        .select()
+        .from(exa_usage_log)
+        .where(eq(exa_usage_log.kilo_user_id, missingUserId));
+      const monthlyRows = await db
+        .select()
+        .from(exa_monthly_usage)
+        .where(eq(exa_monthly_usage.kilo_user_id, missingUserId));
+      const totals = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, missingUserId));
+      expect(sourceRows).toHaveLength(0);
+      expect(monthlyRows).toHaveLength(0);
+      expect(totals).toHaveLength(0);
     });
 
     test('does not deduct from balance when chargedToBalance is false', async () => {

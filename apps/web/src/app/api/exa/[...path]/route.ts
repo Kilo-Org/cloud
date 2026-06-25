@@ -13,16 +13,15 @@ import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage
 import { readDb } from '@/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
+import { EXA_ALLOWED_PATHS, isExaAllowedPath } from '@/lib/exa-paths';
 
 const EXA_BASE_URL = 'https://api.exa.ai';
-
-const ALLOWED_PATHS = new Set(['/search', '/contents', '/findSimilar', '/answer', '/context']);
 
 function extractExaPath(url: URL): string | null {
   const prefix = '/api/exa';
   if (!url.pathname.startsWith(prefix)) return null;
   const path = url.pathname.slice(prefix.length);
-  return ALLOWED_PATHS.has(path) ? path : null;
+  return isExaAllowedPath(path) ? path : null;
 }
 
 function extractCostDollars(responseBody: unknown): number | undefined {
@@ -40,7 +39,7 @@ export async function POST(request: NextRequest) {
   const exaPath = extractExaPath(url);
   if (!exaPath) {
     return NextResponse.json(
-      { error: `Invalid path. Allowed: ${[...ALLOWED_PATHS].join(', ')}` },
+      { error: `Invalid path. Allowed: ${EXA_ALLOWED_PATHS.join(', ')}` },
       { status: 400 }
     );
   }

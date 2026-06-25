@@ -374,6 +374,7 @@ function Inner(props: InnerProps) {
   const isAutoTopUpEnabled = useIsAutoTopUpEnabled();
   const isInAdminDashboard = isKiloAdmin && showAdminControls;
   const isOrgOwner = useCanManagePaymentInfo();
+  const canManageRequestedSlug = isOrgOwner || isKiloAdmin;
   const hierarchyQuery = useAdminOrganizationHierarchy(id, isInAdminDashboard);
 
   const handleSeatsRequirementEdit = () => {
@@ -530,107 +531,109 @@ function Inner(props: InnerProps) {
             </div>
           )}
         </div>
-        <div>
-          <label className="text-muted-foreground text-sm font-medium">Requested Slug</label>
-          {isEditingRequestedSlug ? (
-            <div className="mt-1">
-              <div className="flex items-center gap-2">
-                <Input
-                  value={editedRequestedSlug}
-                  onChange={e => {
-                    setEditedRequestedSlug(e.target.value);
-                    setRequestedSlugError(null);
-                  }}
-                  onKeyDown={handleRequestedSlugKeyDown}
-                  className={`font-mono text-sm ${requestedSlugError ? 'border-red-400' : ''}`}
-                  autoFocus
-                  disabled={updateOrganizationRequestedSlug.isPending}
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleRequestedSlugSave}
-                  disabled={updateOrganizationRequestedSlug.isPending}
-                  className="h-8 w-8 p-0"
-                  aria-label="Save requested organization slug"
-                >
-                  <Check className="h-4 w-4 text-green-400" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleRequestedSlugCancel}
-                  disabled={updateOrganizationRequestedSlug.isPending}
-                  className="h-8 w-8 p-0"
-                  aria-label="Cancel requested organization slug edit"
-                >
-                  <X className="h-4 w-4 text-red-400" />
-                </Button>
-              </div>
-              {requestedSlugError ? (
-                <p className="mt-1 text-sm text-red-400">{requestedSlugError}</p>
-              ) : null}
-            </div>
-          ) : (
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <p className="font-mono text-sm">
-                {info.requested_slug || <span className="text-muted-foreground">Not set</span>}
-              </p>
-              {info.requested_slug && !isRequestedSlugAvailable ? (
-                <Badge className="bg-status-destructive-surface text-status-destructive border-status-destructive-border">
-                  Not Available
-                </Badge>
-              ) : null}
-              {isOrgOwner && (
-                <button
-                  onClick={() => setIsEditingRequestedSlug(true)}
-                  className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"
-                  title="Edit requested organization slug"
-                >
-                  <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
-                </button>
-              )}
-              {isKiloAdmin && info.requested_slug ? (
-                <>
+        {canManageRequestedSlug ? (
+          <div>
+            <label className="text-muted-foreground text-sm font-medium">Requested Slug</label>
+            {isEditingRequestedSlug ? (
+              <div className="mt-1">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={editedRequestedSlug}
+                    onChange={e => {
+                      setEditedRequestedSlug(e.target.value);
+                      setRequestedSlugError(null);
+                    }}
+                    onKeyDown={handleRequestedSlugKeyDown}
+                    className={`font-mono text-sm ${requestedSlugError ? 'border-red-400' : ''}`}
+                    autoFocus
+                    disabled={updateOrganizationRequestedSlug.isPending}
+                  />
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() =>
-                      adminAcceptRequestedSlug.mutate({
-                        organizationId: id,
-                      })
-                    }
-                    disabled={requestedSlugMutationPending || !isRequestedSlugAvailable}
+                    onClick={handleRequestedSlugSave}
+                    disabled={updateOrganizationRequestedSlug.isPending}
                     className="h-8 w-8 p-0"
-                    aria-label="Accept requested organization slug"
-                    title={
-                      isRequestedSlugAvailable
-                        ? 'Accept requested organization slug'
-                        : 'Requested slug is not available'
-                    }
+                    aria-label="Save requested organization slug"
                   >
                     <Check className="h-4 w-4 text-green-400" />
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() =>
-                      adminDeclineRequestedSlug.mutate({
-                        organizationId: id,
-                      })
-                    }
-                    disabled={requestedSlugMutationPending}
+                    onClick={handleRequestedSlugCancel}
+                    disabled={updateOrganizationRequestedSlug.isPending}
                     className="h-8 w-8 p-0"
-                    aria-label="Decline requested organization slug"
-                    title="Decline requested organization slug"
+                    aria-label="Cancel requested organization slug edit"
                   >
                     <X className="h-4 w-4 text-red-400" />
                   </Button>
-                </>
-              ) : null}
-            </div>
-          )}
-        </div>
+                </div>
+                {requestedSlugError ? (
+                  <p className="mt-1 text-sm text-red-400">{requestedSlugError}</p>
+                ) : null}
+              </div>
+            ) : (
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <p className="font-mono text-sm">
+                  {info.requested_slug || <span className="text-muted-foreground">Not set</span>}
+                </p>
+                {info.requested_slug && !isRequestedSlugAvailable ? (
+                  <Badge className="bg-status-destructive-surface text-status-destructive border-status-destructive-border">
+                    Not Available
+                  </Badge>
+                ) : null}
+                {isOrgOwner && (
+                  <button
+                    onClick={() => setIsEditingRequestedSlug(true)}
+                    className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"
+                    title="Edit requested organization slug"
+                  >
+                    <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
+                  </button>
+                )}
+                {isKiloAdmin && info.requested_slug ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        adminAcceptRequestedSlug.mutate({
+                          organizationId: id,
+                        })
+                      }
+                      disabled={requestedSlugMutationPending || !isRequestedSlugAvailable}
+                      className="h-8 w-8 p-0"
+                      aria-label="Accept requested organization slug"
+                      title={
+                        isRequestedSlugAvailable
+                          ? 'Accept requested organization slug'
+                          : 'Requested slug is not available'
+                      }
+                    >
+                      <Check className="h-4 w-4 text-green-400" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        adminDeclineRequestedSlug.mutate({
+                          organizationId: id,
+                        })
+                      }
+                      disabled={requestedSlugMutationPending}
+                      className="h-8 w-8 p-0"
+                      aria-label="Decline requested organization slug"
+                      title="Decline requested organization slug"
+                    >
+                      <X className="h-4 w-4 text-red-400" />
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+            )}
+          </div>
+        ) : null}
         <div>
           <label className="text-muted-foreground text-sm font-medium">Company Domain</label>
           {isEditingDomain ? (

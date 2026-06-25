@@ -110,6 +110,7 @@ describe('organization admin router', () => {
           organizationIds.includes(organization.id)
         );
 
+        expect(result.updatedCount).toBeLessThanOrEqual(50);
         expect(backfilledRows).toHaveLength(2);
         expect(backfilledRows.map(organization => organization.id)).toEqual([
           otherMissingOrganization.id,
@@ -138,6 +139,88 @@ describe('organization admin router', () => {
 
         const secondResult = await caller.organizations.admin.backfillMissingSlugs();
         expect(secondResult).toEqual({ updatedCount: 0, organizations: [] });
+      } finally {
+        await db.delete(organizations).where(inArray(organizations.id, organizationIds));
+      }
+    });
+
+    it('backfills legacy deleted organizations with deleted slugs that do not block name reuse', async () => {
+      const organizationName = `Backfill Deleted Legacy ${crypto.randomUUID()}`;
+      const deletedOrganization = await createOrganization(organizationName, null);
+      const nullSlugDeletedOrganization = await createOrganization(
+        `Backfill Null Deleted Legacy ${crypto.randomUUID()}`,
+        null
+      );
+      const alreadyBackfilledDeletedOrganization = await createOrganization(
+        `Backfill Already Deleted Legacy ${crypto.randomUUID()}`,
+        null
+      );
+      const alreadyBackfilledDeletedSlug = `deleted-${crypto.randomUUID().replaceAll('-', '').slice(0, 24)}`;
+      const organizationIds = [
+        deletedOrganization.id,
+        nullSlugDeletedOrganization.id,
+        alreadyBackfilledDeletedOrganization.id,
+      ];
+
+      try {
+        await db
+          .update(organizations)
+          .set({ slug: null, deleted_at: sql`NOW()` })
+          .where(eq(organizations.id, nullSlugDeletedOrganization.id));
+
+        await db
+          .update(organizations)
+          .set({ deleted_at: sql`NOW()` })
+          .where(eq(organizations.id, deletedOrganization.id));
+
+        await db
+          .update(organizations)
+          .set({ slug: alreadyBackfilledDeletedSlug, deleted_at: sql`NOW()` })
+          .where(eq(organizations.id, alreadyBackfilledDeletedOrganization.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.organizations.admin.backfillMissingSlugs();
+        const backfilledDeletedOrganization = result.organizations.find(
+          organization => organization.id === deletedOrganization.id
+        );
+        const backfilledNullSlugDeletedOrganization = result.organizations.find(
+          organization => organization.id === nullSlugDeletedOrganization.id
+        );
+
+        expect(backfilledDeletedOrganization?.slug).toMatch(/^deleted-[0-9a-f]{24}$/);
+        expect(backfilledNullSlugDeletedOrganization?.slug).toMatch(/^deleted-[0-9a-f]{24}$/);
+        expect(
+          result.organizations.some(
+            organization => organization.id === alreadyBackfilledDeletedOrganization.id
+          )
+        ).toBe(false);
+
+        const reusedNameOrganization = await createOrganization(organizationName, null);
+        organizationIds.push(reusedNameOrganization.id);
+
+        const updatedOrganizations = await db
+          .select({ id: organizations.id, slug: organizations.slug })
+          .from(organizations)
+          .where(inArray(organizations.id, organizationIds));
+        const updatedSlugByOrganizationId = new Map(
+          updatedOrganizations.map(organization => [organization.id, organization.slug])
+        );
+
+        expect(updatedSlugByOrganizationId.get(deletedOrganization.id)).toMatch(
+          /^deleted-[0-9a-f]{24}$/
+        );
+        expect(updatedSlugByOrganizationId.get(deletedOrganization.id)).not.toBe(
+          normalizeOrganizationSlug(organizationName)
+        );
+        expect(updatedSlugByOrganizationId.get(nullSlugDeletedOrganization.id)).toMatch(
+          /^deleted-[0-9a-f]{24}$/
+        );
+        expect(updatedSlugByOrganizationId.get(alreadyBackfilledDeletedOrganization.id)).toBe(
+          alreadyBackfilledDeletedSlug
+        );
+        expect(updatedSlugByOrganizationId.get(reusedNameOrganization.id)).toBe(
+          normalizeOrganizationSlug(organizationName)
+        );
       } finally {
         await db.delete(organizations).where(inArray(organizations.id, organizationIds));
       }

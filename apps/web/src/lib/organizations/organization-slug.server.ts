@@ -13,6 +13,9 @@ import {
 const ORGANIZATION_SLUG_ALLOCATION_LOCK_KEY_1 = 20260625;
 const ORGANIZATION_SLUG_ALLOCATION_LOCK_KEY_2 = 1;
 const MAX_ORGANIZATION_SLUG_ALLOCATION_ATTEMPTS = 32;
+const DELETED_ORGANIZATION_SLUG_PREFIX = 'deleted-';
+const DELETED_ORGANIZATION_SLUG_RANDOM_BYTES = 12;
+export const MAX_DELETED_ORGANIZATION_SLUG_ATTEMPTS = 5;
 
 async function organizationSlugExists(slug: string, tx: DrizzleTransaction): Promise<boolean> {
   const [existingOrganization] = await tx
@@ -26,6 +29,10 @@ async function organizationSlugExists(slug: string, tx: DrizzleTransaction): Pro
 
 function generateOrganizationSlugCollisionSuffix(): string {
   return randomBytes(2).toString('hex').slice(0, ORGANIZATION_SLUG_COLLISION_SUFFIX_LENGTH);
+}
+
+function generateDeletedOrganizationSlug(): string {
+  return `${DELETED_ORGANIZATION_SLUG_PREFIX}${randomBytes(DELETED_ORGANIZATION_SLUG_RANDOM_BYTES).toString('hex')}`;
 }
 
 export async function allocateOrganizationSlug(
@@ -53,4 +60,16 @@ export async function allocateOrganizationSlug(
   }
 
   throw new Error(`Failed to allocate organization slug for "${name}"`);
+}
+
+export async function allocateDeletedOrganizationSlug(tx: DrizzleTransaction): Promise<string> {
+  for (let attempt = 0; attempt < MAX_DELETED_ORGANIZATION_SLUG_ATTEMPTS; attempt += 1) {
+    const candidateSlug = generateDeletedOrganizationSlug();
+
+    if (!(await organizationSlugExists(candidateSlug, tx))) {
+      return candidateSlug;
+    }
+  }
+
+  throw new Error('Failed to allocate deleted organization slug');
 }

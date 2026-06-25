@@ -107,7 +107,7 @@ export function useOrganizationUsageStats(organizationId: string) {
 
 export function useSlugAvailability(
   organizationId: string,
-  slug: string | null,
+  slug: string,
   options?: { enabled?: boolean }
 ) {
   const trpc = useTRPC();

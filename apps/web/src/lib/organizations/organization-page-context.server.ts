@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cache } from 'react';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import type { Organization, User } from '@kilocode/db/schema';
@@ -21,13 +22,18 @@ export type AuthorizedOrganizationRouteContext = {
   organization: Organization;
 };
 
+const getAuthorizedOrganizationRouteContextForIdentifier = cache(
+  async (routeIdentifier: string, roles?: OrganizationRole[]) =>
+    getAuthorizedOrgContext(routeIdentifier, roles)
+);
+
 export async function getAuthorizedOrganizationRouteContext(
   params: OrganizationRouteParams,
   roles?: OrganizationRole[]
 ) {
   const { id } = await params;
   const routeIdentifier = decodeURIComponent(id);
-  const result = await getAuthorizedOrgContext(routeIdentifier, roles);
+  const result = await getAuthorizedOrganizationRouteContextForIdentifier(routeIdentifier, roles);
 
   return {
     rawRouteIdentifier: id,

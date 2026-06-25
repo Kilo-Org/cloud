@@ -32,8 +32,8 @@ export function OrganizationSlugBackfill() {
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        Backfill organization slugs for legacy organizations missing the field. This scans all
-        missing rows in one transaction and allocates unique slugs from organization names.
+        Backfill organization slugs for legacy organizations missing the field. Each click processes
+        up to 50 organizations. Click repeatedly until no rows are updated.
       </p>
 
       <div className="bg-background space-y-4 rounded-lg border p-6">
@@ -75,7 +75,7 @@ export function OrganizationSlugBackfill() {
         ) : null}
 
         <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-          {mutation.isPending ? 'Backfilling...' : 'Backfill missing slugs'}
+          {mutation.isPending ? 'Backfilling...' : 'Backfill next 50'}
         </Button>
       </div>
 

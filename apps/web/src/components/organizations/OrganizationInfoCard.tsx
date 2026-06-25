@@ -209,7 +209,7 @@ function Inner(props: InnerProps) {
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
 
   const { expiringBlocks, expiring_mUsd, earliestExpiry } = useExpiringCredits(id);
-  const editedSlugAvailability = useSlugAvailability(id, editedSlug.trim() || null, {
+  const editedSlugAvailability = useSlugAvailability(id, editedSlug.trim(), {
     enabled: isEditingSlug && Boolean(editedSlug.trim()) && editedSlug.trim() !== info.slug,
   });
   const isEditedSlugAvailable = editedSlugAvailability.data?.available ?? true;
@@ -254,7 +254,12 @@ function Inner(props: InnerProps) {
 
   const handleSlugSave = async () => {
     setSlugError(null);
-    const nextSlug = editedSlug.trim() || null;
+    const nextSlug = editedSlug.trim();
+    if (!nextSlug) {
+      setSlugError('Organization slug is required');
+      return;
+    }
+
     if (nextSlug === info.slug) {
       setEditedSlug(info.slug ?? '');
       setIsEditingSlug(false);

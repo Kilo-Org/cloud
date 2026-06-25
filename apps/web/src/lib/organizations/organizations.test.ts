@@ -19,6 +19,7 @@ import {
   inviteUserToOrganization,
   getOrganizationMembers,
   acceptOrganizationInvite,
+  markOrganizationAsDeleted,
 } from './organizations';
 import { fromMicrodollars } from '@/lib/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
@@ -45,6 +46,7 @@ describe('Organizations', () => {
       expect(normalizeOrganizationSlug('Team_Alpha Beta.Gamma!')).toBe('teamalpha-beta-gamma');
       expect(normalizeOrganizationSlug('Kilo Test Org')).toBe('test-org');
       expect(normalizeOrganizationSlug('Kilocode Team')).toBe('code-team');
+      expect(normalizeOrganizationSlug('Deleted Team')).toBe('team');
       expect(normalizeOrganizationSlug('mykiloorg')).toBe('myorg');
       expect(normalizeOrganizationSlug('Kilo')).toMatch(/^[a-z]+-[a-z]+$/);
       expect(normalizeOrganizationSlug('')).toMatch(/^[a-z]+-[a-z]+$/);
@@ -68,6 +70,52 @@ describe('Organizations', () => {
 
       expect(firstOrganization.slug).toBe('demo-example-org');
       expect(secondOrganization.slug).toMatch(/^demo-example-org-[0-9a-f]{3}$/);
+    });
+
+    test('randomizes deleted organization slugs and releases the original slug', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Reusable Org', user.id);
+      const secondOrganization = await createOrganization('Second Reusable Org', user.id);
+
+      await markOrganizationAsDeleted(organization.id);
+      await markOrganizationAsDeleted(secondOrganization.id);
+
+      const deletedOrganization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, organization.id),
+      });
+      const secondDeletedOrganization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, secondOrganization.id),
+      });
+      expect(deletedOrganization).toBeDefined();
+      expect(deletedOrganization?.deleted_at).not.toBeNull();
+      expect(deletedOrganization?.slug).toMatch(/^deleted-[0-9a-f]{24}$/);
+      expect(deletedOrganization?.slug).toHaveLength(32);
+      expect(deletedOrganization?.slug).not.toBe(
+        `deleted-${organization.id.replaceAll('-', '').slice(0, 24)}`
+      );
+      expect(secondDeletedOrganization?.slug).toMatch(/^deleted-[0-9a-f]{24}$/);
+      expect(secondDeletedOrganization?.slug).not.toBe(deletedOrganization?.slug);
+
+      const replacementOrganization = await createOrganization('Reusable Org', user.id);
+      expect(replacementOrganization.slug).toBe('reusable-org');
+    });
+
+    test('sets a deleted marker slug when the existing organization slug is null', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Null Slug Org', user.id);
+      await db
+        .update(organizations)
+        .set({ slug: null })
+        .where(eq(organizations.id, organization.id));
+
+      await markOrganizationAsDeleted(organization.id);
+
+      const deletedOrganization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, organization.id),
+      });
+      expect(deletedOrganization?.deleted_at).not.toBeNull();
+      expect(deletedOrganization?.slug).toMatch(/^deleted-[0-9a-f]{24}$/);
+      expect(deletedOrganization?.slug).toHaveLength(32);
     });
   });
 

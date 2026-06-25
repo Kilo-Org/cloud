@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cache } from 'react';
 import { organizations } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
@@ -13,7 +14,7 @@ export type ResolvedOrganizationRouteIdentifier = OrganizationRouteIdentifierInp
   routeIdentifier: string;
 };
 
-export async function resolveOrganizationRouteIdentifierDetails(
+async function resolveOrganizationRouteIdentifierDetailsUncached(
   identifier: string
 ): Promise<ResolvedOrganizationRouteIdentifier | null> {
   const [organization] = await db
@@ -38,6 +39,10 @@ export async function resolveOrganizationRouteIdentifierDetails(
     routeIdentifier: getOrganizationRouteIdentifier(organization),
   };
 }
+
+export const resolveOrganizationRouteIdentifierDetails = cache(
+  resolveOrganizationRouteIdentifierDetailsUncached
+);
 
 export async function resolveOrganizationRouteIdentifier(
   identifier: string

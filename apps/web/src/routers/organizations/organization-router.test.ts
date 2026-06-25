@@ -3,7 +3,11 @@ import { db } from '@/lib/drizzle';
 import { credit_transactions, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
+import {
+  createOrganization,
+  addUserToOrganization,
+  markOrganizationAsDeleted,
+} from '@/lib/organizations/organizations';
 import type { User, Organization } from '@kilocode/db/schema';
 
 // Test users and organization will be created dynamically
@@ -635,6 +639,42 @@ describe('organizations trpc router', () => {
         })
       ).rejects.toThrow('You do not have access to this organization');
     });
+
+    it('rejects availability checks for deleted organizations', async () => {
+      const deletedOrganization = await createOrganization(
+        'Deleted Slug Availability Organization',
+        regularUser.id
+      );
+      await db
+        .update(organizations)
+        .set({ slug: 'deleted-availability-before' })
+        .where(eq(organizations.id, deletedOrganization.id));
+      await markOrganizationAsDeleted(deletedOrganization.id);
+
+      try {
+        const [deletedRow] = await db
+          .select({ slug: organizations.slug })
+          .from(organizations)
+          .where(eq(organizations.id, deletedOrganization.id));
+        if (!deletedRow) throw new Error('Expected deleted organization row to exist');
+
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.organizations.slugAvailability({
+            organizationId: deletedOrganization.id,
+            slug: 'deleted-availability-after',
+          })
+        ).rejects.toThrow('Organization not found');
+
+        const [unchangedRow] = await db
+          .select({ slug: organizations.slug })
+          .from(organizations)
+          .where(eq(organizations.id, deletedOrganization.id));
+        expect(unchangedRow?.slug).toBe(deletedRow.slug);
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, deletedOrganization.id));
+      }
+    });
   });
 
   describe('updateSlug procedure', () => {
@@ -767,6 +807,17 @@ describe('organizations trpc router', () => {
       ).rejects.toThrow('Organization slug must use lowercase letters, numbers, and hyphens');
     });
 
+    it('rejects null slug updates', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.organizations.updateSlug({
+          organizationId: testOrganization.id,
+          slug: null as never,
+        })
+      ).rejects.toThrow();
+    });
+
     it('rejects slugs containing reserved terms', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
@@ -783,6 +834,50 @@ describe('organizations trpc router', () => {
           slug: 'kilocode-org',
         })
       ).rejects.toThrow('Organization slug cannot contain reserved terms');
+
+      await expect(
+        caller.organizations.updateSlug({
+          organizationId: testOrganization.id,
+          slug: 'deleted-team',
+        })
+      ).rejects.toThrow('Organization slug cannot contain reserved terms');
+    });
+
+    it('rejects deleted organizations without changing the deleted marker slug', async () => {
+      const deletedOrganization = await createOrganization(
+        'Deleted Slug Update Organization',
+        regularUser.id
+      );
+      await db
+        .update(organizations)
+        .set({ slug: 'deleted-update-before' })
+        .where(eq(organizations.id, deletedOrganization.id));
+      await markOrganizationAsDeleted(deletedOrganization.id);
+
+      try {
+        const [deletedRow] = await db
+          .select({ slug: organizations.slug })
+          .from(organizations)
+          .where(eq(organizations.id, deletedOrganization.id));
+        if (!deletedRow) throw new Error('Expected deleted organization row to exist');
+        expect(deletedRow.slug).toMatch(/^deleted-/);
+
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.organizations.updateSlug({
+            organizationId: deletedOrganization.id,
+            slug: 'active-looking-slug',
+          })
+        ).rejects.toThrow('Organization not found');
+
+        const [unchangedRow] = await db
+          .select({ slug: organizations.slug })
+          .from(organizations)
+          .where(eq(organizations.id, deletedOrganization.id));
+        expect(unchangedRow?.slug).toBe(deletedRow.slug);
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, deletedOrganization.id));
+      }
     });
   });
 

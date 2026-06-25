@@ -27,7 +27,11 @@ import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { failureResult, successResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
-import { allocateOrganizationSlug } from '@/lib/organizations/organization-slug.server';
+import {
+  allocateDeletedOrganizationSlug,
+  allocateOrganizationSlug,
+  MAX_DELETED_ORGANIZATION_SLUG_ATTEMPTS,
+} from '@/lib/organizations/organization-slug.server';
 
 export async function getOrganizationById(
   id: Organization['id'],
@@ -847,11 +851,31 @@ export async function setOrganizationRecommendationsDigestEnabled(
   return row?.settings ?? {};
 }
 
+function isUniqueConstraintViolation(error: unknown): boolean {
+  if (error === null || typeof error !== 'object') return false;
+  const err = error as { code?: string; cause?: { code?: string } };
+  return (err.code ?? err.cause?.code) === '23505';
+}
+
 export async function markOrganizationAsDeleted(organizationId: Organization['id']): Promise<void> {
-  await db
-    .update(organizations)
-    .set({ ...auto_deleted_at })
-    .where(eq(organizations.id, organizationId));
+  for (let attempt = 0; attempt < MAX_DELETED_ORGANIZATION_SLUG_ATTEMPTS; attempt += 1) {
+    try {
+      await db.transaction(async tx => {
+        const deletedSlug = await allocateDeletedOrganizationSlug(tx);
+
+        await tx
+          .update(organizations)
+          .set({ ...auto_deleted_at, slug: deletedSlug })
+          .where(eq(organizations.id, organizationId));
+      });
+      return;
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) continue;
+      throw error;
+    }
+  }
+
+  throw new Error(`Failed to allocate deleted organization slug for ${organizationId}`);
 }
 
 export async function getOrganizationMemberByEmail(

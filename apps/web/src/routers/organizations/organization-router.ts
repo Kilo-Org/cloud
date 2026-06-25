@@ -88,7 +88,7 @@ const OrganizationSlugSchema = z
   );
 
 const OrganizationSlugUpdateSchema = OrganizationIdInputSchema.extend({
-  slug: OrganizationSlugSchema.nullable(),
+  slug: OrganizationSlugSchema,
 });
 
 const OrganizationSeatsUpdateSchema = OrganizationIdInputSchema.extend({
@@ -116,6 +116,16 @@ async function ensureOrganizationSlugUpdateAccess(ctx: TRPCContext, organization
     message: membership
       ? 'You do not have the required organizational role to access this feature'
       : 'You do not have access to this organization',
+  });
+}
+
+async function assertOrganizationSlugUpdateTargetIsActive(organizationId: string) {
+  const organization = await getOrganizationById(organizationId);
+  if (organization) return;
+
+  throw new TRPCError({
+    code: 'NOT_FOUND',
+    message: 'Organization not found',
   });
 }
 
@@ -283,10 +293,7 @@ export const organizationsRouter = createTRPCRouter({
 
   slugAvailability: baseProcedure.input(OrganizationSlugUpdateSchema).query(async opts => {
     await ensureOrganizationSlugUpdateAccess(opts.ctx, opts.input.organizationId);
-
-    if (!opts.input.slug) {
-      return { available: true };
-    }
+    await assertOrganizationSlugUpdateTargetIsActive(opts.input.organizationId);
 
     const existingOrganization = await getOrganizationByActiveSlug(
       opts.input.slug,
@@ -481,24 +488,31 @@ export const organizationsRouter = createTRPCRouter({
 
   updateSlug: baseProcedure.input(OrganizationSlugUpdateSchema).mutation(async opts => {
     await ensureOrganizationSlugUpdateAccess(opts.ctx, opts.input.organizationId);
-    if (opts.input.slug) {
-      if (
-        organizationSlugContainsReservedSubstring(opts.input.slug) &&
-        !isKiloStaffUser(opts.ctx.user)
-      ) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Organization slug cannot contain reserved terms',
-        });
-      }
-
-      await assertActiveSlugAvailable(opts.input.slug, opts.input.organizationId);
+    await assertOrganizationSlugUpdateTargetIsActive(opts.input.organizationId);
+    if (
+      organizationSlugContainsReservedSubstring(opts.input.slug) &&
+      !isKiloStaffUser(opts.ctx.user)
+    ) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Organization slug cannot contain reserved terms',
+      });
     }
 
-    await db
+    await assertActiveSlugAvailable(opts.input.slug, opts.input.organizationId);
+
+    const [updatedOrganization] = await db
       .update(organizations)
       .set({ slug: opts.input.slug })
-      .where(eq(organizations.id, opts.input.organizationId));
+      .where(and(eq(organizations.id, opts.input.organizationId), isNull(organizations.deleted_at)))
+      .returning({ id: organizations.id });
+
+    if (!updatedOrganization) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Organization not found',
+      });
+    }
 
     return {
       organization: {

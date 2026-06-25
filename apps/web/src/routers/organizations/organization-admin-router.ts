@@ -21,7 +21,9 @@ import {
   gt,
   and,
   isNull,
+  isNotNull,
   inArray,
+  notLike,
   sql,
   type SQL,
 } from 'drizzle-orm';
@@ -51,7 +53,10 @@ import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
 } from '@kilocode/organization-entitlement';
-import { allocateOrganizationSlug } from '@/lib/organizations/organization-slug.server';
+import {
+  allocateDeletedOrganizationSlug,
+  allocateOrganizationSlug,
+} from '@/lib/organizations/organization-slug.server';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -201,6 +206,8 @@ const BackfillMissingSlugsOutputSchema = z.object({
   ),
 });
 
+const BACKFILL_MISSING_SLUGS_BATCH_SIZE = 50;
+
 const AddMemberInputSchema = z.object({
   organizationId: z.uuid(),
   userId: z.string(),
@@ -311,14 +318,21 @@ export const organizationAdminRouter = createTRPCRouter({
           .select({
             id: organizations.id,
             name: organizations.name,
+            deleted_at: organizations.deleted_at,
           })
           .from(organizations)
-          .where(isNull(organizations.slug))
+          .where(
+            or(
+              isNull(organizations.slug),
+              and(isNotNull(organizations.deleted_at), notLike(organizations.slug, 'deleted-%'))
+            )
+          )
           .orderBy(
             desc(organizations.total_microdollars_acquired),
             asc(organizations.created_at),
             asc(organizations.id)
           )
+          .limit(BACKFILL_MISSING_SLUGS_BATCH_SIZE)
           .for('update');
 
         const updatedOrganizations: Array<{
@@ -328,11 +342,21 @@ export const organizationAdminRouter = createTRPCRouter({
         }> = [];
 
         for (const organization of organizationsWithoutSlugs) {
-          const slug = await allocateOrganizationSlug(organization.name, tx);
+          const slug = organization.deleted_at
+            ? await allocateDeletedOrganizationSlug(tx)
+            : await allocateOrganizationSlug(organization.name, tx);
           const [updatedOrganization] = await tx
             .update(organizations)
             .set({ slug })
-            .where(and(eq(organizations.id, organization.id), isNull(organizations.slug)))
+            .where(
+              and(
+                eq(organizations.id, organization.id),
+                or(
+                  isNull(organizations.slug),
+                  and(isNotNull(organizations.deleted_at), notLike(organizations.slug, 'deleted-%'))
+                )
+              )
+            )
             .returning({
               id: organizations.id,
               name: organizations.name,

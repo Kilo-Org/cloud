@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
 import {
+  holdConversationScrolledUp,
   launchExtensionContext,
   seedExtensionAuth,
   setExtensionStorage,
@@ -122,6 +123,66 @@ test('manual scroll up shows jump to latest without following new messages', asy
     expect(
       jumpedScrollState.messagePaneScrollTop + jumpedScrollState.messagePaneClientHeight
     ).toBeGreaterThanOrEqual(jumpedScrollState.messagePaneScrollHeight - 16);
+  } finally {
+    releaseFirstCompletion();
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('dragging the scrollbar up pauses auto-scroll while a reply is being pinned', async () => {
+  const fixture = await startFixtureServer();
+  const { promise: pendingFirstCompletion, resolve: releaseFirstCompletion } =
+    Promise.withResolvers<void>();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      beforeFirstCompletion: () => pendingFirstCompletion,
+      firstCompletionEvents: [
+        { choices: [{ delta: { content: 'Reply that must not steal scroll.' } }] },
+      ],
+      toolNames: safeReadToolNames,
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.setViewportSize({ height: 420, width: 360 });
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await setExtensionStorage(sidePanel, {
+      kiloAgentConversation: Array.from({ length: 80 }, (_value, index) => ({
+        id: `drag-scroll-${index}`,
+        role: 'assistant',
+        text: `Drag scroll content ${index}`,
+        type: 'message',
+      })),
+    });
+    await sidePanel.reload();
+
+    await expect(sidePanel.getByText('Drag scroll content 79')).toBeVisible();
+
+    await sidePanel.getByLabel('Message agent').fill('Pin while I scroll up');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByRole('button', { name: 'Stop' })).toBeVisible();
+
+    // Hold the scrollbar at the top with no wheel events while the reply streams in and the list keeps pinning the newest row. This is the gesture the old wheel-only pause path could not see.
+    const sustainedScrollUp = holdConversationScrolledUp(sidePanel, 90);
+
+    releaseFirstCompletion();
+    await waitForStoredConversationText(sidePanel, 'Reply that must not steal scroll.');
+    await sustainedScrollUp;
+
+    await expect(sidePanel.getByRole('button', { name: 'Jump to latest' })).toBeVisible();
+
+    const finalScrollState = await sidePanel.evaluate(readSidePanelScrollState);
+
+    expect(
+      finalScrollState.messagePaneScrollTop + finalScrollState.messagePaneClientHeight
+    ).toBeLessThan(finalScrollState.messagePaneScrollHeight - 16);
   } finally {
     releaseFirstCompletion();
     await context.close();

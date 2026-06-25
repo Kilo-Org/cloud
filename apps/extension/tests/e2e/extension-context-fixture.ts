@@ -181,3 +181,32 @@ export const waitForStoredConversationText = async (page: Page, text: string): P
     )
     .toBe(true);
 };
+
+export const holdConversationScrolledUp = async (page: Page, frames: number): Promise<void> => {
+  await page.evaluate(
+    frameCount =>
+      new Promise<void>(resolve => {
+        const pane = document.querySelector('[aria-label="Agent conversation"]');
+
+        if (!(pane instanceof HTMLElement)) {
+          throw new Error('Agent conversation pane was not found.');
+        }
+
+        let remainingFrames = frameCount;
+        const dragToTop = (): void => {
+          pane.scrollTop = 0;
+          remainingFrames -= 1;
+
+          if (remainingFrames > 0) {
+            requestAnimationFrame(dragToTop);
+            return;
+          }
+
+          resolve();
+        };
+
+        requestAnimationFrame(dragToTop);
+      }),
+    frames
+  );
+};

@@ -66,6 +66,7 @@ const ConversationVirtualRow = ({
 export const ConversationList = ({ items }: { items: GroupedConversationItem[] }): JSX.Element => {
   const listRef = useRef<HTMLElement | null>(null);
   const isAutoScrollEnabledRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
   const isProgrammaticScrollRef = useRef(false);
   const programmaticScrollFrameRef = useRef<number | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabledState] = useState(true);
@@ -161,11 +162,22 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
         aria-label="Agent conversation"
         className="agent-conversation-scrollbar h-full overflow-y-auto px-4 py-4"
         onScroll={event => {
+          const element = event.currentTarget;
+          const previousScrollTop = lastScrollTopRef.current;
+          lastScrollTopRef.current = element.scrollTop;
+
+          // Moving up while off the bottom is unambiguously the user reading history, so pause even while a pin is in flight. This catches gestures that emit no wheel event, such as dragging the scrollbar or paging with the keyboard.
+          if (element.scrollTop < previousScrollTop - 1 && !isScrolledToBottom(element)) {
+            setIsAutoScrollEnabled(false);
+            return;
+          }
+
           if (!isProgrammaticScrollRef.current) {
-            setIsAutoScrollEnabled(isScrolledToBottom(event.currentTarget));
+            setIsAutoScrollEnabled(isScrolledToBottom(element));
           }
         }}
         onWheel={event => {
+          // Capture upward intent at the moment of input, before an in-flight pin can re-pin the scroll position out from under the user.
           if (
             event.deltaY < 0 &&
             event.currentTarget.scrollHeight > event.currentTarget.clientHeight

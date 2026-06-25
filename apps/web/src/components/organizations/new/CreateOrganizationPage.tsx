@@ -124,6 +124,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
         })
       ).organization.id;
 
+      window.sessionStorage.setItem(`organization-onboarding-new:${orgId}`, 'true');
       window.location.href = `/organizations/${orgId}/welcome`;
     } catch (error) {
       console.error('Failed to create organization:', error);

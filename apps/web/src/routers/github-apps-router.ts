@@ -25,6 +25,7 @@ import {
   getGitHubAppTypeForOrganization,
 } from '@/lib/integrations/platforms/github/app-selector';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
   disconnectGitHubUserAuthorization,
   getGitHubUserAuthorizationStatus,
@@ -102,10 +103,7 @@ export const githubAppsRouter = createTRPCRouter({
     const metadata = integration.metadata as Record<string, unknown> | null;
     const pendingApproval = metadata?.pending_approval as Record<string, unknown> | undefined;
     const status = (pendingApproval?.status as string) || null;
-    const isInstalled =
-      integration.integration_status === 'active' &&
-      integration.suspended_at === null &&
-      integration.auth_invalid_at === null;
+    const isInstalled = isPlatformIntegrationHealthy(integration);
 
     return {
       installed: isInstalled,

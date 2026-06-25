@@ -116,6 +116,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   const handledReturnRef = useRef<string | null>(null);
   const defaultDigestAttemptedRef = useRef(false);
   const [defaultDigestFailed, setDefaultDigestFailed] = useState(false);
+  const [isNewOrganizationOnboarding, setIsNewOrganizationOnboarding] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [sourceControlProvider, setSourceControlProvider] = useState<SourceControlProvider | null>(
     null
@@ -159,11 +160,18 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   );
 
   useEffect(() => {
+    setIsNewOrganizationOnboarding(
+      window.sessionStorage.getItem(`organization-onboarding-new:${organizationId}`) === 'true'
+    );
+  }, [organizationId]);
+
+  useEffect(() => {
     const digestSetting = organizationQuery.data?.settings?.recommendations_digest_enabled;
     if (
       currentScreen !== 'complete' ||
       userRole !== 'owner' ||
       organizationQuery.data?.plan !== 'enterprise' ||
+      !isNewOrganizationOnboarding ||
       digestSetting !== undefined ||
       defaultDigestAttemptedRef.current
     ) {
@@ -174,7 +182,10 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     updateRecommendationsDigest.mutate(
       { organizationId, enabled: true },
       {
-        onSuccess: () => setDefaultDigestFailed(false),
+        onSuccess: () => {
+          setDefaultDigestFailed(false);
+          window.sessionStorage.removeItem(`organization-onboarding-new:${organizationId}`);
+        },
         onError: error => {
           setDefaultDigestFailed(true);
           toast.error('Could not enable weekly recommendations email', {
@@ -185,6 +196,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     );
   }, [
     currentScreen,
+    isNewOrganizationOnboarding,
     organizationId,
     organizationQuery.data,
     updateRecommendationsDigest,
@@ -284,10 +296,18 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
 
   const handleEnableCodeReviewer = async () => {
     setStatusMessage('');
+    const connectedPlatform = checklistQuery.data?.connectedPlatform;
+    if (!connectedPlatform) {
+      const message = 'Connect GitHub or GitLab before turning on Code Reviewer.';
+      setStatusMessage(message);
+      toast.error(message);
+      return;
+    }
+
     try {
       await enableCodeReviewerMutation.mutateAsync({
         organizationId,
-        platform: checklistQuery.data?.connectedPlatform ?? sourceControlProvider ?? 'github',
+        platform: connectedPlatform,
         isEnabled: true,
       });
       const result = await checklistQuery.refetch();
@@ -295,7 +315,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
         result.data?.steps.find(step => step.key === 'code-reviewer')?.done ?? false;
       if (completed) {
         toast.success('Code Reviewer is on', {
-          description: `Balanced defaults are active for ${checklistQuery.data?.connectedPlatform === 'gitlab' || sourceControlProvider === 'gitlab' ? 'GitLab' : 'GitHub'} repositories.`,
+          description: `Balanced defaults are active for ${connectedPlatform === 'gitlab' ? 'GitLab' : 'GitHub'} repositories.`,
         });
         navigate('invite-team');
       } else {
@@ -522,6 +542,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
                       );
                     }}
                     onSourceControlDetected={provider => void handleSourceControlDetected(provider)}
+                    connectedPlatform={checklist.connectedPlatform}
                     codeReviewerPending={enableCodeReviewerMutation.isPending}
                     onEnableCodeReviewer={() => void handleEnableCodeReviewer()}
                     onContinue={() => navigate(getNextOnboardingScreen(currentScreen))}
@@ -627,6 +648,7 @@ function StepScreen({
   onBack,
   onSelectSourceControl,
   onSourceControlDetected,
+  connectedPlatform,
   codeReviewerPending,
   onEnableCodeReviewer,
   onContinue,
@@ -641,6 +663,7 @@ function StepScreen({
   onBack: (screen: OrganizationOnboardingScreen) => void;
   onSelectSourceControl: (provider: SourceControlProvider) => void;
   onSourceControlDetected: (provider: SourceControlProvider) => void;
+  connectedPlatform: SourceControlProvider | null;
   codeReviewerPending: boolean;
   onEnableCodeReviewer: () => void;
   onContinue: () => void;
@@ -767,7 +790,7 @@ function StepScreen({
                         <ArrowRight className="ml-auto size-4 text-muted-foreground" />
                       </button>
                     </div>
-                  ) : (
+                  ) : connectedPlatform ? (
                     <Button
                       onClick={onEnableCodeReviewer}
                       disabled={codeReviewerPending}
@@ -780,6 +803,21 @@ function StepScreen({
                       )}
                       {codeReviewerPending ? 'Turning on…' : 'Turn on Code Reviewer'}
                     </Button>
+                  ) : (
+                    <div className="flex flex-col items-start gap-3">
+                      <p className="type-label text-status-warning">
+                        Code Reviewer needs a connected GitHub or GitLab integration.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => onBack('source-control')}
+                        className="min-h-control-touch sm:min-h-0"
+                      >
+                        <GitBranch className="size-4" />
+                        Connect source control
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>

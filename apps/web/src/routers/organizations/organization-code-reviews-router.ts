@@ -23,6 +23,7 @@ import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
@@ -73,7 +74,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   getGitHubStatus: organizationMemberProcedure.query(async ({ input }) => {
     const integration = await getIntegrationForOrganization(input.organizationId, 'github');
 
-    if (!integration || integration.integration_status !== 'active') {
+    if (!isPlatformIntegrationHealthy(integration)) {
       return {
         connected: false,
         integration: null,
@@ -86,7 +87,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         accountLogin: integration.platform_account_login,
         repositorySelection: integration.repository_access,
         installedAt: integration.installed_at,
-        isValid: !integration.suspended_at,
+        isValid: true,
       },
     };
   }),
@@ -110,7 +111,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   getGitLabStatus: organizationMemberProcedure.query(async ({ input }) => {
     const integration = await getIntegrationForOrganization(input.organizationId, PLATFORM.GITLAB);
 
-    if (!integration || integration.integration_status !== 'active') {
+    if (!isPlatformIntegrationHealthy(integration)) {
       return {
         connected: false,
         integration: null,
@@ -127,7 +128,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         accountLogin: integration.platform_account_login,
         repositorySelection: integration.repository_access,
         installedAt: integration.installed_at,
-        isValid: true, // GitLab OAuth doesn't have suspension concept
+        isValid: true,
         webhookSecret, // Include webhook secret for user to configure in GitLab
         instanceUrl: (metadata?.gitlab_instance_url as string) || 'https://gitlab.com',
       },

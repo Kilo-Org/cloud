@@ -1,5 +1,6 @@
 import { db } from '@/lib/drizzle';
-import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { PLATFORM } from '@/lib/integrations/core/constants';
+import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import { sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -64,18 +65,14 @@ export async function getOrganizationOnboardingState(
         FROM platform_integrations
         WHERE owned_by_organization_id = organizations.id
           AND platform IN (${PLATFORM.GITHUB}, ${PLATFORM.GITLAB})
-          AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
-          AND suspended_at IS NULL
-          AND auth_invalid_at IS NULL
+          AND ${platformIntegrationHealthSql()}
       ) AS "sourceControlConnected",
       (
         SELECT platform
         FROM platform_integrations
         WHERE owned_by_organization_id = organizations.id
           AND platform IN (${PLATFORM.GITHUB}, ${PLATFORM.GITLAB})
-          AND integration_status = ${INTEGRATION_STATUS.ACTIVE}
-          AND suspended_at IS NULL
-          AND auth_invalid_at IS NULL
+          AND ${platformIntegrationHealthSql()}
         ORDER BY CASE WHEN platform = ${PLATFORM.GITHUB} THEN 0 ELSE 1 END
         LIMIT 1
       ) AS "connectedPlatform",
@@ -85,9 +82,7 @@ export async function getOrganizationOnboardingState(
         INNER JOIN platform_integrations
           ON platform_integrations.owned_by_organization_id = organizations.id
           AND platform_integrations.platform = agent_configs.platform
-          AND platform_integrations.integration_status = ${INTEGRATION_STATUS.ACTIVE}
-          AND platform_integrations.suspended_at IS NULL
-          AND platform_integrations.auth_invalid_at IS NULL
+          AND ${platformIntegrationHealthSql()}
         WHERE agent_configs.owned_by_organization_id = organizations.id
           AND agent_configs.agent_type = 'code_review'
           AND agent_configs.platform IN (${PLATFORM.GITHUB}, ${PLATFORM.GITLAB})

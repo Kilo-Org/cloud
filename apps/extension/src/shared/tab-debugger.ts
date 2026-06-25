@@ -304,6 +304,23 @@ const getPngDimensions = (dataUrl: string): { height: number; width: number } | 
   }
 };
 
+// ponytail: one global capture lock. captureVisibleTab grabs whichever tab is active in a window,
+// so the activate->capture->restore window must not interleave. Screenshots are rare and
+// user-driven, so a single chain is fine; key it per-window only if capture throughput matters.
+let screenshotCaptureChain: Promise<unknown> = Promise.resolve();
+const runScreenshotCaptureExclusively = async <Result>(
+  task: () => Promise<Result>
+): Promise<Result> => {
+  const run = screenshotCaptureChain.then(task, task);
+
+  screenshotCaptureChain = run.then(
+    () => undefined,
+    () => undefined
+  );
+
+  return run;
+};
+
 export const getViewportScreenshotWithTabsApi = async ({
   tabId,
   tabsApi,
@@ -311,48 +328,59 @@ export const getViewportScreenshotWithTabsApi = async ({
   readonly tabId: number;
   readonly tabsApi: BrowserTabsApi;
 }): Promise<EvalTabResult> => {
-  if (
-    tabsApi.captureVisibleTab === undefined ||
-    tabsApi.get === undefined ||
-    tabsApi.update === undefined
-  ) {
+  const captureVisibleTab = tabsApi.captureVisibleTab?.bind(tabsApi);
+  const getTab = tabsApi.get?.bind(tabsApi);
+  const updateTab = tabsApi.update?.bind(tabsApi);
+  const queryTabs = tabsApi.query.bind(tabsApi);
+
+  if (captureVisibleTab === undefined || getTab === undefined || updateTab === undefined) {
     return { error: 'Viewport screenshot API is unavailable.', ok: false };
   }
 
-  const { windowId } = await tabsApi.get(tabId);
-  const [previousActiveTab] = await tabsApi.query(
-    windowId === undefined ? { active: true, currentWindow: true } : { active: true, windowId }
-  );
-  const previousActiveTabId = getTabId(previousActiveTab);
+  return runScreenshotCaptureExclusively(async () => {
+    const { windowId } = await getTab(tabId);
+    const activeTabQuery =
+      windowId === undefined ? { active: true, currentWindow: true } : { active: true, windowId };
+    const [previousActiveTab] = await queryTabs(activeTabQuery);
+    const previousActiveTabId = getTabId(previousActiveTab);
 
-  try {
-    await tabsApi.update(tabId, { active: true });
-    const dataUrl = await tabsApi.captureVisibleTab(windowId, { format: 'png' });
+    try {
+      await updateTab(tabId, { active: true });
+      const [activeTab] = await queryTabs(activeTabQuery);
 
-    if (!dataUrl.startsWith('data:image/png;base64,')) {
-      return { error: 'Viewport screenshot API returned an invalid image.', ok: false };
-    }
-    const dimensions = getPngDimensions(dataUrl);
+      // A manual tab switch can land between activation and capture; refuse rather than capture
+      // (and upload) a different tab's contents.
+      if (getTabId(activeTab) !== tabId) {
+        return { error: 'The selected tab was not active at capture time.', ok: false };
+      }
 
-    return {
-      ok: true,
-      value: {
-        dataUrl,
-        devicePixelRatio: 1,
-        height: dimensions?.height ?? 0,
-        mediaType: 'image/png',
-        width: dimensions?.width ?? 0,
-      } satisfies ViewportScreenshot,
-    };
-  } finally {
-    if (previousActiveTabId !== undefined && previousActiveTabId !== tabId) {
-      try {
-        await tabsApi.update(previousActiveTabId, { active: true });
-      } catch {
-        // The previous tab may have closed; don't let restore mask the result.
+      const dataUrl = await captureVisibleTab(windowId, { format: 'png' });
+
+      if (!dataUrl.startsWith('data:image/png;base64,')) {
+        return { error: 'Viewport screenshot API returned an invalid image.', ok: false };
+      }
+      const dimensions = getPngDimensions(dataUrl);
+
+      return {
+        ok: true,
+        value: {
+          dataUrl,
+          devicePixelRatio: 1,
+          height: dimensions?.height ?? 0,
+          mediaType: 'image/png',
+          width: dimensions?.width ?? 0,
+        } satisfies ViewportScreenshot,
+      };
+    } finally {
+      if (previousActiveTabId !== undefined && previousActiveTabId !== tabId) {
+        try {
+          await updateTab(previousActiveTabId, { active: true });
+        } catch {
+          // The previous tab may have closed; don't let restore mask the result.
+        }
       }
     }
-  }
+  });
 };
 
 const getEvalExpression = (code: string): string => `(async () => { ${code} })()`;
@@ -466,6 +494,24 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
 
     return '';
   };
+  const nonRenderedTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'HEAD', 'TITLE']);
+  const isRenderedTextNode = (textNode: Node): boolean => {
+    // Walk ancestors so hidden/non-content text (script JSON, inline styles, display:none modals,
+    // aria-hidden subtrees) is never surfaced as "visible page text".
+    for (let element = textNode.parentElement; element !== null; element = element.parentElement) {
+      if (nonRenderedTags.has(element.tagName) || element.getAttribute('aria-hidden') === 'true') {
+        return false;
+      }
+
+      const style = getComputedStyle(element);
+
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        return false;
+      }
+    }
+
+    return true;
+  };
   const getPageText = (): { text: string; truncated: boolean } => {
     const root = document.body ?? document.documentElement;
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -477,7 +523,7 @@ const runInjectedPageSnapshot = (timeoutMsText: string): PageSnapshot => {
       checkDeadline();
 
       const text = normalize(node.textContent ?? '');
-      if (text !== '') {
+      if (text !== '' && isRenderedTextNode(node)) {
         parts.push(text);
         length += text.length + 1;
       }

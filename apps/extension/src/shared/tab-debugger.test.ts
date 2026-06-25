@@ -52,19 +52,26 @@ const createDebuggerApi = ({
 const restoreFailingPngDataUrl =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
 
-// Activating the target tab (7) succeeds; restoring the previous tab (1) throws.
-const createRestoreFailingTabsApi = (): BrowserTabsApi => ({
-  captureVisibleTab: () => restoreFailingPngDataUrl,
-  get: tabId => ({ id: tabId, title: 'Target', url: 'https://example.com/', windowId: 3 }),
-  query: () => [{ id: 1, title: 'Previous', url: 'https://kilo.ai/', windowId: 3 }],
-  update: tabId => {
-    if (tabId === 1) {
-      throw new Error('No tab with id: 1');
-    }
+// Activating the target tab (7) succeeds; restoring the previous tab (1) throws. Tracks the active
+// tab so the capture-time re-verification sees the requested tab.
+const createRestoreFailingTabsApi = (): BrowserTabsApi => {
+  let activeTabId = 1;
 
-    return { id: tabId, title: 'Tab', url: 'https://example.com/', windowId: 3 };
-  },
-});
+  return {
+    captureVisibleTab: () => restoreFailingPngDataUrl,
+    get: tabId => ({ id: tabId, title: 'Target', url: 'https://example.com/', windowId: 3 }),
+    query: () => [{ id: activeTabId, title: 'Previous', url: 'https://kilo.ai/', windowId: 3 }],
+    update: tabId => {
+      if (tabId === 1) {
+        throw new Error('No tab with id: 1');
+      }
+
+      activeTabId = tabId;
+
+      return { id: tabId, title: 'Tab', url: 'https://example.com/', windowId: 3 };
+    },
+  };
+};
 
 describe('tab debugger helpers', () => {
   it('lists only normal inspectable page tabs', async () => {
@@ -336,6 +343,7 @@ describe('tab debugger helpers', () => {
     const calls: unknown[] = [];
     const pngDataUrl =
       'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=';
+    let activeTabId = 1;
     const tabsApi: BrowserTabsApi = {
       captureVisibleTab: (windowId, options) => {
         calls.push({ name: 'captureVisibleTab', options, windowId });
@@ -347,10 +355,11 @@ describe('tab debugger helpers', () => {
       },
       query: queryInfo => {
         calls.push({ name: 'query', queryInfo });
-        return [{ id: 1, title: 'Previous', url: 'https://kilo.ai/', windowId: 3 }];
+        return [{ id: activeTabId, title: 'Active', url: 'https://kilo.ai/', windowId: 3 }];
       },
       update: (tabId, updateProperties) => {
         calls.push({ name: 'update', tabId, updateProperties });
+        activeTabId = tabId;
         return { id: tabId, title: 'Tab', url: 'https://example.com/', windowId: 3 };
       },
     };
@@ -369,9 +378,25 @@ describe('tab debugger helpers', () => {
       { name: 'get', tabId: 7 },
       { name: 'query', queryInfo: { active: true, windowId: 3 } },
       { name: 'update', tabId: 7, updateProperties: { active: true } },
+      { name: 'query', queryInfo: { active: true, windowId: 3 } },
       { name: 'captureVisibleTab', options: { format: 'png' }, windowId: 3 },
       { name: 'update', tabId: 1, updateProperties: { active: true } },
     ]);
+  });
+
+  it('refuses to capture when another tab is active at capture time', async () => {
+    const tabsApi: BrowserTabsApi = {
+      captureVisibleTab: () => restoreFailingPngDataUrl,
+      get: tabId => ({ id: tabId, title: 'Target', url: 'https://example.com/', windowId: 3 }),
+      // A competing switch keeps tab 9 active; the requested tab 7 never becomes active.
+      query: () => [{ id: 9, title: 'Intruder', url: 'https://evil.example/', windowId: 3 }],
+      update: tabId => ({ id: tabId, title: 'Tab', url: 'https://example.com/', windowId: 3 }),
+    };
+
+    await expect(getViewportScreenshotWithTabsApi({ tabId: 7, tabsApi })).resolves.toStrictEqual({
+      error: 'The selected tab was not active at capture time.',
+      ok: false,
+    });
   });
 
   it('returns the screenshot even when restoring the previous tab fails', async () => {
@@ -387,5 +412,58 @@ describe('tab debugger helpers', () => {
         width: 1,
       },
     });
+  });
+
+  it('serializes concurrent captures so they cannot interleave', async () => {
+    const events: string[] = [];
+    let resolveCaptureStarted = (): void => {};
+    const captureStarted = new Promise<void>(resolve => {
+      resolveCaptureStarted = resolve;
+    });
+    let releaseFirstCapture = (): void => {};
+    const firstCaptureReleased = new Promise<void>(resolve => {
+      releaseFirstCapture = resolve;
+    });
+    const createApi = (label: string, blockOnCapture: boolean): BrowserTabsApi => {
+      let activeTabId = 1;
+
+      return {
+        captureVisibleTab: async () => {
+          events.push(`capture:${label}`);
+          if (blockOnCapture) {
+            resolveCaptureStarted();
+            await firstCaptureReleased;
+          }
+
+          return restoreFailingPngDataUrl;
+        },
+        get: tabId => ({ id: tabId, title: 'Target', url: 'https://example.com/', windowId: 3 }),
+        query: () => [{ id: activeTabId, title: 'Active', url: 'https://kilo.ai/', windowId: 3 }],
+        update: tabId => {
+          events.push(`update:${label}:${tabId}`);
+          activeTabId = tabId;
+          return { id: tabId, title: 'Tab', url: 'https://example.com/', windowId: 3 };
+        },
+      };
+    };
+
+    const first = getViewportScreenshotWithTabsApi({ tabId: 7, tabsApi: createApi('A', true) });
+    const second = getViewportScreenshotWithTabsApi({ tabId: 8, tabsApi: createApi('B', false) });
+
+    await captureStarted;
+    expect(events).toStrictEqual(['update:A:7', 'capture:A']);
+
+    releaseFirstCapture();
+    await Promise.all([first, second]);
+
+    // A fully finishes (capture + restore) before B touches its tab.
+    expect(events).toStrictEqual([
+      'update:A:7',
+      'capture:A',
+      'update:A:1',
+      'update:B:8',
+      'capture:B',
+      'update:B:1',
+    ]);
   });
 });

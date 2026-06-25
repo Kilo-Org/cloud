@@ -33,11 +33,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { InviteMemberDialog } from '@/components/organizations/members/InviteMemberDialog';
-import { Switch } from '@/components/ui/switch';
-import {
-  useOrganizationWithMembers,
-  useUpdateRecommendationsDigest,
-} from '@/app/api/organizations/hooks';
+import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useUserOrganizationRole } from '@/components/organizations/OrganizationContext';
 import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
 import { GitLabIntegrationDetails } from '@/components/integrations/GitLabIntegrationDetails';
@@ -111,12 +107,8 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   const searchParams = useSearchParams();
   const prefersReducedMotion = useReducedMotion();
   const userRole = useUserOrganizationRole();
-  const updateRecommendationsDigest = useUpdateRecommendationsDigest();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const handledReturnRef = useRef<string | null>(null);
-  const defaultDigestAttemptedRef = useRef(false);
-  const [defaultDigestFailed, setDefaultDigestFailed] = useState(false);
-  const [isNewOrganizationOnboarding, setIsNewOrganizationOnboarding] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [sourceControlProvider, setSourceControlProvider] = useState<SourceControlProvider | null>(
     null
@@ -131,9 +123,6 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   const enableCodeReviewerMutation = useMutation(
     trpc.organizations.reviewAgent.toggleReviewAgent.mutationOptions()
   );
-  const saveCodeReviewerConfigMutation = useMutation(
-    trpc.organizations.reviewAgent.saveReviewConfig.mutationOptions()
-  );
   const requestedScreen = getOrganizationOnboardingScreen(searchParams);
   const requestedProvider = getSourceControlProvider(searchParams);
   const currentScreen =
@@ -144,64 +133,10 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   const organizationQuery = useOrganizationWithMembers(organizationId, {
     enabled: currentScreen === 'complete',
   });
-  const reviewConfigPlatform =
-    checklistQuery.data?.connectedPlatform ?? sourceControlProvider ?? 'github';
-  const reviewConfigQuery = useQuery({
-    ...trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
-      organizationId,
-      platform: reviewConfigPlatform,
-    }),
-    enabled: currentScreen === 'complete',
-  });
-
   const stepState = useMemo(
     () => new Map(checklistQuery.data?.steps.map(step => [step.key, step.done]) ?? []),
     [checklistQuery.data]
   );
-
-  useEffect(() => {
-    setIsNewOrganizationOnboarding(
-      window.sessionStorage.getItem(`organization-onboarding-new:${organizationId}`) === 'true'
-    );
-  }, [organizationId]);
-
-  useEffect(() => {
-    const digestSetting = organizationQuery.data?.settings?.recommendations_digest_enabled;
-    if (
-      currentScreen !== 'complete' ||
-      userRole !== 'owner' ||
-      organizationQuery.data?.plan !== 'enterprise' ||
-      !isNewOrganizationOnboarding ||
-      digestSetting !== undefined ||
-      defaultDigestAttemptedRef.current
-    ) {
-      return;
-    }
-
-    defaultDigestAttemptedRef.current = true;
-    updateRecommendationsDigest.mutate(
-      { organizationId, enabled: true },
-      {
-        onSuccess: () => {
-          setDefaultDigestFailed(false);
-          window.sessionStorage.removeItem(`organization-onboarding-new:${organizationId}`);
-        },
-        onError: error => {
-          setDefaultDigestFailed(true);
-          toast.error('Could not enable weekly recommendations email', {
-            description: error.message,
-          });
-        },
-      }
-    );
-  }, [
-    currentScreen,
-    isNewOrganizationOnboarding,
-    organizationId,
-    organizationQuery.data,
-    updateRecommendationsDigest,
-    userRole,
-  ]);
 
   useEffect(() => {
     if (!checklistQuery.data || requestedScreen) return;
@@ -331,38 +266,6 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     }
   };
 
-  const handleCodeReviewerModelChange = async (modelSlug: string) => {
-    const config = reviewConfigQuery.data;
-    if (!config) return;
-
-    try {
-      await saveCodeReviewerConfigMutation.mutateAsync({
-        organizationId,
-        platform: reviewConfigPlatform,
-        reviewStyle: config.reviewStyle,
-        focusAreas: config.focusAreas,
-        customInstructions: config.customInstructions ?? undefined,
-        modelSlug,
-        thinkingEffort: null,
-        gateThreshold: config.gateThreshold,
-        repositorySelectionMode: config.repositorySelectionMode,
-        selectedRepositoryIds: config.selectedRepositoryIds,
-        manuallyAddedRepositories: config.manuallyAddedRepositories,
-        disableReviewMd: config.disableReviewMd,
-      });
-      await reviewConfigQuery.refetch();
-      toast.success(
-        modelSlug === 'kilo-auto/free'
-          ? 'Code Reviewer set to Auto Free'
-          : 'Code Reviewer set to Auto Balanced'
-      );
-    } catch (error) {
-      toast.error('Could not update Code Reviewer model', {
-        description: error instanceof Error ? error.message : 'Try again.',
-      });
-    }
-  };
-
   const handleInvitationSuccess = async () => {
     const result = await checklistQuery.refetch();
     const completed = result.data?.steps.find(step => step.key === 'invite-team')?.done ?? false;
@@ -483,44 +386,9 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
                     }
                     organizationLoading={organizationQuery.isLoading}
                     userRole={userRole}
-                    connectedPlatform={checklist.connectedPlatform}
-                    codeReviewerModel={reviewConfigQuery.data?.modelSlug}
-                    codeReviewerModelPending={
-                      reviewConfigQuery.isLoading || saveCodeReviewerConfigMutation.isPending
-                    }
-                    onCodeReviewerModelChange={modelSlug =>
-                      void handleCodeReviewerModelChange(modelSlug)
-                    }
-                    showRecommendationsDigest={
-                      organizationQuery.data?.plan === 'enterprise' && userRole === 'owner'
-                    }
                     recommendationsDigestEnabled={
-                      organizationQuery.data?.settings?.recommendations_digest_enabled === true ||
-                      (organizationQuery.data?.settings?.recommendations_digest_enabled ===
-                        undefined &&
-                        !defaultDigestFailed)
+                      organizationQuery.data?.settings?.recommendations_digest_enabled === true
                     }
-                    recommendationsDigestPending={updateRecommendationsDigest.isPending}
-                    onRecommendationsDigestChange={enabled => {
-                      setDefaultDigestFailed(false);
-                      updateRecommendationsDigest.mutate(
-                        { organizationId, enabled },
-                        {
-                          onSuccess: () => {
-                            toast.success(
-                              enabled
-                                ? 'Weekly recommendations email enabled'
-                                : 'Weekly recommendations email disabled'
-                            );
-                          },
-                          onError: error => {
-                            toast.error('Could not update weekly recommendations email', {
-                              description: error.message,
-                            });
-                          },
-                        }
-                      );
-                    }}
                     onBack={() => navigate('invite-team')}
                   />
                 ) : (
@@ -864,14 +732,7 @@ function CompletionScreen({
   balanceMicrodollars,
   organizationLoading,
   userRole,
-  connectedPlatform,
-  codeReviewerModel,
-  codeReviewerModelPending,
-  onCodeReviewerModelChange,
-  showRecommendationsDigest,
   recommendationsDigestEnabled,
-  recommendationsDigestPending,
-  onRecommendationsDigestChange,
   onBack,
 }: {
   headingRef: React.RefObject<HTMLHeadingElement | null>;
@@ -881,20 +742,12 @@ function CompletionScreen({
   balanceMicrodollars: number;
   organizationLoading: boolean;
   userRole: OrganizationRole;
-  connectedPlatform: 'github' | 'gitlab' | null;
-  codeReviewerModel?: string;
-  codeReviewerModelPending: boolean;
-  onCodeReviewerModelChange: (modelSlug: string) => void;
-  showRecommendationsDigest: boolean;
   recommendationsDigestEnabled: boolean;
-  recommendationsDigestPending: boolean;
-  onRecommendationsDigestChange: (enabled: boolean) => void;
   onBack: () => void;
 }) {
   const complete = completedCount === totalCount;
   const hasCredits = balanceMicrodollars > 0;
   const canManageBilling = userRole === 'owner' || userRole === 'billing_manager';
-  const platformQuery = connectedPlatform ? `?platform=${connectedPlatform}` : '';
   const returnPath = buildOrganizationWelcomePath(organizationId, 'complete');
   const topUpPath = `/payments/topup?${new URLSearchParams({
     amount: '10',
@@ -934,28 +787,13 @@ function CompletionScreen({
             <h2 id="configured-title" className="type-heading">
               Configured for you
             </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <SetupStatus
                 icon={Mail}
                 title="Weekly recommendations"
-                detail={recommendationsDigestEnabled ? 'Enabled' : 'Off'}
-              >
-                {showRecommendationsDigest && (
-                  <Switch
-                    id="onboarding-recommendations-digest"
-                    checked={recommendationsDigestEnabled}
-                    disabled={recommendationsDigestPending}
-                    onCheckedChange={onRecommendationsDigestChange}
-                    aria-label="Weekly recommendations email"
-                  />
-                )}
-              </SetupStatus>
-              <SetupStatus icon={Route} title="Auto routing" detail="Best accuracy per dollar" />
-              <SetupStatus
-                icon={CodeXml}
-                title="Code Reviewer"
-                detail={codeReviewerModel === 'kilo-auto/free' ? 'Auto Free' : 'Auto Balanced'}
+                detail={recommendationsDigestEnabled ? 'Enabled' : 'Not enabled'}
               />
+              <SetupStatus icon={Route} title="Auto routing" detail="Best accuracy per dollar" />
             </div>
           </section>
 
@@ -1032,20 +870,9 @@ function CompletionScreen({
           {!hasCredits && !organizationLoading && (
             <section aria-labelledby="unlock-title" className="space-y-3">
               <h2 id="unlock-title" className="type-heading">
-                Choose your model path
+                Unlock paid workflows
               </h2>
-              <div className="grid gap-3 lg:grid-cols-3">
-                <ChoiceCard
-                  icon={CodeXml}
-                  title="Start free"
-                  description="Use Auto Free for Code Reviewer. Free-model limits and provider data policies apply."
-                  active={codeReviewerModel === 'kilo-auto/free'}
-                  actionLabel={
-                    codeReviewerModel === 'kilo-auto/free' ? 'Auto Free selected' : 'Use Auto Free'
-                  }
-                  disabled={codeReviewerModelPending}
-                  onClick={() => onCodeReviewerModelChange('kilo-auto/free')}
-                />
+              <div className="grid gap-3 sm:grid-cols-2">
                 <ChoiceCard
                   icon={Coins}
                   title="Add $10 in credits"
@@ -1070,17 +897,7 @@ function CompletionScreen({
             <Button asChild className="min-h-control-touch sm:min-h-0">
               <Link href={`/organizations/${organizationId}`}>Open organization</Link>
             </Button>
-            <Button asChild variant="secondary" className="min-h-control-touch sm:min-h-0">
-              <Link href={`/organizations/${organizationId}/code-reviews${platformQuery}`}>
-                Configure Code Reviewer
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" className="min-h-control-touch sm:min-h-0">
-              <Link href={`/organizations/${organizationId}/integrations`}>
-                Manage integrations
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" className="min-h-control-touch sm:min-h-0">
+            <Button asChild className="min-h-control-touch sm:min-h-0">
               <a href="mailto:sales@kilocode.ai">Contact sales</a>
             </Button>
           </div>
@@ -1124,36 +941,22 @@ function ChoiceCard({
   title,
   description,
   actionLabel,
-  active = false,
   disabled = false,
   href,
-  onClick,
 }: {
   icon: typeof Mail;
   title: string;
   description: string;
   actionLabel: string;
-  active?: boolean;
   disabled?: boolean;
   href?: string;
-  onClick?: () => void;
 }) {
   const action = href ? (
-    <Button asChild variant={active ? 'secondary' : 'outline'} size="sm" className="mt-auto w-full">
+    <Button asChild variant="outline" size="sm" className="mt-auto w-full">
       <Link href={href}>{actionLabel}</Link>
     </Button>
   ) : (
-    <Button
-      type="button"
-      variant={active ? 'secondary' : 'outline'}
-      size="sm"
-      className="mt-auto w-full"
-      disabled={disabled || active}
-      onClick={onClick}
-    >
-      {disabled && !active && (
-        <Loader2 className="size-icon-sm animate-spin motion-reduce:animate-none" />
-      )}
+    <Button type="button" variant="outline" size="sm" className="mt-auto w-full" disabled>
       {actionLabel}
     </Button>
   );
@@ -1161,8 +964,7 @@ function ChoiceCard({
   return (
     <div
       className={cn(
-        'flex min-h-56 flex-col rounded-xl border bg-surface-background p-5',
-        active ? 'border-status-success-border' : 'border-border',
+        'flex min-h-56 flex-col rounded-xl border border-border bg-surface-background p-5',
         disabled && 'opacity-60'
       )}
     >

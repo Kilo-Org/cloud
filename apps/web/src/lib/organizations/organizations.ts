@@ -202,6 +202,7 @@ export async function createOrganization(
           enable_usage_limits: false,
           // all new orgs will have code indexing enabled by default
           code_indexing_enabled: true,
+          ...(plan === 'enterprise' ? { recommendations_digest_enabled: true } : {}),
         },
         ...(company_domain ? { company_domain } : {}),
         ...(plan ? { plan } : {}),

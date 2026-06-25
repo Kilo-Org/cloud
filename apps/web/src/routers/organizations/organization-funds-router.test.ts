@@ -9,6 +9,7 @@ import {
 import { eq, and, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
+import { hasOrganizationEverPaid } from '@/lib/creditTransactions';
 import type { User, Organization } from '@kilocode/db/schema';
 
 let ownerUser: User;
@@ -165,6 +166,9 @@ describe('organization funds router', () => {
       expect(childAIncoming).toHaveLength(1);
       expect(childAIncoming[0].amount_microdollars).toBe(2_000_000);
       expect(childAIncoming[0].expiry_date).toBeNull();
+      // A transfer is a balance movement, not a purchase: it must not be
+      // recorded as paid, or it would fabricate paid provenance downstream.
+      expect(childAIncoming[0].is_free).toBe(true);
 
       const parentOutgoing = await db
         .select()
@@ -189,6 +193,20 @@ describe('organization funds router', () => {
           )
         );
       expect(parentAuditLogs).toHaveLength(1);
+    });
+
+    it('does not mark the child or parent as having ever paid', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await caller.organizations.funds.distribute({
+        organizationId: parentOrg.id,
+        allocations: [{ childOrganizationId: childA.id, amountMicrodollars: 1_000_000 }],
+      });
+
+      // Neither org made a purchase; the transfer must not flip the paid gate
+      // that gates deployments and notifications.
+      expect(await hasOrganizationEverPaid(childA.id)).toBe(false);
+      expect(await hasOrganizationEverPaid(parentOrg.id)).toBe(false);
     });
 
     it('rejects when the total exceeds the available balance', async () => {

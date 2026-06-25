@@ -203,12 +203,14 @@ export const organizationFundsRouter = createTRPCRouter({
           if (!child) continue; // Unreachable given the size check above.
 
           // Credit the child. Transfers are non-expiring in v1, so there is no
-          // expiry date or expiration baseline. `is_free` is false because this
-          // is real balance being moved, not a newly granted free credit.
+          // expiry date or expiration baseline. `is_free` is true because a
+          // transfer is a balance movement, not a purchase: marking it as paid
+          // would fabricate `hasOrganizationEverPaid` for a child that never
+          // paid (and could move free credits in as paid-looking ones).
           await tx.insert(credit_transactions).values({
             kilo_user_id: user.id,
             created_by_kilo_user_id: user.id,
-            is_free: false,
+            is_free: true,
             amount_microdollars: allocation.amountMicrodollars,
             description: `Transfer from parent organization ${parent.name}`,
             credit_category: 'parent_to_child_transfer_in',
@@ -227,10 +229,13 @@ export const organizationFundsRouter = createTRPCRouter({
             .where(eq(organizations.id, child.id));
 
           // Matching deduction recorded on the parent for a symmetric ledger.
+          // Also `is_free: true` so the movement never fabricates a paid signal
+          // on the parent either (a parent funded only by free credits must not
+          // look like it paid just because it distributed funds).
           await tx.insert(credit_transactions).values({
             kilo_user_id: user.id,
             created_by_kilo_user_id: user.id,
-            is_free: false,
+            is_free: true,
             amount_microdollars: -allocation.amountMicrodollars,
             description: `Transfer to child organization ${child.name}`,
             credit_category: 'parent_to_child_transfer_out',

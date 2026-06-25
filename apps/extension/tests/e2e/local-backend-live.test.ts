@@ -555,18 +555,20 @@ test('live local backend runs parallel frontier conversations without switching 
       )
       .toBe(true);
 
+    // The second request stays on its own tab (the running first request never steals focus).
     await expect(sidePanel.getByRole('tab', { selected: true })).toContainText(
       'LOCAL_PARALLEL_SECOND'
     );
-    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
-      timeout: 120_000,
-    });
-    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText(
-      'LOCAL_PARALLEL_SECOND'
-    );
+
+    // Switch to the still-running first conversation and stop it, promptly after the overlap poll: a backgrounded run is also aborted if its selected tab leaves the inspectable list, so we don't wait out the second request before exercising the first.
     await sidePanel.getByRole('tab', { name: /LOCAL_PARALLEL_FIRST/u }).click();
+    // Match the user message exactly: the live model's thinking can quote the prompt token, which would make a substring match resolve to multiple elements.
     await expect(
-      sidePanel.getByLabel('Agent conversation').getByText('LOCAL_PARALLEL_FIRST')
+      sidePanel
+        .getByLabel('Agent conversation')
+        .getByText('LOCAL_PARALLEL_FIRST: write a detailed answer of at least 700 words.', {
+          exact: true,
+        })
     ).toBeVisible();
     const firstStopButton = sidePanel.getByRole('button', { exact: true, name: 'Stop' });
 
@@ -574,9 +576,18 @@ test('live local backend runs parallel frontier conversations without switching 
     await firstStopButton.click();
     await expect(sidePanel.getByText('Stopped.')).toBeVisible({ timeout: 30_000 });
 
+    // The second conversation runs to completion on its own tab.
     await sidePanel.getByRole('tab', { name: /LOCAL_PARALLEL_SECOND/u }).click();
+    await expect(sidePanel.getByRole('tab', { selected: true })).toContainText(
+      'LOCAL_PARALLEL_SECOND'
+    );
+    await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+      timeout: 120_000,
+    });
     await expect(
-      sidePanel.getByLabel('Agent conversation').getByText('LOCAL_PARALLEL_SECOND')
+      sidePanel
+        .getByLabel('Agent conversation')
+        .getByText('LOCAL_PARALLEL_SECOND: reply in one short sentence.', { exact: true })
     ).toBeVisible();
   } finally {
     await context.close();

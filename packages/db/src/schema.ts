@@ -3051,12 +3051,10 @@ export const platform_integrations = pgTable(
       .on(table.platform, table.platform_installation_id)
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
-      .on(table.owned_by_user_id, table.platform)
-      .concurrently()
+      .on(table.owned_by_user_id)
       .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
     uniqueIndex('UQ_platform_integrations_org_bitbucket')
-      .on(table.owned_by_organization_id, table.platform)
-      .concurrently()
+      .on(table.owned_by_organization_id)
       .where(
         sql`${table.platform} = 'bitbucket' AND ${table.owned_by_organization_id} IS NOT NULL`
       ),
@@ -3089,17 +3087,6 @@ export const platform_integrations = pgTable(
       sql`(
         (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
         (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
-      )`
-    ),
-    check(
-      'platform_integrations_access_token_auth_invalidation_pair_check',
-      sql`(
-        ${table.platform} <> 'bitbucket' OR
-        ${table.integration_type} <> 'workspace_access_token' OR
-        (
-          (${table.auth_invalid_at} IS NULL AND ${table.auth_invalid_reason} IS NULL) OR
-          (${table.auth_invalid_at} IS NOT NULL AND ${table.auth_invalid_reason} IS NOT NULL)
-        )
       )`
     ),
   ]
@@ -3178,10 +3165,6 @@ export const platform_oauth_credentials = pgTable(
     uniqueIndex('UQ_platform_oauth_credentials_platform_integration_id').on(
       table.platform_integration_id
     ),
-    index('IDX_platform_oauth_credentials_platform_subject').on(
-      table.platform,
-      table.provider_subject_id
-    ),
     index('IDX_platform_oauth_credentials_authorized_by_user_id').on(table.authorized_by_user_id),
   ]
 );
@@ -3214,19 +3197,6 @@ export const platform_access_token_credentials = pgTable(
   table => [
     unique('UQ_platform_access_token_credentials_platform_integration_id').on(
       table.platform_integration_id
-    ),
-    check('platform_access_token_credentials_platform_check', sql`${table.platform} = 'bitbucket'`),
-    check(
-      'platform_access_token_credentials_integration_type_check',
-      sql`${table.integration_type} = 'workspace_access_token'`
-    ),
-    check(
-      'platform_access_token_credentials_provider_type_check',
-      sql`${table.provider_credential_type} = 'workspace_access_token'`
-    ),
-    check(
-      'platform_access_token_credentials_version_positive_check',
-      sql`${table.credential_version} > 0`
     ),
     foreignKey({
       columns: [table.platform_integration_id],

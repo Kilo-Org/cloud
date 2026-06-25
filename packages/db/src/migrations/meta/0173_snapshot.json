@@ -1,5 +1,5 @@
 {
-  "id": "31964f5d-47f0-4ff5-967b-f2bb1a2abd70",
+  "id": "06265fd6-428e-4b7d-9092-dba307d6255e",
   "prevId": "969175e5-639f-49f5-beef-8d6033d50298",
   "version": "7",
   "dialect": "postgresql",
@@ -23737,24 +23737,7 @@
         }
       },
       "policies": {},
-      "checkConstraints": {
-        "platform_access_token_credentials_platform_check": {
-          "name": "platform_access_token_credentials_platform_check",
-          "value": "\"platform_access_token_credentials\".\"platform\" = 'bitbucket'"
-        },
-        "platform_access_token_credentials_integration_type_check": {
-          "name": "platform_access_token_credentials_integration_type_check",
-          "value": "\"platform_access_token_credentials\".\"integration_type\" = 'workspace_access_token'"
-        },
-        "platform_access_token_credentials_provider_type_check": {
-          "name": "platform_access_token_credentials_provider_type_check",
-          "value": "\"platform_access_token_credentials\".\"provider_credential_type\" = 'workspace_access_token'"
-        },
-        "platform_access_token_credentials_version_positive_check": {
-          "name": "platform_access_token_credentials_version_positive_check",
-          "value": "\"platform_access_token_credentials\".\"credential_version\" > 0"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.platform_integrations": {
@@ -24032,17 +24015,11 @@
               "isExpression": false,
               "asc": true,
               "nulls": "last"
-            },
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
             }
           ],
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'bitbucket' AND \"platform_integrations\".\"owned_by_user_id\" IS NOT NULL",
-          "concurrently": true,
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },
@@ -24054,17 +24031,11 @@
               "isExpression": false,
               "asc": true,
               "nulls": "last"
-            },
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
             }
           ],
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'bitbucket' AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL",
-          "concurrently": true,
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },
@@ -24275,10 +24246,6 @@
         "platform_integrations_owner_check": {
           "name": "platform_integrations_owner_check",
           "value": "(\n        (\"platform_integrations\".\"owned_by_user_id\" IS NOT NULL AND \"platform_integrations\".\"owned_by_organization_id\" IS NULL) OR\n        (\"platform_integrations\".\"owned_by_user_id\" IS NULL AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
-        },
-        "platform_integrations_access_token_auth_invalidation_pair_check": {
-          "name": "platform_integrations_access_token_auth_invalidation_pair_check",
-          "value": "(\n        \"platform_integrations\".\"platform\" <> 'bitbucket' OR\n        \"platform_integrations\".\"integration_type\" <> 'workspace_access_token' OR\n        (\n          (\"platform_integrations\".\"auth_invalid_at\" IS NULL AND \"platform_integrations\".\"auth_invalid_reason\" IS NULL) OR\n          (\"platform_integrations\".\"auth_invalid_at\" IS NOT NULL AND \"platform_integrations\".\"auth_invalid_reason\" IS NOT NULL)\n        )\n      )"
         }
       },
       "isRLSEnabled": false
@@ -24400,27 +24367,6 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_platform_oauth_credentials_platform_subject": {
-          "name": "IDX_platform_oauth_credentials_platform_subject",
-          "columns": [
-            {
-              "expression": "platform",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "provider_subject_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}

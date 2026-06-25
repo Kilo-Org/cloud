@@ -2,7 +2,7 @@ import 'server-only';
 import { db } from '@/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, desc, isNull, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
@@ -54,6 +54,14 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
     .select()
     .from(platform_integrations)
     .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')))
+    .orderBy(
+      desc(sql`
+        ${platform_integrations.integration_status} = ${INTEGRATION_STATUS.ACTIVE}
+        AND ${platform_integrations.suspended_at} IS NULL
+        AND ${platform_integrations.auth_invalid_at} IS NULL
+      `),
+      desc(platform_integrations.updated_at)
+    )
     .limit(1);
 
   return integration || null;

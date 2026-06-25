@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -38,7 +39,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { InviteMemberDialog } from '@/components/organizations/members/InviteMemberDialog';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useUserOrganizationRole } from '@/components/organizations/OrganizationContext';
-import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
 import { OpenInExtensionButton } from '@/components/auth/OpenInExtensionButton';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -50,6 +50,14 @@ import {
   getPreviousOnboardingScreen,
   type OrganizationOnboardingScreen,
 } from './organization-setup-path';
+
+const GitHubIntegrationDetails = dynamic(
+  () =>
+    import('@/components/integrations/GitHubIntegrationDetails').then(
+      module => module.GitHubIntegrationDetails
+    ),
+  { loading: GitHubIntegrationDetailsLoading }
+);
 
 const STEP_CONTENT = {
   'source-control': {
@@ -95,6 +103,16 @@ const STEP_CONTENT = {
 >;
 
 const STEP_KEYS = ORGANIZATION_ONBOARDING_STEP_KEYS;
+
+function GitHubIntegrationDetailsLoading() {
+  return (
+    <div className="animate-pulse space-y-4 rounded-xl border border-border bg-surface-background p-6">
+      <div className="h-5 w-40 rounded bg-surface-hover" />
+      <div className="h-16 rounded-lg bg-surface-raised" />
+      <div className="h-10 rounded-md bg-surface-hover" />
+    </div>
+  );
+}
 
 type OrganizationSetupWizardProps = {
   organizationId: string;

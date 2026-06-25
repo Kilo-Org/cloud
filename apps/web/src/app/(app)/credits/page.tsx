@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Info, X, CheckCircle2, CalendarDays, ExternalLink, ChevronRight } from 'lucide-react';
@@ -16,6 +16,38 @@ import { TRPCClientError } from '@trpc/client';
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
 import { AutoTopUpToggle } from '@/components/payment/AutoTopUpToggle';
 import { TOPUP_AMOUNT_QUERY_STRING_KEY } from '@/lib/organizations/constants';
+
+// Shared table header cell — applies the canonical eyebrow type utility.
+function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
+  return (
+    <th
+      className={`type-eyebrow text-muted-foreground px-6 py-3 ${align === 'right' ? 'text-right' : 'text-left'}`}
+    >
+      {children}
+    </th>
+  );
+}
+
+// Shared table body cell — applies the canonical body type utility.
+function Td({
+  children,
+  align = 'left',
+  numeric = false,
+  className = '',
+}: {
+  children: React.ReactNode;
+  align?: 'left' | 'right';
+  numeric?: boolean;
+  className?: string;
+}) {
+  return (
+    <td
+      className={`type-body px-6 py-3 whitespace-nowrap ${align === 'right' ? 'text-right' : ''} ${numeric ? 'tabular-nums' : ''} ${className}`}
+    >
+      {children}
+    </td>
+  );
+}
 
 export default function CreditsPage() {
   const router = useRouter();
@@ -36,94 +68,82 @@ export default function CreditsPage() {
     }
   }, [error, router]);
 
+  const headerActions = (
+    <Link
+      href="/subscriptions"
+      className="type-body flex items-center gap-1 text-blue-400 hover:underline"
+    >
+      Manage subscriptions <ChevronRight className="size-4" />
+    </Link>
+  );
+
   if (isLoading) {
     return (
       <PageLayout
         title="Credits"
         subtitle="Buy credits, view your balance, and manage auto top-up."
-        headerActions={
-          <Link
-            href="/subscriptions"
-            className="flex items-center gap-1 text-sm text-blue-400 hover:underline"
-          >
-            Manage subscriptions <ChevronRight className="h-4 w-4" />
-          </Link>
-        }
+        headerActions={headerActions}
       >
         <div className="flex flex-col gap-6">
-          <Card className="w-full overflow-hidden">
+          <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-6 w-6 rounded-full" />
-                  <Skeleton className="h-6 w-48" />
-                </div>
-              </div>
+              <Skeleton className="h-8 w-36" />
+              <Skeleton className="h-4 w-24 mt-1" />
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-12 w-32" />
-                <Skeleton className="h-4 w-20" />
-              </div>
+              <Skeleton className="h-16 w-full rounded-lg" />
             </CardContent>
           </Card>
 
-          <Card className="w-full overflow-hidden">
+          <Card>
             <CardHeader>
-              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-5 w-32" />
             </CardHeader>
             <CardContent>
               <Skeleton className="h-24 w-full rounded-lg" />
             </CardContent>
           </Card>
 
-          <Card className="w-full overflow-hidden">
+          <Card>
             <CardHeader>
-              <Skeleton className="h-6 w-48" />
+              <Skeleton className="h-5 w-32" />
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-20 w-full rounded-lg" />
+              <Skeleton className="h-16 w-full rounded-lg" />
             </CardContent>
           </Card>
 
-          <Card className="w-full overflow-hidden">
+          <Card className="overflow-hidden">
             <CardHeader>
-              <Skeleton className="h-6 w-64" />
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-4 w-64 mt-1" />
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="bg-muted border-b">
-                      <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                        Purchase Date
-                      </th>
-                      <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                        Credits Added
-                      </th>
-                      <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                        Expiration Date
-                      </th>
-                      <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                        Invoice
-                      </th>
+                      <Th>Purchase Date</Th>
+                      <Th>Credits Added</Th>
+                      <Th>Expiration Date</Th>
+                      <Th>Invoice</Th>
                     </tr>
                   </thead>
                   <tbody className="divide-border divide-y">
-                    {Array.from({ length: 3 }).map((_, index) => (
-                      <tr key={index} className="even:bg-muted group">
-                        <td className="px-6 py-4 text-sm whitespace-nowrap">
-                          <Skeleton className="group-even:bg-background h-5 w-20" />
-                        </td>
-                        <td className="px-6 py-4 text-sm whitespace-nowrap">
-                          <Skeleton className="group-even:bg-background h-5 w-16" />
-                        </td>
-                        <td className="px-6 py-4 text-sm whitespace-nowrap">
-                          <Skeleton className="group-even:bg-background h-5 w-20" />
-                        </td>
-                        <td className="px-6 py-4 text-sm whitespace-nowrap">
-                          <Skeleton className="group-even:bg-background h-5 w-16" />
-                        </td>
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <tr key={i} className="even:bg-muted group">
+                        <Td>
+                          <Skeleton className="group-even:bg-background h-4 w-20" />
+                        </Td>
+                        <Td>
+                          <Skeleton className="group-even:bg-background h-4 w-16" />
+                        </Td>
+                        <Td>
+                          <Skeleton className="group-even:bg-background h-4 w-20" />
+                        </Td>
+                        <Td>
+                          <Skeleton className="group-even:bg-background h-4 w-16" />
+                        </Td>
                       </tr>
                     ))}
                   </tbody>
@@ -141,7 +161,7 @@ export default function CreditsPage() {
       return (
         <PageLayout title="Credits">
           <div className="flex items-center justify-center py-12">
-            <div className="text-muted-foreground text-lg">Redirecting to sign in...</div>
+            <p className="type-body text-muted-foreground">Redirecting to sign in...</p>
           </div>
         </PageLayout>
       );
@@ -150,11 +170,13 @@ export default function CreditsPage() {
     return (
       <PageLayout title="Credits">
         <div className="flex flex-col items-center justify-center gap-4 py-12">
-          <div className="text-destructive text-lg">
-            Error: {error instanceof TRPCClientError ? error.message : 'An error occurred'}
-          </div>
+          <p className="type-body text-destructive">
+            {error instanceof TRPCClientError
+              ? error.message
+              : 'Something went wrong. Try refreshing the page.'}
+          </p>
           <Button onClick={() => refetch()} variant="outline">
-            Try Again
+            Try again
           </Button>
         </div>
       </PageLayout>
@@ -165,7 +187,7 @@ export default function CreditsPage() {
     return (
       <PageLayout title="Credits">
         <div className="flex items-center justify-center py-12">
-          <div className="text-muted-foreground text-lg">No credit data available</div>
+          <p className="type-body text-muted-foreground">No credit data available</p>
         </div>
       </PageLayout>
     );
@@ -187,38 +209,34 @@ export default function CreditsPage() {
     <PageLayout
       title="Credits"
       subtitle="Buy credits, view your balance, and manage auto top-up."
-      headerActions={
-        <Link
-          href="/subscriptions"
-          className="flex items-center gap-1 text-sm text-blue-400 hover:underline"
-        >
-          Manage subscriptions <ChevronRight className="h-4 w-4" />
-        </Link>
-      }
+      headerActions={headerActions}
     >
       <div className="flex flex-col gap-6">
+        {/* Post-purchase confirmation banner */}
         {showBanner && (
-          <Card className="border-green-600/40 bg-green-950/30">
+          <Card className="border-green-500/20 bg-green-500/10">
             <CardContent className="p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-0.5 h-5 w-5 text-green-400 shrink-0" />
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-12">
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-green-400" />
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-10">
                     <div>
-                      <div className="text-lg font-semibold text-green-400">
+                      <p className="type-heading text-green-400">
                         ${Number(purchasedParam).toFixed(2)} in credits added
-                      </div>
-                      <div className="text-muted-foreground text-sm">
+                      </p>
+                      <p className="type-body text-muted-foreground mt-0.5 tabular-nums">
                         Previous balance {formatMicrodollars(previousBalance)} + $
-                        {Number(purchasedParam).toFixed(2)} purchase = New balance{' '}
+                        {Number(purchasedParam).toFixed(2)} = New balance{' '}
                         {formatMicrodollars(currentBalance)}
-                      </div>
+                      </p>
                     </div>
                     {latestExpiry && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <CalendarDays className="h-4 w-4 text-blue-400" />
-                        <span className="text-muted-foreground">These credits expire on</span>
-                        <span className="font-medium text-blue-400">
+                      <div className="flex items-center gap-1.5">
+                        <CalendarDays className="size-4 text-blue-400 shrink-0" />
+                        <span className="type-body text-muted-foreground">
+                          These credits expire on
+                        </span>
+                        <span className="type-body font-medium text-blue-400">
                           {formatIsoDateString_UsaDateOnlyFormat(latestExpiry)}
                         </span>
                       </div>
@@ -228,121 +246,118 @@ export default function CreditsPage() {
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Dismiss"
                   className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
                   onClick={() => setBannerDismissed(true)}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="size-4" />
                 </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
+        {/* Balance summary */}
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-medium">Your credit balance</CardTitle>
+          <CardHeader>
+            <CardTitle>Your credit balance</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_auto_1fr] lg:grid-cols-[1fr_1px_1fr_1px_1fr]">
+          <CardContent className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1px_1fr_1px_1fr]">
+              {/* Current balance KPI */}
               <div>
-                <div className="text-4xl font-bold text-green-500">
+                <div className="type-title tabular-nums text-green-400">
                   {formatMicrodollars(currentBalance)}
                 </div>
-                <div className="text-muted-foreground mt-1 text-sm">available</div>
+                <div className="type-label text-muted-foreground mt-1">available</div>
               </div>
 
               <div className="hidden lg:block w-px bg-border self-stretch" />
 
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Previous balance</span>
-                  <span>{formatMicrodollars(previousBalance)}</span>
+              {/* Breakdown */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="type-body text-muted-foreground">Previous balance</span>
+                  <span className="type-body tabular-nums">
+                    {formatMicrodollars(previousBalance)}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Credits purchased</span>
-                  <span className="font-medium text-green-500">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="type-body text-muted-foreground">Credits purchased</span>
+                  <span className="type-body tabular-nums font-medium text-green-400">
                     +{formatMicrodollars(creditsPurchased)}
                   </span>
                 </div>
-                <div className="my-1 border-t border-border" />
-                <div className="flex items-center justify-between text-sm font-semibold">
-                  <span>Current balance</span>
-                  <span>{formatMicrodollars(currentBalance)}</span>
+                <div className="border-t border-border" />
+                <div className="flex items-center justify-between gap-4">
+                  <span className="type-body font-semibold">Current balance</span>
+                  <span className="type-body tabular-nums font-semibold">
+                    {formatMicrodollars(currentBalance)}
+                  </span>
                 </div>
               </div>
 
               <div className="hidden lg:block w-px bg-border self-stretch" />
 
+              {/* Expiry info */}
               <div className="flex items-start gap-2">
-                <Info className="mt-0.5 h-4 w-4 text-blue-400 shrink-0" />
-                <div className="text-sm">
-                  <div className="text-muted-foreground">Your latest purchase expires on</div>
+                <Info className="mt-0.5 size-4 text-blue-400 shrink-0" />
+                <div>
+                  <p className="type-body text-muted-foreground">Latest purchase expires on</p>
                   {latestExpiry ? (
-                    <div className="font-medium text-blue-400">
+                    <p className="type-body font-medium text-blue-400">
                       {formatIsoDateString_UsaDateOnlyFormat(latestExpiry)}
-                    </div>
+                    </p>
                   ) : (
-                    <div className="font-medium">Never</div>
+                    <p className="type-body font-medium">Never</p>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="text-muted-foreground mt-4 border-t border-border pt-4 text-xs">
+            <div className="type-label text-muted-foreground border-t border-border pt-4">
               Credit expiration applies to each purchase. Credits expire at 11:59 PM (UTC) on the
               expiration date.
             </div>
           </CardContent>
         </Card>
 
+        {/* Buy Credits */}
         <CreditPurchaseOptions isFirstPurchase={creditData.isFirstPurchase} />
 
+        {/* Automatic Top Up */}
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-medium">Automatic Top Up</CardTitle>
+          <CardHeader>
+            <CardTitle>Automatic Top Up</CardTitle>
           </CardHeader>
           <CardContent>
             <AutoTopUpToggle />
           </CardContent>
         </Card>
 
-        <Card className="w-full overflow-hidden">
+        {/* Credit history */}
+        <Card className="overflow-hidden">
           <CardHeader>
-            <CardTitle className="text-lg font-medium">Credit history</CardTitle>
-            <p className="text-muted-foreground text-sm">
-              A detailed record of your credit purchases and balances.
-            </p>
+            <CardTitle>Credit history</CardTitle>
+            <CardDescription>A record of your credit purchases.</CardDescription>
           </CardHeader>
-
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-muted border-b">
-                    <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                      Purchase Date
-                    </th>
-                    <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                      Credits Added
-                    </th>
-                    <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                      Expiration Date
-                    </th>
-                    <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                      Invoice
-                    </th>
+                    <Th>Purchase Date</Th>
+                    <Th>Credits Added</Th>
+                    <Th>Expiration Date</Th>
+                    <Th>Invoice</Th>
                   </tr>
                 </thead>
                 <tbody className="divide-border divide-y">
                   {blocks.map(block => (
-                    <tr key={block.id} className="even:bg-muted text-foreground">
-                      <td className="px-6 py-4 text-sm whitespace-nowrap">
-                        {formatIsoDateString_UsaDateOnlyFormat(block.effective_date)}
-                      </td>
-                      <td className="px-6 py-4 text-sm whitespace-nowrap">
-                        {formatMicrodollars(block.amount_mUsd)}
-                      </td>
-                      <td className="px-6 py-4 text-sm whitespace-nowrap">
+                    <tr key={block.id} className="even:bg-muted">
+                      <Td>{formatIsoDateString_UsaDateOnlyFormat(block.effective_date)}</Td>
+                      <Td numeric>{formatMicrodollars(block.amount_mUsd)}</Td>
+                      <Td>
                         {block.expiry_date ? (
                           <Link
                             href={`https://countdown.val.run/?time=${new Date(block.expiry_date).toISOString()}`}
@@ -356,8 +371,8 @@ export default function CreditsPage() {
                         ) : (
                           <span className="text-muted-foreground">Never</span>
                         )}
-                      </td>
-                      <td className="px-6 py-4 text-sm whitespace-nowrap">
+                      </Td>
+                      <Td>
                         {block.receipt_url ? (
                           <Link
                             href={block.receipt_url}
@@ -365,78 +380,69 @@ export default function CreditsPage() {
                             target="_blank"
                             prefetch={false}
                           >
-                            View invoice <ExternalLink className="h-3 w-3" />
+                            View invoice <ExternalLink className="size-3" />
                           </Link>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
-                      </td>
+                      </Td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-
             {blocks.length === 0 && (
-              <div className="text-muted-foreground px-6 py-12 text-center">
-                No credit blocks found
+              <div className="type-body text-muted-foreground px-6 py-12 text-center">
+                No credit purchases yet.
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="w-full overflow-hidden">
+        {/* Credit Subscription Transactions */}
+        <Card className="overflow-hidden">
           <CardHeader>
-            <CardTitle className="text-lg font-medium">Credit Subscription Transactions</CardTitle>
-            <p className="text-muted-foreground text-sm">
-              Credits spent on subscriptions and other recurring expenses.
-            </p>
+            <CardTitle>Credit Subscription Transactions</CardTitle>
+            <CardDescription>
+              Credits spent on subscriptions and recurring expenses.
+            </CardDescription>
           </CardHeader>
-
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-muted border-b">
-                    <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                      Date
-                    </th>
-                    <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                      Description
-                    </th>
-                    <th className="text-muted-foreground px-6 py-3 text-right text-xs font-medium tracking-wider uppercase">
-                      Amount
-                    </th>
+                    <Th>Date</Th>
+                    <Th>Description</Th>
+                    <Th align="right">Amount</Th>
                   </tr>
                 </thead>
                 <tbody className="divide-border divide-y">
                   {creditData.deductions.map(deduction => (
-                    <tr key={deduction.id} className="even:bg-muted text-foreground">
-                      <td className="px-6 py-4 text-sm whitespace-nowrap">
-                        {formatIsoDateString_UsaDateOnlyFormat(deduction.date)}
-                      </td>
-                      <td className="px-6 py-4 text-sm">{deduction.description}</td>
-                      <td className="px-6 py-4 text-sm whitespace-nowrap text-right">
+                    <tr key={deduction.id} className="even:bg-muted">
+                      <Td>{formatIsoDateString_UsaDateOnlyFormat(deduction.date)}</Td>
+                      <Td className="whitespace-normal">{deduction.description}</Td>
+                      <Td numeric align="right">
                         -{formatMicrodollars(Math.abs(deduction.amount_mUsd))}
-                      </td>
+                      </Td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-
             {creditData.deductions.length === 0 && (
-              <div className="text-muted-foreground px-6 py-12 text-center">
-                No subscription transactions found
+              <div className="type-body text-muted-foreground px-6 py-12 text-center">
+                No subscription transactions yet.
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border-border">
-          <CardContent className="flex items-start gap-3 px-4 py-3">
-            <Info className="mt-0.5 h-4 w-4 text-blue-400 shrink-0" />
-            <p className="text-muted-foreground text-sm">
+        {/* Disclaimer */}
+        <Card>
+          <CardContent className="flex items-start gap-3 py-3">
+            <Info className="mt-0.5 size-4 text-muted-foreground shrink-0" />
+            <p className="type-label text-muted-foreground">
               Credits are non-refundable. For questions about billing or credits, please{' '}
               <Link href="mailto:hi@kilocode.ai" className="text-blue-400 hover:underline">
                 contact support

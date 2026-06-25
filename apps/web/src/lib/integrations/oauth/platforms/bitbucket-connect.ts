@@ -8,6 +8,7 @@ import { buildBitbucketOAuthUrl } from '@/lib/integrations/platforms/bitbucket/a
 import { createOAuthState } from '@/lib/integrations/oauth-state';
 import {
   buildIntegrationOAuthConnectErrorPath,
+  parseOptionalOrganizationId,
   redirectToSignInForOAuthConnect,
 } from '@/lib/integrations/oauth/common';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
@@ -21,9 +22,12 @@ function detailPath(organizationId: string | null): string {
 }
 
 export async function handleBitbucketOAuthConnect(request: NextRequest): Promise<Response> {
-  const organizationId = request.nextUrl.searchParams.get('organizationId');
+  let organizationId: string | null = null;
 
   try {
+    organizationId = parseOptionalOrganizationId(
+      request.nextUrl.searchParams.get('organizationId')
+    );
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return redirectToSignInForOAuthConnect(request, detailPath(organizationId));

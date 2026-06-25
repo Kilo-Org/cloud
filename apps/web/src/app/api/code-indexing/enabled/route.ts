@@ -1,9 +1,12 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createTRPCContext } from '@/lib/trpc/init';
 import { ensureOrganizationAccessAndFetchOrg } from '@/routers/organizations/utils';
 import { getUserFromAuth } from '@/lib/user/server';
 import { isEnabledForUser } from '@/lib/code-indexing/util';
+
+const OrganizationIdSchema = z.uuid();
 
 type EnabledResponse = { enabled: boolean };
 type ErrorResponse = { error: string; message?: string };
@@ -36,11 +39,16 @@ export async function GET(
     return NextResponse.json({ enabled: isEnabledForUser(res.user) });
   }
 
+  const parsedOrganizationId = OrganizationIdSchema.safeParse(organizationId);
+  if (!parsedOrganizationId.success) {
+    return NextResponse.json({ error: 'Invalid organizationId' }, { status: 400 });
+  }
+
   // Check if user has access to the organization and fetch it
   try {
     // Create tRPC context for authentication
     const ctx = await createTRPCContext();
-    const org = await ensureOrganizationAccessAndFetchOrg(ctx, organizationId);
+    const org = await ensureOrganizationAccessAndFetchOrg(ctx, parsedOrganizationId.data);
 
     // Check if code indexing is enabled in organization settings
     const enabled = org.settings?.code_indexing_enabled === true;

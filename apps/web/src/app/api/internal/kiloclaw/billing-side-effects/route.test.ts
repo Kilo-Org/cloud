@@ -62,6 +62,7 @@ const mockProcessPersonalKiloClawPaidConversion = jest.mocked(
   processPersonalKiloClawPaidConversion
 );
 const mockEnforceKiloClawCommitRetirementGuard = jest.mocked(enforceKiloClawCommitRetirementGuard);
+const ORGANIZATION_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 type ConsoleSpy = jest.SpiedFunction<typeof console.log> | jest.SpiedFunction<typeof console.error>;
 
@@ -174,11 +175,11 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
             organization_name: 'Acme Corp',
             instance_label: 'Research Claw',
             destruction_date: 'May 25, 2026',
-            organization_billing_url: 'https://app.kilo.ai/organizations/org-123/payment-details',
+            organization_billing_url: `https://app.kilo.ai/organizations/${ORGANIZATION_ID}/payment-details`,
           },
           userId: 'owner-123',
           instanceId: 'instance-456',
-          organizationId: 'org-123',
+          organizationId: ORGANIZATION_ID,
         },
       })
     );
@@ -189,14 +190,14 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
         templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
         userId: 'owner-123',
         instanceId: 'instance-456',
-        organizationId: 'org-123',
+        organizationId: ORGANIZATION_ID,
       })
     );
     expect(findJsonLog(consoleLogSpy, 'Starting billing side effect request')).toEqual(
       expect.objectContaining({
         userId: 'owner-123',
         instanceId: 'instance-456',
-        organizationId: 'org-123',
+        organizationId: ORGANIZATION_ID,
         templateName: 'clawOrganizationTrialSuspendedBillingAuthority',
       })
     );
@@ -218,7 +219,7 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
           },
           userId: 'member-123',
           instanceId: 'instance-456',
-          organizationId: 'org-123',
+          organizationId: ORGANIZATION_ID,
         },
       })
     );
@@ -238,9 +239,9 @@ describe('POST /api/internal/kiloclaw/billing-side-effects', () => {
           templateVars: {
             organization_name: 'Acme Corp',
             instance_label: 'Research Claw',
-            organization_billing_url: 'https://app.kilo.ai/organizations/org-123/payment-details',
+            organization_billing_url: `https://app.kilo.ai/organizations/${ORGANIZATION_ID}/payment-details`,
           },
-          organizationId: 'org-123',
+          organizationId: ORGANIZATION_ID,
         },
       })
     );

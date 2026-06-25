@@ -600,12 +600,12 @@ const ScopeOrganizationsInputSchema = z.object({
 });
 
 const ScopeOrganizationSchema = z.object({
-  organizationId: z.string(),
+  organizationId: z.uuid(),
   organizationName: z.string(),
 });
 
 const ScopeOrganizationsOutputSchema = z.object({
-  organizationId: z.string(),
+  organizationId: z.uuid(),
   organizationName: z.string(),
   /** Direct child organizations, sorted by name. Empty when not a parent org. */
   children: z.array(ScopeOrganizationSchema),

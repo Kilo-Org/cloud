@@ -15,6 +15,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import {
   buildIntegrationOAuthConnectErrorPath,
+  parseOptionalOrganizationId,
   redirectToSignInForOAuthConnect,
 } from '@/lib/integrations/oauth/common';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -22,7 +23,7 @@ import type { Owner } from '@/lib/integrations/core/types';
 type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
 
 const GitLabOAuthConnectPostBodySchema = z.object({
-  organizationId: z.string().optional(),
+  organizationId: z.uuid().optional(),
   instanceUrl: z.string().optional(),
   clientId: z.string().optional(),
   clientSecret: z.string().optional(),
@@ -50,9 +51,10 @@ type GitLabOAuthConnectOptions = {
  */
 export async function handleGitLabOAuthConnect(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const organizationId = searchParams.get('organizationId');
+  let organizationId: string | null = null;
 
   try {
+    organizationId = parseOptionalOrganizationId(searchParams.get('organizationId'));
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       const hasLegacyQueryCredentials =

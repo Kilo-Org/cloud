@@ -5,6 +5,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { TRPCError } from '@trpc/server';
 import { NextResponse, type NextRequest } from 'next/server';
+import { z } from 'zod';
 import {
   getAutoRoutingMode,
   updateAutoRoutingMode,
@@ -12,6 +13,8 @@ import {
 import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
+
+const OrganizationIdSchema = z.uuid();
 
 function workerResultResponse(result: { status: number; body: unknown }): NextResponse {
   if (result.status >= 400) {
@@ -47,10 +50,16 @@ async function resolveOwner(
     return { response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
   }
 
-  const organizationId = request.nextUrl.searchParams.get('organizationId');
-  if (!organizationId) {
+  const organizationIdParam = request.nextUrl.searchParams.get('organizationId');
+  if (!organizationIdParam) {
     return { ownerType: 'user', ownerId: user.id };
   }
+
+  const parsedOrganizationId = OrganizationIdSchema.safeParse(organizationIdParam);
+  if (!parsedOrganizationId.success) {
+    return { response: NextResponse.json({ error: 'Invalid organizationId' }, { status: 400 }) };
+  }
+  const organizationId = parsedOrganizationId.data;
 
   try {
     await ensureOrganizationAccess({ user }, organizationId, roles);

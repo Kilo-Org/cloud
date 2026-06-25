@@ -30,6 +30,7 @@ jest.mock('@/lib/tokens', () => ({
 import { POST } from './route';
 
 const mockGenerateApiToken = jest.mocked(generateApiToken);
+const ORGANIZATION_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 function createRequest(body: unknown, headers: Record<string, string> = {}) {
   return new NextRequest('http://localhost:3000/api/internal/auto-routing-benchmark/token', {
@@ -98,7 +99,7 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
 
     const res = await POST(
       createRequest(
-        { userId: 'user-1', organizationId: 'org-1' },
+        { userId: 'user-1', organizationId: ORGANIZATION_ID },
         { authorization: 'Bearer internal-secret' }
       )
     );
@@ -106,7 +107,11 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
     expect(res.status).toBe(200);
     expect(mockGenerateApiToken).toHaveBeenCalledWith(
       user,
-      { tokenSource: 'auto-routing-benchmark', organizationId: 'org-1', organizationRole: 'owner' },
+      {
+        tokenSource: 'auto-routing-benchmark',
+        organizationId: ORGANIZATION_ID,
+        organizationRole: 'owner',
+      },
       { expiresIn: 6 * 60 * 60 }
     );
   });

@@ -9,7 +9,11 @@ import { fromMicrodollars } from '@/lib/utils';
 import { TOPUP_AMOUNT_QUERY_STRING_KEY } from '@/lib/organizations/constants';
 import { PageContainer } from '@/components/layouts/PageContainer';
 
-function getRedirectUrl(txn: CreditTransaction | undefined, returnUrl: string | null) {
+type TopUpCreditTransaction = CreditTransaction & {
+  organizationRouteIdentifier?: string | null;
+};
+
+function getRedirectUrl(txn: TopUpCreditTransaction | undefined, returnUrl: string | null) {
   // If there's a valid return URL from the cookie, use it
   if (returnUrl) {
     return returnUrl;
@@ -21,11 +25,11 @@ function getRedirectUrl(txn: CreditTransaction | undefined, returnUrl: string | 
   }
   const params = new URLSearchParams();
   params.set(TOPUP_AMOUNT_QUERY_STRING_KEY, fromMicrodollars(txn.amount_microdollars).toString());
-  return `/organizations/${txn.organization_id}?${params.toString()}`;
+  return `/organizations/${txn.organizationRouteIdentifier ?? txn.organization_id}?${params.toString()}`;
 }
 
 export default function TopUpSuccessPage() {
-  const [creditTransaction, setCreditTransaction] = useState<CreditTransaction>();
+  const [creditTransaction, setCreditTransaction] = useState<TopUpCreditTransaction>();
   const [tries, setTries] = useState(0);
   const [hasExceededMaxTries, setHasExceededMaxTries] = useState(false);
   const [returnUrl, setReturnUrl] = useState<string | null>(null);

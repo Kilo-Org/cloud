@@ -33,7 +33,7 @@ import { INTERNAL_API_SECRET } from '@/lib/config.server';
 
 const RequestSchema = z.object({
   userId: z.string().min(1),
-  organizationId: z.string().min(1).optional(),
+  organizationId: z.uuid().optional(),
 });
 
 const SIX_HOURS_IN_SECONDS = 6 * 60 * 60;

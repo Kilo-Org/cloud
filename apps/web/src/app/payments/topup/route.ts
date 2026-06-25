@@ -7,6 +7,8 @@ import { isValidReturnUrl } from '@/lib/payment-return-url';
 import { captureException } from '@sentry/nextjs';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
+import { TOPUP_CANCELED_QUERY_STRING_KEY } from '@/lib/organizations/constants';
 
 /**
  * NOTE: Crypto payment support (Coinbase Commerce) was removed in January 2026.
@@ -58,25 +60,36 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
     return NextResponse.json({ error: validationResult.error }, { status: 400 });
   }
 
-  // validate org id
-  const organizationId = searchParams.get('organization-id');
-  if (organizationId && typeof organizationId !== 'string') {
+  // Accept a route identifier at the URL boundary, then immediately normalize to
+  // the database UUID before calling billing or writing Stripe metadata.
+  const organizationRouteIdentifier = searchParams.get('organization-id');
+  if (organizationRouteIdentifier && typeof organizationRouteIdentifier !== 'string') {
     return NextResponse.json({ error: 'Invalid org id' }, { status: 400 });
   }
 
   let stripeCustomerId: string | null | undefined;
-  if (organizationId) {
-    const orgContext = await getAuthorizedOrgContext(organizationId, ['owner', 'billing_manager']);
+  let organizationId: string | null = null;
+  let organizationCancelPath: string | null = null;
+  if (organizationRouteIdentifier) {
+    const orgContext = await getAuthorizedOrgContext(organizationRouteIdentifier, [
+      'owner',
+      'billing_manager',
+    ]);
     if (!orgContext.success) {
       return orgContext.nextResponse;
     }
+    organizationId = orgContext.data.organization.id;
+    const canonicalRouteIdentifier = getOrganizationRouteIdentifier(orgContext.data.organization);
+    organizationCancelPath = `/organizations/${canonicalRouteIdentifier}?${TOPUP_CANCELED_QUERY_STRING_KEY}=true`;
     stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
   } else {
     stripeCustomerId = currentUser.stripe_customer_id;
   }
 
   const cancelPathRaw = searchParams.get('cancel-path');
-  const cancelPath = cancelPathRaw && isValidReturnUrl(cancelPathRaw) ? cancelPathRaw : null;
+  const cancelPath =
+    (cancelPathRaw && isValidReturnUrl(cancelPathRaw) ? cancelPathRaw : null) ??
+    organizationCancelPath;
 
   const url = await getStripeTopUpCheckoutUrl(
     currentUser.id,

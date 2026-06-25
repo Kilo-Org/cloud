@@ -40,7 +40,7 @@ const sentryError = sentryLogger('organization_seats', 'error');
 const SubscriptionMetadataSchema = z.object({
   type: z.string(),
   kiloUserId: z.string(),
-  organizationId: z.string(),
+  organizationId: z.uuid(),
   seats: z
     .string()
     .transform((val, ctx) => {

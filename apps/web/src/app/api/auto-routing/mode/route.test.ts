@@ -22,7 +22,7 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
 
 const USER_ID = 'user-1';
-const ORGANIZATION_ID = 'org-1';
+const ORGANIZATION_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 function makeRequest(path: string, body?: unknown) {
   return new NextRequest(`http://localhost:3000${path}`, {
@@ -145,6 +145,21 @@ describe('/api/auto-routing/mode', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'You do not have access to this organization',
     });
+    expect(mockedUpdateAutoRoutingMode).not.toHaveBeenCalled();
+  });
+
+  test('rejects a slug passed as organizationId before organization access checks', async () => {
+    const response = await PUT(
+      makeRequest('/api/auto-routing/mode?organizationId=acme', {
+        mode: 'best_accuracy',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Invalid organizationId',
+    });
+    expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
     expect(mockedUpdateAutoRoutingMode).not.toHaveBeenCalled();
   });
 

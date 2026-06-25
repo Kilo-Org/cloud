@@ -26,7 +26,7 @@ import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 const RequestSchema = z
   .object({
     userId: z.string().min(1).optional(),
-    organizationId: z.string().min(1).optional(),
+    organizationId: z.uuid().optional(),
   })
   .refine(v => Boolean(v.userId) !== Boolean(v.organizationId), {
     message: 'Provide exactly one of userId or organizationId',

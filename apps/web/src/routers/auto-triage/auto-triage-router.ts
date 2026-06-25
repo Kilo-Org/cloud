@@ -334,7 +334,7 @@ export const autoTriageRouter = createTRPCRouter({
       z.object({
         issueUrl: z.string().min(1),
         owner: z.discriminatedUnion('type', [
-          z.object({ type: z.literal('org'), organizationId: z.string() }),
+          z.object({ type: z.literal('org'), organizationId: z.uuid() }),
           z.object({ type: z.literal('user') }),
         ]),
       })

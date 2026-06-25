@@ -2,6 +2,7 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
+import { z } from 'zod';
 import { APP_URL } from '@/lib/constants';
 import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -12,6 +13,7 @@ import type { Owner } from '@/lib/integrations/core/types';
 import type { RetainedOAuthPlatform, StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
 
 type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
+const OrganizationIdSchema = z.uuid();
 
 export type ResolveConnectOwnerOptions = {
   organizationRoles?: Parameters<typeof ensureOrganizationAccess>[2];
@@ -46,6 +48,17 @@ export function parseOAuthStateOwner(owner: string): Owner | null {
   }
 
   return null;
+}
+
+export function parseOptionalOrganizationId(value: string | null | undefined): string | null {
+  if (!value) return null;
+
+  const parsed = OrganizationIdSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new Error('Invalid organizationId');
+  }
+
+  return parsed.data;
 }
 
 export function buildIntegrationOAuthRedirectPath(
@@ -126,7 +139,9 @@ export async function resolveOAuthConnectOwner(
   user: AuthenticatedOAuthUser,
   options: ResolveConnectOwnerOptions = {}
 ): Promise<{ owner: Owner; organizationId: string | null }> {
-  const organizationId = request.nextUrl.searchParams.get('organizationId');
+  const organizationId = parseOptionalOrganizationId(
+    request.nextUrl.searchParams.get('organizationId')
+  );
 
   if (!organizationId) {
     return {
@@ -157,9 +172,12 @@ export async function handleStatefulPlatformOAuthConnect(
     requireActiveOrganizationSubscription,
   }: HandleStatefulOAuthConnectOptions
 ): Promise<Response> {
-  const organizationId = request.nextUrl.searchParams.get('organizationId');
+  let organizationId: string | null = null;
 
   try {
+    organizationId = parseOptionalOrganizationId(
+      request.nextUrl.searchParams.get('organizationId')
+    );
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return redirectToSignInForOAuthConnect(request);

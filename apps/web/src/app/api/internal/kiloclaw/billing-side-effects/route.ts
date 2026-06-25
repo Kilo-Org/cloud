@@ -114,7 +114,7 @@ const OrganizationLifecycleIdentitySchema = {
   to: z.email(),
   userId: z.string().min(1),
   instanceId: z.string().min(1),
-  organizationId: z.string().min(1),
+  organizationId: z.uuid(),
 };
 
 const OrganizationLifecycleBillingAuthorityVarsSchema = z.object({

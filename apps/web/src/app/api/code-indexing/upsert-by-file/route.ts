@@ -23,7 +23,7 @@ const BATCH_SIZE = 4;
 // Zod schema for form data validation
 const FormDataSchema = z.object({
   file: z.instanceof(File, { message: 'file must be a File object' }),
-  organizationId: z.string().optional().nullable(),
+  organizationId: z.uuid().optional().nullable(),
   projectId: z.string().min(1, { message: 'projectId is required' }),
   filePath: z.string().min(1, { message: 'filePath is required' }),
   fileHash: z.string().min(1, { message: 'fileHash is required' }),

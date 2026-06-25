@@ -8,6 +8,8 @@ import { captureMessage } from '@sentry/nextjs';
 import { inArray } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { getAndClearPaymentReturnUrl } from '@/lib/payment-return-url';
+import { getOrganizationById } from '@/lib/organizations/organizations';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 export async function fetchCreditTransactionIdForStripeSession(sessionId: string) {
   console.info(
@@ -47,7 +49,15 @@ export async function fetchCreditTransactionIdForStripeSession(sessionId: string
     console.info(`No credit transaction found for session ${sessionId}`);
   }
 
-  return creditTransaction;
+  if (!creditTransaction?.organization_id) {
+    return creditTransaction;
+  }
+
+  const organization = await getOrganizationById(creditTransaction.organization_id);
+  return {
+    ...creditTransaction,
+    organizationRouteIdentifier: organization ? getOrganizationRouteIdentifier(organization) : null,
+  };
 }
 
 export async function getPaymentReturnUrl(): Promise<string | null> {

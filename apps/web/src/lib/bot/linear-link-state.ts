@@ -22,7 +22,7 @@ const linearBotLinkStatePayloadSchema = z.object({
   kind: z.literal(KIND),
   userId: z.string().min(1),
   platformIntegrationId: z.string().min(1),
-  organizationId: z.string().min(1),
+  organizationId: z.uuid(),
   callbackPath: z.string().startsWith('/'),
   iat: z.number(),
   nonce: z.string().min(1),

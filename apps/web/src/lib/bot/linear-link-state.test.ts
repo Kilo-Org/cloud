@@ -5,7 +5,7 @@ import { createLinearBotLinkState, verifyLinearBotLinkState } from './linear-lin
 
 const USER_ID = 'kilo-user-1';
 const PLATFORM_INTEGRATION_ID = 'pi_linear_1';
-const ORGANIZATION_ID = 'org-linear-123';
+const ORGANIZATION_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 function signPayload(payload: object): string {
   const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');

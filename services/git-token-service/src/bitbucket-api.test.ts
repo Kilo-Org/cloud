@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  findBitbucketWorkspaceRepositoryByUuid,
-  listBitbucketWorkspaceRepositories,
-} from './bitbucket-api.js';
+import { listBitbucketWorkspaceRepositories } from './bitbucket-api.js';
 
 const REPOSITORY_PAGE_LENGTH = 50;
 const MAX_REPOSITORY_PAGES = 20;
@@ -119,7 +116,7 @@ describe('listBitbucketWorkspaceRepositories', () => {
 
   it('follows a validated opaque next link', async () => {
     const next =
-      'https://api.bitbucket.org/2.0/repositories/acme?cursor=opaque%2F%5C%2Evalue&pagelen=50';
+      'https://api.bitbucket.org/2.0/repositories/acme?cursor=opaque%2F%5C%2Evalue&pagelen=%35%30';
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
@@ -532,7 +529,6 @@ describe('listBitbucketWorkspaceRepositories', () => {
       'query',
       'https://api.bitbucket.org/2.0/repositories/acme?cursor=opaque\u00a0value&pagelen=50',
     ],
-    ['page length', 'https://api.bitbucket.org/2.0/repositories/acme?pagelen=%35%30'],
     ['page length', 'https://api.bitbucket.org/2.0/repositories/acme?pagelen=51'],
     ['page length', 'https://api.bitbucket.org/2.0/repositories/acme?pagelen=0'],
     ['page length', 'https://api.bitbucket.org/2.0/repositories/acme?pagelen=50&pagelen=10'],
@@ -627,84 +623,5 @@ describe('listBitbucketWorkspaceRepositories', () => {
       expect(errorText).not.toContain('Authorization');
       expect(JSON.stringify(thrown)).not.toContain(accessToken);
     }
-  });
-});
-
-describe('findBitbucketWorkspaceRepositoryByUuid', () => {
-  it('finds a validated workspace repository by normalized UUID', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse({
-        pagelen: 50,
-        values: [
-          {
-            uuid: `{${repositoryUuid}}`,
-            name: 'Widgets',
-            slug: 'widgets',
-            full_name: 'acme/widgets',
-            is_private: true,
-            workspace: { uuid: `{${workspaceUuid}}`, slug: 'acme' },
-            mainbranch: { name: 'main' },
-          },
-        ],
-      })
-    );
-
-    await expect(
-      findBitbucketWorkspaceRepositoryByUuid({
-        accessToken,
-        workspace: { slug: 'acme', uuid: workspaceUuid },
-        repositoryUuid: `{${repositoryUuid}}`,
-        fetch: fetchMock,
-      })
-    ).resolves.toMatchObject({ id: repositoryUuid, fullName: 'acme/widgets' });
-  });
-
-  it('returns null when the contributor listing does not contain the UUID', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse({ pagelen: 50, values: [repositoryPayload()] }));
-
-    await expect(
-      findBitbucketWorkspaceRepositoryByUuid({
-        accessToken,
-        workspace: { slug: 'acme', uuid: workspaceUuid },
-        repositoryUuid: anotherRepositoryUuid,
-        fetch: fetchMock,
-      })
-    ).resolves.toBeNull();
-  });
-
-  it('rejects a malformed target UUID before making a request', async () => {
-    const fetchMock = vi.fn();
-
-    await expect(
-      findBitbucketWorkspaceRepositoryByUuid({
-        accessToken,
-        workspace: { slug: 'acme', uuid: workspaceUuid },
-        repositoryUuid: 'not-a-uuid',
-        fetch: fetchMock,
-      })
-    ).rejects.toMatchObject({ code: 'invalid_request' });
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('validates all pagination before returning a matching repository', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      jsonResponse({
-        pagelen: 50,
-        values: [repositoryPayload()],
-        next: 'https://evil.example/2.0/repositories/acme?pagelen=50',
-      })
-    );
-
-    await expect(
-      findBitbucketWorkspaceRepositoryByUuid({
-        accessToken,
-        workspace: { slug: 'acme', uuid: workspaceUuid },
-        repositoryUuid,
-        fetch: fetchMock,
-      })
-    ).rejects.toMatchObject({ code: 'invalid_pagination' });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

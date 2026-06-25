@@ -263,8 +263,6 @@ export type GetSessionOutput = {
   githubRepo?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
-  bitbucketWorkspaceUuid?: string;
-  bitbucketRepositoryUuid?: string;
 
   // Execution params
   prompt?: string;

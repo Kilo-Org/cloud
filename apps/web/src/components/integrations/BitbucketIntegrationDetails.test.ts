@@ -1,7 +1,10 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { buildConnectedWorkspaceAccessTokenStatus } from '@/components/integrations/BitbucketConnectSetup';
-import { getRecoveryGuidance } from '@/components/integrations/BitbucketConnectedManagement';
+import {
+  BitbucketAdditionalPermissionsWarning,
+  getRecoveryGuidance,
+} from '@/components/integrations/BitbucketConnectedManagement';
 import {
   BitbucketConnectionRedirectNotice,
   getBitbucketConnectionErrorMessage,
@@ -22,6 +25,7 @@ describe('Bitbucket integration UI state', () => {
           credentialVersion: 1,
           repositoryCount: 1,
           validatedAt: '2026-06-24T08:00:00.000Z',
+          unexpectedScopes: [],
         },
         true
       )
@@ -39,6 +43,7 @@ describe('Bitbucket integration UI state', () => {
       invalidatedAt: null,
       invalidationReason: null,
       lastValidatedAt: '2026-06-24T08:00:00.000Z',
+      unexpectedScopes: [],
       repositoryCache: {
         status: 'uninitialized',
         repositories: [],
@@ -46,6 +51,18 @@ describe('Bitbucket integration UI state', () => {
       },
       canManage: true,
     });
+  });
+
+  it('warns without rejecting a token that has additional permissions', () => {
+    const html = renderToStaticMarkup(
+      createElement(BitbucketAdditionalPermissionsWarning, {
+        scopes: ['pipeline:write', 'repository:admin'],
+      })
+    );
+
+    expect(html).toContain('Token has additional permissions');
+    expect(html).toContain('pipeline:write');
+    expect(html).toContain('repository:admin');
   });
 
   it('omits redundant integration controls guidance for OAuth connections', () => {

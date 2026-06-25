@@ -540,6 +540,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       lastUsedRepo: getLastUsedRepo(organizationId),
       isLoadingGitHubRepos,
       isLoadingGitLabRepos,
+      isLoadingBitbucketRepos,
     });
     if (!preferredRepo) return;
 

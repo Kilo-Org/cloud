@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { inferRouterOutputs } from '@trpc/server';
-import { AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import type { RootRouter } from '@/routers/root-router';
 import { BitbucketLogo } from '@/components/auth/BitbucketLogo';
@@ -63,6 +63,22 @@ export function getRecoveryGuidance(
     return `${problem} ${nextStep}`;
   }
   return problem;
+}
+
+export function BitbucketAdditionalPermissionsWarning({ scopes }: { scopes: readonly string[] }) {
+  if (scopes.length === 0) return null;
+
+  return (
+    <Alert variant="warning">
+      <TriangleAlert />
+      <AlertTitle>Token has additional permissions</AlertTitle>
+      <AlertDescription>
+        Kilo did not request these permissions: <code>{scopes.join(', ')}</code>. Cloud Agent
+        sessions can use the token&apos;s full workspace access. Replace the token with only the
+        required permissions if this is not intentional.
+      </AlertDescription>
+    </Alert>
+  );
 }
 
 function StatusBadge({ status }: { status: BitbucketStatus['status'] }) {
@@ -303,6 +319,9 @@ export function BitbucketConnectedManagement({
               Showing the last loaded workspace and repository cache. Try again in a minute.
             </AlertDescription>
           </Alert>
+        )}
+        {status.method === 'workspace_access_token' && (
+          <BitbucketAdditionalPermissionsWarning scopes={status.unexpectedScopes} />
         )}
         {status.status === 'reconnect_required' && (
           <Alert className="border-status-destructive-border bg-status-destructive-surface text-status-destructive">

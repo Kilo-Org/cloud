@@ -833,8 +833,6 @@ export const GetSessionOutput = z.object({
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),
   gitUrl: z.string().optional().describe('Generic git URL'),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional().describe('Git platform type'),
-  bitbucketWorkspaceUuid: z.string().uuid().optional(),
-  bitbucketRepositoryUuid: z.string().uuid().optional(),
 
   // Execution params
   prompt: z.string().optional().describe('Task prompt'),

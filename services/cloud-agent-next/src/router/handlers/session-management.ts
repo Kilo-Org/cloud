@@ -33,8 +33,6 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
-  bitbucketWorkspaceUuid?: string;
-  bitbucketRepositoryUuid?: string;
 } {
   const repository = metadata.repository;
   if (!repository) return {};
@@ -44,12 +42,7 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
     case 'gitlab':
       return { gitUrl: repository.url, platform: 'gitlab' };
     case 'bitbucket':
-      return {
-        gitUrl: repository.url,
-        platform: 'bitbucket',
-        bitbucketWorkspaceUuid: repository.workspaceUuid,
-        bitbucketRepositoryUuid: repository.repositoryUuid,
-      };
+      return { gitUrl: repository.url, platform: 'bitbucket' };
     case 'git':
       return { gitUrl: repository.url, platform: repository.platform };
   }

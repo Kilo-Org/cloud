@@ -198,6 +198,7 @@ describe('Bitbucket Workspace Access Token credentials', () => {
       credentialVersion: 1,
       repositoryCount: 1,
       validatedAt: expect.any(String),
+      unexpectedScopes: [],
     });
     expect(integration).toEqual(
       expect.objectContaining({
@@ -282,6 +283,27 @@ describe('Bitbucket Workspace Access Token credentials', () => {
     const persistedAndReturned = JSON.stringify({ result, integration, credential, audit });
     expect(persistedAndReturned).not.toContain(ACCESS_TOKEN);
     expect(integration.metadata).toEqual({ displayName: 'Acme Workspace' });
+  });
+
+  it('connects tokens with additional permissions and reports them for warning', async () => {
+    const actor = await insertTestUser();
+    const organization = await createTestOrganization('Broad Scope Organization', actor.id, 0);
+    mockSuccessfulProviderValidation({
+      scopeHeader:
+        'account repository repository:write pullrequest webhook pipeline:write repository:admin',
+    });
+
+    const connected = await connectBitbucketWorkspaceAccessToken({
+      organizationId: organization.id,
+      actorUserId: actor.id,
+      accessToken: ACCESS_TOKEN,
+    });
+
+    expect(connected.unexpectedScopes).toEqual(['pipeline:write', 'repository:admin']);
+    await expect(getBitbucketWorkspaceAccessTokenStatus(organization.id)).resolves.toMatchObject({
+      status: 'connected',
+      unexpectedScopes: ['pipeline:write', 'repository:admin'],
+    });
   });
 
   it('connects an empty workspace with an initialized available cache', async () => {
@@ -587,6 +609,7 @@ describe('Bitbucket Workspace Access Token credentials', () => {
       credentialVersion: 2,
       repositoryCount: 1,
       validatedAt: expect.any(String),
+      unexpectedScopes: [],
     });
     expect(credential.id).toBe(oldCredential.id);
     expect(credential.credential_version).toBe(2);

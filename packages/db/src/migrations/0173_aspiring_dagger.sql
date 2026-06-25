@@ -46,8 +46,10 @@ ALTER TABLE "platform_oauth_credentials" ADD CONSTRAINT "platform_oauth_credenti
 CREATE UNIQUE INDEX "UQ_platform_oauth_credentials_platform_integration_id" ON "platform_oauth_credentials" USING btree ("platform_integration_id");--> statement-breakpoint
 CREATE INDEX "IDX_platform_oauth_credentials_platform_subject" ON "platform_oauth_credentials" USING btree ("platform","provider_subject_id");--> statement-breakpoint
 CREATE INDEX "IDX_platform_oauth_credentials_authorized_by_user_id" ON "platform_oauth_credentials" USING btree ("authorized_by_user_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_platform_integrations_user_bitbucket" ON "platform_integrations" USING btree ("owned_by_user_id","platform") WHERE "platform_integrations"."platform" = 'bitbucket' AND "platform_integrations"."owned_by_user_id" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_platform_integrations_org_bitbucket" ON "platform_integrations" USING btree ("owned_by_organization_id","platform") WHERE "platform_integrations"."platform" = 'bitbucket' AND "platform_integrations"."owned_by_organization_id" IS NOT NULL;--> statement-breakpoint
+COMMIT;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_user_bitbucket" ON "platform_integrations" USING btree ("owned_by_user_id","platform") WHERE "platform_integrations"."platform" = 'bitbucket' AND "platform_integrations"."owned_by_user_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_org_bitbucket" ON "platform_integrations" USING btree ("owned_by_organization_id","platform") WHERE "platform_integrations"."platform" = 'bitbucket' AND "platform_integrations"."owned_by_organization_id" IS NOT NULL;--> statement-breakpoint
+BEGIN;--> statement-breakpoint
 ALTER TABLE "platform_integrations" ADD CONSTRAINT "platform_integrations_access_token_auth_invalidation_pair_check" CHECK ((
         "platform_integrations"."platform" <> 'bitbucket' OR
         "platform_integrations"."integration_type" <> 'workspace_access_token' OR

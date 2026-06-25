@@ -438,8 +438,6 @@ export const baseGetSessionNextOutputSchema = z.object({
   githubRepo: z.string().optional(),
   gitUrl: z.string().optional(),
   platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
-  bitbucketWorkspaceUuid: z.uuid().optional(),
-  bitbucketRepositoryUuid: z.uuid().optional(),
 
   // Execution params
   prompt: z.string().optional(),

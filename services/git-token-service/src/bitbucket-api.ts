@@ -1,3 +1,4 @@
+import { isValidBitbucketRepositoryPaginationUrl } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { z } from 'zod';
 import { normalizeBitbucketUuid } from './bitbucket-url.js';
 
@@ -95,47 +96,9 @@ function hasNonVisibleAscii(value: string): boolean {
 }
 
 function validateNextLink(value: string, workspaceSlug: string): string {
-  const expectedPath = `/2.0/repositories/${encodeURIComponent(workspaceSlug)}`;
-  const rawUrl = /^https:\/\/api\.bitbucket\.org([^?#]*)(\?[^#]*)?$/.exec(value);
-  if (!rawUrl || rawUrl[1] !== expectedPath || hasNonVisibleAscii(value)) {
+  if (!isValidBitbucketRepositoryPaginationUrl(value, workspaceSlug)) {
     throw new BitbucketApiError('invalid_pagination');
   }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-    decodeURIComponent(`${parsed.pathname}${parsed.search}`);
-  } catch {
-    throw new BitbucketApiError('invalid_pagination');
-  }
-
-  const rawQueryParameters = (rawUrl[2]?.slice(1) ?? '').split('&');
-  const queryParameterNames = [...parsed.searchParams.keys()];
-  const hasRole = queryParameterNames.some(name => name.toLowerCase() === 'role');
-  const hasCaseVariantPageLength = queryParameterNames.some(
-    name => name !== 'pagelen' && name.toLowerCase() === 'pagelen'
-  );
-  const pageLengths = parsed.searchParams.getAll('pagelen');
-  if (
-    parsed.protocol !== 'https:' ||
-    parsed.origin !== 'https://api.bitbucket.org' ||
-    parsed.username !== '' ||
-    parsed.password !== '' ||
-    parsed.port !== '' ||
-    parsed.pathname !== expectedPath ||
-    parsed.href !== value ||
-    hasRole ||
-    hasCaseVariantPageLength ||
-    pageLengths.length > 1 ||
-    (pageLengths.length === 1 &&
-      (!/^[1-9][0-9]*$/.test(pageLengths[0]) ||
-        Number(pageLengths[0]) > BITBUCKET_REPOSITORY_PAGE_LENGTH ||
-        rawQueryParameters.filter(parameter => parameter === `pagelen=${pageLengths[0]}`).length !==
-          1))
-  ) {
-    throw new BitbucketApiError('invalid_pagination');
-  }
-
   return value;
 }
 
@@ -325,19 +288,4 @@ export async function listBitbucketWorkspaceRepositories(
   }
 
   return repositories;
-}
-
-export async function findBitbucketWorkspaceRepositoryByUuid(
-  options: BitbucketRepositoryApiOptions & { repositoryUuid: string }
-): Promise<BitbucketRepository | null> {
-  const repositoryUuid = normalizeBitbucketUuid(options.repositoryUuid);
-  if (!repositoryUuid) throw new BitbucketApiError('invalid_request');
-
-  const repositories = await listBitbucketWorkspaceRepositories({
-    accessToken: options.accessToken,
-    workspace: options.workspace,
-    fetch: options.fetch,
-    requestTimeoutMs: options.requestTimeoutMs,
-  });
-  return repositories.find(repository => repository.id === repositoryUuid) ?? null;
 }

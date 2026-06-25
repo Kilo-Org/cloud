@@ -60,6 +60,7 @@ export function buildConnectedWorkspaceAccessTokenStatus(
     invalidatedAt: null,
     invalidationReason: null,
     lastValidatedAt: result.validatedAt,
+    unexpectedScopes: result.unexpectedScopes,
     repositoryCache: {
       status: 'uninitialized',
       repositories: [],

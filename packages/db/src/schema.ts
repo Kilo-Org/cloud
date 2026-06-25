@@ -3052,9 +3052,11 @@ export const platform_integrations = pgTable(
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
     uniqueIndex('UQ_platform_integrations_user_bitbucket')
       .on(table.owned_by_user_id, table.platform)
+      .concurrently()
       .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
     uniqueIndex('UQ_platform_integrations_org_bitbucket')
       .on(table.owned_by_organization_id, table.platform)
+      .concurrently()
       .where(
         sql`${table.platform} = 'bitbucket' AND ${table.owned_by_organization_id} IS NOT NULL`
       ),

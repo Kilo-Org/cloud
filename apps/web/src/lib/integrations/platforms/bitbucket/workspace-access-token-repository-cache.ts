@@ -5,6 +5,7 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_INVALIDATION_REASONS,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
+  getUnexpectedBitbucketWorkspaceAccessTokenScopes,
   hasRequiredBitbucketWorkspaceAccessTokenScopes,
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { platform_access_token_credentials, platform_integrations } from '@kilocode/db/schema';
@@ -270,6 +271,7 @@ function notConnectedStatus() {
     invalidatedAt: null,
     invalidationReason: null,
     lastValidatedAt: null,
+    unexpectedScopes: [],
     repositoryCache: {
       status: 'uninitialized' as const,
       repositories: [],
@@ -293,6 +295,9 @@ export async function getBitbucketWorkspaceAccessTokenStatus(organizationId: str
     invalidatedAt: toIsoTimestamp(integration.row.authInvalidAt),
     invalidationReason: invalidationReason.success ? invalidationReason.data : null,
     lastValidatedAt: toIsoTimestamp(integration.row.lastValidatedAt),
+    unexpectedScopes: getUnexpectedBitbucketWorkspaceAccessTokenScopes(
+      integration.row.providerScopes ?? []
+    ),
     repositoryCache: integration.cache ?? {
       status: 'uninitialized' as const,
       repositories: [],

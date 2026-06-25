@@ -1,11 +1,16 @@
+import { getWorkerDb } from '@kilocode/db/client';
+import { platform_integrations } from '@kilocode/db/schema';
+import { BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
+import { and, eq, isNull } from 'drizzle-orm';
+import { z } from 'zod';
 import {
   BitbucketApiError,
-  findBitbucketWorkspaceRepositoryByUuid,
   listBitbucketWorkspaceRepositories,
   type BitbucketRepository,
   type BitbucketRepositoryApiOptions,
 } from './bitbucket-api.js';
 import {
+  BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS,
   BitbucketAuthorizationService,
   type BitbucketAuthorizationResult,
 } from './bitbucket-authorization-service.js';
@@ -48,6 +53,22 @@ export type GetBitbucketTokenResult =
         | 'repository_mismatch';
     };
 
+const CachedRepositorySchema = z
+  .object({
+    id: z.uuid(),
+    name: z.string().min(1),
+    full_name: z.string().min(3),
+    private: z.boolean(),
+    default_branch: z.string().min(1).optional(),
+  })
+  .strict();
+
+type CachedRepositoryLookupResult =
+  | { status: 'available'; repository: BitbucketRepository }
+  | { status: 'not_connected' }
+  | { status: 'repository_not_found' }
+  | { status: 'temporarily_unavailable' };
+
 type AuthorizationService = {
   getAuthorization(input: {
     userId: string;
@@ -59,10 +80,13 @@ type AuthorizationService = {
   ): Promise<void>;
 };
 type OAuthAuthorizationService = {
-  getAuthorization(input: {
-    userId: string;
-    orgId?: string;
-  }): Promise<BitbucketAuthorizationResult>;
+  getAuthorization(
+    input: {
+      userId: string;
+      orgId?: string;
+    },
+    minimumValidityMs?: number
+  ): Promise<BitbucketAuthorizationResult>;
 };
 type RuntimeAuthorization =
   | (BitbucketWorkspaceAccessTokenAuthorization & { source: 'workspace_access_token' })
@@ -72,10 +96,77 @@ export type BitbucketRuntimeTokenResolverDependencies = {
   authorizationService: AuthorizationService;
   oauthAuthorizationService: OAuthAuthorizationService;
   listRepositories(options: BitbucketRepositoryApiOptions): Promise<BitbucketRepository[]>;
-  findRepository(
-    options: BitbucketRepositoryApiOptions & { repositoryUuid: string }
-  ): Promise<BitbucketRepository | null>;
+  findCachedRepository(input: {
+    integrationId: string;
+    organizationId: string;
+    workspace: { uuid: string; slug: string };
+    repositoryUuid: string;
+  }): Promise<CachedRepositoryLookupResult>;
 };
+
+async function findCachedBitbucketRepository(
+  env: CloudflareEnv,
+  input: {
+    integrationId: string;
+    organizationId: string;
+    workspace: { uuid: string; slug: string };
+    repositoryUuid: string;
+  }
+): Promise<CachedRepositoryLookupResult> {
+  if (!env.HYPERDRIVE) return { status: 'temporarily_unavailable' };
+
+  try {
+    const db = getWorkerDb(env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
+    const [integration] = await db
+      .select({
+        repositories: platform_integrations.repositories,
+        repositoriesSyncedAt: platform_integrations.repositories_synced_at,
+      })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.id, input.integrationId),
+          eq(platform_integrations.owned_by_organization_id, input.organizationId),
+          isNull(platform_integrations.owned_by_user_id),
+          eq(platform_integrations.platform, BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM),
+          eq(platform_integrations.integration_status, 'active'),
+          isNull(platform_integrations.auth_invalid_at),
+          eq(platform_integrations.platform_account_id, input.workspace.uuid),
+          eq(platform_integrations.platform_account_login, input.workspace.slug)
+        )
+      )
+      .limit(1);
+    if (!integration) return { status: 'not_connected' };
+    if (
+      integration.repositories === null ||
+      integration.repositoriesSyncedAt === null ||
+      !Number.isFinite(new Date(integration.repositoriesSyncedAt).getTime())
+    ) {
+      return { status: 'temporarily_unavailable' };
+    }
+
+    const repositories = z
+      .array(CachedRepositorySchema)
+      .max(500)
+      .safeParse(integration.repositories);
+    if (!repositories.success) return { status: 'temporarily_unavailable' };
+    const repository = repositories.data.find(candidate => candidate.id === input.repositoryUuid);
+    if (!repository) return { status: 'repository_not_found' };
+    return {
+      status: 'available',
+      repository: {
+        id: repository.id,
+        workspaceUuid: input.workspace.uuid,
+        name: repository.name,
+        fullName: repository.full_name,
+        private: repository.private,
+        ...(repository.default_branch ? { defaultBranch: repository.default_branch } : {}),
+      },
+    };
+  } catch {
+    return { status: 'temporarily_unavailable' };
+  }
+}
 
 function dependencies(
   env: CloudflareEnv,
@@ -86,7 +177,7 @@ function dependencies(
     authorizationService: new BitbucketWorkspaceAccessTokenAuthorizationService(env),
     oauthAuthorizationService: new BitbucketAuthorizationService(env),
     listRepositories: listBitbucketWorkspaceRepositories,
-    findRepository: findBitbucketWorkspaceRepositoryByUuid,
+    findCachedRepository: input => findCachedBitbucketRepository(env, input),
   };
 }
 
@@ -148,15 +239,10 @@ function toRepositoryListFailure(
   return { status: failure === 'workspace_mismatch' ? 'reconnect_required' : failure };
 }
 
-function toTokenFailure(
-  failure: CanonicalProviderFailure
-): Exclude<GetBitbucketTokenResult, { success: true }> {
-  return { success: false, reason: failure };
-}
-
 async function getRuntimeAuthorization(
   owner: { userId: string; orgId?: string },
-  runtimeDependencies: BitbucketRuntimeTokenResolverDependencies
+  runtimeDependencies: BitbucketRuntimeTokenResolverDependencies,
+  oauthMinimumValidityMs?: number
 ): Promise<
   | { status: 'available'; authorization: RuntimeAuthorization }
   | Exclude<BitbucketRepositoryListResult, { status: 'available' }>
@@ -174,7 +260,12 @@ async function getRuntimeAuthorization(
   }
 
   const oauthAuthorization =
-    await runtimeDependencies.oauthAuthorizationService.getAuthorization(owner);
+    oauthMinimumValidityMs === undefined
+      ? await runtimeDependencies.oauthAuthorizationService.getAuthorization(owner)
+      : await runtimeDependencies.oauthAuthorizationService.getAuthorization(
+          owner,
+          oauthMinimumValidityMs
+        );
   if (oauthAuthorization.status === 'available') {
     return {
       status: 'available',
@@ -235,7 +326,8 @@ export async function resolveBitbucketToken(
   const runtimeDependencies = dependencies(env, dependencyOverrides);
   const authorizationResult = await getRuntimeAuthorization(
     { userId: params.userId, orgId: params.orgId },
-    runtimeDependencies
+    runtimeDependencies,
+    BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS
   );
   if (authorizationResult.status !== 'available') {
     return { success: false, reason: authorizationResult.status };
@@ -251,30 +343,22 @@ export async function resolveBitbucketToken(
     return { success: false, reason: 'workspace_mismatch' };
   }
 
-  try {
-    const repository = await runtimeDependencies.findRepository({
-      accessToken: authorization.token,
-      workspace: authorization.workspace,
-      repositoryUuid,
-    });
-    if (!repository) return { success: false, reason: 'repository_not_found' };
-    if (
-      repository.id !== repositoryUuid ||
-      repository.workspaceUuid !== workspaceUuid ||
-      repository.fullName !== parsedUrl.fullName
-    ) {
-      return { success: false, reason: 'repository_mismatch' };
-    }
-    return { success: true, token: authorization.token };
-  } catch (error) {
-    if (error instanceof BitbucketApiError) {
-      const failure = await classifyProviderError(
-        error,
-        authorization,
-        runtimeDependencies.authorizationService
-      );
-      return toTokenFailure(failure);
-    }
-    throw error;
+  const cachedRepository = await runtimeDependencies.findCachedRepository({
+    integrationId: authorization.integrationId,
+    organizationId: params.orgId,
+    workspace: authorization.workspace,
+    repositoryUuid,
+  });
+  if (cachedRepository.status !== 'available') {
+    return { success: false, reason: cachedRepository.status };
   }
+  const repository = cachedRepository.repository;
+  if (
+    repository.id !== repositoryUuid ||
+    repository.workspaceUuid !== workspaceUuid ||
+    repository.fullName !== parsedUrl.fullName
+  ) {
+    return { success: false, reason: 'repository_mismatch' };
+  }
+  return { success: true, token: authorization.token };
 }

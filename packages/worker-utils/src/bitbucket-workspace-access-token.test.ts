@@ -7,8 +7,10 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES,
   buildBitbucketOrganizationCredentialLockKey,
   buildBitbucketWorkspaceAccessTokenAad,
+  getUnexpectedBitbucketWorkspaceAccessTokenScopes,
   hasBitbucketAccessTokenFamilyPrefix,
   hasRequiredBitbucketWorkspaceAccessTokenScopes,
+  isValidBitbucketRepositoryPaginationUrl,
   normalizeBitbucketWorkspaceAccessTokenScopes,
 } from './bitbucket-workspace-access-token';
 
@@ -76,6 +78,20 @@ describe('Bitbucket Workspace Access Token contract', () => {
     ]);
   });
 
+  it('reports observed scopes that Kilo did not request', () => {
+    expect(
+      getUnexpectedBitbucketWorkspaceAccessTokenScopes([
+        'account',
+        'repository',
+        'repository:write',
+        'pullrequest',
+        'webhook',
+        'repository:admin',
+        'pipeline:write',
+      ])
+    ).toEqual(['pipeline:write', 'repository:admin']);
+  });
+
   it('requires effective scopes without rejecting additional observed evidence', () => {
     expect(hasRequiredBitbucketWorkspaceAccessTokenScopes(['account', 'repository:write'])).toBe(
       false
@@ -102,6 +118,27 @@ describe('Bitbucket Workspace Access Token contract', () => {
     expect(hasRequiredBitbucketWorkspaceAccessTokenScopes(['account', 'repository'])).toBe(false);
     expect(
       hasRequiredBitbucketWorkspaceAccessTokenScopes(['pullrequest', 'repository:write'])
+    ).toBe(false);
+  });
+
+  it('validates fixed-host repository pagination consistently', () => {
+    expect(
+      isValidBitbucketRepositoryPaginationUrl(
+        'https://api.bitbucket.org/2.0/repositories/acme?pagelen=%35%30',
+        'acme'
+      )
+    ).toBe(true);
+    expect(
+      isValidBitbucketRepositoryPaginationUrl(
+        'https://api.bitbucket.org/2.0/repositories/acme?role=contributor&pagelen=50',
+        'acme'
+      )
+    ).toBe(false);
+    expect(
+      isValidBitbucketRepositoryPaginationUrl(
+        'https://evil.example/2.0/repositories/acme?pagelen=50',
+        'acme'
+      )
     ).toBe(false);
   });
 

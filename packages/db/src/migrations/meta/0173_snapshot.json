@@ -1,5 +1,5 @@
 {
-  "id": "f9ae3efa-e7e8-486d-8a23-06730f557a96",
+  "id": "31964f5d-47f0-4ff5-967b-f2bb1a2abd70",
   "prevId": "969175e5-639f-49f5-beef-8d6033d50298",
   "version": "7",
   "dialect": "postgresql",
@@ -24042,7 +24042,7 @@
           ],
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'bitbucket' AND \"platform_integrations\".\"owned_by_user_id\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -24064,7 +24064,7 @@
           ],
           "isUnique": true,
           "where": "\"platform_integrations\".\"platform\" = 'bitbucket' AND \"platform_integrations\".\"owned_by_organization_id\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },

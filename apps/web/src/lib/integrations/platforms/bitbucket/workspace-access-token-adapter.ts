@@ -4,6 +4,7 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
   hasBitbucketAccessTokenFamilyPrefix,
   hasRequiredBitbucketWorkspaceAccessTokenScopes,
+  isValidBitbucketRepositoryPaginationUrl,
   normalizeBitbucketWorkspaceAccessTokenScopes,
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { z } from 'zod';
@@ -406,44 +407,9 @@ function normalizeRepository(
 }
 
 function validateRepositoryNextLink(value: string, workspaceSlug: string): string {
-  const expectedPath = `/2.0/repositories/${encodeURIComponent(workspaceSlug)}`;
-  const rawUrl = /^https:\/\/api\.bitbucket\.org([^?#]*)(\?[^#]*)?$/.exec(value);
-  if (!rawUrl || rawUrl[1] !== expectedPath || hasNonVisibleAscii(value)) {
+  if (!isValidBitbucketRepositoryPaginationUrl(value, workspaceSlug)) {
     throw new BitbucketWorkspaceAccessTokenError('invalid_pagination');
   }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(value);
-    decodeURIComponent(`${parsed.pathname}${parsed.search}`);
-  } catch {
-    throw new BitbucketWorkspaceAccessTokenError('invalid_pagination');
-  }
-
-  const queryParameterNames = [...parsed.searchParams.keys()];
-  const hasRoleParameter = queryParameterNames.some(name => name.toLowerCase() === 'role');
-  const hasCaseVariantPageLength = queryParameterNames.some(
-    name => name !== 'pagelen' && name.toLowerCase() === 'pagelen'
-  );
-  const pageLengths = parsed.searchParams.getAll('pagelen');
-  if (
-    parsed.protocol !== 'https:' ||
-    parsed.origin !== BITBUCKET_API_ORIGIN ||
-    parsed.username !== '' ||
-    parsed.password !== '' ||
-    parsed.port !== '' ||
-    parsed.pathname !== expectedPath ||
-    parsed.href !== value ||
-    hasRoleParameter ||
-    hasCaseVariantPageLength ||
-    pageLengths.length > 1 ||
-    (pageLengths.length === 1 &&
-      (!/^[1-9][0-9]*$/.test(pageLengths[0]) ||
-        Number(pageLengths[0]) > BITBUCKET_REPOSITORY_PAGE_LENGTH))
-  ) {
-    throw new BitbucketWorkspaceAccessTokenError('invalid_pagination');
-  }
-
   return value;
 }
 

@@ -14,6 +14,7 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM,
   buildBitbucketWorkspaceAccessTokenAad,
+  getUnexpectedBitbucketWorkspaceAccessTokenScopes,
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { platform_access_token_credentials, platform_integrations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
@@ -87,6 +88,7 @@ export type BitbucketWorkspaceAccessTokenMutationResult = {
   credentialVersion: number;
   repositoryCount: number;
   validatedAt: string;
+  unexpectedScopes: string[];
 };
 
 function canonicalizeOrganizationId(value: string): string {
@@ -440,6 +442,7 @@ export async function rotateBitbucketWorkspaceAccessToken(
       credentialVersion,
       repositoryCount: repositories.length,
       validatedAt,
+      unexpectedScopes: getUnexpectedBitbucketWorkspaceAccessTokenScopes(validation.providerScopes),
     };
   });
 }
@@ -539,6 +542,7 @@ export async function connectBitbucketWorkspaceAccessToken(
       credentialVersion,
       repositoryCount: repositories.length,
       validatedAt,
+      unexpectedScopes: getUnexpectedBitbucketWorkspaceAccessTokenScopes(validation.providerScopes),
     };
   });
 }

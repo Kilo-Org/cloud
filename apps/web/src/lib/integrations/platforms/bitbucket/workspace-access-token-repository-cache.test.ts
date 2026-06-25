@@ -212,6 +212,28 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
     });
   });
 
+  it('reports permissions beyond the required Workspace Access Token scopes', async () => {
+    const integration = await insertStaticIntegration(organization.id, user.id);
+    await db
+      .update(platform_access_token_credentials)
+      .set({
+        provider_scopes: [
+          'account',
+          'pullrequest',
+          'repository',
+          'repository:admin',
+          'repository:write',
+          'webhook',
+        ],
+      })
+      .where(eq(platform_access_token_credentials.platform_integration_id, integration.id));
+
+    await expect(getBitbucketWorkspaceAccessTokenStatus(organization.id)).resolves.toMatchObject({
+      status: 'connected',
+      unexpectedScopes: ['repository:admin'],
+    });
+  });
+
   it('requires disconnect and reconnect when the credential is missing', async () => {
     await insertStaticIntegration(organization.id, user.id);
     await db.delete(platform_access_token_credentials);

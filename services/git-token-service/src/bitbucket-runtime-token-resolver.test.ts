@@ -4,7 +4,10 @@ import {
   listBitbucketRepositories,
   resolveBitbucketToken,
 } from './bitbucket-runtime-token-resolver.js';
-import type { BitbucketAuthorizationResult } from './bitbucket-authorization-service.js';
+import {
+  BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS,
+  type BitbucketAuthorizationResult,
+} from './bitbucket-authorization-service.js';
 import type { BitbucketWorkspaceAccessTokenAuthorization } from './bitbucket-workspace-access-token-authorization-service.js';
 
 const organizationId = '123e4567-e89b-12d3-a456-426614174030';
@@ -44,7 +47,7 @@ function dependencies() {
       getAuthorization: vi.fn().mockResolvedValue({ status: 'not_connected' }),
     },
     listRepositories: vi.fn().mockResolvedValue([repository]),
-    findRepository: vi.fn().mockResolvedValue(repository),
+    findCachedRepository: vi.fn().mockResolvedValue({ status: 'available', repository }),
   };
 }
 
@@ -73,7 +76,7 @@ describe('Bitbucket runtime token resolver', () => {
     expect(deps.oauthAuthorizationService.getAuthorization).not.toHaveBeenCalled();
   });
 
-  it('releases only the opaque token after exact workspace and repository validation', async () => {
+  it('releases only the opaque token after exact cached repository validation', async () => {
     const deps = dependencies();
 
     await expect(resolveBitbucketToken({} as CloudflareEnv, tokenParams(), deps)).resolves.toEqual({
@@ -84,11 +87,13 @@ describe('Bitbucket runtime token resolver', () => {
       userId: 'member-1',
       orgId: organizationId,
     });
-    expect(deps.findRepository).toHaveBeenCalledWith({
-      accessToken: 'ATCT-runtime-token',
+    expect(deps.findCachedRepository).toHaveBeenCalledWith({
+      integrationId: authorization.integrationId,
+      organizationId,
       workspace: authorization.workspace,
       repositoryUuid,
     });
+    expect(deps.listRepositories).not.toHaveBeenCalled();
     expect(deps.oauthAuthorizationService.getAuthorization).not.toHaveBeenCalled();
   });
 
@@ -128,6 +133,27 @@ describe('Bitbucket runtime token resolver', () => {
     expect(deps.listRepositories).toHaveBeenCalledWith({
       accessToken: 'oauth-runtime-token',
       workspace: oauthAuthorization.workspace,
+    });
+  });
+
+  it('uses the cached repository and Cloud Agent validity threshold for OAuth tokens', async () => {
+    const deps = dependencies();
+    deps.authorizationService.getAuthorization.mockResolvedValue({ status: 'not_connected' });
+    deps.oauthAuthorizationService.getAuthorization.mockResolvedValue(oauthAuthorization);
+
+    await expect(resolveBitbucketToken({} as CloudflareEnv, tokenParams(), deps)).resolves.toEqual({
+      success: true,
+      token: 'oauth-runtime-token',
+    });
+    expect(deps.oauthAuthorizationService.getAuthorization).toHaveBeenCalledWith(
+      { userId: 'member-1', orgId: organizationId },
+      BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS
+    );
+    expect(deps.findCachedRepository).toHaveBeenCalledWith({
+      integrationId: oauthAuthorization.integrationId,
+      organizationId,
+      workspace: oauthAuthorization.workspace,
+      repositoryUuid,
     });
   });
 
@@ -176,74 +202,26 @@ describe('Bitbucket runtime token resolver', () => {
     }
   );
 
-  it('generation-fences provider 401 invalidation', async () => {
-    const deps = dependencies();
-    deps.findRepository.mockRejectedValue(new BitbucketApiError('authentication_rejected'));
-
-    await expect(resolveBitbucketToken({} as CloudflareEnv, tokenParams(), deps)).resolves.toEqual({
-      success: false,
-      reason: 'reconnect_required',
-    });
-    expect(deps.authorizationService.invalidateAuthorization).toHaveBeenCalledTimes(1);
-    expect(deps.authorizationService.invalidateAuthorization).toHaveBeenCalledWith(
-      authorization,
-      'provider_rejected'
-    );
-  });
-
-  it('maps a collection-level provider 404 to reconnect without invalidation', async () => {
-    const deps = dependencies();
-    deps.findRepository.mockRejectedValue(new BitbucketApiError('not_found'));
-
-    await expect(resolveBitbucketToken({} as CloudflareEnv, tokenParams(), deps)).resolves.toEqual({
-      success: false,
-      reason: 'reconnect_required',
-    });
-    expect(deps.authorizationService.invalidateAuthorization).not.toHaveBeenCalled();
-  });
-
-  it('reports 403 without invalidating the credential', async () => {
-    const deps = dependencies();
-    deps.findRepository.mockRejectedValue(new BitbucketApiError('insufficient_permissions'));
-
-    await expect(resolveBitbucketToken({} as CloudflareEnv, tokenParams(), deps)).resolves.toEqual({
-      success: false,
-      reason: 'insufficient_permissions',
-    });
-    expect(deps.authorizationService.invalidateAuthorization).not.toHaveBeenCalled();
-  });
-
   it.each([
-    'rate_limited',
-    'provider_unavailable',
-    'transport_failed',
-    'request_timed_out',
-    'invalid_response',
-  ] as const)('keeps temporary provider failure %s non-invalidating', async code => {
-    const deps = dependencies();
-    deps.findRepository.mockRejectedValue(new BitbucketApiError(code));
+    ['not_connected', 'not_connected'],
+    ['repository_not_found', 'repository_not_found'],
+    ['temporarily_unavailable', 'temporarily_unavailable'],
+  ] as const)(
+    'maps cached repository status %s without provider access',
+    async (status, reason) => {
+      const deps = dependencies();
+      deps.findCachedRepository.mockResolvedValue({ status });
 
-    await expect(resolveBitbucketToken({} as CloudflareEnv, tokenParams(), deps)).resolves.toEqual({
-      success: false,
-      reason: 'temporarily_unavailable',
-    });
-    expect(deps.authorizationService.invalidateAuthorization).not.toHaveBeenCalled();
-  });
-
-  it('generation-fences a provider workspace mismatch before refusing release', async () => {
-    const deps = dependencies();
-    deps.findRepository.mockRejectedValue(new BitbucketApiError('workspace_mismatch'));
-
-    await expect(resolveBitbucketToken({} as CloudflareEnv, tokenParams(), deps)).resolves.toEqual({
-      success: false,
-      reason: 'workspace_mismatch',
-    });
-    expect(deps.authorizationService.invalidateAuthorization).toHaveBeenCalledTimes(1);
-    expect(deps.authorizationService.invalidateAuthorization).toHaveBeenCalledWith(
-      authorization,
-      'workspace_mismatch'
-    );
-  });
+      await expect(
+        resolveBitbucketToken({} as CloudflareEnv, tokenParams(), deps)
+      ).resolves.toEqual({
+        success: false,
+        reason,
+      });
+      expect(deps.listRepositories).not.toHaveBeenCalled();
+      expect(deps.authorizationService.invalidateAuthorization).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     [{ workspaceUuid: '123e4567-e89b-12d3-a456-426614174099' }, 'workspace_mismatch'],
@@ -258,26 +236,22 @@ describe('Bitbucket runtime token resolver', () => {
       await expect(
         resolveBitbucketToken({} as CloudflareEnv, tokenParams(overrides), deps)
       ).resolves.toEqual({ success: false, reason });
-      expect(deps.findRepository).not.toHaveBeenCalled();
+      expect(deps.findCachedRepository).not.toHaveBeenCalled();
       expect(deps.authorizationService.invalidateAuthorization).not.toHaveBeenCalled();
     }
   );
 
   it.each([
-    [{ ...repository, id: '123e4567-e89b-12d3-a456-426614174099' }, 'repository_mismatch'],
-    [
-      { ...repository, workspaceUuid: '123e4567-e89b-12d3-a456-426614174099' },
-      'repository_mismatch',
-    ],
-    [{ ...repository, fullName: 'acme/other' }, 'repository_mismatch'],
-    [null, 'repository_not_found'],
-  ] as const)('does not release for provider repository mismatch %#', async (resolved, reason) => {
+    { ...repository, id: '123e4567-e89b-12d3-a456-426614174099' },
+    { ...repository, workspaceUuid: '123e4567-e89b-12d3-a456-426614174099' },
+    { ...repository, fullName: 'acme/other' },
+  ] as const)('does not release for cached repository mismatch %#', async resolved => {
     const deps = dependencies();
-    deps.findRepository.mockResolvedValue(resolved);
+    deps.findCachedRepository.mockResolvedValue({ status: 'available', repository: resolved });
 
     await expect(resolveBitbucketToken({} as CloudflareEnv, tokenParams(), deps)).resolves.toEqual({
       success: false,
-      reason,
+      reason: 'repository_mismatch',
     });
     expect(deps.authorizationService.invalidateAuthorization).not.toHaveBeenCalled();
   });

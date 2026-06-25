@@ -55,6 +55,49 @@ export function hasBitbucketAccessTokenFamilyPrefix(token: string): boolean {
   return token.startsWith(BITBUCKET_ACCESS_TOKEN_FAMILY_PREFIX);
 }
 
+export function isValidBitbucketRepositoryPaginationUrl(
+  value: string,
+  workspaceSlug: string
+): boolean {
+  const expectedPath = `/2.0/repositories/${encodeURIComponent(workspaceSlug)}`;
+  const rawUrl = /^https:\/\/api\.bitbucket\.org([^?#]*)(\?[^#]*)?$/.exec(value);
+  if (!rawUrl || rawUrl[1] !== expectedPath) return false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code < 0x21 || code > 0x7e) return false;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+    decodeURIComponent(`${parsed.pathname}${parsed.search}`);
+  } catch {
+    return false;
+  }
+
+  const queryParameterNames = [...parsed.searchParams.keys()];
+  const hasRole = queryParameterNames.some(name => name.toLowerCase() === 'role');
+  const hasCaseVariantPageLength = queryParameterNames.some(
+    name => name !== 'pagelen' && name.toLowerCase() === 'pagelen'
+  );
+  const pageLengths = parsed.searchParams.getAll('pagelen');
+  return (
+    parsed.protocol === 'https:' &&
+    parsed.origin === 'https://api.bitbucket.org' &&
+    parsed.username === '' &&
+    parsed.password === '' &&
+    parsed.port === '' &&
+    parsed.pathname === expectedPath &&
+    parsed.href === value &&
+    !hasRole &&
+    !hasCaseVariantPageLength &&
+    pageLengths.length <= 1 &&
+    (pageLengths.length === 0 ||
+      (/^[1-9][0-9]*$/.test(pageLengths[0]) && Number(pageLengths[0]) <= 50))
+  );
+}
+
 export function normalizeBitbucketWorkspaceAccessTokenScopes(scopeHeader: string): string[] {
   return [
     ...new Set(
@@ -64,6 +107,17 @@ export function normalizeBitbucketWorkspaceAccessTokenScopes(scopeHeader: string
         .filter(Boolean)
     ),
   ].sort();
+}
+
+export function getUnexpectedBitbucketWorkspaceAccessTokenScopes(
+  observedScopes: readonly string[]
+): string[] {
+  const expectedScopes = new Set<string>(
+    BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES
+  );
+  return normalizeBitbucketWorkspaceAccessTokenScopes(observedScopes.join(' ')).filter(
+    scope => !expectedScopes.has(scope)
+  );
 }
 
 export function hasRequiredBitbucketWorkspaceAccessTokenScopes(

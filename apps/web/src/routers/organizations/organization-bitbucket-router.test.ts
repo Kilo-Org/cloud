@@ -275,6 +275,7 @@ describe('organization Bitbucket router', () => {
       invalidatedAt: null,
       invalidationReason: null,
       lastValidatedAt: VALIDATED_AT,
+      unexpectedScopes: [],
       repositoryCache: {
         status: 'available',
         repositories: [
@@ -537,6 +538,7 @@ describe('organization Bitbucket router', () => {
       credentialVersion: 1,
       repositoryCount: 1,
       validatedAt: VALIDATED_AT,
+      unexpectedScopes: [],
     });
     const caller = await createCallerForUser(billingManager.id);
 

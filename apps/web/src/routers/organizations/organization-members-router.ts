@@ -1,6 +1,7 @@
 import {
   updateUserRoleInOrganization,
   removeUserFromOrganization,
+  addUserToOrganization,
   getOrganizationById,
   inviteUserToOrganization,
   getAcceptInviteUrl,
@@ -10,6 +11,7 @@ import {
   organization_memberships,
   organization_invitations,
   kilocode_users,
+  organizations,
 } from '@kilocode/db/schema';
 import { db, sql } from '@/lib/drizzle';
 import { createTRPCRouter } from '@/lib/trpc/init';
@@ -21,7 +23,7 @@ import {
 } from '@/routers/organizations/utils';
 import { sendOrganizationInviteEmail } from '@/lib/email';
 import { TRPCError } from '@trpc/server';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { findUserById } from '@/lib/user';
@@ -29,6 +31,7 @@ import { successResult } from '@/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
+import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 
 const MAX_DAILY_LIMIT_USD = 2000;
 
@@ -50,6 +53,29 @@ const InviteMemberSchema = OrganizationIdInputSchema.extend({
 const DeleteInviteSchema = OrganizationIdInputSchema.extend({
   inviteId: z.string(),
 });
+
+const SetChildMembershipsSchema = OrganizationIdInputSchema.extend({
+  memberId: z.string(),
+  childOrganizationIds: z.array(z.uuid()),
+});
+
+async function getDirectOrganizationRole(
+  organizationId: string,
+  userId: string
+): Promise<'owner' | 'member' | 'billing_manager' | null> {
+  const [membership] = await db
+    .select({ role: organization_memberships.role })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.organization_id, organizationId),
+        eq(organization_memberships.kilo_user_id, userId)
+      )
+    )
+    .limit(1);
+
+  return membership?.role ?? null;
+}
 
 export const organizationsMembersRouter = createTRPCRouter({
   update: organizationOwnerMutationProcedure
@@ -119,6 +145,170 @@ export const organizationsMembersRouter = createTRPCRouter({
       return successResult({
         updated: role !== undefined ? 'role and limit' : 'limit',
       });
+    }),
+  setChildMemberships: organizationBillingMutationProcedure
+    .input(SetChildMembershipsSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { user } = ctx;
+      const { organizationId, memberId } = input;
+      const childOrganizationIds = Array.from(new Set(input.childOrganizationIds));
+
+      const directRole = user.is_admin
+        ? 'owner'
+        : await getDirectOrganizationRole(organizationId, user.id);
+      if (directRole !== 'owner' && directRole !== 'billing_manager') {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have the required organizational role to access this feature',
+        });
+      }
+
+      const [parentMember] = await db
+        .select({
+          email: kilocode_users.google_user_email,
+          isBot: kilocode_users.is_bot,
+        })
+        .from(organization_memberships)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organizationId),
+            eq(organization_memberships.kilo_user_id, memberId)
+          )
+        )
+        .limit(1);
+
+      if (!parentMember || parentMember.isBot) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'User is not a member of the parent organization',
+        });
+      }
+
+      const childOrganizations = await db
+        .select({
+          id: organizations.id,
+          name: organizations.name,
+          plan: organizations.plan,
+          requireSeats: organizations.require_seats,
+        })
+        .from(organizations)
+        .where(
+          and(
+            eq(organizations.parent_organization_id, organizationId),
+            isNull(organizations.deleted_at)
+          )
+        );
+      const childOrganizationsById = new Map(childOrganizations.map(child => [child.id, child]));
+
+      if (
+        childOrganizationIds.some(
+          childOrganizationId => !childOrganizationsById.has(childOrganizationId)
+        )
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Selected organizations must be direct child organizations',
+        });
+      }
+
+      const childIds = childOrganizations.map(child => child.id);
+      const existingMemberships =
+        childIds.length > 0
+          ? await db
+              .select({
+                organizationId: organization_memberships.organization_id,
+                role: organization_memberships.role,
+              })
+              .from(organization_memberships)
+              .where(
+                and(
+                  eq(organization_memberships.kilo_user_id, memberId),
+                  inArray(organization_memberships.organization_id, childIds)
+                )
+              )
+          : [];
+      const existingMembershipsByOrganizationId = new Map(
+        existingMemberships.map(membership => [membership.organizationId, membership])
+      );
+      const selectedChildOrganizationIds = new Set(childOrganizationIds);
+
+      const added: string[] = [];
+      const removed: string[] = [];
+
+      for (const childOrganizationId of childOrganizationIds) {
+        if (existingMembershipsByOrganizationId.has(childOrganizationId)) continue;
+
+        const childOrganization = childOrganizationsById.get(childOrganizationId);
+        if (!childOrganization) continue;
+
+        const [pendingInvitation] = await db
+          .select({ id: organization_invitations.id })
+          .from(organization_invitations)
+          .where(
+            and(
+              eq(organization_invitations.organization_id, childOrganizationId),
+              eq(organization_invitations.email, parentMember.email),
+              isNull(organization_invitations.accepted_at),
+              sql`${organization_invitations.expires_at} > NOW()`
+            )
+          )
+          .limit(1);
+        if (pendingInvitation) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `${parentMember.email} already has a pending invitation for ${childOrganization.name}`,
+          });
+        }
+
+        if (childOrganization.requireSeats && childOrganization.plan !== 'enterprise') {
+          const seatUsage = await getOrganizationSeatUsage(childOrganizationId);
+          if (seatUsage.used >= seatUsage.total) {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message: `${childOrganization.name} has no available seats`,
+            });
+          }
+        }
+
+        const wasAdded = await addUserToOrganization(childOrganizationId, memberId, 'member');
+        if (wasAdded) {
+          added.push(childOrganizationId);
+          await createAuditLog({
+            action: 'organization.member.admin_add',
+            actor_email: user.google_user_email,
+            actor_id: user.id,
+            actor_name: user.google_user_name,
+            message: `Added parent organization member ${parentMember.email} as a member from parent organization ${organizationId}`,
+            organization_id: childOrganizationId,
+          });
+        }
+      }
+
+      for (const membership of existingMemberships) {
+        if (selectedChildOrganizationIds.has(membership.organizationId)) continue;
+        if (membership.role !== 'member') continue;
+
+        const result = await removeUserFromOrganization(
+          membership.organizationId,
+          memberId,
+          user.id
+        );
+        if ((result.rowCount ?? 0) > 0) {
+          removed.push(membership.organizationId);
+          await revokeGatewayStateForOrganizationMember(db, membership.organizationId, memberId);
+          await createAuditLog({
+            action: 'organization.member.remove',
+            actor_email: user.google_user_email,
+            actor_id: user.id,
+            actor_name: user.google_user_name,
+            message: `Removed parent organization member ${parentMember.email} from child organization via parent organization ${organizationId}`,
+            organization_id: membership.organizationId,
+          });
+        }
+      }
+
+      return successResult({ added, removed });
     }),
   remove: organizationOwnerMutationProcedure
     .input(RemoveMemberSchema)

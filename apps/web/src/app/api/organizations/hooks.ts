@@ -153,6 +153,16 @@ export function useInviteMember() {
   );
 }
 
+export function useSetChildMemberships() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationAndMembers();
+  return useMutation(
+    trpc.organizations.members.setChildMemberships.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
 export function useUpdateOrganizationName() {
   const trpc = useTRPC();
   const onSuccess = useInvalidateOrganizationAndMembers();

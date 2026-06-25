@@ -196,6 +196,60 @@ describe('organizations trpc router', () => {
       }
     });
 
+    it('should include child organization memberships for parent organization members', async () => {
+      const parentOwner = await insertTestUser({
+        google_user_email: 'parent-label-owner-org@example.com',
+        google_user_name: 'Parent Label Owner Org User',
+        is_admin: false,
+      });
+      const parentMember = await insertTestUser({
+        google_user_email: 'parent-label-member-org@example.com',
+        google_user_name: 'Parent Label Member Org User',
+        is_admin: false,
+      });
+      const childOwner = await insertTestUser({
+        google_user_email: 'child-label-owner-org@example.com',
+        google_user_name: 'Child Label Owner Org User',
+        is_admin: false,
+      });
+      const parentOrganization = await createOrganization(
+        'Parent Label Organization',
+        parentOwner.id
+      );
+      await addUserToOrganization(parentOrganization.id, parentMember.id, 'member');
+      const childOrganization = await createOrganization('Child Label Organization', childOwner.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parentOrganization.id })
+        .where(eq(organizations.id, childOrganization.id));
+      await addUserToOrganization(childOrganization.id, parentMember.id, 'member');
+
+      try {
+        const caller = await createCallerForUser(parentOwner.id);
+        const result = await caller.organizations.withMembers({
+          organizationId: parentOrganization.id,
+        });
+
+        expect(result.childOrganizations).toEqual([
+          { id: childOrganization.id, name: 'Child Label Organization' },
+        ]);
+        const member = result.members.find(m => m.status === 'active' && m.id === parentMember.id);
+        expect(member).toMatchObject({
+          status: 'active',
+          childOrganizationMemberships: [
+            { id: childOrganization.id, name: 'Child Label Organization', role: 'member' },
+          ],
+        });
+      } finally {
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: null })
+          .where(eq(organizations.id, childOrganization.id));
+        await db.delete(organizations).where(eq(organizations.id, childOrganization.id));
+        await db.delete(organizations).where(eq(organizations.id, parentOrganization.id));
+      }
+    });
+
     it('should reject child organization data for a regular parent organization member', async () => {
       const parentOwner = await insertTestUser({
         google_user_email: 'parent-member-owner-org@example.com',

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Plus,
   Copy,
@@ -13,6 +15,7 @@ import {
   UserPen,
   ChevronRight,
   UserCog,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { AddMemberDialog } from '../../app/admin/components/OrganizationAdmin/AddMemberDialog';
@@ -24,6 +27,7 @@ import {
   useOrganizationWithMembers,
   useDeleteOrganizationInvitation,
   useRemoveMember,
+  useSetChildMemberships,
 } from '@/app/api/organizations/hooks';
 import { ErrorCard } from '../ErrorCard';
 import { LoadingCard } from '../LoadingCard';
@@ -281,6 +285,115 @@ function EditLimitButton({ organization, member }: EditLimitButtonProps) {
   );
 }
 
+type ChildTeamsControlProps = {
+  organization: OrganizationWithMembers;
+  member: OrganizationMember;
+  editable: boolean;
+};
+
+function ChildTeamsControl({ organization, member, editable }: ChildTeamsControlProps) {
+  const mutation = useSetChildMemberships();
+
+  if (member.status !== 'active') return null;
+
+  const childMemberships = member.childOrganizationMemberships ?? [];
+  const childMembershipsById = new Map(childMemberships.map(child => [child.id, child]));
+
+  if (organization.childOrganizations.length === 0 && childMemberships.length === 0) return null;
+
+  const handleToggleChildOrganization = (childOrganizationId: string, checked: boolean) => {
+    const currentChildOrganizationIds = new Set(childMemberships.map(child => child.id));
+    if (checked) {
+      currentChildOrganizationIds.add(childOrganizationId);
+    } else {
+      currentChildOrganizationIds.delete(childOrganizationId);
+    }
+
+    mutation.mutate(
+      {
+        organizationId: organization.id,
+        memberId: member.id,
+        childOrganizationIds: Array.from(currentChildOrganizationIds),
+      },
+      {
+        onSuccess: () => {
+          toast.success(`Updated child teams for ${member.name || member.email}`);
+        },
+        onError: error => {
+          toast.error(error instanceof Error ? error.message : 'Failed to update child teams');
+        },
+      }
+    );
+  };
+
+  const labels =
+    childMemberships.length > 0 ? (
+      <div className="flex flex-wrap gap-1">
+        {childMemberships.map(child => (
+          <Badge key={child.id} variant="outline" className="text-xs font-normal">
+            {child.name}
+            {child.role !== 'member' ? ` · ${child.role === 'owner' ? 'Owner' : 'Billing'}` : ''}
+          </Badge>
+        ))}
+      </div>
+    ) : (
+      <span className="text-muted-foreground text-xs">No child teams</span>
+    );
+
+  if (!editable) return labels;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 gap-2">
+          {mutation.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+          Child teams
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="end">
+        <div className="border-b p-3">
+          <p className="text-sm font-medium">Child teams</p>
+          <p className="text-muted-foreground text-xs">Assign this parent member to child teams.</p>
+        </div>
+        <div className="max-h-72 overflow-y-auto p-2">
+          {organization.childOrganizations.length === 0 ? (
+            <p className="text-muted-foreground px-2 py-4 text-sm">No child teams found.</p>
+          ) : (
+            organization.childOrganizations.map(childOrganization => {
+              const membership = childMembershipsById.get(childOrganization.id);
+              const checked = Boolean(membership);
+              const locked = membership && membership.role !== 'member';
+              return (
+                <label
+                  key={childOrganization.id}
+                  className="hover:bg-accent flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-sm"
+                >
+                  <Checkbox
+                    checked={checked}
+                    disabled={mutation.isPending || locked}
+                    onCheckedChange={nextChecked =>
+                      handleToggleChildOrganization(childOrganization.id, nextChecked)
+                    }
+                    className="mt-0.5"
+                  />
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate">{childOrganization.name}</span>
+                    {locked ? (
+                      <span className="text-muted-foreground text-xs">
+                        {membership.role === 'owner' ? 'Owner' : 'Billing manager'} in child team
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+              );
+            })
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function OrganizationAdminMembers({
   organizationId,
   showAdminLinks = false,
@@ -422,8 +535,11 @@ export function OrganizationAdminMembers({
                     member.status === 'active'
                       ? canRemoveMember(currentUserRole, isKiloAdmin, isCurrentUser)
                       : canManageMembers(currentUserRole, isKiloAdmin);
+                  const canEditChildTeams =
+                    member.status === 'active' && canInviteMembers(currentUserRole, isKiloAdmin);
 
-                  const hasAnyEditableActions = canEditRole || canEditLimit || canDelete;
+                  const hasAnyEditableActions =
+                    canEditRole || canEditLimit || canDelete || canEditChildTeams;
 
                   return (
                     <div
@@ -459,6 +575,11 @@ export function OrganizationAdminMembers({
                             </span>
                             <DailyUsageLimitDisplay member={member} />
                           </div>
+                          <ChildTeamsControl
+                            organization={organizationData}
+                            member={member}
+                            editable={false}
+                          />
                         </div>
                       </div>
 
@@ -491,6 +612,13 @@ export function OrganizationAdminMembers({
                               member={member}
                               showAsReadOnly={false}
                             />
+                            {canEditChildTeams && (
+                              <ChildTeamsControl
+                                organization={organizationData}
+                                member={member}
+                                editable={true}
+                              />
+                            )}
                             <EditLimitButton organization={organizationData} member={member} />
                             <DeleteMemberButton organizationId={organizationId} member={member} />
                             <DeleteInvitationButton

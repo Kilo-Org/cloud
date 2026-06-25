@@ -26,7 +26,9 @@ export const morph_qwen35_397b_model: KiloExclusiveModel = {
   context_length: 262_144,
   max_completion_tokens: 131_072,
   status: 'public',
-  flags: ['reasoning'],
+  // Qwen3.5 397B accepts image input on Morph's gateway (canonical JSON
+  // input_modalities: ["text","image"]).
+  flags: ['reasoning', 'vision'],
   gateway: 'morph',
   internal_id: 'morph-qwen35-397b',
   pricing: flat({
@@ -86,7 +88,9 @@ export const morph_minimax_m3_model: KiloExclusiveModel = {
   context_length: 256_000,
   max_completion_tokens: 256_000,
   status: 'public',
-  flags: ['reasoning'],
+  // MiniMax M3 accepts image input on Morph's gateway (canonical JSON
+  // input_modalities: ["text","image"]).
+  flags: ['reasoning', 'vision'],
   gateway: 'morph',
   internal_id: 'morph-minimax3-428b',
   pricing: flat({

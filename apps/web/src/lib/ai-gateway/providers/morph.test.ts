@@ -51,13 +51,16 @@ describe('Morph gateway provider', () => {
   // (https://www.morphllm.com/api/models/json). Cache-read is only billed for
   // qwen3.5 (0.3) and glm-5.2 (0.35, LMCache prefix reuse); the JSON omits the
   // glm rate, but Morph's calculateChatGlm52Cost bills it, so it is set here.
-  const EXPECTED: Record<string, { in: number; out: number; cache: number | null }> = {
-    'morph/qwen3.5-397b': { in: 0.5, out: 3.5, cache: 0.3 },
-    'morph/qwen3.6-27b': { in: 0.289, out: 2.4, cache: null },
-    'morph/minimax-m2.7': { in: 0.279, out: 1.2, cache: null },
-    'morph/minimax-m3': { in: 0.6, out: 2.4, cache: null },
-    'morph/glm-5.2': { in: 1.1, out: 4.1, cache: 0.35 },
-    'morph/deepseek-v4-flash': { in: 0.139, out: 0.278, cache: null },
+  const EXPECTED: Record<
+    string,
+    { in: number; out: number; cache: number | null; vision: boolean }
+  > = {
+    'morph/qwen3.5-397b': { in: 0.5, out: 3.5, cache: 0.3, vision: true },
+    'morph/qwen3.6-27b': { in: 0.289, out: 2.4, cache: null, vision: false },
+    'morph/minimax-m2.7': { in: 0.279, out: 1.2, cache: null, vision: false },
+    'morph/minimax-m3': { in: 0.6, out: 2.4, cache: null, vision: true },
+    'morph/glm-5.2': { in: 1.1, out: 4.1, cache: 0.35, vision: false },
+    'morph/deepseek-v4-flash': { in: 0.139, out: 0.278, cache: null, vision: false },
   };
 
   it.each(morphChatModels)('prices $public_id to match Morph canonical pricing', model => {
@@ -69,4 +72,17 @@ describe('Morph gateway provider', () => {
     expect(p.completion_per_million).toBe(want.out);
     expect(p.input_cache_read_per_million ?? null).toBe(want.cache);
   });
+
+  // Only qwen3.5-397b and minimax-m3 expose image input on Morph's gateway
+  // (canonical JSON input_modalities includes "image").
+  it.each(morphChatModels)(
+    'flags $public_id vision support to match canonical modalities',
+    model => {
+      const want = EXPECTED[model.public_id];
+      expect(want).toBeDefined();
+      expect(model.flags.includes('vision')).toBe(want.vision);
+      // Every Morph chat model is a reasoning model.
+      expect(model.flags.includes('reasoning')).toBe(true);
+    }
+  );
 });

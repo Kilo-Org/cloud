@@ -63,8 +63,7 @@ describe('Morph gateway provider', () => {
 
   // Per-1M-token rates mirror Morph's canonical pricing
   // (https://www.morphllm.com/api/models/json). Cache-read is only billed for
-  // qwen3.5 (0.3) and glm-5.2 (0.35, LMCache prefix reuse); the JSON omits the
-  // glm rate, but Morph's calculateChatGlm52Cost bills it, so it is set here.
+  // qwen3.5 (0.3); every other Morph model (incl. GLM-5.2) has no cache rate.
   const EXPECTED: Record<
     string,
     { in: number; out: number; cache: number | null; vision: boolean }
@@ -73,7 +72,7 @@ describe('Morph gateway provider', () => {
     'morph/qwen3.6-27b': { in: 0.289, out: 2.4, cache: null, vision: false },
     'morph/minimax-m2.7': { in: 0.279, out: 1.2, cache: null, vision: false },
     'morph/minimax-m3': { in: 0.6, out: 2.4, cache: null, vision: true },
-    'morph/glm-5.2': { in: 1.1, out: 4.1, cache: 0.35, vision: false },
+    'morph/glm-5.2': { in: 1.1, out: 4.1, cache: null, vision: false },
     'morph/deepseek-v4-flash': { in: 0.139, out: 0.278, cache: null, vision: false },
   };
 
@@ -132,7 +131,7 @@ describe('Morph gateway provider', () => {
   const ONE_M = 1_000_000;
   const flatPricing = (id: string) => findKiloExclusiveModel(id)!.pricing![0].pricing;
 
-  it('bills cache reads at the discounted rate for qwen3.5 and glm-5.2', () => {
+  it('bills cache reads at the discounted rate for qwen3.5 (the only cache model)', () => {
     // 1M cache-hit tokens should cost the cache_read rate, strictly less than prompt.
     const qwen = flatPricing('morph/qwen3.5-397b'); // prompt 0.5, cache_read 0.3
     const qwenCacheCost = calculateCost_mUsd(
@@ -141,24 +140,20 @@ describe('Morph gateway provider', () => {
     );
     expect(qwenCacheCost).toBe(300_000); // 1M * 0.3
     expect(qwenCacheCost).toBeLessThan(ONE_M * qwen.prompt_per_million);
-
-    const glm = flatPricing('morph/glm-5.2'); // prompt 1.1, cache_read 0.35
-    const glmCacheCost = calculateCost_mUsd(
-      { uncachedInputTokens: 0, cacheWriteTokens: 0, cacheHitTokens: ONE_M, totalOutputTokens: 0 },
-      [{ start_context_length: 0, pricing: glm }]
-    );
-    expect(glmCacheCost).toBe(350_000); // 1M * 0.35
   });
 
   it('falls back to the prompt rate for cache reads on models without a cache_read price', () => {
-    // dsv4flash declares no cache_read rate; cache hits must bill at the prompt rate (not free).
-    const ds = flatPricing('morph/deepseek-v4-flash'); // prompt 0.139, cache_read null
-    expect(ds.input_cache_read_per_million).toBeNull();
-    const cost = calculateCost_mUsd(
-      { uncachedInputTokens: 0, cacheWriteTokens: 0, cacheHitTokens: ONE_M, totalOutputTokens: 0 },
-      [{ start_context_length: 0, pricing: ds }]
-    );
-    expect(cost).toBe(ONE_M * ds.prompt_per_million); // 139_000
+    // GLM-5.2 and dsv4flash declare no cache_read rate per canonical JSON; cache
+    // hits must bill at the prompt rate (not free, not a discount).
+    for (const id of ['morph/glm-5.2', 'morph/deepseek-v4-flash']) {
+      const p = flatPricing(id);
+      expect(p.input_cache_read_per_million).toBeNull();
+      const cost = calculateCost_mUsd(
+        { uncachedInputTokens: 0, cacheWriteTokens: 0, cacheHitTokens: ONE_M, totalOutputTokens: 0 },
+        [{ start_context_length: 0, pricing: p }]
+      );
+      expect(cost).toBe(ONE_M * p.prompt_per_million);
+    }
   });
 
   it('computes a mixed-usage bill from the stored qwen3.5 pricing', () => {

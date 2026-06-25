@@ -112,7 +112,10 @@ export const morph_glm52_744b_model: KiloExclusiveModel = {
   pricing: flat({
     prompt_per_million: 1.1,
     completion_per_million: 4.1,
-    input_cache_read_per_million: null,
+    // GLM-5.2 runs LMCache prefix reuse, so cached input bills at a cheaper
+    // read rate (Morph's calculateChatGlm52Cost). The other Morph chat models
+    // do not bill cache reads, hence null on those.
+    input_cache_read_per_million: 0.35,
     input_cache_write_per_million: null,
   }),
   exclusive_to: [],

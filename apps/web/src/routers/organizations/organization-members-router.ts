@@ -413,8 +413,7 @@ export const organizationsMembersRouter = createTRPCRouter({
           if (error.message === 'Child organizations cannot invite members') {
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
-              message:
-                'Child organizations manage membership through their parent organization.',
+              message: 'Child organizations manage membership through their parent organization.',
             });
           }
           if (error.message === 'User must join this organization through SSO') {

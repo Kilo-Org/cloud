@@ -21,21 +21,25 @@ import { parseDolthubUpstream } from '@/lib/wasteland/upstream';
 // legacy page renders the configure-upstream UI in that case.
 function linkForOrgWasteland(
   wasteland: { wasteland_id: string; dolthub_upstream: string | null },
-  organizationId: string
+  organizationRouteIdentifier: string
 ) {
   const upstream = parseDolthubUpstream(wasteland.dolthub_upstream);
   if (upstream) return `/wasteland/${upstream.owner}/${upstream.repo}`;
-  return `/organizations/${organizationId}/wasteland/${wasteland.wasteland_id}`;
+  return `/organizations/${organizationRouteIdentifier}/wasteland/${wasteland.wasteland_id}`;
 }
 
 type OrgWastelandListPageClientProps = {
   organizationId: string;
+  organizationRouteIdentifier: string;
 };
 
-export function OrgWastelandListPageClient({ organizationId }: OrgWastelandListPageClientProps) {
+export function OrgWastelandListPageClient({
+  organizationId,
+  organizationRouteIdentifier,
+}: OrgWastelandListPageClientProps) {
   const router = useRouter();
   const trpc = useWastelandTRPC();
-  const newUrl = `/organizations/${organizationId}/wasteland/new`;
+  const newUrl = `/organizations/${organizationRouteIdentifier}/wasteland/new`;
 
   const wastelandsQuery = useQuery({
     ...trpc.wasteland.listWastelands.queryOptions({ organizationId }),
@@ -126,7 +130,9 @@ export function OrgWastelandListPageClient({ organizationId }: OrgWastelandListP
             <WastelandCard
               key={wasteland.wasteland_id}
               wasteland={wasteland}
-              onClick={() => router.push(linkForOrgWasteland(wasteland, organizationId))}
+              onClick={() =>
+                router.push(linkForOrgWasteland(wasteland, organizationRouteIdentifier))
+              }
             />
           ))}
         </div>

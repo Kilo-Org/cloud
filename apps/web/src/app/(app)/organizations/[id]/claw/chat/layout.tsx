@@ -12,7 +12,10 @@ export default async function OrgChatRootLayout({ children, params }: OrgChatRoo
       params={params}
       fullBleed
       render={org => (
-        <OrgChatRootLayoutClient organizationId={org.organization.id}>
+        <OrgChatRootLayoutClient
+          organizationId={org.organization.id}
+          organizationRouteIdentifier={org.organizationRouteIdentifier}
+        >
           {children}
         </OrgChatRootLayoutClient>
       )}

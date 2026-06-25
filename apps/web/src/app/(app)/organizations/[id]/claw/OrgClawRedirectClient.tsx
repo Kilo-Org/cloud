@@ -16,10 +16,16 @@ function LoadingState() {
   );
 }
 
-export function OrgClawRedirectClient({ organizationId }: { organizationId: string }) {
+export function OrgClawRedirectClient({
+  organizationId,
+  organizationRouteIdentifier,
+}: {
+  organizationId: string;
+  organizationRouteIdentifier: string;
+}) {
   const router = useRouter();
   const { data: status, isLoading, error } = useOrgKiloClawStatus(organizationId);
-  const basePath = `/organizations/${organizationId}/claw`;
+  const basePath = `/organizations/${organizationRouteIdentifier}/claw`;
   const redirectPath = status?.status ? `${basePath}/chat` : `${basePath}/new`;
 
   useEffect(() => {

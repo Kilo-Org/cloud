@@ -15,10 +15,15 @@ import { formatDistanceToNow } from 'date-fns';
 
 type OrgTownListPageClientProps = {
   organizationId: string;
+  organizationRouteIdentifier: string;
   role: string;
 };
 
-export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageClientProps) {
+export function OrgTownListPageClient({
+  organizationId,
+  organizationRouteIdentifier,
+  role,
+}: OrgTownListPageClientProps) {
   const isOwner = role === 'owner';
   const router = useRouter();
   const trpc = useGastownTRPC();
@@ -120,7 +125,7 @@ export function OrgTownListPageClient({ organizationId, role }: OrgTownListPageC
               key={town.id}
               className="cursor-pointer border-white/10 bg-white/[0.03] transition-[border-color,background-color,transform] hover:bg-white/[0.05]"
               onClick={() =>
-                void router.push(`/organizations/${organizationId}/gastown/${town.id}`)
+                void router.push(`/organizations/${organizationRouteIdentifier}/gastown/${town.id}`)
               }
             >
               <CardContent className="flex items-center justify-between p-4">

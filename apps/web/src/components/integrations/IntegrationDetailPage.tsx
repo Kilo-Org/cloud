@@ -253,10 +253,12 @@ export async function OrganizationIntegrationDetailPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => (
+      render={({ organization, organizationRouteIdentifier }) => (
         <>
           <div className="space-y-4">
-            <BackToIntegrationsLink href={`/organizations/${organization.id}/integrations`} />
+            <BackToIntegrationsLink
+              href={`/organizations/${organizationRouteIdentifier}/integrations`}
+            />
             <SetPageTitle title={entry.title} />
             <p className="text-muted-foreground">{entry.organizationSubtitle(organization.name)}</p>
           </div>

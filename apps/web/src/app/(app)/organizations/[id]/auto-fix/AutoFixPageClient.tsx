@@ -16,6 +16,7 @@ import Link from 'next/link';
 
 type AutoFixPageClientProps = {
   organizationId: string;
+  organizationRouteIdentifier: string;
   organizationName: string;
   successMessage?: string;
   errorMessage?: string;
@@ -23,6 +24,7 @@ type AutoFixPageClientProps = {
 
 export function AutoFixPageClient({
   organizationId,
+  organizationRouteIdentifier,
   organizationName,
   successMessage,
   errorMessage,
@@ -82,7 +84,7 @@ export function AutoFixPageClient({
               The Kilo GitHub App must be installed to use Auto Fix. The app automatically manages
               workflows and triggers fixes on labeled issues.
             </p>
-            <Link href={`/organizations/${organizationId}/integrations/github`}>
+            <Link href={`/organizations/${organizationRouteIdentifier}/integrations/github`}>
               <Button variant="default" size="sm">
                 Install GitHub App
                 <ExternalLink className="ml-2 h-3 w-3" />

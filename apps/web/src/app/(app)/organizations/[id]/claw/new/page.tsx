@@ -25,6 +25,7 @@ export default async function OrgClawNewPage({ params, searchParams }: OrgClawNe
       render={org => (
         <OrgClawNewClient
           organizationId={org.organization.id}
+          organizationRouteIdentifier={org.organizationRouteIdentifier}
           fakeOnboardingStep={fakeOnboardingStep}
         />
       )}

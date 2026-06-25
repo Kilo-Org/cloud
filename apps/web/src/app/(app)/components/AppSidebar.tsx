@@ -82,8 +82,22 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
     })),
     currentOrgIdentifier
   );
+  const { data: resolvedCurrentOrg } = useQuery(
+    trpc.organizations.resolveRouteIdentifier.queryOptions(
+      { routeIdentifier: currentOrgIdentifier ?? '' },
+      {
+        enabled: Boolean(currentOrgIdentifier && !currentOrgFromList),
+        trpc: {
+          context: {
+            skipBatch: true,
+          },
+        },
+      }
+    )
+  );
   const currentOrgId =
     currentOrgFromList?.id ??
+    resolvedCurrentOrg?.id ??
     (currentOrgIdentifier && isUuidOrganizationRouteIdentifier(currentOrgIdentifier)
       ? currentOrgIdentifier
       : null);

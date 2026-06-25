@@ -31,6 +31,7 @@ type Platform = 'github' | 'gitlab';
 
 type ReviewAgentPageClientProps = {
   organizationId: string;
+  organizationRouteIdentifier: string;
   organizationName: string;
   successMessage?: string;
   errorMessage?: string;
@@ -39,6 +40,7 @@ type ReviewAgentPageClientProps = {
 
 export function ReviewAgentPageClient({
   organizationId,
+  organizationRouteIdentifier,
   organizationName,
   successMessage,
   errorMessage,
@@ -55,7 +57,7 @@ export function ReviewAgentPageClient({
     }
     const queryString = params.toString();
     router.push(
-      `/organizations/${organizationId}/code-reviews${queryString ? `?${queryString}` : ''}`
+      `/organizations/${organizationRouteIdentifier}/code-reviews${queryString ? `?${queryString}` : ''}`
     );
   };
 
@@ -166,7 +168,7 @@ export function ReviewAgentPageClient({
                   The Kilo GitHub App must be installed to use Code Reviewer. The app automatically
                   manages workflows and triggers reviews on your pull requests.
                 </p>
-                <Link href={`/organizations/${organizationId}/integrations/github`}>
+                <Link href={`/organizations/${organizationRouteIdentifier}/integrations/github`}>
                   <Button variant="default" size="sm">
                     Install GitHub App
                     <ExternalLink className="ml-2 h-3 w-3" />
@@ -263,7 +265,7 @@ export function ReviewAgentPageClient({
                   Connect your GitLab account to use Code Reviews for GitLab. You'll also need to
                   configure a webhook in your GitLab project settings.
                 </p>
-                <Link href={`/organizations/${organizationId}/integrations/gitlab`}>
+                <Link href={`/organizations/${organizationRouteIdentifier}/integrations/gitlab`}>
                   <Button variant="default" size="sm">
                     Connect GitLab
                     <ExternalLink className="ml-2 h-3 w-3" />

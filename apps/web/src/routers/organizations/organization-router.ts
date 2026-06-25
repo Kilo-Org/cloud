@@ -67,6 +67,8 @@ import { organizationKiloclawRouter } from '@/routers/organizations/organization
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
 import { ORGANIZATION_SLUG_MAX_LENGTH } from '@/lib/organizations/organization-route-utils';
 import { organizationSlugContainsReservedSubstring } from '@/lib/organizations/organization-slug';
+import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -188,6 +190,25 @@ export const organizationsRouter = createTRPCRouter({
   autoTopUp: organizationAutoTopUpRouter,
   kiloclaw: organizationKiloclawRouter,
   bitbucket: organizationBitbucketRouter,
+
+  resolveRouteIdentifier: baseProcedure
+    .input(z.object({ routeIdentifier: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const result = await getAuthorizedOrgContext(input.routeIdentifier);
+
+      if (!result.success) {
+        throw new TRPCError({
+          code: result.nextResponse.status === 401 ? 'UNAUTHORIZED' : 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      return {
+        id: result.data.organization.id,
+        slug: result.data.organization.slug,
+        routeIdentifier: getOrganizationRouteIdentifier(result.data.organization),
+      };
+    }),
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;

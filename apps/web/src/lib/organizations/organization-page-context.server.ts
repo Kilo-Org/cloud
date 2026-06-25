@@ -83,11 +83,13 @@ export async function redirectCanonicalOrganizationRouteIfNeeded({
     return;
   }
 
-  const pathname = (await headers()).get('x-pathname') ?? `/organizations/${rawRouteIdentifier}`;
+  const headersList = await headers();
+  const pathname = headersList.get('x-pathname') ?? `/organizations/${rawRouteIdentifier}`;
+  const search = headersList.get('x-search') ?? '';
   redirect(
-    pathname.replace(
+    `${pathname.replace(
       `/organizations/${rawRouteIdentifier}`,
       `/organizations/${canonicalRouteIdentifier}`
-    )
+    )}${search}`
   );
 }

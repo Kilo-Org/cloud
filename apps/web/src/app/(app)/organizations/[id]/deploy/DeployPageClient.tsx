@@ -13,14 +13,19 @@ import { useState } from 'react';
 
 type DeployPageClientProps = {
   organizationId: string;
+  organizationRouteIdentifier: string;
   initialDeploymentId?: string;
 };
 
-export function DeployPageClient({ organizationId, initialDeploymentId }: DeployPageClientProps) {
+export function DeployPageClient({
+  organizationId,
+  organizationRouteIdentifier,
+  initialDeploymentId,
+}: DeployPageClientProps) {
   const router = useRouter();
   const [isNewDeploymentOpen, setIsNewDeploymentOpen] = useState(false);
 
-  const basePath = `/organizations/${organizationId}/deploy`;
+  const basePath = `/organizations/${organizationRouteIdentifier}/deploy`;
 
   const handleViewDetails = (deploymentId: string) => {
     router.push(`${basePath}/${deploymentId}`);

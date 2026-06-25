@@ -14,7 +14,7 @@ export default async function AutoTriagePage({ params, searchParams }: AutoTriag
   return (
     <OrganizationByPageLayout
       params={params}
-      render={async ({ organization }) => {
+      render={async ({ organization, organizationRouteIdentifier }) => {
         const isAutoTriageFeatureEnabled = await isFeatureFlagEnabled(
           'auto-triage-feature',
           organization.id
@@ -28,6 +28,7 @@ export default async function AutoTriagePage({ params, searchParams }: AutoTriag
         return (
           <AutoTriagePageClient
             organizationId={organization.id}
+            organizationRouteIdentifier={organizationRouteIdentifier}
             organizationName={organization.name}
             successMessage={search.success}
             errorMessage={search.error}

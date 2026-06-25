@@ -46,7 +46,15 @@ const PLATFORM_OPTIONS: readonly {
 
 type PlatformFilterValue = 'all' | 'cloud-agent' | 'cli' | 'agent-manager' | 'gastown' | 'other';
 
-export function SessionsPageContent() {
+type SessionsPageContentProps = {
+  organizationId?: string;
+  organizationRouteIdentifier?: string;
+};
+
+export function SessionsPageContent({
+  organizationId,
+  organizationRouteIdentifier,
+}: SessionsPageContentProps = {}) {
   const trpc = useTRPC();
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,11 +73,12 @@ export function SessionsPageContent() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Determine if we're in an organization context
-  const organizationId = pathname.match(/^\/organizations\/([^/]+)/)?.[1];
-
   // When in organization context, OrganizationTrialWrapper already provides PageContainer
   const shouldUsePageContainer = !organizationId;
+  const organizationPathIdentifier =
+    organizationRouteIdentifier ??
+    organizationId ??
+    pathname.match(/^\/organizations\/([^/]+)/)?.[1];
 
   const isSearching = debouncedSearchQuery.trim().length > 0;
 
@@ -242,7 +251,7 @@ export function SessionsPageContent() {
                   <Link
                     href={
                       organizationId
-                        ? `/organizations/${organizationId}/cloud/chat?sessionId=${selectedSession.sessionId}`
+                        ? `/organizations/${organizationPathIdentifier}/cloud/chat?sessionId=${selectedSession.sessionId}`
                         : `/cloud/chat?sessionId=${selectedSession.sessionId}`
                     }
                     onClick={() => setIsDialogOpen(false)}

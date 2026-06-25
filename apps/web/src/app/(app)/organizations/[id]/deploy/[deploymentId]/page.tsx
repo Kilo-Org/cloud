@@ -20,8 +20,12 @@ export default async function OrgDeploymentDetailPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => (
-        <DeployPageClient organizationId={organization.id} initialDeploymentId={deploymentId} />
+      render={({ organization, organizationRouteIdentifier }) => (
+        <DeployPageClient
+          organizationId={organization.id}
+          organizationRouteIdentifier={organizationRouteIdentifier}
+          initialDeploymentId={deploymentId}
+        />
       )}
     />
   );

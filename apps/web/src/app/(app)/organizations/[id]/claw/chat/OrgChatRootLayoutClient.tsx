@@ -7,9 +7,11 @@ import { KiloChatLayout } from '@/app/(app)/claw/kilo-chat/components/KiloChatLa
 export function OrgChatRootLayoutClient({
   children,
   organizationId,
+  organizationRouteIdentifier,
 }: {
   children: React.ReactNode;
   organizationId: string;
+  organizationRouteIdentifier: string;
 }) {
   const { data: user } = useUser();
   const { data: status, error, isError, isLoading, refetch } = useOrgKiloClawStatus(organizationId);
@@ -20,8 +22,8 @@ export function OrgChatRootLayoutClient({
     <KiloChatLayout
       currentUserId={user?.id ?? null}
       sandboxId={status?.sandboxId ?? null}
-      basePath={`/organizations/${organizationId}/claw/chat`}
-      noInstanceRedirect={`/organizations/${organizationId}/claw/new`}
+      basePath={`/organizations/${organizationRouteIdentifier}/claw/chat`}
+      noInstanceRedirect={`/organizations/${organizationRouteIdentifier}/claw/new`}
       instanceStatus={status?.status ?? null}
       isInstanceLoading={isLoading}
       isInstanceError={isError}

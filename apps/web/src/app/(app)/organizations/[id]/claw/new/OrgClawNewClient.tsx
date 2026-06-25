@@ -14,16 +14,18 @@ const ClawOnboardingWithBoundary = withStatusQueryBoundary(ClawOnboardingFlow);
 
 export function OrgClawNewClient({
   organizationId,
+  organizationRouteIdentifier,
   fakeOnboardingStep,
 }: {
   organizationId: string;
+  organizationRouteIdentifier: string;
   fakeOnboardingStep: ClawOnboardingRenderStep | null;
 }) {
   if (fakeOnboardingStep) {
     return (
       <ClawOnboardingFakeWalkthrough
         initialStep={fakeOnboardingStep}
-        basePath={`/organizations/${organizationId}/claw`}
+        basePath={`/organizations/${organizationRouteIdentifier}/claw`}
       />
     );
   }

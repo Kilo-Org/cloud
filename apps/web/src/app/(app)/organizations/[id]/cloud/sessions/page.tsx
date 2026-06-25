@@ -10,11 +10,14 @@ export default async function OrganizationSessionsPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={() => (
+      render={({ organization, organizationRouteIdentifier }) => (
         <Suspense
           fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}
         >
-          <SessionsPageContent />
+          <SessionsPageContent
+            organizationId={organization.id}
+            organizationRouteIdentifier={organizationRouteIdentifier}
+          />
         </Suspense>
       )}
     />

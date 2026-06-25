@@ -13,9 +13,10 @@ export default async function ReviewAgentPage({ params, searchParams }: ReviewAg
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => (
+      render={({ organization, organizationRouteIdentifier }) => (
         <ReviewAgentPageClient
           organizationId={organization.id}
+          organizationRouteIdentifier={organizationRouteIdentifier}
           organizationName={organization.name}
           successMessage={search.success}
           errorMessage={search.error}

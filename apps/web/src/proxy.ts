@@ -13,6 +13,7 @@ import {
 function baseProxy(request: NextRequestWithAuth) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', request.nextUrl.pathname);
+  requestHeaders.set('x-search', request.nextUrl.search);
 
   const response = NextResponse.next({
     request: {

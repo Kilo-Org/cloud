@@ -14,7 +14,7 @@ export default async function AutoFixPage({ params, searchParams }: AutoFixPageP
   return (
     <OrganizationByPageLayout
       params={params}
-      render={async ({ organization }) => {
+      render={async ({ organization, organizationRouteIdentifier }) => {
         const isAutoTriageFeatureEnabled = await isFeatureFlagEnabled(
           'auto-triage-feature',
           organization.id
@@ -28,6 +28,7 @@ export default async function AutoFixPage({ params, searchParams }: AutoFixPageP
         return (
           <AutoFixPageClient
             organizationId={organization.id}
+            organizationRouteIdentifier={organizationRouteIdentifier}
             organizationName={organization.name}
             successMessage={search.success}
             errorMessage={search.error}

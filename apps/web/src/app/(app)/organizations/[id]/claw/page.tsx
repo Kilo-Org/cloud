@@ -9,7 +9,12 @@ export default async function OrgClawPage({ params }: OrgClawPageProps) {
   return (
     <OrganizationByPageLayout
       params={params}
-      render={org => <OrgClawRedirectClient organizationId={org.organization.id} />}
+      render={org => (
+        <OrgClawRedirectClient
+          organizationId={org.organization.id}
+          organizationRouteIdentifier={org.organizationRouteIdentifier}
+        />
+      )}
     />
   );
 }

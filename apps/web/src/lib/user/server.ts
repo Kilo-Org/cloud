@@ -1066,9 +1066,10 @@ async function appendCallbackPath(url: string): Promise<string> {
   if (url.includes('callbackPath')) return url;
   const headersList = await headers();
   const pathname = headersList.get('x-pathname');
+  const search = headersList.get('x-search') ?? '';
   if (pathname && pathname !== '/') {
     const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}callbackPath=${encodeURIComponent(pathname)}`;
+    return `${url}${separator}callbackPath=${encodeURIComponent(`${pathname}${search}`)}`;
   }
   return url;
 }

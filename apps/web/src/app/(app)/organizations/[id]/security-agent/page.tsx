@@ -4,17 +4,19 @@ import { redirect } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useSecurityAgent } from '@/components/security-agent/SecurityAgentContext';
 import { SecurityDashboard } from '@/components/security-agent/SecurityDashboard';
+import { useUrlOrganizationIdentifier } from '@/hooks/useUrlOrganizationId';
 
 export default function OrgSecurityAgentDashboardPage() {
   const { hasIntegration, isEnabled, isLoadingConfig, isLoadingPermission, organizationId } =
     useSecurityAgent();
+  const organizationRouteIdentifier = useUrlOrganizationIdentifier() ?? organizationId;
 
   const shouldRedirectToConfig =
     !!organizationId &&
     ((!isLoadingPermission && !hasIntegration) || (hasIntegration && isEnabled === false));
 
   if (shouldRedirectToConfig) {
-    redirect(`/organizations/${organizationId}/security-agent/config`);
+    redirect(`/organizations/${organizationRouteIdentifier}/security-agent/config`);
   }
 
   if (isLoadingPermission || (hasIntegration && isLoadingConfig)) {

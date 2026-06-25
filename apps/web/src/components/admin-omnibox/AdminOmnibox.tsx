@@ -21,6 +21,8 @@ import { createActionRegistry, filterRegistry } from './action-registry';
 import type { OmniboxContext, OmniboxActionGroup } from './types';
 import { Shield, User, MapPin, ExternalLink, Info, Zap, Building2 } from 'lucide-react';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { useTRPC } from '@/lib/trpc/utils';
+import { useQuery } from '@tanstack/react-query';
 
 // Build version - using a constant for now, could be injected at build time
 const BUILD_VERSION = 'dev';
@@ -68,10 +70,18 @@ type AdminOmniboxInnerProps = {
 
 function AdminOmniboxInner({ open, setOpen }: AdminOmniboxInnerProps) {
   const pathname = usePathname();
+  const trpc = useTRPC();
   const { data: user } = useUser();
   const { setAssumedRole, assumedRole, originalRole } = useRoleTesting();
 
-  const organizationId = extractOrganizationId(pathname);
+  const organizationRouteIdentifier = extractOrganizationId(pathname);
+  const { data: resolvedOrganization } = useQuery(
+    trpc.organizations.resolveRouteIdentifier.queryOptions(
+      { routeIdentifier: organizationRouteIdentifier ?? '' },
+      { enabled: Boolean(organizationRouteIdentifier) }
+    )
+  );
+  const organizationId = resolvedOrganization?.id ?? null;
 
   // Handle role change
   const handleRoleChange = useCallback(

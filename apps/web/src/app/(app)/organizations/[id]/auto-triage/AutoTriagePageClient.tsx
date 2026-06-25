@@ -18,6 +18,7 @@ import Link from 'next/link';
 
 type AutoTriagePageClientProps = {
   organizationId: string;
+  organizationRouteIdentifier: string;
   organizationName: string;
   successMessage?: string;
   errorMessage?: string;
@@ -25,6 +26,7 @@ type AutoTriagePageClientProps = {
 
 export function AutoTriagePageClient({
   organizationId,
+  organizationRouteIdentifier,
   organizationName,
   successMessage,
   errorMessage,
@@ -85,7 +87,7 @@ export function AutoTriagePageClient({
               The Kilo GitHub App must be installed to use Auto Triage. The app automatically
               manages workflows and triggers triage on your issues.
             </p>
-            <Link href={`/organizations/${organizationId}/integrations/github`}>
+            <Link href={`/organizations/${organizationRouteIdentifier}/integrations/github`}>
               <Button variant="default" size="sm">
                 Install GitHub App
                 <ExternalLink className="ml-2 h-3 w-3" />

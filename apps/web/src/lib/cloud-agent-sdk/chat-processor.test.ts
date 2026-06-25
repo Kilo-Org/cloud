@@ -59,6 +59,29 @@ function makeFilePart(id: string, messageID: string, sessionID = 'ses-1') {
   } satisfies FilePart;
 }
 
+function makeCompletedToolPart(id: string, messageID: string, sessionID = 'ses-1') {
+  return {
+    id,
+    sessionID,
+    messageID,
+    type: 'tool' as const,
+    callID: 'call-1',
+    tool: 'kilo_usage_query_kilo_dataset',
+    state: {
+      status: 'completed' as const,
+      input: {},
+      output: '{"rows":[{"sum_costUsd":"0.42"}]}',
+      structuredContent: {
+        dataset: 'microdollar_usage',
+        rows: [{ sum_costUsd: '0.42' }],
+      },
+      title: 'query_kilo_dataset',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
+  } as Part;
+}
+
 describe('createChatProcessor', () => {
   describe('message.updated', () => {
     it('upserts message info into storage', () => {
@@ -99,6 +122,25 @@ describe('createChatProcessor', () => {
       const storedFile = stored[0] satisfies Part as FilePart;
       expect(storedFile.url).toBe('');
       expect(storedFile.source?.text.value).toBe('');
+    });
+
+    it('preserves completed tool structuredContent in storage', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part = makeCompletedToolPart('part-tool', 'msg-1');
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect(
+        stored[0]?.type === 'tool' && stored[0].state.status === 'completed'
+          ? (stored[0].state as Record<string, unknown>).structuredContent
+          : undefined
+      ).toEqual({
+        dataset: 'microdollar_usage',
+        rows: [{ sum_costUsd: '0.42' }],
+      });
     });
 
     it('does not replace text with empty non-synthetic part', () => {

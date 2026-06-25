@@ -1,5 +1,9 @@
 import { describe, expect, test } from '@jest/globals';
-import { GetKiloUsageCostInputSchema, QueryKiloDatasetInputSchema } from './contracts';
+import {
+  GetKiloUsageCostInputSchema,
+  QueryKiloDatasetInputSchema,
+  QueryKiloDatasetOutputSchema,
+} from './contracts';
 
 function parseMessages(input: unknown): string[] {
   const result = QueryKiloDatasetInputSchema.safeParse(input);
@@ -125,5 +129,97 @@ describe('GetKiloUsageCostInputSchema', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe('QueryKiloDatasetOutputSchema', () => {
+  const aggregateOutput = {
+    dataset: 'microdollar_usage',
+    mode: 'aggregate',
+    scope: { type: 'me' },
+    range: {
+      startDate: '2026-06-22T00:00:00.000Z',
+      endDate: '2026-06-23T00:00:00.000Z',
+      timeField: 'createdAt',
+    },
+    columns: [{ name: 'sum_costUsd', type: 'decimal', nullable: false }],
+    rows: [{ sum_costUsd: '0.42' }],
+  };
+
+  test('accepts valid aggregate outputs', () => {
+    expect(QueryKiloDatasetOutputSchema.safeParse(aggregateOutput).success).toBe(true);
+  });
+
+  test('accepts valid timeseries outputs', () => {
+    expect(
+      QueryKiloDatasetOutputSchema.safeParse({
+        ...aggregateOutput,
+        mode: 'timeseries',
+        columns: [
+          { name: 'bucketStart', type: 'timestamp', nullable: false },
+          { name: 'sum_costUsd', type: 'decimal', nullable: false },
+        ],
+        rows: [{ bucketStart: '2026-06-22T00:00:00.000Z', sum_costUsd: 0 }],
+      }).success
+    ).toBe(true);
+  });
+
+  test('requires strict UTC ISO timestamps', () => {
+    expect(
+      QueryKiloDatasetOutputSchema.safeParse({
+        ...aggregateOutput,
+        range: { ...aggregateOutput.range, startDate: '2026-06-22 00:00:00.000+00' },
+      }).success
+    ).toBe(false);
+  });
+
+  test('rejects unknown top-level properties', () => {
+    expect(
+      QueryKiloDatasetOutputSchema.safeParse({ ...aggregateOutput, chartConfig: {} }).success
+    ).toBe(false);
+  });
+
+  test('rejects malformed columns and duplicate names', () => {
+    expect(
+      QueryKiloDatasetOutputSchema.safeParse({
+        ...aggregateOutput,
+        columns: [{ name: '', type: 'decimal', nullable: false }],
+      }).success
+    ).toBe(false);
+
+    expect(
+      QueryKiloDatasetOutputSchema.safeParse({
+        ...aggregateOutput,
+        columns: [
+          { name: 'sum_costUsd', type: 'decimal', nullable: false },
+          { name: 'sum_costUsd', type: 'decimal', nullable: false },
+        ],
+      }).success
+    ).toBe(false);
+  });
+
+  test('rejects non-scalar row values', () => {
+    expect(
+      QueryKiloDatasetOutputSchema.safeParse({
+        ...aggregateOutput,
+        rows: [{ sum_costUsd: { amount: '0.42' } }],
+      }).success
+    ).toBe(false);
+  });
+
+  test('rejects undeclared and missing row columns', () => {
+    expect(
+      QueryKiloDatasetOutputSchema.safeParse({
+        ...aggregateOutput,
+        rows: [{ sum_costUsd: '0.42', extra: true }],
+      }).success
+    ).toBe(false);
+
+    expect(
+      QueryKiloDatasetOutputSchema.safeParse({
+        ...aggregateOutput,
+        rows: [{}],
+      }).success
+    ).toBe(false);
   });
 });

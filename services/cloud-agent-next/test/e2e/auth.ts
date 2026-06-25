@@ -17,6 +17,7 @@ import path from 'node:path';
 import process from 'node:process';
 import jwt from 'jsonwebtoken';
 import { computeDatabaseUrl, createDrizzleClient, kilocode_users, sql } from '@kilocode/db';
+import { encryptWithPublicKey } from '@kilocode/encryption';
 
 export const DRIVER_USER_EMAIL_SUFFIX = '@cloud-agent-next-e2e.example.com';
 export const FUNDED_DRIVER_BALANCE_MICRODOLLARS = 10_000_000;
@@ -76,10 +77,18 @@ export function loadDevVars(servicePackageDir: string): Record<string, string> {
 /** Load repo database env for standalone `tsx` driver processes. */
 export function loadRepoEnvFiles(servicePackageDir: string): void {
   const repoRootDir = path.resolve(servicePackageDir, '../..');
-  const envPaths = [path.join(repoRootDir, '.env.local'), path.join(repoRootDir, '.env')];
+  const envPaths = [
+    path.join(repoRootDir, 'apps/web/.env.development.local'),
+    path.join(repoRootDir, 'apps/web/.env.local'),
+    path.join(repoRootDir, 'apps/web/.env'),
+    path.join(repoRootDir, '.env.local'),
+    path.join(repoRootDir, '.env'),
+  ];
   for (const envPath of envPaths) {
     if (existsSync(envPath)) {
-      process.loadEnvFile(envPath);
+      for (const [key, value] of Object.entries(parseDotDevVars(readFileSync(envPath, 'utf8')))) {
+        process.env[key] ??= value;
+      }
     }
   }
 }
@@ -102,7 +111,7 @@ export type TestUser = {
 export async function ensureTestUser(
   databaseUrl: string | undefined,
   email: string,
-  options?: { funded?: boolean }
+  options?: { funded?: boolean; admin?: boolean }
 ): Promise<TestUser> {
   const resolvedUrl = databaseUrl ?? computeDatabaseUrl();
   const driver = createDrizzleClient({
@@ -130,13 +139,14 @@ export async function ensureTestUser(
         google_user_image_url: 'https://example.com/avatar.png',
         stripe_customer_id: 'cus_e2e_' + userId,
         api_token_pepper: apiTokenPepper,
-        is_admin: false,
+        is_admin: options?.admin ?? false,
         ...fundedValues,
       })
       .onConflictDoUpdate({
         target: kilocode_users.id,
         set: {
           api_token_pepper: apiTokenPepper,
+          is_admin: options?.admin ?? false,
           ...fundedValues,
           updated_at: sql`now()`,
         },
@@ -173,6 +183,100 @@ export function mintApiToken(user: TestUser, nextAuthSecret: string): string {
     nextAuthSecret,
     { algorithm: 'HS256', expiresIn: '1h' }
   );
+}
+
+type GatewayJwtKey = {
+  keyId: string;
+  privateKeyPem?: string;
+};
+
+type GatewayJwtKeyset = {
+  issuer: string;
+  activeKeyId: string;
+  keys: GatewayJwtKey[];
+};
+
+function parseJsonOrBase64JsonEnv(value: string | undefined, name: string): unknown {
+  if (!value) throw new Error(`${name} is required for Ask Usage e2e`);
+  try {
+    return JSON.parse(value);
+  } catch {
+    try {
+      return JSON.parse(Buffer.from(value, 'base64').toString('utf8'));
+    } catch (error) {
+      throw new Error(`${name} must contain valid JSON or base64-encoded JSON`, { cause: error });
+    }
+  }
+}
+
+function readGatewayJwtKeyset(): GatewayJwtKeyset {
+  const parsed = parseJsonOrBase64JsonEnv(
+    process.env.MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON,
+    'MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON'
+  );
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error('MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON must decode to an object');
+  }
+  const candidate = parsed as Partial<GatewayJwtKeyset>;
+  if (
+    typeof candidate.issuer !== 'string' ||
+    typeof candidate.activeKeyId !== 'string' ||
+    !Array.isArray(candidate.keys)
+  ) {
+    throw new Error('MCP_GATEWAY_JWT_PRIVATE_KEYSET_JSON has an invalid shape');
+  }
+  return {
+    issuer: candidate.issuer,
+    activeKeyId: candidate.activeKeyId,
+    keys: candidate.keys.map(key => {
+      if (typeof key !== 'object' || key === null) {
+        throw new Error('MCP gateway JWT key must be an object');
+      }
+      const record = key as Partial<GatewayJwtKey>;
+      if (typeof record.keyId !== 'string') {
+        throw new Error('MCP gateway JWT key is missing keyId');
+      }
+      return {
+        keyId: record.keyId,
+        privateKeyPem: typeof record.privateKeyPem === 'string' ? record.privateKeyPem : undefined,
+      };
+    }),
+  };
+}
+
+export function mintNativeMcpAccessToken(params: {
+  user: TestUser;
+  appBaseUrl: string;
+  clientId: string;
+  ttlSeconds?: number;
+}): string {
+  const keyset = readGatewayJwtKeyset();
+  const activeKey = keyset.keys.find(key => key.keyId === keyset.activeKeyId);
+  if (!activeKey?.privateKeyPem) {
+    throw new Error('MCP gateway active private key is required for Ask Usage e2e');
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const resourceUrl = new URL('/mcp', params.appBaseUrl).toString();
+  return jwt.sign(
+    {
+      iss: keyset.issuer,
+      sub: params.user.id,
+      aud: resourceUrl,
+      exp: now + (params.ttlSeconds ?? 900),
+      iat: now,
+      scope: 'mcp:access',
+      token_use: 'native_mcp',
+      client_id: params.clientId,
+    },
+    activeKey.privateKeyPem,
+    { algorithm: 'RS256', keyid: activeKey.keyId }
+  );
+}
+
+export function encryptAgentHeaderValue(value: string) {
+  const publicKey = process.env.AGENT_ENV_VARS_PUBLIC_KEY;
+  if (!publicKey) throw new Error('AGENT_ENV_VARS_PUBLIC_KEY is required for Ask Usage e2e');
+  return encryptWithPublicKey(value, Buffer.from(publicKey, 'base64'));
 }
 
 /**

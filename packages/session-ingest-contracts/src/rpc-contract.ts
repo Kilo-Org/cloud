@@ -332,6 +332,7 @@ export const sdkToolStateSchema = z.discriminatedUnion('status', [
     status: z.literal('completed'),
     input: sdkMetadataSchema,
     output: z.string(),
+    structuredContent: z.unknown().optional(),
     title: z.string(),
     metadata: sdkMetadataSchema,
     time: z.object({ start: z.number(), end: z.number(), compacted: z.number().optional() }),

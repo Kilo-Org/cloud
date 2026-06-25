@@ -9,7 +9,13 @@
  */
 
 import WebSocket from 'ws';
-import { mintApiToken, mintStreamTicket, type TestUser } from './auth.js';
+import {
+  encryptAgentHeaderValue,
+  mintApiToken,
+  mintNativeMcpAccessToken,
+  mintStreamTicket,
+  type TestUser,
+} from './auth.js';
 
 /**
  * Which tRPC surface the driver exercises.
@@ -55,6 +61,8 @@ export type DriverConfig = {
    * `/test/release`, `/test/gate-status`, and `/test/requests`.
    */
   fakeLlmUrl: string;
+  /** Base URL of the local web app that serves the native `/mcp` endpoint. */
+  webUrl: string;
 };
 
 export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
@@ -62,7 +70,46 @@ export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
   gitUrl: 'https://github.com/octocat/Hello-World.git',
   model: 'kilo/fake-deterministic',
   fakeLlmUrl: process.env.FAKE_LLM_URL ?? 'http://localhost:8811',
+  webUrl: process.env.WEB_URL ?? 'http://localhost:3000',
 };
+
+const ASK_USAGE_MCP_SERVER_NAME = 'kilo_usage';
+const ASK_USAGE_FLATTENED_TOOL_NAME = 'kilo_usage_query_kilo_dataset';
+const ASK_USAGE_RUNTIME_AGENT_SLUG = 'usage-analyst';
+const ASK_USAGE_RUNTIME_AGENT_NAME = 'Usage Analyst';
+const ASK_USAGE_CLIENT_ID = 'internal:kilo-usage-ai';
+const ASK_USAGE_CREATED_ON_PLATFORM = 'kilo-usage-ai';
+const blankAskUsagePrompt = 'Blank Ask Usage session. Wait for the user to ask a question.';
+
+const usageAnalystPermission = {
+  '*': 'deny',
+  read: 'deny',
+  edit: 'deny',
+  glob: 'deny',
+  grep: 'deny',
+  list: 'deny',
+  bash: 'deny',
+  task: 'deny',
+  external_directory: { '*': 'deny' },
+  todowrite: 'deny',
+  todoread: 'deny',
+  question: 'deny',
+  webfetch: 'deny',
+  websearch: 'deny',
+  codesearch: 'deny',
+  lsp: 'deny',
+  skill: 'deny',
+  suggest: 'deny',
+  [ASK_USAGE_FLATTENED_TOOL_NAME]: 'allow',
+};
+
+function sandboxReachableOrigin(hostOrigin: string): string {
+  const url = new URL(hostOrigin);
+  if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+    url.hostname = 'host.docker.internal';
+  }
+  return url.origin;
+}
 
 // ---------------------------------------------------------------------------
 // tRPC helpers
@@ -125,6 +172,64 @@ export type StartSessionResult = {
   messageId: string;
   delivery: 'sent' | 'queued';
 };
+
+export type PreparedSessionResult = {
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+};
+
+export async function prepareAskUsageSession(config: DriverConfig): Promise<PreparedSessionResult> {
+  if (!config.internalApiSecret) {
+    throw new Error('prepareAskUsageSession requires INTERNAL_API_SECRET from .dev.vars');
+  }
+
+  const appBaseUrl = new URL(config.webUrl).origin;
+  const sandboxWebOrigin = sandboxReachableOrigin(appBaseUrl);
+  const accessToken = mintNativeMcpAccessToken({
+    user: config.user,
+    appBaseUrl,
+    clientId: ASK_USAGE_CLIENT_ID,
+  });
+  const encryptedAuthorization = encryptAgentHeaderValue(`Bearer ${accessToken}`);
+
+  return trpcCall<PreparedSessionResult>(
+    config,
+    'prepareSession',
+    {
+      repositorySource: 'empty-local',
+      mode: ASK_USAGE_RUNTIME_AGENT_SLUG,
+      model: config.model,
+      prompt: blankAskUsagePrompt,
+      autoCommit: false,
+      autoInitiate: false,
+      createdOnPlatform: ASK_USAGE_CREATED_ON_PLATFORM,
+      mcpServers: {
+        [ASK_USAGE_MCP_SERVER_NAME]: {
+          type: 'remote',
+          url: new URL('/mcp', sandboxWebOrigin).toString(),
+          headers: {
+            Authorization: encryptedAuthorization,
+          },
+        },
+      },
+      runtimeAgents: [
+        {
+          slug: ASK_USAGE_RUNTIME_AGENT_SLUG,
+          name: ASK_USAGE_RUNTIME_AGENT_NAME,
+          config: {
+            mode: 'primary',
+            steps: 8,
+            color: 'info',
+            prompt:
+              'Use the kilo_usage/query_kilo_dataset MCP tool before answering usage questions.',
+            permission: usageAnalystPermission,
+          },
+        },
+      ],
+    },
+    { internalApiSecret: config.internalApiSecret }
+  );
+}
 
 export type StartSessionArgs = {
   prompt: string;

@@ -9,13 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { CloudAgentProvider } from '@/components/cloud-agent-next/CloudAgentProvider';
-import { CloudChatPage } from '@/components/cloud-agent-next/CloudChatPage';
 import { useOrganizationModels } from '@/components/cloud-agent-next/hooks/useOrganizationModels';
 import { ModelCombobox } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { useTRPC } from '@/lib/trpc/utils';
+import { AskUsageChat } from './AskUsageChat';
 
-const KILO_USAGE_AI_DEFAULT_MODEL = 'kilo-auto/balanced';
+const ASK_USAGE_DEFAULT_MODEL = 'kilo-auto/balanced';
 
 function ScopeItem({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
   return (
@@ -29,14 +29,14 @@ function ScopeItem({ icon: Icon, title, text }: { icon: LucideIcon; title: strin
   );
 }
 
-export function KiloUsageAiContent() {
+export function AskUsageContent() {
   const trpc = useTRPC();
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('sessionId');
-  const startMutation = useMutation(trpc.admin.kiloUsageAi.start.mutationOptions());
+  const startMutation = useMutation(trpc.admin.askUsage.start.mutationOptions());
   const { modelOptions, isLoadingModels, defaultModel } = useOrganizationModels();
-  const [selectedModel, setSelectedModel] = useState(KILO_USAGE_AI_DEFAULT_MODEL);
+  const [selectedModel, setSelectedModel] = useState(ASK_USAGE_DEFAULT_MODEL);
   const [selectedVariant, setSelectedVariant] = useState<string | undefined>();
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
 
@@ -56,9 +56,7 @@ export function KiloUsageAiContent() {
     const defaultModelOption = defaultModel
       ? modelOptions.find(model => model.id === defaultModel)
       : undefined;
-    const balancedModelOption = modelOptions.find(
-      model => model.id === KILO_USAGE_AI_DEFAULT_MODEL
-    );
+    const balancedModelOption = modelOptions.find(model => model.id === ASK_USAGE_DEFAULT_MODEL);
     const nextModel = defaultModelOption?.id ?? balancedModelOption?.id ?? modelOptions[0]?.id;
     if (!nextModel) return;
 
@@ -119,7 +117,7 @@ export function KiloUsageAiContent() {
         </div>
         <div className="min-h-0 flex-1">
           <CloudAgentProvider>
-            <CloudChatPage surface="usage-analyst" />
+            <AskUsageChat />
           </CloudAgentProvider>
         </div>
       </div>

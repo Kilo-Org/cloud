@@ -90,6 +90,10 @@ tsx services/cloud-agent-next/test/e2e/run.ts interrupt-mid-stream _
 tsx services/cloud-agent-next/test/e2e/run.ts unknown-model _
 tsx services/cloud-agent-next/test/e2e/run.ts waiters-clean _
 
+# Ask Usage native MCP tool result boundary. Requires the local web app `/mcp`
+# route and MCP gateway env vars in addition to cloud-agent + fake-llm.
+tsx services/cloud-agent-next/test/e2e/run.ts ask-usage-mcp-tool _
+
 # Callback delivery — driver stands up a local HTTP sink and asserts on receipt.
 tsx services/cloud-agent-next/test/e2e/run.ts callback-completion echo:done
 tsx services/cloud-agent-next/test/e2e/run.ts callback-batch-followup _
@@ -166,6 +170,7 @@ source of directive truth is `test/e2e/fake-llm-server.ts`.
 | `hang` | Opens the SSE stream but emits nothing and never closes. Drives abort/timeout paths. |
 | `error:<msg>` | HTTP 402 with OpenAI-shaped error body carrying `<msg>`. Exercises kilo's error propagation. |
 | `gate:<tag>` | Opens the SSE stream, emits no chunks, blocks until the driver calls `POST /test/release?tag=<tag>`. On release, emits `"done"` + stop + `[DONE]`. |
+| `ask-usage-tool` | Emits an OpenAI-style tool call to `kilo_usage_query_kilo_dataset` when that tool is available, then final text after the tool response is in model history. |
 
 Unknown or missing directives produce HTTP 402 with
 `unknown fake scenario: <name>` — easy to spot in fake-LLM logs.
@@ -208,6 +213,7 @@ These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
 | `interrupt-mid-stream` | Interrupt an actively gated fake request and assert the active message is interrupted, not a queued message. |
 | `unknown-model` | Use a model rejected by the fake validation route and require synchronous rejection before sandbox creation or fake chat dispatch. |
 | `waiters-clean` | Complete a normal fake turn, then assert the fake server has no parked waiters or live responses. |
+| `ask-usage-mcp-tool` | Prepare an Ask Usage-shaped empty-local session using the local web `/mcp` route, then assert a completed dataset ToolPart preserves first-class `state.structuredContent`. |
 | `callback-completion` | Stand up local HTTP sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`. |
 | `callback-batch-followup` | Queue two turns behind a gated callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback. |
 | `callback-interrupt` | Local HTTP sink + gated active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`. |

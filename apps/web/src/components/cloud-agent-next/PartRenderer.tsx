@@ -18,10 +18,8 @@ import { TodoWriteToolCard } from './TodoWriteToolCard';
 import { QuestionToolStatus } from './QuestionToolStatus';
 import { SuggestToolCard } from './SuggestToolCard';
 import { SkillToolCard } from './SkillToolCard';
-import { isKiloDatasetQueryTool, KiloDatasetToolCard } from './KiloDatasetToolCard';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
 import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
-import { AskUsageRawRenderResultCard } from './AskUsageRawRenderResultCard';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
@@ -37,7 +35,7 @@ import {
   isPatchPart,
   isPartStreaming,
 } from './types';
-import { extractRawUsageRenderResults, stripRawToolCallMarkup } from './raw-tool-call-markup';
+import type { MessageRenderPolicy } from './message-render-policy';
 
 // ============================================================================
 // Types
@@ -46,7 +44,7 @@ import { extractRawUsageRenderResults, stripRawToolCallMarkup } from './raw-tool
 export type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
-  suppressRawToolCallText?: boolean;
+  messageRenderPolicy?: MessageRenderPolicy;
   /** Messages for child sessions (task tools) - keyed by session ID */
   childSessionMessages?: Map<string, StoredMessage[]>;
   /** Function to get messages for a child session ID (for nested sessions) */
@@ -77,31 +75,19 @@ const markdownComponents = { a: LinkRenderer };
  */
 function TextPartRenderer({
   part,
-  suppressRawToolCallText,
+  transformAssistantText,
 }: {
   part: Extract<Part, { type: 'text' }>;
-  suppressRawToolCallText?: boolean;
+  transformAssistantText?: (text: string) => string;
 }) {
-  const rawUsageRenderResults = suppressRawToolCallText
-    ? extractRawUsageRenderResults(part.text)
-    : [];
-  const text = suppressRawToolCallText
-    ? stripRawToolCallMarkup(part.text, { preserveWhenNoRenderableResults: true })
-    : part.text;
-  if (!text && rawUsageRenderResults.length === 0) return null;
+  const text = transformAssistantText ? transformAssistantText(part.text) : part.text;
+  if (!text) return null;
 
   return (
-    <div className="space-y-3">
-      {rawUsageRenderResults.map((result, index) => (
-        <AskUsageRawRenderResultCard key={index} result={result} />
-      ))}
-      {text && (
-        <div className="prose prose-sm prose-invert max-w-none overflow-hidden">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {text}
-          </ReactMarkdown>
-        </div>
-      )}
+    <div className="prose prose-sm prose-invert max-w-none overflow-hidden">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        {text}
+      </ReactMarkdown>
     </div>
   );
 }
@@ -166,8 +152,6 @@ function StreamingToolPlaceholder({ toolName }: { toolName: string }) {
   );
 }
 
-const renderPartFn: RenderPartFn = props => <PartRenderer {...props} />;
-
 /**
  * Renders a ToolPart using ToolExecutionCard
  * Converts V2 ToolPart format to V1 ToolExecution format for compatibility
@@ -178,19 +162,22 @@ function ToolPartRenderer({
   childSessionMessages,
   getChildMessages,
   onOpenChildSession,
+  messageRenderPolicy,
 }: {
   part: Extract<Part, { type: 'tool' }>;
   childSessionMessages?: Map<string, StoredMessage[]>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
+  messageRenderPolicy?: MessageRenderPolicy;
 }) {
   // plan_enter / plan_exit are internal mode-switching tools with no user-visible output
   if (part.tool === 'plan_exit' || part.tool === 'plan_enter') {
     return null;
   }
 
-  if (isKiloDatasetQueryTool(part)) {
-    return <KiloDatasetToolCard toolPart={part} />;
+  const policyDecision = messageRenderPolicy?.renderToolPart?.(part);
+  if (policyDecision?.handled) {
+    return policyDecision.node;
   }
 
   // Check if tool input is still streaming (incomplete data)
@@ -205,13 +192,20 @@ function ToolPartRenderer({
       ? childSessionMessages?.get(sessionId) || getChildMessages?.(sessionId) || []
       : [];
 
+    const renderChildPart: RenderPartFn = props => (
+      <PartRenderer
+        {...props}
+        messageRenderPolicy={props.messageRenderPolicy ?? messageRenderPolicy}
+      />
+    );
+
     return (
       <ChildSessionSection
         taskToolPart={part}
         sessionId={sessionId}
         childMessages={childMessages}
         getChildMessages={getChildMessages}
-        renderPart={renderPartFn}
+        renderPart={renderChildPart}
         onOpenChildSession={onOpenChildSession}
       />
     );
@@ -463,7 +457,7 @@ function PartErrorFallback({ partType }: { partType: string }) {
 export function PartRenderer({
   part,
   isStreaming,
-  suppressRawToolCallText,
+  messageRenderPolicy,
   childSessionMessages,
   getChildMessages,
   onOpenChildSession,
@@ -472,7 +466,10 @@ export function PartRenderer({
   if (isTextPart(part)) {
     return (
       <MessageErrorBoundary fallback={<PartErrorFallback partType="text" />}>
-        <TextPartRenderer part={part} suppressRawToolCallText={suppressRawToolCallText} />
+        <TextPartRenderer
+          part={part}
+          transformAssistantText={messageRenderPolicy?.transformAssistantText}
+        />
       </MessageErrorBoundary>
     );
   }
@@ -486,6 +483,7 @@ export function PartRenderer({
           childSessionMessages={childSessionMessages}
           getChildMessages={getChildMessages}
           onOpenChildSession={onOpenChildSession}
+          messageRenderPolicy={messageRenderPolicy}
         />
       </MessageErrorBoundary>
     );

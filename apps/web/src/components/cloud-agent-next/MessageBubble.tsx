@@ -15,13 +15,13 @@ import {
 } from './types';
 import type { FilePart } from './types';
 import { PartRenderer } from './PartRenderer';
-import { stripRawToolCallMarkup } from './raw-tool-call-markup';
 import type { OpenChildSession } from './ChildSessionSection';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { stripImageContext } from '@/lib/app-builder/message-utils';
 import { getDeliveryBadge, type DeliveryBadge } from './delivery-badge';
 import { getAssistantErrorMessage } from './assistant-error-message';
+import type { MessageRenderPolicy } from './message-render-policy';
 
 import LinkifyIt from 'linkify-it';
 
@@ -130,13 +130,16 @@ function getUserTextContent(parts: Part[]): string {
  * Get copyable text content from message parts.
  * Extracts text from TextParts (the main prose the assistant writes).
  */
-function getAssistantTextContent(parts: Part[], suppressRawToolCallText?: boolean): string {
+export function getAssistantTextContent(
+  parts: Part[],
+  transformAssistantText?: (text: string) => string
+): string {
   const text = parts
     .filter(isTextPart)
     .map(p => p.text)
     .join('\n\n')
     .trim();
-  return suppressRawToolCallText ? stripRawToolCallMarkup(text) : text;
+  return transformAssistantText ? transformAssistantText(text) : text;
 }
 
 function DeliveryStatusIcon({ badge }: { badge: DeliveryBadge }) {
@@ -177,7 +180,7 @@ type MessageBubbleProps = {
   /** Function to get messages for a child session ID */
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
-  suppressRawToolCallText?: boolean;
+  messageRenderPolicy?: MessageRenderPolicy;
 };
 
 /**
@@ -192,13 +195,13 @@ export function MessageBubble({
   deliveryState,
   getChildMessages,
   onOpenChildSession,
-  suppressRawToolCallText,
+  messageRenderPolicy,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = message.info.time.created;
   const deliveryBadge = getDeliveryBadge(deliveryState);
   const assistantTextContent = isAssistantMessage(message.info)
-    ? getAssistantTextContent(message.parts, suppressRawToolCallText)
+    ? getAssistantTextContent(message.parts, messageRenderPolicy?.transformAssistantText)
     : '';
 
   const getTextForCopy = useCallback(
@@ -269,7 +272,7 @@ export function MessageBubble({
               key={part.id || index}
               part={part}
               isStreaming={isStreaming}
-              suppressRawToolCallText={suppressRawToolCallText}
+              messageRenderPolicy={messageRenderPolicy}
               getChildMessages={getChildMessages}
               onOpenChildSession={onOpenChildSession}
             />

@@ -50,6 +50,7 @@ import type { AgentMode } from './types';
 import type { MessageDeliveryState, StoredMessage } from '@/lib/cloud-agent-sdk';
 import type { WorkspaceTabId } from './terminal-tabs';
 import type { TerminalStatus } from './useCloudAgentTerminal';
+import type { MessageRenderPolicy } from './message-render-policy';
 
 // ---------------------------------------------------------------------------
 // Static messages — memoized, never re-renders during streaming
@@ -60,13 +61,13 @@ const StaticMessages = memo(
     pendingMessages,
     getChildMessages,
     onOpenChildSession,
-    suppressRawToolCallText,
+    messageRenderPolicy,
   }: {
     messages: StoredMessage[];
     pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
     getChildMessages?: (sessionId: string) => StoredMessage[];
     onOpenChildSession?: OpenChildSession;
-    suppressRawToolCallText?: boolean;
+    messageRenderPolicy?: MessageRenderPolicy;
   }) => (
     <>
       {messages.map(msg => (
@@ -76,7 +77,7 @@ const StaticMessages = memo(
             deliveryState={pendingMessages.get(msg.info.id)}
             getChildMessages={getChildMessages}
             onOpenChildSession={onOpenChildSession}
-            suppressRawToolCallText={suppressRawToolCallText}
+            messageRenderPolicy={messageRenderPolicy}
           />
         </MessageErrorBoundary>
       ))}
@@ -94,7 +95,7 @@ type DynamicMessagesProps = {
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
-  suppressRawToolCallText?: boolean;
+  messageRenderPolicy?: MessageRenderPolicy;
 };
 
 const DynamicMessages = memo(
@@ -103,7 +104,7 @@ const DynamicMessages = memo(
     pendingMessages,
     getChildMessages,
     onOpenChildSession,
-    suppressRawToolCallText,
+    messageRenderPolicy,
   }: DynamicMessagesProps) {
     return (
       <>
@@ -117,7 +118,7 @@ const DynamicMessages = memo(
                 deliveryState={pendingMessages.get(msg.info.id)}
                 getChildMessages={getChildMessages}
                 onOpenChildSession={onOpenChildSession}
-                suppressRawToolCallText={suppressRawToolCallText}
+                messageRenderPolicy={messageRenderPolicy}
               />
             </MessageErrorBoundary>
           );
@@ -133,7 +134,8 @@ const DynamicMessages = memo(
       previous.messages === next.messages &&
       previous.pendingMessages === next.pendingMessages &&
       previous.getChildMessages === next.getChildMessages &&
-      previous.onOpenChildSession === next.onOpenChildSession
+      previous.onOpenChildSession === next.onOpenChildSession &&
+      previous.messageRenderPolicy === next.messageRenderPolicy
     );
   }
 );
@@ -144,9 +146,18 @@ DynamicMessages.displayName = 'DynamicMessages';
 // ---------------------------------------------------------------------------
 const emptyQuestionRequestIds = new Map<string, string>();
 
-type CloudChatSurface = 'default' | 'usage-analyst';
-
-type CloudChatPageProps = { organizationId?: string; surface?: CloudChatSurface };
+type CloudChatPageProps = {
+  organizationId?: string;
+  chrome?: 'full' | 'focused';
+  title?: string;
+  placeholder?: string;
+  composer?: {
+    attachments?: boolean;
+    slashCommands?: boolean;
+    modePicker?: boolean;
+  };
+  messageRenderPolicy?: MessageRenderPolicy;
+};
 
 type TerminalStatusSummary = { status: TerminalStatus; statusText: string };
 
@@ -182,8 +193,18 @@ function TerminalPaneSlot({
   );
 }
 
-export default function CloudChatPage({ organizationId, surface = 'default' }: CloudChatPageProps) {
-  const isUsageAnalystSurface = surface === 'usage-analyst';
+export default function CloudChatPage({
+  organizationId,
+  chrome = 'full',
+  title,
+  placeholder: placeholderOverride,
+  composer,
+  messageRenderPolicy,
+}: CloudChatPageProps) {
+  const focusedChrome = chrome === 'focused';
+  const attachmentsEnabled = composer?.attachments ?? true;
+  const slashCommandsEnabled = composer?.slashCommands ?? true;
+  const modePickerEnabled = composer?.modePicker ?? true;
   const manager = useManager();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -635,19 +656,19 @@ export default function CloudChatPage({ organizationId, surface = 'default' }: C
     : (sessionConfig?.variant ?? undefined);
   const displayAvailableVariants = modelPickerLocked ? [] : availableVariants;
 
-  const placeholder = isUsageAnalystSurface
-    ? 'Ask a usage question...'
-    : isLoading
+  const placeholder =
+    placeholderOverride ??
+    (isLoading
       ? 'Loading session…'
       : cloudStatus?.type === 'preparing'
         ? 'Setting up environment…'
         : cloudStatus?.type === 'finalizing'
           ? 'Wrapping up…'
-          : 'Ask anything…';
+          : 'Ask anything…');
 
-  const canOpenTerminal = Boolean(sessionId) && !isReadOnly && !isUsageAnalystSurface;
+  const canOpenTerminal = Boolean(sessionId) && !isReadOnly && !focusedChrome;
 
-  const sessionActions = isUsageAnalystSurface ? null : (
+  const sessionActions = focusedChrome ? null : (
     <ChatHeader
       cloudAgentSessionId={sessionId ?? 'Starting session…'}
       kiloSessionId={sessionIdFromParams ?? undefined}
@@ -684,9 +705,7 @@ export default function CloudChatPage({ organizationId, surface = 'default' }: C
           <div className="flex h-full w-full flex-col overflow-hidden">
             <SetPageTitle
               title={
-                isUsageAnalystSurface
-                  ? 'Ask Usage'
-                  : fetchedSessionData?.title || sessionConfig?.repository || 'Cloud Agent'
+                title ?? fetchedSessionData?.title ?? sessionConfig?.repository ?? 'Cloud Agent'
               }
             >
               {totalCost > 0 && (
@@ -697,7 +716,7 @@ export default function CloudChatPage({ organizationId, surface = 'default' }: C
               <>
                 {showLoadingIndicator && <div className="bg-primary h-0.5 w-full animate-pulse" />}
 
-                {!isUsageAnalystSurface && (
+                {!focusedChrome && (
                   <div className="flex shrink-0 items-center gap-2 border-b px-3 py-2">
                     <MobileSidebarToggle variant="inline" label="Sessions" />
                     <div className="min-w-0 flex-1">
@@ -739,7 +758,7 @@ export default function CloudChatPage({ organizationId, surface = 'default' }: C
                               pendingMessages={pendingMessages}
                               getChildMessages={getChildMessages}
                               onOpenChildSession={handleOpenTopLevelChildSession}
-                              suppressRawToolCallText={isUsageAnalystSurface}
+                              messageRenderPolicy={messageRenderPolicy}
                             />
                             <DynamicMessages
                               active={chatTabActive}
@@ -747,7 +766,7 @@ export default function CloudChatPage({ organizationId, surface = 'default' }: C
                               pendingMessages={pendingMessages}
                               getChildMessages={getChildMessages}
                               onOpenChildSession={handleOpenTopLevelChildSession}
-                              suppressRawToolCallText={isUsageAnalystSurface}
+                              messageRenderPolicy={messageRenderPolicy}
                             />
 
                             {chatTabActive && (
@@ -820,13 +839,13 @@ export default function CloudChatPage({ organizationId, surface = 'default' }: C
                               <ChatInput
                                 onSend={handleSendMessage}
                                 onSendCommand={
-                                  isUsageAnalystSurface ? undefined : handleSendSlashCommand
+                                  slashCommandsEnabled ? handleSendSlashCommand : undefined
                                 }
                                 onStop={handleStopExecution}
                                 disabled={!canSend}
                                 isStreaming={isStreaming && !activeSuggestion}
                                 placeholder={placeholder}
-                                slashCommands={isUsageAnalystSurface ? [] : availableCommands}
+                                slashCommands={slashCommandsEnabled ? availableCommands : []}
                                 mode={sessionConfig?.mode as AgentMode | undefined}
                                 model={displayModel}
                                 modelOptions={modelOptions}
@@ -837,14 +856,14 @@ export default function CloudChatPage({ organizationId, surface = 'default' }: C
                                 onVariantChange={handleVariantChange}
                                 availableVariants={displayAvailableVariants}
                                 showToolbar={Boolean(sessionIdFromParams)}
-                                showModePicker={!isUsageAnalystSurface}
+                                showModePicker={modePickerEnabled}
                                 initialValue={failedPrompt ?? undefined}
                                 customModeOptions={customModeOptions}
                                 modelPickerDisabled={modelPickerLocked}
                                 modelPickerTooltip={lockTooltip}
                                 variantPickerDisabled={modelPickerLocked}
                                 variantPickerTooltip={lockTooltip}
-                                attachmentsEnabled={supportsAttachments && !isUsageAnalystSurface}
+                                attachmentsEnabled={supportsAttachments && attachmentsEnabled}
                                 attachmentUploadOptions={{
                                   messageUuid: attachmentMessageUuid,
                                   organizationId,
@@ -854,7 +873,7 @@ export default function CloudChatPage({ organizationId, surface = 'default' }: C
                                   },
                                 }}
                               />
-                              {!isUsageAnalystSurface &&
+                              {!focusedChrome &&
                                 (sessionConfig?.repository ||
                                   (contextUsage !== undefined && contextWindow !== undefined)) && (
                                   <div className="text-muted-foreground flex items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">

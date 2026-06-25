@@ -8,6 +8,7 @@ import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
 import type { SubtaskPart, StoredMessage, ToolPart, Part } from './types';
 import { isMessageStreaming, isToolPart } from './types';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
+import type { MessageRenderPolicy } from './message-render-policy';
 
 const MAX_NESTING_DEPTH = 5;
 
@@ -25,6 +26,7 @@ export type RenderPartFn = (props: {
   childSessionMessages?: Map<string, StoredMessage[]>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
+  messageRenderPolicy?: MessageRenderPolicy;
 }) => ReactNode;
 
 type ChildSessionSectionProps = {

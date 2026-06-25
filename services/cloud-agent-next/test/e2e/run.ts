@@ -150,7 +150,9 @@ async function main(): Promise<void> {
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
   const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
   const email = `kilo-e2e-driver-${Date.now()}${DRIVER_USER_EMAIL_SUFFIX}`;
-  const user = await ensureTestUser(process.env.DATABASE_URL, email);
+  const user = await ensureTestUser(process.env.DATABASE_URL, email, {
+    admin: lifecycle === 'ask-usage-mcp-tool',
+  });
   console.log(`driver user: ${user.id} (${user.email}); api=${api}`);
 
   const config: DriverConfig = {

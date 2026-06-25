@@ -270,11 +270,11 @@ export const kiloPassSuggestion = {
   eyebrow: 'Cost suggestion',
   title: 'Get more credits from your monthly spend with Kilo Pass Expert',
   description:
-    'You spent $106.90 on pay-as-you-go credits in the last 7 days. Kilo Pass Expert converts your $199 monthly payment into paid credits and lets you earn up to $79.60 more in free bonus credits.',
+    'You spent $106.90 on pay-as-you-go credits in the last 7 days, about $458 over 30 days at the same pace. Kilo Pass Expert costs $199 per month and includes $199 in paid credits, plus up to $79.60 in free bonus credits. Based on your recent spend, the plan could give you more credits for part of the spend you already make.',
   facts: [
-    { label: 'Monthly payment', value: '$199' },
-    { label: 'Paid credits', value: '$199' },
-    { label: 'Potential bonus', value: '+$79.60' },
+    { label: 'Last 7 days', value: '$106.90' },
+    { label: '30-day pace', value: '~$458' },
+    { label: 'Expert plan', value: '$199 + up to $79.60 bonus' },
   ],
   ctaLabel: 'View Kilo Pass Expert',
   ctaHref: '/kilo-pass',
@@ -286,11 +286,11 @@ export const codingPlanSuggestion = {
   eyebrow: 'Cost suggestion',
   title: 'Get more MiniMax usage with Token Plan Plus',
   description:
-    'You spent $15.00 on MiniMax in the last 7 days. For $20 every 30 days, Token Plan Plus includes about 1.7B M3 tokens and access to the full MiniMax model family.',
+    'You spent $15.00 on MiniMax in the last 7 days, about $64 over 30 days at the same pace. Token Plan Plus costs $20 every 30 days and includes about 1.7B M3 tokens with access to the full MiniMax model family.',
   facts: [
-    { label: 'Plan price', value: '$20' },
-    { label: 'Included usage', value: '~1.7B tokens' },
-    { label: 'Renews every', value: '30 days' },
+    { label: 'Last 7 days', value: '$15.00' },
+    { label: '30-day pace', value: '~$64' },
+    { label: 'Plan price', value: '$20 every 30 days' },
   ],
   ctaLabel: 'View MiniMax plan',
   ctaHref: '/coding-plans/minimax',

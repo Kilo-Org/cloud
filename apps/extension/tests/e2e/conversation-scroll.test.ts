@@ -191,7 +191,7 @@ test('dragging the scrollbar up pauses auto-scroll while a reply is being pinned
   }
 });
 
-test('scrolling back to bottom reactivates automatic scroll to new messages', async () => {
+test('the jump to latest button reactivates automatic scroll to new messages', async () => {
   const fixture = await startFixtureServer();
   const { promise: pendingFirstCompletion, resolve: releaseFirstCompletion } =
     Promise.withResolvers<void>();
@@ -248,7 +248,8 @@ test('scrolling back to bottom reactivates automatic scroll to new messages', as
     releaseFirstCompletion();
     await waitForStoredConversationText(sidePanel, 'First delayed reply.');
 
-    await sidePanel.mouse.wheel(0, 8000);
+    await sidePanel.getByRole('button', { name: 'Jump to latest' }).click();
+    await expect(sidePanel.getByRole('button', { name: 'Jump to latest' })).toBeHidden();
     await expect
       .poll(async () => {
         const scrollState = await sidePanel.evaluate(readSidePanelScrollState);
@@ -259,7 +260,6 @@ test('scrolling back to bottom reactivates automatic scroll to new messages', as
         );
       })
       .toBe(true);
-    await expect(sidePanel.getByRole('button', { name: 'Jump to latest' })).toBeHidden();
 
     await sidePanel.getByLabel('Message agent').fill('Reply after bottom');
     await sidePanel.getByLabel('Message agent').press('Enter');

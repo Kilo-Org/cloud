@@ -16,6 +16,7 @@ const getVirtualRowStyle = (start: number): CSSProperties => ({
 });
 const isScrolledToBottom = (element: HTMLElement): boolean =>
   element.scrollTop + element.clientHeight >= element.scrollHeight - 16;
+const isScrollable = (element: HTMLElement): boolean => element.scrollHeight > element.clientHeight;
 
 const ConversationVirtualRow = ({
   index,
@@ -65,11 +66,12 @@ const ConversationVirtualRow = ({
 
 export const ConversationList = ({ items }: { items: GroupedConversationItem[] }): JSX.Element => {
   const listRef = useRef<HTMLElement | null>(null);
-  const isAutoScrollEnabledRef = useRef(true);
+  // Source of truth for auto-scroll, owned outside React so a streaming render cannot race it. The state mirror below only drives the jump button.
+  const isStuckToBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
-  const isProgrammaticScrollRef = useRef(false);
-  const programmaticScrollFrameRef = useRef<number | null>(null);
-  const [isAutoScrollEnabled, setIsAutoScrollEnabledState] = useState(true);
+  const lastPinnedTopRef = useRef(0);
+  const pinFrameRef = useRef<number | null>(null);
+  const [showJumpButton, setShowJumpButton] = useState(false);
   const scrollKey = getConversationScrollKey(items);
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -79,80 +81,135 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
   });
   const totalSize = virtualizer.getTotalSize();
 
-  const setIsAutoScrollEnabled = useCallback((isEnabled: boolean): void => {
-    isAutoScrollEnabledRef.current = isEnabled;
-    setIsAutoScrollEnabledState(isEnabled);
-  }, []);
-
-  const markProgrammaticScroll = useCallback((): void => {
-    if (programmaticScrollFrameRef.current !== null) {
-      cancelAnimationFrame(programmaticScrollFrameRef.current);
+  const cancelPin = useCallback((): void => {
+    if (pinFrameRef.current !== null) {
+      cancelAnimationFrame(pinFrameRef.current);
+      pinFrameRef.current = null;
     }
-
-    isProgrammaticScrollRef.current = true;
-    programmaticScrollFrameRef.current = requestAnimationFrame(() => {
-      programmaticScrollFrameRef.current = requestAnimationFrame(() => {
-        isProgrammaticScrollRef.current = false;
-        programmaticScrollFrameRef.current = null;
-      });
-    });
   }, []);
 
-  const scrollToLatest = useCallback((): void => {
-    if (items.length === 0) {
+  // Drive the scroll to the bottom directly on the DOM node across a few frames so late virtualizer row measurements cannot leave us short. Every pass re-checks the stuck flag, so a user scroll-up that flips it stops the chain immediately.
+  const pinToBottom = useCallback((): void => {
+    cancelPin();
+
+    const runPass = (remainingPasses: number): void => {
+      const element = listRef.current;
+
+      if (element === null || !isStuckToBottomRef.current || items.length === 0) {
+        pinFrameRef.current = null;
+        return;
+      }
+
+      virtualizer.scrollToIndex(items.length - 1, { align: 'end' });
+      element.scrollTop = element.scrollHeight;
+      lastPinnedTopRef.current = element.scrollTop;
+      lastScrollTopRef.current = element.scrollTop;
+
+      if (remainingPasses > 0) {
+        pinFrameRef.current = requestAnimationFrame(() => {
+          runPass(remainingPasses - 1);
+        });
+        return;
+      }
+
+      pinFrameRef.current = null;
+    };
+
+    runPass(5);
+  }, [cancelPin, items.length, virtualizer]);
+
+  const releaseToManualScroll = useCallback((): void => {
+    if (!isStuckToBottomRef.current) {
       return;
     }
 
-    const scrollToLastMeasuredRow = (): void => {
-      markProgrammaticScroll();
-      virtualizer.scrollToIndex(items.length - 1, { align: 'end' });
+    isStuckToBottomRef.current = false;
+    cancelPin();
+    setShowJumpButton(true);
+  }, [cancelPin]);
 
-      const scrollElement = listRef.current;
+  const followBottomAgain = useCallback((): void => {
+    if (isStuckToBottomRef.current) {
+      return;
+    }
 
-      if (scrollElement !== null) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
+    isStuckToBottomRef.current = true;
+    setShowJumpButton(false);
+  }, []);
+
+  // Bind scroll detection straight to the DOM node so upward intent is seen on the input event itself, before any in-flight pin can write the position back to the bottom.
+  useEffect(() => {
+    const element = listRef.current;
+
+    if (element === null) {
+      return;
+    }
+
+    const handleWheel = (event: WheelEvent): void => {
+      if (event.deltaY < 0 && isScrollable(element)) {
+        releaseToManualScroll();
       }
     };
-    const scheduleScrollToLastMeasuredRow = (remainingPasses: number): void => {
-      requestAnimationFrame(() => {
-        if (!isAutoScrollEnabledRef.current) {
-          return;
-        }
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      const isUpwardKey = event.key === 'ArrowUp' || event.key === 'PageUp' || event.key === 'Home';
 
-        scrollToLastMeasuredRow();
+      if (isUpwardKey && isScrollable(element)) {
+        releaseToManualScroll();
+      }
+    };
+    let touchStartY = 0;
+    const handleTouchStart = (event: TouchEvent): void => {
+      touchStartY = event.touches[0]?.clientY ?? 0;
+    };
+    const handleTouchMove = (event: TouchEvent): void => {
+      const currentY = event.touches[0]?.clientY ?? 0;
 
-        if (remainingPasses > 0) {
-          scheduleScrollToLastMeasuredRow(remainingPasses - 1);
-        }
-      });
+      // A downward finger drag scrolls the content upward.
+      if (currentY > touchStartY + 2 && isScrollable(element)) {
+        releaseToManualScroll();
+      }
+    };
+    const handleScroll = (): void => {
+      const currentTop = element.scrollTop;
+      const previousTop = lastScrollTopRef.current;
+      lastScrollTopRef.current = currentTop;
+
+      // Backstop for gestures with no input event of their own, such as dragging the scrollbar: any move above the last pinned position is the user leaving the bottom. Re-arming is left to the jump button.
+      if (
+        currentTop < previousTop - 1 &&
+        currentTop < lastPinnedTopRef.current - 1 &&
+        !isScrolledToBottom(element)
+      ) {
+        releaseToManualScroll();
+      }
     };
 
-    scrollToLastMeasuredRow();
-    scheduleScrollToLastMeasuredRow(4);
-  }, [items.length, markProgrammaticScroll, virtualizer]);
+    element.addEventListener('wheel', handleWheel, { passive: true });
+    element.addEventListener('keydown', handleKeyDown);
+    element.addEventListener('touchstart', handleTouchStart, { passive: true });
+    element.addEventListener('touchmove', handleTouchMove, { passive: true });
+    element.addEventListener('scroll', handleScroll, { passive: true });
 
-  useEffect(
-    () => () => {
-      if (programmaticScrollFrameRef.current !== null) {
-        cancelAnimationFrame(programmaticScrollFrameRef.current);
-      }
-    },
-    []
-  );
+    return () => {
+      element.removeEventListener('wheel', handleWheel);
+      element.removeEventListener('keydown', handleKeyDown);
+      element.removeEventListener('touchstart', handleTouchStart);
+      element.removeEventListener('touchmove', handleTouchMove);
+      element.removeEventListener('scroll', handleScroll);
+    };
+  }, [releaseToManualScroll]);
+
+  useEffect(() => cancelPin, [cancelPin]);
 
   useLayoutEffect(() => {
-    if (items.length > 0 && isAutoScrollEnabledRef.current) {
-      scrollToLatest();
+    if (items.length > 0 && isStuckToBottomRef.current) {
+      pinToBottom();
     }
-  }, [items.length, scrollKey, scrollToLatest, totalSize]);
+  }, [items.length, pinToBottom, scrollKey, totalSize]);
 
   const jumpToLatest = (): void => {
-    setIsAutoScrollEnabled(true);
-    requestAnimationFrame(() => {
-      if (isAutoScrollEnabledRef.current) {
-        scrollToLatest();
-      }
-    });
+    followBottomAgain();
+    pinToBottom();
   };
   const virtualItems = virtualizer.getVirtualItems();
 
@@ -161,30 +218,6 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
       <section
         aria-label="Agent conversation"
         className="agent-conversation-scrollbar h-full overflow-y-auto px-4 py-4"
-        onScroll={event => {
-          const element = event.currentTarget;
-          const previousScrollTop = lastScrollTopRef.current;
-          lastScrollTopRef.current = element.scrollTop;
-
-          // Moving up while off the bottom is unambiguously the user reading history, so pause even while a pin is in flight. This catches gestures that emit no wheel event, such as dragging the scrollbar or paging with the keyboard.
-          if (element.scrollTop < previousScrollTop - 1 && !isScrolledToBottom(element)) {
-            setIsAutoScrollEnabled(false);
-            return;
-          }
-
-          if (!isProgrammaticScrollRef.current) {
-            setIsAutoScrollEnabled(isScrolledToBottom(element));
-          }
-        }}
-        onWheel={event => {
-          // Capture upward intent at the moment of input, before an in-flight pin can re-pin the scroll position out from under the user.
-          if (
-            event.deltaY < 0 &&
-            event.currentTarget.scrollHeight > event.currentTarget.clientHeight
-          ) {
-            setIsAutoScrollEnabled(false);
-          }
-        }}
         ref={listRef}
       >
         <div className="relative w-full" style={getListSpacerStyle(totalSize)}>
@@ -207,7 +240,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
           })}
         </div>
       </section>
-      {isAutoScrollEnabled ? null : (
+      {showJumpButton ? (
         <button
           aria-label="Jump to latest"
           className="absolute bottom-3 right-3 z-10 flex size-9 items-center justify-center rounded-full border border-zinc-700 bg-zinc-950 text-zinc-100 shadow-lg shadow-zinc-950/60 outline-none transition hover:border-[#EDFF00] hover:text-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/50"
@@ -216,7 +249,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
         >
           <ArrowDown aria-hidden="true" className="size-4" />
         </button>
-      )}
+      ) : null}
     </div>
   );
 };

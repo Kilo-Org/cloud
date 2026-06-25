@@ -2621,6 +2621,7 @@ export const organizations = pgTable(
   {
     id: idPrimaryKeyColumn,
     name: text().notNull(),
+    slug: text().unique(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

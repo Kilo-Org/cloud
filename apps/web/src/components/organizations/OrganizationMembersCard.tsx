@@ -289,9 +289,15 @@ type ChildTeamsControlProps = {
   organization: OrganizationWithMembers;
   member: OrganizationMember;
   editable: boolean;
+  canOpenChildOrganizations: boolean;
 };
 
-function ChildTeamsControl({ organization, member, editable }: ChildTeamsControlProps) {
+function ChildTeamsControl({
+  organization,
+  member,
+  editable,
+  canOpenChildOrganizations,
+}: ChildTeamsControlProps) {
   const mutation = useSetChildMemberships();
 
   if (member.status !== 'active') return null;
@@ -329,12 +335,28 @@ function ChildTeamsControl({ organization, member, editable }: ChildTeamsControl
   const labels =
     childMemberships.length > 0 ? (
       <div className="flex flex-wrap gap-1">
-        {childMemberships.map(child => (
-          <Badge key={child.id} variant="outline" className="text-xs font-normal">
-            {child.name}
-            {child.role !== 'member' ? ` · ${child.role === 'owner' ? 'Owner' : 'Billing'}` : ''}
-          </Badge>
-        ))}
+        {childMemberships.map(child => {
+          const label = `${child.name}${child.role !== 'member' ? ` · ${child.role === 'owner' ? 'Owner' : 'Billing'}` : ''}`;
+
+          if (!canOpenChildOrganizations) {
+            return (
+              <Badge key={child.id} variant="outline" className="text-xs font-normal">
+                {label}
+              </Badge>
+            );
+          }
+
+          return (
+            <Badge
+              key={child.id}
+              variant="outline"
+              asChild
+              className="text-xs font-normal hover:bg-accent focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+            >
+              <Link href={`/organizations/${encodeURIComponent(child.id)}`}>{label}</Link>
+            </Badge>
+          );
+        })}
       </div>
     ) : (
       <span className="text-muted-foreground text-xs">No child teams</span>
@@ -579,6 +601,7 @@ export function OrganizationAdminMembers({
                             organization={organizationData}
                             member={member}
                             editable={false}
+                            canOpenChildOrganizations={showInviteMemberButton}
                           />
                         </div>
                       </div>
@@ -617,6 +640,7 @@ export function OrganizationAdminMembers({
                                 organization={organizationData}
                                 member={member}
                                 editable={true}
+                                canOpenChildOrganizations={showInviteMemberButton}
                               />
                             )}
                             <EditLimitButton organization={organizationData} member={member} />

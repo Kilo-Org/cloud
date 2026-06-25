@@ -20,12 +20,14 @@ const toToolResultEvent = (toolCall: ToolCallEvent, result: EvalTabResult): Tool
 
 export const runToolCalls = <ToolCall extends ToolCallEvent>(
   toolCalls: ToolCall[],
-  executeToolCall: (toolCall: ToolCall) => Promise<EvalTabResult>
+  executeToolCall: (toolCall: ToolCall) => Promise<EvalTabResult>,
+  signal?: AbortSignal
 ): Promise<ToolResultEvent[]> => {
   const runNext = async (index: number, results: ToolResultEvent[]): Promise<ToolResultEvent[]> => {
     const toolCall = toolCalls[index];
 
-    if (toolCall === undefined) {
+    // Stop before each call so pressing Stop mid-batch doesn't run later (side-effecting) tools.
+    if (toolCall === undefined || signal?.aborted === true) {
       return results;
     }
 

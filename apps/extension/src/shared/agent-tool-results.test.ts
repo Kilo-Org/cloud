@@ -21,4 +21,24 @@ describe('agent tool results', () => {
       secondToolCall.id,
     ]);
   });
+
+  it('stops before later tool calls once the signal is aborted', async () => {
+    const events: string[] = [];
+    const controller = new AbortController();
+    const firstToolCall = createEvalToolCall({ code: 'first', tabId: 1 });
+    const secondToolCall = createEvalToolCall({ code: 'second', tabId: 1 });
+
+    const results = await runToolCalls(
+      [firstToolCall, secondToolCall],
+      async toolCall => {
+        events.push(toolCall.code);
+        controller.abort();
+        return { ok: true, value: toolCall.code };
+      },
+      controller.signal
+    );
+
+    expect(events).toStrictEqual(['first']);
+    expect(results.map(result => result.toolCallId)).toStrictEqual([firstToolCall.id]);
+  });
 });

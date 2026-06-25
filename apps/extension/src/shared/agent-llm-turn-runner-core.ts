@@ -200,7 +200,8 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
 
       const toolResultEvents: AgentConversationEvent[] = await runToolCalls(
         toolCallEvents,
-        executeToolCall
+        executeToolCall,
+        signal
       );
 
       if (isSignalAborted(signal)) {

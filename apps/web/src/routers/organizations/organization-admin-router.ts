@@ -51,6 +51,7 @@ import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
 } from '@kilocode/organization-entitlement';
+import { allocateOrganizationSlug } from '@/lib/organizations/organization-slug.server';
 
 const OrganizationListInputSchema = z.object({
   page: z.number().int().min(1).default(1),
@@ -301,11 +302,13 @@ export const organizationAdminRouter = createTRPCRouter({
 
     const organization = await db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+      const slug = await allocateOrganizationSlug(opts.input.name, tx);
 
       const [createdOrganization] = await tx
         .insert(organizations)
         .values({
           name: opts.input.name,
+          slug,
           require_seats: false,
           free_trial_end_at: null,
           parent_organization_id: parentOrganizationId,

@@ -27,6 +27,7 @@ import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { failureResult, successResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
+import { allocateOrganizationSlug } from '@/lib/organizations/organization-slug.server';
 
 export async function getOrganizationById(
   id: Organization['id'],
@@ -190,11 +191,13 @@ export async function createOrganization(
   const organization = await db.transaction(async tx => {
     const now = new Date();
     const trialEndDate = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
+    const slug = await allocateOrganizationSlug(name, tx);
 
     const [org] = await tx
       .insert(organizations)
       .values({
         name,
+        slug,
         require_seats: true,
         created_by_kilo_user_id: userId,
         free_trial_end_at: trialEndDate.toISOString(),

@@ -247,7 +247,11 @@ describe('organizations trpc router', () => {
         });
 
         expect(result.childOrganizations).toEqual([
-          { id: childOrganization.id, name: 'Child Label Organization', slug: null },
+          {
+            id: childOrganization.id,
+            name: 'Child Label Organization',
+            slug: 'child-label-organization',
+          },
         ]);
         const member = result.members.find(m => m.status === 'active' && m.id === parentMember.id);
         expect(member).toMatchObject({
@@ -660,6 +664,17 @@ describe('organizations trpc router', () => {
           slug: 'existing-slug',
         })
       ).rejects.toThrow('Requested slug is not available');
+    });
+
+    it('rejects slugs with underscores', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.organizations.updateSlug({
+          organizationId: testOrganization.id,
+          slug: 'invalid_slug',
+        })
+      ).rejects.toThrow('Organization slug must use lowercase letters, numbers, and hyphens');
     });
   });
 

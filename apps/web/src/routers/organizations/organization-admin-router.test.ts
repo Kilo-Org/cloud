@@ -10,6 +10,7 @@ import {
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
+import { normalizeOrganizationSlug } from '@/lib/organizations/organization-slug';
 import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import type { User, Organization } from '@kilocode/db/schema';
 
@@ -825,14 +826,18 @@ describe('organization admin router', () => {
 
   describe('hierarchy management', () => {
     it('creates an empty child organization under a parent organization', async () => {
-      const searchPrefix = `Admin Create Child Org ${crypto.randomUUID()}`;
-      const parentOrganization = await createOrganization(`${searchPrefix} parent`, adminUser.id);
+      const searchId = crypto.randomUUID();
+      const parentOrganization = await createOrganization(
+        `Parent Admin Org ${searchId}`,
+        adminUser.id
+      );
+      const childOrganizationName = `Child Admin Org ${searchId}`;
       const caller = await createCallerForUser(adminUser.id);
       let childOrganizationId: string | null = null;
 
       try {
         const result = await caller.organizations.admin.create({
-          name: `${searchPrefix} child`,
+          name: childOrganizationName,
           parentOrganizationId: parentOrganization.id,
         });
         childOrganizationId = result.organization.id;
@@ -842,6 +847,7 @@ describe('organization admin router', () => {
             parent_organization_id: organizations.parent_organization_id,
             require_seats: organizations.require_seats,
             free_trial_end_at: organizations.free_trial_end_at,
+            slug: organizations.slug,
             settings: organizations.settings,
             member_count: sql<number>`(
               SELECT COUNT(*)::int
@@ -855,10 +861,12 @@ describe('organization admin router', () => {
         expect(result.organization.parent_organization_id).toBe(parentOrganization.id);
         expect(result.organization.require_seats).toBe(false);
         expect(result.organization.free_trial_end_at).toBeNull();
+        expect(result.organization.slug).toBe(normalizeOrganizationSlug(childOrganizationName));
         expect(result.organization.settings.suppress_trial_messaging).toBe(true);
         expect(childOrganization.parent_organization_id).toBe(parentOrganization.id);
         expect(childOrganization.require_seats).toBe(false);
         expect(childOrganization.free_trial_end_at).toBeNull();
+        expect(childOrganization.slug).toBe(normalizeOrganizationSlug(childOrganizationName));
         expect(childOrganization.settings.suppress_trial_messaging).toBe(true);
         expect(childOrganization.member_count).toBe(0);
       } finally {

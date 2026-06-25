@@ -22,6 +22,7 @@ import {
 } from './organizations';
 import { fromMicrodollars } from '@/lib/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
+import { normalizeOrganizationSlug } from '@/lib/organizations/organization-slug';
 
 describe('Organizations', () => {
   afterEach(async () => {
@@ -35,6 +36,33 @@ describe('Organizations', () => {
     await db.delete(organization_membership_removals);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
+  });
+
+  describe('organization slug creation', () => {
+    test('normalizes organization names into reusable slugs', () => {
+      expect(normalizeOrganizationSlug("Evan's Test Org")).toBe('evans-test-org');
+      expect(normalizeOrganizationSlug('Money.7R33$')).toBe('money-7ree');
+      expect(normalizeOrganizationSlug('Team_Alpha Beta.Gamma!')).toBe('teamalpha-beta-gamma');
+    });
+
+    test('stores the normalized organization slug when creating an organization', async () => {
+      const user = await insertTestUser();
+
+      const organization = await createOrganization("Evan's Test Org", user.id);
+
+      expect(organization.slug).toBe('evans-test-org');
+    });
+
+    test('appends a three-character suffix when the normalized slug collides', async () => {
+      const firstUser = await insertTestUser();
+      const secondUser = await insertTestUser();
+
+      const firstOrganization = await createOrganization('Demo Example Org', firstUser.id);
+      const secondOrganization = await createOrganization('Demo Example Org', secondUser.id);
+
+      expect(firstOrganization.slug).toBe('demo-example-org');
+      expect(secondOrganization.slug).toMatch(/^demo-example-org-[0-9a-f]{3}$/);
+    });
   });
 
   describe('getUserOrganizationsWithSeats', () => {

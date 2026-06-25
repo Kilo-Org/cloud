@@ -194,6 +194,9 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const [showRepositoryRequiredMessage, setShowRepositoryRequiredMessage] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
   const [attachmentMessageUuid, setAttachmentMessageUuid] = useState(() => uuidv4());
+  // Repo profile bindings are only keyed by GitHub/GitLab today.
+  const profileBindingPlatform: Exclude<RepositoryPlatform, 'bitbucket'> | undefined =
+    selectedPlatform === 'bitbucket' ? undefined : selectedPlatform;
 
   // ---------------------------------------------------------------------------
   // GitHub identity awareness
@@ -1521,7 +1524,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               selectedOverrideProfileId={selectedProfileId}
               onOverrideProfileSelect={setSelectedProfileId}
               repoFullName={selectedRepo || undefined}
-              platform={selectedPlatform === 'bitbucket' ? undefined : selectedPlatform}
+              platform={profileBindingPlatform}
               devcontainerToggle={
                 isDevcontainerAvailable
                   ? {

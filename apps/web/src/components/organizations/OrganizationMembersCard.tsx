@@ -355,7 +355,12 @@ export function OrganizationAdminMembers({
   // Show "Add Member" button only for Kilo admins
   const showAddMemberButton = isKiloAdmin;
 
-  const showInviteMemberButton = canInviteMembers(currentUserRole, isKiloAdmin);
+  // Child organizations manage membership through their parent organization,
+  // so the self-serve invite flow is hidden for them.
+  const isChildOrganization = organizationData.parent_organization_id !== null;
+
+  const showInviteMemberButton =
+    canInviteMembers(currentUserRole, isKiloAdmin) && !isChildOrganization;
 
   return (
     <>

@@ -435,12 +435,10 @@ export async function inviteUserToOrganization(
     if (!organization) {
       throw new Error('Organization SSO policy is misconfigured');
     }
+    // Child organizations manage membership through their parent organization,
+    // so direct invitations into a child org are not allowed.
     if (organization.parentOrganizationId) {
-      await tx
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(eq(organizations.id, organization.parentOrganizationId))
-        .for('update');
+      throw new Error('Child organizations cannot invite members');
     }
 
     const policy = await resolveEffectiveOrganizationSsoPolicy(organizationId, tx);
@@ -663,12 +661,10 @@ export async function acceptOrganizationInvite(
       if (!organization) {
         return failureResult('Organization not found');
       }
+      // Child organizations manage membership through their parent organization.
+      // Reject any invitation (including pre-existing ones) into a child org.
       if (organization.parent_organization_id) {
-        await tx
-          .select({ id: organizations.id })
-          .from(organizations)
-          .where(eq(organizations.id, organization.parent_organization_id))
-          .for('update');
+        return failureResult('Child organizations cannot accept invitations');
       }
 
       const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organization.id, tx);

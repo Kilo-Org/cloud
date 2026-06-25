@@ -56,8 +56,6 @@ export const OrganizationCreateRequestSchema = z.object({
 export const OrganizationSchema = z.object({
   id: z.string(),
   name: z.string(),
-  slug: z.string().nullable(),
-  requested_slug: z.string().nullable(),
   created_at: z.string(),
   updated_at: z.string(),
   microdollars_used: z.number(),
@@ -75,6 +73,8 @@ export const OrganizationSchema = z.object({
   plan: z.enum(['teams', 'enterprise']),
   free_trial_end_at: z.string().nullable(),
   company_domain: z.string().nullable(),
+  slug: z.string().nullable(),
+  requested_slug: z.string().nullable(),
 });
 
 export type UserOrganizationWithSeats = {

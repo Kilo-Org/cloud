@@ -2,6 +2,7 @@ import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals
 import { createCallerFactory } from '@/lib/trpc/init';
 import type * as TrpcInitModule from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
+import type * as BitbucketIntegrationHelpers from '@/lib/cloud-agent/bitbucket-integration-helpers';
 import type { BitbucketOrganizationRepositoryListResult } from '@/lib/cloud-agent/bitbucket-integration-helpers';
 
 const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
@@ -82,7 +83,7 @@ jest.mock('@/lib/posthog-feature-flags', () => ({
 }));
 
 jest.mock('@/lib/cloud-agent/bitbucket-integration-helpers', () => ({
-  ...jest.requireActual<typeof import('@/lib/cloud-agent/bitbucket-integration-helpers')>(
+  ...jest.requireActual<typeof BitbucketIntegrationHelpers>(
     '@/lib/cloud-agent/bitbucket-integration-helpers'
   ),
   fetchBitbucketRepositoriesForOrganization: mockFetchBitbucketRepositoriesForOrganization,

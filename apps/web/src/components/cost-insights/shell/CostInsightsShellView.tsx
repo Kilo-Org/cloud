@@ -30,9 +30,9 @@ export function CostInsightsShellView({
       : '/cost-insights';
   const navItems = [
     { page: 'dashboard' as const, label: 'Overview', href: basePath },
-    { page: 'ask' as const, label: 'Ask Kilo', href: `${basePath}?tab=ask` },
-    { page: 'events' as const, label: 'Activity', href: `${basePath}?tab=events` },
-    { page: 'settings' as const, label: 'Alert settings', href: `${basePath}/config` },
+    { page: 'ask' as const, label: 'Ask Kilo', href: `${basePath}/ask-kilo` },
+    { page: 'events' as const, label: 'Activity', href: `${basePath}/activity` },
+    { page: 'settings' as const, label: 'Alert settings', href: `${basePath}/settings` },
   ];
   const roleLabel =
     owner.authorizedRole === 'billing_manager'

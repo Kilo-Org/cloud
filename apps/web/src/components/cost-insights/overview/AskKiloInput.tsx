@@ -17,8 +17,8 @@ export function AskKiloInput({
   const [question, setQuestion] = useState('');
   const askHref =
     owner.type === 'organization'
-      ? '/organizations/acme-cost-insights/cost-insights?tab=ask'
-      : '/cost-insights?tab=ask';
+      ? '/organizations/acme-cost-insights/cost-insights/ask-kilo'
+      : '/cost-insights/ask-kilo';
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

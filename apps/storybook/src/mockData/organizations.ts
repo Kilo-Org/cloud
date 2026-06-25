@@ -23,6 +23,15 @@ function generateMember(): OrganizationMember {
       inviteDate: randomBoolean(rng, 0.5) ? new Date().toISOString() : null,
       dailyUsageLimitUsd,
       currentDailyUsageUsd,
+      childOrganizationMemberships: randomBoolean(rng, 0.35)
+        ? [
+            {
+              id: randomId(rng, 'org'),
+              name: `Team ${randomInt(rng, 1, 9)}`,
+              role: 'member',
+            },
+          ]
+        : [],
     };
   }
 
@@ -46,6 +55,10 @@ export function generateOrganization(): OrganizationWithMembers {
   return {
     ...base,
     name: `Company ${randomInt(rng, 0, 999)} ${companyType}`,
+    childOrganizations: [
+      { id: randomId(rng, 'org'), name: 'Platform Team' },
+      { id: randomId(rng, 'org'), name: 'Product Team' },
+    ],
     members: Array.from({ length: randomInt(rng, 2, 7) }, generateMember),
     effectiveSsoPolicy: {
       required: false,

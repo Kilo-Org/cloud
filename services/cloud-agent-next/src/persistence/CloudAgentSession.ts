@@ -228,6 +228,13 @@ type GroupedRegisterSessionInput = {
         branch?: string;
       }
     | {
+        type: 'bitbucket';
+        url: string;
+        workspaceUuid: string;
+        repositoryUuid: string;
+        branch?: string;
+      }
+    | {
         type: 'git';
         url: string;
         token?: string;
@@ -1698,14 +1705,23 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
               platform: 'gitlab',
               upstreamBranch: input.repository.branch,
             }
-          : input.repository?.type === 'git'
+          : input.repository?.type === 'bitbucket'
             ? {
-                type: 'git',
+                type: 'bitbucket',
                 url: input.repository.url,
-                token: input.repository.token,
+                platform: 'bitbucket',
+                workspaceUuid: input.repository.workspaceUuid,
+                repositoryUuid: input.repository.repositoryUuid,
                 upstreamBranch: input.repository.branch,
               }
-            : undefined;
+            : input.repository?.type === 'git'
+              ? {
+                  type: 'git',
+                  url: input.repository.url,
+                  token: input.repository.token,
+                  upstreamBranch: input.repository.branch,
+                }
+              : undefined;
 
     const metadata: SessionMetadata = {
       metadataSchemaVersion: 2,
@@ -1909,6 +1925,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     githubAppType?: 'standard' | 'lite';
     gitToken?: string;
     gitlabTokenManaged?: boolean;
+    bitbucketTokenManaged?: boolean;
     devcontainer?: SessionMetadata['devcontainer'];
   }): Promise<OperationResult<SessionMetadata>> {
     const metadata = await this.getMetadata();
@@ -1942,7 +1959,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
               gitlabTokenManaged:
                 input.gitlabTokenManaged ?? metadata.repository.gitlabTokenManaged,
             }
-          : metadata.repository;
+          : metadata.repository?.type === 'bitbucket'
+            ? {
+                ...metadata.repository,
+                bitbucketTokenManaged:
+                  input.bitbucketTokenManaged ?? metadata.repository.bitbucketTokenManaged,
+              }
+            : metadata.repository;
 
     const updated: SessionMetadata = {
       ...metadata,

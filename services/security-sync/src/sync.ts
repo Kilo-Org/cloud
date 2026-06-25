@@ -26,6 +26,7 @@ import {
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,
+  type PlatformRepository,
 } from '@kilocode/db/schema-types';
 import {
   decideAutoAnalysisEligibility,
@@ -331,7 +332,10 @@ export async function getOwnerConfig(
 
   // Filter repositories
   const allRepos = (integration.repositories ?? []).filter(
-    r => typeof r.id === 'number' && typeof r.full_name === 'string' && r.full_name.length > 0
+    (repository): repository is PlatformRepository =>
+      typeof repository.id === 'number' &&
+      typeof repository.full_name === 'string' &&
+      repository.full_name.length > 0
   );
   if (allRepos.length === 0) return null;
 

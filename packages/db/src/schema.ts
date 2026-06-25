@@ -193,6 +193,8 @@ export const SCHEMA_CHECK_ENUMS = {
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
+  SecurityFindingNotificationKind,
+  SecurityFindingNotificationStatus,
   KiloClawPlan,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
@@ -3004,7 +3006,7 @@ export const platform_integrations = pgTable(
 
     // Repository access (GitHub's value: 'all' or 'selected')
     repository_access: text(), // nullable for pending installations
-    repositories: jsonb().$type<PlatformRepository[]>(),
+    repositories: jsonb().$type<PlatformRepository<number | string>[]>(),
     repositories_synced_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_reason: text(),
@@ -3048,6 +3050,14 @@ export const platform_integrations = pgTable(
     uniqueIndex('UQ_platform_integrations_linear_platform_inst')
       .on(table.platform, table.platform_installation_id)
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_user_bitbucket')
+      .on(table.owned_by_user_id)
+      .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_org_bitbucket')
+      .on(table.owned_by_organization_id)
+      .where(
+        sql`${table.platform} = 'bitbucket' AND ${table.owned_by_organization_id} IS NOT NULL`
+      ),
     index('IDX_platform_integrations_owned_by_org_id').on(table.owned_by_organization_id),
     index('IDX_platform_integrations_owned_by_user_id').on(table.owned_by_user_id),
     index('IDX_platform_integrations_platform_inst_id').on(table.platform_installation_id),
@@ -3123,6 +3133,82 @@ export const user_github_app_tokens = pgTable(
 
 export type UserGitHubAppToken = typeof user_github_app_tokens.$inferSelect;
 export type NewUserGitHubAppToken = typeof user_github_app_tokens.$inferInsert;
+
+export const platform_oauth_credentials = pgTable(
+  'platform_oauth_credentials',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid()
+      .notNull()
+      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
+    platform: text().notNull(),
+    authorized_by_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    provider_subject_id: text().notNull(),
+    provider_subject_login: text().notNull(),
+    access_token_encrypted: text().notNull(),
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    refresh_token_encrypted: text().notNull(),
+    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    credential_version: integer().notNull().default(1),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_reason: text(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_platform_oauth_credentials_platform_integration_id').on(
+      table.platform_integration_id
+    ),
+    index('IDX_platform_oauth_credentials_authorized_by_user_id').on(table.authorized_by_user_id),
+  ]
+);
+
+export type PlatformOAuthCredential = typeof platform_oauth_credentials.$inferSelect;
+export type NewPlatformOAuthCredential = typeof platform_oauth_credentials.$inferInsert;
+
+export const platform_access_token_credentials = pgTable(
+  'platform_access_token_credentials',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid().notNull(),
+    owned_by_organization_id: uuid().notNull(),
+    platform: text().notNull().$type<'bitbucket'>(),
+    integration_type: text().notNull().$type<'workspace_access_token'>(),
+    token_encrypted: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    provider_credential_type: text().notNull().$type<'workspace_access_token'>(),
+    provider_scopes: text().array().notNull(),
+    provider_verified_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    credential_version: integer().notNull().default(1),
+    last_validated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_platform_access_token_credentials_platform_integration_id').on(
+      table.platform_integration_id
+    ),
+    foreignKey({
+      columns: [table.platform_integration_id],
+      foreignColumns: [platform_integrations.id],
+      name: 'FK_platform_access_token_credentials_parent',
+    }).onDelete('cascade'),
+  ]
+);
+
+export type PlatformAccessTokenCredential = typeof platform_access_token_credentials.$inferSelect;
+export type NewPlatformAccessTokenCredential =
+  typeof platform_access_token_credentials.$inferInsert;
 
 // User Deployments
 

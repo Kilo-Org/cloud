@@ -1,5 +1,6 @@
 import {
   microdollar_usage,
+  organization_memberships,
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
@@ -38,7 +39,7 @@ import { organizationsSubscriptionRouter } from '@/routers/organizations/organiz
 import { organizationsSettingsRouter } from '@/routers/organizations/organization-settings-router';
 import { organizationsUsageDetailsRouter } from '@/routers/organizations/organization-usage-details-router';
 import { TRPCError } from '@trpc/server';
-import { and, asc, count, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
@@ -62,6 +63,7 @@ import { organizationAutoTriageRouter } from '@/routers/organizations/organizati
 import { organizationAutoFixRouter } from '@/routers/organizations/organization-auto-fix-router';
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
 import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
+import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -117,6 +119,7 @@ export const organizationsRouter = createTRPCRouter({
   autoFix: organizationAutoFixRouter,
   autoTopUp: organizationAutoTopUpRouter,
   kiloclaw: organizationKiloclawRouter,
+  bitbucket: organizationBitbucketRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;
@@ -220,14 +223,68 @@ export const organizationsRouter = createTRPCRouter({
       }
     }
 
-    const [members, ssoPolicy] = await Promise.all([
+    const [members, ssoPolicy, childOrganizations] = await Promise.all([
       getOrganizationMembers(organizationId),
       resolveEffectiveOrganizationSsoPolicy(organizationId),
+      db
+        .select({ id: organizations.id, name: organizations.name })
+        .from(organizations)
+        .where(
+          and(
+            eq(organizations.parent_organization_id, organizationId),
+            isNull(organizations.deleted_at)
+          )
+        )
+        .orderBy(organizations.name),
     ]);
+
+    const activeMemberIds = members.flatMap(member =>
+      member.status === 'active' ? [member.id] : []
+    );
+    const childOrganizationIds = childOrganizations.map(child => child.id);
+    const childMembershipRows =
+      activeMemberIds.length > 0 && childOrganizationIds.length > 0
+        ? await db
+            .select({
+              userId: organization_memberships.kilo_user_id,
+              organizationId: organization_memberships.organization_id,
+              role: organization_memberships.role,
+            })
+            .from(organization_memberships)
+            .where(
+              and(
+                inArray(organization_memberships.kilo_user_id, activeMemberIds),
+                inArray(organization_memberships.organization_id, childOrganizationIds)
+              )
+            )
+        : [];
+    const childOrganizationsById = new Map(childOrganizations.map(child => [child.id, child]));
+    const childMembershipsByUserId = new Map<
+      string,
+      Array<{ id: string; name: string; role: (typeof childMembershipRows)[number]['role'] }>
+    >();
+    for (const row of childMembershipRows) {
+      const childOrganization = childOrganizationsById.get(row.organizationId);
+      if (!childOrganization) continue;
+      const existing = childMembershipsByUserId.get(row.userId) ?? [];
+      existing.push({ ...childOrganization, role: row.role });
+      childMembershipsByUserId.set(row.userId, existing);
+    }
+
+    const membersWithChildOrganizations = members.map(member => {
+      if (member.status !== 'active') return member;
+      return {
+        ...member,
+        childOrganizationMemberships: (childMembershipsByUserId.get(member.id) ?? []).sort((a, b) =>
+          a.name.localeCompare(b.name)
+        ),
+      };
+    });
 
     return {
       ...organization,
-      members,
+      members: membersWithChildOrganizations,
+      childOrganizations,
       effectiveSsoPolicy:
         ssoPolicy.status === 'required'
           ? {

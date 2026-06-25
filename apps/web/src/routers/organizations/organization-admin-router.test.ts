@@ -840,6 +840,9 @@ describe('organization admin router', () => {
         const [childOrganization] = await db
           .select({
             parent_organization_id: organizations.parent_organization_id,
+            require_seats: organizations.require_seats,
+            free_trial_end_at: organizations.free_trial_end_at,
+            settings: organizations.settings,
             member_count: sql<number>`(
               SELECT COUNT(*)::int
               FROM ${organization_memberships}
@@ -850,7 +853,13 @@ describe('organization admin router', () => {
           .where(eq(organizations.id, childOrganizationId));
 
         expect(result.organization.parent_organization_id).toBe(parentOrganization.id);
+        expect(result.organization.require_seats).toBe(false);
+        expect(result.organization.free_trial_end_at).toBeNull();
+        expect(result.organization.settings.suppress_trial_messaging).toBe(true);
         expect(childOrganization.parent_organization_id).toBe(parentOrganization.id);
+        expect(childOrganization.require_seats).toBe(false);
+        expect(childOrganization.free_trial_end_at).toBeNull();
+        expect(childOrganization.settings.suppress_trial_messaging).toBe(true);
         expect(childOrganization.member_count).toBe(0);
       } finally {
         await db
@@ -879,11 +888,22 @@ describe('organization admin router', () => {
         const hierarchy = await caller.organizations.admin.getHierarchy({
           organizationId: parentOrganization.id,
         });
+        const [updatedChildOrganization] = await db
+          .select({
+            require_seats: organizations.require_seats,
+            free_trial_end_at: organizations.free_trial_end_at,
+            settings: organizations.settings,
+          })
+          .from(organizations)
+          .where(eq(organizations.id, childOrganization.id));
 
         expect(hierarchy.children).toContainEqual({
           id: childOrganization.id,
           name: childOrganization.name,
         });
+        expect(updatedChildOrganization.require_seats).toBe(false);
+        expect(updatedChildOrganization.free_trial_end_at).toBeNull();
+        expect(updatedChildOrganization.settings.suppress_trial_messaging).toBe(true);
       } finally {
         await db
           .update(organizations)

@@ -103,6 +103,10 @@ export const kiloExtras = {
       description: 'Enable AI-powered codebase search',
       type: 'boolean',
     },
+    native_notebook_tools: {
+      description: 'Enable native tools for reading, editing, and executing VS Code notebooks',
+      type: 'boolean',
+    },
     openTelemetry: {
       description: 'Enable telemetry. Set to false to opt-out.',
       default: true,

@@ -111,6 +111,9 @@ describe('kilo config.json schema merge', () => {
   test('adds kilo experimental keys without dropping upstream', () => {
     const exp = props.experimental as { properties: Record<string, unknown> };
     expect(exp.properties.codebase_search).toBeDefined();
+    expect(exp.properties.native_notebook_tools).toEqual(
+      expect.objectContaining({ type: 'boolean' })
+    );
     expect(exp.properties.openTelemetry).toBeDefined();
     expect(exp.properties.batch_tool).toBeDefined(); // upstream key preserved
   });

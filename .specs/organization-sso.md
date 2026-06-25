@@ -58,17 +58,14 @@ Active.
 2. Parent membership MUST NOT grant child membership, and child membership MUST NOT grant parent or sibling membership.
 3. Ordinary SSO JIT provisioning MAY add a user only to the SSO authority organization.
 4. Ordinary SSO JIT provisioning MUST NOT restore a membership when a Removal tombstone exists.
-5. A billing event MUST NOT create a new Same-domain human membership in an SSO-protected organization.
-6. Billing processing MUST continue when rule 5 prevents membership creation, and the condition MUST be observable to operators.
-7. A platform administrator MAY restore or add a Same-domain user only through an explicit audited action after verifying a matching WorkOS identity.
-8. Bot users are exempt from human SSO requirements and MUST be admitted only through explicit bot/service-account paths.
+5. A platform administrator MAY restore or add a Same-domain user only through an explicit audited action after verifying a matching WorkOS identity.
+6. Bot users are exempt from human SSO requirements and MUST be admitted only through explicit bot/service-account paths.
 
 ### Isolation
 
-1. Parent and child organizations MUST retain independent billing, subscriptions, seats, owners, roles, settings, and data.
+1. Parent and child organizations MUST retain independent owners, roles, and data.
 2. A child owner MUST NOT gain access to the parent's WorkOS configuration or administrative controls.
 3. The API MAY expose a read-only Effective SSO policy to child members for user-interface behavior.
-4. SSO inheritance MUST NOT change seat counting. A user consumes a seat independently in every organization where they hold a qualifying membership.
 
 ### Policy Transitions
 

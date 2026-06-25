@@ -14,7 +14,7 @@ import {
   fetchGitLabRepositoriesForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import {
-  basePrepareSessionNextSchema,
+  personalPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
   baseInitiateFromPreparedSessionNextSchema,
   baseInitiateSessionNextOutputSchema,
@@ -119,7 +119,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
    * initiateFromPreparedSession.
    */
   prepareSession: baseProcedure
-    .input(basePrepareSessionNextSchema)
+    .input(personalPrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
       if (

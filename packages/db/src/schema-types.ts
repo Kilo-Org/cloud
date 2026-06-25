@@ -974,11 +974,12 @@ export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
 
 export type IntegrationPermissions = Record<string, string>;
 
-export type PlatformRepository = {
-  id: number;
+export type PlatformRepository<TId extends number | string = number> = {
+  id: TId;
   name: string;
   full_name: string;
   private: boolean;
+  default_branch?: string;
 };
 
 export const REVIEW_MEMORY_PLATFORMS = ['github'] as const;

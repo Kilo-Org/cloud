@@ -107,6 +107,7 @@ function CreditsPageContent() {
   const transactionIdParam = searchParams.get(TOPUP_TRANSACTION_QUERY_STRING_KEY);
   const transactionIdIsValid = z.uuid().safeParse(transactionIdParam).success;
   const isPaymentPending = searchParams.get(TOPUP_STATUS_QUERY_STRING_KEY) === TOPUP_STATUS_PENDING;
+  const shouldPollPendingPayment = isPaymentPending && !paymentPendingDismissed;
   const hasTopUpContext = transactionIdIsValid || isPaymentPending;
 
   const {
@@ -118,7 +119,7 @@ function CreditsPageContent() {
     trpc.user.getCreditBlocks.queryOptions(
       {},
       {
-        refetchInterval: isPaymentPending && !paymentPendingDismissed ? 5000 : false,
+        refetchInterval: shouldPollPendingPayment ? 5000 : false,
         refetchOnMount: hasTopUpContext ? 'always' : true,
       }
     )
@@ -131,7 +132,10 @@ function CreditsPageContent() {
   } = useQuery(
     trpc.user.getCreditPurchaseHistory.queryOptions(
       { cursor: historyCursor },
-      { refetchOnMount: transactionIdIsValid ? 'always' : true }
+      {
+        refetchInterval: shouldPollPendingPayment ? 5000 : false,
+        refetchOnMount: hasTopUpContext ? 'always' : true,
+      }
     )
   );
   const { data: confirmation, isError: isPurchaseConfirmationError } = useQuery(
@@ -602,9 +606,7 @@ function CreditsPageContent() {
                       <Td className="whitespace-normal">{deduction.description}</Td>
                       <Td>{deductionKindLabel(deduction.kind)}</Td>
                       <Td numeric align="right">
-                        {deduction.kind === 'balance_neutral'
-                          ? 'Balance neutral'
-                          : `-${formatMicrodollars(Math.abs(deduction.amount_mUsd))}`}
+                        -{formatMicrodollars(Math.abs(deduction.amount_mUsd))}
                       </Td>
                     </tr>
                   ))}

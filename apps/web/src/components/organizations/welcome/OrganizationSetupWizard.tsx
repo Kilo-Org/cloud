@@ -27,7 +27,10 @@ import {
   Users,
 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { OrganizationOnboardingStepKey } from '@/lib/organizations/onboarding-steps';
+import {
+  ORGANIZATION_ONBOARDING_STEP_KEYS,
+  type OrganizationOnboardingStepKey,
+} from '@/lib/organizations/onboarding-steps';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -91,7 +94,7 @@ const STEP_CONTENT = {
   }
 >;
 
-const STEP_KEYS = Object.keys(STEP_CONTENT) as OrganizationOnboardingStepKey[];
+const STEP_KEYS = ORGANIZATION_ONBOARDING_STEP_KEYS;
 
 type OrganizationSetupWizardProps = {
   organizationId: string;

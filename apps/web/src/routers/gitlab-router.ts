@@ -10,6 +10,7 @@ import {
 } from '@/lib/integrations/resolve-owner';
 import { validateGitLabInstance } from '@/lib/integrations/platforms/gitlab/adapter';
 import { validatePersonalAccessToken } from '@/lib/integrations/platforms/gitlab/adapter';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 
 export const gitlabRouter = createTRPCRouter({
   /**
@@ -85,10 +86,7 @@ export const gitlabRouter = createTRPCRouter({
       auth_type?: 'oauth' | 'pat';
     } | null;
 
-    const isInstalled =
-      integration.integration_status === 'active' &&
-      integration.suspended_at === null &&
-      integration.auth_invalid_at === null;
+    const isInstalled = isPlatformIntegrationHealthy(integration);
 
     return {
       installed: isInstalled,

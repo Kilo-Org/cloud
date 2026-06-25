@@ -98,6 +98,7 @@ export const organizationFundsRouter = createTRPCRouter({
           name: organizations.name,
           total_microdollars_acquired: organizations.total_microdollars_acquired,
           microdollars_used: organizations.microdollars_used,
+          next_credit_expiration_at: organizations.next_credit_expiration_at,
         })
         .from(organizations)
         .where(
@@ -108,14 +109,38 @@ export const organizationFundsRouter = createTRPCRouter({
         )
         .orderBy(asc(organizations.name));
 
+      // Process any due expirations per child so displayed balances aren't
+      // overstated, mirroring the parent path. The hierarchy is single-level,
+      // so this is a small, bounded set of direct children.
+      const now = new Date();
+      const children: { id: string; name: string; balanceMicrodollars: number }[] = [];
+      for (const child of childRows) {
+        let totalAcquired = child.total_microdollars_acquired;
+        if (child.next_credit_expiration_at && now >= new Date(child.next_credit_expiration_at)) {
+          const expiryResult = await processOrganizationExpirations(
+            {
+              id: child.id,
+              microdollars_used: child.microdollars_used,
+              next_credit_expiration_at: child.next_credit_expiration_at,
+              total_microdollars_acquired: child.total_microdollars_acquired,
+            },
+            now
+          );
+          if (expiryResult) {
+            totalAcquired = expiryResult.total_microdollars_acquired;
+          }
+        }
+        children.push({
+          id: child.id,
+          name: child.name,
+          balanceMicrodollars: totalAcquired - child.microdollars_used,
+        });
+      }
+
       return {
         parentBalanceMicrodollars: parent.total_microdollars_acquired - parent.microdollars_used,
         hasExpiringCredits: parent.next_credit_expiration_at != null,
-        children: childRows.map(child => ({
-          id: child.id,
-          name: child.name,
-          balanceMicrodollars: child.total_microdollars_acquired - child.microdollars_used,
-        })),
+        children,
       };
     }),
 

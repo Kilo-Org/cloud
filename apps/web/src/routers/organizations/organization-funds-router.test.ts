@@ -119,6 +119,45 @@ describe('organization funds router', () => {
       expect(result.children.some(child => child.id === unrelatedOrg.id)).toBe(false);
     });
 
+    it('processes due expirations for children before returning their balance', async () => {
+      const past = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      await db
+        .update(organizations)
+        .set({
+          total_microdollars_acquired: 2_000_000,
+          microdollars_used: 0,
+          microdollars_balance: 2_000_000,
+          next_credit_expiration_at: past,
+        })
+        .where(eq(organizations.id, childA.id));
+      await db.insert(credit_transactions).values({
+        kilo_user_id: 'system',
+        is_free: true,
+        amount_microdollars: 2_000_000,
+        description: 'Expiring grant',
+        credit_category: 'organization_custom',
+        expiry_date: past,
+        organization_id: childA.id,
+        original_baseline_microdollars_used: 0,
+        expiration_baseline_microdollars_used: 0,
+      });
+
+      const caller = await createCallerForUser(ownerUser.id);
+      const result = await caller.organizations.funds.childBalances({
+        organizationId: parentOrg.id,
+      });
+
+      const childAResult = result.children.find(child => child.id === childA.id);
+      expect(childAResult?.balanceMicrodollars).toBe(0);
+
+      // Expiry was actually processed: the child's expiry hint is cleared.
+      const [updated] = await db
+        .select({ next: organizations.next_credit_expiration_at })
+        .from(organizations)
+        .where(eq(organizations.id, childA.id));
+      expect(updated.next).toBeNull();
+    });
+
     it('reports hasExpiringCredits when the parent has a future expiry date', async () => {
       const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
       await db

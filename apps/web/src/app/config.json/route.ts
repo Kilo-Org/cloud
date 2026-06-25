@@ -30,6 +30,21 @@ export function merge(schema: Schema): Schema {
   };
   properties.agent = agent;
 
+  const defs = isObject(schema.$defs) ? { ...schema.$defs } : undefined;
+  if (defs && isObject(defs.PermissionConfig)) {
+    const permissionConfig = { ...defs.PermissionConfig };
+    if (Array.isArray(permissionConfig.anyOf)) {
+      permissionConfig.anyOf = permissionConfig.anyOf.map(variant => {
+        if (!isObject(variant) || !isObject(variant.properties)) return variant;
+        return {
+          ...variant,
+          properties: { ...variant.properties, ...kiloExtras.permissions },
+        };
+      });
+      defs.PermissionConfig = permissionConfig;
+    }
+  }
+
   const experimental = isObject(properties.experimental) ? { ...properties.experimental } : {};
   experimental.properties = {
     ...(isObject(experimental.properties) ? experimental.properties : {}),
@@ -37,7 +52,7 @@ export function merge(schema: Schema): Schema {
   };
   properties.experimental = experimental;
 
-  return { ...schema, properties };
+  return { ...schema, ...(defs ? { $defs: defs } : {}), properties };
 }
 
 export async function GET() {

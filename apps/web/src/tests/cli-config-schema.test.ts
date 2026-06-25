@@ -4,6 +4,20 @@ const upstream: Schema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   ref: 'Config',
   type: 'object',
+  $defs: {
+    PermissionConfig: {
+      anyOf: [
+        { $ref: '#/$defs/PermissionActionConfig' },
+        {
+          type: 'object',
+          properties: {
+            read: { $ref: '#/$defs/PermissionRuleConfig' },
+          },
+          additionalProperties: { $ref: '#/$defs/PermissionRuleConfig' },
+        },
+      ],
+    },
+  },
   properties: {
     agent: {
       type: 'object',
@@ -73,6 +87,25 @@ describe('kilo config.json schema merge', () => {
     expect(agent.properties.debug).toBeDefined();
     expect(agent.properties.orchestrator).toBeDefined();
     expect(agent.properties.build).toBeDefined(); // upstream key preserved
+  });
+
+  test('adds notebook permission keys without dropping upstream', () => {
+    const defs = out.$defs as Record<string, unknown>;
+    const permissionConfig = defs.PermissionConfig as { anyOf: Array<Record<string, unknown>> };
+    const permissionObject = permissionConfig.anyOf.find(variant => variant.type === 'object') as {
+      properties: Record<string, unknown>;
+    };
+
+    expect(permissionObject.properties.notebook_read).toEqual({
+      $ref: '#/$defs/PermissionRuleConfig',
+    });
+    expect(permissionObject.properties.notebook_edit).toEqual({
+      $ref: '#/$defs/PermissionRuleConfig',
+    });
+    expect(permissionObject.properties.notebook_execute).toEqual({
+      $ref: '#/$defs/PermissionRuleConfig',
+    });
+    expect(permissionObject.properties.read).toBeDefined();
   });
 
   test('adds kilo experimental keys without dropping upstream', () => {

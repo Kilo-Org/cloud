@@ -12,17 +12,23 @@ import {
   BookOpen,
   Check,
   Circle,
+  Cloud,
   CodeXml,
+  Coins,
   ExternalLink,
-  Mail,
   Github,
   GitBranch,
+  Key,
   Loader2,
+  Mail,
   RefreshCw,
+  Route,
+  Terminal,
   Users,
 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { OrganizationOnboardingStepKey } from '@/lib/organizations/onboarding-steps';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -36,6 +42,8 @@ import { useUserOrganizationRole } from '@/components/organizations/Organization
 import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
 import { GitLabIntegrationDetails } from '@/components/integrations/GitLabIntegrationDetails';
 import { GitLabIcon } from '@/app/collab/_components/icons/GitLabIcon';
+import { OpenInExtensionButton } from '@/components/auth/OpenInExtensionButton';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import {
   buildOrganizationWelcomePath,
@@ -106,6 +114,8 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   const updateRecommendationsDigest = useUpdateRecommendationsDigest();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const handledReturnRef = useRef<string | null>(null);
+  const defaultDigestAttemptedRef = useRef(false);
+  const [defaultDigestFailed, setDefaultDigestFailed] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [sourceControlProvider, setSourceControlProvider] = useState<SourceControlProvider | null>(
     null
@@ -120,6 +130,9 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   const enableCodeReviewerMutation = useMutation(
     trpc.organizations.reviewAgent.toggleReviewAgent.mutationOptions()
   );
+  const saveCodeReviewerConfigMutation = useMutation(
+    trpc.organizations.reviewAgent.saveReviewConfig.mutationOptions()
+  );
   const requestedScreen = getOrganizationOnboardingScreen(searchParams);
   const requestedProvider = getSourceControlProvider(searchParams);
   const currentScreen =
@@ -128,13 +141,55 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
       ? getFirstIncompleteOnboardingScreen(checklistQuery.data)
       : 'source-control');
   const organizationQuery = useOrganizationWithMembers(organizationId, {
-    enabled: currentScreen === 'complete' && userRole === 'owner',
+    enabled: currentScreen === 'complete',
+  });
+  const reviewConfigPlatform =
+    checklistQuery.data?.connectedPlatform ?? sourceControlProvider ?? 'github';
+  const reviewConfigQuery = useQuery({
+    ...trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
+      organizationId,
+      platform: reviewConfigPlatform,
+    }),
+    enabled: currentScreen === 'complete',
   });
 
   const stepState = useMemo(
     () => new Map(checklistQuery.data?.steps.map(step => [step.key, step.done]) ?? []),
     [checklistQuery.data]
   );
+
+  useEffect(() => {
+    const digestSetting = organizationQuery.data?.settings?.recommendations_digest_enabled;
+    if (
+      currentScreen !== 'complete' ||
+      userRole !== 'owner' ||
+      organizationQuery.data?.plan !== 'enterprise' ||
+      digestSetting !== undefined ||
+      defaultDigestAttemptedRef.current
+    ) {
+      return;
+    }
+
+    defaultDigestAttemptedRef.current = true;
+    updateRecommendationsDigest.mutate(
+      { organizationId, enabled: true },
+      {
+        onSuccess: () => setDefaultDigestFailed(false),
+        onError: error => {
+          setDefaultDigestFailed(true);
+          toast.error('Could not enable weekly recommendations email', {
+            description: error.message,
+          });
+        },
+      }
+    );
+  }, [
+    currentScreen,
+    organizationId,
+    organizationQuery.data,
+    updateRecommendationsDigest,
+    userRole,
+  ]);
 
   useEffect(() => {
     if (!checklistQuery.data || requestedScreen) return;
@@ -256,6 +311,38 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     }
   };
 
+  const handleCodeReviewerModelChange = async (modelSlug: string) => {
+    const config = reviewConfigQuery.data;
+    if (!config) return;
+
+    try {
+      await saveCodeReviewerConfigMutation.mutateAsync({
+        organizationId,
+        platform: reviewConfigPlatform,
+        reviewStyle: config.reviewStyle,
+        focusAreas: config.focusAreas,
+        customInstructions: config.customInstructions ?? undefined,
+        modelSlug,
+        thinkingEffort: null,
+        gateThreshold: config.gateThreshold,
+        repositorySelectionMode: config.repositorySelectionMode,
+        selectedRepositoryIds: config.selectedRepositoryIds,
+        manuallyAddedRepositories: config.manuallyAddedRepositories,
+        disableReviewMd: config.disableReviewMd,
+      });
+      await reviewConfigQuery.refetch();
+      toast.success(
+        modelSlug === 'kilo-auto/free'
+          ? 'Code Reviewer set to Auto Free'
+          : 'Code Reviewer set to Auto Balanced'
+      );
+    } catch (error) {
+      toast.error('Could not update Code Reviewer model', {
+        description: error instanceof Error ? error.message : 'Try again.',
+      });
+    }
+  };
+
   const handleInvitationSuccess = async () => {
     const result = await checklistQuery.refetch();
     const completed = result.data?.steps.find(step => step.key === 'invite-team')?.done ?? false;
@@ -370,14 +457,32 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
                     completedCount={checklist.completedCount}
                     totalCount={checklist.totalCount}
                     organizationId={organizationId}
+                    balanceMicrodollars={
+                      (organizationQuery.data?.total_microdollars_acquired ?? 0) -
+                      (organizationQuery.data?.microdollars_used ?? 0)
+                    }
+                    organizationLoading={organizationQuery.isLoading}
+                    userRole={userRole}
+                    connectedPlatform={checklist.connectedPlatform}
+                    codeReviewerModel={reviewConfigQuery.data?.modelSlug}
+                    codeReviewerModelPending={
+                      reviewConfigQuery.isLoading || saveCodeReviewerConfigMutation.isPending
+                    }
+                    onCodeReviewerModelChange={modelSlug =>
+                      void handleCodeReviewerModelChange(modelSlug)
+                    }
                     showRecommendationsDigest={
                       organizationQuery.data?.plan === 'enterprise' && userRole === 'owner'
                     }
                     recommendationsDigestEnabled={
-                      organizationQuery.data?.settings?.recommendations_digest_enabled === true
+                      organizationQuery.data?.settings?.recommendations_digest_enabled === true ||
+                      (organizationQuery.data?.settings?.recommendations_digest_enabled ===
+                        undefined &&
+                        !defaultDigestFailed)
                     }
                     recommendationsDigestPending={updateRecommendationsDigest.isPending}
                     onRecommendationsDigestChange={enabled => {
+                      setDefaultDigestFailed(false);
                       updateRecommendationsDigest.mutate(
                         { organizationId, enabled },
                         {
@@ -718,6 +823,13 @@ function CompletionScreen({
   completedCount,
   totalCount,
   organizationId,
+  balanceMicrodollars,
+  organizationLoading,
+  userRole,
+  connectedPlatform,
+  codeReviewerModel,
+  codeReviewerModelPending,
+  onCodeReviewerModelChange,
   showRecommendationsDigest,
   recommendationsDigestEnabled,
   recommendationsDigestPending,
@@ -728,6 +840,13 @@ function CompletionScreen({
   completedCount: number;
   totalCount: number;
   organizationId: string;
+  balanceMicrodollars: number;
+  organizationLoading: boolean;
+  userRole: OrganizationRole;
+  connectedPlatform: 'github' | 'gitlab' | null;
+  codeReviewerModel?: string;
+  codeReviewerModelPending: boolean;
+  onCodeReviewerModelChange: (modelSlug: string) => void;
   showRecommendationsDigest: boolean;
   recommendationsDigestEnabled: boolean;
   recommendationsDigestPending: boolean;
@@ -735,6 +854,16 @@ function CompletionScreen({
   onBack: () => void;
 }) {
   const complete = completedCount === totalCount;
+  const hasCredits = balanceMicrodollars > 0;
+  const canManageBilling = userRole === 'owner' || userRole === 'billing_manager';
+  const platformQuery = connectedPlatform ? `?platform=${connectedPlatform}` : '';
+  const returnPath = buildOrganizationWelcomePath(organizationId, 'complete');
+  const topUpPath = `/payments/topup?${new URLSearchParams({
+    amount: '10',
+    'organization-id': organizationId,
+    'cancel-path': returnPath,
+  })}`;
+
   return (
     <>
       <div className="flex flex-1 flex-col">
@@ -750,47 +879,30 @@ function CompletionScreen({
               id="setup-complete-title"
               className="type-title focus:outline-none"
             >
-              {complete ? 'Your organization is set up' : 'Finish setup when you’re ready'}
+              {complete ? 'Your organization is ready' : 'Finish setup when you’re ready'}
             </h1>
-            <p className="type-body max-w-xl text-muted-foreground">
+            <p className="type-body max-w-2xl text-muted-foreground">
               You completed{' '}
               <span className="tabular-nums">
                 {completedCount} of {totalCount}
               </span>{' '}
-              setup tasks. You can return to this guide whenever you need it.
+              setup tasks. Choose how your team should start using Kilo.
             </p>
           </div>
         </div>
 
-        <div className="grid flex-1 gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
-          <div className="flex min-h-56 flex-col justify-between rounded-xl border border-border bg-surface-background p-6">
-            <div className="space-y-3">
-              <h2 className="type-heading">
-                {complete ? 'Start working with your organization' : 'Continue when you are ready'}
-              </h2>
-              <p className="type-body text-muted-foreground">
-                Open the organization dashboard now, or return to Welcome later to finish any
-                incomplete setup tasks.
-              </p>
-            </div>
-            <div className="mt-8 space-y-5">
-              {showRecommendationsDigest && (
-                <div className="flex items-start justify-between gap-4 rounded-lg border border-border bg-surface-inset p-4">
-                  <div className="flex items-start gap-3">
-                    <Mail className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                    <div className="space-y-1">
-                      <label
-                        htmlFor="onboarding-recommendations-digest"
-                        className="type-body font-medium text-foreground"
-                      >
-                        Weekly recommendations email
-                      </label>
-                      <p className="type-label max-w-lg text-muted-foreground">
-                        Email organization owners a weekly summary of open recommendations and
-                        feature setup.
-                      </p>
-                    </div>
-                  </div>
+        <div className="space-y-6 py-6">
+          <section aria-labelledby="configured-title" className="space-y-3">
+            <h2 id="configured-title" className="type-heading">
+              Configured for you
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <SetupStatus
+                icon={Mail}
+                title="Weekly recommendations"
+                detail={recommendationsDigestEnabled ? 'Enabled' : 'Off'}
+              >
+                {showRecommendationsDigest && (
                   <Switch
                     id="onboarding-recommendations-digest"
                     checked={recommendationsDigestEnabled}
@@ -798,49 +910,142 @@ function CompletionScreen({
                     onCheckedChange={onRecommendationsDigestChange}
                     aria-label="Weekly recommendations email"
                   />
-                </div>
-              )}
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Button asChild className="min-h-control-touch sm:min-h-0">
-                  <Link href={`/organizations/${organizationId}`}>Open organization</Link>
-                </Button>
-                <Button asChild variant="secondary" className="min-h-control-touch sm:min-h-0">
-                  <Link href={`/organizations/${organizationId}/payment-details`}>
-                    Add usage credits
-                  </Link>
-                </Button>
-              </div>
+                )}
+              </SetupStatus>
+              <SetupStatus icon={Route} title="Auto routing" detail="Best accuracy per dollar" />
+              <SetupStatus
+                icon={CodeXml}
+                title="Code Reviewer"
+                detail={codeReviewerModel === 'kilo-auto/free' ? 'Auto Free' : 'Auto Balanced'}
+              />
             </div>
-          </div>
+          </section>
 
-          <aside
-            className="rounded-xl border border-border bg-surface-inset p-5"
-            aria-label="Setup help"
-          >
-            <div className="flex size-8 items-center justify-center rounded-md border border-border bg-surface-raised">
-              <BookOpen className="size-4 text-muted-foreground" />
+          <section aria-labelledby="start-title" className="space-y-3">
+            <div>
+              <h2 id="start-title" className="type-heading">
+                {hasCredits ? 'Start a cloud workflow' : 'Start coding for free'}
+              </h2>
+              <p className="type-body mt-1 text-muted-foreground">
+                {hasCredits
+                  ? 'Your organization has usage credits, so paid models and Cloud Agent are ready.'
+                  : 'Your organization has no usage credits yet. Auto Free, local tools, and BYOK remain available.'}
+              </p>
             </div>
-            <h2 className="type-heading mt-4">Explore organization guides</h2>
-            <p className="type-body mt-2 text-muted-foreground">
-              Learn how to manage members, roles, billing, and organization settings.
-            </p>
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="mt-5 w-full min-w-0 justify-start overflow-hidden"
-            >
-              <a
-                href="https://kilo.ai/docs/collaborate/teams/getting-started"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <BookOpen className="size-4 shrink-0" />
-                <span className="min-w-0 flex-1 truncate text-left">Read the team guide</span>
-                <ExternalLink className="size-icon-sm ml-auto shrink-0" />
-              </a>
+
+            {organizationLoading ? (
+              <div className="flex min-h-32 items-center justify-center rounded-xl border border-border bg-surface-inset">
+                <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
+              </div>
+            ) : hasCredits ? (
+              <div className="rounded-xl border border-border bg-surface-background p-6">
+                <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+                  <div className="space-y-2">
+                    <Cloud className="size-5 text-muted-foreground" />
+                    <h3 className="type-heading">Run your first Cloud Agent</h3>
+                    <p className="type-body max-w-xl text-muted-foreground">
+                      Ask Kilo to review a repository, improve its README, or explain its
+                      architecture.
+                    </p>
+                  </div>
+                  <Button asChild className="min-h-control-touch shrink-0 sm:min-h-0">
+                    <Link href={`/organizations/${organizationId}/cloud`}>Start Cloud Agent</Link>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border bg-surface-background p-6">
+                <div className="space-y-2">
+                  <h3 className="type-heading">Install Kilo Code</h3>
+                  <p className="type-body text-muted-foreground">
+                    Use Auto Free from your editor or terminal without adding Kilo credits.
+                  </p>
+                </div>
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                  <OpenInExtensionButton
+                    ideName="VS Code"
+                    source="vscode"
+                    className="min-h-control-touch sm:min-h-0"
+                  >
+                    <Image src="/logos/vscode.svg" alt="" width={16} height={16} />
+                    Install for VS Code
+                  </OpenInExtensionButton>
+                  <Button asChild variant="outline" className="min-h-control-touch sm:min-h-0">
+                    <a
+                      href="https://plugins.jetbrains.com/plugin/28350-kilo-code"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Image src="/logos/idea.svg" alt="" width={16} height={16} />
+                      Install for JetBrains
+                    </a>
+                  </Button>
+                  <Button asChild variant="outline" className="min-h-control-touch sm:min-h-0">
+                    <a href="https://kilo.ai/install#cli" target="_blank" rel="noopener noreferrer">
+                      <Terminal className="size-4" />
+                      Install CLI
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            )}
+          </section>
+
+          {!hasCredits && !organizationLoading && (
+            <section aria-labelledby="unlock-title" className="space-y-3">
+              <h2 id="unlock-title" className="type-heading">
+                Choose your model path
+              </h2>
+              <div className="grid gap-3 lg:grid-cols-3">
+                <ChoiceCard
+                  icon={CodeXml}
+                  title="Start free"
+                  description="Use Auto Free for Code Reviewer. Free-model limits and provider data policies apply."
+                  active={codeReviewerModel === 'kilo-auto/free'}
+                  actionLabel={
+                    codeReviewerModel === 'kilo-auto/free' ? 'Auto Free selected' : 'Use Auto Free'
+                  }
+                  disabled={codeReviewerModelPending}
+                  onClick={() => onCodeReviewerModelChange('kilo-auto/free')}
+                />
+                <ChoiceCard
+                  icon={Coins}
+                  title="Add $10 in credits"
+                  description="Unlock Auto Balanced, paid models, Cloud Agent, Security Agent analysis, and remediation."
+                  actionLabel="Add $10"
+                  href={canManageBilling ? topUpPath : undefined}
+                  disabled={!canManageBilling}
+                />
+                <ChoiceCard
+                  icon={Key}
+                  title="Use your provider key"
+                  description="Use supported models through organization BYOK. Your provider bills the usage."
+                  actionLabel="Configure BYOK"
+                  href={canManageBilling ? `/organizations/${organizationId}/byok` : undefined}
+                  disabled={!canManageBilling}
+                />
+              </div>
+            </section>
+          )}
+
+          <div className="flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:flex-wrap">
+            <Button asChild className="min-h-control-touch sm:min-h-0">
+              <Link href={`/organizations/${organizationId}`}>Open organization</Link>
             </Button>
-          </aside>
+            <Button asChild variant="secondary" className="min-h-control-touch sm:min-h-0">
+              <Link href={`/organizations/${organizationId}/code-reviews${platformQuery}`}>
+                Configure Code Reviewer
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" className="min-h-control-touch sm:min-h-0">
+              <Link href={`/organizations/${organizationId}/integrations`}>
+                Manage integrations
+              </Link>
+            </Button>
+            <Button asChild variant="ghost" className="min-h-control-touch sm:min-h-0">
+              <a href="mailto:sales@kilocode.ai">Contact sales</a>
+            </Button>
+          </div>
         </div>
       </div>
       <div className="border-t border-border pt-5">
@@ -850,5 +1055,85 @@ function CompletionScreen({
         </Button>
       </div>
     </>
+  );
+}
+
+function SetupStatus({
+  icon: Icon,
+  title,
+  detail,
+  children,
+}: {
+  icon: typeof Mail;
+  title: string;
+  detail: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-20 items-center gap-3 rounded-lg border border-border bg-surface-inset p-4">
+      <Icon className="size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <p className="type-body font-medium">{title}</p>
+        <p className="type-label truncate text-muted-foreground">{detail}</p>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ChoiceCard({
+  icon: Icon,
+  title,
+  description,
+  actionLabel,
+  active = false,
+  disabled = false,
+  href,
+  onClick,
+}: {
+  icon: typeof Mail;
+  title: string;
+  description: string;
+  actionLabel: string;
+  active?: boolean;
+  disabled?: boolean;
+  href?: string;
+  onClick?: () => void;
+}) {
+  const action = href ? (
+    <Button asChild variant={active ? 'secondary' : 'outline'} size="sm" className="mt-auto w-full">
+      <Link href={href}>{actionLabel}</Link>
+    </Button>
+  ) : (
+    <Button
+      type="button"
+      variant={active ? 'secondary' : 'outline'}
+      size="sm"
+      className="mt-auto w-full"
+      disabled={disabled || active}
+      onClick={onClick}
+    >
+      {disabled && !active && (
+        <Loader2 className="size-icon-sm animate-spin motion-reduce:animate-none" />
+      )}
+      {actionLabel}
+    </Button>
+  );
+
+  return (
+    <div
+      className={cn(
+        'flex min-h-56 flex-col rounded-xl border bg-surface-background p-5',
+        active ? 'border-status-success-border' : 'border-border',
+        disabled && 'opacity-60'
+      )}
+    >
+      <div className="flex size-8 items-center justify-center rounded-md border border-border bg-surface-inset">
+        <Icon className="size-4 text-muted-foreground" />
+      </div>
+      <h3 className="type-heading mt-4">{title}</h3>
+      <p className="type-body mt-2 flex-1 text-muted-foreground">{description}</p>
+      {action}
+    </div>
   );
 }

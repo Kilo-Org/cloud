@@ -26,7 +26,7 @@ import {
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
 import { getStripeInvoices } from '@/lib/stripe';
-import { adminProcedure, baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
@@ -41,6 +41,7 @@ import { organizationsUsageDetailsRouter } from '@/routers/organizations/organiz
 import { TRPCError } from '@trpc/server';
 import { and, asc, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
+import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
 import { processOrganizationExpirations } from '@/lib/creditExpiration';
@@ -90,6 +91,30 @@ const OrganizationSlugUpdateSchema = OrganizationIdInputSchema.extend({
 const OrganizationSeatsUpdateSchema = OrganizationIdInputSchema.extend({
   seatsRequired: z.boolean(),
 });
+
+async function ensureOrganizationSlugUpdateAccess(ctx: TRPCContext, organizationId: string) {
+  if (userCanManageCredits(ctx.user)) return;
+
+  const [membership] = await db
+    .select({ role: organization_memberships.role })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.kilo_user_id, ctx.user.id),
+        eq(organization_memberships.organization_id, organizationId)
+      )
+    )
+    .limit(1);
+
+  if (membership?.role === 'owner') return;
+
+  throw new TRPCError({
+    code: 'UNAUTHORIZED',
+    message: membership
+      ? 'You do not have the required organizational role to access this feature'
+      : 'You do not have access to this organization',
+  });
+}
 
 const OrganizationInvoicesInputSchema = OrganizationIdInputSchema.extend({
   period: TimePeriodSchema.optional().default('month'),
@@ -428,8 +453,8 @@ export const organizationsRouter = createTRPCRouter({
     };
   }),
 
-  updateSlug: adminProcedure.input(OrganizationSlugUpdateSchema).mutation(async opts => {
-    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
+  updateSlug: baseProcedure.input(OrganizationSlugUpdateSchema).mutation(async opts => {
+    await ensureOrganizationSlugUpdateAccess(opts.ctx, opts.input.organizationId);
     if (opts.input.slug) {
       await assertActiveSlugAvailable(opts.input.slug, opts.input.organizationId);
     }

@@ -6,7 +6,7 @@ import { BooleanBadge } from '@/components/ui/boolean-badge';
 import {
   useUpdateOrganizationName,
   useSlugAvailability,
-  useAdminUpdateOrganizationSlug,
+  useUpdateOrganizationSlug,
   useUpdateCompanyDomain,
   useOrganizationWithMembers,
   useAdminToggleCodeIndexing,
@@ -180,7 +180,7 @@ function Inner(props: InnerProps) {
   const [isSpendingAlertsModalOpen, setIsSpendingAlertsModalOpen] = useState(false);
   const [ossSponsorshipDialogOpen, setOssSponsorshipDialogOpen] = useState(false);
   const updateOrganizationName = useUpdateOrganizationName();
-  const adminUpdateOrganizationSlug = useAdminUpdateOrganizationSlug();
+  const updateOrganizationSlug = useUpdateOrganizationSlug();
   const updateCompanyDomain = useUpdateCompanyDomain();
   const adminToggleCodeIndexing = useAdminToggleCodeIndexing();
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
@@ -244,7 +244,7 @@ function Inner(props: InnerProps) {
     }
 
     try {
-      await adminUpdateOrganizationSlug.mutateAsync({
+      await updateOrganizationSlug.mutateAsync({
         organizationId: id,
         slug: nextSlug,
       });
@@ -315,6 +315,7 @@ function Inner(props: InnerProps) {
   const isAutoTopUpEnabled = useIsAutoTopUpEnabled();
   const isInAdminDashboard = isKiloAdmin && showAdminControls;
   const isOrgOwner = useCanManagePaymentInfo();
+  const canEditSlug = isOrgOwner || isKiloAdmin;
   const hierarchyQuery = useAdminOrganizationHierarchy(id, isInAdminDashboard);
 
   const handleSeatsRequirementEdit = () => {
@@ -424,7 +425,7 @@ function Inner(props: InnerProps) {
                   onKeyDown={handleSlugKeyDown}
                   className={`font-mono text-sm ${slugError ? 'border-red-400' : ''}`}
                   autoFocus
-                  disabled={adminUpdateOrganizationSlug.isPending}
+                  disabled={updateOrganizationSlug.isPending}
                 />
                 {editedSlug.trim() && !isEditedSlugAvailable ? (
                   <Badge className="bg-status-destructive-surface text-status-destructive border-status-destructive-border">
@@ -435,7 +436,7 @@ function Inner(props: InnerProps) {
                   size="sm"
                   variant="ghost"
                   onClick={handleSlugSave}
-                  disabled={adminUpdateOrganizationSlug.isPending || !isEditedSlugAvailable}
+                  disabled={updateOrganizationSlug.isPending || !isEditedSlugAvailable}
                   className="h-8 w-8 p-0"
                   aria-label="Save organization slug"
                 >
@@ -445,7 +446,7 @@ function Inner(props: InnerProps) {
                   size="sm"
                   variant="ghost"
                   onClick={handleSlugCancel}
-                  disabled={adminUpdateOrganizationSlug.isPending}
+                  disabled={updateOrganizationSlug.isPending}
                   className="h-8 w-8 p-0"
                   aria-label="Cancel organization slug edit"
                 >
@@ -459,7 +460,7 @@ function Inner(props: InnerProps) {
               <p className="font-mono text-sm">
                 {info.slug || <span className="text-muted-foreground">Not set</span>}
               </p>
-              {isKiloAdmin && (
+              {canEditSlug && (
                 <button
                   onClick={() => setIsEditingSlug(true)}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none"

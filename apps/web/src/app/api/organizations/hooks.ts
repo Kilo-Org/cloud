@@ -200,7 +200,7 @@ export function useUpdateOrganizationName() {
   );
 }
 
-export function useAdminUpdateOrganizationSlug() {
+export function useUpdateOrganizationSlug() {
   const trpc = useTRPC();
   const invalidate = useInvalidateAllOrganizationData();
   const queryClient = useQueryClient();

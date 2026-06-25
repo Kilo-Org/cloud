@@ -9,6 +9,8 @@ import type { User, Organization } from '@kilocode/db/schema';
 // Test users and organization will be created dynamically
 let regularUser: User;
 let adminUser: User;
+let creditManagerUser: User;
+let adminWithoutCreditAccessUser: User;
 let memberUser: User;
 let nonMemberUser: User;
 let testOrganization: Organization;
@@ -26,6 +28,20 @@ describe('organizations trpc router', () => {
       google_user_email: 'admin-org@admin.example.com',
       google_user_name: 'Admin Org User',
       is_admin: true,
+    });
+
+    creditManagerUser = await insertTestUser({
+      google_user_email: 'credit-manager-org@admin.example.com',
+      google_user_name: 'Credit Manager Org User',
+      is_admin: true,
+      can_manage_credits: true,
+    });
+
+    adminWithoutCreditAccessUser = await insertTestUser({
+      google_user_email: 'admin-without-credit-org@admin.example.com',
+      google_user_name: 'Admin Without Credit Org User',
+      is_admin: true,
+      can_manage_credits: false,
     });
 
     memberUser = await insertTestUser({
@@ -231,7 +247,7 @@ describe('organizations trpc router', () => {
         });
 
         expect(result.childOrganizations).toEqual([
-          { id: childOrganization.id, name: 'Child Label Organization' },
+          { id: childOrganization.id, name: 'Child Label Organization', slug: null },
         ]);
         const member = result.members.find(m => m.status === 'active' && m.id === parentMember.id);
         expect(member).toMatchObject({
@@ -541,6 +557,109 @@ describe('organizations trpc router', () => {
         .update(organizations)
         .set({ name: 'Test Organization' })
         .where(eq(organizations.id, testOrganization.id));
+    });
+  });
+
+  describe('updateSlug procedure', () => {
+    let slugConflictOrganization: Organization;
+
+    beforeAll(async () => {
+      slugConflictOrganization = await createOrganization(
+        'Slug Conflict Organization',
+        memberUser.id
+      );
+      await db
+        .update(organizations)
+        .set({ slug: 'existing-slug' })
+        .where(eq(organizations.id, slugConflictOrganization.id));
+    });
+
+    afterAll(async () => {
+      await db.delete(organizations).where(eq(organizations.id, slugConflictOrganization.id));
+    });
+
+    afterEach(async () => {
+      await db
+        .update(organizations)
+        .set({ slug: null })
+        .where(eq(organizations.id, testOrganization.id));
+    });
+
+    it('updates organization slug for organization owner', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.organizations.updateSlug({
+        organizationId: testOrganization.id,
+        slug: 'owner-slug',
+      });
+
+      expect(result).toEqual({
+        organization: {
+          id: testOrganization.id,
+          slug: 'owner-slug',
+        },
+      });
+
+      const [updatedOrg] = await db
+        .select({ slug: organizations.slug })
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+      expect(updatedOrg.slug).toBe('owner-slug');
+    });
+
+    it('updates organization slug for credit managers without org membership', async () => {
+      const caller = await createCallerForUser(creditManagerUser.id);
+
+      const result = await caller.organizations.updateSlug({
+        organizationId: testOrganization.id,
+        slug: 'support-slug',
+      });
+
+      expect(result.organization.slug).toBe('support-slug');
+    });
+
+    it('rejects admins without credit management access when they are not org members', async () => {
+      const caller = await createCallerForUser(adminWithoutCreditAccessUser.id);
+
+      await expect(
+        caller.organizations.updateSlug({
+          organizationId: testOrganization.id,
+          slug: 'admin-no-credit-slug',
+        })
+      ).rejects.toThrow('You do not have access to this organization');
+    });
+
+    it('rejects regular organization members', async () => {
+      const caller = await createCallerForUser(memberUser.id);
+
+      await expect(
+        caller.organizations.updateSlug({
+          organizationId: testOrganization.id,
+          slug: 'member-slug',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+
+    it('rejects non-members', async () => {
+      const caller = await createCallerForUser(nonMemberUser.id);
+
+      await expect(
+        caller.organizations.updateSlug({
+          organizationId: testOrganization.id,
+          slug: 'non-member-slug',
+        })
+      ).rejects.toThrow('You do not have access to this organization');
+    });
+
+    it('rejects unavailable slugs', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.organizations.updateSlug({
+          organizationId: testOrganization.id,
+          slug: 'existing-slug',
+        })
+      ).rejects.toThrow('Requested slug is not available');
     });
   });
 

@@ -3,7 +3,10 @@ import { db } from '@/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import {
+  findOrganizationByRouteIdentifier,
   getOrganizationRouteIdentifier,
+  isOrganizationRouteIdentifierMatch,
+  isUuidOrganizationRouteIdentifier,
   ORGANIZATION_SLUG_MAX_LENGTH,
 } from './organization-route-utils';
 import {
@@ -22,6 +25,47 @@ describe('getOrganizationRouteIdentifier', () => {
 
   it('exports the organization slug route length', () => {
     expect(ORGANIZATION_SLUG_MAX_LENGTH).toBe(32);
+  });
+});
+
+describe('organization route identifier matching', () => {
+  const organizationsForRouteMatching = [
+    { id: '550e8400-e29b-41d4-a716-446655440000', slug: 'acme' },
+    { id: '550e8400-e29b-41d4-a716-446655440001', slug: null },
+  ];
+
+  it('matches organizations by slug or id', () => {
+    expect(isOrganizationRouteIdentifierMatch(organizationsForRouteMatching[0], 'acme')).toBe(true);
+    expect(
+      isOrganizationRouteIdentifierMatch(
+        organizationsForRouteMatching[0],
+        '550e8400-e29b-41d4-a716-446655440000'
+      )
+    ).toBe(true);
+  });
+
+  it('finds an organization by slug route identifier', () => {
+    expect(findOrganizationByRouteIdentifier(organizationsForRouteMatching, 'acme')).toEqual(
+      organizationsForRouteMatching[0]
+    );
+  });
+
+  it('finds an organization by id route identifier', () => {
+    expect(
+      findOrganizationByRouteIdentifier(
+        organizationsForRouteMatching,
+        '550e8400-e29b-41d4-a716-446655440001'
+      )
+    ).toEqual(organizationsForRouteMatching[1]);
+  });
+
+  it('returns null when there is no route identifier', () => {
+    expect(findOrganizationByRouteIdentifier(organizationsForRouteMatching, null)).toBeNull();
+  });
+
+  it('detects UUID route identifiers', () => {
+    expect(isUuidOrganizationRouteIdentifier('550e8400-e29b-41d4-a716-446655440000')).toBe(true);
+    expect(isUuidOrganizationRouteIdentifier('acme')).toBe(false);
   });
 });
 

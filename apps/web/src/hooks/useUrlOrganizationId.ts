@@ -1,20 +1,27 @@
 import { usePathname } from 'next/navigation';
 import { useMemo } from 'react';
 
-const ORG_PATH_REGEX =
-  /^\/organizations\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+const ORG_PATH_REGEX = /^\/organizations\/([^/?#]+)/;
+
+export function getUrlOrganizationIdentifier(pathname: string): string | null {
+  const orgMatch = pathname.match(ORG_PATH_REGEX);
+  return orgMatch ? decodeURIComponent(orgMatch[1]) : null;
+}
 
 /**
- * Hook to extract organization ID from the current URL pathname.
+ * Hook to extract organization route identifier from the current URL pathname.
  * Returns null if not viewing an organization page.
  *
- * Uses useMemo (not useEffect) so the org ID is available on the first render,
+ * Uses useMemo (not useEffect) so the identifier is available on the first render,
  * avoiding a flash of "Personal Workspace" before the org name appears.
  */
-export function useUrlOrganizationId(): string | null {
+export function useUrlOrganizationIdentifier(): string | null {
   const pathname = usePathname();
   return useMemo(() => {
-    const orgMatch = pathname.match(ORG_PATH_REGEX);
-    return orgMatch ? orgMatch[1] : null;
+    return getUrlOrganizationIdentifier(pathname);
   }, [pathname]);
+}
+
+export function useUrlOrganizationId(): string | null {
+  return useUrlOrganizationIdentifier();
 }

@@ -5,8 +5,32 @@ export type OrganizationRouteIdentifierInput = {
   slug: string | null;
 };
 
+const UUID_ROUTE_IDENTIFIER_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export function getOrganizationRouteIdentifier(
   organization: OrganizationRouteIdentifierInput
 ): string {
   return organization.slug ?? organization.id;
+}
+
+export function isUuidOrganizationRouteIdentifier(identifier: string): boolean {
+  return UUID_ROUTE_IDENTIFIER_PATTERN.test(identifier);
+}
+
+export function isOrganizationRouteIdentifierMatch(
+  organization: OrganizationRouteIdentifierInput,
+  routeIdentifier: string
+): boolean {
+  return organization.id === routeIdentifier || organization.slug === routeIdentifier;
+}
+
+export function findOrganizationByRouteIdentifier<T extends OrganizationRouteIdentifierInput>(
+  organizations: readonly T[],
+  routeIdentifier: string | null | undefined
+): T | null {
+  if (!routeIdentifier) return null;
+  return (
+    organizations.find(org => isOrganizationRouteIdentifierMatch(org, routeIdentifier)) ?? null
+  );
 }

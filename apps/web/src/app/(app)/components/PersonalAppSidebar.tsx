@@ -33,6 +33,7 @@ import {
   Gift,
   ChevronLeft,
   ChevronRight,
+  ChartLine,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -86,6 +87,11 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: 'Usage',
       icon: ChartColumnIncreasing,
       url: '/usage',
+    },
+    {
+      title: 'Cost Insights',
+      icon: ChartLine,
+      url: '/cost-insights',
     },
   ];
 

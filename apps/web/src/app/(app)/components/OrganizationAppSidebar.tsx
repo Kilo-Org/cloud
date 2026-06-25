@@ -27,6 +27,7 @@ import {
   MessageSquare,
   ChevronLeft,
   ChevronRight,
+  ChartLine,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -99,6 +100,8 @@ export default function OrganizationAppSidebar({
     }
   }, [actualRole, user?.is_admin, setOriginalRole, setAssumedRole]);
 
+  const hasOwnerLevelAccess = currentRole === 'owner' || currentRole === 'billing_manager';
+
   // Dashboard group
   const dashboardItems: Array<{
     title: string;
@@ -125,9 +128,16 @@ export default function OrganizationAppSidebar({
       icon: ChartColumnIncreasing,
       url: `/organizations/${organizationId}/usage-details`,
     },
+    ...(hasOwnerLevelAccess
+      ? [
+          {
+            title: 'Cost Insights',
+            icon: ChartLine,
+            url: `/organizations/${organizationId}/cost-insights`,
+          },
+        ]
+      : []),
   ];
-
-  const hasOwnerLevelAccess = currentRole === 'owner' || currentRole === 'billing_manager';
 
   // KiloClaw group
   const kiloClawItems: Array<{

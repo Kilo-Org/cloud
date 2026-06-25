@@ -1,0 +1,150 @@
+import { useState } from 'react';
+import type { Meta, StoryObj } from '@storybook/nextjs';
+import {
+  CostInsightsAskKiloView,
+  CostInsightsDashboardView,
+  CostInsightsShellView,
+  type CostInsightsDashboardData,
+  type CostInsightsPage,
+} from '@/components/cost-insights';
+import {
+  anomalyAlert,
+  anomalyMetrics,
+  codingPlanSuggestion,
+  dashboardData,
+  emptyDashboardData,
+  evidenceAnomaly,
+  kiloPassSuggestion,
+  longLabelDrivers,
+  organizationOwner,
+  thresholdAlert,
+} from './costInsightsFixtures';
+
+const meta: Meta<typeof CostInsightsDashboardView> = {
+  title: 'Cost Insights/Overview',
+  component: CostInsightsDashboardView,
+  parameters: { layout: 'fullscreen' },
+};
+
+export default meta;
+type Story = StoryObj<typeof CostInsightsDashboardView>;
+
+function CostInsightsOverviewStory({
+  data,
+  options = {},
+  initialPage = 'dashboard',
+}: {
+  data: CostInsightsDashboardData;
+  options?: { isLoading?: boolean; isError?: boolean; attention?: 'none' | 'alert' };
+  initialPage?: CostInsightsPage;
+}) {
+  const [activePage, setActivePage] = useState<CostInsightsPage>(initialPage);
+  const [askKiloQuestion, setAskKiloQuestion] = useState(
+    'Create a graph of my costs for the last week'
+  );
+
+  function handleAskKilo(question: string) {
+    setAskKiloQuestion(question);
+    setActivePage('ask');
+  }
+
+  return (
+    <CostInsightsShellView
+      owner={data.owner}
+      activePage={activePage}
+      attention={options.attention ?? (data.alerts.length > 0 ? 'alert' : 'none')}
+      onPageChange={setActivePage}
+    >
+      {activePage === 'ask' ? (
+        <CostInsightsAskKiloView initialQuestion={askKiloQuestion} />
+      ) : (
+        <CostInsightsDashboardView
+          data={data}
+          isLoading={options.isLoading}
+          isError={options.isError}
+          onAskKilo={handleAskKilo}
+        />
+      )}
+    </CostInsightsShellView>
+  );
+}
+
+function renderDashboard(
+  data: CostInsightsDashboardData,
+  options: { isLoading?: boolean; isError?: boolean; attention?: 'none' | 'alert' } = {}
+) {
+  return <CostInsightsOverviewStory data={data} options={options} />;
+}
+
+export const PersonalOverview: Story = {
+  render: () => renderDashboard(dashboardData()),
+};
+
+export const AlertsNotSetUp: Story = {
+  render: () =>
+    renderDashboard(
+      dashboardData({
+        enabled: false,
+        alerts: [],
+      })
+    ),
+};
+
+export const NoSpendYet: Story = {
+  render: () => renderDashboard(emptyDashboardData()),
+};
+
+export const AlertsNeedReview: Story = {
+  render: () =>
+    renderDashboard(
+      dashboardData({
+        alerts: [anomalyAlert, thresholdAlert],
+        metrics: anomalyMetrics(),
+        evidence: evidenceAnomaly,
+      }),
+      { attention: 'alert' }
+    ),
+};
+
+export const KiloPassSuggestion: Story = {
+  render: () => renderDashboard(dashboardData({ suggestions: [kiloPassSuggestion] })),
+};
+
+export const CodingPlanSuggestion: Story = {
+  render: () => renderDashboard(dashboardData({ suggestions: [codingPlanSuggestion] })),
+};
+
+export const AlertAndSuggestion: Story = {
+  render: () =>
+    renderDashboard(
+      dashboardData({
+        alerts: [anomalyAlert],
+        suggestions: [kiloPassSuggestion],
+        metrics: anomalyMetrics(),
+        evidence: evidenceAnomaly,
+      }),
+      { attention: 'alert' }
+    ),
+};
+
+export const Loading: Story = {
+  render: () => renderDashboard(dashboardData(), { isLoading: true }),
+};
+
+export const LoadError: Story = {
+  render: () => renderDashboard(dashboardData(), { isError: true }),
+};
+
+export const MobileOrganizationOverview: Story = {
+  render: () =>
+    renderDashboard(
+      dashboardData({
+        owner: organizationOwner,
+        drivers: longLabelDrivers,
+        memberLimitsHref: '/organizations/acme/members/limits',
+      })
+    ),
+  globals: {
+    viewport: { value: 'mobile2', isRotated: false },
+  },
+};

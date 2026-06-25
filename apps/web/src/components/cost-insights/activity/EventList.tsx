@@ -1,0 +1,168 @@
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  Lightbulb,
+  Settings2,
+  TrendingUp,
+  XCircle,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { money, percentOf, sourceLabels } from '../formatting';
+import { EmptyPanel } from '../shared/EmptyPanel';
+import { StatusBadge } from '../shared/StatusBadge';
+import type { CostInsightEvent } from '../types';
+
+export function EventList({
+  events,
+  compact = false,
+}: {
+  events: CostInsightEvent[];
+  compact?: boolean;
+}) {
+  if (events.length === 0)
+    return <EmptyPanel title="No recent activity" description="New activity will appear here." />;
+  return (
+    <ol className="divide-border divide-y">
+      {events.map(event => {
+        const Icon =
+          event.type === 'anomaly_alert'
+            ? TrendingUp
+            : event.type === 'threshold_crossed'
+              ? AlertTriangle
+              : event.type === 'suggestion_created'
+                ? Lightbulb
+                : event.type === 'reviewed'
+                  ? CheckCircle2
+                  : event.type === 'suggestion_dismissed' || event.type === 'disabled'
+                    ? XCircle
+                    : Settings2;
+        const eventLabel =
+          event.type === 'anomaly_alert'
+            ? 'Anomaly alert'
+            : event.type === 'threshold_crossed'
+              ? 'Threshold alert'
+              : event.type === 'suggestion_created'
+                ? 'Suggestion'
+                : event.type === 'suggestion_dismissed'
+                  ? 'Suggestion dismissed'
+                  : event.type === 'reviewed'
+                    ? 'Review'
+                    : 'Settings change';
+        const capturedSpend =
+          event.topDrivers?.reduce((sum, driver) => sum + driver.spendUsd, 0) ?? 0;
+        return (
+          <li key={event.id} className={cn(compact ? 'py-5 first:pt-0 last:pb-0' : 'p-4 sm:p-6')}>
+            <div className="grid gap-3 lg:grid-cols-[7.5rem_minmax(0,1fr)_auto] lg:gap-5">
+              <div className="flex items-center gap-3 lg:flex-col lg:items-start lg:gap-2">
+                <time className="type-label text-muted-foreground block shrink-0">
+                  {event.timestampLabel}
+                </time>
+                <StatusBadge
+                  tone={
+                    event.type === 'anomaly_alert' || event.type === 'threshold_crossed'
+                      ? 'warning'
+                      : event.type === 'suggestion_created'
+                        ? 'success'
+                        : 'neutral'
+                  }
+                >
+                  {eventLabel}
+                </StatusBadge>
+              </div>
+              <div className="min-w-0">
+                <div className="flex gap-3">
+                  <div className="bg-surface-overlay text-muted-foreground flex size-9 shrink-0 items-center justify-center rounded-lg">
+                    <Icon className="size-4" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="type-body font-medium break-words">{event.title}</div>
+                    <p className="type-label text-muted-foreground mt-1">{event.description}</p>
+                    {event.actorLabel && (
+                      <p className="type-label text-muted-foreground mt-2">By {event.actorLabel}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {event.amountLabel && (
+                <div className="lg:text-right">
+                  <div className="font-mono type-body font-semibold tabular-nums">
+                    {event.amountLabel}
+                  </div>
+                  {event.amountClassifier && (
+                    <div className="type-label text-muted-foreground mt-0.5">
+                      {event.amountClassifier}
+                    </div>
+                  )}
+                </div>
+              )}
+              {!compact && event.topDrivers && event.topDrivers.length > 0 && (
+                <details className="group lg:col-span-2 lg:col-start-2">
+                  <summary className="focus-visible:ring-ring text-muted-foreground hover:text-foreground inline-flex min-h-control-touch cursor-pointer list-none items-center gap-1.5 rounded-md type-label font-medium focus-visible:ring-2 focus-visible:outline-none sm:min-h-8">
+                    View contributors
+                    <ChevronDown
+                      className="size-icon-sm transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                      aria-hidden="true"
+                    />
+                  </summary>
+                  <div className="border-border bg-surface-inset mt-2 overflow-hidden rounded-lg border">
+                    <div className="border-border flex items-center justify-between gap-4 border-b px-4 py-3">
+                      <div className="type-label font-medium">
+                        Largest contributors at alert time
+                      </div>
+                      <div className="type-label text-muted-foreground shrink-0">
+                        {money(capturedSpend)} captured
+                      </div>
+                    </div>
+                    <ol className="divide-border divide-y">
+                      {event.topDrivers.slice(0, 5).map((driver, index) => {
+                        const share = percentOf(driver.spendUsd, capturedSpend);
+                        return (
+                          <li
+                            key={`${event.id}-${driver.label}-${driver.actorLabel ?? 'none'}`}
+                            className="grid gap-3 px-4 py-3 lg:grid-cols-[1.5rem_minmax(0,1fr)_8rem] lg:items-center"
+                          >
+                            <span className="type-label text-muted-foreground hidden font-mono lg:block">
+                              {index + 1}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="type-body font-medium break-words">
+                                {driver.label}
+                              </div>
+                              <div className="type-label text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                <span>{driver.actorLabel ?? 'No member attributed'}</span>
+                                <span>{sourceLabels[driver.source]}</span>
+                                {driver.modelOrProvider && <span>{driver.modelOrProvider}</span>}
+                              </div>
+                            </div>
+                            <div className="lg:text-right">
+                              <div className="type-body font-mono font-semibold tabular-nums">
+                                {money(driver.spendUsd)}
+                              </div>
+                              <div className="type-label text-muted-foreground mt-0.5">
+                                {share}% of captured spend
+                              </div>
+                              <div
+                                className="bg-surface-overlay mt-2 h-1 overflow-hidden rounded-full"
+                                aria-hidden="true"
+                              >
+                                <div
+                                  className="bg-chart-1 h-full rounded-full"
+                                  style={{ width: `${share}%` }}
+                                />
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </div>
+                </details>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}

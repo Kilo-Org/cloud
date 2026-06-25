@@ -233,6 +233,36 @@ describe('tab debugger helpers', () => {
     ).resolves.toStrictEqual({ error: 'Page evaluation timed out.', ok: false });
   });
 
+  it('reports Firefox scripting eval errors instead of a phantom success', async () => {
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: () => [{ error: { message: 'missingValue is not defined' } }],
+    };
+
+    await expect(
+      evalInTabWithScripting({
+        code: 'return missingValue;',
+        scriptingApi,
+        tabId: 7,
+      })
+    ).resolves.toStrictEqual({
+      error: 'Page evaluation failed: missingValue is not defined',
+      ok: false,
+    });
+  });
+
+  it('reports Firefox scripting snapshot errors instead of a phantom success', async () => {
+    const scriptingApi: BrowserScriptingApi = {
+      executeScript: () => [{ error: 'Page snapshot timed out.' }],
+    };
+
+    await expect(
+      getPageSnapshotInTabWithScripting({ scriptingApi, tabId: 7 })
+    ).resolves.toStrictEqual({
+      error: 'Failed to read page snapshot: Page snapshot timed out.',
+      ok: false,
+    });
+  });
+
   it('rejects non-serializable Firefox scripting eval results', async () => {
     const scriptingApi: BrowserScriptingApi = {
       executeScript: () => {

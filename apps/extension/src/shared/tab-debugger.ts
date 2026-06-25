@@ -55,6 +55,8 @@ export interface BrowserTabsApi {
 }
 
 export interface BrowserScriptingInjectionResult {
+  // Firefox sets `error` (the thrown/rejected value) when the injected function fails; `result` is absent.
+  readonly error?: unknown;
   readonly result?: unknown;
 }
 
@@ -366,6 +368,23 @@ const getExceptionMessage = (exceptionDetails: unknown): string => {
   }
 
   return 'Page evaluation failed.';
+};
+const extractInjectionErrorText = (error: unknown): string | undefined => {
+  if (typeof error === 'string' && error.trim() !== '') {
+    return error;
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string' &&
+    error.message.trim() !== ''
+  ) {
+    return error.message;
+  }
+
+  return undefined;
 };
 const toSerializableEvalResult = (value: unknown): EvalTabResult => {
   try {
@@ -730,6 +749,16 @@ export const evalInTabWithScripting = async ({
       timeoutMs
     );
 
+    if (response?.error !== undefined) {
+      const detail = extractInjectionErrorText(response.error);
+
+      return {
+        error:
+          detail === undefined ? 'Page evaluation failed.' : `Page evaluation failed: ${detail}`,
+        ok: false,
+      };
+    }
+
     return toSerializableEvalResult(response?.result);
   } catch (error) {
     return {
@@ -760,6 +789,18 @@ export const getPageSnapshotInTabWithScripting = async ({
       ),
       timeoutMs
     );
+
+    if (response?.error !== undefined) {
+      const detail = extractInjectionErrorText(response.error);
+
+      return {
+        error:
+          detail === undefined
+            ? 'Failed to read page snapshot.'
+            : `Failed to read page snapshot: ${detail}`,
+        ok: false,
+      };
+    }
 
     return { ok: true, value: response?.result };
   } catch (error) {

@@ -2,6 +2,19 @@ import { describe, it, expect } from '@jest/globals';
 import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { morphChatModels, isMorphModel } from '@/lib/ai-gateway/providers/morph';
+import {
+  getAiSdkProvider,
+  getGatewayOpenCodeSettings,
+} from '@/lib/ai-gateway/providers/model-settings';
+
+// Mirrors get-provider.ts: the OpenCode AI SDK provider selects the request kind
+// a client sends. Morph only supports chat_completions, so any other kind is
+// rejected by apiKindNotSupportedResponse before reaching the gateway.
+function requestKindFor(aiSdkProvider: string | undefined) {
+  if (aiSdkProvider === 'anthropic') return 'messages';
+  if (aiSdkProvider === 'openai') return 'responses';
+  return 'chat_completions';
+}
 
 // Resolves a kilo-exclusive model to its provider using the exact same lookup
 // get-provider.ts performs for non-Vercel, non-BYOK gateway models.
@@ -85,4 +98,30 @@ describe('Morph gateway provider', () => {
       expect(model.flags.includes('reasoning')).toBe(true);
     }
   );
+
+  // Regression: getAiSdkProvider's name-based heuristics map any '*minimax*' id
+  // to the Anthropic Messages API (and gpt/grok ids to the OpenAI Responses
+  // API). The Morph gateway only speaks chat_completions, so every Morph model
+  // must resolve to an OpenAI-compatible provider whose request kind the gateway
+  // actually supports — otherwise OpenCode clients hit apiKindNotSupportedResponse.
+  it.each(morphChatModels)(
+    'maps $public_id to a chat_completions-compatible OpenCode provider',
+    model => {
+      const aiSdkProvider = getAiSdkProvider(model.public_id, null);
+      expect(aiSdkProvider).toBe('openai-compatible');
+      expect(getGatewayOpenCodeSettings(model.public_id)?.ai_sdk_provider).toBe(
+        'openai-compatible'
+      );
+
+      const kind = requestKindFor(aiSdkProvider);
+      expect(kind).toBe('chat_completions');
+      expect(PROVIDERS.MORPH.supportedChatApis).toContain(kind);
+    }
+  );
+
+  it('does not route the Morph MiniMax models through the Anthropic Messages API', () => {
+    for (const id of ['morph/minimax-m2.7', 'morph/minimax-m3']) {
+      expect(getAiSdkProvider(id, null)).not.toBe('anthropic');
+    }
+  });
 });

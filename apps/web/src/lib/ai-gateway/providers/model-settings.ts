@@ -19,6 +19,7 @@ import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { ReasoningEffortSchema } from '@kilocode/db/schema-types';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
+import { isMorphModel } from '@/lib/ai-gateway/providers/morph';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 const REASONING_VARIANTS_THINKING_ONLY = {
@@ -136,6 +137,15 @@ export function getAiSdkProvider(
   model: string,
   directProviderId: DirectUserByokInferenceProviderId | null
 ): Exclude<CustomLlmProvider, 'openrouter' /*the default*/> | undefined {
+  if (isMorphModel(model)) {
+    // Morph's gateway only exposes OpenAI Chat Completions
+    // (MORPH.supportedChatApis === ['chat_completions']). Pin every Morph model
+    // to the OpenAI-compatible AI SDK provider so name-based heuristics below
+    // (e.g. minimax -> 'anthropic'/Messages, gpt/grok -> 'openai'/Responses)
+    // never select an API kind the gateway would reject with
+    // apiKindNotSupportedResponse.
+    return 'openai-compatible';
+  }
   if (seed_20_code_free_model.public_id === model) {
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';

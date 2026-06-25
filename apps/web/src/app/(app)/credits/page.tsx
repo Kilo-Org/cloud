@@ -4,14 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Info,
-  X,
-  CheckCircle2,
-  CalendarDays,
-  ExternalLink,
-  ChevronRight,
-} from 'lucide-react';
+import { Info, X, CheckCircle2, CalendarDays, ExternalLink, ChevronRight } from 'lucide-react';
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -392,56 +385,60 @@ export default function CreditsPage() {
           </CardContent>
         </Card>
 
-        {creditData.deductions.length > 0 && (
-          <Card className="w-full overflow-hidden">
-            <CardHeader>
-              <CardTitle className="text-lg font-medium">
-                Credit Subscription Transactions
-              </CardTitle>
-            </CardHeader>
+        <Card className="w-full overflow-hidden">
+          <CardHeader>
+            <CardTitle className="text-lg font-medium">Credit Subscription Transactions</CardTitle>
+            <p className="text-muted-foreground text-sm">
+              Credits spent on subscriptions and other recurring expenses.
+            </p>
+          </CardHeader>
 
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="bg-muted border-b">
-                      <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                        Date
-                      </th>
-                      <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
-                        Description
-                      </th>
-                      <th className="text-muted-foreground px-6 py-3 text-right text-xs font-medium tracking-wider uppercase">
-                        Amount
-                      </th>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-muted border-b">
+                    <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                      Date
+                    </th>
+                    <th className="text-muted-foreground px-6 py-3 text-left text-xs font-medium tracking-wider uppercase">
+                      Description
+                    </th>
+                    <th className="text-muted-foreground px-6 py-3 text-right text-xs font-medium tracking-wider uppercase">
+                      Amount
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-border divide-y">
+                  {creditData.deductions.map(deduction => (
+                    <tr key={deduction.id} className="even:bg-muted text-foreground">
+                      <td className="px-6 py-4 text-sm whitespace-nowrap">
+                        {formatIsoDateString_UsaDateOnlyFormat(deduction.date)}
+                      </td>
+                      <td className="px-6 py-4 text-sm">{deduction.description}</td>
+                      <td className="px-6 py-4 text-sm whitespace-nowrap text-right">
+                        -{formatMicrodollars(Math.abs(deduction.amount_mUsd))}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-border divide-y">
-                    {creditData.deductions.map(deduction => (
-                      <tr key={deduction.id} className="even:bg-muted text-foreground">
-                        <td className="px-6 py-4 text-sm whitespace-nowrap">
-                          {formatIsoDateString_UsaDateOnlyFormat(deduction.date)}
-                        </td>
-                        <td className="px-6 py-4 text-sm">{deduction.description}</td>
-                        <td className="px-6 py-4 text-sm whitespace-nowrap text-right">
-                          -{formatMicrodollars(Math.abs(deduction.amount_mUsd))}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {creditData.deductions.length === 0 && (
+              <div className="text-muted-foreground px-6 py-12 text-center">
+                No subscription transactions found
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="border-border">
           <CardContent className="flex items-start gap-3 px-4 py-3">
             <Info className="mt-0.5 h-4 w-4 text-blue-400 shrink-0" />
             <p className="text-muted-foreground text-sm">
-              Credits are non-refundable and non-transferable. For questions about billing or
-              credits, please{' '}
-              <Link href="mailto:hello@kilocode.ai" className="text-blue-400 hover:underline">
+              Credits are non-refundable. For questions about billing or credits, please{' '}
+              <Link href="mailto:hi@kilocode.ai" className="text-blue-400 hover:underline">
                 contact support
               </Link>
               .

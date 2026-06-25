@@ -111,9 +111,19 @@ type ActiveMember = {
   inviteDate: string | null;
   dailyUsageLimitUsd: number | null;
   currentDailyUsageUsd: number | null;
+  childOrganizationMemberships?: ChildOrganizationMembership[];
 };
 
 export type OrganizationMember = InvitedMember | ActiveMember;
+
+export type ChildOrganizationSummary = {
+  id: string;
+  name: string;
+};
+
+export type ChildOrganizationMembership = ChildOrganizationSummary & {
+  role: OrganizationRole;
+};
 
 export type OrganizationSsoPolicyView = {
   required: boolean;
@@ -124,6 +134,7 @@ export type OrganizationSsoPolicyView = {
 
 export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
   members: OrganizationMember[];
+  childOrganizations: ChildOrganizationSummary[];
   effectiveSsoPolicy: OrganizationSsoPolicyView;
 };
 

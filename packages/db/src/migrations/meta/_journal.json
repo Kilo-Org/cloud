@@ -1212,6 +1212,13 @@
       "when": 1782227993584,
       "tag": "0172_boring_ghost_rider",
       "breakpoints": true
+    },
+    {
+      "idx": 173,
+      "version": "7",
+      "when": 1782381719017,
+      "tag": "0173_lowly_venom",
+      "breakpoints": true
     }
   ]
 }

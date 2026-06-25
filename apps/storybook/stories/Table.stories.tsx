@@ -21,6 +21,12 @@ const meta: Meta<typeof Table> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const usageRows = [
+  { session: 'Storybook QA', model: 'GPT-5.5', cost: '$4.20', selected: true },
+  { session: 'Billing review', model: 'Claude Opus 4.8', cost: '$7.14', selected: false },
+  { session: 'Docs cleanup', model: 'Gemini 3.5', cost: '$1.88', selected: false },
+] as const;
+
 export const Usage: Story = {
   render: () => (
     <div className="w-[640px] rounded-xl border border-border bg-card p-4">
@@ -34,15 +40,11 @@ export const Usage: Story = {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {[
-            ['Storybook QA', 'GPT-5.5', '$4.20'],
-            ['Billing review', 'Claude Opus 4.8', '$7.14'],
-            ['Docs cleanup', 'Gemini 3.5', '$1.88'],
-          ].map(row => (
-            <TableRow key={row[0]}>
-              <TableCell className="font-medium">{row[0]}</TableCell>
-              <TableCell>{row[1]}</TableCell>
-              <TableCell className="text-right tabular-nums">{row[2]}</TableCell>
+          {usageRows.map(row => (
+            <TableRow key={row.session} data-state={row.selected ? 'selected' : undefined}>
+              <TableCell className="font-medium">{row.session}</TableCell>
+              <TableCell>{row.model}</TableCell>
+              <TableCell className="text-right tabular-nums">{row.cost}</TableCell>
             </TableRow>
           ))}
         </TableBody>

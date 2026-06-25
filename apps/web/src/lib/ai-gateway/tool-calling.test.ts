@@ -4,7 +4,11 @@ import type {
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { repairTools, repairMessagesTools, sanitizeBinaryToolResults } from './tool-calling';
+import {
+  repairChatCompletionsTools,
+  repairMessagesTools,
+  sanitizeBinaryToolResults,
+} from './tool-calling';
 
 function createRequest(
   overrides: Partial<OpenRouterChatCompletionRequest> = {}
@@ -16,7 +20,7 @@ function createRequest(
   };
 }
 
-describe('repairTools', () => {
+describe('repairChatCompletionsTools', () => {
   describe('spurious tool result removal', () => {
     it('should remove tool results without matching tool calls', () => {
       const request = createRequest({
@@ -26,7 +30,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(1);
       expect(request.messages[0]).toEqual({ role: 'user', content: 'Hello' });
@@ -47,7 +51,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(3);
     });
@@ -62,7 +66,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(2);
       expect(request.messages.map(m => m.role)).toEqual(['user', 'assistant']);
@@ -85,7 +89,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(4);
       expect(request.messages[2]).toEqual({
@@ -111,7 +115,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(5);
       expect(request.messages[2]).toEqual({
@@ -143,7 +147,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       // Missing result for call_2 is inserted right after the assistant message
       // So the order becomes: user, assistant, call_2_result (inserted), call_1_result (existing), user
@@ -169,7 +173,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(3);
     });
@@ -196,7 +200,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(6);
       expect(request.messages[2]).toEqual({
@@ -229,7 +233,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       // Orphan removed, missing result inserted
       expect(request.messages).toHaveLength(4);
@@ -278,7 +282,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       // Stray result removed, missing result inserted
       expect(request.messages).toHaveLength(6);
@@ -294,7 +298,7 @@ describe('repairTools', () => {
     it('should handle empty messages array', () => {
       const request = createRequest({ messages: [] });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toEqual([]);
     });
@@ -307,7 +311,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(2);
     });
@@ -320,7 +324,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(2);
     });
@@ -341,7 +345,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(4);
     });
@@ -371,7 +375,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       // All messages should remain - both tool results match their respective tool calls
       expect(request.messages).toHaveLength(6);
@@ -405,7 +409,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(3);
       const assistantMsg = request.messages[1];
@@ -431,7 +435,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(3);
       expect(request.messages[2]).toEqual({
@@ -472,7 +476,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(4);
       const assistantMsg = request.messages[1];
@@ -508,7 +512,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       // Should deduplicate to single tool call, then insert missing result
       expect(request.messages).toHaveLength(4);
@@ -543,7 +547,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       // Duplicate tool calls removed (2 unique), duplicate results removed
       expect(request.messages).toHaveLength(4);
@@ -582,7 +586,7 @@ describe('repairTools', () => {
         ],
       });
 
-      repairTools(request);
+      repairChatCompletionsTools(request);
 
       expect(request.messages).toHaveLength(3);
       const assistantMsg = request.messages[1];
@@ -1041,6 +1045,147 @@ describe('sanitizeBinaryToolResults', () => {
       const user = request.body.messages[1];
       if (user.role !== 'user') throw new Error('expected user');
       expect(user.content).toEqual([{ type: 'tool_result', tool_use_id: 'tu_1', content: 'ok' }]);
+    });
+
+    it('should insert missing tool results before existing results and user content', () => {
+      const request = {
+        model: 'test-model',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'assistant',
+            content: [
+              { type: 'tool_use', id: 'tu_1', name: 'read', input: {} },
+              { type: 'tool_use', id: 'tu_2', name: 'write', input: {} },
+            ],
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'tool_result', tool_use_id: 'tu_1', content: 'read result' },
+              { type: 'text', text: 'Continue' },
+            ],
+          },
+        ],
+      } as GatewayMessagesRequest;
+
+      repairMessagesTools(request);
+
+      expect(request.messages[1]).toEqual({
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'tu_2',
+            content: 'Tool execution was interrupted before completion.',
+          },
+          { type: 'tool_result', tool_use_id: 'tu_1', content: 'read result' },
+          { type: 'text', text: 'Continue' },
+        ],
+      });
+    });
+
+    it('should keep only the first matching tool result', () => {
+      const request = {
+        model: 'test-model',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'assistant',
+            content: [{ type: 'tool_use', id: 'tu_1', name: 'read', input: {} }],
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'tool_result', tool_use_id: 'tu_1', content: 'first' },
+              { type: 'tool_result', tool_use_id: 'tu_1', content: 'duplicate' },
+            ],
+          },
+        ],
+      } as GatewayMessagesRequest;
+
+      repairMessagesTools(request);
+
+      expect(request.messages[1]).toEqual({
+        role: 'user',
+        content: [{ type: 'tool_result', tool_use_id: 'tu_1', content: 'first' }],
+      });
+    });
+
+    it('should scope results to their assistant turn when tool ids are reused', () => {
+      const request = {
+        model: 'test-model',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'assistant',
+            content: [{ type: 'tool_use', id: 'tu_1', name: 'read', input: {} }],
+          },
+          { role: 'user', content: 'Continue' },
+          {
+            role: 'assistant',
+            content: [{ type: 'tool_use', id: 'tu_1', name: 'write', input: {} }],
+          },
+          {
+            role: 'user',
+            content: [{ type: 'tool_result', tool_use_id: 'tu_1', content: 'write result' }],
+          },
+        ],
+      } as GatewayMessagesRequest;
+
+      repairMessagesTools(request);
+
+      expect(request.messages).toEqual([
+        {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 'tu_1', name: 'read', input: {} }],
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'tu_1',
+              content: 'Tool execution was interrupted before completion.',
+            },
+            { type: 'text', text: 'Continue' },
+          ],
+        },
+        {
+          role: 'assistant',
+          content: [{ type: 'tool_use', id: 'tu_1', name: 'write', input: {} }],
+        },
+        {
+          role: 'user',
+          content: [{ type: 'tool_result', tool_use_id: 'tu_1', content: 'write result' }],
+        },
+      ]);
+    });
+
+    it('should insert a user message when the final tool use has no result', () => {
+      const request = {
+        model: 'test-model',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'assistant',
+            content: [{ type: 'tool_use', id: 'tu_1', name: 'read', input: {} }],
+          },
+        ],
+      } as GatewayMessagesRequest;
+
+      repairMessagesTools(request);
+
+      expect(request.messages[1]).toEqual({
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'tu_1',
+            content: 'Tool execution was interrupted before completion.',
+          },
+        ],
+      });
     });
 
     it('should preserve content arrays with no duplicates', () => {

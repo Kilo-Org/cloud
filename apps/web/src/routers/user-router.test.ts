@@ -1,7 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
+import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
@@ -414,5 +414,114 @@ describe('session and API token reset mutations', () => {
     expect(updated.web_session_pepper).toEqual(expect.any(String));
     expect(updated.web_session_pepper).not.toBe('web-session-pepper-before');
     expect(updated.api_token_pepper).toBe('api-pepper-before');
+  });
+});
+
+describe('user router - credit purchase history', () => {
+  let purchaser: User;
+  let otherUser: User;
+  const manualPurchaseId = crypto.randomUUID();
+  const automaticPurchaseId = crypto.randomUUID();
+
+  beforeAll(async () => {
+    purchaser = await insertTestUser({
+      total_microdollars_acquired: 35_000_000,
+      microdollars_used: 35_000_000,
+    });
+    otherUser = await insertTestUser();
+
+    await db.insert(credit_transactions).values([
+      {
+        id: manualPurchaseId,
+        kilo_user_id: purchaser.id,
+        amount_microdollars: 20_000_000,
+        is_free: false,
+        description: 'Top-up via stripe',
+        stripe_payment_id: `ch_${crypto.randomUUID()}`,
+        created_at: '2026-06-20T10:00:00.000Z',
+      },
+      {
+        id: automaticPurchaseId,
+        kilo_user_id: purchaser.id,
+        amount_microdollars: 15_000_000,
+        is_free: false,
+        description: 'Auto top-up via stripe',
+        stripe_payment_id: `in_${crypto.randomUUID()}`,
+        created_at: '2026-06-21T10:00:00.000Z',
+      },
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: purchaser.id,
+        amount_microdollars: 9_000_000,
+        is_free: false,
+        description: 'KiloClaw standard settlement',
+        stripe_payment_id: `in_${crypto.randomUUID()}`,
+        created_at: '2026-06-22T10:00:00.000Z',
+      },
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: purchaser.id,
+        amount_microdollars: 5_000_000,
+        is_free: true,
+        description: 'Promotional credits',
+        created_at: '2026-06-23T10:00:00.000Z',
+      },
+    ]);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(credit_transactions)
+      .where(inArray(credit_transactions.kilo_user_id, [purchaser.id, otherUser.id]));
+    await db.delete(kilocode_users).where(inArray(kilocode_users.id, [purchaser.id, otherUser.id]));
+  });
+
+  it('returns spent personal top-ups without subscription deposits or free grants', async () => {
+    const caller = await createCallerForUser(purchaser.id);
+
+    const result = await caller.user.getCreditPurchaseHistory({ cursor: 0 });
+
+    expect(result.entries).toEqual([
+      expect.objectContaining({
+        id: automaticPurchaseId,
+        description: 'Automatic top-up',
+        amount_mUsd: 15_000_000,
+      }),
+      expect.objectContaining({
+        id: manualPurchaseId,
+        description: 'Credit purchase',
+        amount_mUsd: 20_000_000,
+      }),
+    ]);
+    expect(result.nextCursor).toBeNull();
+    expect(result.previousCursor).toBeNull();
+  });
+
+  it('returns confirmation only to the purchaser', async () => {
+    const purchaserCaller = await createCallerForUser(purchaser.id);
+    const otherCaller = await createCallerForUser(otherUser.id);
+
+    await expect(
+      purchaserCaller.user.getCreditPurchaseConfirmation({ transactionId: manualPurchaseId })
+    ).resolves.toEqual({
+      transactionId: manualPurchaseId,
+      amount_mUsd: 20_000_000,
+      purchasedAt: '2026-06-20T10:00:00.000Z',
+    });
+    await expect(
+      otherCaller.user.getCreditPurchaseConfirmation({ transactionId: manualPurchaseId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('authorizes receipt lookup by purchase ownership', async () => {
+    const purchaserCaller = await createCallerForUser(purchaser.id);
+    const otherCaller = await createCallerForUser(otherUser.id);
+
+    await expect(
+      purchaserCaller.user.getCreditPurchaseReceipt({ transactionId: manualPurchaseId })
+    ).resolves.toEqual({ url: null });
+    await expect(
+      otherCaller.user.getCreditPurchaseReceipt({ transactionId: manualPurchaseId })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

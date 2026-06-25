@@ -81,7 +81,7 @@ export function PlatformCard({ platform, githubIdentityStatus, onNavigate }: Pla
 
   return (
     <Card
-      className={`transition-all ${
+      className={`flex flex-col justify-between transition-all ${
         platform.enabled ? 'cursor-pointer hover:shadow-md' : 'cursor-not-allowed opacity-60'
       }`}
       onClick={platform.enabled ? handleClick : undefined}

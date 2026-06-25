@@ -691,6 +691,20 @@ export async function createSandboxUsageEvent(
   };
 }
 
+type ManagedGitPlatform = 'github' | 'gitlab' | 'bitbucket';
+
+function gitCredentialUsername(platform: ManagedGitPlatform | undefined): string {
+  switch (platform) {
+    case 'gitlab':
+      return 'oauth2';
+    case 'bitbucket':
+      return 'x-token-auth';
+    case 'github':
+    case undefined:
+      return 'x-access-token';
+  }
+}
+
 export async function cloneGitHubRepo(
   session: ExecutionSession,
   workspacePath: string,
@@ -709,14 +723,14 @@ export async function cloneGitRepo(
   gitUrl: string,
   gitToken?: string,
   gitAuthor?: GitAuthorConfig,
-  options?: { shallow?: boolean; platform?: 'github' | 'gitlab' }
+  options?: { shallow?: boolean; platform?: ManagedGitPlatform }
 ): Promise<void> {
   // Build URL with token if available (for private repos)
   // GitLab OAuth tokens require username 'oauth2'; all other providers use 'x-access-token'
   let repoUrl = gitUrl;
   if (gitToken) {
     const url = new URL(gitUrl);
-    url.username = options?.platform === 'gitlab' ? 'oauth2' : 'x-access-token';
+    url.username = gitCredentialUsername(options?.platform);
     url.password = gitToken;
     repoUrl = url.toString();
   }
@@ -803,7 +817,7 @@ export type RestoreWorkspaceOptions = {
   gitToken?: string;
   gitAuthor?: GitAuthorConfig;
   lastSeenBranch?: string;
-  platform?: 'github' | 'gitlab';
+  platform?: ManagedGitPlatform;
 };
 
 export async function restoreWorkspace(
@@ -869,11 +883,10 @@ export async function updateGitRemoteToken(
   workspacePath: string,
   gitUrl: string,
   gitToken: string,
-  platform?: 'github' | 'gitlab'
+  platform?: ManagedGitPlatform
 ): Promise<void> {
-  // Build new URL with token embedded (GitLab uses 'oauth2', others use 'x-access-token')
   const newUrl = new URL(gitUrl);
-  newUrl.username = platform === 'gitlab' ? 'oauth2' : 'x-access-token';
+  newUrl.username = gitCredentialUsername(platform);
   newUrl.password = gitToken;
 
   const sanitizedGitUrl = sanitizeGitUrlForLogging(gitUrl);

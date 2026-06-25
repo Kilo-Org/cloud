@@ -4,8 +4,8 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, desc, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import type { Owner } from '@/lib/integrations/core/types';
-import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
+import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
+import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import {
   deleteIntegration,
@@ -178,7 +178,13 @@ export async function listRepositories(
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(and(eq(platform_integrations.id, integrationId), ownershipCondition))
+    .where(
+      and(
+        eq(platform_integrations.id, integrationId),
+        ownershipCondition,
+        eq(platform_integrations.platform, PLATFORM.GITHUB)
+      )
+    )
     .limit(1);
 
   if (!integration) {
@@ -195,8 +201,9 @@ export async function listRepositories(
     });
   }
 
+  const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
   // If forceRefresh, no cached repos, or never synced before, fetch from GitHub and update cache
-  if (forceRefresh || !integration.repositories?.length || !integration.repositories_synced_at) {
+  if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
     const appType = integration.github_app_type || 'standard';
     const repos = await fetchGitHubRepositories(integration.platform_installation_id, appType);
     await updateRepositoriesForIntegration(integrationId, repos);
@@ -208,7 +215,7 @@ export async function listRepositories(
 
   // Return cached repos
   return {
-    repositories: integration.repositories,
+    repositories: cachedRepositories,
     syncedAt: integration.repositories_synced_at,
   };
 }
@@ -268,7 +275,13 @@ export async function listBranches(
   const [integration] = await db
     .select()
     .from(platform_integrations)
-    .where(and(eq(platform_integrations.id, integrationId), ownershipCondition))
+    .where(
+      and(
+        eq(platform_integrations.id, integrationId),
+        ownershipCondition,
+        eq(platform_integrations.platform, PLATFORM.GITHUB)
+      )
+    )
     .limit(1);
 
   if (!integration) {

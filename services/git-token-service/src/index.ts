@@ -1,5 +1,9 @@
 import { timingSafeEqual } from '@kilocode/encryption';
-import { extractBearerToken, verifyKiloToken } from '@kilocode/worker-utils';
+import {
+  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+  extractBearerToken,
+  verifyKiloToken,
+} from '@kilocode/worker-utils';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
 import { GitLabLookupService, type GitLabLookupSuccess } from './gitlab-lookup-service.js';
@@ -39,6 +43,13 @@ import {
   type GitAuthorConfig,
   type ManagedGitHubFallbackReason as UserAuthorizationFallbackReason,
 } from './github-user-authorization-service.js';
+import {
+  listBitbucketRepositories,
+  resolveBitbucketToken,
+  type BitbucketRepositoryListResult,
+  type GetBitbucketTokenParams,
+  type GetBitbucketTokenResult,
+} from './bitbucket-runtime-token-resolver.js';
 
 export type GetTokenForRepoParams = {
   githubRepo: string;
@@ -71,6 +82,11 @@ export type {
   GetGitLabTokenFailure,
   GetGitLabTokenResult,
 } from './gitlab-runtime-token-resolver.js';
+export type {
+  BitbucketRepositoryListResult,
+  GetBitbucketTokenParams,
+  GetBitbucketTokenResult,
+} from './bitbucket-runtime-token-resolver.js';
 
 export type ManagedGitHubFallbackReason = UserAuthorizationFallbackReason | 'lite_installation';
 
@@ -176,8 +192,9 @@ export type RedeemGitLabSessionCapabilityResult =
   | { success: false; reason: RedeemGitLabSessionCapabilityFailureReason };
 
 const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
+const BITBUCKET_REPOSITORIES_PATH = '/internal/bitbucket/repositories';
 
-type DisconnectEnv = CloudflareEnv & {
+type ServiceHttpEnv = CloudflareEnv & {
   NEXTAUTH_SECRET: SecretsStoreSecret | string;
 };
 
@@ -714,6 +731,12 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     });
   }
 
+  async getBitbucketToken(params: GetBitbucketTokenParams): Promise<GetBitbucketTokenResult> {
+    if (!params.orgId) return { success: false, reason: 'invalid_request' };
+    const result = await resolveBitbucketToken(this.env, params);
+    return result.success ? { success: true, token: result.token } : result;
+  }
+
   async issueGitLabSessionCapability(
     params: IssueGitLabSessionCapabilityParams
   ): Promise<IssueGitLabSessionCapabilityResult> {
@@ -867,9 +890,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 }
 
 export default {
-  async fetch(request: Request, env: DisconnectEnv): Promise<Response> {
+  async fetch(request: Request, env: ServiceHttpEnv): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== DISCONNECT_PATH) return new Response(null, { status: 404 });
+    if (url.pathname !== DISCONNECT_PATH && url.pathname !== BITBUCKET_REPOSITORIES_PATH) {
+      return new Response(null, { status: 404 });
+    }
     if (request.method !== 'POST') return new Response(null, { status: 405 });
 
     const token = extractBearerToken(request.headers.get('Authorization'));
@@ -883,20 +908,40 @@ export default {
     }
     if (!secret) return Response.json({ error: 'authentication_unavailable' }, { status: 503 });
 
-    let kiloUserId: string;
+    let authorization: Awaited<ReturnType<typeof verifyKiloToken>>;
     try {
-      const authorization = await verifyKiloToken(token, secret);
-      kiloUserId = authorization.kiloUserId;
+      authorization = await verifyKiloToken(
+        token,
+        secret,
+        url.pathname === BITBUCKET_REPOSITORIES_PATH
+          ? { audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE }
+          : undefined
+      );
     } catch {
       return Response.json({ error: 'unauthorized' }, { status: 401 });
     }
 
+    if (url.pathname === BITBUCKET_REPOSITORIES_PATH) {
+      if (!authorization.organizationId) {
+        return Response.json({ error: 'organization_required' }, { status: 403 });
+      }
+      try {
+        const result: BitbucketRepositoryListResult = await listBitbucketRepositories(env, {
+          userId: authorization.kiloUserId,
+          orgId: authorization.organizationId,
+        });
+        return Response.json(result);
+      } catch {
+        return Response.json({ status: 'temporarily_unavailable' });
+      }
+    }
+
     try {
       const service = new GitHubUserAuthorizationService(env);
-      await service.disconnectUserAuthorization(kiloUserId);
+      await service.disconnectUserAuthorization(authorization.kiloUserId);
       return Response.json({ disconnected: true });
     } catch {
       return Response.json({ error: 'disconnect_failed' }, { status: 502 });
     }
   },
-} satisfies ExportedHandler<DisconnectEnv>;
+} satisfies ExportedHandler<ServiceHttpEnv>;

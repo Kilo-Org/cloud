@@ -32,6 +32,9 @@ export const directByokModelsRedisKey = (providerId: DirectUserByokInferenceProv
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 
 export const INFERENCE_PROVIDER_USAGE_REDIS_KEY = redisKey('public-api:inference-provider-usage');
+export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
+  'public-api:leaderboard-model-provider-usage'
+);
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 
 export const requestLogRedisKey = (hash: string) => redisKey(`ai-gateway.request-log:${hash}`);

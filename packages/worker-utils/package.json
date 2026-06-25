@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./bitbucket-workspace-access-token": "./src/bitbucket-workspace-access-token.ts",
+    "./internal-service-token-audiences": "./src/internal-service-token-audiences.ts",
     "./instance-id": "./src/instance-id.ts",
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./sandbox-id": "./src/sandbox-id.ts",

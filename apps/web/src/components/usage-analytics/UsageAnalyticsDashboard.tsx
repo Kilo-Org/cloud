@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
+import { skipToken, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,7 +43,11 @@ import {
   type UsageFilters,
   type ViewAs,
 } from './hooks';
-import { useUsageDashboardState } from './useUsageDashboardState';
+import {
+  ORG_SCOPE_ALL_ORGS,
+  ORG_SCOPE_SELF,
+  useUsageDashboardState,
+} from './useUsageDashboardState';
 import {
   DIMENSION_LABELS,
   type CostSource,
@@ -116,7 +121,21 @@ export function UsageAnalyticsDashboard({
   title,
 }: UsageAnalyticsDashboardProps) {
   const trpc = useTRPC();
-  const { state, setState } = useUsageDashboardState();
+  // Migrate legacy `?viewAs=org-wide` links (which meant page-org-wide) to the
+  // new `scope` model so existing bookmarks keep opening an org-wide view
+  // instead of silently collapsing to "My Usage". Only applied when no explicit
+  // `scope` is present.
+  const searchParams = useSearchParams();
+  const legacyOrgWideScope =
+    context === 'organization' &&
+    organizationId &&
+    searchParams.get('scope') == null &&
+    searchParams.get('viewAs') === 'org-wide'
+      ? organizationId
+      : undefined;
+  const { state, setState } = useUsageDashboardState(
+    legacyOrgWideScope ? { orgScope: legacyOrgWideScope } : undefined
+  );
   const {
     period,
     granularity,
@@ -125,10 +144,14 @@ export function UsageAnalyticsDashboard({
     filters,
     groupBy,
     personalView,
-    viewAs,
+    orgScope,
     usageView,
   } = state;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const isOrgContext = context === 'organization';
+  // Owners/billing_managers are the only roles that may view org-wide usage and
+  // (via inheritance) child-org usage, so only they get the expanded scope list.
+  const isOrgAdmin = isOrgContext && (callerRole === 'owner' || callerRole === 'billing_manager');
   const hasEnterpriseUsageViews = context === 'organization' && organizationPlan === 'enterprise';
   const showDetailedUsage = !hasEnterpriseUsageViews || usageView === 'ai-usage';
 
@@ -141,6 +164,17 @@ export function UsageAnalyticsDashboard({
     enabled: context === 'personal',
   });
 
+  // Parent/child hierarchy for the org-context Scope selector. Only fetched for
+  // owners/billing_managers; members never see the expanded scope list.
+  const scopeOrgsQuery = useQuery(
+    trpc.usageAnalytics.getScopeOrganizations.queryOptions(
+      isOrgAdmin && organizationId ? { organizationId } : skipToken
+    )
+  );
+  const scopeOrgs = scopeOrgsQuery.data;
+  const childOrganizations = useMemo(() => scopeOrgs?.children ?? [], [scopeOrgs]);
+  const isParentOrg = childOrganizations.length > 0;
+
   const dateRange = useMemo(() => periodToDateRange(period), [period]);
   const granularityOptions = useMemo(() => granularityOptionsForPeriod(period), [period]);
 
@@ -151,40 +185,81 @@ export function UsageAnalyticsDashboard({
     [setState]
   );
 
-  const effectiveOrgId =
-    context === 'organization'
+  // ---- Effective query scope ----------------------------------------------
+  // Personal context: the org (if any) chosen in the personal Scope dropdown.
+  const personalEffectiveOrgId =
+    personalView !== PERSONAL_VIEW_PERSONAL_ONLY && personalView !== PERSONAL_VIEW_ALL_USAGE
+      ? personalView
+      : null;
+
+  // The set of scope values the caller is allowed to pick in org context:
+  // 'self', the page org (org-wide), each child org, and the all-orgs aggregate.
+  const validOrgScopeValues = useMemo(() => {
+    const values = new Set<string>([ORG_SCOPE_SELF]);
+    if (organizationId) values.add(organizationId);
+    for (const child of childOrganizations) values.add(child.organizationId);
+    if (childOrganizations.length > 0) values.add(ORG_SCOPE_ALL_ORGS);
+    return values;
+  }, [organizationId, childOrganizations]);
+
+  // Clamp the stored scope to something the caller may actually see. Non-admins
+  // and any stale/unknown scope (e.g. a deep link to a sibling org) collapse to
+  // "My Usage". The server independently enforces access regardless.
+  //
+  // While the scope list is still loading we optimistically honor the URL scope
+  // rather than clamp: otherwise a deep link like `?scope=<child-id>&group=user`
+  // would momentarily resolve to 'self', and the cleanup effect below would wipe
+  // (and persist) the deep-linked grouping/user filters before validation runs.
+  // Keyed off `isLoading` (not `!data`) so a failed scope-list fetch falls back
+  // to clamping instead of honoring a stale/unknown scope indefinitely.
+  const scopeListPending = isOrgAdmin && !!organizationId && scopeOrgsQuery.isLoading;
+  const resolvedOrgScope = !isOrgAdmin
+    ? ORG_SCOPE_SELF
+    : scopeListPending || validOrgScopeValues.has(orgScope)
+      ? orgScope
+      : ORG_SCOPE_SELF;
+  const isAllOrgsScope = isOrgContext && resolvedOrgScope === ORG_SCOPE_ALL_ORGS;
+  const isSelfOrgScope = resolvedOrgScope === ORG_SCOPE_SELF;
+
+  // Single org targeted by a query: the page org for 'self', the selected org
+  // for a specific pick, and none for the all-orgs aggregate.
+  const orgContextOrgId: string | null = isAllOrgsScope
+    ? null
+    : isSelfOrgScope
       ? organizationId
-      : personalView !== PERSONAL_VIEW_PERSONAL_ONLY && personalView !== PERSONAL_VIEW_ALL_USAGE
-        ? personalView
-        : null;
+      : resolvedOrgScope;
+
+  const effectiveOrgId: string | null = isOrgContext ? orgContextOrgId : personalEffectiveOrgId;
+
+  // Org ids aggregated by the "All Organizations" scope (parent + children).
+  const effectiveOrganizationIds = useMemo<string[] | null>(() => {
+    if (!isAllOrgsScope) return null;
+    const ids = new Set<string>();
+    if (organizationId) ids.add(organizationId);
+    for (const child of childOrganizations) ids.add(child.organizationId);
+    return Array.from(ids);
+  }, [isAllOrgsScope, organizationId, childOrganizations]);
+
   const effectivePersonalScope: 'personal-only' | 'include-orgs' =
-    context === 'organization' || personalView === PERSONAL_VIEW_ALL_USAGE
-      ? 'include-orgs'
-      : 'personal-only';
+    isOrgContext || personalView === PERSONAL_VIEW_ALL_USAGE ? 'include-orgs' : 'personal-only';
+
+  // Any non-self org scope (a specific org or the all-orgs aggregate) is
+  // org-wide. Personal context is always 'self'.
+  const effectiveViewAs: ViewAs = isOrgContext && !isSelfOrgScope ? 'org-wide' : 'self';
 
   // Role in the effective org drives whether the caller may see all users.
   // - Organization context: prop `callerRole` from the server layout.
   // - Personal context with an org selected: look it up via organizations.list.
-  // - Personal context with no org selected: no role; toggle hidden.
   const roleForEffectiveOrg: OrganizationRole | undefined = useMemo(() => {
-    if (context === 'organization') return callerRole;
-    if (!effectiveOrgId) return undefined;
-    const match = organizations?.find(o => o.organizationId === effectiveOrgId);
-    return match?.role;
-  }, [context, callerRole, effectiveOrgId, organizations]);
+    if (isOrgContext) return callerRole;
+    if (!personalEffectiveOrgId) return undefined;
+    return organizations?.find(o => o.organizationId === personalEffectiveOrgId)?.role;
+  }, [isOrgContext, callerRole, personalEffectiveOrgId, organizations]);
 
-  const canViewAllOrgUsers =
-    !!effectiveOrgId &&
-    (roleForEffectiveOrg === 'owner' || roleForEffectiveOrg === 'billing_manager');
-
-  // Per plan: the view-as toggle is hidden on the personal page entirely.
-  // Personal page users picking an org always get "my usage in that org".
-  const showViewAsSelector = context === 'organization' && canViewAllOrgUsers;
-
-  // Effective viewAs: only honor the toggle when it's allowed + shown.
-  // Server still enforces this; client-side gating avoids sending requests
-  // that would be rejected.
-  const effectiveViewAs: ViewAs = showViewAsSelector && viewAs === 'org-wide' ? 'org-wide' : 'self';
+  const canViewAllOrgUsers = isOrgContext
+    ? isOrgAdmin
+    : !!personalEffectiveOrgId &&
+      (roleForEffectiveOrg === 'owner' || roleForEffectiveOrg === 'billing_manager');
 
   /**
    * Whether the current effective view includes data from multiple users.
@@ -194,43 +269,42 @@ export function UsageAnalyticsDashboard({
    */
   const isOrgWideView = canViewAllOrgUsers && effectiveViewAs === 'org-wide';
 
-  // Reset viewAs to 'self' whenever the effective org changes (e.g. personal
-  // user switches org in the Scope dropdown). Only fires on actual org changes
-  // to avoid a redundant state update on initial mount.
-  const prevEffectiveOrgId = useRef(effectiveOrgId);
-  useEffect(() => {
-    if (prevEffectiveOrgId.current !== effectiveOrgId) {
-      setState({ viewAs: 'self' });
-      prevEffectiveOrgId.current = effectiveOrgId;
+  // Orgs to resolve user ids against for display labels. For the all-orgs
+  // aggregate this spans the parent and its children.
+  const userResolutionOrgIds = useMemo<string[]>(() => {
+    if (effectiveOrganizationIds && effectiveOrganizationIds.length > 0) {
+      return effectiveOrganizationIds;
     }
-  }, [effectiveOrgId, setState]);
+    return effectiveOrgId ? [effectiveOrgId] : [];
+  }, [effectiveOrganizationIds, effectiveOrgId]);
 
-  // When the view collapses to a single user ('self'), drop any stale
-  // user-dimension state that no longer makes sense:
-  // - Reset `groupBy: 'user'` to 'none' so the chart splits by time only.
-  // - Clear user include/exclude filters (the server would otherwise reject
-  //   self-scope requests carrying userIds referring to someone else).
+  // When the scope changes, drop user-dimension state that no longer applies:
+  // - 'self' has no other users, so reset `groupBy: 'user'` and clear user
+  //   filters (the server rejects self-scope requests carrying others' ids).
+  // - Switching between orgs invalidates user filters that referenced the
+  //   previous org's members.
+  const prevResolvedScope = useRef(resolvedOrgScope);
   useEffect(() => {
-    if (isOrgWideView) return;
+    const scopeChanged = prevResolvedScope.current !== resolvedOrgScope;
+    prevResolvedScope.current = resolvedOrgScope;
+    if (isOrgWideView && !scopeChanged) return;
     const updates: Partial<ReturnType<typeof useUsageDashboardState>['state']> = {};
-    if (groupBy === 'user') updates.groupBy = 'none';
-    if (filters.userIds.length > 0 || filters.excludedUserIds.length > 0) {
+    if (groupBy === 'user' && !isOrgWideView) updates.groupBy = 'none';
+    if (
+      (filters.userIds.length > 0 || filters.excludedUserIds.length > 0) &&
+      (!isOrgWideView || scopeChanged)
+    ) {
       updates.filters = { ...filters, userIds: [], excludedUserIds: [] };
     }
     if (Object.keys(updates).length > 0) {
       setState(updates);
     }
-  }, [isOrgWideView, groupBy, filters, setState]);
-
-  const effectiveOrganizationName = useMemo(() => {
-    if (context === 'organization') return organizationName ?? null;
-    if (!effectiveOrgId) return null;
-    return organizations?.find(o => o.organizationId === effectiveOrgId)?.organizationName ?? null;
-  }, [context, organizationName, effectiveOrgId, organizations]);
+  }, [resolvedOrgScope, isOrgWideView, groupBy, filters, setState]);
 
   const commonArgs = useMemo(
     () => ({
       organizationId: effectiveOrgId,
+      organizationIds: effectiveOrganizationIds,
       dateRange,
       granularity,
       costSource,
@@ -240,6 +314,7 @@ export function UsageAnalyticsDashboard({
     }),
     [
       effectiveOrgId,
+      effectiveOrganizationIds,
       dateRange,
       granularity,
       costSource,
@@ -306,7 +381,7 @@ export function UsageAnalyticsDashboard({
   // resolve labels correctly; today that path is hidden in the UI, but the
   // resolver should not depend on UI gating.
   const userIds = useMemo(() => {
-    if (!effectiveOrgId) return [];
+    if (userResolutionOrgIds.length === 0) return [];
     const fromBreakdown = userBreakdown?.breakdown.map(b => b.key) ?? [];
     const fromFilters = [...filters.userIds, ...filters.excludedUserIds];
     const fromTable =
@@ -315,8 +390,8 @@ export function UsageAnalyticsDashboard({
         return userId ? [userId] : [];
       }) ?? [];
     return Array.from(new Set([...fromBreakdown, ...fromFilters, ...fromTable]));
-  }, [userBreakdown, effectiveOrgId, filters.userIds, filters.excludedUserIds, tableData]);
-  const { data: userResolution } = useResolveOrgUsers(effectiveOrgId, userIds);
+  }, [userBreakdown, userResolutionOrgIds, filters.userIds, filters.excludedUserIds, tableData]);
+  const { data: userResolution } = useResolveOrgUsers(userResolutionOrgIds, userIds);
   const userLabelFor = useCallback(
     (value: string) => {
       const match = userResolution?.users.find(u => u.id === value);
@@ -331,13 +406,13 @@ export function UsageAnalyticsDashboard({
 
   const labelForDimensionValue = useCallback(
     (dim: Dimension, value: string): string => {
-      if (dim === 'user' && effectiveOrgId) return userLabelFor(value);
+      if (dim === 'user' && userResolutionOrgIds.length > 0) return userLabelFor(value);
       if (dim === 'feature') return featureLabelFor(value);
       if (dim === 'mode') return modeLabelFor(value);
       if (dim === 'project') return projectLabelFor(value);
       return value;
     },
-    [effectiveOrgId, userLabelFor, featureLabelFor, modeLabelFor, projectLabelFor]
+    [userResolutionOrgIds, userLabelFor, featureLabelFor, modeLabelFor, projectLabelFor]
   );
 
   const activeFilters = useMemo((): ActiveFilter[] => {
@@ -493,22 +568,25 @@ export function UsageAnalyticsDashboard({
     });
   }, [tableData, tableGroupBy, granularity, period, costSource, labelForDimensionValue]);
 
-  const isOrgContext = context === 'organization';
-
   const sidebar = (
     <UsageAnalyticsSidebar
       context={context}
       organizationId={effectiveOrgId}
+      organizationIds={effectiveOrganizationIds}
       dateRange={dateRange}
       personalScope={effectivePersonalScope}
       personalView={personalView}
       onPersonalViewChange={(v: PersonalView) => setState({ personalView: v })}
       organizations={organizations ?? []}
       viewAs={effectiveViewAs}
-      onViewAsChange={(v: ViewAs) => setState({ viewAs: v })}
+      orgScope={resolvedOrgScope}
+      onOrgScopeChange={(v: string) => setState({ orgScope: v })}
+      pageOrganizationId={organizationId}
+      pageOrganizationName={organizationName ?? null}
+      childOrganizations={childOrganizations}
+      isParentOrg={isParentOrg}
       canViewAllOrgUsers={canViewAllOrgUsers}
       isOrgWideView={isOrgWideView}
-      effectiveOrganizationName={effectiveOrganizationName}
       period={period}
       onPeriodChange={handlePeriodChange}
       granularity={granularity}
@@ -611,8 +689,11 @@ export function UsageAnalyticsDashboard({
               <>
                 <UsageWarning />
 
-                {isOrgContext && organizationId && (
-                  <AIAdoptionScoreCard organizationId={organizationId} dateRange={dateRange} />
+                {/* Org-level panels follow the selected single org so they
+                    don't mix scopes; hidden in the All Organizations aggregate
+                    (effectiveOrgId is null) which they cannot represent. */}
+                {isOrgContext && effectiveOrgId && (
+                  <AIAdoptionScoreCard organizationId={effectiveOrgId} dateRange={dateRange} />
                 )}
 
                 <SummarySection
@@ -702,9 +783,9 @@ export function UsageAnalyticsDashboard({
                 />
 
                 {isOrgContext &&
-                  organizationId &&
+                  effectiveOrgId &&
                   (callerRole === 'owner' || callerRole === 'billing_manager') && (
-                    <ActiveKiloclawsTable organizationId={organizationId} />
+                    <ActiveKiloclawsTable organizationId={effectiveOrgId} />
                   )}
               </>
             )}

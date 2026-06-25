@@ -32,17 +32,20 @@ import { requireCurrentSessionAccess } from '../../session-access.js';
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
   gitUrl?: string;
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
 } {
   const repository = metadata.repository;
   if (!repository) return {};
-  if (repository.type === 'github') {
-    return { githubRepo: repository.repo, platform: repository.platform ?? 'github' };
+  switch (repository.type) {
+    case 'github':
+      return { githubRepo: repository.repo, platform: repository.platform ?? 'github' };
+    case 'gitlab':
+      return { gitUrl: repository.url, platform: 'gitlab' };
+    case 'bitbucket':
+      return { gitUrl: repository.url, platform: 'bitbucket' };
+    case 'git':
+      return { gitUrl: repository.url, platform: repository.platform };
   }
-  return {
-    gitUrl: repository.url,
-    platform: repository.platform ?? (repository.type === 'gitlab' ? 'gitlab' : undefined),
-  };
 }
 
 async function deleteSessionResources(

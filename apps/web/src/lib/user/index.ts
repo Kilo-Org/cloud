@@ -37,6 +37,7 @@ import {
   device_auth_requests,
   auto_top_up_configs,
   platform_integrations,
+  platform_oauth_credentials,
   byok_api_keys,
   agent_configs,
   webhook_events,
@@ -858,6 +859,8 @@ export class SoftDeletePreconditionError extends Error {
  * - deployments_ephemeral ownership link and cleanup claims (FK nulled;
  *   immediate cleanup scheduled)
  * - Recommendation dismissal actor references (nulled)
+ * - platform_oauth_credentials (encrypted OAuth tokens and provider identity;
+ *   authorizations created by the user are removed, including organization grants)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
@@ -1085,6 +1088,21 @@ export async function softDeleteUser(userId: string) {
       .delete(agent_environment_profiles)
       .where(eq(agent_environment_profiles.owned_by_user_id, userId));
 
+    const authorizedOAuthIntegrationIds = tx
+      .select({ id: platform_oauth_credentials.platform_integration_id })
+      .from(platform_oauth_credentials)
+      .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
+    await tx
+      .update(platform_integrations)
+      .set({
+        integration_status: 'suspended',
+        auth_invalid_at: new Date().toISOString(),
+        auth_invalid_reason: 'authorizing_user_deleted',
+      })
+      .where(inArray(platform_integrations.id, authorizedOAuthIntegrationIds));
+    await tx
+      .delete(platform_oauth_credentials)
+      .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
     await tx
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));

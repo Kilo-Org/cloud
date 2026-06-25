@@ -923,6 +923,7 @@ export const AuditLogAction = z.enum([
   'organization.mode.delete', // ✅
   'organization.created', // ✅
   'organization.token.generate', // ✅
+  'organization.funds.distribute_to_children', // ✅
 ]);
 
 // --- EncryptedData ---
@@ -974,11 +975,12 @@ export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
 
 export type IntegrationPermissions = Record<string, string>;
 
-export type PlatformRepository = {
-  id: number;
+export type PlatformRepository<TId extends number | string = number> = {
+  id: TId;
   name: string;
   full_name: string;
   private: boolean;
+  default_branch?: string;
 };
 
 export const REVIEW_MEMORY_PLATFORMS = ['github'] as const;
@@ -1539,7 +1541,7 @@ export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 export const EndpointSchema = z.object({
   tag: z.string().optional(),
   provider_name: z.string().optional(),
-  context_length: z.number(),
+  context_length: z.number().optional(),
   pricing: z
     .object({
       prompt: z.string(),

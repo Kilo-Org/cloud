@@ -7,8 +7,6 @@ import { EventServiceProvider } from '@/contexts/EventServiceContext';
 import { AdminOmnibox } from '@/components/admin-omnibox';
 import { PrefetchedOrganizations } from './components/PrefetchedOrganizations';
 import { PlatformPresenceMount } from './components/PlatformPresenceMount';
-import { MiniMaxCodingPlansBanner } from '@/components/shared/MiniMaxCodingPlansBanner';
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <RoleTestingProvider>
@@ -21,7 +19,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <AppSidebar />
                 <SidebarInset>
                   <AppTopbar />
-                  <MiniMaxCodingPlansBanner />
                   <main className="bg-background w-full flex-1">{children}</main>
                 </SidebarInset>
               </div>

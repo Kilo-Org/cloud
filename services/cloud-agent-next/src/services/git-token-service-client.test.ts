@@ -1,13 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
+import { logger } from '../logger.js';
 import type { GitTokenService } from '../types.js';
 import {
   resolveCloudAgentGitHubAuthForRepo,
+  resolveManagedBitbucketToken,
   resolveManagedGitLabToken,
 } from './git-token-service-client.js';
 
 vi.mock('../logger.js', () => ({
   logger: {
     info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
     withFields: vi.fn(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn() })),
   },
 }));
@@ -23,6 +27,81 @@ function createGitTokenService() {
 function createEnv(service: Partial<GitTokenService>) {
   return { GIT_TOKEN_SERVICE: service as GitTokenService };
 }
+
+describe('resolveManagedBitbucketToken', () => {
+  const repositoryParams = {
+    userId: 'user_123',
+    workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+    repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    repositoryUrl: 'https://bitbucket.org/acme/repo.git',
+  };
+
+  it('rejects a missing organization before invoking the service binding', async () => {
+    const getBitbucketToken = vi.fn().mockResolvedValue({ success: true, token: 'opaque-token' });
+
+    await expect(
+      resolveManagedBitbucketToken(createEnv({ getBitbucketToken }), repositoryParams as never)
+    ).resolves.toEqual({ success: false, reason: 'invalid_request' });
+    expect(getBitbucketToken).not.toHaveBeenCalled();
+  });
+
+  it('forwards exact organization and repository identity and returns the token unchanged', async () => {
+    const getBitbucketToken = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'opaque-workspace-token',
+    });
+    const params = {
+      ...repositoryParams,
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+    };
+
+    await expect(
+      resolveManagedBitbucketToken(createEnv({ getBitbucketToken }), params)
+    ).resolves.toEqual({ success: true, token: 'opaque-workspace-token' });
+    expect(getBitbucketToken).toHaveBeenCalledWith(params);
+  });
+
+  it.each(['insufficient_permissions', 'temporarily_unavailable'] as const)(
+    'preserves the %s resolver failure',
+    async reason => {
+      const getBitbucketToken = vi.fn().mockResolvedValue({ success: false, reason });
+
+      await expect(
+        resolveManagedBitbucketToken(createEnv({ getBitbucketToken }), {
+          ...repositoryParams,
+          orgId: '123e4567-e89b-12d3-a456-426614174030',
+        })
+      ).resolves.toEqual({ success: false, reason });
+    }
+  );
+
+  it('normalizes a missing service binding to temporary unavailability', async () => {
+    await expect(
+      resolveManagedBitbucketToken(
+        {},
+        {
+          ...repositoryParams,
+          orgId: '123e4567-e89b-12d3-a456-426614174030',
+        }
+      )
+    ).resolves.toEqual({ success: false, reason: 'temporarily_unavailable' });
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Bitbucket git-token-service binding is not configured'
+    );
+  });
+
+  it('normalizes an RPC exception to temporary unavailability', async () => {
+    const getBitbucketToken = vi.fn().mockRejectedValue(new Error('binding unavailable'));
+
+    await expect(
+      resolveManagedBitbucketToken(createEnv({ getBitbucketToken }), {
+        ...repositoryParams,
+        orgId: '123e4567-e89b-12d3-a456-426614174030',
+      })
+    ).resolves.toEqual({ success: false, reason: 'temporarily_unavailable' });
+    expect(logger.error).toHaveBeenCalledWith('Failed to call git-token-service getBitbucketToken');
+  });
+});
 
 describe('resolveManagedGitLabToken', () => {
   const reviewParams = {

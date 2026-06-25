@@ -1,6 +1,6 @@
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { and, eq, inArray, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import { readDb } from '@/lib/drizzle';
 import { getEnvVariable } from '@/lib/dotenvx';
@@ -9,12 +9,22 @@ import {
   resolveSnowflakeConfig,
   type SnowflakeBinding,
 } from '@/lib/snowflake';
-import { kilocode_users, organization_memberships, user_auth_provider } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  organization_memberships,
+  organizations,
+  user_auth_provider,
+} from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import {
+  ensureOrganizationAccess,
+  ensureOrganizationsAccess,
+  getOrganizationsAccessRoles,
+} from '@/routers/organizations/utils';
 import {
   BreakdownInputSchema,
   BreakdownOutputSchema,
+  MAX_SCOPE_ORGANIZATION_IDS,
   SummaryOutputSchema,
   TableInputSchema,
   TableOutputSchema,
@@ -35,6 +45,7 @@ export {
   CostSourceSchema,
   DimensionSchema,
   GranularitySchema,
+  MAX_SCOPE_ORGANIZATION_IDS,
   MetricSchema,
   SummaryOutputSchema,
   TableInputSchema,
@@ -137,7 +148,7 @@ function ceilIsoToUtcMonthExclusive(iso: string): string {
  * Accumulates SQL WHERE clauses with positional `?` bindings.
  * Callers push conditions in any order; `sql()` joins them with AND.
  */
-class WhereBuilder {
+export class WhereBuilder {
   readonly clauses: string[] = [];
   readonly bindings: SnowflakeBinding[] = [];
 
@@ -195,8 +206,25 @@ class WhereBuilder {
 // Authorization
 // ---------------------------------------------------------------------------
 
+/** True when the filters target one or more organizations (vs personal usage). */
+function isOrgScope(filters: UsageAnalyticsFilters): boolean {
+  return Boolean(filters.organizationId) || (filters.organizationIds?.length ?? 0) > 0;
+}
+
 async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilters): Promise<void> {
   const userId = ctx.user.id;
+
+  // Multi-org aggregate ("All Organizations"): always org-wide, and the caller
+  // must be owner/billing_manager of every org in the list. A parent owner has
+  // inherited owner/billing access to children, so this passes for the parent
+  // plus all of its children while rejecting any org they cannot administer.
+  // Batched into a fixed number of queries so a large org list cannot fan out
+  // into one authorization query per id.
+  if (filters.organizationIds && filters.organizationIds.length > 0) {
+    await ensureOrganizationsAccess(ctx, filters.organizationIds, ['owner', 'billing_manager']);
+    return;
+  }
+
   if (filters.organizationId) {
     const requiredRoles =
       filters.viewAs === 'org-wide' ? (['owner', 'billing_manager'] as const) : undefined;
@@ -256,11 +284,23 @@ function buildDateConditions(
   }
 }
 
-function buildScopeConditions(
+export function buildScopeConditions(
   where: WhereBuilder,
   filters: UsageAnalyticsFilters,
   ctxUserId: string
 ): void {
+  if (filters.organizationIds && filters.organizationIds.length > 0) {
+    // Aggregate across the parent org and its children. Always org-wide, so
+    // honor any explicit user include/exclude filters but never pin to self.
+    where.addIn('organization_id', filters.organizationIds);
+    if (filters.userIds && filters.userIds.length > 0) {
+      where.addIn('kilo_user_id', filters.userIds);
+    }
+    if (filters.excludedUserIds && filters.excludedUserIds.length > 0) {
+      where.addNotIn('kilo_user_id', filters.excludedUserIds);
+    }
+    return;
+  }
   if (filters.organizationId) {
     where.addEq('organization_id', filters.organizationId);
     if (filters.viewAs === 'self') {
@@ -537,7 +577,7 @@ function toSafeNumber(value: unknown): number {
 const MAX_USER_LABEL_LOOKUP_IDS = 1_000;
 
 const UserListInputSchema = z.object({
-  organizationId: z.uuid(),
+  organizationIds: z.array(z.uuid()).min(1).max(MAX_SCOPE_ORGANIZATION_IDS),
   userIds: z.array(z.string()).max(MAX_USER_LABEL_LOOKUP_IDS),
 });
 
@@ -549,6 +589,26 @@ const UserListOutputSchema = z.object({
       email: z.string().nullable(),
     })
   ),
+});
+
+// ---------------------------------------------------------------------------
+// Scope organizations (org usage page Scope selector)
+// ---------------------------------------------------------------------------
+
+const ScopeOrganizationsInputSchema = z.object({
+  organizationId: z.uuid(),
+});
+
+const ScopeOrganizationSchema = z.object({
+  organizationId: z.string(),
+  organizationName: z.string(),
+});
+
+const ScopeOrganizationsOutputSchema = z.object({
+  organizationId: z.string(),
+  organizationName: z.string(),
+  /** Direct child organizations, sorted by name. Empty when not a parent org. */
+  children: z.array(ScopeOrganizationSchema),
 });
 
 function parseLegacyOAuthUserId(
@@ -654,7 +714,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         {
           route: 'usageAnalytics.getSummary',
           queryLabel: `summary_${meta.tier}`,
-          scope: input.organizationId ? 'org' : 'user',
+          scope: isOrgScope(input) ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
         signal =>
@@ -663,7 +723,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
-              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+              defaultTimeoutForScope(isOrgScope(input) ? 'org' : 'user') / 1000
             ),
             signal,
           })
@@ -761,7 +821,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         {
           route: 'usageAnalytics.getTimeseries',
           queryLabel: `timeseries_${meta.tier}${input.splitBy ? `_split_${input.splitBy}` : ''}`,
-          scope: input.organizationId ? 'org' : 'user',
+          scope: isOrgScope(input) ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
         signal =>
@@ -770,7 +830,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
-              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+              defaultTimeoutForScope(isOrgScope(input) ? 'org' : 'user') / 1000
             ),
             signal,
           })
@@ -821,7 +881,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         {
           route: 'usageAnalytics.getBreakdown',
           queryLabel: `breakdown_${meta.tier}_by_${input.dimension}`,
-          scope: input.organizationId ? 'org' : 'user',
+          scope: isOrgScope(input) ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
         signal =>
@@ -830,7 +890,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
-              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+              defaultTimeoutForScope(isOrgScope(input) ? 'org' : 'user') / 1000
             ),
             signal,
           })
@@ -913,7 +973,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
         {
           route: 'usageAnalytics.getTable',
           queryLabel: `table_${meta.tier}_groupby_${requestedDims.join('+') || 'none'}`,
-          scope: input.organizationId ? 'org' : 'user',
+          scope: isOrgScope(input) ? 'org' : 'user',
           period: `${input.startDate}/${input.endDate}`,
         },
         signal =>
@@ -922,7 +982,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
-              defaultTimeoutForScope(input.organizationId ? 'org' : 'user') / 1000
+              defaultTimeoutForScope(isOrgScope(input) ? 'org' : 'user') / 1000
             ),
             signal,
           })
@@ -961,23 +1021,84 @@ export const usageAnalyticsRouter = createTRPCRouter({
     }),
 
   /**
-   * Look up user names and emails for a set of user IDs that belong to an org.
-   * Used by the UI to decorate per-user breakdowns, filters, and table rows.
+   * Returns the org plus its direct child organizations, for the org usage
+   * page's Scope selector. Restricted to owner/billing_manager because that is
+   * who may view org-wide usage and (via inheritance) child-org usage. Members
+   * never see the expanded scope list, so they cannot enumerate children here.
+   */
+  getScopeOrganizations: baseProcedure
+    .input(ScopeOrganizationsInputSchema)
+    .output(ScopeOrganizationsOutputSchema)
+    .query(async ({ input, ctx }) => {
+      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'billing_manager']);
+
+      const [org] = await readDb
+        .select({ id: organizations.id, name: organizations.name })
+        .from(organizations)
+        .where(and(eq(organizations.id, input.organizationId), isNull(organizations.deleted_at)))
+        .limit(1);
+
+      if (!org) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      // Exclude soft-deleted children so they never appear in the scope list or
+      // get folded into the All Organizations aggregate.
+      const children = await readDb
+        .select({ id: organizations.id, name: organizations.name })
+        .from(organizations)
+        .where(
+          and(
+            eq(organizations.parent_organization_id, input.organizationId),
+            isNull(organizations.deleted_at)
+          )
+        )
+        .orderBy(asc(organizations.name));
+
+      return {
+        organizationId: org.id,
+        organizationName: org.name,
+        children: children.map(child => ({
+          organizationId: child.id,
+          organizationName: child.name,
+        })),
+      };
+    }),
+
+  /**
+   * Look up user names and emails for a set of user IDs that belong to the
+   * given orgs. Used by the UI to decorate per-user breakdowns, filters, and
+   * table rows — including the multi-org "All Organizations" aggregate view,
+   * where a parent owner resolves users across the parent and its children.
    *
-   * Only returns users that are active or invited members of `organizationId`
-   * to prevent callers from enumerating arbitrary kilocode_users PII.
+   * Only returns users that are members of one of `organizationIds` to prevent
+   * callers from enumerating arbitrary kilocode_users PII.
    *
-   * Members (role != 'owner' | 'billing_manager') can only resolve their own
-   * id — they have no legitimate need to see other members' name/email from
-   * this endpoint.
+   * Callers who are not owner/billing_manager of *every* requested org can only
+   * resolve their own id — they have no legitimate need to see other members'
+   * name/email from this endpoint.
    */
   resolveOrgUsers: baseProcedure
     .input(UserListInputSchema)
     .output(UserListOutputSchema)
     .query(async ({ input, ctx }) => {
-      const role = await ensureOrganizationAccess(ctx, input.organizationId);
+      const accessByOrg = await getOrganizationsAccessRoles(ctx, input.organizationIds);
 
-      const canSeeAllMembers = role === 'owner' || role === 'billing_manager';
+      // Require access to every requested org (mirrors the single-org guard).
+      const hasAccessToAll = input.organizationIds.every(orgId => accessByOrg.has(orgId));
+      if (!hasAccessToAll) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have access to this organization',
+        });
+      }
+
+      // Only owner/billing_manager of *every* requested org may resolve other
+      // members; anyone else can resolve only their own id.
+      const canSeeAllMembers = input.organizationIds.every(orgId => {
+        const role = accessByOrg.get(orgId);
+        return role === 'owner' || role === 'billing_manager';
+      });
       const allowedIds = canSeeAllMembers
         ? input.userIds
         : input.userIds.filter(id => id === ctx.user.id);
@@ -995,7 +1116,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
           organization_memberships,
           and(
             eq(organization_memberships.kilo_user_id, kilocode_users.id),
-            eq(organization_memberships.organization_id, input.organizationId)
+            inArray(organization_memberships.organization_id, input.organizationIds)
           )
         )
         .where(inArray(kilocode_users.id, allowedIds));
@@ -1047,7 +1168,7 @@ export const usageAnalyticsRouter = createTRPCRouter({
               organization_memberships,
               and(
                 eq(organization_memberships.kilo_user_id, user_auth_provider.kilo_user_id),
-                eq(organization_memberships.organization_id, input.organizationId)
+                inArray(organization_memberships.organization_id, input.organizationIds)
               )
             )
             .where(legacyWhere);

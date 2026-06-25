@@ -1,3 +1,4 @@
+import { signKiloToken } from '@kilocode/worker-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as GitLabLookupServiceModule from './gitlab-lookup-service.js';
 
@@ -13,6 +14,8 @@ const serviceMocks = vi.hoisted(() => ({
   findGitLabIntegration: vi.fn(),
   findAuthorizedGitLabIntegrations: vi.fn(),
   getGitLabToken: vi.fn(),
+  listBitbucketRepositories: vi.fn(),
+  resolveBitbucketToken: vi.fn(),
 }));
 
 vi.mock('cloudflare:workers', () => ({
@@ -65,9 +68,95 @@ vi.mock('./gitlab-token-service.js', () => ({
   },
 }));
 
+vi.mock('./bitbucket-runtime-token-resolver.js', () => ({
+  listBitbucketRepositories: serviceMocks.listBitbucketRepositories,
+  resolveBitbucketToken: serviceMocks.resolveBitbucketToken,
+}));
+
 import type { AuthorizedGitLabIntegration } from './gitlab-lookup-service.js';
 import { resolveGitLabRuntimeToken } from './gitlab-runtime-token-resolver.js';
-import { GitTokenRPCEntrypoint } from './index.js';
+import gitTokenServiceWorker, { GitTokenRPCEntrypoint } from './index.js';
+
+describe('Bitbucket repository-list HTTP authorization', () => {
+  const jwtSecret = 'test-secret-that-is-at-least-32-characters';
+  const env = { NEXTAUTH_SECRET: jwtSecret } as CloudflareEnv;
+
+  beforeEach(() => {
+    serviceMocks.listBitbucketRepositories.mockReset().mockResolvedValue({
+      status: 'available',
+      repositories: [],
+    });
+  });
+
+  it('derives the owner from a purpose-bound token instead of request input', async () => {
+    const { token } = await signKiloToken({
+      userId: 'member-1',
+      pepper: null,
+      secret: jwtSecret,
+      expiresInSeconds: 5 * 60,
+      audience: 'git-token-service:bitbucket-repositories',
+      extra: { organizationId: '123e4567-e89b-12d3-a456-426614174030' },
+    });
+    const response = await gitTokenServiceWorker.fetch(
+      new Request('https://git-token-service.test/internal/bitbucket/repositories', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orgId: '123e4567-e89b-12d3-a456-426614174099' }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ status: 'available', repositories: [] });
+    expect(serviceMocks.listBitbucketRepositories).toHaveBeenCalledWith(expect.anything(), {
+      userId: 'member-1',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+    });
+  });
+
+  it('requires an organization claim before repository lookup', async () => {
+    const { token } = await signKiloToken({
+      userId: 'member-1',
+      pepper: null,
+      secret: jwtSecret,
+      expiresInSeconds: 5 * 60,
+      audience: 'git-token-service:bitbucket-repositories',
+    });
+    const response = await gitTokenServiceWorker.fetch(
+      new Request('https://git-token-service.test/internal/bitbucket/repositories', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: 'organization_required' });
+    expect(serviceMocks.listBitbucketRepositories).not.toHaveBeenCalled();
+  });
+
+  it('rejects a generic Kilo token without the repository-list audience', async () => {
+    const { token } = await signKiloToken({
+      userId: 'member-1',
+      pepper: null,
+      secret: jwtSecret,
+      expiresInSeconds: 5 * 60,
+    });
+    const response = await gitTokenServiceWorker.fetch(
+      new Request('https://git-token-service.test/internal/bitbucket/repositories', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(serviceMocks.listBitbucketRepositories).not.toHaveBeenCalled();
+  });
+});
 
 const integration: AuthorizedGitLabIntegration = {
   integrationId: '123e4567-e89b-12d3-a456-426614174011',
@@ -109,6 +198,45 @@ function createService(): GitTokenRPCEntrypoint {
     } as unknown as CloudflareEnv
   );
 }
+
+describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {
+  it('requires an organization before invoking the reachable V1 resolver', async () => {
+    serviceMocks.resolveBitbucketToken.mockReset();
+
+    await expect(
+      createService().getBitbucketToken({
+        userId: 'user-1',
+        workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+        repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+        repositoryUrl: 'https://bitbucket.org/acme/widgets.git',
+      })
+    ).resolves.toEqual({ success: false, reason: 'invalid_request' });
+    expect(serviceMocks.resolveBitbucketToken).not.toHaveBeenCalled();
+  });
+
+  it('returns only the opaque token from a successful V1 resolution', async () => {
+    serviceMocks.resolveBitbucketToken.mockReset().mockResolvedValue({
+      success: true,
+      token: 'ATCT-runtime-token',
+      integrationId: 'must-not-cross-rpc',
+      credentialId: 'must-not-cross-rpc',
+      credentialVersion: 7,
+    });
+    const params = {
+      userId: 'user-1',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      repositoryUrl: 'https://bitbucket.org/acme/widgets.git',
+    };
+
+    await expect(createService().getBitbucketToken(params)).resolves.toEqual({
+      success: true,
+      token: 'ATCT-runtime-token',
+    });
+    expect(serviceMocks.resolveBitbucketToken).toHaveBeenCalledWith(expect.anything(), params);
+  });
+});
 
 afterEach(() => {
   vi.restoreAllMocks();

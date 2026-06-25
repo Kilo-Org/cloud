@@ -156,9 +156,42 @@ describe('grouped unified session input contracts', () => {
 
     expect(SendMessageInput.parse(input)).toEqual(input);
   });
+
+  it('requires stable workspace and repository UUIDs for Bitbucket starts', () => {
+    const repository = {
+      type: 'bitbucket' as const,
+      url: 'https://bitbucket.org/acme/repo.git',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    };
+    expect(StartSessionInput.safeParse({ ...baseStartInput, repository }).success).toBe(true);
+    expect(
+      StartSessionInput.safeParse({
+        ...baseStartInput,
+        repository: { type: 'bitbucket', url: repository.url },
+      }).success
+    ).toBe(false);
+  });
 });
 
 describe('legacy live attachment input compatibility', () => {
+  it('requires paired Bitbucket identity fields on prepareSession', () => {
+    const input = {
+      prompt: 'Update the repository',
+      mode: 'code',
+      model: 'claude-sonnet-4-5-20250929',
+      gitUrl: 'https://bitbucket.org/acme/repo.git',
+      platform: 'bitbucket',
+      bitbucketWorkspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      bitbucketRepositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    };
+    expect(PrepareSessionInput.safeParse(input).success).toBe(true);
+    expect(
+      PrepareSessionInput.safeParse({ ...input, bitbucketRepositoryUuid: undefined }).success
+    ).toBe(false);
+    expect(PrepareSessionInput.safeParse({ ...input, platform: 'gitlab' }).success).toBe(false);
+  });
+
   it('accepts document attachments on prepareSession while retaining images', () => {
     const basePrepareInput = {
       prompt: 'Summarize this document',

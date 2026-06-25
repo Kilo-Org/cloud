@@ -5,7 +5,7 @@ import { useUser } from '@/hooks/useUser';
 import { useKiloClawNavState } from '@/hooks/useKiloClaw';
 import { useState } from 'react';
 import {
-  Code,
+  ChartColumnIncreasing,
   Coins,
   Receipt,
   User,
@@ -84,7 +84,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     },
     {
       title: 'Usage',
-      icon: Code,
+      icon: ChartColumnIncreasing,
       url: '/usage',
     },
   ];
@@ -354,7 +354,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   return (
     <Sidebar {...props}>
       <SidebarHeader className="p-4">
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-8">
           <div className="flex items-center gap-3">
             <HeaderLogo href="/profile" />
           </div>

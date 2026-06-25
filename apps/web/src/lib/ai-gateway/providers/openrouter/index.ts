@@ -27,7 +27,6 @@ import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrou
 import { getTerminalBenchSummaries, terminalBenchFor } from '@/lib/model-stats/terminal-bench';
 import { isFreeNemotronModel, NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@/lib/ai-gateway/custom-pricing';
-import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { addMonths } from 'date-fns';
 
 // Re-export from shared module for backwards compatibility
@@ -123,6 +122,11 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
   return model.status !== 'disabled' || model.pricing === null;
 }
 
+const unavailableModels = [
+  'claude-fable', // not available anywhere
+  'sakana/fugu', // not available in the EU
+];
+
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const endpointsMetadata = await getOpenRouterModelsMetadata();
@@ -135,7 +139,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
             m => m.public_id === model.id && shouldSuppressOpenRouterModel(m)
           ) &&
           !isForbiddenFreeModel(model.id) &&
-          !isFableModel(model.id)
+          !unavailableModels.some(unavailableId => model.id.includes(unavailableId))
       )
       .map(model => {
         const preferredProvider = getPreferredProviderOrder(model.id).at(0);

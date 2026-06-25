@@ -55,10 +55,22 @@ export type QueueBacklogAlertPayload = {
   oldestMessageTimestamp?: Date;
 };
 
+export type GastownHealthAlertPayload = {
+  alertType: 'gastown_container_health';
+  severity: 'ticket';
+  weightedFailedChecks: number;
+  affectedTownCount: number;
+  windowMinutes: number;
+  crossedThresholds: Array<'failed_checks' | 'affected_towns'>;
+  failedChecksThreshold: number;
+  affectedTownsThreshold: number;
+};
+
 export type AlertPayload =
   | SloAlertPayload
   | ContainerCapacityAlertPayload
-  | QueueBacklogAlertPayload;
+  | QueueBacklogAlertPayload
+  | GastownHealthAlertPayload;
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
@@ -76,6 +88,8 @@ function formatAlertTypeLabel(alertType: AlertPayload['alertType']): string {
       return 'Container Capacity';
     case 'queue_backlog':
       return 'Queue Backlog';
+    case 'gastown_container_health':
+      return 'Gastown Container Health';
   }
 }
 
@@ -178,9 +192,15 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
       type: 'section',
       fields: [
         { type: 'mrkdwn', text: `*Queue ID:*\n${alert.model}` },
-        { type: 'mrkdwn', text: `*Backlog:*\n${alert.backlogCount.toLocaleString()} messages` },
-        { type: 'mrkdwn', text: `*Threshold:*\n${alert.thresholdCount.toLocaleString()} messages` },
-        { type: 'mrkdwn', text: `*Backlog bytes:*\n${alert.backlogBytes.toLocaleString()}` },
+        {
+          type: 'mrkdwn',
+          text: `*Backlog:*\n${alert.backlogCount.toLocaleString('en-US')} messages`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Threshold:*\n${alert.thresholdCount.toLocaleString('en-US')} messages`,
+        },
+        { type: 'mrkdwn', text: `*Backlog bytes:*\n${alert.backlogBytes.toLocaleString('en-US')}` },
       ],
     },
     {
@@ -188,6 +208,52 @@ function buildQueueBacklogSlackBlocks(alert: QueueBacklogAlertPayload): object[]
       text: {
         type: 'mrkdwn',
         text: `Oldest message: ${oldestMessageTimestamp}`,
+      },
+    },
+  ];
+}
+
+const GASTOWN_DASHBOARD_URL = 'https://ops.kiloapps.io/d/gastown-ops-1/gastown-operations';
+const GASTOWN_HEALTH_RUNBOOK_URL =
+  'https://github.com/Kilo-Org/on-call/blob/main/runbooks/gastown-container-health-failures.md';
+
+function buildGastownHealthSlackBlocks(alert: GastownHealthAlertPayload): object[] {
+  const crossedThresholds = alert.crossedThresholds
+    .map(threshold =>
+      threshold === 'failed_checks'
+        ? `${alert.failedChecksThreshold.toLocaleString('en-US')} failed checks`
+        : `${alert.affectedTownsThreshold.toLocaleString('en-US')} affected towns`
+    )
+    .join(' and ');
+
+  return [
+    {
+      type: 'header',
+      text: {
+        type: 'plain_text',
+        text: ':ticket: TICKET — Gastown container health failures',
+      },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Window:*\n${alert.windowMinutes}-minute window` },
+        {
+          type: 'mrkdwn',
+          text: `*Failed checks:*\n${alert.weightedFailedChecks.toLocaleString('en-US')}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*Affected towns:*\n${alert.affectedTownCount.toLocaleString('en-US')}`,
+        },
+        { type: 'mrkdwn', text: `*Threshold crossed:*\n${crossedThresholds}` },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `Investigate aggregate container health failures. Do not restart towns without active-session authorization.\n<${GASTOWN_DASHBOARD_URL}|Gastown dashboard> | <${GASTOWN_HEALTH_RUNBOOK_URL}|Container-health runbook>`,
       },
     },
   ];
@@ -203,6 +269,8 @@ export function buildSlackMessage(alert: AlertPayload): object {
       return { blocks: buildCapacitySlackBlocks(alert) };
     case 'queue_backlog':
       return { blocks: buildQueueBacklogSlackBlocks(alert) };
+    case 'gastown_container_health':
+      return { blocks: buildGastownHealthSlackBlocks(alert) };
     default:
       return { blocks: buildSloSlackBlocks(alert) };
   }

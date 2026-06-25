@@ -127,6 +127,13 @@ describe('repository preference', () => {
     });
   });
 
+  it('restores a saved Bitbucket repository', () => {
+    expect(parseLastUsedRepo('{"fullName":"acme/widgets","platform":"bitbucket"}')).toEqual({
+      fullName: 'acme/widgets',
+      platform: 'bitbucket',
+    });
+  });
+
   it('ignores malformed stored data', () => {
     expect(parseLastUsedRepo('{"fullName":"kilo/cloud","platform":"invalid"}')).toBeNull();
     expect(parseLastUsedRepo('{"platform":"github"}')).toBeNull();
@@ -153,8 +160,28 @@ describe('repository preference', () => {
         lastUsedRepo: { fullName: 'kilo/cloud', platform: 'gitlab' },
         isLoadingGitHubRepos: false,
         isLoadingGitLabRepos: false,
+        isLoadingBitbucketRepos: false,
       })
     ).toEqual(gitlabRepo);
+  });
+
+  it('waits for saved Bitbucket repositories before falling back', () => {
+    const recentRepo = {
+      id: 1,
+      fullName: 'kilo/recent',
+      platform: 'github',
+    } satisfies RepositoryOption;
+
+    expect(
+      getPreferredInitialRepo({
+        availableRepos: [recentRepo],
+        recentRepos: [recentRepo],
+        lastUsedRepo: { fullName: 'acme/widgets', platform: 'bitbucket' },
+        isLoadingGitHubRepos: false,
+        isLoadingGitLabRepos: false,
+        isLoadingBitbucketRepos: true,
+      })
+    ).toBeUndefined();
   });
 
   it('waits for the saved provider before falling back to a recent repository', () => {
@@ -172,6 +199,7 @@ describe('repository preference', () => {
         lastUsedRepo,
         isLoadingGitHubRepos: false,
         isLoadingGitLabRepos: true,
+        isLoadingBitbucketRepos: false,
       })
     ).toBeUndefined();
 
@@ -182,8 +210,28 @@ describe('repository preference', () => {
         lastUsedRepo,
         isLoadingGitHubRepos: false,
         isLoadingGitLabRepos: false,
+        isLoadingBitbucketRepos: false,
       })
     ).toEqual(recentRepo);
+  });
+
+  it('waits for all providers before falling back to a recent repository', () => {
+    const recentRepo = {
+      id: 1,
+      fullName: 'kilo/recent',
+      platform: 'github',
+    } satisfies RepositoryOption;
+
+    expect(
+      getPreferredInitialRepo({
+        availableRepos: [recentRepo],
+        recentRepos: [recentRepo],
+        lastUsedRepo: null,
+        isLoadingGitHubRepos: false,
+        isLoadingGitLabRepos: false,
+        isLoadingBitbucketRepos: true,
+      })
+    ).toBeUndefined();
   });
 });
 

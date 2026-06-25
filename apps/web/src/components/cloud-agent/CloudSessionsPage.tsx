@@ -96,6 +96,9 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
   const [model, setModel] = useState<string>('');
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  // Repo profile bindings are only keyed by GitHub/GitLab today.
+  const profileBindingPlatform: Exclude<RepositoryPlatform, 'bitbucket'> | undefined =
+    selectedPlatform === 'bitbucket' ? undefined : selectedPlatform;
 
   // Demo session state
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -618,7 +621,7 @@ export function CloudSessionsPage({ organizationId }: CloudSessionsPageProps) {
               selectedOverrideProfileId={selectedProfileId}
               onOverrideProfileSelect={setSelectedProfileId}
               repoFullName={selectedRepo || undefined}
-              platform={selectedPlatform}
+              platform={profileBindingPlatform}
             />
           </div>
 

@@ -24,6 +24,7 @@ import {
   getGitHubAppCredentials,
   getGitHubAppTypeForOrganization,
 } from '@/lib/integrations/platforms/github/app-selector';
+import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
@@ -119,7 +120,7 @@ export const githubAppsRouter = createTRPCRouter({
         permissions: integration.permissions,
         events: integration.scopes,
         repositorySelection: integration.repository_access,
-        repositories: integration.repositories,
+        repositories: requireNumericPlatformRepositories(integration.repositories),
         suspendedAt: integration.suspended_at,
         suspendedBy: integration.suspended_by,
         installedAt: integration.installed_at,

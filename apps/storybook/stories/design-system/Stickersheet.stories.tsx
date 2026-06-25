@@ -1,10 +1,37 @@
 import type { Meta, StoryObj } from '@storybook/nextjs';
 import type { ReactNode } from 'react';
-import { ArrowRight, CheckCircle2, Clock3, LoaderCircle, Search } from 'lucide-react';
+import {
+  ArrowRight,
+  Bot,
+  CheckCircle2,
+  Clock3,
+  CreditCard,
+  Home,
+  LoaderCircle,
+  Search,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+} from '@/components/ui/sidebar';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 const meta: Meta = {
   title: 'Design System/Stickersheet',
@@ -89,6 +116,44 @@ function TypographySample({
       <code className="type-code text-muted-foreground">{label}</code>
       <span className={className}>{sample}</span>
     </div>
+  );
+}
+
+const sidebarItems = [
+  { icon: Home, label: 'Your Profile', active: true },
+  { icon: Bot, label: 'Cloud Agent', active: false, badge: 'NEW' },
+  { icon: CreditCard, label: 'Subscriptions', active: false },
+];
+
+function SidebarSample() {
+  return (
+    <SidebarProvider defaultOpen className="min-h-0! w-full!">
+      <div className="max-w-sm rounded-xl border border-sidebar-border bg-sidebar p-2 text-sidebar-foreground">
+        <SidebarGroup className="p-0">
+          <SidebarGroupLabel>Dashboard</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {sidebarItems.map(item => (
+                <SidebarMenuItem key={item.label}>
+                  <SidebarMenuButton
+                    isActive={item.active}
+                    className="flex items-center gap-3 transition-colors"
+                  >
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </SidebarMenuButton>
+                  {item.badge && (
+                    <SidebarMenuBadge className="bg-brand-primary text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-[active=true]/menu-button:text-primary-foreground right-4 !top-1/2 h-4 min-w-0 !-translate-y-1/2 rounded-full px-1.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-brand-primary/30">
+                      {item.badge}
+                    </SidebarMenuBadge>
+                  )}
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </div>
+    </SidebarProvider>
   );
 }
 
@@ -216,6 +281,76 @@ function StickersheetPage() {
           </Badge>
           <Badge variant="destructive">Action needed</Badge>
         </div>
+      </Section>
+
+      <Section
+        eyebrow="06"
+        title="Overlays"
+        description="Overlay surfaces keep distinct radius and padding so popovers, dialogs, and sheets read as separate layers."
+      >
+        <div className="grid gap-4 lg:grid-cols-[minmax(14rem,1fr)_minmax(18rem,1.25fr)_minmax(14rem,1fr)]">
+          <div className="rounded-lg border border-border bg-popover p-3 text-popover-foreground">
+            <p className="type-label">Popover</p>
+            <p className="type-body text-muted-foreground mt-1">
+              Quick filters and compact actions.
+            </p>
+          </div>
+          <div className="rounded-xl border border-border bg-card p-6 text-card-foreground">
+            <p className="type-heading">Dialog</p>
+            <p className="type-body text-muted-foreground mt-2">
+              Confirm changes before applying organization policy updates.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="secondary">Cancel</Button>
+              <Button>Apply</Button>
+            </div>
+          </div>
+          <div className="border-border bg-card text-card-foreground flex min-h-40 flex-col border-l p-6">
+            <p className="type-heading">Sheet</p>
+            <p className="type-body text-muted-foreground mt-2">Session settings</p>
+            <Button className="mt-auto" variant="outline">
+              Save changes
+            </Button>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="07"
+        title="Tables"
+        description="Rows use 48px height, visible hover affordance, and selected surface state for persistent selection."
+      >
+        <div className="rounded-xl border border-border bg-card p-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Run</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow data-state="selected">
+                <TableCell className="font-medium">Primitive audit</TableCell>
+                <TableCell>Reviewing</TableCell>
+                <TableCell className="text-right tabular-nums">$4.20</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Storybook QA</TableCell>
+                <TableCell>Ready</TableCell>
+                <TableCell className="text-right tabular-nums">$1.88</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+      </Section>
+
+      <Section
+        eyebrow="08"
+        title="Sidebar"
+        description="Sidebar sample renders the same menu primitives as app navigation, including the primary-accent selected item state."
+      >
+        <SidebarSample />
       </Section>
     </StoryCanvas>
   );

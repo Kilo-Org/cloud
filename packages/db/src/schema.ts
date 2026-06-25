@@ -2621,7 +2621,6 @@ export const organizations = pgTable(
   {
     id: idPrimaryKeyColumn,
     name: text().notNull(),
-    slug: text().unique(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -2656,6 +2655,8 @@ export const organizations = pgTable(
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
     company_domain: text(),
+    slug: text().unique(),
+    requested_slug: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),

@@ -6,6 +6,7 @@ import {
   getAiSdkProvider,
   getGatewayOpenCodeSettings,
 } from '@/lib/ai-gateway/providers/model-settings';
+import { calculateCost_mUsd } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 // Mirrors get-provider.ts: the OpenCode AI SDK provider selects the request kind
 // a client sends. Morph only supports chat_completions, so any other kind is
@@ -123,5 +124,55 @@ describe('Morph gateway provider', () => {
     for (const id of ['morph/minimax-m2.7', 'morph/minimax-m3']) {
       expect(getAiSdkProvider(id, null)).not.toBe('anthropic');
     }
+  });
+
+  // calculateCost_mUsd returns micro-USD: tokens * (USD per 1M tokens). These
+  // assertions prove the stored pricing actually bills correctly end to end, not
+  // just that the per-million numbers are present.
+  const ONE_M = 1_000_000;
+  const flatPricing = (id: string) => findKiloExclusiveModel(id)!.pricing![0].pricing;
+
+  it('bills cache reads at the discounted rate for qwen3.5 and glm-5.2', () => {
+    // 1M cache-hit tokens should cost the cache_read rate, strictly less than prompt.
+    const qwen = flatPricing('morph/qwen3.5-397b'); // prompt 0.5, cache_read 0.3
+    const qwenCacheCost = calculateCost_mUsd(
+      { uncachedInputTokens: 0, cacheWriteTokens: 0, cacheHitTokens: ONE_M, totalOutputTokens: 0 },
+      [{ start_context_length: 0, pricing: qwen }]
+    );
+    expect(qwenCacheCost).toBe(300_000); // 1M * 0.3
+    expect(qwenCacheCost).toBeLessThan(ONE_M * qwen.prompt_per_million);
+
+    const glm = flatPricing('morph/glm-5.2'); // prompt 1.1, cache_read 0.35
+    const glmCacheCost = calculateCost_mUsd(
+      { uncachedInputTokens: 0, cacheWriteTokens: 0, cacheHitTokens: ONE_M, totalOutputTokens: 0 },
+      [{ start_context_length: 0, pricing: glm }]
+    );
+    expect(glmCacheCost).toBe(350_000); // 1M * 0.35
+  });
+
+  it('falls back to the prompt rate for cache reads on models without a cache_read price', () => {
+    // dsv4flash declares no cache_read rate; cache hits must bill at the prompt rate (not free).
+    const ds = flatPricing('morph/deepseek-v4-flash'); // prompt 0.139, cache_read null
+    expect(ds.input_cache_read_per_million).toBeNull();
+    const cost = calculateCost_mUsd(
+      { uncachedInputTokens: 0, cacheWriteTokens: 0, cacheHitTokens: ONE_M, totalOutputTokens: 0 },
+      [{ start_context_length: 0, pricing: ds }]
+    );
+    expect(cost).toBe(ONE_M * ds.prompt_per_million); // 139_000
+  });
+
+  it('computes a mixed-usage bill from the stored qwen3.5 pricing', () => {
+    const qwen = flatPricing('morph/qwen3.5-397b'); // prompt 0.5, completion 3.5, cache_read 0.3
+    const cost = calculateCost_mUsd(
+      {
+        uncachedInputTokens: ONE_M,
+        cacheWriteTokens: 0,
+        cacheHitTokens: ONE_M,
+        totalOutputTokens: ONE_M,
+      },
+      [{ start_context_length: 0, pricing: qwen }]
+    );
+    // 1M*0.5 (uncached) + 1M*0.3 (cache hit) + 1M*3.5 (output) = 4,300,000 µUSD
+    expect(cost).toBe(4_300_000);
   });
 });

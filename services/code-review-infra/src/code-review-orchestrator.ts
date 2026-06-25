@@ -959,6 +959,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
     skipBalanceCheck?: boolean;
     agentVersion?: string;
     previousCloudAgentSessionId?: string;
+    sandboxRetryOfCloudAgentSessionId?: string;
     repositorySize?: string | null;
     runReviewDelayMs?: number;
   }): Promise<{ status: CodeReviewStatus }> {
@@ -986,6 +987,8 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       skipBalanceCheck: params.skipBalanceCheck,
       agentVersion: params.agentVersion,
       previousCloudAgentSessionId: params.previousCloudAgentSessionId,
+      sandboxRetryOfCloudAgentSessionId: params.sandboxRetryOfCloudAgentSessionId,
+      sandboxRetryAttempted: params.sandboxRetryOfCloudAgentSessionId ? true : undefined,
       repositorySize: params.repositorySize,
     };
     await this.saveState();
@@ -1064,7 +1067,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       return false;
     }
 
-    if (params.sessionId && this.state.sessionId && params.sessionId !== this.state.sessionId) {
+    if (!params.sessionId || !this.state.sessionId || params.sessionId !== this.state.sessionId) {
       console.warn(
         '[CodeReviewOrchestrator] retryFreshAfterInfraFailure ignored session mismatch',
         {
@@ -1097,6 +1100,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       skipBalanceCheck: this.state.skipBalanceCheck,
       agentVersion: this.state.agentVersion,
       previousCloudAgentSessionId: undefined,
+      sandboxRetryOfCloudAgentSessionId: params.sessionId,
       repositorySize: this.state.repositorySize,
       runReviewDelayMs: retryDelayMs,
     });
@@ -1297,6 +1301,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         runtimeSkills: githubCloudReviewSkillAttached ? [GITHUB_CLOUD_REVIEW_SKILL] : undefined,
         createdOnPlatform: 'code-review' as const,
         callbackTarget,
+        sandboxRetryOfCloudAgentSessionId: this.state.sandboxRetryOfCloudAgentSessionId,
       };
 
       console.log('[CodeReviewOrchestrator] Calling prepareSession', {

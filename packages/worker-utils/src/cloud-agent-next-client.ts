@@ -33,6 +33,7 @@ export type CloudAgentPrepareSessionInput = {
   upstreamBranch?: string;
   callbackTarget?: CallbackTarget;
   createdOnPlatform?: string;
+  sandboxRetryOfCloudAgentSessionId?: string;
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   runtimeSkills?: Array<{
     name: string;
@@ -44,6 +45,7 @@ export type CloudAgentPrepareSessionInput = {
 export type CloudAgentPrepareSessionOutput = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
+  sandboxRetryPrepared?: true;
 };
 
 export type CloudAgentInitiateInput = {
@@ -294,7 +296,26 @@ export function createCloudAgentNextFetchClient(baseUrl: string): CloudAgentNext
           `Unexpected prepareSession response shape: ${JSON.stringify(data).slice(0, 500)}`
         );
       }
-      return data as unknown as CloudAgentPrepareSessionOutput;
+      if (data.sandboxRetryPrepared !== undefined && data.sandboxRetryPrepared !== true) {
+        throw new Error(
+          `Unexpected prepareSession response shape: ${JSON.stringify(data).slice(0, 500)}`
+        );
+      }
+      if (
+        input.sandboxRetryOfCloudAgentSessionId !== undefined &&
+        data.sandboxRetryPrepared !== true
+      ) {
+        throw new Error('prepareSession did not acknowledge sandbox retry preparation');
+      }
+
+      const output: CloudAgentPrepareSessionOutput = {
+        cloudAgentSessionId: data.cloudAgentSessionId,
+        kiloSessionId: data.kiloSessionId,
+      };
+      if (data.sandboxRetryPrepared === true) {
+        output.sandboxRetryPrepared = true;
+      }
+      return output;
     },
 
     async initiateFromPreparedSession(headers, input) {

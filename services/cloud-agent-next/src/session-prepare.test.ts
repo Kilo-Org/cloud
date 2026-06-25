@@ -115,6 +115,7 @@ vi.mock('./session-service.js', () => ({
 
 import { appRouter } from './router.js';
 import { profileResolutionPolicyForSessionCreateOrigin } from './router/handlers/session-prepare.js';
+import { fetchSessionMetadata } from './session-service.js';
 import type { TRPCContext, SessionId } from './types.js';
 
 function createMockDOStub(
@@ -265,6 +266,7 @@ describe('prepareSession endpoint', () => {
     recordInternalCompensationMock.mockResolvedValue(undefined);
     mergeProfileConfigurationMock.mockResolvedValue({});
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
+    vi.mocked(fetchSessionMetadata).mockResolvedValue(null);
   });
 
   it('rejects request without internal API key header', async () => {
@@ -700,6 +702,125 @@ describe('prepareSession endpoint', () => {
     );
     expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
       expect.objectContaining({ sandboxId: failoverSandboxId }),
+      expect.any(Object)
+    );
+  });
+
+  it('prepares a shared sandbox retry on the failover slot', async () => {
+    const sourceSessionId = 'agent_00000000-0000-4000-8000-000000000001';
+    const routeKey = 'usr-000000000000000000000000000000000000000000000000';
+    const failoverSandboxId = 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df';
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+      kind: 'shared',
+      routeKey,
+    });
+    vi.mocked(fetchSessionMetadata).mockResolvedValueOnce({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: sourceSessionId, userId: 'test-user-123' },
+      auth: {},
+      workspace: {
+        sandboxId: routeKey,
+        sandboxRoute: { kind: 'shared', routeKey },
+      },
+      lifecycle: { version: 1, timestamp: Date.now() },
+    });
+    const overrideStore = {
+      get: vi.fn().mockResolvedValue(null),
+      put: vi.fn().mockResolvedValue(undefined),
+    };
+    const doStub = createMockDOStub();
+    const context = createInternalApiContext({ doStub });
+    Object.assign(context.env, { SHARED_SANDBOX_OVERRIDES: overrideStore });
+    const caller = appRouter.createCaller(context);
+
+    const result = await caller.prepareSession({
+      prompt: 'Retry on a fresh sandbox slot',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      sandboxRetryOfCloudAgentSessionId: sourceSessionId,
+    });
+
+    expect(result).toEqual({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'cli-session-abc123',
+      sandboxRetryPrepared: true,
+    });
+    expect(fetchSessionMetadata).toHaveBeenCalledWith(
+      context.env,
+      'test-user-123',
+      sourceSessionId
+    );
+    expect(overrideStore.get).toHaveBeenCalledWith(`shared-sandbox-route:${routeKey}`);
+    expect(overrideStore.put).toHaveBeenCalledWith(
+      `shared-sandbox-route:${routeKey}`,
+      'shared-slot-v1'
+    );
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: {
+          sandboxId: failoverSandboxId,
+          shallow: false,
+          sandboxRoute: {
+            kind: 'shared',
+            routeKey,
+            suffix: 'shared-slot-v1',
+          },
+        },
+      })
+    );
+    expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sandboxId: failoverSandboxId }),
+      expect.any(Object)
+    );
+  });
+
+  it('rejects a shared sandbox retry when the source already uses the failover slot', async () => {
+    const sourceSessionId = 'agent_00000000-0000-4000-8000-000000000001';
+    const routeKey = 'usr-000000000000000000000000000000000000000000000000';
+    const failoverSandboxId = 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df';
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+      kind: 'shared',
+      routeKey,
+    });
+    vi.mocked(fetchSessionMetadata).mockResolvedValueOnce({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: sourceSessionId, userId: 'test-user-123' },
+      auth: {},
+      workspace: {
+        sandboxId: failoverSandboxId,
+        sandboxRoute: { kind: 'shared', routeKey, suffix: 'shared-slot-v1' },
+      },
+      lifecycle: { version: 1, timestamp: Date.now() },
+    });
+    const overrideStore = {
+      get: vi.fn().mockResolvedValue('shared-slot-v1'),
+      put: vi.fn().mockResolvedValue(undefined),
+    };
+    const doStub = createMockDOStub();
+    const context = createInternalApiContext({ doStub });
+    Object.assign(context.env, { SHARED_SANDBOX_OVERRIDES: overrideStore });
+    const caller = appRouter.createCaller(context);
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Do not retry from a failed failover slot',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        sandboxRetryOfCloudAgentSessionId: sourceSessionId,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(overrideStore.get).not.toHaveBeenCalled();
+    expect(overrideStore.put).not.toHaveBeenCalled();
+    expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(recordSessionFailureMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failure: { stage: 'sandbox_identity', code: 'sandbox_id_derivation_failed' },
+      }),
       expect.any(Object)
     );
   });

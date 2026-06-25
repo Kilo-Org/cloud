@@ -617,10 +617,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             return { status: 'inspection-failed', error: 'Session metadata unavailable' };
           return createAgentSandbox(this.env, metadata).stopWrappers(request);
         },
-        recordSharedSandboxFailover: routeKey =>
-          this.sharedSandboxFailoverRecorder
-            ? this.sharedSandboxFailoverRecorder(routeKey)
-            : recordSharedSandboxFailover(this.env.SHARED_SANDBOX_OVERRIDES, routeKey),
+        recordSharedSandboxFailover: async routeKey => {
+          if (this.sharedSandboxFailoverRecorder) {
+            await this.sharedSandboxFailoverRecorder(routeKey);
+            return;
+          }
+          await recordSharedSandboxFailover(this.env.SHARED_SANDBOX_OVERRIDES, routeKey);
+        },
         requestAlarmAtOrBefore: deadline => this.scheduleAlarmAtOrBefore(deadline),
         getSessionIdForLogs: () => this.sessionId,
       });

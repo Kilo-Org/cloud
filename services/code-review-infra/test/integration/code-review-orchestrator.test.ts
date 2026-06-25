@@ -523,6 +523,7 @@ describe('CodeReviewOrchestrator recovery', () => {
         return trpcSuccess({
           cloudAgentSessionId: 'agent-retry-fresh',
           kiloSessionId: 'ses_retry_fresh',
+          sandboxRetryPrepared: true,
         });
       }
       if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
@@ -577,6 +578,7 @@ describe('CodeReviewOrchestrator recovery', () => {
         return trpcSuccess({
           cloudAgentSessionId: 'agent-retry-fresh',
           kiloSessionId: 'ses_retry_fresh',
+          sandboxRetryPrepared: true,
         });
       }
       if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
@@ -629,6 +631,8 @@ describe('CodeReviewOrchestrator recovery', () => {
     });
     await expect(storedReview(retryStub)).resolves.toMatchObject({
       repositorySize: '100 MB',
+      sandboxRetryOfCloudAgentSessionId: 'agent-old',
+      sandboxRetryAttempted: true,
     });
     const retryAlarm = await storedAlarm(retryStub);
     expectAutoRetryAlarmInRange(retryAlarm, retrySchedulingStartedAt);
@@ -644,6 +648,13 @@ describe('CodeReviewOrchestrator recovery', () => {
       sessionId: 'agent-retry-fresh',
       cliSessionId: 'ses_retry_fresh',
     });
+    const prepareCall = getFetchCall(fetchMock, '/trpc/prepareSession');
+    const prepareBody = JSON.parse(String(prepareCall?.[1]?.body));
+    expect(prepareBody.sandboxRetryOfCloudAgentSessionId).toBe('agent-old');
+    expect(prepareBody).not.toHaveProperty('previousCloudAgentSessionId');
+    expect(fetchCalls(fetchMock, '/trpc/getSessionHealth')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/updateSession')).toHaveLength(0);
+    expect(fetchCalls(fetchMock, '/trpc/sendMessageV2')).toHaveLength(0);
   });
 
   it('retry-fresh ignores mismatched sessions', async () => {

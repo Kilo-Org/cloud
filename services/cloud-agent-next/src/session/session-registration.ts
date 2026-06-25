@@ -21,14 +21,18 @@ import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { generateSessionId, SessionService } from '../session-service.js';
+import { fetchSessionMetadata, generateSessionId, SessionService } from '../session-service.js';
 import {
   createCloudAgentSessionReport,
   recordCloudAgentSandboxIdentity,
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
-import { generateSandboxRoutingTarget } from '../sandbox-id.js';
-import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
+import { generateSandboxRoutingTarget, isGeneratedSharedSandboxId } from '../sandbox-id.js';
+import {
+  recordSharedSandboxFailover,
+  resolveSharedSandboxAssignment,
+  SHARED_SANDBOX_FAILOVER_SUFFIX,
+} from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { createMessageId } from './message-id.js';
 import type {
@@ -50,6 +54,7 @@ export type SessionRegistrationContext = {
   userId: string;
   authToken: string;
   botId?: string;
+  sandboxRetryOfCloudAgentSessionId?: string;
 };
 
 export type SessionRegistrationResult = {
@@ -57,6 +62,7 @@ export type SessionRegistrationResult = {
   kiloSessionId: string;
   sandboxId: SandboxId;
   sandboxRoute?: SharedSandboxRouteMetadata;
+  sandboxRetryPrepared?: true;
   /**
    * Canonical initial turn reserved for a later legacy initiation request.
    */
@@ -116,6 +122,23 @@ type NewSessionAllocation = SessionRegistrationResult & {
   rollbackCliSession: () => Promise<void>;
 };
 
+type RetrySandboxAllocation = {
+  sandboxId: SandboxId;
+  sandboxRoute?: SharedSandboxRouteMetadata;
+  sandboxRetryPrepared?: true;
+};
+
+type SandboxRetryPreparationRejection =
+  | 'source_metadata_unavailable'
+  | 'source_metadata_missing'
+  | 'source_sandbox_missing'
+  | 'source_shared_route_missing'
+  | 'source_shared_route_inconsistent'
+  | 'source_shared_already_failed_over'
+  | 'target_shared_route_mismatch'
+  | 'target_shared_failover_unavailable'
+  | 'target_sandbox_unchanged';
+
 function initialAdmissionFailure(
   result: Extract<SessionMessageAdmissionResult, { success: false }>
 ): Extract<SessionEstablishmentFailure, { stage: 'initial_admission' }> {
@@ -136,6 +159,141 @@ async function recordPostSetupFailure(record: () => Promise<void>): Promise<void
   }
 }
 
+function rejectSandboxRetryPreparation(reason: SandboxRetryPreparationRejection): never {
+  logger
+    .withFields({ reason, logTag: 'sandbox_retry_preparation_rejected' })
+    .warn('Rejected sandbox retry preparation');
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: `Sandbox retry preparation rejected: ${reason}`,
+  });
+}
+
+function getSourceSandboxForRetry(sourceMetadata: SessionMetadata): {
+  sandboxId: SandboxId;
+  sandboxRoute?: SharedSandboxRouteMetadata;
+} {
+  const sourceSandboxId = sourceMetadata.workspace?.sandboxId;
+  if (!sourceSandboxId) rejectSandboxRetryPreparation('source_sandbox_missing');
+
+  const sourceRoute = sourceMetadata.workspace?.sandboxRoute;
+  if (!sourceRoute) {
+    if (isGeneratedSharedSandboxId(sourceSandboxId)) {
+      rejectSandboxRetryPreparation('source_shared_route_missing');
+    }
+    return { sandboxId: sourceSandboxId };
+  }
+
+  if (sourceRoute.suffix !== undefined) {
+    rejectSandboxRetryPreparation('source_shared_already_failed_over');
+  }
+
+  if (sourceSandboxId !== sourceRoute.routeKey) {
+    rejectSandboxRetryPreparation('source_shared_route_inconsistent');
+  }
+
+  return { sandboxId: sourceSandboxId, sandboxRoute: sourceRoute };
+}
+
+async function fetchSourceSandboxForRetry(
+  ctx: SessionRegistrationContext,
+  sourceSessionId: string
+): Promise<ReturnType<typeof getSourceSandboxForRetry>> {
+  let sourceMetadata: SessionMetadata | null;
+  try {
+    sourceMetadata = await fetchSessionMetadata(ctx.env, ctx.userId, sourceSessionId);
+  } catch (error) {
+    logger
+      .withFields({
+        errorType: error instanceof Error ? error.name : typeof error,
+        logTag: 'sandbox_retry_source_metadata_unavailable',
+      })
+      .warn('Failed to load source session metadata for sandbox retry');
+    rejectSandboxRetryPreparation('source_metadata_unavailable');
+  }
+
+  if (!sourceMetadata) rejectSandboxRetryPreparation('source_metadata_missing');
+  return getSourceSandboxForRetry(sourceMetadata);
+}
+
+async function allocateSandboxForNewSession(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  cloudAgentSessionId: string
+): Promise<RetrySandboxAllocation> {
+  const target = await generateSandboxRoutingTarget(
+    ctx.env.PER_SESSION_SANDBOX_ORG_IDS,
+    input.options?.kilocodeOrganizationId,
+    ctx.userId,
+    cloudAgentSessionId,
+    ctx.botId,
+    input.runtime?.devcontainer
+  );
+
+  const sourceSessionId = ctx.sandboxRetryOfCloudAgentSessionId;
+  if (!sourceSessionId) {
+    if (target.kind === 'shared') {
+      const assignment = await resolveSharedSandboxAssignment(
+        ctx.env.SHARED_SANDBOX_OVERRIDES,
+        target.routeKey
+      );
+      return {
+        sandboxId: assignment.sandboxId,
+        sandboxRoute: {
+          kind: 'shared',
+          routeKey: target.routeKey,
+          ...(assignment.suffix ? { suffix: assignment.suffix } : {}),
+        },
+      };
+    }
+    return { sandboxId: target.sandboxId };
+  }
+
+  const source = await fetchSourceSandboxForRetry(ctx, sourceSessionId);
+  if (target.kind === 'shared') {
+    if (source.sandboxRoute?.routeKey !== target.routeKey) {
+      rejectSandboxRetryPreparation('target_shared_route_mismatch');
+    }
+
+    let assignment: Awaited<ReturnType<typeof recordSharedSandboxFailover>>;
+    try {
+      assignment = await recordSharedSandboxFailover(
+        ctx.env.SHARED_SANDBOX_OVERRIDES,
+        target.routeKey
+      );
+    } catch (error) {
+      logger
+        .withFields({
+          errorType: error instanceof Error ? error.name : typeof error,
+          logTag: 'sandbox_retry_failover_unavailable',
+        })
+        .warn('Failed to record shared sandbox failover for sandbox retry');
+      rejectSandboxRetryPreparation('target_shared_failover_unavailable');
+    }
+    if (assignment.suffix !== SHARED_SANDBOX_FAILOVER_SUFFIX) {
+      rejectSandboxRetryPreparation('target_shared_failover_unavailable');
+    }
+    if (assignment.sandboxId === source.sandboxId) {
+      rejectSandboxRetryPreparation('target_sandbox_unchanged');
+    }
+
+    return {
+      sandboxId: assignment.sandboxId,
+      sandboxRoute: {
+        kind: 'shared',
+        routeKey: target.routeKey,
+        suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
+      },
+      sandboxRetryPrepared: true,
+    };
+  }
+
+  if (target.sandboxId === source.sandboxId) {
+    rejectSandboxRetryPreparation('target_sandbox_unchanged');
+  }
+  return { sandboxId: target.sandboxId, sandboxRetryPrepared: true };
+}
+
 async function allocateNewSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
@@ -153,29 +311,12 @@ async function allocateNewSession(
 
   let sandboxId: SandboxId;
   let sandboxRoute: SharedSandboxRouteMetadata | undefined;
+  let sandboxRetryPrepared: true | undefined;
   try {
-    const target = await generateSandboxRoutingTarget(
-      ctx.env.PER_SESSION_SANDBOX_ORG_IDS,
-      input.options?.kilocodeOrganizationId,
-      ctx.userId,
-      cloudAgentSessionId,
-      ctx.botId,
-      input.runtime?.devcontainer
-    );
-    if (target.kind === 'shared') {
-      const assignment = await resolveSharedSandboxAssignment(
-        ctx.env.SHARED_SANDBOX_OVERRIDES,
-        target.routeKey
-      );
-      sandboxId = assignment.sandboxId;
-      sandboxRoute = {
-        kind: 'shared',
-        routeKey: target.routeKey,
-        ...(assignment.suffix ? { suffix: assignment.suffix } : {}),
-      };
-    } else {
-      sandboxId = target.sandboxId;
-    }
+    const allocation = await allocateSandboxForNewSession(input, ctx, cloudAgentSessionId);
+    sandboxId = allocation.sandboxId;
+    sandboxRoute = allocation.sandboxRoute;
+    sandboxRetryPrepared = allocation.sandboxRetryPrepared;
   } catch (error) {
     await recordCloudAgentSessionFailure(
       {
@@ -225,6 +366,7 @@ async function allocateNewSession(
     kiloSessionId,
     sandboxId,
     sandboxRoute,
+    ...(sandboxRetryPrepared === true ? { sandboxRetryPrepared } : {}),
     initialTurn,
     sessionService,
     rollbackCliSession: async () => {
@@ -402,6 +544,10 @@ export async function startNewSession(
     cloudAgentSessionId: allocation.cloudAgentSessionId,
     kiloSessionId: allocation.kiloSessionId,
     sandboxId: allocation.sandboxId,
+    sandboxRoute: allocation.sandboxRoute,
+    ...(allocation.sandboxRetryPrepared === true
+      ? { sandboxRetryPrepared: allocation.sandboxRetryPrepared }
+      : {}),
     admission,
   };
 }

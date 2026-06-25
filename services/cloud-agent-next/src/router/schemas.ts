@@ -441,6 +441,9 @@ export const PrepareSessionInput = z
     callbackTarget: CallbackTargetSchema.optional().describe(
       'Optional callback target configuration for execution completion notifications'
     ),
+    sandboxRetryOfCloudAgentSessionId: sessionIdSchema
+      .optional()
+      .describe('Failed Cloud Agent session that this fresh retry must not reuse'),
 
     // Organization context
     kilocodeOrganizationId: z
@@ -546,6 +549,7 @@ export const PrepareSessionInput = z
 export const PrepareSessionOutput = z.object({
   cloudAgentSessionId: z.string().describe('The generated cloud-agent session ID'),
   kiloSessionId: z.string().describe('The Kilo CLI session ID'),
+  sandboxRetryPrepared: z.literal(true).optional(),
 });
 
 /**

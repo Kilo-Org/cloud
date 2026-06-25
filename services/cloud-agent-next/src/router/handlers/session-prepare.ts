@@ -360,18 +360,24 @@ const prepareSessionHandler = internalApiProtectedProcedure
               userId: ctx.userId,
               authToken: ctx.authToken,
               botId: ctx.botId,
+              sandboxRetryOfCloudAgentSessionId: input.sandboxRetryOfCloudAgentSessionId,
             })
           : await registerNewSession(requestWithProfile, {
               env: ctx.env,
               userId: ctx.userId,
               authToken: ctx.authToken,
               botId: ctx.botId,
+              sandboxRetryOfCloudAgentSessionId: input.sandboxRetryOfCloudAgentSessionId,
             });
 
-      return {
+      const output = {
         cloudAgentSessionId: result.cloudAgentSessionId,
         kiloSessionId: result.kiloSessionId,
       };
+      if (result.sandboxRetryPrepared === true) {
+        return { ...output, sandboxRetryPrepared: true };
+      }
+      return output;
     });
   });
 

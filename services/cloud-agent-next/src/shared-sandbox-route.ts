@@ -74,16 +74,21 @@ export async function resolveSharedSandboxAssignment(
 export async function recordSharedSandboxFailover(
   store: SharedSandboxOverrideStore,
   routeKey: SandboxId
-): Promise<void> {
+): Promise<SharedSandboxAssignment> {
   if (!isGeneratedSharedSandboxId(routeKey)) {
     throw new Error('Shared sandbox route key must be a generated shared sandbox ID');
   }
 
   const key = routeOverrideKey(routeKey);
   const existing = await readRouteOverride(store, key);
-  if (existing === SHARED_SANDBOX_FAILOVER_SUFFIX) return;
-  if (existing !== null) {
+  if (existing !== null && existing !== SHARED_SANDBOX_FAILOVER_SUFFIX) {
     throw new Error('Invalid shared sandbox override');
   }
-  await writeRouteOverride(store, key, SHARED_SANDBOX_FAILOVER_SUFFIX);
+  if (existing === null) {
+    await writeRouteOverride(store, key, SHARED_SANDBOX_FAILOVER_SUFFIX);
+  }
+  return {
+    sandboxId: await deriveSharedSandboxId(routeKey, SHARED_SANDBOX_FAILOVER_SUFFIX),
+    suffix: SHARED_SANDBOX_FAILOVER_SUFFIX,
+  };
 }

@@ -71,6 +71,8 @@ export interface CodeReview {
   agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
+  /** Failed Cloud Agent session ID that this fresh retry must avoid reusing at the sandbox layer. */
+  sandboxRetryOfCloudAgentSessionId?: string;
   sandboxRetryAttempted?: boolean;
   /** Provider-reported repository storage size, formatted for log correlation. */
   repositorySize?: string | null;
@@ -141,6 +143,8 @@ export interface CodeReviewRequest {
   agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
+  /** Failed Cloud Agent session ID that this fresh retry must avoid reusing at the sandbox layer. */
+  sandboxRetryOfCloudAgentSessionId?: string;
   /** Provider-reported repository storage size, formatted for log correlation. */
   repositorySize?: string | null;
 }

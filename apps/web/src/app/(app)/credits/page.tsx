@@ -363,6 +363,7 @@ export default function CreditsPage() {
                             href={`https://countdown.val.run/?time=${new Date(block.expiry_date).toISOString()}`}
                             className="text-blue-400 hover:underline"
                             target="_blank"
+                            rel="noopener noreferrer"
                             prefetch={false}
                             title={`${new Date(block.expiry_date).toLocaleDateString()} ${new Date(block.expiry_date).toLocaleTimeString()}`}
                           >
@@ -378,6 +379,7 @@ export default function CreditsPage() {
                             href={block.receipt_url}
                             className="inline-flex items-center gap-1 text-blue-400 hover:underline"
                             target="_blank"
+                            rel="noopener noreferrer"
                             prefetch={false}
                           >
                             View invoice <ExternalLink className="size-3" />

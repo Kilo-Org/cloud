@@ -16,7 +16,6 @@ const makeTransaction = (
   credit_category: opts.credit_category ?? null,
   original_transaction_id: opts.original_transaction_id ?? null,
   created_at: opts.created_at ?? '2024-01-01',
-  stripe_payment_id: opts.stripe_payment_id ?? null,
 });
 
 const ENTITY_ID = 'user-1';

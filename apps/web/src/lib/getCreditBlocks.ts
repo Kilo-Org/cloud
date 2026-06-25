@@ -61,7 +61,6 @@ export function getCreditBlocks(
         balance_mUsd,
         amount_mUsd: block.amount_microdollars,
         is_free: block.is_free,
-        stripe_payment_id: block.stripe_payment_id,
       };
     })
     .filter(t => t.balance_mUsd > 0);
@@ -88,7 +87,6 @@ export function getCreditBlocks(
         amount_mUsd: tx.amount_microdollars,
         balance_mUsd,
         is_free: tx.is_free,
-        stripe_payment_id: tx.stripe_payment_id,
       };
     })
     .filter(tx => tx.balance_mUsd > 0)

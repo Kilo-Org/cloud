@@ -39,8 +39,10 @@ import { resolveStripeReceiptUrl } from '@/lib/credits';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
+import pLimit from 'p-limit';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+const MAX_CONCURRENT_STRIPE_RECEIPT_LOOKUPS = 4;
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
 
@@ -87,7 +89,6 @@ const CreditBlockSchema = z.object({
   balance_mUsd: z.number(),
   amount_mUsd: z.number(),
   is_free: z.boolean(),
-  stripe_payment_id: z.string().nullable(),
   receipt_url: z.string().nullable(),
 });
 
@@ -336,16 +337,22 @@ export const userRouter = createTRPCRouter({
         result.deductions
       );
 
-      // Resolve Stripe receipt/invoice URLs in parallel for all paid blocks.
+      const stripePaymentIdsByTransactionId = new Map(
+        transactions.map(transaction => [transaction.id, transaction.stripe_payment_id])
+      );
+      const limitStripeReceiptLookup = pLimit(MAX_CONCURRENT_STRIPE_RECEIPT_LOOKUPS);
       const creditBlocksWithReceipts = await Promise.all(
-        result.creditBlocks.map(async block => {
-          if (block.is_free || !block.stripe_payment_id) {
+        result.creditBlocks.map(block => {
+          const stripePaymentId = stripePaymentIdsByTransactionId.get(block.id);
+          if (block.is_free || !stripePaymentId) {
             return { ...block, receipt_url: null };
           }
-          const receipt_url = await resolveStripeReceiptUrl(block.stripe_payment_id, {
-            skipInAutomatedTest: true,
-          });
-          return { ...block, receipt_url };
+          return limitStripeReceiptLookup(async () => ({
+            ...block,
+            receipt_url: await resolveStripeReceiptUrl(stripePaymentId, {
+              skipInAutomatedTest: true,
+            }),
+          }));
         })
       );
 

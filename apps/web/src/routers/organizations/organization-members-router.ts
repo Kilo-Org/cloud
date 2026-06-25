@@ -251,7 +251,6 @@ export const organizationsMembersRouter = createTRPCRouter({
 
       for (const membership of existingMemberships) {
         if (selectedChildOrganizationIds.has(membership.organizationId)) continue;
-        if (membership.role !== 'member') continue;
 
         const result = await removeUserFromOrganization(
           membership.organizationId,

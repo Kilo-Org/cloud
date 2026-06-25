@@ -376,7 +376,7 @@ describe('organizations members trpc router', () => {
       }
     });
 
-    it('does not remove elevated child organization memberships from the parent control', async () => {
+    it('removes unselected child organization memberships regardless of role', async () => {
       const childOwner = await insertTestUser({
         google_user_email: `${crypto.randomUUID()}@elevated-child-owner.example.com`,
         google_user_name: 'Elevated Child Owner',
@@ -393,7 +393,7 @@ describe('organizations members trpc router', () => {
           childOrganizationIds: [],
         });
 
-        expect(result).toEqual({ success: true, added: [], removed: [] });
+        expect(result).toEqual({ success: true, added: [], removed: [child.id] });
         const [membership] = await db
           .select({ role: organization_memberships.role })
           .from(organization_memberships)
@@ -403,7 +403,7 @@ describe('organizations members trpc router', () => {
               eq(organization_memberships.kilo_user_id, memberUser.id)
             )
           );
-        expect(membership?.role).toBe('owner');
+        expect(membership).toBeUndefined();
       } finally {
         await cleanupChildOrganizations([child.id]);
       }

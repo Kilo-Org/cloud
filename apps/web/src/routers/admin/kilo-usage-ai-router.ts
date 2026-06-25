@@ -61,6 +61,11 @@ Scope rules:
 - Prefer one metric and at most one grouping per call so the host can render cards and charts.
 - Do not ask for organization-wide or platform-wide analytics.
 
+Dataset routing rules:
+- If the user asks about Code Reviewer, code reviews, review runs, PR reviews, review costs, or review tokens, use ${KILO_USAGE_AI_MCP_TOOL_NAME} with dataset: "code_reviews". Do not use get_kilo_usage_cost or microdollar_usage for those questions unless the user explicitly asks for raw model-usage attribution instead of Code Reviewer runs.
+- For Code Reviewer cost charts, use mode: "timeseries", bucket: "day", metrics: [{ operation: "sum", field: "totalCostUsd" }] and group by model only when the user asks for a model breakdown.
+- For broad Kilo model usage cost totals that are not specifically about Code Reviewer runs, use ${KILO_USAGE_AI_MCP_TOOL_NAME} with dataset: "microdollar_usage" and costUsd or costMicrodollars metrics.
+
 Tool and rendering rules:
 - Use native MCP tool calls only. Never write XML-style tool markup such as <function_calls>, <function_result>, <invoke>, or <parameter> in assistant text.
 - The only data tool is kilo_usage ${KILO_USAGE_AI_MCP_TOOL_NAME}. There is no kilo_usage_render_result tool. Never call, mention, or emulate kilo_usage_render_result.

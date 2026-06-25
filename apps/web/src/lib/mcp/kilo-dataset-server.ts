@@ -13,6 +13,41 @@ import {
   queryKiloDatasetStats,
 } from '@/lib/kilo-datasets/query';
 
+function summarizeDatasetQueryInput(input: unknown) {
+  if (!input || typeof input !== 'object') return { inputType: typeof input };
+  const record = input as Record<string, unknown>;
+  const filters = Array.isArray(record.filters)
+    ? record.filters.map(filter => {
+        if (!filter || typeof filter !== 'object') return { filterType: typeof filter };
+        const filterRecord = filter as Record<string, unknown>;
+        return {
+          field: filterRecord.field,
+          operator: filterRecord.operator,
+          valueKind: Array.isArray(filterRecord.value) ? 'array' : typeof filterRecord.value,
+          valueCount: Array.isArray(filterRecord.value) ? filterRecord.value.length : undefined,
+        };
+      })
+    : undefined;
+  const metrics = Array.isArray(record.metrics)
+    ? record.metrics.map(metric => {
+        if (!metric || typeof metric !== 'object') return { metricType: typeof metric };
+        const metricRecord = metric as Record<string, unknown>;
+        return { operation: metricRecord.operation, field: metricRecord.field };
+      })
+    : undefined;
+  return {
+    dataset: record.dataset,
+    mode: record.mode,
+    range: record.range,
+    bucket: record.bucket,
+    groupBy: record.groupBy,
+    metrics,
+    filters,
+    orderBy: record.orderBy,
+    limit: record.limit,
+  };
+}
+
 function toStructuredContent(output: object): Record<string, unknown> {
   return Object.fromEntries(Object.entries(output));
 }
@@ -44,8 +79,17 @@ export function createKiloDatasetMcpServer(params: { user: User }) {
     async input => {
       try {
         const output = await getKiloUsageCost({ user: params.user, input });
+        console.info('[kilo-dataset-mcp] get_kilo_usage_cost completed', {
+          period: output.period,
+          range: output.range,
+          rowCount: output.rows.length,
+          totalCostMicrodollars: output.summary.totalCostMicrodollars,
+        });
         return jsonToolResult(output);
       } catch (error) {
+        console.warn('[kilo-dataset-mcp] get_kilo_usage_cost failed', {
+          error: formatKiloDatasetQueryError(error, 'get_kilo_usage_cost'),
+        });
         return {
           isError: true,
           content: [
@@ -73,8 +117,18 @@ export function createKiloDatasetMcpServer(params: { user: User }) {
     async input => {
       try {
         const output = await queryKiloDatasetStats({ user: params.user, input });
+        console.info('[kilo-dataset-mcp] query_kilo_dataset completed', {
+          input: summarizeDatasetQueryInput(input),
+          range: output.range,
+          columns: output.columns.map(column => column.name),
+          rowCount: output.rows.length,
+        });
         return jsonToolResult(output);
       } catch (error) {
+        console.warn('[kilo-dataset-mcp] query_kilo_dataset failed', {
+          input: summarizeDatasetQueryInput(input),
+          error: formatKiloDatasetQueryError(error),
+        });
         return {
           isError: true,
           content: [{ type: 'text', text: formatKiloDatasetQueryError(error) }],

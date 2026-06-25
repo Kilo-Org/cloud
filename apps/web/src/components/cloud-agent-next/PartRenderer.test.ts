@@ -46,4 +46,28 @@ The bar chart above shows code review costs.`;
       },
     ]);
   });
+
+  it('strips malformed raw chart JSON while preserving the assistant answer', () => {
+    const text = `<function_returns> {"chartType":"bar","title":"costUsd over time","data":{"labels":["2026-06-18","2026-06-19"],"datasets":[{"label":"costUsd","data":[0.15052808,0.10165488]}]}}</parameter> </invoke>
+
+Here is the daily cost breakdown.`;
+
+    expect(stripRawToolCallMarkup(text)).toBe('Here is the daily cost breakdown.');
+    expect(extractRawUsageRenderResults(text)).toEqual([
+      {
+        type: 'chart',
+        chartType: 'bar',
+        title: 'costUsd over time',
+        dataset: undefined,
+        metric: 'costUsd',
+        scopeType: undefined,
+        startDate: undefined,
+        endDate: undefined,
+        data: [
+          { label: '2026-06-18', costUsd: 0.15052808 },
+          { label: '2026-06-19', costUsd: 0.10165488 },
+        ],
+      },
+    ]);
+  });
 });

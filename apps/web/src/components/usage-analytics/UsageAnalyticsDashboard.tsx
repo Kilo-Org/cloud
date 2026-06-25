@@ -151,8 +151,7 @@ export function UsageAnalyticsDashboard({
   const isOrgContext = context === 'organization';
   // Owners/billing_managers are the only roles that may view org-wide usage and
   // (via inheritance) child-org usage, so only they get the expanded scope list.
-  const isOrgAdmin =
-    isOrgContext && (callerRole === 'owner' || callerRole === 'billing_manager');
+  const isOrgAdmin = isOrgContext && (callerRole === 'owner' || callerRole === 'billing_manager');
   const hasEnterpriseUsageViews = context === 'organization' && organizationPlan === 'enterprise';
   const showDetailedUsage = !hasEnterpriseUsageViews || usageView === 'ai-usage';
 

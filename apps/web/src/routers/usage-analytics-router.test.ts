@@ -96,17 +96,14 @@ describe('usage analytics scope conditions', () => {
   it('falls back to personal scope with no org', () => {
     const { sql, bindings } = scopeSql({});
     expect(sql).toContain('kilo_user_id = ?');
-    expect(sql).toContain("organization_id = ?");
+    expect(sql).toContain('organization_id = ?');
     // personal-only pins kilo_user_id to caller and org to the empty-string sentinel
     expect(bindings).toEqual([CTX_USER, '']);
   });
 
   it('caps organizationIds at the boundary to bound auth fan-out', () => {
     const makeIds = (n: number) =>
-      Array.from(
-        { length: n },
-        (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`
-      );
+      Array.from({ length: n }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`);
     expect(
       UsageAnalyticsFiltersSchema.safeParse({
         ...baseFilters,

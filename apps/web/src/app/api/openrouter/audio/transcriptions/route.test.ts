@@ -121,6 +121,39 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     });
   });
 
+  it('proxies Parakeet requests without prompt conditioning', async () => {
+    setUserAuth();
+    mockedFetch.mockResolvedValue(
+      makeUpstreamResponse({
+        text: 'hello world',
+        model: 'nvidia/parakeet-tdt-0.6b-v3',
+        usage: { seconds: 60, cost: 0.0015, is_byok: false },
+      })
+    );
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest({
+        model: 'nvidia/parakeet-tdt-0.6b-v3',
+        input_audio: { data: 'UklGRiQA', format: 'wav' },
+        language: 'en',
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      text: 'hello world',
+      model: 'nvidia/parakeet-tdt-0.6b-v3',
+    });
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const upstream = JSON.parse(init?.body as string);
+    expect(upstream.model).toBe('nvidia/parakeet-tdt-0.6b-v3');
+    expect(upstream.input_audio).toEqual({ data: 'UklGRiQA', format: 'wav' });
+    expect(upstream.language).toBe('en');
+    expect(upstream.prompt).toBeUndefined();
+  });
+
   it('forwards organization provider policy through the OpenRouter provider field', async () => {
     setUserAuth();
     mockedGetBalanceAndOrgSettings.mockResolvedValue({

@@ -817,6 +817,26 @@ describe('parseTranscriptionUsageFromResponse', () => {
     expect(result.generation_time).toBe(2.5);
   });
 
+  it('accounts for duration-priced Parakeet responses without token fields', () => {
+    const result = parseTranscriptionUsageFromResponse(
+      makeResponse({
+        model: 'nvidia/parakeet-tdt-0.6b-v3',
+        usage: { seconds: 60, cost: 0.0015, is_byok: false },
+      }),
+      200,
+      'nvidia/parakeet-tdt-0.6b-v3'
+    );
+
+    expect(result).toMatchObject({
+      model: 'nvidia/parakeet-tdt-0.6b-v3',
+      cost_mUsd: 1500,
+      inputTokens: 0,
+      outputTokens: 0,
+      generation_time: 60,
+      hasError: false,
+    });
+  });
+
   it('falls back to requested model when response model is absent', () => {
     const parsed = JSON.parse(makeResponse());
     delete parsed.model;

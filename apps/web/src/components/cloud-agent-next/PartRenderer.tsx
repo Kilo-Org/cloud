@@ -36,6 +36,7 @@ import {
   isPatchPart,
   isPartStreaming,
 } from './types';
+import { stripRawToolCallMarkup } from './raw-tool-call-markup';
 
 // ============================================================================
 // Types
@@ -44,6 +45,7 @@ import {
 export type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
+  suppressRawToolCallText?: boolean;
   /** Messages for child sessions (task tools) - keyed by session ID */
   childSessionMessages?: Map<string, StoredMessage[]>;
   /** Function to get messages for a child session ID (for nested sessions) */
@@ -72,14 +74,21 @@ const markdownComponents = { a: LinkRenderer };
 /**
  * Renders a TextPart as markdown
  */
-function TextPartRenderer({ part }: { part: Extract<Part, { type: 'text' }> }) {
+function TextPartRenderer({
+  part,
+  suppressRawToolCallText,
+}: {
+  part: Extract<Part, { type: 'text' }>;
+  suppressRawToolCallText?: boolean;
+}) {
+  const text = suppressRawToolCallText ? stripRawToolCallMarkup(part.text) : part.text;
+  if (!text) return null;
+
   return (
     <div className="prose prose-sm prose-invert max-w-none overflow-hidden">
-      {part.text ? (
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {part.text}
-        </ReactMarkdown>
-      ) : null}
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        {text}
+      </ReactMarkdown>
     </div>
   );
 }
@@ -441,6 +450,7 @@ function PartErrorFallback({ partType }: { partType: string }) {
 export function PartRenderer({
   part,
   isStreaming,
+  suppressRawToolCallText,
   childSessionMessages,
   getChildMessages,
   onOpenChildSession,
@@ -449,7 +459,7 @@ export function PartRenderer({
   if (isTextPart(part)) {
     return (
       <MessageErrorBoundary fallback={<PartErrorFallback partType="text" />}>
-        <TextPartRenderer part={part} />
+        <TextPartRenderer part={part} suppressRawToolCallText={suppressRawToolCallText} />
       </MessageErrorBoundary>
     );
   }

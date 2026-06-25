@@ -33,6 +33,9 @@ import type { ToolPart } from './types';
 
 export const KILO_DATASET_TOOL_NAME = 'kilo_usage_query_kilo_dataset';
 
+const KILO_DATASET_MCP_SERVER_NAME = 'kilo_usage';
+const KILO_DATASET_MCP_TOOL_NAME = 'query_kilo_dataset';
+
 export type KiloDatasetRenderMode = 'metric-grid' | 'bar-chart' | 'timeseries-chart' | 'table';
 
 type RowValue = QueryKiloDatasetOutput['rows'][number][string];
@@ -59,6 +62,53 @@ const chartColors = [
 
 function metricAlias(metric: QueryKiloDatasetInput['metrics'][number]): string {
   return metric.operation === 'count' ? 'count' : `${metric.operation}_${metric.field}`;
+}
+
+function isKiloDatasetQueryTool(toolPart: ToolPart): boolean {
+  if (toolPart.tool === KILO_DATASET_TOOL_NAME) return true;
+  if (toolPart.tool !== 'mcp') return false;
+
+  const input = toolPart.state.input;
+  return (
+    input.server_name === KILO_DATASET_MCP_SERVER_NAME &&
+    input.tool_name === KILO_DATASET_MCP_TOOL_NAME
+  );
+}
+
+function inputForKiloDatasetQuery(toolPart: ToolPart): unknown {
+  if (toolPart.tool !== 'mcp') return toolPart.state.input;
+  return toolPart.state.input.arguments;
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function outputCandidateFromMcpResult(value: unknown): unknown {
+  if (!isRecord(value)) return value;
+  if (value.structuredContent !== undefined) return value.structuredContent;
+
+  if (!Array.isArray(value.content)) return value;
+  for (const item of value.content) {
+    if (!isRecord(item) || item.type !== 'text' || typeof item.text !== 'string') continue;
+    const parsedText = parseJson(item.text);
+    if (parsedText !== undefined) return parsedText;
+  }
+  return value;
+}
+
+function parseKiloDatasetOutput(output: string): unknown {
+  const parsed = parseJson(output);
+  if (parsed === undefined) return undefined;
+  return outputCandidateFromMcpResult(parsed);
 }
 
 function columnByName(output: QueryKiloDatasetOutput): Map<string, QueryKiloDatasetColumn> {
@@ -133,7 +183,7 @@ function classifyRenderMode(params: {
 }
 
 export function resolveKiloDatasetToolView(toolPart: ToolPart): KiloDatasetToolView {
-  if (toolPart.tool !== KILO_DATASET_TOOL_NAME) return { kind: 'fallback' };
+  if (!isKiloDatasetQueryTool(toolPart)) return { kind: 'fallback' };
 
   const { state } = toolPart;
   if (state.status === 'pending' || state.status === 'running') {
@@ -143,15 +193,11 @@ export function resolveKiloDatasetToolView(toolPart: ToolPart): KiloDatasetToolV
     return { kind: 'status', status: 'error', error: state.error };
   }
 
-  const inputResult = QueryKiloDatasetInputSchema.safeParse(state.input);
+  const inputResult = QueryKiloDatasetInputSchema.safeParse(inputForKiloDatasetQuery(toolPart));
   if (!inputResult.success) return { kind: 'fallback' };
 
-  let parsedOutput: unknown;
-  try {
-    parsedOutput = JSON.parse(state.output) as unknown;
-  } catch {
-    return { kind: 'fallback' };
-  }
+  const parsedOutput = parseKiloDatasetOutput(state.output);
+  if (parsedOutput === undefined) return { kind: 'fallback' };
 
   const outputResult = QueryKiloDatasetOutputSchema.safeParse(parsedOutput);
   if (!outputResult.success) return { kind: 'fallback' };

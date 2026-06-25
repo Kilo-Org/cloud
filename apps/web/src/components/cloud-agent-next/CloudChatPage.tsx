@@ -60,11 +60,13 @@ const StaticMessages = memo(
     pendingMessages,
     getChildMessages,
     onOpenChildSession,
+    suppressRawToolCallText,
   }: {
     messages: StoredMessage[];
     pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
     getChildMessages?: (sessionId: string) => StoredMessage[];
     onOpenChildSession?: OpenChildSession;
+    suppressRawToolCallText?: boolean;
   }) => (
     <>
       {messages.map(msg => (
@@ -74,6 +76,7 @@ const StaticMessages = memo(
             deliveryState={pendingMessages.get(msg.info.id)}
             getChildMessages={getChildMessages}
             onOpenChildSession={onOpenChildSession}
+            suppressRawToolCallText={suppressRawToolCallText}
           />
         </MessageErrorBoundary>
       ))}
@@ -91,6 +94,7 @@ type DynamicMessagesProps = {
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
+  suppressRawToolCallText?: boolean;
 };
 
 const DynamicMessages = memo(
@@ -99,6 +103,7 @@ const DynamicMessages = memo(
     pendingMessages,
     getChildMessages,
     onOpenChildSession,
+    suppressRawToolCallText,
   }: DynamicMessagesProps) {
     return (
       <>
@@ -112,6 +117,7 @@ const DynamicMessages = memo(
                 deliveryState={pendingMessages.get(msg.info.id)}
                 getChildMessages={getChildMessages}
                 onOpenChildSession={onOpenChildSession}
+                suppressRawToolCallText={suppressRawToolCallText}
               />
             </MessageErrorBoundary>
           );
@@ -733,6 +739,7 @@ export default function CloudChatPage({ organizationId, surface = 'default' }: C
                               pendingMessages={pendingMessages}
                               getChildMessages={getChildMessages}
                               onOpenChildSession={handleOpenTopLevelChildSession}
+                              suppressRawToolCallText={isUsageAnalystSurface}
                             />
                             <DynamicMessages
                               active={chatTabActive}
@@ -740,6 +747,7 @@ export default function CloudChatPage({ organizationId, surface = 'default' }: C
                               pendingMessages={pendingMessages}
                               getChildMessages={getChildMessages}
                               onOpenChildSession={handleOpenTopLevelChildSession}
+                              suppressRawToolCallText={isUsageAnalystSurface}
                             />
 
                             {chatTabActive && (

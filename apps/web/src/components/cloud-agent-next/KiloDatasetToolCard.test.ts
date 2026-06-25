@@ -21,14 +21,18 @@ const validOutput = {
   rows: [{ sum_costUsd: '12.3456' }],
 };
 
-function completedToolPart(input: unknown, output: string): ToolPart {
+function completedToolPart(
+  input: unknown,
+  output: string,
+  tool = KILO_DATASET_TOOL_NAME
+): ToolPart {
   return {
     id: 'part_usage_dataset',
     sessionID: 'ses_test',
     messageID: 'msg_ca0395def0011t6S1qwxQbPSYB',
     type: 'tool',
     callID: 'call_usage_dataset',
-    tool: KILO_DATASET_TOOL_NAME,
+    tool,
     state: {
       status: 'completed',
       input: input as Record<string, unknown>,
@@ -49,6 +53,24 @@ describe('KiloDatasetToolCard', () => {
     expect(view.kind === 'ready' ? view.metricColumns.map(column => column.name) : []).toEqual([
       'sum_costUsd',
     ]);
+  });
+
+  it('accepts an MCP-shaped query result envelope', () => {
+    const part = completedToolPart(
+      {
+        server_name: 'kilo_usage',
+        tool_name: 'query_kilo_dataset',
+        arguments: validInput,
+      },
+      JSON.stringify({
+        structuredContent: validOutput,
+        content: [{ type: 'text', text: JSON.stringify(validOutput) }],
+      }),
+      'mcp'
+    );
+
+    const view = resolveKiloDatasetToolView(part);
+    expect(view).toMatchObject({ kind: 'ready', renderMode: 'metric-grid' });
   });
 
   it('rejects malformed or mismatched output for the generic fallback path', () => {

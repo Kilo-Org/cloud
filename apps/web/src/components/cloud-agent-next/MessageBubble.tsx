@@ -15,6 +15,7 @@ import {
 } from './types';
 import type { FilePart } from './types';
 import { PartRenderer } from './PartRenderer';
+import { stripRawToolCallMarkup } from './raw-tool-call-markup';
 import type { OpenChildSession } from './ChildSessionSection';
 import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -129,12 +130,13 @@ function getUserTextContent(parts: Part[]): string {
  * Get copyable text content from message parts.
  * Extracts text from TextParts (the main prose the assistant writes).
  */
-function getAssistantTextContent(parts: Part[]): string {
-  return parts
+function getAssistantTextContent(parts: Part[], suppressRawToolCallText?: boolean): string {
+  const text = parts
     .filter(isTextPart)
     .map(p => p.text)
     .join('\n\n')
     .trim();
+  return suppressRawToolCallText ? stripRawToolCallMarkup(text) : text;
 }
 
 function DeliveryStatusIcon({ badge }: { badge: DeliveryBadge }) {
@@ -175,6 +177,7 @@ type MessageBubbleProps = {
   /** Function to get messages for a child session ID */
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
+  suppressRawToolCallText?: boolean;
 };
 
 /**
@@ -189,17 +192,18 @@ export function MessageBubble({
   deliveryState,
   getChildMessages,
   onOpenChildSession,
+  suppressRawToolCallText,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = message.info.time.created;
   const deliveryBadge = getDeliveryBadge(deliveryState);
+  const assistantTextContent = isAssistantMessage(message.info)
+    ? getAssistantTextContent(message.parts, suppressRawToolCallText)
+    : '';
 
   const getTextForCopy = useCallback(
-    () =>
-      isUserMessage(message.info)
-        ? getUserTextContent(message.parts)
-        : getAssistantTextContent(message.parts),
-    [message.info, message.parts]
+    () => (isUserMessage(message.info) ? getUserTextContent(message.parts) : assistantTextContent),
+    [assistantTextContent, message.info, message.parts]
   );
 
   // User message
@@ -255,7 +259,7 @@ export function MessageBubble({
       <div className="group/msg py-2">
         <div className="mb-1 flex items-center gap-2 opacity-0 transition-opacity group-hover/msg:opacity-100">
           <TimeAgo timestamp={timestamp} className="text-muted-foreground/50 text-xs" />
-          {!isStreaming && message.parts.some(isTextPart) && (
+          {!isStreaming && assistantTextContent.length > 0 && (
             <CopyMessageButton getText={getTextForCopy} />
           )}
         </div>
@@ -265,6 +269,7 @@ export function MessageBubble({
               key={part.id || index}
               part={part}
               isStreaming={isStreaming}
+              suppressRawToolCallText={suppressRawToolCallText}
               getChildMessages={getChildMessages}
               onOpenChildSession={onOpenChildSession}
             />

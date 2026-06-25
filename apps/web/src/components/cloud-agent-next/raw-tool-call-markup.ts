@@ -7,6 +7,11 @@ const RAW_FUNCTION_RETURN_END = '</function_return>';
 const RAW_FUNCTION_RETURNS_START = '<function_returns>';
 const RAW_FUNCTION_RETURNS_END = '</function_returns>';
 const RAW_USAGE_RENDER_TOOL_NAME = 'kilo_usage_render_result';
+const RAW_DATASET_QUERY_TOOL_NAMES = [
+  'kilo_usage__query_kilo_dataset',
+  'kilo_usage_query_kilo_dataset',
+  'query_kilo_dataset',
+] as const;
 
 type Scalar = string | number | boolean | null;
 
@@ -57,7 +62,14 @@ function stripOrphanRawTags(text: string): string {
     .replace(/^\s*<\/parameter>\s*<\/invoke>\s*$/gm, '');
 }
 
-export function stripRawToolCallMarkup(text: string): string {
+export function stripRawToolCallMarkup(
+  text: string,
+  options?: { preserveWhenNoRenderableResults?: boolean }
+): string {
+  if (options?.preserveWhenNoRenderableResults && extractRawUsageRenderResults(text).length === 0) {
+    return text.trim();
+  }
+
   let output = '';
   let cursor = 0;
 
@@ -142,6 +154,14 @@ function toScalarArray(value: unknown[]): Scalar[] | undefined {
 function stringParam(params: Map<string, string>, name: string): string | undefined {
   const value = params.get(name)?.trim();
   return value ? value : undefined;
+}
+
+function paramsFromInvokeBody(body: string): Map<string, string> {
+  const params = new Map<string, string>();
+  for (const match of body.matchAll(/<parameter name="([^"]+)">([\s\S]*?)<\/parameter>/g)) {
+    params.set(match[1], match[2]);
+  }
+  return params;
 }
 
 function stringFromValue(value: unknown): string | undefined {
@@ -248,10 +268,7 @@ function rawUsageResultFromChartData(value: unknown): RawUsageRenderResult | und
 }
 
 function parseRawUsageRenderResult(body: string): RawUsageRenderResult | undefined {
-  const params = new Map<string, string>();
-  for (const match of body.matchAll(/<parameter name="([^"]+)">([\s\S]*?)<\/parameter>/g)) {
-    params.set(match[1], match[2]);
-  }
+  const params = paramsFromInvokeBody(body);
 
   const parsedData = parseJson(params.get('data') ?? '');
   const data = toRows(parsedData);
@@ -282,6 +299,82 @@ function parseRawUsageRenderResult(body: string): RawUsageRenderResult | undefin
   };
 }
 
+function metricAliasFromParams(params: Map<string, string>): string | undefined {
+  const parsedMetrics = parseJson(params.get('metrics') ?? '');
+  if (!Array.isArray(parsedMetrics)) return undefined;
+
+  const firstMetric = parsedMetrics[0];
+  if (!isRecord(firstMetric) || typeof firstMetric.operation !== 'string') return undefined;
+  if (firstMetric.operation === 'count') return 'count';
+  if (typeof firstMetric.field !== 'string' || firstMetric.field.length === 0) return undefined;
+  return `${firstMetric.operation}_${firstMetric.field}`;
+}
+
+function firstNumericColumn(rows: Array<Record<string, Scalar>>): string | undefined {
+  const firstRow = rows[0];
+  if (!firstRow) return undefined;
+  return Object.keys(firstRow).find(key => {
+    const value = firstRow[key];
+    if (typeof value === 'number') return Number.isFinite(value);
+    if (typeof value !== 'string' || value.trim() === '') return false;
+    return Number.isFinite(Number(value));
+  });
+}
+
+function rawUsageResultFromDatasetQuery(
+  params: Map<string, string>,
+  value: unknown
+): RawUsageRenderResult | undefined {
+  if (!isRecord(value)) return undefined;
+
+  const rows = toRows(value.rows);
+  if (!rows) return undefined;
+
+  const mode = stringFromValue(value.type) ?? stringParam(params, 'mode');
+  const metric = metricAliasFromParams(params) ?? firstNumericColumn(rows);
+  const isTimeseries = mode === 'timeseries' || stringParam(params, 'bucket') !== undefined;
+  const title = metric?.toLowerCase().includes('cost') ? 'Cost over time' : undefined;
+
+  return {
+    type: isTimeseries ? 'chart' : undefined,
+    chartType: isTimeseries ? 'bar' : undefined,
+    title,
+    dataset: stringParam(params, 'dataset'),
+    metric,
+    scopeType: stringFromValue(value.scopeType),
+    startDate: stringParam(params, 'startDate'),
+    endDate: stringParam(params, 'endDate'),
+    data: rows,
+  };
+}
+
+function extractRawDatasetQueryResults(text: string): RawUsageRenderResult[] {
+  const results: RawUsageRenderResult[] = [];
+  const toolNamesPattern = RAW_DATASET_QUERY_TOOL_NAMES.join('|');
+  const invokePattern = new RegExp(
+    `<invoke name="(${toolNamesPattern})">([\\s\\S]*?)</invoke>`,
+    'g'
+  );
+
+  for (const match of text.matchAll(invokePattern)) {
+    const invokeEnd = (match.index ?? 0) + match[0].length;
+    const resultStart = text.indexOf(RAW_FUNCTION_RESULT_START, invokeEnd);
+    if (resultStart === -1) continue;
+
+    const objectStart = text.indexOf('{', resultStart + RAW_FUNCTION_RESULT_START.length);
+    if (objectStart === -1) continue;
+
+    const objectEnd = findJsonObjectEnd(text, objectStart);
+    if (objectEnd === undefined) continue;
+
+    const parsedResult = parseJson(text.slice(objectStart, objectEnd));
+    const result = rawUsageResultFromDatasetQuery(paramsFromInvokeBody(match[2]), parsedResult);
+    if (result) results.push(result);
+  }
+
+  return results;
+}
+
 export function extractRawUsageRenderResults(text: string): RawUsageRenderResult[] {
   const results: RawUsageRenderResult[] = [];
   const pattern = new RegExp(
@@ -298,6 +391,8 @@ export function extractRawUsageRenderResults(text: string): RawUsageRenderResult
     const result = rawUsageResultFromChartData(rawResult);
     if (result) results.push(result);
   }
+
+  results.push(...extractRawDatasetQueryResults(text));
 
   return results;
 }

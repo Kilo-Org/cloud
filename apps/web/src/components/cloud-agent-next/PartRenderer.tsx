@@ -85,7 +85,9 @@ function TextPartRenderer({
   const rawUsageRenderResults = suppressRawToolCallText
     ? extractRawUsageRenderResults(part.text)
     : [];
-  const text = suppressRawToolCallText ? stripRawToolCallMarkup(part.text) : part.text;
+  const text = suppressRawToolCallText
+    ? stripRawToolCallMarkup(part.text, { preserveWhenNoRenderableResults: true })
+    : part.text;
   if (!text && rawUsageRenderResults.length === 0) return null;
 
   return (

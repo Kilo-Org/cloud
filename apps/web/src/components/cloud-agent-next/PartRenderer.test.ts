@@ -70,4 +70,54 @@ Here is the daily cost breakdown.`;
       },
     ]);
   });
+
+  it('preserves unrenderable raw markup when display fallback is enabled', () => {
+    const text = `<function_returns><html><body><div id="chart"></div></body></html></function_returns>`;
+
+    expect(stripRawToolCallMarkup(text, { preserveWhenNoRenderableResults: true })).toBe(text);
+    expect(extractRawUsageRenderResults(text)).toEqual([]);
+  });
+
+  it('extracts raw dataset query function results for local chart rendering', () => {
+    const text = `
+<function_calls>
+<invoke name="kilo_usage__query_kilo_dataset">
+<parameter name="mode">timeseries</parameter>
+<parameter name="dataset">microdollar_usage</parameter>
+<parameter name="metrics">[{ "operation": "sum", "field": "costUsd" }]</parameter>
+<parameter name="bucket">day</parameter>
+<parameter name="startDate">2026-06-18</parameter>
+<parameter name="endDate">2026-06-24</parameter>
+</invoke>
+</function_calls>
+<function_result>
+{"type":"timeseries","bucket":"day","metrics":[{"operation":"sum","field":"costUsd"}],"rows":[{"bucketStart":"2026-06-18T00:00:00.000Z","sum_costUsd":1.4230397927999998},{"bucketStart":"2026-06-19T00:00:00.000Z","sum_costUsd":0.27994249249999995}],"scopeType":"me"}
+</parameter>
+</function_result>
+
+Here's your daily cost trend.`;
+
+    expect(stripRawToolCallMarkup(text, { preserveWhenNoRenderableResults: true })).toBe(
+      "Here's your daily cost trend."
+    );
+    expect(extractRawUsageRenderResults(text)).toEqual([
+      {
+        type: 'chart',
+        chartType: 'bar',
+        title: 'Cost over time',
+        dataset: 'microdollar_usage',
+        metric: 'sum_costUsd',
+        scopeType: 'me',
+        startDate: '2026-06-18',
+        endDate: '2026-06-24',
+        data: [
+          { bucketStart: '2026-06-18T00:00:00.000Z', sum_costUsd: 1.4230397927999998 },
+          {
+            bucketStart: '2026-06-19T00:00:00.000Z',
+            sum_costUsd: Number('0.27994249249999995'),
+          },
+        ],
+      },
+    ]);
+  });
 });

@@ -126,6 +126,15 @@ describe('adminKiloUsageAiRouter.start', () => {
       'The host renders the validated structured tool result automatically'
     );
     expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain(
+      'call query_kilo_dataset before answering'
+    );
+    expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain(
+      'Do not say \\"shown above\\", \\"charted above\\", \\"visible in the chart\\", \\"second chart\\", \\"rendered above\\"'
+    );
+    expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain(
+      'If you cannot call the tool or no tool result is returned, say you could not retrieve the data'
+    );
+    expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain(
       'Do not expose internal identifiers'
     );
     expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain(

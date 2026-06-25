@@ -2,10 +2,12 @@ import * as z from 'zod';
 
 /**
  * Upper bound on the orgs in an "All Organizations" aggregate (a parent plus
- * its children). Caps authorization fan-out and the generated SQL `IN` clause
- * for this caller-controlled input.
+ * its children). Bounds this caller-controlled input so it cannot generate an
+ * unbounded SQL `IN` clause, while staying well above any realistic two-level
+ * org hierarchy so legitimate parents are never rejected. (Authorization is
+ * batched into a fixed number of queries, so the cap need not be tight.)
  */
-export const MAX_SCOPE_ORGANIZATION_IDS = 100;
+export const MAX_SCOPE_ORGANIZATION_IDS = 1_000;
 
 export const GranularitySchema = z.enum(['hour', 'day', 'week', 'month']);
 export type Granularity = z.infer<typeof GranularitySchema>;

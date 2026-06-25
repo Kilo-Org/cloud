@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { skipToken, useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
@@ -120,7 +121,21 @@ export function UsageAnalyticsDashboard({
   title,
 }: UsageAnalyticsDashboardProps) {
   const trpc = useTRPC();
-  const { state, setState } = useUsageDashboardState();
+  // Migrate legacy `?viewAs=org-wide` links (which meant page-org-wide) to the
+  // new `scope` model so existing bookmarks keep opening an org-wide view
+  // instead of silently collapsing to "My Usage". Only applied when no explicit
+  // `scope` is present.
+  const searchParams = useSearchParams();
+  const legacyOrgWideScope =
+    context === 'organization' &&
+    organizationId &&
+    searchParams.get('scope') == null &&
+    searchParams.get('viewAs') === 'org-wide'
+      ? organizationId
+      : undefined;
+  const { state, setState } = useUsageDashboardState(
+    legacyOrgWideScope ? { orgScope: legacyOrgWideScope } : undefined
+  );
   const {
     period,
     granularity,

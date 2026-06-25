@@ -342,6 +342,8 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     } else {
       params.delete('scope');
     }
+    // Drop the legacy org-wide param once migrated to `scope` (see dashboard).
+    params.delete('viewAs');
 
     if (state.usageView === 'overview') {
       params.delete('view');

@@ -16,10 +16,15 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import {
+  ensureOrganizationAccess,
+  ensureOrganizationsAccess,
+  getOrganizationsAccessRoles,
+} from '@/routers/organizations/utils';
 import {
   BreakdownInputSchema,
   BreakdownOutputSchema,
+  MAX_SCOPE_ORGANIZATION_IDS,
   SummaryOutputSchema,
   TableInputSchema,
   TableOutputSchema,
@@ -213,12 +218,10 @@ async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilter
   // must be owner/billing_manager of every org in the list. A parent owner has
   // inherited owner/billing access to children, so this passes for the parent
   // plus all of its children while rejecting any org they cannot administer.
+  // Batched into a fixed number of queries so a large org list cannot fan out
+  // into one authorization query per id.
   if (filters.organizationIds && filters.organizationIds.length > 0) {
-    await Promise.all(
-      filters.organizationIds.map(orgId =>
-        ensureOrganizationAccess(ctx, orgId, ['owner', 'billing_manager'])
-      )
-    );
+    await ensureOrganizationsAccess(ctx, filters.organizationIds, ['owner', 'billing_manager']);
     return;
   }
 
@@ -572,10 +575,9 @@ function toSafeNumber(value: unknown): number {
 // ---------------------------------------------------------------------------
 
 const MAX_USER_LABEL_LOOKUP_IDS = 1_000;
-const MAX_USER_LABEL_LOOKUP_ORGS = 100;
 
 const UserListInputSchema = z.object({
-  organizationIds: z.array(z.uuid()).min(1).max(MAX_USER_LABEL_LOOKUP_ORGS),
+  organizationIds: z.array(z.uuid()).min(1).max(MAX_SCOPE_ORGANIZATION_IDS),
   userIds: z.array(z.string()).max(MAX_USER_LABEL_LOOKUP_IDS),
 });
 
@@ -1080,13 +1082,23 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .input(UserListInputSchema)
     .output(UserListOutputSchema)
     .query(async ({ input, ctx }) => {
-      const roles = await Promise.all(
-        input.organizationIds.map(orgId => ensureOrganizationAccess(ctx, orgId))
-      );
+      const accessByOrg = await getOrganizationsAccessRoles(ctx, input.organizationIds);
 
-      const canSeeAllMembers = roles.every(
-        role => role === 'owner' || role === 'billing_manager'
-      );
+      // Require access to every requested org (mirrors the single-org guard).
+      const hasAccessToAll = input.organizationIds.every(orgId => accessByOrg.has(orgId));
+      if (!hasAccessToAll) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'You do not have access to this organization',
+        });
+      }
+
+      // Only owner/billing_manager of *every* requested org may resolve other
+      // members; anyone else can resolve only their own id.
+      const canSeeAllMembers = input.organizationIds.every(orgId => {
+        const role = accessByOrg.get(orgId);
+        return role === 'owner' || role === 'billing_manager';
+      });
       const allowedIds = canSeeAllMembers
         ? input.userIds
         : input.userIds.filter(id => id === ctx.user.id);

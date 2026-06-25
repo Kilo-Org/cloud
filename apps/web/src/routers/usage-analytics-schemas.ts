@@ -31,6 +31,13 @@ const FiltersShape = {
   granularity: GranularitySchema,
   costSource: CostSourceSchema.default('cost'),
   organizationId: z.uuid().optional(),
+  /**
+   * Aggregate usage across multiple organizations (a parent org plus its
+   * children). When set and non-empty, this takes precedence over
+   * `organizationId` and is always treated as an org-wide view. The caller must
+   * have owner/billing_manager access to every listed org.
+   */
+  organizationIds: z.array(z.uuid()).optional(),
   personalScope: z.enum(['personal-only', 'include-orgs']).default('personal-only'),
   viewAs: z.enum(['self', 'org-wide']).default('self'),
   features: z.array(z.string()).optional(),

@@ -21,7 +21,7 @@ import {
   type QueryKiloDatasetInput,
   type QueryKiloDatasetOutput,
 } from '@/lib/kilo-datasets/contracts';
-import { formatDollarsFromMicrodollars, humanize } from '@/components/usage-analytics/format';
+import { formatDollarsFromMicrodollars } from '@/components/usage-analytics/format';
 import {
   formatDollars,
   formatIsoDateString_UsaDateOnlyFormat,
@@ -29,6 +29,13 @@ import {
 } from '@/lib/utils';
 import { GenericToolCard } from './GenericToolCard';
 import { ToolCardShell } from './ToolCardShell';
+import {
+  getKiloDatasetColumnLabel,
+  getKiloDatasetModeLabel,
+  getKiloDatasetNameLabel,
+  getKiloDatasetRenderModeLabel,
+  getKiloDatasetScalarValueLabel,
+} from './kilo-dataset-display';
 import type { ToolPart } from './types';
 
 export const KILO_DATASET_TOOL_NAME = 'kilo_usage_query_kilo_dataset';
@@ -218,16 +225,15 @@ export function resolveKiloDatasetToolView(toolPart: ToolPart): KiloDatasetToolV
   };
 }
 
-function labelForValue(value: RowValue): string {
-  if (value === null) return '(none)';
-  if (typeof value === 'boolean') return value ? 'True' : 'False';
+function labelForValue(column: QueryKiloDatasetColumn, value: RowValue): string {
+  const scalarLabel = getKiloDatasetScalarValueLabel(column.name, value);
+  if (scalarLabel) return scalarLabel;
   return String(value);
 }
 
 function formatColumnValue(column: QueryKiloDatasetColumn, value: RowValue): string {
-  if (value === null) return 'No data';
-  if (column.type === 'boolean')
-    return value === true ? 'True' : value === false ? 'False' : String(value);
+  const scalarLabel = getKiloDatasetScalarValueLabel(column.name, value);
+  if (scalarLabel) return scalarLabel;
   if (column.type === 'timestamp') return formatIsoDateString_UsaDateOnlyFormat(String(value));
   const numeric = numberFromValue(value);
   if (numeric !== null) {
@@ -249,7 +255,9 @@ function MetricGrid({ view }: { view: Extract<KiloDatasetToolView, { kind: 'read
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {view.metricColumns.map(column => (
         <div key={column.name} className="rounded-lg border bg-background/50 p-3">
-          <div className="text-muted-foreground text-xs">{humanize(column.name)}</div>
+          <div className="text-muted-foreground text-xs">
+            {getKiloDatasetColumnLabel(column.name, view.output.dataset)}
+          </div>
           <div className="mt-1 font-mono text-xl font-semibold tabular-nums">
             {formatColumnValue(column, row[column.name])}
           </div>
@@ -267,7 +275,7 @@ function BarChartView({ view }: { view: Extract<KiloDatasetToolView, { kind: 're
   }
 
   const data = view.output.rows.map((row, index) => ({
-    label: labelForValue(row[groupColumn.name]),
+    label: labelForValue(groupColumn, row[groupColumn.name]),
     value: numberFromValue(row[metricColumn.name]) ?? 0,
     color: chartColors[index % chartColors.length],
   }));
@@ -278,7 +286,8 @@ function BarChartView({ view }: { view: Extract<KiloDatasetToolView, { kind: 're
   return (
     <div className="space-y-2">
       <p className="text-muted-foreground text-xs">
-        {humanize(metricColumn.name)} by {humanize(groupColumn.name)}
+        {getKiloDatasetColumnLabel(metricColumn.name, view.output.dataset)} by{' '}
+        {getKiloDatasetColumnLabel(groupColumn.name, view.output.dataset)}
       </p>
       <div className="w-full" style={{ height: chartHeight }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -341,7 +350,7 @@ function buildTimeseriesData(view: Extract<KiloDatasetToolView, { kind: 'ready' 
   const seriesKeys: string[] = [];
   for (const row of view.output.rows) {
     const bucket = formatIsoDateString_UsaDateOnlyFormat(String(row.bucketStart ?? ''));
-    const seriesKey = labelForValue(row[groupColumn.name]);
+    const seriesKey = labelForValue(groupColumn, row[groupColumn.name]);
     if (!seriesKeys.includes(seriesKey)) seriesKeys.push(seriesKey);
     const existing = byBucket.get(bucket) ?? { bucket };
     existing[seriesKey] = numberFromValue(row[metricColumn.name]) ?? 0;
@@ -362,7 +371,9 @@ function TimeseriesChartView({ view }: { view: Extract<KiloDatasetToolView, { ki
 
   return (
     <div className="space-y-2">
-      <p className="text-muted-foreground text-xs">{humanize(metricColumn.name)} over time</p>
+      <p className="text-muted-foreground text-xs">
+        {getKiloDatasetColumnLabel(metricColumn.name, view.output.dataset)} over time
+      </p>
       <div className="h-72 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
@@ -412,7 +423,7 @@ function TableView({ view }: { view: Extract<KiloDatasetToolView, { kind: 'ready
           <tr>
             {view.output.columns.map(column => (
               <th key={column.name} className="px-3 py-2 font-medium">
-                {humanize(column.name)}
+                {getKiloDatasetColumnLabel(column.name, view.output.dataset)}
               </th>
             ))}
           </tr>
@@ -440,26 +451,13 @@ function RenderedResult({ view }: { view: Extract<KiloDatasetToolView, { kind: '
   return <TableView view={view} />;
 }
 
-function ResultDetails({ output }: { output: QueryKiloDatasetOutput }) {
-  return (
-    <details className="rounded-lg border bg-background/50">
-      <summary className="cursor-pointer px-3 py-2 text-xs text-muted-foreground">
-        Validated result JSON
-      </summary>
-      <pre className="max-h-72 overflow-auto border-t p-3 text-xs">
-        <code>{JSON.stringify(output, null, 2)}</code>
-      </pre>
-    </details>
-  );
-}
-
 export function KiloDatasetToolCard({ toolPart }: { toolPart: ToolPart }) {
   const view = resolveKiloDatasetToolView(toolPart);
   if (view.kind === 'fallback') return <GenericToolCard toolPart={toolPart} />;
 
   if (view.kind === 'status') {
     return (
-      <ToolCardShell icon={Database} title="Kilo usage dataset" status={view.status}>
+      <ToolCardShell icon={Database} title="Kilo usage" status={view.status}>
         {view.error ? (
           <pre className="overflow-auto rounded-md bg-background p-2 text-xs text-red-500">
             <code>{view.error}</code>
@@ -476,22 +474,25 @@ export function KiloDatasetToolCard({ toolPart }: { toolPart: ToolPart }) {
   return (
     <ToolCardShell
       icon={BarChart3}
-      title="Kilo usage dataset"
+      title={getKiloDatasetNameLabel(view.output.dataset)}
       status="completed"
-      badge={<span className="text-muted-foreground shrink-0 text-xs">{view.renderMode}</span>}
+      badge={
+        <span className="text-muted-foreground shrink-0 text-xs">
+          {getKiloDatasetRenderModeLabel(view.renderMode)}
+        </span>
+      }
       defaultExpanded
     >
       <div className="space-y-3">
         <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 text-xs">
-          <span>{humanize(view.output.dataset)}</span>
-          <span>{humanize(view.output.mode)}</span>
+          <span>{getKiloDatasetNameLabel(view.output.dataset)}</span>
+          <span>{getKiloDatasetModeLabel(view.output.mode)}</span>
           <span>
             {formatIsoDateString_UsaDateOnlyFormat(view.output.range.startDate)} to{' '}
             {formatIsoDateString_UsaDateOnlyFormat(view.output.range.endDate)}
           </span>
         </div>
         <RenderedResult view={view} />
-        <ResultDetails output={view.output} />
       </div>
     </ToolCardShell>
   );

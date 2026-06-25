@@ -122,6 +122,15 @@ describe('adminKiloUsageAiRouter.start', () => {
     expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain(
       'There is no kilo_usage_render_result tool'
     );
+    expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain(
+      'The host renders the validated structured tool result automatically'
+    );
+    expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain(
+      'Do not expose internal identifiers'
+    );
+    expect(JSON.stringify(mockPrepareSession.mock.calls[0]?.[0])).toContain(
+      'Lead with the answer in one sentence'
+    );
     expect(mockPrepareSession.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         runtimeAgents: [

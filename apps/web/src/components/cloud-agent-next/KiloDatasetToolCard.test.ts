@@ -3,6 +3,13 @@ import {
   isKiloDatasetQueryTool,
   resolveKiloDatasetToolView,
 } from './KiloDatasetToolCard';
+import {
+  getKiloDatasetColumnLabel,
+  getKiloDatasetFriendlyText,
+  getKiloDatasetNameLabel,
+  getKiloDatasetRenderModeLabel,
+  getKiloDatasetScalarValueLabel,
+} from './kilo-dataset-display';
 import type { ToolPart } from './types';
 
 const validInput = {
@@ -88,5 +95,17 @@ describe('KiloDatasetToolCard', () => {
       JSON.stringify({ ...validOutput, dataset: 'code_reviews' })
     );
     expect(resolveKiloDatasetToolView(mismatched)).toEqual({ kind: 'fallback' });
+  });
+
+  it('maps internal dataset fields to user-facing labels', () => {
+    expect(getKiloDatasetNameLabel('microdollar_usage')).toBe('Model usage');
+    expect(getKiloDatasetNameLabel('code_reviews')).toBe('Code Reviewer');
+    expect(getKiloDatasetColumnLabel('sum_costUsd', 'microdollar_usage')).toBe('Cost');
+    expect(getKiloDatasetColumnLabel('sum_totalCostUsd', 'code_reviews')).toBe('Cost');
+    expect(getKiloDatasetColumnLabel('bucketStart', 'microdollar_usage')).toBe('Date');
+    expect(getKiloDatasetColumnLabel('count', 'code_reviews')).toBe('Reviews');
+    expect(getKiloDatasetRenderModeLabel('timeseries-chart')).toBe('Trend');
+    expect(getKiloDatasetScalarValueLabel('hasError', false)).toBe('Successful');
+    expect(getKiloDatasetFriendlyText('costUsd over time')).toBe('Cost over time');
   });
 });

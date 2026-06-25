@@ -16,8 +16,13 @@ import {
   formatIsoDateString_UsaDateOnlyFormat,
   formatLargeNumber,
 } from '@/lib/utils';
-import { humanize } from '@/components/usage-analytics/format';
 import { ToolCardShell } from './ToolCardShell';
+import {
+  getKiloDatasetColumnLabel,
+  getKiloDatasetFriendlyText,
+  getKiloDatasetNameLabel,
+  getKiloDatasetScalarValueLabel,
+} from './kilo-dataset-display';
 import type { RawUsageRenderResult } from './raw-tool-call-markup';
 
 const chartColors = [
@@ -39,15 +44,24 @@ function numberFromValue(value: RowValue): number | null {
   return null;
 }
 
-function labelForValue(value: RowValue): string {
-  if (value === null) return '(none)';
-  if (typeof value === 'boolean') return value ? 'True' : 'False';
+function labelForValue(value: RowValue, columnName = ''): string {
+  const scalarLabel = getKiloDatasetScalarValueLabel(columnName, value);
+  if (scalarLabel) return scalarLabel;
   return String(value);
 }
 
 function formatMaybeDate(value: string): string {
   if (!/^\d{4}-\d{2}-\d{2}/.test(value)) return value;
   return formatIsoDateString_UsaDateOnlyFormat(value);
+}
+
+function isDateLike(value: RowValue): boolean {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value);
+}
+
+function labelColumnDisplayName(result: RawUsageRenderResult, labelKey: string): string {
+  if (labelKey === 'label' && result.data.some(row => isDateLike(row[labelKey]))) return 'Date';
+  return getKiloDatasetColumnLabel(labelKey, result.dataset);
 }
 
 function formatMetricValue(metric: string | undefined, value: number): string {
@@ -81,8 +95,8 @@ function resolveLabelKey(
 
 function subtitle(result: RawUsageRenderResult): string {
   return [
-    result.dataset ? humanize(result.dataset) : undefined,
-    result.metric ? humanize(result.metric) : undefined,
+    result.dataset ? getKiloDatasetNameLabel(result.dataset) : undefined,
+    result.metric ? getKiloDatasetColumnLabel(result.metric, result.dataset) : undefined,
     result.startDate && result.endDate
       ? `${formatMaybeDate(result.startDate)} to ${formatMaybeDate(result.endDate)}`
       : undefined,
@@ -104,7 +118,7 @@ function ResultTable({ result }: { result: RawUsageRenderResult }) {
           <tr>
             {columns.map(column => (
               <th key={column} className="px-3 py-2 font-medium">
-                {humanize(column)}
+                {getKiloDatasetColumnLabel(column, result.dataset)}
               </th>
             ))}
           </tr>
@@ -117,7 +131,9 @@ function ResultTable({ result }: { result: RawUsageRenderResult }) {
                 const numeric = numberFromValue(value);
                 return (
                   <td key={column} className="px-3 py-2 tabular-nums">
-                    {numeric !== null ? formatMetricValue(column, numeric) : labelForValue(value)}
+                    {numeric !== null
+                      ? formatMetricValue(column, numeric)
+                      : labelForValue(value, column)}
                   </td>
                 );
               })}
@@ -137,7 +153,7 @@ function ResultChart({ result }: { result: RawUsageRenderResult }) {
   }
 
   const data = result.data.map((row, index) => ({
-    label: formatMaybeDate(labelForValue(row[labelKey])),
+    label: formatMaybeDate(labelForValue(row[labelKey], labelKey)),
     value: numberFromValue(row[metricKey]) ?? 0,
     color: chartColors[index % chartColors.length],
   }));
@@ -146,7 +162,8 @@ function ResultChart({ result }: { result: RawUsageRenderResult }) {
   return (
     <div className="space-y-2">
       <p className="text-muted-foreground text-xs">
-        {humanize(metricKey)} by {humanize(labelKey)}
+        {getKiloDatasetColumnLabel(metricKey, result.dataset)} by{' '}
+        {labelColumnDisplayName(result, labelKey)}
       </p>
       <div className="w-full" style={{ height: chartHeight }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -185,11 +202,11 @@ export function AskUsageRawRenderResultCard({ result }: { result: RawUsageRender
   return (
     <ToolCardShell
       icon={BarChart3}
-      title={result.title ?? 'Usage result'}
+      title={result.title ? getKiloDatasetFriendlyText(result.title) : 'Usage result'}
       status="completed"
       badge={
         <span className="text-muted-foreground shrink-0 text-xs">
-          {isChart ? (result.chartType ?? 'chart') : 'table'}
+          {isChart ? 'Chart' : 'Table'}
         </span>
       }
       defaultExpanded

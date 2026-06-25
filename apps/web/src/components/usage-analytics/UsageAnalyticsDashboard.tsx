@@ -687,8 +687,11 @@ export function UsageAnalyticsDashboard({
               <>
                 <UsageWarning />
 
-                {isOrgContext && organizationId && (
-                  <AIAdoptionScoreCard organizationId={organizationId} dateRange={dateRange} />
+                {/* Org-level panels follow the selected single org so they
+                    don't mix scopes; hidden in the All Organizations aggregate
+                    (effectiveOrgId is null) which they cannot represent. */}
+                {isOrgContext && effectiveOrgId && (
+                  <AIAdoptionScoreCard organizationId={effectiveOrgId} dateRange={dateRange} />
                 )}
 
                 <SummarySection
@@ -778,9 +781,9 @@ export function UsageAnalyticsDashboard({
                 />
 
                 {isOrgContext &&
-                  organizationId &&
+                  effectiveOrgId &&
                   (callerRole === 'owner' || callerRole === 'billing_manager') && (
-                    <ActiveKiloclawsTable organizationId={organizationId} />
+                    <ActiveKiloclawsTable organizationId={effectiveOrgId} />
                   )}
               </>
             )}

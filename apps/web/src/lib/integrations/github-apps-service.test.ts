@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { organizations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
+import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { getInstallation, isInstallationGoneError } from './github-apps-service';
 
 describe('getInstallation', () => {
@@ -35,8 +36,10 @@ describe('getInstallation', () => {
 
     try {
       const integration = await getInstallation({ type: 'org', id: organization.id });
+      const sharedIntegration = await getIntegrationForOrganization(organization.id, 'github');
 
       expect(integration?.id).toBe(rows[1].id);
+      expect(sharedIntegration?.id).toBe(rows[1].id);
     } finally {
       await db.delete(organizations).where(eq(organizations.id, organization.id));
     }

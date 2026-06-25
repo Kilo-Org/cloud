@@ -10,6 +10,7 @@ import type {
 } from '../core/types';
 import { INTEGRATION_STATUS, PLATFORM, PENDING_APPROVAL_STATUS } from '../core/constants';
 import type { IntegrationStatus } from '../core/constants';
+import { platformIntegrationHealthSql } from '../core/health';
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 
@@ -49,6 +50,7 @@ export async function getIntegrationForOrganization(organizationId: string, plat
         eq(platform_integrations.platform, platform)
       )
     )
+    .orderBy(desc(platformIntegrationHealthSql()), desc(platform_integrations.updated_at))
     .limit(1);
 
   return integration || null;

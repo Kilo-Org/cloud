@@ -7,7 +7,7 @@ import {
 } from '@/lib/public-snowflake-report';
 import { LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY } from '@/lib/redis-keys';
 
-const MINIMUM_TOKENS = 1_000_000;
+const MINIMUM_TOKENS = 10_000_000;
 const MAXIMUM_ERROR_RATE = 0.5;
 
 const LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY = `
@@ -26,7 +26,6 @@ where
     and mu.provider not in ('custom', 'direct-byok')
     and mu.total_output_tokens > 0
     and mu.is_user_byok = false
-    and mu.requested_model not ilike 'openrouter/%'
 group by 1, 2
 order by 4 desc;
 `;
@@ -60,8 +59,11 @@ type AggregatedUsage = {
 function normalizeModel(model: string): string {
   const withoutTrailingSlashes = model.replace(/\/+$/, '');
   const slashIndex = withoutTrailingSlashes.lastIndexOf('/');
-  const withoutProvider =
-    slashIndex >= 0 ? withoutTrailingSlashes.slice(slashIndex + 1) : withoutTrailingSlashes;
+  const withoutProvider = withoutTrailingSlashes.startsWith('openrouter/')
+    ? withoutTrailingSlashes
+    : slashIndex >= 0
+      ? withoutTrailingSlashes.slice(slashIndex + 1)
+      : withoutTrailingSlashes;
   const colonIndex = withoutProvider.indexOf(':');
 
   if (colonIndex < 0 || withoutProvider.slice(colonIndex) === ':free') {

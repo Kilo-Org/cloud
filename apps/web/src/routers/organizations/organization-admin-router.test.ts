@@ -51,6 +51,99 @@ describe('organization admin router', () => {
     await db.delete(organizations).where(eq(organizations.id, testOrganization.id));
   });
 
+  describe('backfillMissingSlugs', () => {
+    it('rejects non-admin callers', async () => {
+      const organization = await createOrganization(
+        `Backfill Non Admin ${crypto.randomUUID()}`,
+        null
+      );
+
+      try {
+        await db
+          .update(organizations)
+          .set({ slug: null })
+          .where(eq(organizations.id, organization.id));
+
+        const caller = await createCallerForUser(nonAdminUser.id);
+        await expect(caller.organizations.admin.backfillMissingSlugs()).rejects.toThrow(
+          'Admin access required'
+        );
+
+        const [unchangedOrganization] = await db
+          .select({ slug: organizations.slug })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(unchangedOrganization.slug).toBeNull();
+      } finally {
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
+      }
+    });
+
+    it('backfills missing organization slugs once', async () => {
+      const suffix = crypto.randomUUID();
+      const existingOrganization = await createOrganization(`Backfill Legacy ${suffix}`, null);
+      const missingOrganization = await createOrganization(`Backfill Legacy ${suffix}`, null);
+      const otherMissingOrganization = await createOrganization(
+        `Backfill Other Legacy ${suffix}`,
+        null
+      );
+      const organizationIds = [
+        existingOrganization.id,
+        missingOrganization.id,
+        otherMissingOrganization.id,
+      ];
+
+      try {
+        await db
+          .update(organizations)
+          .set({ slug: null, total_microdollars_acquired: 1_000_000 })
+          .where(eq(organizations.id, missingOrganization.id));
+
+        await db
+          .update(organizations)
+          .set({ slug: null, total_microdollars_acquired: 2_000_000 })
+          .where(eq(organizations.id, otherMissingOrganization.id));
+
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.organizations.admin.backfillMissingSlugs();
+        const backfilledRows = result.organizations.filter(organization =>
+          organizationIds.includes(organization.id)
+        );
+
+        expect(backfilledRows).toHaveLength(2);
+        expect(backfilledRows.map(organization => organization.id)).toEqual([
+          otherMissingOrganization.id,
+          missingOrganization.id,
+        ]);
+        expect(result.updatedCount).toBeGreaterThanOrEqual(2);
+
+        const updatedOrganizations = await db
+          .select({ id: organizations.id, slug: organizations.slug })
+          .from(organizations)
+          .where(inArray(organizations.id, organizationIds));
+        const updatedSlugByOrganizationId = new Map(
+          updatedOrganizations.map(organization => [organization.id, organization.slug])
+        );
+
+        expect(updatedSlugByOrganizationId.get(existingOrganization.id)).toBe(
+          normalizeOrganizationSlug(existingOrganization.name)
+        );
+        expect(updatedSlugByOrganizationId.get(missingOrganization.id)).toBeTruthy();
+        expect(updatedSlugByOrganizationId.get(otherMissingOrganization.id)).toBe(
+          normalizeOrganizationSlug(otherMissingOrganization.name)
+        );
+        expect(updatedSlugByOrganizationId.get(missingOrganization.id)).not.toBe(
+          updatedSlugByOrganizationId.get(existingOrganization.id)
+        );
+
+        const secondResult = await caller.organizations.admin.backfillMissingSlugs();
+        expect(secondResult).toEqual({ updatedCount: 0, organizations: [] });
+      } finally {
+        await db.delete(organizations).where(inArray(organizations.id, organizationIds));
+      }
+    });
+  });
+
   describe('nullifyCredits', () => {
     beforeEach(async () => {
       await db

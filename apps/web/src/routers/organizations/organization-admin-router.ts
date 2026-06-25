@@ -190,6 +190,17 @@ const OrganizationMetricsSchema = z.object({
   totalSeats: z.number(),
 });
 
+const BackfillMissingSlugsOutputSchema = z.object({
+  updatedCount: z.number(),
+  organizations: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      slug: z.string(),
+    })
+  ),
+});
+
 const AddMemberInputSchema = z.object({
   organizationId: z.uuid(),
   userId: z.string(),
@@ -291,6 +302,60 @@ async function validateParentOrganizationChange(
 }
 
 export const organizationAdminRouter = createTRPCRouter({
+  // Temporary one-time admin tool. Remove after legacy organizations have slugs.
+  backfillMissingSlugs: adminProcedure
+    .output(BackfillMissingSlugsOutputSchema)
+    .mutation(async () => {
+      const backfilledOrganizations = await db.transaction(async tx => {
+        const organizationsWithoutSlugs = await tx
+          .select({
+            id: organizations.id,
+            name: organizations.name,
+          })
+          .from(organizations)
+          .where(isNull(organizations.slug))
+          .orderBy(
+            desc(organizations.total_microdollars_acquired),
+            asc(organizations.created_at),
+            asc(organizations.id)
+          )
+          .for('update');
+
+        const updatedOrganizations: Array<{
+          id: string;
+          name: string;
+          slug: string;
+        }> = [];
+
+        for (const organization of organizationsWithoutSlugs) {
+          const slug = await allocateOrganizationSlug(organization.name, tx);
+          const [updatedOrganization] = await tx
+            .update(organizations)
+            .set({ slug })
+            .where(and(eq(organizations.id, organization.id), isNull(organizations.slug)))
+            .returning({
+              id: organizations.id,
+              name: organizations.name,
+              slug: organizations.slug,
+            });
+
+          if (updatedOrganization?.slug) {
+            updatedOrganizations.push({
+              ...updatedOrganization,
+              slug: updatedOrganization.slug,
+            });
+          }
+        }
+
+        return updatedOrganizations;
+      });
+
+      return {
+        updatedCount: backfilledOrganizations.length,
+        organizations: backfilledOrganizations,
+      };
+    }),
+
   create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async opts => {
     const parentOrganizationId = opts.input.parentOrganizationId ?? null;
 

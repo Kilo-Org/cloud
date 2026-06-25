@@ -572,6 +572,71 @@ describe('organizations trpc router', () => {
     });
   });
 
+  describe('slugAvailability procedure', () => {
+    let slugAvailabilityConflictOrganization: Organization;
+
+    beforeAll(async () => {
+      slugAvailabilityConflictOrganization = await createOrganization(
+        'Slug Availability Conflict Organization',
+        memberUser.id
+      );
+      await db
+        .update(organizations)
+        .set({ slug: 'availability-existing-slug' })
+        .where(eq(organizations.id, slugAvailabilityConflictOrganization.id));
+    });
+
+    afterAll(async () => {
+      await db
+        .delete(organizations)
+        .where(eq(organizations.id, slugAvailabilityConflictOrganization.id));
+    });
+
+    it('checks organization slug availability for organization owners', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.organizations.slugAvailability({
+          organizationId: testOrganization.id,
+          slug: 'owner-available-slug',
+        })
+      ).resolves.toEqual({ available: true });
+    });
+
+    it('checks organization slug availability for credit managers without org membership', async () => {
+      const caller = await createCallerForUser(creditManagerUser.id);
+
+      await expect(
+        caller.organizations.slugAvailability({
+          organizationId: testOrganization.id,
+          slug: 'support-available-slug',
+        })
+      ).resolves.toEqual({ available: true });
+    });
+
+    it('returns unavailable slugs for credit managers without org membership', async () => {
+      const caller = await createCallerForUser(creditManagerUser.id);
+
+      await expect(
+        caller.organizations.slugAvailability({
+          organizationId: testOrganization.id,
+          slug: 'availability-existing-slug',
+        })
+      ).resolves.toEqual({ available: false });
+    });
+
+    it('rejects availability checks for admins without credit management access', async () => {
+      const caller = await createCallerForUser(adminWithoutCreditAccessUser.id);
+
+      await expect(
+        caller.organizations.slugAvailability({
+          organizationId: testOrganization.id,
+          slug: 'admin-no-credit-slug',
+        })
+      ).rejects.toThrow('You do not have access to this organization');
+    });
+  });
+
   describe('updateSlug procedure', () => {
     let slugConflictOrganization: Organization;
 

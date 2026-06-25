@@ -47,6 +47,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useExpiringCredits } from './useExpiringCredits';
 import { useAdminOrganizationHierarchy } from '@/app/admin/api/organizations/hooks';
 import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
+import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -334,10 +335,16 @@ function Inner(props: InnerProps) {
   };
 
   const isKiloAdmin = useIsKiloAdmin();
+  const orgRole = useUserOrganizationRole();
   const isAutoTopUpEnabled = useIsAutoTopUpEnabled();
   const isInAdminDashboard = isKiloAdmin && showAdminControls;
   const isOrgOwner = useCanManagePaymentInfo();
-  const canEditSlug = isOrgOwner || isKiloAdmin;
+  const adminCreditManagementPermission = useAdminCreditManagementPermission({
+    enabled: isKiloAdmin,
+  });
+  const canEditSlug =
+    (orgRole === 'owner' && !showAdminControls) ||
+    (isKiloAdmin && adminCreditManagementPermission.canManageCredits);
   const hierarchyQuery = useAdminOrganizationHierarchy(id, isInAdminDashboard);
 
   const handleSeatsRequirementEdit = () => {

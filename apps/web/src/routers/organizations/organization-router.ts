@@ -260,20 +260,20 @@ export const organizationsRouter = createTRPCRouter({
       return successResult();
     }),
 
-  slugAvailability: organizationMemberProcedure
-    .input(OrganizationSlugUpdateSchema)
-    .query(async opts => {
-      if (!opts.input.slug) {
-        return { available: true };
-      }
+  slugAvailability: baseProcedure.input(OrganizationSlugUpdateSchema).query(async opts => {
+    await ensureOrganizationSlugUpdateAccess(opts.ctx, opts.input.organizationId);
 
-      const existingOrganization = await getOrganizationByActiveSlug(
-        opts.input.slug,
-        opts.input.organizationId
-      );
+    if (!opts.input.slug) {
+      return { available: true };
+    }
 
-      return { available: !existingOrganization };
-    }),
+    const existingOrganization = await getOrganizationByActiveSlug(
+      opts.input.slug,
+      opts.input.organizationId
+    );
+
+    return { available: !existingOrganization };
+  }),
 
   withMembers: organizationMemberProcedure.query<OrganizationWithMembers>(async opts => {
     const organizationId = opts.input.organizationId;

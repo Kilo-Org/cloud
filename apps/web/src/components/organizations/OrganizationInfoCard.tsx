@@ -86,6 +86,28 @@ type OrganizationHierarchySectionProps = {
   parent: OrganizationHierarchySummary | null;
 };
 
+function getOrganizationSlugErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) return 'Slug is not available';
+
+  try {
+    const parsed = JSON.parse(error.message) as unknown;
+    if (Array.isArray(parsed)) {
+      const firstIssue = parsed.find(
+        issue =>
+          typeof issue === 'object' &&
+          issue !== null &&
+          'message' in issue &&
+          typeof issue.message === 'string'
+      );
+      if (firstIssue?.message) return firstIssue.message;
+    }
+  } catch {
+    // Non-JSON errors are already user-readable.
+  }
+
+  return error.message || 'Slug is not available';
+}
+
 function OrganizationHierarchySection({ parent }: OrganizationHierarchySectionProps) {
   if (!parent) {
     return null;
@@ -251,7 +273,7 @@ function Inner(props: InnerProps) {
       setIsEditingSlug(false);
     } catch (error) {
       console.error('Failed to update organization slug:', error);
-      setSlugError(error instanceof Error ? error.message : 'Slug is not available');
+      setSlugError(getOrganizationSlugErrorMessage(error));
     }
   };
 

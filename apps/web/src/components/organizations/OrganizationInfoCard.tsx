@@ -353,6 +353,10 @@ function Inner(props: InnerProps) {
           )}
         </div>
         <div>
+          <label className="text-muted-foreground text-sm font-medium">Slug</label>
+          <p className="mt-1 font-mono text-sm">{info.slug}</p>
+        </div>
+        <div>
           <label className="text-muted-foreground text-sm font-medium">Company Domain</label>
           {isEditingDomain ? (
             <div className="mt-1">

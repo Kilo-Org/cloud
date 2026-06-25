@@ -105,20 +105,6 @@ export function useOrganizationUsageStats(organizationId: string) {
   return useQuery(trpc.organizations.usageStats.queryOptions({ organizationId }));
 }
 
-export function useRequestedSlugAvailability(
-  organizationId: string,
-  requestedSlug: string | null,
-  options?: { enabled?: boolean }
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.requestedSlugAvailability.queryOptions(
-      { organizationId, requested_slug: requestedSlug },
-      options
-    )
-  );
-}
-
 export function useSlugAvailability(
   organizationId: string,
   slug: string | null,
@@ -126,10 +112,7 @@ export function useSlugAvailability(
 ) {
   const trpc = useTRPC();
   return useQuery(
-    trpc.organizations.requestedSlugAvailability.queryOptions(
-      { organizationId, requested_slug: slug },
-      options
-    )
+    trpc.organizations.slugAvailability.queryOptions({ organizationId, slug }, options)
   );
 }
 
@@ -217,50 +200,12 @@ export function useUpdateOrganizationName() {
   );
 }
 
-export function useUpdateOrganizationRequestedSlug() {
-  const trpc = useTRPC();
-  const onSuccess = useInvalidateOrganizationAndMembers();
-  return useMutation(
-    trpc.organizations.updateRequestedSlug.mutationOptions({
-      onSuccess,
-    })
-  );
-}
-
 export function useAdminUpdateOrganizationSlug() {
   const trpc = useTRPC();
   const invalidate = useInvalidateAllOrganizationData();
   const queryClient = useQueryClient();
   return useMutation(
     trpc.organizations.updateSlug.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
-        void invalidate();
-      },
-    })
-  );
-}
-
-export function useAdminAcceptRequestedSlug() {
-  const trpc = useTRPC();
-  const invalidate = useInvalidateAllOrganizationData();
-  const queryClient = useQueryClient();
-  return useMutation(
-    trpc.organizations.acceptRequestedSlug.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
-        void invalidate();
-      },
-    })
-  );
-}
-
-export function useAdminDeclineRequestedSlug() {
-  const trpc = useTRPC();
-  const invalidate = useInvalidateAllOrganizationData();
-  const queryClient = useQueryClient();
-  return useMutation(
-    trpc.organizations.declineRequestedSlug.mutationOptions({
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
         void invalidate();

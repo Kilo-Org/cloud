@@ -83,10 +83,6 @@ const OrganizationSlugSchema = z
     'Organization slug must use lowercase letters, numbers, and hyphens'
   );
 
-const OrganizationRequestedSlugUpdateSchema = OrganizationIdInputSchema.extend({
-  requested_slug: OrganizationSlugSchema.nullable(),
-});
-
 const OrganizationSlugUpdateSchema = OrganizationIdInputSchema.extend({
   slug: OrganizationSlugSchema.nullable(),
 });
@@ -234,25 +230,15 @@ export const organizationsRouter = createTRPCRouter({
       return successResult();
     }),
 
-  updateRequestedSlug: organizationBillingMutationProcedure
-    .input(OrganizationRequestedSlugUpdateSchema)
-    .mutation(async opts => {
-      await db
-        .update(organizations)
-        .set({ requested_slug: opts.input.requested_slug })
-        .where(eq(organizations.id, opts.input.organizationId));
-      return successResult();
-    }),
-
-  requestedSlugAvailability: organizationMemberProcedure
-    .input(OrganizationRequestedSlugUpdateSchema)
+  slugAvailability: organizationMemberProcedure
+    .input(OrganizationSlugUpdateSchema)
     .query(async opts => {
-      if (!opts.input.requested_slug) {
+      if (!opts.input.slug) {
         return { available: true };
       }
 
       const existingOrganization = await getOrganizationByActiveSlug(
-        opts.input.requested_slug,
+        opts.input.slug,
         opts.input.organizationId
       );
 
@@ -457,45 +443,6 @@ export const organizationsRouter = createTRPCRouter({
       organization: {
         id: opts.input.organizationId,
         slug: opts.input.slug,
-      },
-    };
-  }),
-
-  acceptRequestedSlug: adminProcedure.input(OrganizationIdInputSchema).mutation(async opts => {
-    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
-    const organization = await getOrganizationById(opts.input.organizationId);
-    if (!organization) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-    }
-
-    const requestedSlug = OrganizationSlugSchema.parse(organization.requested_slug);
-    await assertActiveSlugAvailable(requestedSlug, opts.input.organizationId);
-
-    await db
-      .update(organizations)
-      .set({ slug: requestedSlug, requested_slug: null })
-      .where(eq(organizations.id, opts.input.organizationId));
-
-    return {
-      organization: {
-        id: opts.input.organizationId,
-        slug: requestedSlug,
-        requested_slug: null,
-      },
-    };
-  }),
-
-  declineRequestedSlug: adminProcedure.input(OrganizationIdInputSchema).mutation(async opts => {
-    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
-    await db
-      .update(organizations)
-      .set({ requested_slug: null })
-      .where(eq(organizations.id, opts.input.organizationId));
-
-    return {
-      organization: {
-        id: opts.input.organizationId,
-        requested_slug: null,
       },
     };
   }),

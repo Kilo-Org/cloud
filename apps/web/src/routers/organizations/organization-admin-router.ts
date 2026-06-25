@@ -1012,7 +1012,6 @@ export const organizationAdminRouter = createTRPCRouter({
         free_trial_end_at: organizations.free_trial_end_at,
         company_domain: organizations.company_domain,
         slug: organizations.slug,
-        requested_slug: organizations.requested_slug,
         // Null out subscription_amount_usd for non-billable statuses so the
         // "Subscription" column doesn't display the dollar amount of a churned
         // plan as if it were current MRR. Reading "latest_stripe_status" tells

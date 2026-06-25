@@ -74,7 +74,6 @@ export const OrganizationSchema = z.object({
   free_trial_end_at: z.string().nullable(),
   company_domain: z.string().nullable(),
   slug: z.string().nullable(),
-  requested_slug: z.string().nullable(),
 });
 
 export type UserOrganizationWithSeats = {

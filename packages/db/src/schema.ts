@@ -2656,7 +2656,6 @@ export const organizations = pgTable(
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
     company_domain: text(),
     slug: text().unique(),
-    requested_slug: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),

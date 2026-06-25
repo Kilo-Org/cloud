@@ -31,6 +31,7 @@ import {
   gemma_4_26b_a4b_it_free_model,
 } from '@/lib/ai-gateway/providers/google';
 import { QWEN37_PLUS_MODEL_ID, qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
+import { morphChatModels } from '@/lib/ai-gateway/providers/morph';
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
@@ -85,6 +86,7 @@ export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
   seed_20_code_free_model,
   ...deepseekDiscountedModels,
+  ...morphChatModels,
   qwen36_plus_stealth_model,
   claude_sonnet_clawsetup_model,
   claude_opus_4_8_stealth_model,

@@ -10,6 +10,7 @@ export type ProviderId =
   | 'inception'
   | 'martian'
   | 'mistral'
+  | 'morph'
   | 'vercel'
   | 'custom'
   | 'experiment'

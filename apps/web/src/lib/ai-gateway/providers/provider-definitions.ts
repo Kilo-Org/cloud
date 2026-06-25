@@ -60,6 +60,14 @@ export default {
     supportedChatApis: [],
     async transformRequest() {},
   },
+  MORPH: {
+    id: 'morph',
+    apiUrl: 'https://api.morphllm.com/v1',
+    apiKey: getEnvVariable('MORPH_API_KEY'),
+    // Morph's gateway exposes an OpenAI-compatible Chat Completions endpoint.
+    supportedChatApis: ['chat_completions'],
+    async transformRequest() {},
+  },
   VERCEL_AI_GATEWAY: {
     id: 'vercel',
     apiUrl: 'https://ai-gateway.vercel.sh/v1',

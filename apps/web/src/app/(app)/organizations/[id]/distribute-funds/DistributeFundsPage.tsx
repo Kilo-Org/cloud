@@ -32,31 +32,12 @@ import {
   useOrganizationChildBalances,
 } from '@/app/api/organizations/hooks';
 import { formatMicrodollars } from '@/lib/admin-utils';
-import { cn, toMicrodollars } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { parseDollarInput } from './parseDollarInput';
 
 type Props = {
   organizationId: string;
 };
-
-function parseDollarInput(raw: string): { microdollars: number; error: string | null } {
-  const trimmed = raw.trim();
-  if (trimmed === '') return { microdollars: 0, error: null };
-
-  const normalized = trimmed.replace(/,/g, '');
-  if (!/^\d*\.?\d*$/.test(normalized) || normalized === '.') {
-    return { microdollars: 0, error: 'Enter a valid amount' };
-  }
-  if (/\.\d{3,}$/.test(normalized)) {
-    return { microdollars: 0, error: 'Use at most 2 decimal places' };
-  }
-
-  const value = Number(normalized);
-  if (value === 0) return { microdollars: 0, error: null };
-  if (!Number.isFinite(value) || value < 0) {
-    return { microdollars: 0, error: 'Enter a valid amount' };
-  }
-  return { microdollars: toMicrodollars(value), error: null };
-}
 
 export function DistributeFundsPage({ organizationId }: Props) {
   const { data, isLoading, error } = useOrganizationChildBalances(organizationId);

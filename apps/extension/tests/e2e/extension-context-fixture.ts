@@ -182,10 +182,13 @@ export const waitForStoredConversationText = async (page: Page, text: string): P
     .toBe(true);
 };
 
-export const holdConversationScrolledUp = async (page: Page, frames: number): Promise<void> => {
-  await page.evaluate(
+export const holdConversationScrolledUp = (
+  page: Page,
+  frames: number
+): Promise<{ everRecapturedToBottom: boolean }> =>
+  page.evaluate(
     frameCount =>
-      new Promise<void>(resolve => {
+      new Promise<{ everRecapturedToBottom: boolean }>(resolve => {
         const pane = document.querySelector('[aria-label="Agent conversation"]');
 
         if (!(pane instanceof HTMLElement)) {
@@ -193,8 +196,16 @@ export const holdConversationScrolledUp = async (page: Page, frames: number): Pr
         }
 
         let remainingFrames = frameCount;
+        let hasForcedTop = false;
+        let everRecapturedToBottom = false;
         const dragToTop = (): void => {
+          // Before re-forcing the top, look at where the previous frame left us. If anything scrolled us back to the bottom after we had already dragged up, the reply stole focus during the window this helper is holding open.
+          if (hasForcedTop && pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 16) {
+            everRecapturedToBottom = true;
+          }
+
           pane.scrollTop = 0;
+          hasForcedTop = true;
           remainingFrames -= 1;
 
           if (remainingFrames > 0) {
@@ -202,11 +213,10 @@ export const holdConversationScrolledUp = async (page: Page, frames: number): Pr
             return;
           }
 
-          resolve();
+          resolve({ everRecapturedToBottom });
         };
 
         requestAnimationFrame(dragToTop);
       }),
     frames
   );
-};

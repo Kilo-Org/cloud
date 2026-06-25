@@ -174,7 +174,10 @@ test('dragging the scrollbar up pauses auto-scroll while a reply is being pinned
 
     releaseFirstCompletion();
     await waitForStoredConversationText(sidePanel, 'Reply that must not steal scroll.');
-    await sustainedScrollUp;
+    const holdResult = await sustainedScrollUp;
+
+    // The reply must never have re-pinned the view to the bottom at any point during the hold, not merely by the time the hold ended.
+    expect(holdResult.everRecapturedToBottom).toBe(false);
 
     await expect(sidePanel.getByRole('button', { name: 'Jump to latest' })).toBeVisible();
 

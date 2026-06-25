@@ -346,7 +346,7 @@ describe('kilo gateway chat stream client', () => {
     });
   });
 
-  it('omits unsupported thinking effort variants from gateway reasoning', async () => {
+  it('sends xhigh thinking effort as gateway reasoning', async () => {
     let seenBody: unknown = null;
     const fetch: FetchLike = (_input, init) => {
       seenBody = parseJsonRequestBody(init?.body);
@@ -358,9 +358,57 @@ describe('kilo gateway chat stream client', () => {
       apiBaseUrl: 'https://app.kilo.ai',
       fetch,
       messages: [{ content: 'Think harder', role: 'user' }],
-      model: 'anthropic/claude-sonnet-4',
+      model: 'anthropic/claude-opus-4',
       onContentDelta: () => {},
       thinkingEffort: 'xhigh',
+      token: 'token-1',
+      tools: [],
+    });
+
+    expect(seenBody).toMatchObject({ reasoning: { effort: 'xhigh', enabled: true } });
+    expect(seenBody).not.toHaveProperty('verbosity');
+  });
+
+  it('maps max thinking effort to xhigh reasoning with max verbosity', async () => {
+    let seenBody: unknown = null;
+    const fetch: FetchLike = (_input, init) => {
+      seenBody = parseJsonRequestBody(init?.body);
+
+      return streamResponse(['data: [DONE]\n\n']);
+    };
+
+    await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://app.kilo.ai',
+      fetch,
+      messages: [{ content: 'Think hardest', role: 'user' }],
+      model: 'anthropic/claude-opus-4',
+      onContentDelta: () => {},
+      thinkingEffort: 'max',
+      token: 'token-1',
+      tools: [],
+    });
+
+    expect(seenBody).toMatchObject({
+      reasoning: { effort: 'xhigh', enabled: true },
+      verbosity: 'max',
+    });
+  });
+
+  it('omits reasoning for unrecognized thinking effort variants', async () => {
+    let seenBody: unknown = null;
+    const fetch: FetchLike = (_input, init) => {
+      seenBody = parseJsonRequestBody(init?.body);
+
+      return streamResponse(['data: [DONE]\n\n']);
+    };
+
+    await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://app.kilo.ai',
+      fetch,
+      messages: [{ content: 'Think weird', role: 'user' }],
+      model: 'anthropic/claude-sonnet-4',
+      onContentDelta: () => {},
+      thinkingEffort: 'bogus',
       token: 'token-1',
       tools: [],
     });

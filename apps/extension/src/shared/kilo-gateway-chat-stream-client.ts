@@ -51,7 +51,18 @@ interface StreamReaderContext {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 const organizationHeaderName = 'x-kilocode-organizationid';
-const validGatewayReasoningEfforts = new Set(['high', 'low', 'medium', 'minimal', 'none']);
+// Map exposed catalog variants to the gateway reasoning effort. `xhigh`/`max` both run at xhigh
+// effort; `max` additionally requests maximum verbosity (handled in toReasoningRequest).
+const variantToGatewayEffort: Record<string, string> = {
+  high: 'high',
+  instant: 'none',
+  low: 'low',
+  max: 'xhigh',
+  medium: 'medium',
+  minimal: 'minimal',
+  none: 'none',
+  xhigh: 'xhigh',
+};
 const toolArgumentsSchema = z.record(z.string(), z.unknown());
 const gatewayToolNameSchema = z.enum([
   'eval',
@@ -81,14 +92,19 @@ const streamDataSchema = z.object({
     })
   ),
 });
-const toReasoning = (effort: string | undefined) => {
-  const gatewayEffort = effort === 'instant' ? 'none' : effort;
+const toReasoningRequest = (
+  variant: string | undefined
+): { reasoning: { effort: string; enabled: boolean }; verbosity?: 'max' } | undefined => {
+  const gatewayEffort = variant === undefined ? undefined : variantToGatewayEffort[variant];
 
-  if (gatewayEffort === undefined || !validGatewayReasoningEfforts.has(gatewayEffort)) {
+  if (gatewayEffort === undefined) {
     return;
   }
 
-  return { effort: gatewayEffort, enabled: gatewayEffort !== 'none' };
+  return {
+    reasoning: { effort: gatewayEffort, enabled: gatewayEffort !== 'none' },
+    ...(variant === 'max' ? { verbosity: 'max' } : {}),
+  };
 };
 const parseJson = (value: string): unknown => {
   try {
@@ -321,12 +337,12 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   token,
   tools,
 }: FetchKiloGatewayChatCompletionStreamOptions): Promise<KiloGatewayChatCompletion> => {
-  const reasoning = toReasoning(thinkingEffort);
+  const reasoningRequest = toReasoningRequest(thinkingEffort);
   const response = await fetch(`${trimTrailingSlash(apiBaseUrl)}/api/gateway/v1/chat/completions`, {
     body: JSON.stringify({
       messages,
       model,
-      ...(reasoning === undefined ? {} : { reasoning }),
+      ...(reasoningRequest ?? {}),
       stream: true,
       temperature: 0,
       tool_choice: tools.length === 0 ? 'none' : 'auto',

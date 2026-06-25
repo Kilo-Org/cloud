@@ -34,6 +34,7 @@ interface StreamingAccumulator {
   isDone: boolean;
   pendingText: string;
   reasoning: string;
+  reasoningDetailsByIndex: Map<number, Record<string, unknown>>;
   toolCallsByIndex: Map<number, StreamingToolCallBuffer>;
 }
 
@@ -51,8 +52,7 @@ interface StreamReaderContext {
 
 const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
 const organizationHeaderName = 'x-kilocode-organizationid';
-// Map exposed catalog variants to the gateway reasoning effort. `xhigh`/`max` both run at xhigh
-// effort; `max` additionally requests maximum verbosity (handled in toReasoningRequest).
+// Map exposed catalog variants to the gateway reasoning effort. `xhigh` and `max` both run at xhigh effort; `max` additionally requests maximum verbosity (handled in toReasoningRequest).
 const variantToGatewayEffort: Record<string, string> = {
   high: 'high',
   instant: 'none',
@@ -87,11 +87,44 @@ const streamDataSchema = z.object({
       delta: z.object({
         content: z.string().nullable().optional(),
         reasoning: z.string().nullable().optional(),
+        reasoning_details: z.array(z.unknown()).nullable().optional(),
         tool_calls: z.array(z.unknown()).optional(),
       }),
     })
   ),
 });
+// Reasoning blocks stream incrementally like content: text accumulates while structural fields (type/signature/data/index) carry their final value. Providers may require these signed/encrypted blocks replayed verbatim on the assistant tool-call message or they reject the continuation.
+const appendableReasoningKeys = new Set(['data', 'summary', 'text']);
+const mergeReasoningDetail = (
+  detailsByIndex: Map<number, Record<string, unknown>>,
+  block: unknown,
+  fallbackIndex: number
+): void => {
+  const parsed = toolArgumentsSchema.safeParse(block);
+
+  if (!parsed.success) {
+    return;
+  }
+
+  const record = parsed.data;
+  const index = typeof record['index'] === 'number' ? record['index'] : fallbackIndex;
+  const current = detailsByIndex.get(index) ?? {};
+
+  for (const [key, value] of Object.entries(record)) {
+    if (value !== undefined && value !== null) {
+      const existing = current[key];
+
+      current[key] =
+        appendableReasoningKeys.has(key) &&
+        typeof value === 'string' &&
+        typeof existing === 'string'
+          ? existing + value
+          : value;
+    }
+  }
+
+  detailsByIndex.set(index, current);
+};
 const toReasoningRequest = (
   variant: string | undefined
 ): { reasoning: { effort: string; enabled: boolean }; verbosity?: 'max' } | undefined => {
@@ -147,12 +180,15 @@ const parseToolCallBuffer = (value: StreamingToolCallBuffer): KiloGatewayToolCal
     name: value.name,
   };
 };
+// SSE allows CRLF, LF, or CR; a blank line ends a record. Match a real upstream regardless of framing.
+const sseRecordSeparator = /\r\n\r\n|\r\r|\n\n/;
+const sseLineSeparator = /\r\n|\r|\n/;
 const parseServerSentEvents = (text: string): string[] =>
   text
-    .split('\n\n')
+    .split(sseRecordSeparator)
     .flatMap(block => {
       const dataLines = block
-        .split('\n')
+        .split(sseLineSeparator)
         .map(line => line.trim())
         .filter(line => line.startsWith('data:'))
         .map(line => line.slice('data:'.length).trim());
@@ -218,7 +254,7 @@ const applyStreamingData = (
   }
 
   const { delta } = choice;
-  const { content, reasoning, tool_calls: toolCalls } = delta;
+  const { content, reasoning, reasoning_details: reasoningDetails, tool_calls: toolCalls } = delta;
 
   if (typeof content === 'string' && content.length > 0) {
     accumulator.content += content;
@@ -230,19 +266,32 @@ const applyStreamingData = (
     handlers.onReasoningDelta(reasoning);
   }
 
+  if (Array.isArray(reasoningDetails)) {
+    reasoningDetails.forEach((block, position) => {
+      mergeReasoningDetail(accumulator.reasoningDetailsByIndex, block, position);
+    });
+  }
+
   if (Array.isArray(toolCalls)) {
     for (const toolCall of toolCalls) {
       mergeStreamingToolCall(accumulator.toolCallsByIndex, toolCall);
     }
   }
 };
-const toCompletion = (accumulator: StreamingAccumulator): KiloGatewayChatCompletion => ({
-  ...(accumulator.content === '' ? {} : { content: accumulator.content }),
-  ...(accumulator.reasoning === '' ? {} : { reasoning: accumulator.reasoning }),
-  toolCalls: [...accumulator.toolCallsByIndex.values()].map(toolCall =>
-    parseToolCallBuffer(toolCall)
-  ),
-});
+const toCompletion = (accumulator: StreamingAccumulator): KiloGatewayChatCompletion => {
+  const reasoningDetails = [...accumulator.reasoningDetailsByIndex.entries()]
+    .toSorted(([left], [right]) => left - right)
+    .map(([, block]) => block);
+
+  return {
+    ...(accumulator.content === '' ? {} : { content: accumulator.content }),
+    ...(accumulator.reasoning === '' ? {} : { reasoning: accumulator.reasoning }),
+    ...(reasoningDetails.length === 0 ? {} : { reasoningDetails }),
+    toolCalls: [...accumulator.toolCallsByIndex.values()].map(toolCall =>
+      parseToolCallBuffer(toolCall)
+    ),
+  };
+};
 
 export const parseKiloGatewayChatCompletionStream = (
   text: string,
@@ -254,6 +303,7 @@ export const parseKiloGatewayChatCompletionStream = (
     isDone: false,
     pendingText: '',
     reasoning: '',
+    reasoningDetailsByIndex: new Map(),
     toolCallsByIndex: new Map(),
   };
   const handlers = { onContentDelta, onReasoningDelta };
@@ -282,7 +332,7 @@ const consumeStreamReader = async ({
 
   accumulator.pendingText += decoder.decode(value, { stream: !done });
 
-  const blocks = accumulator.pendingText.split('\n\n');
+  const blocks = accumulator.pendingText.split(sseRecordSeparator);
   accumulator.pendingText = blocks.pop() ?? '';
 
   for (const data of parseServerSentEvents(blocks.join('\n\n'))) {
@@ -310,6 +360,7 @@ const consumeKiloGatewayChatCompletionStream = async (
     isDone: false,
     pendingText: '',
     reasoning: '',
+    reasoningDetailsByIndex: new Map(),
     toolCallsByIndex: new Map(),
   };
   const reader = body.getReader();
@@ -338,16 +389,18 @@ export const fetchKiloGatewayChatCompletionStream = async ({
   tools,
 }: FetchKiloGatewayChatCompletionStreamOptions): Promise<KiloGatewayChatCompletion> => {
   const reasoningRequest = toReasoningRequest(thinkingEffort);
+  const requestBody = {
+    messages,
+    model,
+    stream: true,
+    temperature: 0,
+    tool_choice: tools.length === 0 ? 'none' : 'auto',
+    tools,
+  };
   const response = await fetch(`${trimTrailingSlash(apiBaseUrl)}/api/gateway/v1/chat/completions`, {
-    body: JSON.stringify({
-      messages,
-      model,
-      ...(reasoningRequest ?? {}),
-      stream: true,
-      temperature: 0,
-      tool_choice: tools.length === 0 ? 'none' : 'auto',
-      tools,
-    }),
+    body: JSON.stringify(
+      reasoningRequest === undefined ? requestBody : { ...requestBody, ...reasoningRequest }
+    ),
     headers: {
       Accept: 'text/event-stream',
       Authorization: `Bearer ${token}`,

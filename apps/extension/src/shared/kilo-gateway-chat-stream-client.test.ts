@@ -267,11 +267,58 @@ describe('kilo gateway chat stream client', () => {
     ).resolves.toStrictEqual({
       content: 'Visible answer.',
       reasoning: 'Thinking',
+      reasoningDetails: [{ format: 'unknown', index: 0, text: 'Think', type: 'reasoning.text' }],
       toolCalls: [],
     });
 
     expect(contentDeltas).toStrictEqual(['Visible answer.']);
     expect(reasoningDeltas).toStrictEqual(['Think', 'ing']);
+  });
+
+  it('accumulates reasoning detail text across deltas and keeps the final signature', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"reasoning":"Th","reasoning_details":[{"type":"reasoning.text","text":"Th","index":0}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"reasoning":"ink","reasoning_details":[{"type":"reasoning.text","text":"ink","signature":"sig-1","index":0}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    const completion = await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://app.kilo.ai',
+      fetch,
+      messages: [{ content: 'Think', role: 'user' }],
+      model: 'anthropic/claude-sonnet-4',
+      onContentDelta: () => {},
+      token: 'token-1',
+      tools: [],
+    });
+
+    expect(completion.reasoningDetails).toStrictEqual([
+      { index: 0, signature: 'sig-1', text: 'Think', type: 'reasoning.text' },
+    ]);
+  });
+
+  it('parses CRLF-separated SSE records split across chunk boundaries', async () => {
+    const contentDeltas: string[] = [];
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"content":"Hel"}}]}\r\n\r',
+        '\ndata: {"choices":[{"delta":{"content":"lo"}}]}\r\n\r\n',
+        'data: [DONE]\r\n\r\n',
+      ]);
+
+    const completion = await fetchKiloGatewayChatCompletionStream({
+      apiBaseUrl: 'https://app.kilo.ai',
+      fetch,
+      messages: [{ content: 'Hi', role: 'user' }],
+      model: 'anthropic/claude-sonnet-4',
+      onContentDelta: delta => contentDeltas.push(delta),
+      token: 'token-1',
+      tools: [],
+    });
+
+    expect(contentDeltas.join('')).toBe('Hello');
+    expect(completion).toMatchObject({ content: 'Hello' });
   });
 
   it('sends selected thinking effort as gateway reasoning', async () => {

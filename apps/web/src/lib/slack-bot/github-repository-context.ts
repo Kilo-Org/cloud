@@ -1,4 +1,8 @@
-import type { Owner, PlatformRepository } from '@/lib/integrations/core/types';
+import {
+  requireNumericPlatformRepositories,
+  type Owner,
+  type PlatformRepository,
+} from '@/lib/integrations/core/types';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 
@@ -24,7 +28,7 @@ export async function getGitHubRepositoryContext(owner: Owner): Promise<GitHubRe
     };
   }
 
-  const repositories = integration.repositories ? integration.repositories : null;
+  const repositories = requireNumericPlatformRepositories(integration.repositories);
 
   return {
     accountLogin: integration.platform_account_login,

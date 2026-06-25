@@ -227,18 +227,21 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
         },
 
         respondToPermission: async payload => {
-          const trpc = organizationId
-            ? trpcClient.organizations.cloudAgentNext
-            : trpcClient.cloudAgentNext;
-          await trpc.answerPermission.mutate(
-            {
-              ...(organizationId ? { organizationId } : {}),
-              sessionId: payload.sessionId,
-              permissionId: payload.requestId,
-              response: payload.response,
-            },
-            { context: { skipBatch: true } }
-          );
+          const input = {
+            sessionId: payload.sessionId,
+            permissionId: payload.requestId,
+            response: payload.response,
+          };
+          if (organizationId) {
+            await trpcClient.organizations.cloudAgentNext.answerPermission.mutate(
+              { ...input, organizationId },
+              { context: { skipBatch: true } }
+            );
+            return;
+          }
+          await trpcClient.cloudAgentNext.answerPermission.mutate(input, {
+            context: { skipBatch: true },
+          });
         },
       },
 

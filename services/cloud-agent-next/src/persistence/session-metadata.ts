@@ -71,6 +71,17 @@ const MetadataRepositorySchema = z.discriminatedUnion('type', [
     .strip(),
   z
     .object({
+      type: z.literal('bitbucket'),
+      url: z.string(),
+      platform: z.literal('bitbucket').optional(),
+      workspaceUuid: z.string().uuid(),
+      repositoryUuid: z.string().uuid(),
+      bitbucketTokenManaged: z.boolean().optional(),
+      upstreamBranch: branchNameSchema.optional(),
+    })
+    .strip(),
+  z
+    .object({
       type: z.literal('git'),
       url: z.string(),
       platform: z.enum(['github', 'gitlab']).optional(),

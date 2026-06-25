@@ -79,7 +79,12 @@ let createCaller: (ctx: { user: User }) => {
     prompt: string;
     mode: string;
     model: string;
-    githubRepo: string;
+    githubRepo?: string;
+    bitbucketRepo?: {
+      fullName: string;
+      workspaceUuid: string;
+      repositoryUuid: string;
+    };
     autoInitiate: boolean;
     devcontainer: boolean;
     images?: { path: string; files: string[] };
@@ -235,6 +240,29 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       expect.objectContaining({ attachments: images, createdOnPlatform: 'cloud-agent-web' })
     );
     expect(mockPrepareSession).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
+  });
+
+  it('rejects personal Bitbucket sessions before constructing a Cloud Agent client', async () => {
+    const caller = createCaller({
+      user: { id: 'user-1', is_admin: false } as User,
+    });
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Inspect the repository',
+        mode: 'code',
+        model: 'kilo/test-model',
+        bitbucketRepo: {
+          fullName: 'acme/api',
+          workspaceUuid: '11111111-1111-4111-8111-111111111111',
+          repositoryUuid: '22222222-2222-4222-8222-222222222222',
+        },
+        autoInitiate: true,
+        devcontainer: false,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
   it('forwards devcontainer sessions when the feature flag is enabled', async () => {

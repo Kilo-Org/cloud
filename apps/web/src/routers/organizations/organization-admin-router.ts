@@ -195,6 +195,10 @@ const AddMemberInputSchema = z.object({
   role: z.enum(['owner', 'member', 'billing_manager']),
 });
 
+const childOrganizationSettings = {
+  suppress_trial_messaging: true,
+};
+
 async function validateParentOrganizationChange(
   organizationId: string,
   parentOrganizationId: string | null,
@@ -298,20 +302,17 @@ export const organizationAdminRouter = createTRPCRouter({
     const organization = await db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
 
-      const now = new Date();
-      const trialEndDate = new Date(
-        now.getTime() + ORGANIZATION_TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000
-      );
       const [createdOrganization] = await tx
         .insert(organizations)
         .values({
           name: opts.input.name,
-          require_seats: true,
-          free_trial_end_at: trialEndDate.toISOString(),
+          require_seats: false,
+          free_trial_end_at: null,
           parent_organization_id: parentOrganizationId,
           settings: {
             enable_usage_limits: false,
             code_indexing_enabled: true,
+            ...childOrganizationSettings,
           },
         })
         .returning();
@@ -332,7 +333,16 @@ export const organizationAdminRouter = createTRPCRouter({
 
       await tx
         .update(organizations)
-        .set({ parent_organization_id: input.parentOrganizationId })
+        .set(
+          input.parentOrganizationId
+            ? {
+                parent_organization_id: input.parentOrganizationId,
+                require_seats: false,
+                free_trial_end_at: null,
+                settings: sql`${organizations.settings} || ${JSON.stringify(childOrganizationSettings)}::jsonb`,
+              }
+            : { parent_organization_id: input.parentOrganizationId }
+        )
         .where(eq(organizations.id, input.organizationId));
     });
 

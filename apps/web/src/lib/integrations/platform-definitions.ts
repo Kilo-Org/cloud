@@ -86,12 +86,23 @@ export const PLATFORM_DEFINITIONS: PlatformDefinition[] = [
     orgRoute: organizationId => `/organizations/${organizationId}/integrations/dolthub`,
   },
   {
-    id: 'bitbucket',
+    id: PLATFORM.BITBUCKET,
     name: 'Bitbucket',
-    description: 'Integrate Bitbucket repositories for intelligent code analysis and automation',
-    enabled: false,
+    description: 'Connect your Bitbucket Cloud repositories to Kilo Code',
+    enabled: true,
+    orgRoute: organizationId => `/organizations/${organizationId}/integrations/bitbucket`,
   },
 ];
+
+function getPlatformDefinitionsForOwner(organizationId?: string): PlatformDefinition[] {
+  return PLATFORM_DEFINITIONS.filter(definition =>
+    organizationId ? Boolean(definition.orgRoute) : Boolean(definition.personalRoute)
+  );
+}
+
+export function getPlatformDefinitionCountForOwner(organizationId?: string): number {
+  return getPlatformDefinitionsForOwner(organizationId).length;
+}
 
 type InstallationStatus = Partial<Record<PlatformType, { installed: boolean }>>;
 
@@ -115,17 +126,19 @@ export function buildPlatforms(
 ): Platform[] {
   const installations = buildInstallationStatusMap(installationStatuses);
 
-  return PLATFORM_DEFINITIONS.filter(def => {
-    if (def.hiddenUnlessInstalled) {
-      return installations[def.id as keyof InstallationStatus]?.installed === true;
-    }
-    return true;
-  }).map(def => ({
-    id: def.id,
-    name: def.name,
-    description: def.description,
-    status: getStatus(def.id, installations),
-    enabled: def.enabled,
-    route: organizationId ? def.orgRoute?.(organizationId) : def.personalRoute,
-  }));
+  return getPlatformDefinitionsForOwner(organizationId)
+    .filter(def => {
+      if (def.hiddenUnlessInstalled) {
+        return installations[def.id as keyof InstallationStatus]?.installed === true;
+      }
+      return true;
+    })
+    .map(def => ({
+      id: def.id,
+      name: def.name,
+      description: def.description,
+      status: getStatus(def.id, installations),
+      enabled: def.enabled,
+      route: organizationId ? def.orgRoute?.(organizationId) : def.personalRoute,
+    }));
 }

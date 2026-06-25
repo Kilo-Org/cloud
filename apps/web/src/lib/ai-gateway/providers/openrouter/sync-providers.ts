@@ -62,7 +62,6 @@ async function fetchGatewayModels(gateway: Provider) {
   await Promise.all(
     models.data.map(model =>
       limit(async () => {
-        console.debug(`[fetchGatewayModels] ${gateway.id}/${model.id}`);
         const endpointsResponse = await fetch(`${gateway.apiUrl}/models/${model.id}/endpoints`, {
           method: 'GET',
           headers,
@@ -85,6 +84,7 @@ async function fetchGatewayModels(gateway: Provider) {
   if (count < 100) {
     throw new Error(`Suspicious: total number of ${gateway.id} models is ${count} < 100`);
   }
+  console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.id}`);
 
   return result;
 }

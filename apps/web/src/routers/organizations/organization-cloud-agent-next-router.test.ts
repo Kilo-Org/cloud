@@ -2,6 +2,8 @@ import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals
 import { createCallerFactory } from '@/lib/trpc/init';
 import type * as TrpcInitModule from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
+import type * as BitbucketIntegrationHelpers from '@/lib/cloud-agent/bitbucket-integration-helpers';
+import type { BitbucketOrganizationRepositoryListResult } from '@/lib/cloud-agent/bitbucket-integration-helpers';
 
 const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
 
@@ -10,6 +12,10 @@ type AttachmentReference = { path: string; files: string[] };
 const mockPrepareSession = jest.fn<
   (input: {
     githubRepo?: string;
+    gitUrl?: string;
+    platform?: 'github' | 'gitlab' | 'bitbucket';
+    bitbucketWorkspaceUuid?: string;
+    bitbucketRepositoryUuid?: string;
     devcontainer?: boolean;
     kilocodeOrganizationId?: string;
     attachments?: AttachmentReference;
@@ -55,6 +61,13 @@ const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
 const mockVerifyOrgOwnsSessionV2ByCloudAgentId =
   jest.fn<() => Promise<{ kiloSessionId: string } | null>>();
+const mockFetchBitbucketRepositoriesForOrganization =
+  jest.fn<
+    (
+      organizationId: string,
+      kiloUserId: string
+    ) => Promise<BitbucketOrganizationRepositoryListResult>
+  >();
 
 jest.mock('@/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
@@ -67,6 +80,13 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 
 jest.mock('@/lib/posthog-feature-flags', () => ({
   isFeatureFlagEnabledOrDevelopment: mockIsFeatureFlagEnabledOrDevelopment,
+}));
+
+jest.mock('@/lib/cloud-agent/bitbucket-integration-helpers', () => ({
+  ...jest.requireActual<typeof BitbucketIntegrationHelpers>(
+    '@/lib/cloud-agent/bitbucket-integration-helpers'
+  ),
+  fetchBitbucketRepositoriesForOrganization: mockFetchBitbucketRepositoriesForOrganization,
 }));
 
 jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
@@ -93,7 +113,12 @@ let createCaller: (ctx: { user: User }) => {
     prompt: string;
     mode: string;
     model: string;
-    githubRepo: string;
+    githubRepo?: string;
+    bitbucketRepo?: {
+      fullName: string;
+      workspaceUuid: string;
+      repositoryUuid: string;
+    };
     autoInitiate: boolean;
     devcontainer: boolean;
     images?: { path: string; files: string[] };
@@ -115,6 +140,9 @@ let createCaller: (ctx: { user: User }) => {
     contentType: 'text/markdown';
     contentLength: number;
   }) => Promise<unknown>;
+  listBitbucketRepositories: (input: {
+    organizationId: string;
+  }) => Promise<BitbucketOrganizationRepositoryListResult>;
 };
 
 beforeAll(async () => {
@@ -262,6 +290,38 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     expect(mockPrepareSession).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
   });
 
+  it('forwards stable Bitbucket identity for organization sessions', async () => {
+    mockIsFeatureFlagEnabledOrDevelopment.mockResolvedValue(true);
+    const caller = createCaller({ user: { id: 'user-2', is_admin: false } as User });
+
+    await caller.prepareSession({
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      bitbucketRepo: {
+        fullName: 'acme/repo',
+        workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+        repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      },
+      autoInitiate: true,
+      devcontainer: false,
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gitUrl: 'https://bitbucket.org/acme/repo.git',
+        platform: 'bitbucket',
+        bitbucketWorkspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+        bitbucketRepositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+        kilocodeOrganizationId: ORGANIZATION_ID,
+      })
+    );
+    expect(mockPrepareSession).not.toHaveBeenCalledWith(
+      expect.objectContaining({ bitbucketRepo: expect.anything() })
+    );
+  });
+
   it('forwards devcontainer sessions when the feature flag is enabled', async () => {
     mockIsFeatureFlagEnabledOrDevelopment.mockResolvedValue(true);
     const caller = createCaller({
@@ -293,5 +353,43 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
         kilocodeOrganizationId: ORGANIZATION_ID,
       })
     );
+  });
+});
+
+describe('organizationCloudAgentNextRouter Bitbucket repository listing', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('forwards exact organization ownership without a provider-refresh control', async () => {
+    const result = {
+      status: 'available' as const,
+      repositories: [],
+      syncedAt: '2026-06-23T08:00:00.000Z',
+    };
+    mockFetchBitbucketRepositoriesForOrganization.mockResolvedValue(result);
+    const caller = createCaller({ user: { id: 'member-1', is_admin: false } as User });
+
+    await expect(
+      caller.listBitbucketRepositories({
+        organizationId: ORGANIZATION_ID,
+      })
+    ).resolves.toEqual(result);
+    expect(mockFetchBitbucketRepositoriesForOrganization).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      'member-1'
+    );
+  });
+
+  it('propagates temporary cache initialization failure distinctly', async () => {
+    const result = { status: 'temporarily_unavailable' as const };
+    mockFetchBitbucketRepositoriesForOrganization.mockResolvedValue(result);
+    const caller = createCaller({ user: { id: 'member-1', is_admin: false } as User });
+
+    await expect(
+      caller.listBitbucketRepositories({
+        organizationId: ORGANIZATION_ID,
+      })
+    ).resolves.toEqual(result);
   });
 });

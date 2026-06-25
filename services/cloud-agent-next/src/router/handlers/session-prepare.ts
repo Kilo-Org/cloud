@@ -42,6 +42,7 @@ import type { Env } from '../../types.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
+import { assertBitbucketRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
 
 type SessionPrepareHandlers = {
   prepareSession: typeof prepareSessionHandler;
@@ -210,19 +211,32 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
         message: 'Must provide either githubRepo or gitUrl',
       });
     }
-    repository =
-      input.platform === 'gitlab'
-        ? {
-            type: 'gitlab',
-            url: gitUrl,
-            branch: input.upstreamBranch,
-          }
-        : {
-            type: 'git',
-            url: gitUrl,
-            token: input.gitToken,
-            branch: input.upstreamBranch,
-          };
+    if (input.platform === 'gitlab') {
+      repository = {
+        type: 'gitlab',
+        url: gitUrl,
+        branch: input.upstreamBranch,
+      };
+    } else if (
+      input.platform === 'bitbucket' &&
+      input.bitbucketWorkspaceUuid &&
+      input.bitbucketRepositoryUuid
+    ) {
+      repository = {
+        type: 'bitbucket',
+        url: gitUrl,
+        workspaceUuid: input.bitbucketWorkspaceUuid,
+        repositoryUuid: input.bitbucketRepositoryUuid,
+        branch: input.upstreamBranch,
+      };
+    } else {
+      repository = {
+        type: 'git',
+        url: gitUrl,
+        token: input.gitToken,
+        branch: input.upstreamBranch,
+      };
+    }
   }
 
   const initialTurn: SessionCreateRequest['initialTurn'] =
@@ -298,6 +312,12 @@ const prepareSessionHandler = internalApiProtectedProcedure
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'prepareSession' }, async () => {
       const request = prepareInputToSessionCreateRequest(input);
+      await assertBitbucketRepositoryAccessBeforeSessionCreation({
+        env: ctx.env,
+        userId: ctx.userId,
+        orgId: input.kilocodeOrganizationId,
+        repository: request.repository,
+      });
       const policy = profileResolutionPolicyForSessionCreateOrigin(input.createdOnPlatform);
       const requestWithProfile = await resolveEffectiveSessionConfiguration(ctx, request, policy);
       assertModeAvailableForProfile(

@@ -240,6 +240,16 @@ export const basePrepareSessionNextSchema = z
       )
       .optional()
       .describe('GitLab project path (e.g., group/project or group/subgroup/project)'),
+    bitbucketRepo: z
+      .object({
+        fullName: z
+          .string()
+          .regex(/^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/, 'Invalid Bitbucket repository'),
+        workspaceUuid: z.uuid(),
+        repositoryUuid: z.uuid(),
+      })
+      .strict()
+      .optional(),
 
     // Execution params (required)
     prompt: z.string().min(1).max(100_000),
@@ -273,9 +283,12 @@ export const basePrepareSessionNextSchema = z
     devcontainer: z.boolean().optional(),
   })
   .refine(
-    data => (data.githubRepo || data.gitlabProject) && !(data.githubRepo && data.gitlabProject),
+    data =>
+      [data.githubRepo, data.gitlabProject, data.bitbucketRepo].filter(
+        repository => repository !== undefined
+      ).length === 1,
     {
-      message: 'Must provide either githubRepo or gitlabProject, but not both',
+      message: 'Must provide exactly one repository source',
       path: ['githubRepo'],
     }
   )
@@ -283,6 +296,14 @@ export const basePrepareSessionNextSchema = z
     message: 'Must not provide both attachments and images',
     path: ['attachments'],
   });
+
+export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema.refine(
+  data => data.bitbucketRepo === undefined,
+  {
+    message: 'Bitbucket repositories require an organization',
+    path: ['bitbucketRepo'],
+  }
+);
 
 // Output schema for prepareSession
 export const basePrepareSessionNextOutputSchema = z.object({
@@ -416,7 +437,7 @@ export const baseGetSessionNextOutputSchema = z.object({
   // Repository info (no tokens)
   githubRepo: z.string().optional(),
   gitUrl: z.string().optional(),
-  platform: z.enum(['github', 'gitlab']).optional(),
+  platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
 
   // Execution params
   prompt: z.string().optional(),

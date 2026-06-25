@@ -77,6 +77,91 @@ export async function ensureOrganizationAccess(
   return role;
 }
 
+/**
+ * Resolves the caller's effective role for each of `organizationIds` in a fixed
+ * number of queries (vs one per org). Mirrors {@link ensureOrganizationAccess}:
+ * admins get 'owner' everywhere, otherwise direct memberships are unioned with
+ * roles inherited from a parent org (owner/billing_manager). Orgs the caller has
+ * no access to are simply absent from the returned map.
+ */
+export async function getOrganizationsAccessRoles(
+  ctx: TRPCContext,
+  organizationIds: Organization['id'][]
+): Promise<Map<string, OrganizationRole>> {
+  const uniqueIds = Array.from(new Set(organizationIds));
+  const result = new Map<string, OrganizationRole>();
+  if (uniqueIds.length === 0) {
+    return result;
+  }
+  if (ctx.user.is_admin) {
+    for (const id of uniqueIds) result.set(id, 'owner');
+    return result;
+  }
+
+  const directRows = await db
+    .select({
+      organizationId: organization_memberships.organization_id,
+      role: organization_memberships.role,
+    })
+    .from(organization_memberships)
+    .where(
+      and(
+        eq(organization_memberships.kilo_user_id, ctx.user.id),
+        inArray(organization_memberships.organization_id, uniqueIds)
+      )
+    );
+
+  const inheritedRows = await db
+    .select({
+      organizationId: organizations.id,
+      role: organization_memberships.role,
+    })
+    .from(organizations)
+    .innerJoin(
+      organization_memberships,
+      and(
+        eq(organization_memberships.organization_id, organizations.parent_organization_id),
+        eq(organization_memberships.kilo_user_id, ctx.user.id),
+        inArray(organization_memberships.role, parentOrganizationAccessRoles)
+      )
+    )
+    .where(inArray(organizations.id, uniqueIds));
+
+  const rolesByOrg = new Map<string, OrganizationRole[]>();
+  for (const row of [...directRows, ...inheritedRows]) {
+    const list = rolesByOrg.get(row.organizationId) ?? [];
+    list.push(row.role);
+    rolesByOrg.set(row.organizationId, list);
+  }
+  for (const [organizationId, roles] of rolesByOrg) {
+    const best = rolePriority.find(role => roles.includes(role));
+    if (best) result.set(organizationId, best);
+  }
+  return result;
+}
+
+/**
+ * Batched variant of {@link ensureOrganizationAccess} for many orgs at once.
+ * Throws unless the caller has an allowed role on *every* org in the list.
+ */
+export async function ensureOrganizationsAccess(
+  ctx: TRPCContext,
+  organizationIds: Organization['id'][],
+  roles?: OrganizationRole[]
+): Promise<void> {
+  const accessByOrg = await getOrganizationsAccessRoles(ctx, organizationIds);
+  const allowedRoles = roles && roles.length > 0 ? roles : rolePriority;
+  for (const organizationId of new Set(organizationIds)) {
+    const role = accessByOrg.get(organizationId);
+    if (!role || !allowedRoles.includes(role)) {
+      throw new TRPCError({
+        code: 'UNAUTHORIZED',
+        message: 'You do not have access to this organization',
+      });
+    }
+  }
+}
+
 export async function ensureOrganizationAccessAndFetchOrg(
   ctx: TRPCContext,
   organizationId: Organization['id'],

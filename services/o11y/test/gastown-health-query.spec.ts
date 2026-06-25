@@ -31,20 +31,20 @@ describe('queryGastownHealth', () => {
         data: [
           {
             town_id: 'town-1',
-            weighted_failed_checks: 20,
-            weighted_successful_checks: 100,
+            weighted_failed_checks: '20',
+            weighted_successful_checks: '100',
             latest_event_timestamp: '2026-06-24 15:09:00.000',
           },
           {
             town_id: 'town-2',
-            weighted_failed_checks: 4,
-            weighted_successful_checks: 50,
+            weighted_failed_checks: '4',
+            weighted_successful_checks: '50',
             latest_event_timestamp: '2026-06-24 15:10:00.000',
           },
           {
             town_id: '',
-            weighted_failed_checks: 3,
-            weighted_successful_checks: 2,
+            weighted_failed_checks: '3',
+            weighted_successful_checks: '2',
             latest_event_timestamp: '2026-06-24 15:08:00.000',
           },
         ],
@@ -106,6 +106,25 @@ describe('queryGastownHealth', () => {
       latestEventTimestamp: null,
     });
   });
+
+  it.each(['', 'not-a-number', '-1', 'Infinity'])(
+    'rejects invalid Analytics Engine aggregate %j',
+    async aggregate => {
+      const fetchFn: FetchFn = async () =>
+        Response.json({
+          data: [
+            {
+              town_id: '',
+              weighted_failed_checks: aggregate,
+              weighted_successful_checks: '0',
+              latest_event_timestamp: null,
+            },
+          ],
+        });
+
+      await expect(queryGastownHealth(makeEnv(), fetchFn)).rejects.toThrow();
+    }
+  );
 
   it('rejects malformed Analytics Engine responses', async () => {
     const fetchFn: FetchFn = async () =>

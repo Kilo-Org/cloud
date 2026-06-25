@@ -366,6 +366,34 @@ describe('session metadata boundary', () => {
     expect(serializeSessionMetadata(current)).toEqual(current);
   });
 
+  it('persists Bitbucket identity and managed status without a token', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_bitbucket', userId: 'user_123' },
+      auth: {},
+      repository: {
+        type: 'bitbucket',
+        url: 'https://bitbucket.org/acme/repo.git',
+        platform: 'bitbucket',
+        workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+        repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+        bitbucketTokenManaged: true,
+        token: 'must-not-persist',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(metadata.repository).toEqual({
+      type: 'bitbucket',
+      url: 'https://bitbucket.org/acme/repo.git',
+      platform: 'bitbucket',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      bitbucketTokenManaged: true,
+    });
+    expect(JSON.stringify(serializeSessionMetadata(metadata))).not.toContain('must-not-persist');
+  });
+
   it('preserves legacy generic git tokens in grouped repository metadata', () => {
     const metadata = parseSessionMetadata({
       version: 1,

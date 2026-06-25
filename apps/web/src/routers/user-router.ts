@@ -35,6 +35,7 @@ import {
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@/lib/autoTopUpConstants';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
+import { resolveStripeReceiptUrl } from '@/lib/credits';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
@@ -86,6 +87,8 @@ const CreditBlockSchema = z.object({
   balance_mUsd: z.number(),
   amount_mUsd: z.number(),
   is_free: z.boolean(),
+  stripe_payment_id: z.string().nullable(),
+  receipt_url: z.string().nullable(),
 });
 
 const GetCreditBlocksInputSchema = z.object({});
@@ -333,8 +336,22 @@ export const userRouter = createTRPCRouter({
         result.deductions
       );
 
+      // Resolve Stripe receipt/invoice URLs in parallel for all paid blocks.
+      const creditBlocksWithReceipts = await Promise.all(
+        result.creditBlocks.map(async block => {
+          if (block.is_free || !block.stripe_payment_id) {
+            return { ...block, receipt_url: null };
+          }
+          const receipt_url = await resolveStripeReceiptUrl(block.stripe_payment_id, {
+            skipInAutomatedTest: true,
+          });
+          return { ...block, receipt_url };
+        })
+      );
+
       return {
         ...result,
+        creditBlocks: creditBlocksWithReceipts,
         deductions: enrichedDeductions,
         autoTopUpEnabled: ctx.user.auto_top_up_enabled,
       };

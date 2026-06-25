@@ -20,7 +20,10 @@ export type ExpiringTransaction = Pick<
 >;
 
 export type CreditTransactionForBlocks = ExpiringTransaction &
-  Pick<CreditTransaction, 'credit_category' | 'original_transaction_id' | 'created_at'>;
+  Pick<
+    CreditTransaction,
+    'credit_category' | 'original_transaction_id' | 'created_at' | 'stripe_payment_id'
+  >;
 
 export type EntityForExpiration = { id: string; microdollars_used: number };
 export type UserForExpiration = EntityForExpiration;

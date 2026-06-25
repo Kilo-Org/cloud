@@ -17,7 +17,12 @@ function getRedirectUrl(txn: CreditTransaction | undefined, returnUrl: string | 
 
   // Otherwise, use the existing logic
   if (!txn || !txn.organization_id) {
-    return '/payments/topup/thank-you';
+    if (!txn) {
+      return '/credits';
+    }
+    const params = new URLSearchParams();
+    params.set(TOPUP_AMOUNT_QUERY_STRING_KEY, fromMicrodollars(txn.amount_microdollars).toString());
+    return `/credits?${params.toString()}`;
   }
   const params = new URLSearchParams();
   params.set(TOPUP_AMOUNT_QUERY_STRING_KEY, fromMicrodollars(txn.amount_microdollars).toString());

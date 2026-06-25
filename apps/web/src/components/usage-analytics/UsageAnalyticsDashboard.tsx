@@ -167,11 +167,12 @@ export function UsageAnalyticsDashboard({
 
   // Parent/child hierarchy for the org-context Scope selector. Only fetched for
   // owners/billing_managers; members never see the expanded scope list.
-  const { data: scopeOrgs } = useQuery(
+  const scopeOrgsQuery = useQuery(
     trpc.usageAnalytics.getScopeOrganizations.queryOptions(
       isOrgAdmin && organizationId ? { organizationId } : skipToken
     )
   );
+  const scopeOrgs = scopeOrgsQuery.data;
   const childOrganizations = useMemo(() => scopeOrgs?.children ?? [], [scopeOrgs]);
   const isParentOrg = childOrganizations.length > 0;
 
@@ -210,7 +211,9 @@ export function UsageAnalyticsDashboard({
   // rather than clamp: otherwise a deep link like `?scope=<child-id>&group=user`
   // would momentarily resolve to 'self', and the cleanup effect below would wipe
   // (and persist) the deep-linked grouping/user filters before validation runs.
-  const scopeListPending = isOrgAdmin && !!organizationId && !scopeOrgs;
+  // Keyed off `isLoading` (not `!data`) so a failed scope-list fetch falls back
+  // to clamping instead of honoring a stale/unknown scope indefinitely.
+  const scopeListPending = isOrgAdmin && !!organizationId && scopeOrgsQuery.isLoading;
   const resolvedOrgScope = !isOrgAdmin
     ? ORG_SCOPE_SELF
     : scopeListPending || validOrgScopeValues.has(orgScope)

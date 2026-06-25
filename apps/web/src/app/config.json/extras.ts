@@ -15,6 +15,7 @@
  *   3. Paste that shape into the right bucket below:
  *        - Top-level: `top`
  *        - New primary agent: `agents`
+ *        - Permission key: `permissions`
  *        - Under `experimental`: `experimental`
  *        - Anywhere else nested: add a new bucket here AND extend the merge
  *          logic in `./route.ts` to overlay that section.
@@ -91,6 +92,11 @@ export const kiloExtras = {
     ask: agentConfig,
     debug: agentConfig,
     orchestrator: agentConfig,
+  },
+  permissions: {
+    notebook_read: { $ref: '#/$defs/PermissionRuleConfig' },
+    notebook_edit: { $ref: '#/$defs/PermissionRuleConfig' },
+    notebook_execute: { $ref: '#/$defs/PermissionRuleConfig' },
   },
   experimental: {
     codebase_search: {

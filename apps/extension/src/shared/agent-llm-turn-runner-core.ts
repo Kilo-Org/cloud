@@ -31,6 +31,20 @@ interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
 }
 
+// Attach the turn's reasoning blocks to the first tool call so the harness can replay them on the assistant tool-call message (providers may require signed/encrypted reasoning for a continuation).
+const withReasoningDetails = <ToolCall extends ToolCallEvent>(
+  toolCallEvents: ToolCall[],
+  reasoningDetails: readonly unknown[] | undefined
+): ToolCall[] => {
+  const [first, ...rest] = toolCallEvents;
+
+  if (first === undefined || reasoningDetails === undefined || reasoningDetails.length === 0) {
+    return toolCallEvents;
+  }
+
+  return [{ ...first, reasoningDetails }, ...rest];
+};
+
 const isAbortError = (error: unknown): boolean =>
   error instanceof Error && error.name === 'AbortError';
 
@@ -158,7 +172,10 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
       completionEvents.push(createThinkingBlock(completion.reasoning));
     }
 
-    const toolCallEvents = toToolCallEvents(completion.toolCalls);
+    const toolCallEvents = withReasoningDetails(
+      toToolCallEvents(completion.toolCalls),
+      completion.reasoningDetails
+    );
     completionEvents.push(...toolCallEvents);
 
     appendEvents(

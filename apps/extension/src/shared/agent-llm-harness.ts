@@ -273,8 +273,12 @@ export const buildGatewayMessagesFromEvents = (
           }
 
           index += toolCalls.length - 1;
+          const reasoningDetails = toolCalls.find(
+            toolCall => toolCall.reasoningDetails !== undefined
+          )?.reasoningDetails;
           messages.push({
             content: null,
+            ...(reasoningDetails === undefined ? {} : { reasoning_details: reasoningDetails }),
             role: 'assistant',
             tool_calls: toolCalls.map(toolCall => ({
               function: {

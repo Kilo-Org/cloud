@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import {
   EXTENSION_AGENT_SYSTEM_PROMPT,
@@ -196,6 +197,36 @@ describe('agent LLM harness', () => {
               name: 'eval',
             },
             id: 'call_eval_2',
+            type: 'function',
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('replays reasoning details on the assistant tool-call message', () => {
+    const reasoningDetails = [
+      { index: 0, signature: 'sig-1', text: 'Think', type: 'reasoning.text' },
+    ];
+    const toolCall = {
+      ...createEvalToolCall({
+        code: 'return document.title;',
+        providerToolCallId: 'call_eval_1',
+        tabId: 7,
+      }),
+      reasoningDetails,
+    };
+
+    expect(buildGatewayMessagesFromEvents([toolCall])).toStrictEqual([
+      { content: EXTENSION_AGENT_SYSTEM_PROMPT, role: 'system' },
+      {
+        content: null,
+        reasoning_details: reasoningDetails,
+        role: 'assistant',
+        tool_calls: [
+          {
+            function: { arguments: '{"code":"return document.title;"}', name: 'eval' },
+            id: 'call_eval_1',
             type: 'function',
           },
         ],

@@ -19,6 +19,7 @@ export type KiloGatewayChatContentPart =
 
 export interface KiloGatewayChatMessage {
   readonly content?: KiloGatewayChatContentPart[] | string | null;
+  readonly reasoning_details?: readonly unknown[];
   readonly role: 'assistant' | 'system' | 'tool' | 'user';
   readonly tool_call_id?: string;
   readonly tool_calls?: KiloGatewayChatToolCall[];
@@ -51,5 +52,6 @@ export interface KiloGatewayToolCallRequest {
 export interface KiloGatewayChatCompletion {
   readonly content?: string;
   readonly reasoning?: string;
+  readonly reasoningDetails?: readonly unknown[];
   readonly toolCalls: KiloGatewayToolCallRequest[];
 }

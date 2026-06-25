@@ -24,6 +24,7 @@ export type AgentConversationEvent =
       readonly id: string;
       readonly name: 'eval';
       readonly providerToolCallId?: string;
+      readonly reasoningDetails?: readonly unknown[];
       readonly tabId: number;
       readonly type: 'tool-call';
     }
@@ -33,6 +34,7 @@ export type AgentConversationEvent =
       readonly name: SafeToolName;
       readonly providerToolCallId?: string;
       readonly query?: string;
+      readonly reasoningDetails?: readonly unknown[];
       readonly snapshotId?: string;
       readonly tabId: number;
       readonly type: 'tool-call';

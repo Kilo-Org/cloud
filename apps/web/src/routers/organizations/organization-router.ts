@@ -38,7 +38,7 @@ import { organizationsSubscriptionRouter } from '@/routers/organizations/organiz
 import { organizationsSettingsRouter } from '@/routers/organizations/organization-settings-router';
 import { organizationsUsageDetailsRouter } from '@/routers/organizations/organization-usage-details-router';
 import { TRPCError } from '@trpc/server';
-import { and, count, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
@@ -243,6 +243,24 @@ export const organizationsRouter = createTRPCRouter({
               configurationError: ssoPolicy.status === 'misconfigured',
             },
     };
+  }),
+
+  // Child organizations parented by this organization. Restricted to
+  // owner/billing_manager because only those roles inherit access to children.
+  childOrganizations: organizationBillingProcedure.query(async opts => {
+    return await db
+      .select({
+        id: organizations.id,
+        name: organizations.name,
+      })
+      .from(organizations)
+      .where(
+        and(
+          eq(organizations.parent_organization_id, opts.input.organizationId),
+          isNull(organizations.deleted_at)
+        )
+      )
+      .orderBy(asc(organizations.name));
   }),
 
   update: organizationBillingMutationProcedure

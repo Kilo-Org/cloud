@@ -23,6 +23,22 @@ export function useOrganizationWithMembers(id: string, options?: { enabled?: boo
   );
 }
 
+export function useOrganizationChildren(id: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.childOrganizations.queryOptions(
+      { organizationId: id },
+      {
+        trpc: {
+          context: {
+            skipBatch: true,
+          },
+        },
+      }
+    )
+  );
+}
+
 const useInvalidateOrganizationAndMembers = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

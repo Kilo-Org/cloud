@@ -2,6 +2,7 @@ jest.mock('@/lib/redis', () => ({ redisClient: {} }));
 
 import {
   CostSourceSchema,
+  MAX_SCOPE_ORGANIZATION_IDS,
   UsageAnalyticsFiltersSchema,
   WhereBuilder,
   buildScopeConditions,
@@ -98,5 +99,25 @@ describe('usage analytics scope conditions', () => {
     expect(sql).toContain("organization_id = ?");
     // personal-only pins kilo_user_id to caller and org to the empty-string sentinel
     expect(bindings).toEqual([CTX_USER, '']);
+  });
+
+  it('caps organizationIds at the boundary to bound auth fan-out', () => {
+    const makeIds = (n: number) =>
+      Array.from(
+        { length: n },
+        (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`
+      );
+    expect(
+      UsageAnalyticsFiltersSchema.safeParse({
+        ...baseFilters,
+        organizationIds: makeIds(MAX_SCOPE_ORGANIZATION_IDS),
+      }).success
+    ).toBe(true);
+    expect(
+      UsageAnalyticsFiltersSchema.safeParse({
+        ...baseFilters,
+        organizationIds: makeIds(MAX_SCOPE_ORGANIZATION_IDS + 1),
+      }).success
+    ).toBe(false);
   });
 });

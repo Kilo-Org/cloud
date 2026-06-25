@@ -1,5 +1,12 @@
 import * as z from 'zod';
 
+/**
+ * Upper bound on the orgs in an "All Organizations" aggregate (a parent plus
+ * its children). Caps authorization fan-out and the generated SQL `IN` clause
+ * for this caller-controlled input.
+ */
+export const MAX_SCOPE_ORGANIZATION_IDS = 100;
+
 export const GranularitySchema = z.enum(['hour', 'day', 'week', 'month']);
 export type Granularity = z.infer<typeof GranularitySchema>;
 
@@ -37,7 +44,7 @@ const FiltersShape = {
    * `organizationId` and is always treated as an org-wide view. The caller must
    * have owner/billing_manager access to every listed org.
    */
-  organizationIds: z.array(z.uuid()).optional(),
+  organizationIds: z.array(z.uuid()).max(MAX_SCOPE_ORGANIZATION_IDS).optional(),
   personalScope: z.enum(['personal-only', 'include-orgs']).default('personal-only'),
   viewAs: z.enum(['self', 'org-wide']).default('self'),
   features: z.array(z.string()).optional(),

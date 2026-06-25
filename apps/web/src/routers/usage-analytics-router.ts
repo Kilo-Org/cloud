@@ -40,6 +40,7 @@ export {
   CostSourceSchema,
   DimensionSchema,
   GranularitySchema,
+  MAX_SCOPE_ORGANIZATION_IDS,
   MetricSchema,
   SummaryOutputSchema,
   TableInputSchema,

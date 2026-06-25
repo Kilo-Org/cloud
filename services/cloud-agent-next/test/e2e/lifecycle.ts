@@ -10,6 +10,7 @@ import {
   fetchFakeWaiters,
   interruptSession,
   openStream,
+  prepareAskUsageSession,
   releaseGate,
   sendMessage,
   startSession,
@@ -72,6 +73,50 @@ async function collectUntilTerminal(
 
 function hasEventOfType(events: StreamEvent[], type: string): boolean {
   return events.some(e => e.streamEventType === type);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+const ASK_USAGE_RUNTIME_AGENT_SLUG = 'usage-analyst';
+const ASK_USAGE_FLATTENED_TOOL_NAME = 'kilo_usage_query_kilo_dataset';
+const ASK_USAGE_MCP_SERVER_NAME = 'kilo_usage';
+const ASK_USAGE_MCP_TOOL_NAME = 'query_kilo_dataset';
+
+function completedAskUsageDatasetToolPart(event: StreamEvent): Record<string, unknown> | null {
+  if (event.streamEventType !== 'kilocode') return null;
+  const data = event.data;
+  if (data.type !== 'message.part.updated' && data.event !== 'message.part.updated') return null;
+  if (!isRecord(data.properties)) return null;
+  const part = data.properties.part;
+  if (!isRecord(part) || part.type !== 'tool') return null;
+  if (!isRecord(part.state) || part.state.status !== 'completed') return null;
+
+  if (part.tool === ASK_USAGE_FLATTENED_TOOL_NAME) return part;
+  if (part.tool !== 'mcp') return null;
+
+  const input = part.state.input;
+  if (!isRecord(input)) return null;
+  return input.server_name === ASK_USAGE_MCP_SERVER_NAME &&
+    input.tool_name === ASK_USAGE_MCP_TOOL_NAME
+    ? part
+    : null;
+}
+
+function datasetToolInput(part: Record<string, unknown>): Record<string, unknown> | null {
+  if (!isRecord(part.state)) return null;
+  const input = part.state.input;
+  if (part.tool !== 'mcp') return isRecord(input) ? input : null;
+  return isRecord(input) && isRecord(input.arguments) ? input.arguments : null;
+}
+
+function datasetToolStructuredContent(
+  part: Record<string, unknown>
+): Record<string, unknown> | null {
+  if (!isRecord(part.state)) return null;
+  const structuredContent = part.state.structuredContent;
+  return isRecord(structuredContent) ? structuredContent : null;
 }
 
 async function snapshotSandboxIds(): Promise<Set<string>> {
@@ -322,7 +367,8 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
       stream.close();
 
       const sandboxesAfter = await listSandboxContainers();
-      const completed = hotResult.terminal?.streamEventType === 'complete';
+      const hotTerminal = hotResult.terminal;
+      const completed = hotTerminal?.streamEventType === 'complete';
       const noPrepare = !hasEventOfType(hotResult.events, 'preparing');
       const sameContainers =
         sandboxesAfter.some(candidate => candidate.id === sandbox.id) &&
@@ -339,7 +385,7 @@ export async function lifecycleColdHot(args: LifecycleArgs): Promise<LifecycleRe
       }
 
       hotSummaries.push(
-        `${directive}:${hotResult.terminal.streamEventType}/${firstKilocode ? `${firstKilocodeLatency}ms` : 'no-kilocode'}`
+        `${directive}:${hotTerminal.streamEventType}/${firstKilocode ? `${firstKilocodeLatency}ms` : 'no-kilocode'}`
       );
     }
 
@@ -1671,7 +1717,7 @@ export async function lifecycleCallbackBatchFollowup(
   args: LifecycleArgs
 ): Promise<LifecycleResult> {
   const start = Date.now();
-  const { config, timeoutMs = 120_000, api = 'unified' } = args;
+  const { config, timeoutMs = 240_000, api = 'unified' } = args;
   const scenarioName = 'callback-batch-followup';
   const gateTag = 'callback-batch';
   let sink: CallbackServerHandle | null = null;
@@ -2017,6 +2063,92 @@ export async function lifecycleCallbackInterrupt(args: LifecycleArgs): Promise<L
   }
 }
 
+/**
+ * ask-usage-mcp-tool: prepares an Ask Usage-shaped empty-local session with the
+ * real local `/mcp` endpoint, then asks the fake model to emit one dataset tool
+ * call. The assertion only trusts the completed ToolPart's first-class
+ * structuredContent, never the string output.
+ */
+export async function lifecycleAskUsageMcpTool(args: LifecycleArgs): Promise<LifecycleResult> {
+  const start = Date.now();
+  const { config, timeoutMs = 120_000, api = 'unified' } = args;
+  const conversation = 'ask-usage-tool';
+  try {
+    const knownSandboxIds = await snapshotSandboxIds();
+    const session = await prepareAskUsageSession(config);
+    const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+
+    await sendMessage(
+      config,
+      {
+        cloudAgentSessionId: session.cloudAgentSessionId,
+        prompt: fakeDirective(conversation),
+        mode: ASK_USAGE_RUNTIME_AGENT_SLUG,
+      },
+      api
+    );
+
+    const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);
+    if (!sandbox) {
+      stream.close();
+      return {
+        name: 'ask-usage-mcp-tool',
+        conversation,
+        ok: false,
+        message: 'sandbox did not appear',
+        events: [...stream.events],
+        durationMs: Date.now() - start,
+      };
+    }
+
+    const terminal = await stream.waitForTerminal(timeoutMs);
+    const events = [...stream.events];
+    stream.close();
+
+    const completed =
+      terminal?.streamEventType === 'complete' ||
+      terminal?.streamEventType === 'cloud.message.completed';
+    const part = events.map(completedAskUsageDatasetToolPart).find(candidate => candidate !== null);
+    if (!part) {
+      return {
+        name: 'ask-usage-mcp-tool',
+        conversation,
+        ok: false,
+        message: `terminal=${terminal?.streamEventType ?? 'none'}, dataset tool part not observed`,
+        events,
+        durationMs: Date.now() - start,
+      };
+    }
+
+    const input = datasetToolInput(part);
+    const structuredContent = datasetToolStructuredContent(part);
+    const inputMatches = input?.dataset === 'cloud_sessions' && input.mode === 'aggregate';
+    const outputMatches =
+      structuredContent?.dataset === 'cloud_sessions' && structuredContent.mode === 'aggregate';
+    const rows = structuredContent?.rows;
+    const hasRows = Array.isArray(rows);
+
+    return {
+      name: 'ask-usage-mcp-tool',
+      conversation,
+      ok: completed && inputMatches && outputMatches && hasRows,
+      message: `terminal=${terminal?.streamEventType ?? 'none'}, tool=${String(part.tool)}, structuredContent=${structuredContent ? 'present' : 'missing'}, rows=${Array.isArray(rows) ? rows.length : 'n/a'}`,
+      events,
+      durationMs: Date.now() - start,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      name: 'ask-usage-mcp-tool',
+      conversation,
+      ok: false,
+      message: `threw: ${msg}`,
+      events: [],
+      durationMs: Date.now() - start,
+    };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
@@ -2044,4 +2176,5 @@ export const LIFECYCLE_SCENARIOS: Record<
   'callback-completion': lifecycleCallbackCompletion,
   'callback-batch-followup': lifecycleCallbackBatchFollowup,
   'callback-interrupt': lifecycleCallbackInterrupt,
+  'ask-usage-mcp-tool': lifecycleAskUsageMcpTool,
 };

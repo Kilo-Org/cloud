@@ -156,15 +156,19 @@ async function readAllSse(body: ReadableStream<Uint8Array>): Promise<SseChunk[]>
   return chunks;
 }
 
-async function postChat(url: string, prompt: string): Promise<Response> {
+async function postChatBody(url: string, body: unknown): Promise<Response> {
   return fetch(`${url}/api/openrouter/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'kilo/fake-deterministic',
-      messages: [{ role: 'user', content: prompt }],
-      stream: true,
-    }),
+    body: JSON.stringify(body),
+  });
+}
+
+async function postChat(url: string, prompt: string): Promise<Response> {
+  return postChatBody(url, {
+    model: 'kilo/fake-deterministic',
+    messages: [{ role: 'user', content: prompt }],
+    stream: true,
   });
 }
 
@@ -279,6 +283,85 @@ describe('fake-llm-server HTTP', () => {
     expect(res.status).toBe(200);
     const chunks = await readAllSse(res.body!);
     expect(chunks[chunks.length - 1].data).toBe('[DONE]');
+  });
+
+  it('ask-usage-tool emits a dataset tool call when the tool is available', async () => {
+    const h = await start();
+    const res = await postChatBody(h.url, {
+      model: 'kilo/fake-deterministic',
+      messages: [{ role: 'user', content: '__fake__:ask-usage-tool' }],
+      tools: [
+        {
+          type: 'function',
+          function: {
+            name: 'kilo_usage_query_kilo_dataset',
+            parameters: { type: 'object', properties: {} },
+          },
+        },
+      ],
+      stream: true,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body).not.toBeNull();
+    const chunks = await readAllSse(res.body!);
+    expect(chunks[chunks.length - 1].data).toBe('[DONE]');
+
+    const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
+    const toolChunk = parsed.find(p => p.choices[0].delta.tool_calls);
+    expect(toolChunk.choices[0].delta.tool_calls[0]).toMatchObject({
+      index: 0,
+      id: 'call_fake_ask_usage_dataset',
+      type: 'function',
+      function: {
+        name: 'kilo_usage_query_kilo_dataset',
+      },
+    });
+    expect(JSON.parse(toolChunk.choices[0].delta.tool_calls[0].function.arguments)).toMatchObject({
+      dataset: 'cloud_sessions',
+      mode: 'aggregate',
+      metrics: [{ operation: 'count' }],
+    });
+    expect(parsed[parsed.length - 1].choices[0].finish_reason).toBe('tool_calls');
+  });
+
+  it('ask-usage-tool emits final text after the tool response is present', async () => {
+    const h = await start();
+    const res = await postChatBody(h.url, {
+      model: 'kilo/fake-deterministic',
+      messages: [
+        { role: 'user', content: '__fake__:ask-usage-tool' },
+        {
+          role: 'assistant',
+          tool_calls: [
+            {
+              id: 'call_fake_ask_usage_dataset',
+              type: 'function',
+              function: { name: 'kilo_usage_query_kilo_dataset', arguments: '{}' },
+            },
+          ],
+        },
+        {
+          role: 'tool',
+          tool_call_id: 'call_fake_ask_usage_dataset',
+          content: '{"rows":[]}',
+        },
+      ],
+      tools: [
+        {
+          type: 'function',
+          function: { name: 'kilo_usage_query_kilo_dataset' },
+        },
+      ],
+      stream: true,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body).not.toBeNull();
+    const chunks = await readAllSse(res.body!);
+    const parsed = chunks.slice(0, -1).map(c => JSON.parse(c.data));
+    expect(parsed[0].choices[0].delta.content).toContain('recent Cloud Agent session count');
+    expect(parsed[parsed.length - 1].choices[0].finish_reason).toBe('stop');
   });
 
   it('error scenario returns HTTP 402 with OpenAI-shaped error', async () => {

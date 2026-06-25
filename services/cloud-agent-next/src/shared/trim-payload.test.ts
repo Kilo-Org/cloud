@@ -43,6 +43,44 @@ describe('trimPayload', () => {
       );
     });
 
+    it('truncates string output while preserving first-class structuredContent', () => {
+      const largeOutput = 'x'.repeat(20_000);
+      const structuredContent = {
+        dataset: 'microdollar_usage',
+        rows: [{ sum_costUsd: '0.42' }],
+      };
+      const data = createKilocodeEvent('message.part.updated', {
+        part: {
+          type: 'tool',
+          state: { status: 'completed', output: largeOutput, structuredContent },
+        },
+      });
+
+      const result = trimPayload('kilocode', data) as {
+        properties: { part: { state: { output: string; structuredContent: unknown } } };
+      };
+
+      expect(result.properties.part.state.output).toEqual(
+        largeOutput.slice(0, MAX_TOOL_OUTPUT_LENGTH) + '\n\n[…truncated]'
+      );
+      expect(result.properties.part.state.structuredContent).toEqual(structuredContent);
+    });
+
+    it('does not synthesize structuredContent from JSON-looking string output', () => {
+      const data = createKilocodeEvent('message.part.updated', {
+        part: {
+          type: 'tool',
+          state: { status: 'completed', output: JSON.stringify({ rows: [{ count: 1 }] }) },
+        },
+      });
+
+      const result = trimPayload('kilocode', data) as {
+        properties: { part: { state: Record<string, unknown> } };
+      };
+
+      expect(result.properties.part.state).not.toHaveProperty('structuredContent');
+    });
+
     it('leaves small output unchanged', () => {
       const smallOutput = 'x'.repeat(100);
       const data = createKilocodeEvent('message.part.updated', {

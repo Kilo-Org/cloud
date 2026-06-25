@@ -5,6 +5,7 @@ import {
   DescribeKiloDatasetInputSchema,
   GetKiloUsageCostInputSchema,
   QueryKiloDatasetInputSchema,
+  QueryKiloDatasetOutputSchema,
 } from '@/lib/kilo-datasets/contracts';
 import { describeKiloDataset } from '@/lib/kilo-datasets/catalog-description';
 import {
@@ -107,6 +108,7 @@ export function createKiloDatasetMcpServer(params: { user: User }) {
       description:
         'Query aggregate or timeseries stats for your own Kilo usage, sessions, and Code Reviewer activity over a maximum 60-day range. Prefer get_kilo_usage_cost for common total usage cost; use this tool for custom ranges, trends, or breakdowns. Use aggregate without bucket. Use timeseries with bucket: hour, day, or week. Use count with no field. For raw usage cost queries, use costUsd or costMicrodollars. Call describe_kilo_dataset first when you need allowed fields, recipes, or examples.',
       inputSchema: QueryKiloDatasetInputSchema,
+      outputSchema: QueryKiloDatasetOutputSchema,
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

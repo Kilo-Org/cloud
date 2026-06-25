@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { QueryKiloDatasetOutputSchema } from '@/lib/kilo-datasets/contracts';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 import type * as kiloDatasetServerModule from './kilo-dataset-server';
 
@@ -128,6 +129,86 @@ describe('kilo dataset MCP protocol', () => {
       });
 
       expect(JSON.parse(firstTextContent(result))).toEqual(result.structuredContent);
+    } finally {
+      await closeProtocolSession(session);
+    }
+  });
+
+  test('advertises query_kilo_dataset input and output schemas', async () => {
+    const session = await createProtocolSession();
+
+    try {
+      const response = await session.client.listTools();
+      const queryTool = response.tools.find(tool => tool.name === 'query_kilo_dataset');
+
+      expect(queryTool).toBeDefined();
+      if (!queryTool) throw new Error('query_kilo_dataset was not advertised');
+
+      expect(queryTool.inputSchema.type).toBe('object');
+      expect(queryTool.inputSchema.properties).toHaveProperty('dataset');
+      expect(queryTool.outputSchema).toMatchObject({
+        type: 'object',
+        additionalProperties: false,
+        properties: expect.objectContaining({
+          dataset: expect.objectContaining({ enum: expect.arrayContaining(['microdollar_usage']) }),
+          rows: expect.objectContaining({ type: 'array' }),
+        }),
+      });
+    } finally {
+      await closeProtocolSession(session);
+    }
+  });
+
+  test('query_kilo_dataset returns schema-valid structured content plus compatibility text', async () => {
+    mockTimedUsageQuery.mockResolvedValue({ rows: [{ sum_costUsd: '0.42' }] });
+    const session = await createProtocolSession();
+
+    try {
+      const result = await session.client.callTool({
+        name: 'query_kilo_dataset',
+        arguments: {
+          dataset: 'microdollar_usage',
+          mode: 'aggregate',
+          range: {
+            startDate: '2026-06-22T00:00:00.000Z',
+            endDate: '2026-06-23T00:00:00.000Z',
+          },
+          metrics: [{ operation: 'sum', field: 'costUsd' }],
+        },
+      });
+
+      expect(mockTimedUsageQuery).toHaveBeenCalledTimes(1);
+      expect(result.isError).toBeUndefined();
+      expect(QueryKiloDatasetOutputSchema.safeParse(result.structuredContent).success).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        dataset: 'microdollar_usage',
+        mode: 'aggregate',
+        columns: [{ name: 'sum_costUsd', type: 'decimal', nullable: false }],
+        rows: [{ sum_costUsd: '0.42' }],
+      });
+      expect(JSON.parse(firstTextContent(result))).toEqual(result.structuredContent);
+    } finally {
+      await closeProtocolSession(session);
+    }
+  });
+
+  test('query handler errors return text without trusted structured output', async () => {
+    const session = await createProtocolSession();
+
+    try {
+      const result = await session.client.callTool({
+        name: 'query_kilo_dataset',
+        arguments: {
+          dataset: 'microdollar_usage',
+          mode: 'aggregate',
+          metrics: [{ operation: 'sum', field: 'notAllowed' }],
+        },
+      });
+
+      expect(mockTimedUsageQuery).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toBeUndefined();
+      expect(firstTextContent(result)).toContain('metric field is not allowed');
     } finally {
       await closeProtocolSession(session);
     }

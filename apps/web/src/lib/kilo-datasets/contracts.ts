@@ -213,7 +213,41 @@ export const QueryKiloDatasetOutputSchema = z
     columns: z.array(QueryKiloDatasetColumnSchema),
     rows: z.array(z.record(z.string(), QueryKiloDatasetScalarRowValueSchema)),
   })
-  .strict();
+  .strict()
+  .superRefine((output, ctx) => {
+    const declaredColumns = new Set<string>();
+    for (const [index, column] of output.columns.entries()) {
+      if (declaredColumns.has(column.name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['columns', index, 'name'],
+          message: `duplicate output column: ${column.name}`,
+        });
+      }
+      declaredColumns.add(column.name);
+    }
+
+    for (const [rowIndex, row] of output.rows.entries()) {
+      for (const key of Object.keys(row)) {
+        if (!declaredColumns.has(key)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['rows', rowIndex, key],
+            message: `row contains undeclared output column: ${key}`,
+          });
+        }
+      }
+      for (const column of declaredColumns) {
+        if (!(column in row)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['rows', rowIndex, column],
+            message: `row is missing declared output column: ${column}`,
+          });
+        }
+      }
+    }
+  });
 
 export type QueryKiloDatasetColumn = z.infer<typeof QueryKiloDatasetColumnSchema>;
 export type QueryKiloDatasetOutput = z.infer<typeof QueryKiloDatasetOutputSchema>;

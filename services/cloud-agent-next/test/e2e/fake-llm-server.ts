@@ -196,8 +196,17 @@ type Chunk = {
   model: string;
   choices: Array<{
     index: number;
-    delta: { role?: string; content?: string };
-    finish_reason: null | 'stop';
+    delta: {
+      role?: string;
+      content?: string;
+      tool_calls?: Array<{
+        index: number;
+        id?: string;
+        type?: 'function';
+        function?: { name?: string; arguments?: string };
+      }>;
+    };
+    finish_reason: null | 'stop' | 'tool_calls';
   }>;
   usage?: {
     prompt_tokens: number;
@@ -222,8 +231,8 @@ function ensureStreamHeaders(res: ServerResponse): void {
 function makeChunk(
   id: string,
   model: string,
-  delta: { role?: string; content?: string },
-  finishReason: null | 'stop' = null
+  delta: Chunk['choices'][number]['delta'],
+  finishReason: null | 'stop' | 'tool_calls' = null
 ): Chunk {
   return {
     id,
@@ -267,6 +276,19 @@ function writeFinish(
   writeDone(res);
 }
 
+function writeToolCallFinish(res: ServerResponse, id: string, model: string): void {
+  const finalChunk: Chunk = {
+    ...makeChunk(id, model, {}, 'tool_calls'),
+    usage: {
+      prompt_tokens: 10,
+      completion_tokens: 0,
+      total_tokens: 10,
+    },
+  };
+  writeChunk(res, finalChunk);
+  writeDone(res);
+}
+
 function writeJsonError(res: ServerResponse, status: number, message: string, type: string): void {
   if (res.headersSent) {
     // Stream already started — best-effort: end it.
@@ -297,12 +319,53 @@ export type ScenarioContext = {
   state: ServerState;
   /** Correlation id for log entries of this request. */
   reqLogId: number;
+  requestBody: unknown;
 };
 
 export type ScenarioHandler = (args: string[], ctx: ScenarioContext) => Promise<void> | void;
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+const ASK_USAGE_DATASET_TOOL_NAME = 'kilo_usage_query_kilo_dataset';
+const ASK_USAGE_DATASET_TOOL_CALL_ID = 'call_fake_ask_usage_dataset';
+
+const askUsageDatasetToolInput = {
+  dataset: 'cloud_sessions',
+  mode: 'aggregate',
+  range: {
+    startDate: '2026-06-01T00:00:00.000Z',
+    endDate: '2026-06-25T00:00:00.000Z',
+  },
+  metrics: [{ operation: 'count' }],
+  limit: 20,
+};
+
+function requestHasTool(body: unknown, toolName: string): boolean {
+  return requestToolNames(body).includes(toolName);
+}
+
+function requestToolNames(body: unknown): string[] {
+  if (typeof body !== 'object' || body === null) return [];
+  const tools = (body as { tools?: unknown }).tools;
+  if (!Array.isArray(tools)) return [];
+  return tools.flatMap(tool => {
+    if (typeof tool !== 'object' || tool === null) return [];
+    const candidate = tool as { function?: { name?: unknown } };
+    return typeof candidate.function?.name === 'string' ? [candidate.function.name] : [];
+  });
+}
+
+function requestHasToolResponse(body: unknown, toolCallId: string): boolean {
+  if (typeof body !== 'object' || body === null) return false;
+  const messages = (body as { messages?: unknown }).messages;
+  if (!Array.isArray(messages)) return false;
+  return messages.some(message => {
+    if (typeof message !== 'object' || message === null) return false;
+    const record = message as { role?: unknown; tool_call_id?: unknown };
+    return record.role === 'tool' && record.tool_call_id === toolCallId;
+  });
 }
 
 /**
@@ -348,6 +411,46 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
   idle(_args, ctx) {
     writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, {}));
     writeFinish(ctx.res, ctx.id, ctx.model, 0);
+    ctx.res.end();
+  },
+
+  'ask-usage-tool'(_args, ctx) {
+    if (!requestHasTool(ctx.requestBody, ASK_USAGE_DATASET_TOOL_NAME)) {
+      writeChunk(
+        ctx.res,
+        makeChunk(ctx.id, ctx.model, { role: 'assistant', content: 'Ask Usage smoke' })
+      );
+      writeFinish(ctx.res, ctx.id, ctx.model, 'Ask Usage smoke'.length);
+      ctx.res.end();
+      return;
+    }
+
+    if (requestHasToolResponse(ctx.requestBody, ASK_USAGE_DATASET_TOOL_CALL_ID)) {
+      const text = 'I found your recent Cloud Agent session count.';
+      writeChunk(ctx.res, makeChunk(ctx.id, ctx.model, { role: 'assistant', content: text }));
+      writeFinish(ctx.res, ctx.id, ctx.model, text.length);
+      ctx.res.end();
+      return;
+    }
+
+    writeChunk(
+      ctx.res,
+      makeChunk(ctx.id, ctx.model, {
+        role: 'assistant',
+        tool_calls: [
+          {
+            index: 0,
+            id: ASK_USAGE_DATASET_TOOL_CALL_ID,
+            type: 'function',
+            function: {
+              name: ASK_USAGE_DATASET_TOOL_NAME,
+              arguments: JSON.stringify(askUsageDatasetToolInput),
+            },
+          },
+        ],
+      })
+    );
+    writeToolCallFinish(ctx.res, ctx.id, ctx.model);
     ctx.res.end();
   },
 
@@ -508,6 +611,7 @@ async function handleChatCompletions(
   const bodyModel = (body as { model?: string }).model;
   const prompt = extractLastUserMessageText(body);
   const directive = parseDirective(prompt);
+  const toolNames = requestToolNames(body);
 
   logEvent('request.start', {
     reqId: reqLogId,
@@ -516,6 +620,8 @@ async function handleChatCompletions(
     messages: messageCount,
     scenario: directive?.scenario,
     args: directive ? directive.args.join('|') : undefined,
+    toolCount: toolNames.length,
+    toolNames: toolNames.length > 0 ? toolNames.join(',') : undefined,
   });
 
   const ctx: ScenarioContext = {
@@ -525,6 +631,7 @@ async function handleChatCompletions(
     model: FAKE_MODEL.id,
     state,
     reqLogId,
+    requestBody: body,
   };
 
   let finalized = false;

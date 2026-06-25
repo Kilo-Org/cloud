@@ -122,6 +122,41 @@ describe('normalize', () => {
       });
     });
 
+    it('preserves completed tool structuredContent passthrough fields', () => {
+      const structuredContent = {
+        dataset: 'microdollar_usage',
+        rows: [{ sum_costUsd: '0.42' }],
+      };
+      const part = {
+        id: 'p-tool',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+        tool: 'kilo_usage_query_kilo_dataset',
+        callID: 'call-1',
+        state: {
+          status: 'completed',
+          input: {},
+          output: '{"rows":[{"sum_costUsd":"0.42"}]}',
+          structuredContent,
+          title: 'query_kilo_dataset',
+          metadata: {},
+          time: { start: 1, end: 2 },
+        },
+      };
+
+      const result = normalize(createRaw('message.part.updated', { part }));
+
+      expect(result).toEqual({ type: 'message.part.updated', part });
+      expect(
+        result?.type === 'message.part.updated' &&
+          result.part.type === 'tool' &&
+          result.part.state.status === 'completed'
+          ? (result.part.state as Record<string, unknown>).structuredContent
+          : undefined
+      ).toEqual(structuredContent);
+    });
+
     it('returns null when part is missing', () => {
       expect(normalize(createRaw('message.part.updated', {}))).toBeNull();
     });

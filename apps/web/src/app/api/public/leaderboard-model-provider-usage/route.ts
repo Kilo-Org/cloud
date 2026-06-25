@@ -99,6 +99,10 @@ function parseAndAggregateUsage(rows: string[][]): ModelProviderUsage[] {
       throw new Error('Snowflake returned an invalid leaderboard model provider usage row');
     }
 
+    if (provider.key === 'other') {
+      continue;
+    }
+
     const aggregationKey = `${model}\0${provider.key}`;
     const existing = usageByModelAndProvider.get(aggregationKey);
 

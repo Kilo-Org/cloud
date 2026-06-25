@@ -38,10 +38,12 @@ import {
 } from '@/components/ui/dialog';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import type { CanMigrateToGitHubResult, MigrateToGitHubErrorCode } from '@/lib/app-builder/types';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 type MigrateToGitHubDialogProps = {
   projectId: string;
   organizationId?: string;
+  organizationRouteIdentifier?: string;
   disabled?: boolean;
   /** Called after migration completes successfully, with the GitHub repo full name */
   onMigrationComplete?: (repoFullName: string) => void;
@@ -64,6 +66,7 @@ const errorMessages: Record<MigrateToGitHubErrorCode, string> = {
 export function MigrateToGitHubDialog({
   projectId,
   organizationId,
+  organizationRouteIdentifier,
   disabled,
   onMigrationComplete,
 }: MigrateToGitHubDialogProps) {
@@ -79,6 +82,7 @@ export function MigrateToGitHubDialog({
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
 
   // Pre-flight check queries for personal/org context
   const personalCanMigrateQuery = useQuery({
@@ -280,8 +284,11 @@ export function MigrateToGitHubDialog({
               <Button asChild className="w-full gap-2">
                 <a
                   href={
-                    organizationId
-                      ? `/organizations/${organizationId}/integrations/github`
+                    organizationPathIdentifier
+                      ? getOrganizationAppPathForRouteIdentifier(
+                          organizationPathIdentifier,
+                          '/integrations/github'
+                        )
                       : '/integrations/github'
                   }
                 >

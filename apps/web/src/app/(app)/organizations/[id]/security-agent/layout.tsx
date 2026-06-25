@@ -17,8 +17,11 @@ export default async function OrgSecurityAgentLayout({ params, children }: Layou
     <OrganizationByPageLayout
       params={params}
       fullBleed
-      render={({ organization }) => (
-        <SecurityAgentProvider organizationId={organization.id}>
+      render={({ organization, organizationRouteIdentifier }) => (
+        <SecurityAgentProvider
+          organizationId={organization.id}
+          organizationRouteIdentifier={organizationRouteIdentifier}
+        >
           <SecurityAgentLayout>{children}</SecurityAgentLayout>
         </SecurityAgentProvider>
       )}

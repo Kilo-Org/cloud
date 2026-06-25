@@ -145,6 +145,7 @@ export type AcceptInviteResult = Result<
   {
     invitation: typeof organization_invitations.$inferSelect;
     organizationId: string;
+    organizationSlug: Organization['slug'];
     role: OrganizationRole;
   },
   string

@@ -48,6 +48,7 @@ import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalan
 import { PromptInput } from '@/components/app-builder/PromptInput';
 import { TemplateGallery } from '@/components/app-builder/TemplateGallery';
 import type { Images } from '@/lib/images-schema';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import {
   type AppBuilderGalleryTemplate,
   APP_BUILDER_TEMPLATE_ASK_PROMPT,
@@ -78,6 +79,7 @@ function sanitizeProjectTitle(title: string): string {
 
 type AppBuilderLandingProps = {
   organizationId?: string;
+  organizationRouteIdentifier?: string;
   onProjectCreated: (projectId: string, prompt: string) => void;
 };
 
@@ -248,17 +250,22 @@ function AllProjectsSheet({
   userProjects,
   allProjects,
   organizationId,
+  organizationRouteIdentifier,
   children,
 }: {
   userProjects: Project[];
   allProjects: Project[];
   organizationId?: string;
+  organizationRouteIdentifier?: string;
   children: React.ReactNode;
 }) {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ProjectViewMode>('user');
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
-  const basePath = organizationId ? `/organizations/${organizationId}/app-builder` : '/app-builder';
+  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
+  const basePath = organizationPathIdentifier
+    ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/app-builder')
+    : '/app-builder';
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -383,14 +390,19 @@ function ProjectsSection({
   allProjects,
   isLoading,
   organizationId,
+  organizationRouteIdentifier,
 }: {
   userProjects: Project[] | undefined;
   allProjects: Project[] | undefined;
   isLoading: boolean;
   organizationId?: string;
+  organizationRouteIdentifier?: string;
 }) {
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
-  const basePath = organizationId ? `/organizations/${organizationId}/app-builder` : '/app-builder';
+  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
+  const basePath = organizationPathIdentifier
+    ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/app-builder')
+    : '/app-builder';
   // For landing page, always show user's projects (or all projects for personal context)
   const displayProjects = userProjects;
   const recentProjects = displayProjects?.slice(0, MAX_RECENT_PROJECTS);
@@ -478,6 +490,7 @@ function ProjectsSection({
             userProjects={userProjects || []}
             allProjects={allProjects || []}
             organizationId={organizationId}
+            organizationRouteIdentifier={organizationRouteIdentifier}
           >
             <Button
               variant="ghost"
@@ -507,6 +520,7 @@ function ProjectsSection({
             userProjects={userProjects || []}
             allProjects={allProjects || []}
             organizationId={organizationId}
+            organizationRouteIdentifier={organizationRouteIdentifier}
           >
             <Button variant="outline" size="sm">
               View all {displayProjects.length} projects
@@ -521,7 +535,11 @@ function ProjectsSection({
 /**
  * Main landing component
  */
-export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuilderLandingProps) {
+export function AppBuilderLanding({
+  organizationId,
+  organizationRouteIdentifier,
+  onProjectCreated,
+}: AppBuilderLandingProps) {
   const [model, setModel] = useState('');
   const [isModelUserSelected, setIsModelUserSelected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -845,6 +863,7 @@ export function AppBuilderLanding({ organizationId, onProjectCreated }: AppBuild
           allProjects={allProjects}
           isLoading={projectsLoading}
           organizationId={organizationId}
+          organizationRouteIdentifier={organizationRouteIdentifier}
         />
       </div>
     </div>

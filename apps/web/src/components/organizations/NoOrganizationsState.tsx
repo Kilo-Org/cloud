@@ -10,6 +10,7 @@ export function NoOrganizationsState() {
   const fakeOrganizations: OrganizationCardOrg[] = [
     {
       organizationId: 'fake-org-1',
+      organizationSlug: 'acme-corporation',
       organizationName: 'Acme Corporation',
       role: 'owner',
       memberCount: 8,
@@ -22,6 +23,7 @@ export function NoOrganizationsState() {
     },
     {
       organizationId: 'fake-org-2',
+      organizationSlug: 'tech-innovators-inc',
       organizationName: 'Tech Innovators Inc',
       role: 'member',
       memberCount: 15,

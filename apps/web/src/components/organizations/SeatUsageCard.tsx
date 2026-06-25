@@ -13,12 +13,14 @@ import {
   useOrganizationTrialStatus,
   useOrganizationWithMembers,
 } from '@/app/api/organizations/hooks';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 type Props = {
   organizationId: string;
+  organizationRouteIdentifier?: string;
 };
 
-export function SeatUsageCard({ organizationId }: Props) {
+export function SeatUsageCard({ organizationId, organizationRouteIdentifier }: Props) {
   const currentUserRole = useUserOrganizationRole();
 
   const {
@@ -64,6 +66,7 @@ export function SeatUsageCard({ organizationId }: Props) {
 
   const { usedSeats, totalSeats } = seatUsage;
   const isTrial = status !== 'subscribed';
+  const routeIdentifier = organizationRouteIdentifier ?? getOrganizationRouteIdentifier(org);
 
   // Hide seat usage card when trial messaging is suppressed (e.g., OSS program participants)
   if (org.settings.suppress_trial_messaging) {
@@ -85,7 +88,9 @@ export function SeatUsageCard({ organizationId }: Props) {
           </div>
           {(currentUserRole === 'owner' || currentUserRole === 'billing_manager') && (
             <Button asChild variant="outline" size="sm">
-              <Link href={`/organizations/${organizationId}/subscriptions/seats`}>
+              <Link
+                href={`/organizations/${encodeURIComponent(routeIdentifier)}/subscriptions/seats`}
+              >
                 Manage Subscription
               </Link>
             </Button>

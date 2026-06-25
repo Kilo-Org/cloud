@@ -8,9 +8,11 @@ import {
   getRoleLabel,
 } from '@/lib/organizations/organization-shared-utils';
 import { formatMicrodollars } from '@/lib/admin-utils';
+import { getOrganizationAppPath } from '@/lib/organizations/organization-route-utils';
 
 export type OrganizationCardOrg = {
   organizationId: string;
+  organizationSlug: string | null;
   organizationName: string;
   role: string;
   memberCount: number;
@@ -31,7 +33,7 @@ export function OrganizationCard({ org }: OrganizationCardProps) {
     <Link
       key={org.organizationId}
       prefetch={false}
-      href={`/organizations/${encodeURIComponent(org.organizationId)}`}
+      href={getOrganizationAppPath({ id: org.organizationId, slug: org.organizationSlug })}
       className="block"
     >
       <Card className="hover:border-primary/20 transition-shadow duration-200 hover:shadow-md">

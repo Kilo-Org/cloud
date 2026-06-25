@@ -2,6 +2,7 @@ import { organizations } from '@kilocode/db/schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { readDb } from '@/lib/drizzle';
 import { INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 export const FEATURE_ADOPTION_KEYS = [
   'source-control-integration',
@@ -186,7 +187,7 @@ export async function getOrganizationFeatureAdoption(organizationId: string): Pr
   checks: FeatureAdoptionCheck[];
 }> {
   const organizationRows = await readDb
-    .select({ plan: organizations.plan })
+    .select({ id: organizations.id, plan: organizations.plan, slug: organizations.slug })
     .from(organizations)
     .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
     .limit(1);
@@ -202,6 +203,6 @@ export async function getOrganizationFeatureAdoption(organizationId: string): Pr
 
   return {
     plan: organization.plan,
-    checks: buildFeatureAdoptionChecks(organizationId, state),
+    checks: buildFeatureAdoptionChecks(getOrganizationRouteIdentifier(organization), state),
   };
 }

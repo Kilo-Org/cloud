@@ -46,6 +46,7 @@ import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 import { getSingleUserOrganization, isOrganizationMember } from '@/lib/organizations/organizations';
+import { getOrganizationAppPath } from '@/lib/organizations/organization-route-utils';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
@@ -1181,7 +1182,7 @@ export async function getProfileRedirectPath(user: User) {
     if (classification.isTrialExpiredForEnforcement) {
       return '/profile';
     }
-    return `/organizations/${singleOrg.id}`;
+    return getOrganizationAppPath(singleOrg);
   }
 
   return '/profile';

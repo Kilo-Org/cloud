@@ -18,6 +18,7 @@ import { seatPrice } from '@/lib/organizations/constants';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
 import { formatDate, canManageBilling, findPaidSeatItem } from './utils';
 import type { SubscriptionWithPeriod } from './types';
+import { getOrganizationAppPath } from '@/lib/organizations/organization-route-utils';
 
 export function SubscriptionQuickActions({
   subscription,
@@ -95,6 +96,7 @@ export function SubscriptionQuickActions({
   const canChangeBillingCycle = canCancelSubscription && !hasPendingSchedule;
   const periodEnd = (subscription as SubscriptionWithPeriod).current_period_end;
   const effectiveDateLabel = periodEnd ? formatDate(periodEnd) : null;
+  const paymentHistoryPath = org.data ? getOrganizationAppPath(org.data, '/payment-details') : null;
 
   return (
     <>
@@ -141,16 +143,18 @@ export function SubscriptionQuickActions({
             Update Payment Method
           </Button>
 
-          <Button
-            variant="outline"
-            className="flex w-64 flex-nowrap justify-center text-nowrap"
-            asChild
-          >
-            <Link href={`/organizations/${organizationId}/payment-details`}>
-              <Download className="mr-2 h-4 w-4" />
-              View Payment History
-            </Link>
-          </Button>
+          {paymentHistoryPath ? (
+            <Button
+              variant="outline"
+              className="flex w-64 flex-nowrap justify-center text-nowrap"
+              asChild
+            >
+              <Link href={paymentHistoryPath}>
+                <Download className="mr-2 h-4 w-4" />
+                View Payment History
+              </Link>
+            </Button>
+          ) : null}
 
           {canCancelSubscription && (
             <Button

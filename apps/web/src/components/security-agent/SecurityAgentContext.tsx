@@ -30,6 +30,7 @@ import {
 
 type SecurityAgentContextValue = {
   organizationId: string | undefined;
+  organizationRouteIdentifier: string | undefined;
   isOrg: boolean;
 
   // Permission & config state
@@ -383,6 +384,7 @@ function commandFailureDescription(command: SecurityAgentCommand): string {
 
 type SecurityAgentProviderProps = {
   organizationId?: string;
+  organizationRouteIdentifier?: string;
   children: React.ReactNode;
 };
 
@@ -551,7 +553,8 @@ function invalidateSecurityAgentQueryScopesForOwner(
 }
 
 function useSecurityAgentProviderValue(
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  organizationRouteIdentifier: string | undefined
 ): SecurityAgentContextValue {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -1398,6 +1401,7 @@ function useSecurityAgentProviderValue(
   const value = useMemo<SecurityAgentContextValue>(
     () => ({
       organizationId,
+      organizationRouteIdentifier,
       isOrg,
       hasIntegration,
       hasPermission,
@@ -1460,6 +1464,7 @@ function useSecurityAgentProviderValue(
     }),
     [
       organizationId,
+      organizationRouteIdentifier,
       isOrg,
       hasIntegration,
       hasPermission,
@@ -1509,7 +1514,11 @@ function useSecurityAgentProviderValue(
   return value;
 }
 
-export function SecurityAgentProvider({ organizationId, children }: SecurityAgentProviderProps) {
-  const value = useSecurityAgentProviderValue(organizationId);
+export function SecurityAgentProvider({
+  organizationId,
+  organizationRouteIdentifier,
+  children,
+}: SecurityAgentProviderProps) {
+  const value = useSecurityAgentProviderValue(organizationId, organizationRouteIdentifier);
   return <SecurityAgentContext.Provider value={value}>{children}</SecurityAgentContext.Provider>;
 }

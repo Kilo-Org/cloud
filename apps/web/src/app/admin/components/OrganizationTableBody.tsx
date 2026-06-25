@@ -13,6 +13,7 @@ import {
   getStripeStatusLabel,
   getStripeStatusStyle,
 } from '@/lib/admin/stripe-subscription-statuses';
+import { getOrganizationAppPath } from '@/lib/organizations/organization-route-utils';
 
 type AdminOrganization = z.infer<typeof AdminOrganizationSchema>;
 
@@ -77,7 +78,7 @@ function LinksCell({ organization }: { organization: AdminOrganization }) {
         <ExternalLink className="h-3 w-3" />
       </a>
       <a
-        href={`/organizations/${organization.id}`}
+        href={getOrganizationAppPath(organization)}
         target="_blank"
         className="inline-flex items-center rounded-md bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 transition-colors hover:bg-blue-200"
         title="View Org"

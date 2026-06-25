@@ -1,11 +1,17 @@
 import fs from 'fs';
 import path from 'path';
-import type { Organization } from '@kilocode/db/schema';
+import { organizations, type Organization } from '@kilocode/db/schema';
 import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/magic-link-tokens';
 import { NEXTAUTH_URL } from '@/lib/config.server';
 import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
 import { verifyEmail } from '@/lib/email-neverbounce';
+import { db } from '@/lib/drizzle';
+import {
+  getOrganizationAppPathForRouteIdentifier,
+  getOrganizationRouteIdentifier,
+} from '@/lib/organizations/organization-route-utils';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { and, eq, isNull } from 'drizzle-orm';
 
 // Subject lines for each template — also serves as the canonical list of template names
 export const subjects = {
@@ -156,10 +162,25 @@ type Props = {
   organizationId: string;
 };
 
+async function getOrganizationEmailPath(organizationId: string, suffix = ''): Promise<string> {
+  const [organization] = await db
+    .select({ id: organizations.id, slug: organizations.slug })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+  const routeIdentifier = organization
+    ? getOrganizationRouteIdentifier(organization)
+    : organizationId;
+  return getOrganizationAppPathForRouteIdentifier(routeIdentifier, suffix);
+}
+
 export async function sendOrgSubscriptionEmail(to: string, props: Props): Promise<SendResult> {
   const seats = `${props.seatCount} seat${props.seatCount === 1 ? '' : 's'}`;
-  const organization_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}`;
-  const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
+  const organization_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(props.organizationId)}`;
+  const invoices_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(
+    props.organizationId,
+    '/payment-details'
+  )}`;
   return send({
     to,
     templateName: 'orgSubscription',
@@ -169,7 +190,10 @@ export async function sendOrgSubscriptionEmail(to: string, props: Props): Promis
 
 export async function sendOrgRenewedEmail(to: string, props: Props): Promise<SendResult> {
   const seats = `${props.seatCount} seat${props.seatCount === 1 ? '' : 's'}`;
-  const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
+  const invoices_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(
+    props.organizationId,
+    '/payment-details'
+  )}`;
   return send({
     to,
     templateName: 'orgRenewed',
@@ -181,7 +205,10 @@ export async function sendOrgCancelledEmail(
   to: string,
   props: Omit<Props, 'seatCount'>
 ): Promise<SendResult> {
-  const invoices_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`;
+  const invoices_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(
+    props.organizationId,
+    '/payment-details'
+  )}`;
   return send({
     to,
     templateName: 'orgCancelled',
@@ -193,7 +220,7 @@ export async function sendOrgSSOUserJoinedEmail(
   to: string,
   props: Omit<Props, 'seatCount'> & { new_user_email: string }
 ): Promise<SendResult> {
-  const organization_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}`;
+  const organization_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(props.organizationId)}`;
   return send({
     to,
     templateName: 'orgSSOUserJoined',
@@ -237,7 +264,7 @@ export async function sendAutoTopUpFailedEmail(
   props: { reason: string; organizationId?: string }
 ): Promise<SendResult> {
   const credits_url = props.organizationId
-    ? `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`
+    ? `${NEXTAUTH_URL}${await getOrganizationEmailPath(props.organizationId, '/payment-details')}`
     : `${NEXTAUTH_URL}/credits?show-auto-top-up`;
   return send({
     to,
@@ -298,7 +325,7 @@ export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps): 
     return;
   }
 
-  const organization_url = `${NEXTAUTH_URL}/organizations/${organizationId}`;
+  const organization_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(organizationId)}`;
 
   const sendToRecipient = async (email: string) => {
     const result = await send({
@@ -345,8 +372,14 @@ type OssInviteEmailData = {
 };
 
 export async function sendOssInviteNewUserEmail(data: OssInviteEmailData): Promise<SendResult> {
-  const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
-  const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;
+  const integrations_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(
+    data.organizationId,
+    '/integrations'
+  )}`;
+  const code_reviews_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(
+    data.organizationId,
+    '/code-reviews'
+  )}`;
   const tierConfig = ossTierConfig[data.tier];
   return send({
     to: data.to,
@@ -367,9 +400,15 @@ export async function sendOssInviteNewUserEmail(data: OssInviteEmailData): Promi
 export async function sendOssInviteExistingUserEmail(
   data: Omit<OssInviteEmailData, 'acceptInviteUrl' | 'inviteCode'>
 ): Promise<SendResult> {
-  const organization_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}`;
-  const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
-  const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;
+  const organization_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(data.organizationId)}`;
+  const integrations_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(
+    data.organizationId,
+    '/integrations'
+  )}`;
+  const code_reviews_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(
+    data.organizationId,
+    '/code-reviews'
+  )}`;
   const tierConfig = ossTierConfig[data.tier];
   return send({
     to: data.to,
@@ -398,9 +437,15 @@ type OssProvisionEmailData = {
 export async function sendOssExistingOrgProvisionedEmail(
   data: OssProvisionEmailData
 ): Promise<void> {
-  const organization_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}`;
-  const integrations_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/integrations`;
-  const code_reviews_url = `${NEXTAUTH_URL}/organizations/${data.organizationId}/code-reviews`;
+  const organization_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(data.organizationId)}`;
+  const integrations_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(
+    data.organizationId,
+    '/integrations'
+  )}`;
+  const code_reviews_url = `${NEXTAUTH_URL}${await getOrganizationEmailPath(
+    data.organizationId,
+    '/code-reviews'
+  )}`;
   const tierConfig = ossTierConfig[data.tier];
   const templateVars = {
     organization_name: data.organizationName,
@@ -519,6 +564,19 @@ function formatDate(date: Date): string {
   });
 }
 
+async function getOrganizationCreditsUrl(
+  props: OrganizationCreditsTopUpEmailProps
+): Promise<string> {
+  if (props.creditsUrl) return props.creditsUrl;
+  if (props.organizationId) {
+    return `${NEXTAUTH_URL}${await getOrganizationEmailPath(
+      props.organizationId,
+      '/payment-details'
+    )}`;
+  }
+  throw new Error('Organization top-up emails require creditsUrl or organizationId');
+}
+
 export async function sendCreditsTopUpEmail(
   props: SendCreditsTopUpEmailProps
 ): Promise<SendResult> {
@@ -531,7 +589,7 @@ export async function sendCreditsTopUpEmail(
 
   const organizationName = isOrgVariant ? (props.organizationName ?? 'your organization') : '';
   const credits_url = isOrgVariant
-    ? props.creditsUrl || `${NEXTAUTH_URL}/organizations/${props.organizationId}/payment-details`
+    ? await getOrganizationCreditsUrl(props)
     : `${NEXTAUTH_URL}/credits`;
   return send({
     to: props.to,
@@ -596,6 +654,7 @@ type RecommendationsDigestRecommendation = {
 
 type SendRecommendationsDigestEmailProps = {
   organizationId: string;
+  organizationRouteIdentifier: string;
   organizationName: string;
   adoptedCount: number;
   totalCount: number;
@@ -635,7 +694,10 @@ export async function sendRecommendationsDigestEmail(
   to: string,
   props: SendRecommendationsDigestEmailProps
 ): Promise<SendResult> {
-  const dashboard_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/usage-details?view=feature-adoption`;
+  const dashboard_url = `${NEXTAUTH_URL}${getOrganizationAppPathForRouteIdentifier(
+    props.organizationRouteIdentifier,
+    '/usage-details'
+  )}?view=feature-adoption`;
   return send({
     to,
     templateName: 'recommendationsDigest',

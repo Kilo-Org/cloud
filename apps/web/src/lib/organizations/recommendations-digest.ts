@@ -10,6 +10,7 @@ import {
 import { getOrganizationRecommendations } from './recommendations';
 import { sendRecommendationsDigestEmail } from '@/lib/email';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 // Cap the number of recommendations listed in the email; the rest live on the
 // dashboard the email links to.
@@ -38,6 +39,7 @@ function digestIdempotencyKey(
 
 export type RecommendationsDigestData = {
   organizationId: string;
+  organizationRouteIdentifier: string;
   organizationName: string;
   adoptedCount: number;
   totalCount: number;
@@ -55,7 +57,8 @@ export type RecommendationsDigestData = {
 // that says "all good" every week trains owners to ignore it).
 export async function buildOrganizationRecommendationsDigest(
   organizationId: string,
-  organizationName: string
+  organizationName: string,
+  organizationSlug: string | null = null
 ): Promise<RecommendationsDigestData | null> {
   const { plan, checks, recommendations } = await getOrganizationRecommendations(organizationId);
   if (plan !== 'enterprise') {
@@ -69,6 +72,10 @@ export async function buildOrganizationRecommendationsDigest(
 
   return {
     organizationId,
+    organizationRouteIdentifier: getOrganizationRouteIdentifier({
+      id: organizationId,
+      slug: organizationSlug,
+    }),
     organizationName,
     adoptedCount: checks.filter(check => check.adopted).length,
     totalCount: checks.length,
@@ -188,6 +195,7 @@ export async function dispatchEnterpriseRecommendationsDigests(): Promise<Recomm
     .select({
       id: organizations.id,
       name: organizations.name,
+      slug: organizations.slug,
     })
     .from(organizations)
     .where(
@@ -214,7 +222,7 @@ export async function dispatchEnterpriseRecommendationsDigests(): Promise<Recomm
     enabledOrgs.map(org =>
       limit(async () => {
         try {
-          const digest = await buildOrganizationRecommendationsDigest(org.id, org.name);
+          const digest = await buildOrganizationRecommendationsDigest(org.id, org.name, org.slug);
           if (!digest) {
             summary.orgsSkippedEmpty++;
             return;

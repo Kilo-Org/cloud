@@ -14,9 +14,11 @@ import { useOrganizationConfiguration } from './providers-and-models/useOrganiza
 import { useOpenRouterModelsAndProviders } from '@/app/api/openrouter/hooks';
 import type { ProviderSelection } from '@/components/models/util';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 type OrganizationProvidersAndModelsConfigurationCardProps = {
   organizationId: string;
+  organizationRouteIdentifier?: string;
   readonly: boolean;
 };
 
@@ -64,6 +66,7 @@ export function computeProviderSelectionsForSummaryCard(params: {
 
 export function OrganizationProvidersAndModelsConfigurationCard({
   organizationId,
+  organizationRouteIdentifier,
   readonly,
 }: OrganizationProvidersAndModelsConfigurationCardProps) {
   const [isDefaultModelDialogOpen, setIsDefaultModelDialogOpen] = useState(false);
@@ -114,6 +117,9 @@ export function OrganizationProvidersAndModelsConfigurationCard({
     );
   }
 
+  const routeIdentifier =
+    organizationRouteIdentifier ?? getOrganizationRouteIdentifier(organizationData);
+
   return (
     <Card className="flex flex-col">
       <CardHeader className="mb-2">
@@ -159,7 +165,7 @@ export function OrganizationProvidersAndModelsConfigurationCard({
           />
         </div>
         <CardLinkFooter
-          href={`/organizations/${organizationId}/providers-and-models`}
+          href={`/organizations/${encodeURIComponent(routeIdentifier)}/providers-and-models`}
           className="flex items-center gap-2"
         >
           {readonly ? 'View ' : 'Configure '} providers and models

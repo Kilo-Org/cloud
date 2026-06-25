@@ -29,6 +29,7 @@ import type { UnifiedInvoice } from '@/types/billing';
 import type { StripeConfig } from '@/lib/credits';
 import { processTopUp } from '@/lib/credits';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
+import { getOrganizationAppPathById } from '@/lib/organizations/organization-route-utils.server';
 import {
   STRIPE_SUB_QUERY_STRING_KEY,
   TOPUP_CANCELED_QUERY_STRING_KEY,
@@ -1455,12 +1456,12 @@ export async function getStripeTopUpCheckoutUrl(
         },
       ];
 
-  const isOrganizationTopUp = Boolean(organizationId);
   let cancelUrl: string;
   if (cancelPath) {
     cancelUrl = `${APP_URL}${cancelPath}`;
-  } else if (isOrganizationTopUp) {
-    cancelUrl = `${APP_URL}/organizations/${organizationId}?${TOPUP_CANCELED_QUERY_STRING_KEY}=true`;
+  } else if (organizationId) {
+    const organizationPath = await getOrganizationAppPathById(organizationId);
+    cancelUrl = `${APP_URL}${organizationPath ?? `/organizations/${organizationId}`}?${TOPUP_CANCELED_QUERY_STRING_KEY}=true`;
   } else {
     cancelUrl = `${APP_URL}/profile?payment_status=topup_cancelled&origin=${origin}`;
   }

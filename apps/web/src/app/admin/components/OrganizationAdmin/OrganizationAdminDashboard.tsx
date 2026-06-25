@@ -21,6 +21,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 function OrganizationDetailAdminPage({
   children,
@@ -47,6 +48,11 @@ function OrganizationDetailAdminPage({
 }
 
 export function OrganizationAdminDashboard({ organizationId }: { organizationId: string }) {
+  const { data: organization } = useOrganizationWithMembers(organizationId);
+  const organizationRouteIdentifier = organization
+    ? getOrganizationRouteIdentifier(organization)
+    : undefined;
+
   return (
     // in admin, admins are always owners of every organization
     <OrganizationContextProvider value={{ userRole: 'owner', isKiloAdmin: true }}>
@@ -59,14 +65,20 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
                 <OrganizationAdminHierarchyManagement organizationId={organizationId} />
               </div>
               <div className="space-y-7">
-                <OrganizationUsageSummaryCard organizationId={organizationId} />
+                <OrganizationUsageSummaryCard
+                  organizationId={organizationId}
+                  organizationRouteIdentifier={organizationRouteIdentifier}
+                />
                 <OrganizationAdminCreatedBy organizationId={organizationId} />
                 <OrganizationAdminCreditGrant organizationId={organizationId} />
                 <OrganizationAdminCreditNullify organizationId={organizationId} />
                 <OrganizationWorkOSCard organizationId={organizationId} />
               </div>
               <div className="space-y-8 lg:col-span-2">
-                <SeatUsageCard organizationId={organizationId} />
+                <SeatUsageCard
+                  organizationId={organizationId}
+                  organizationRouteIdentifier={organizationRouteIdentifier}
+                />
                 <OrganizationAdminMembers organizationId={organizationId} showAdminLinks />
               </div>
               <div className="lg:col-span-2">

@@ -1,14 +1,13 @@
 'use client';
 import BigLoader from '@/components/BigLoader';
-import type { Organization } from '@kilocode/db/schema';
 import { useStripeSessionStatus } from '@/app/payments/hooks';
 import { redirect } from 'next/navigation';
 
 type Props = {
-  organizationId: Organization['id'];
+  organizationPath: string;
   sessionId: string;
 };
-export function StripeSessionStatusChecker({ organizationId, sessionId }: Props) {
+export function StripeSessionStatusChecker({ organizationPath, sessionId }: Props) {
   const result = useStripeSessionStatus({ sessionId });
 
   if (result.status === 'pending' && result.isFetching) {
@@ -18,5 +17,5 @@ export function StripeSessionStatusChecker({ organizationId, sessionId }: Props)
       </div>
     );
   }
-  return redirect(`/organizations/${organizationId}`);
+  return redirect(organizationPath);
 }

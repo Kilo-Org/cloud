@@ -5,6 +5,7 @@ import { ClearFindingsCard } from './ClearFindingsCard';
 import { SecurityConfigForm } from './SecurityConfigForm';
 import { useSecurityAgent } from './SecurityAgentContext';
 import { SecurityAgentGitHubInstallCta } from './SecurityAgentGitHubInstallCta';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import {
   DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL,
   DEFAULT_SECURITY_AGENT_REMEDIATION_MODEL,
@@ -15,6 +16,7 @@ import type { SecurityConfigFormState } from './security-config-types';
 export function SecurityConfigPage() {
   const {
     organizationId,
+    organizationRouteIdentifier,
     isOrg,
     hasIntegration,
     isLoadingPermission,
@@ -41,9 +43,10 @@ export function SecurityConfigPage() {
   }
 
   if (!hasIntegration) {
+    const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
     const installUrl =
-      isOrg && organizationId
-        ? `/organizations/${organizationId}/integrations`
+      isOrg && organizationPathIdentifier
+        ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/integrations')
         : '/integrations/github';
     return <SecurityAgentGitHubInstallCta installUrl={installUrl} />;
   }

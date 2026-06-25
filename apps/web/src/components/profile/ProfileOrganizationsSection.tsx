@@ -9,6 +9,7 @@ import {
 import { formatMicrodollars } from '@/lib/admin-utils';
 import Link from 'next/link';
 import type { UserOrganizationWithSeats } from '@/lib/organizations/organization-types';
+import { getOrganizationAppPath } from '@/lib/organizations/organization-route-utils';
 
 type ProfileOrganizationsSectionProps = {
   orgs: UserOrganizationWithSeats[];
@@ -29,7 +30,10 @@ export function ProfileOrganizationsSection({ orgs }: ProfileOrganizationsSectio
             {orgs.map(org => (
               <Link
                 key={org.organizationId}
-                href={`/organizations/${encodeURIComponent(org.organizationId)}`}
+                href={getOrganizationAppPath({
+                  id: org.organizationId,
+                  slug: org.organizationSlug,
+                })}
                 className="block"
               >
                 <Card className="hover:border-primary/20 transition-shadow duration-200 hover:shadow-md">

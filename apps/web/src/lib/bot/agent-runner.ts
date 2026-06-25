@@ -285,14 +285,21 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               resolvedCloudAgentSessionId = cloudAgentSessionId;
               resolvedKiloSessionId = kiloSessionId;
               params.onSessionReady?.({ kiloSessionId, cloudAgentSessionId, prompt: args.prompt });
-              const sessionUrl = buildSessionUrl(kiloSessionId, owner);
-              void postSessionLinkEphemeral({
-                thread: params.thread,
-                message: params.message,
-                sessionUrl,
-                prompt: args.prompt,
-                provider,
-                modelSlug,
+              void (async () => {
+                const sessionUrl = await buildSessionUrl(kiloSessionId, owner);
+                await postSessionLinkEphemeral({
+                  thread: params.thread,
+                  message: params.message,
+                  sessionUrl,
+                  prompt: args.prompt,
+                  provider,
+                  modelSlug,
+                });
+              })().catch(error => {
+                captureException(error, {
+                  tags: { source: 'bot_cloud_agent_session_link' },
+                  extra: { kiloSessionId, owner },
+                });
               });
             },
             {

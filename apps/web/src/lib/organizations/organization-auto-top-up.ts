@@ -6,6 +6,7 @@ import {
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@/lib/autoTopUpConstants';
 import { isFeatureFlagEnabled } from '@/lib/posthog-feature-flags';
+import { getOrganizationAppPathById } from '@/lib/organizations/organization-route-utils.server';
 
 export async function isOrgAutoTopUpFeatureEnabled(organizationId: string): Promise<boolean> {
   return (
@@ -25,6 +26,9 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
   amountCents: number = DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS
 ): Promise<string | null> {
   const amountDollars = amountCents / 100;
+  const organizationPath =
+    (await getOrganizationAppPathById(organizationId, '/payment-details')) ??
+    `/organizations/${organizationId}/payment-details`;
 
   const checkoutSession = await client.checkout.sessions.create({
     mode: 'payment',
@@ -54,8 +58,8 @@ export async function createOrgAutoTopUpSetupCheckoutSession(
       enabled: true,
       required: 'never',
     },
-    success_url: `${APP_URL}/organizations/${organizationId}/payment-details?auto_topup_setup=success`,
-    cancel_url: `${APP_URL}/organizations/${organizationId}/payment-details?auto_topup_setup=cancelled`,
+    success_url: `${APP_URL}${organizationPath}?auto_topup_setup=success`,
+    cancel_url: `${APP_URL}${organizationPath}?auto_topup_setup=cancelled`,
     payment_intent_data: {
       metadata: {
         type: 'org-auto-topup-setup',

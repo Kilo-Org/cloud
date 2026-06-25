@@ -6,8 +6,11 @@ import { timedUsageQuery } from '@/lib/usage-query';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { eq, sql, desc, isNull, and, gte } from 'drizzle-orm';
 import { getDateThreshold, type Period } from '@/routers/user-router';
+import * as z from 'zod';
+import { isOrganizationMember } from '@/lib/organizations/organizations';
 
 const VALID_PERIODS = new Set(['week', 'month', 'year', 'all']);
+const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
 
 export async function GET(request: NextRequest) {
   const { user, authFailedResponse } = await getUserFromAuth({
@@ -18,11 +21,22 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const groupByModel = searchParams.get('groupByModel') === 'true';
-  const viewType = searchParams.get('viewType') || 'personal'; // 'personal', 'all', or organization ID
+  const viewTypeResult = ViewTypeSchema.safeParse(searchParams.get('viewType') || 'personal');
+  if (!viewTypeResult.success) {
+    return NextResponse.json({ error: 'Invalid viewType' }, { status: 400 });
+  }
+  const viewType = viewTypeResult.data;
   const periodParam = searchParams.get('period') || 'week';
   const period: Period = VALID_PERIODS.has(periodParam) ? (periodParam as Period) : 'week';
 
   const userId = user.id;
+
+  if (viewType !== 'personal' && viewType !== 'all') {
+    const hasAccess = await isOrganizationMember(viewType, userId);
+    if (!hasAccess) {
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
+  }
 
   // Build the select object conditionally
   const selectFields = {

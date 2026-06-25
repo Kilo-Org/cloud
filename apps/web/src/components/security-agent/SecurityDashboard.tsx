@@ -28,6 +28,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { DashboardStats } from '@/lib/security-agent/db/dashboard-stats';
 import { useTRPC } from '@/lib/trpc/utils';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import { RepositoryFilter } from './RepositoryFilter';
 import { SecurityAgentActionBar, SecurityAgentActionBarField } from './SecurityAgentActionBar';
 import { SecurityAgentGitHubInstallCta } from './SecurityAgentGitHubInstallCta';
@@ -143,6 +144,7 @@ export function SecurityDashboard() {
     isLoadingPermission,
     isOrg,
     organizationId,
+    organizationRouteIdentifier,
     configData,
     filteredRepositories,
     handleSync,
@@ -150,7 +152,11 @@ export function SecurityDashboard() {
   } = useSecurityAgent();
   const trpc = useTRPC();
   const [repoFullName, setRepoFullName] = useState<string | undefined>(undefined);
-  const basePath = isOrg ? `/organizations/${organizationId}/security-agent` : '/security-agent';
+  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
+  const basePath =
+    isOrg && organizationPathIdentifier
+      ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/security-agent')
+      : '/security-agent';
   const slaEnabled = configData?.slaEnabled ?? true;
 
   const {
@@ -189,9 +195,10 @@ export function SecurityDashboard() {
   }
 
   if (!hasIntegration) {
-    const installUrl = isOrg
-      ? `/organizations/${organizationId}/integrations`
-      : '/integrations/github';
+    const installUrl =
+      isOrg && organizationPathIdentifier
+        ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/integrations')
+        : '/integrations/github';
     return <SecurityAgentGitHubInstallCta installUrl={installUrl} />;
   }
 

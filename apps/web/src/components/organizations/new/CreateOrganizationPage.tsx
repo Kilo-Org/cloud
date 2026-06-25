@@ -26,6 +26,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useCreateOrganization } from '@/app/api/organizations/hooks';
 import { SubscriptionsSeatQuantitySchema } from '@/app/payments/subscriptions/types';
 import Link from 'next/link';
+import { getOrganizationAppPath } from '@/lib/organizations/organization-route-utils';
 
 const CreateOrganizationSchema = z.object({
   organizationName: OrganizationNameSchema,
@@ -116,16 +117,14 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
     }
 
     try {
-      const orgId = (
-        await createOrganizationMutation.mutateAsync({
-          name: validationResult.data.organizationName,
-          autoAddCreator: true,
-          company_domain: companyDomain.trim() || undefined,
-        })
-      ).organization.id;
+      const { organization } = await createOrganizationMutation.mutateAsync({
+        name: validationResult.data.organizationName,
+        autoAddCreator: true,
+        company_domain: companyDomain.trim() || undefined,
+      });
 
       // Redirect with query param that will force users to invite a single user.
-      window.location.href = `/organizations/${orgId}/welcome?firstTime=1`;
+      window.location.href = `${getOrganizationAppPath(organization, '/welcome')}?firstTime=1`;
     } catch (error) {
       console.error('Failed to create organization:', error);
       setErrors({

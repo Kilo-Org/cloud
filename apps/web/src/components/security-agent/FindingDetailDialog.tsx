@@ -30,6 +30,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc/utils';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import { useQuery } from '@tanstack/react-query';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import { formatDistanceToNow, isPast } from 'date-fns';
@@ -973,6 +974,7 @@ type FindingAnalysisProps = {
   analysisError: string | null;
   cliSessionId: string | null;
   organizationId?: string;
+  organizationRouteIdentifier?: string;
   interactionState: AnalysisInteractionState;
   onStartAnalysis: StartAnalysis;
   onRestartAnalysis: () => void;
@@ -1548,6 +1550,7 @@ function FindingAnalysisPanel({
   analysisError,
   cliSessionId,
   organizationId,
+  organizationRouteIdentifier,
   interactionState: {
     isAwaitingAnalysisAdmission,
     isAnalyzing,
@@ -1576,7 +1579,7 @@ function FindingAnalysisPanel({
   });
   const sessionHref = cliSessionId
     ? organizationId
-      ? `/organizations/${organizationId}/cloud/chat?sessionId=${cliSessionId}`
+      ? `${getOrganizationAppPathForRouteIdentifier(organizationRouteIdentifier ?? organizationId, '/cloud/chat')}?sessionId=${cliSessionId}`
       : `/cloud/chat?sessionId=${cliSessionId}`
     : null;
   const sandbox = analysis?.sandboxAnalysis;
@@ -2910,6 +2913,7 @@ type FindingDetailDialogProps = {
   onStartAnalysis: StartFindingAnalysis;
   analysisAtCapacity: boolean;
   organizationId?: string;
+  organizationRouteIdentifier?: string;
   showSla?: boolean;
 };
 
@@ -2923,6 +2927,7 @@ export function FindingDetailDialog({
   onStartAnalysis,
   analysisAtCapacity,
   organizationId,
+  organizationRouteIdentifier,
   showSla = true,
 }: FindingDetailDialogProps) {
   const trpc = useTRPC();
@@ -3350,6 +3355,7 @@ export function FindingDetailDialog({
               analysisError={analysisError}
               cliSessionId={cliSessionId}
               organizationId={organizationId}
+              organizationRouteIdentifier={organizationRouteIdentifier}
               interactionState={{
                 isAwaitingAnalysisAdmission,
                 isAnalyzing,

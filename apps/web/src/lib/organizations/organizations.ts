@@ -721,6 +721,7 @@ export async function acceptOrganizationInvite(
         return successResult({
           invitation: updatedInvitation,
           organizationId: invitation.organization_id,
+          organizationSlug: organization.slug,
           role: invitation.role,
           membershipInserted: false,
         });
@@ -766,6 +767,7 @@ export async function acceptOrganizationInvite(
       return successResult({
         invitation: updatedInvitation,
         organizationId: invitation.organization_id,
+        organizationSlug: organization.slug,
         role: invitation.role,
         membershipInserted: true,
       });

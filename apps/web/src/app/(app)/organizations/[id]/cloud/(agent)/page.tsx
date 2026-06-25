@@ -10,7 +10,7 @@ export default async function OrganizationCloudPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={async ({ organization }) => {
+      render={async ({ organization, organizationRouteIdentifier }) => {
         const isDevcontainerAvailable = await isFeatureFlagEnabledOrDevelopment(
           'cloud-agent-devcontainer',
           organization.id
@@ -18,6 +18,7 @@ export default async function OrganizationCloudPage({
         return (
           <NewSessionPanel
             organizationId={organization.id}
+            organizationRouteIdentifier={organizationRouteIdentifier}
             isDevcontainerAvailable={isDevcontainerAvailable}
           />
         );

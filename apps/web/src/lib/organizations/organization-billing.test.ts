@@ -597,7 +597,7 @@ describe('processTopupForOrganization', () => {
     expect(topUpEmail.html).toContain(
       'A Kilo credit top-up has been processed for Test Organization. The credits are now available to the organization.'
     );
-    expect(topUpEmail.html).toContain(`/organizations/${testOrganization.id}/payment-details`);
+    expect(topUpEmail.html).toContain(`/organizations/${testOrganization.slug}/payment-details`);
     expect(topUpEmail.html).toContain('https://pay.stripe.test/receipts/pi');
 
     const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);
@@ -636,7 +636,7 @@ describe('processTopupForOrganization', () => {
     expect(topUpEmail.html).toContain(
       'Test Organization was automatically topped up so your team can keep using Kilo without interruption. The new credits are available now.'
     );
-    expect(topUpEmail.html).toContain(`/organizations/${testOrganization.id}/payment-details`);
+    expect(topUpEmail.html).toContain(`/organizations/${testOrganization.slug}/payment-details`);
     expect(topUpEmail.html).toContain('https://pay.stripe.test/receipts/ch');
 
     const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);

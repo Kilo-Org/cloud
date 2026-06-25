@@ -10,12 +10,18 @@ export default async function OrgCloudAgentLayout({
   children: React.ReactNode;
   params: Promise<{ id: string }>;
 }) {
-  const { organization } = await requireCanonicalOrganizationRouteContext(params);
+  const { organization, canonicalRouteIdentifier } =
+    await requireCanonicalOrganizationRouteContext(params);
 
   return (
     <CloudAgentProvider organizationId={organization.id}>
       <Suspense fallback={<div className="flex h-dvh items-center justify-center">Loading...</div>}>
-        <CloudSidebarLayout organizationId={organization.id}>{children}</CloudSidebarLayout>
+        <CloudSidebarLayout
+          organizationId={organization.id}
+          organizationRouteIdentifier={canonicalRouteIdentifier}
+        >
+          {children}
+        </CloudSidebarLayout>
       </Suspense>
     </CloudAgentProvider>
   );

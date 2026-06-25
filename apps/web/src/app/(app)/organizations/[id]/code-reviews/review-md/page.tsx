@@ -11,9 +11,9 @@ export default async function OrganizationReviewMdGuidePage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => (
+      render={({ organizationRouteIdentifier }) => (
         <ReviewMdGuideContent
-          backHref={`/organizations/${organization.id}/code-reviews`}
+          backHref={`/organizations/${organizationRouteIdentifier}/code-reviews`}
           backLabel="Back to organization Code Reviewer"
         />
       )}

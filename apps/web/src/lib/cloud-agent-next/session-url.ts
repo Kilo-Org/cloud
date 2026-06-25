@@ -1,6 +1,7 @@
 import { APP_URL } from '@/lib/constants';
 import { db } from '@/lib/drizzle';
 import type { Owner } from '@/lib/integrations/core/types';
+import { getOrganizationAppPathById } from '@/lib/organizations/organization-route-utils.server';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -9,8 +10,12 @@ import { eq } from 'drizzle-orm';
  * @param dbSessionId - The database UUID (session_id from cli_sessions table)
  * @param owner - The owner of the installation (user or org)
  */
-export function buildSessionUrl(dbSessionId: string, owner: Owner): string {
-  const basePath = owner.type === 'org' ? `/organizations/${owner.id}/cloud` : '/cloud';
+export async function buildSessionUrl(dbSessionId: string, owner: Owner): Promise<string> {
+  const basePath =
+    owner.type === 'org'
+      ? ((await getOrganizationAppPathById(owner.id, '/cloud')) ??
+        `/organizations/${owner.id}/cloud`)
+      : '/cloud';
   return `${APP_URL}${basePath}/chat?sessionId=${dbSessionId}`;
 }
 

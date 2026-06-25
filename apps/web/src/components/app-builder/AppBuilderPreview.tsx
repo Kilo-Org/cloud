@@ -29,6 +29,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import { DEPLOYMENT_POLL_INTERVAL_MS } from '@/lib/user-deployments/constants';
 import { isDeploymentInProgress, type BuildStatus } from '@/lib/user-deployments/types';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import { CloneDialog } from './CloneDialog';
 import { MigrateToGitHubDialog } from './MigrateToGitHubDialog';
 import { useProject } from './ProjectSession';
@@ -36,6 +37,7 @@ import { toast } from 'sonner';
 
 type AppBuilderPreviewProps = {
   organizationId?: string;
+  organizationRouteIdentifier?: string;
 };
 
 function IdleState() {
@@ -303,19 +305,21 @@ const statusLabels: Record<BuildStatus, string> = {
   cancelled: 'Cancelled',
 };
 
-function deploymentPageUrl(organizationId: string | undefined, deploymentId: string) {
-  const base = organizationId ? `/organizations/${organizationId}/deploy` : '/deploy';
+function deploymentPageUrl(organizationRouteIdentifier: string | undefined, deploymentId: string) {
+  const base = organizationRouteIdentifier
+    ? getOrganizationAppPathForRouteIdentifier(organizationRouteIdentifier, '/deploy')
+    : '/deploy';
   return `${base}/${deploymentId}`;
 }
 
 function DeploymentControls({
   state,
   onDeploy,
-  organizationId,
+  organizationRouteIdentifier,
 }: {
   state: DeploymentState;
   onDeploy: () => void;
-  organizationId?: string;
+  organizationRouteIdentifier?: string;
 }) {
   switch (state.kind) {
     case 'creating':
@@ -328,7 +332,10 @@ function DeploymentControls({
     case 'in-progress':
       return (
         <Button size="sm" variant="outline" asChild>
-          <Link href={deploymentPageUrl(organizationId, state.deploymentId)} target="_blank">
+          <Link
+            href={deploymentPageUrl(organizationRouteIdentifier, state.deploymentId)}
+            target="_blank"
+          >
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             {statusLabels[state.buildStatus]}...
           </Link>
@@ -346,7 +353,10 @@ function DeploymentControls({
     case 'failed':
       return (
         <Button size="sm" variant="outline" className="text-red-400" asChild>
-          <Link href={deploymentPageUrl(organizationId, state.deploymentId)} target="_blank">
+          <Link
+            href={deploymentPageUrl(organizationRouteIdentifier, state.deploymentId)}
+            target="_blank"
+          >
             <AlertCircle className="mr-2 h-4 w-4" />
             Failed - View Logs
           </Link>
@@ -383,6 +393,7 @@ function getPathFromUrl(url: string): string {
  */
 export const AppBuilderPreview = memo(function AppBuilderPreview({
   organizationId,
+  organizationRouteIdentifier,
 }: AppBuilderPreviewProps) {
   // Get state and manager from ProjectSession context
   const { manager, state } = useProject();
@@ -582,6 +593,7 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
               <MigrateToGitHubDialog
                 projectId={projectId}
                 organizationId={organizationId}
+                organizationRouteIdentifier={organizationRouteIdentifier}
                 onMigrationComplete={repoFullName => manager.setGitRepoFullName(repoFullName)}
               />
               <CloneDialog projectId={projectId} organizationId={organizationId} />
@@ -604,7 +616,7 @@ export const AppBuilderPreview = memo(function AppBuilderPreview({
           <DeploymentControls
             state={deploymentState}
             onDeploy={handleDeploy}
-            organizationId={organizationId}
+            organizationRouteIdentifier={organizationRouteIdentifier ?? organizationId}
           />
         </div>
       </div>

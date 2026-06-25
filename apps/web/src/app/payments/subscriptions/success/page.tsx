@@ -1,5 +1,6 @@
 import { StripeSessionStatusChecker } from '@/components/payment/StripeSessionStatusChecker';
 import { STRIPE_SUB_QUERY_STRING_KEY } from '@/lib/organizations/constants';
+import { getOrganizationAppPathById } from '@/lib/organizations/organization-route-utils.server';
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import assert from 'assert';
 
@@ -14,5 +15,7 @@ export default async function Page({
   const organizationId = params['organizationId'];
   assert(sessionId && typeof sessionId === 'string');
   assert(organizationId && typeof organizationId === 'string');
-  return <StripeSessionStatusChecker organizationId={organizationId} sessionId={sessionId} />;
+  const organizationPath = await getOrganizationAppPathById(organizationId);
+  assert(organizationPath);
+  return <StripeSessionStatusChecker organizationPath={organizationPath} sessionId={sessionId} />;
 }

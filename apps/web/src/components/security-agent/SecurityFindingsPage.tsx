@@ -8,6 +8,7 @@ import { AlertTriangle, ExternalLink } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useTRPC } from '@/lib/trpc/utils';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import {
   OutcomeFilterSchema,
   SecurityFindingStatusSchema,
@@ -133,6 +134,7 @@ function pageReducer(state: PageState, action: PageAction): PageState {
 export function SecurityFindingsPage() {
   const {
     organizationId,
+    organizationRouteIdentifier,
     isOrg,
     configData,
     hasIntegration,
@@ -301,16 +303,21 @@ export function SecurityFindingsPage() {
     dispatch({ type: 'set-sort', sortBy });
   };
 
-  const basePath = isOrg ? `/organizations/${organizationId}/security-agent` : '/security-agent';
+  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
+  const basePath =
+    isOrg && organizationPathIdentifier
+      ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/security-agent')
+      : '/security-agent';
   const handleOpenFinding = (findingId: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('findingId', findingId);
     dispatch({ type: 'open-deep-link' });
     router.replace(`${basePath}/findings?${params.toString()}`);
   };
-  const installUrl = isOrg
-    ? `/organizations/${organizationId}/integrations`
-    : '/integrations/github';
+  const installUrl =
+    isOrg && organizationPathIdentifier
+      ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/integrations')
+      : '/integrations/github';
 
   if (isEnabled === false) {
     return (
@@ -351,7 +358,14 @@ export function SecurityFindingsPage() {
             </p>
             <Button variant="outline" size="sm" asChild>
               <Link
-                href={isOrg ? `/organizations/${organizationId}/integrations` : '/integrations'}
+                href={
+                  isOrg && organizationPathIdentifier
+                    ? getOrganizationAppPathForRouteIdentifier(
+                        organizationPathIdentifier,
+                        '/integrations'
+                      )
+                    : '/integrations'
+                }
               >
                 View integrations
                 <ExternalLink className="ml-2 size-3" aria-hidden="true" />
@@ -410,6 +424,7 @@ export function SecurityFindingsPage() {
         canDismiss={activeFinding?.status === 'open'}
         onOpenFinding={handleOpenFinding}
         organizationId={organizationId}
+        organizationRouteIdentifier={organizationPathIdentifier}
         showSla={slaEnabled}
       />
 

@@ -19,6 +19,7 @@ import { ProjectLoader } from './ProjectLoader';
 import { ProjectSession } from './ProjectSession';
 import { AppBuilderChat } from './AppBuilderChat';
 import { AppBuilderPreview } from './AppBuilderPreview';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import { AppBuilderLanding } from './AppBuilderLanding';
 
 type AppBuilderPageProps = {
@@ -31,7 +32,13 @@ type AppBuilderPageProps = {
  * Inner component that contains the chat and preview layout.
  * Rendered inside ProjectSession, so it has access to useProject hooks.
  */
-function AppBuilderProjectView({ organizationId }: { organizationId?: string }) {
+function AppBuilderProjectView({
+  organizationId,
+  organizationRouteIdentifier,
+}: {
+  organizationId?: string;
+  organizationRouteIdentifier?: string;
+}) {
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] w-full flex-col overflow-hidden lg:flex-row">
       {/* Chat Pane - 1/3 width on desktop, full width on mobile */}
@@ -41,7 +48,10 @@ function AppBuilderProjectView({ organizationId }: { organizationId?: string }) 
 
       {/* Preview Pane - 2/3 width on desktop, full width on mobile */}
       <div className="flex h-1/2 w-full flex-col lg:h-full lg:w-2/3">
-        <AppBuilderPreview organizationId={organizationId} />
+        <AppBuilderPreview
+          organizationId={organizationId}
+          organizationRouteIdentifier={organizationRouteIdentifier}
+        />
       </div>
     </div>
   );
@@ -60,7 +70,10 @@ export function AppBuilderPage({
     (createdProjectId: string, _prompt: string) => {
       // Navigate to the project page - ProjectLoader will handle loading
       const newPath = organizationPathIdentifier
-        ? `/organizations/${organizationPathIdentifier}/app-builder/${createdProjectId}`
+        ? getOrganizationAppPathForRouteIdentifier(
+            organizationPathIdentifier,
+            `/app-builder/${createdProjectId}`
+          )
         : `/app-builder/${createdProjectId}`;
       router.replace(newPath);
     },
@@ -70,7 +83,11 @@ export function AppBuilderPage({
   // Show landing if no projectId
   if (!projectId) {
     return (
-      <AppBuilderLanding organizationId={organizationId} onProjectCreated={handleProjectCreated} />
+      <AppBuilderLanding
+        organizationId={organizationId}
+        organizationRouteIdentifier={organizationRouteIdentifier}
+        onProjectCreated={handleProjectCreated}
+      />
     );
   }
 
@@ -79,7 +96,10 @@ export function AppBuilderPage({
     <ProjectLoader projectId={projectId} organizationId={organizationId ?? null}>
       {projectWithMessages => (
         <ProjectSession project={projectWithMessages} organizationId={organizationId ?? null}>
-          <AppBuilderProjectView organizationId={organizationId} />
+          <AppBuilderProjectView
+            organizationId={organizationId}
+            organizationRouteIdentifier={organizationRouteIdentifier}
+          />
         </ProjectSession>
       )}
     </ProjectLoader>

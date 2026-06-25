@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useMemo } from 'react';
 import Link from 'next/link';
+import { useUrlOrganizationIdentifier } from '@/hooks/useUrlOrganizationId';
 
 type MetricDetailDrawerProps = {
   open: boolean;
@@ -40,7 +41,7 @@ type MetricInfo = {
 };
 
 const getMetricInfo = (
-  organizationId: string
+  organizationRouteIdentifier: string
 ): Record<'frequency' | 'depth' | 'coverage', MetricInfo> => ({
   frequency: {
     title: 'Frequency Score',
@@ -90,7 +91,7 @@ const getMetricInfo = (
             Depth increases when AI touches multiple stages of the same task. A common pattern: use
             Architect mode to plan a feature, the Code mode to build it, and{' '}
             <Link
-              href={`/organizations/${organizationId}/code-reviews`}
+              href={`/organizations/${encodeURIComponent(organizationRouteIdentifier)}/code-reviews`}
               className="text-blue-400 hover:underline"
             >
               Code Reviewer
@@ -110,7 +111,7 @@ const getMetricInfo = (
             If acceptance rates are low, the issue is often context—the AI is making suggestions
             without understanding your codebase.{' '}
             <Link
-              href={`/organizations/${organizationId}/code-indexing`}
+              href={`/organizations/${encodeURIComponent(organizationRouteIdentifier)}/code-indexing`}
               className="text-blue-400 hover:underline"
             >
               Managed Indexing
@@ -128,7 +129,7 @@ const getMetricInfo = (
           <>
             Generated code that never runs is hard to trust.{' '}
             <Link
-              href={`/organizations/${organizationId}/deploy`}
+              href={`/organizations/${encodeURIComponent(organizationRouteIdentifier)}/deploy`}
               className="text-blue-400 hover:underline"
             >
               Kilo Deploy
@@ -165,7 +166,7 @@ const getMetricInfo = (
             Coverage is partly a numbers game. If you have team members who haven't logged in or
             aren't using the tool, your score will reflect that. Check your{' '}
             <Link
-              href={`/organizations/${organizationId}`}
+              href={`/organizations/${encodeURIComponent(organizationRouteIdentifier)}`}
               className="text-blue-400 hover:underline"
             >
               Organization Dashboard
@@ -184,7 +185,7 @@ const getMetricInfo = (
             Spiky usage—heavy on Mondays, quiet the rest of the week—limits your Coverage score. One
             way to smooth this out: make{' '}
             <Link
-              href={`/organizations/${organizationId}/code-reviews`}
+              href={`/organizations/${encodeURIComponent(organizationRouteIdentifier)}/code-reviews`}
               className="text-blue-400 hover:underline"
             >
               Code Reviewer
@@ -206,7 +207,11 @@ export function MetricDetailDrawer({
   organizationId,
   chartData,
 }: MetricDetailDrawerProps) {
-  const metricInfo = useMemo(() => getMetricInfo(organizationId), [organizationId]);
+  const organizationRouteIdentifier = useUrlOrganizationIdentifier() ?? organizationId;
+  const metricInfo = useMemo(
+    () => getMetricInfo(organizationRouteIdentifier),
+    [organizationRouteIdentifier]
+  );
 
   // Filter chart data to only show the selected metric
   const metricChartData = useMemo(() => {

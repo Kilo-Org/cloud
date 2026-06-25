@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { acceptOrganizationInvite } from '@/lib/organizations/organizations';
 import { ensureHasValidStytch } from '@/lib/user';
+import { getOrganizationAppPath } from '@/lib/organizations/organization-route-utils';
 
 type AcceptInvitePageProps = {
   params: Promise<{ token: string }>;
@@ -29,7 +30,10 @@ export default async function AcceptInvitePage({ params }: AcceptInvitePageProps
     await ensureHasValidStytch(user.id);
     // now that the user has signed up (or in) redirect to the standard after sign up page
     // for possible stitch validation etc
-    const redirectTo = `/organizations/${result.organizationId}`;
+    const redirectTo = getOrganizationAppPath({
+      id: result.organizationId,
+      slug: result.organizationSlug,
+    });
     redirect(redirectTo);
   }
 

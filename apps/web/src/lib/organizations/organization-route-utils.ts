@@ -14,6 +14,24 @@ export function getOrganizationRouteIdentifier(
   return organization.slug ?? organization.id;
 }
 
+export function getOrganizationAppPath(
+  organization: OrganizationRouteIdentifierInput,
+  suffix = ''
+): string {
+  return getOrganizationAppPathForRouteIdentifier(
+    getOrganizationRouteIdentifier(organization),
+    suffix
+  );
+}
+
+export function getOrganizationAppPathForRouteIdentifier(
+  routeIdentifier: string,
+  suffix = ''
+): string {
+  const normalizedSuffix = suffix ? (suffix.startsWith('/') ? suffix : `/${suffix}`) : '';
+  return `/organizations/${encodeURIComponent(routeIdentifier)}${normalizedSuffix}`;
+}
+
 export function isUuidOrganizationRouteIdentifier(identifier: string): boolean {
   return UUID_ROUTE_IDENTIFIER_PATTERN.test(identifier);
 }

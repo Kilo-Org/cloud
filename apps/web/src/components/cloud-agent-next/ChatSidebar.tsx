@@ -22,6 +22,7 @@ import type { StoredSession } from './types';
 import { SessionPrIndicator } from './SessionPrIndicator';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { cn } from '@/lib/utils';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -106,6 +107,7 @@ type ChatSidebarProps = {
   sessions: StoredSession[];
   currentSessionId?: string;
   organizationId?: string;
+  organizationRouteIdentifier?: string;
   onDeleteSession?: (sessionId: string) => void;
   onRenameSession?: (sessionId: string, title: string) => Promise<void>;
   isInSheet?: boolean;
@@ -310,6 +312,7 @@ export function ChatSidebar({
   sessions,
   currentSessionId,
   organizationId,
+  organizationRouteIdentifier,
   onDeleteSession,
   onRenameSession,
   isInSheet = false,
@@ -353,7 +356,10 @@ export function ChatSidebar({
     setEditingSessionId(null);
   }, []);
 
-  const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
+  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
+  const basePath = organizationPathIdentifier
+    ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/cloud')
+    : '/cloud';
   const chatPath = `${basePath}/chat`;
 
   const handleNewSession = useCallback(() => {

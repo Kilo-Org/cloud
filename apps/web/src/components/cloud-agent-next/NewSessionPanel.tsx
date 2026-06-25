@@ -35,6 +35,7 @@ import { useSlashCommandAutocomplete } from '@/hooks/useSlashCommandAutocomplete
 import { commandsOrDefault } from '@cloud-agent-shared';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import {
   selectedProfileIdAtom,
   resetSessionFormAtom,
@@ -108,6 +109,7 @@ type Repository = {
 
 type NewSessionPanelProps = {
   organizationId?: string;
+  organizationRouteIdentifier?: string;
   isDevcontainerAvailable: boolean;
 };
 
@@ -118,7 +120,11 @@ type ContextualTipProps = {
   onDismiss: () => void;
 };
 
-export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: NewSessionPanelProps) {
+export function NewSessionPanel({
+  organizationId,
+  organizationRouteIdentifier,
+  isDevcontainerAvailable,
+}: NewSessionPanelProps) {
   const router = useRouter();
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
@@ -229,6 +235,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   // ---------------------------------------------------------------------------
   const [selectedProfileId, setSelectedProfileId] = useAtom(selectedProfileIdAtom);
   const resetSessionForm = useSetAtom(resetSessionFormAtom);
+  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
 
   // Clear any lingering manual overrides whenever the page loads
   useEffect(() => {
@@ -673,8 +680,11 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     !organizationId || (!isLoadingBitbucketRepos && bitbucketRepoData?.status !== 'available');
   const isIntegrationMissing =
     githubIntegrationMissing && gitlabIntegrationMissing && bitbucketIntegrationMissing;
-  const bitbucketIntegrationHref = organizationId
-    ? `/organizations/${organizationId}/integrations/bitbucket`
+  const bitbucketIntegrationHref = organizationPathIdentifier
+    ? getOrganizationAppPathForRouteIdentifier(
+        organizationPathIdentifier,
+        '/integrations/bitbucket'
+      )
     : null;
 
   // ---------------------------------------------------------------------------
@@ -898,7 +908,9 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       attachmentUpload.clearAttachments();
       setAttachmentMessageUuid(uuidv4());
 
-      const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
+      const basePath = organizationPathIdentifier
+        ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/cloud')
+        : '/cloud';
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
     } catch (error) {
       console.error('Failed to prepare session:', error);
@@ -923,6 +935,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     model,
     mode,
     organizationId,
+    organizationPathIdentifier,
     prompt,
     queryClient,
     router,
@@ -1003,8 +1016,8 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   // Integration missing view
   // ---------------------------------------------------------------------------
   if (isIntegrationMissing) {
-    const integrationsPath = organizationId
-      ? `/organizations/${organizationId}/integrations`
+    const integrationsPath = organizationPathIdentifier
+      ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/integrations')
       : '/integrations';
     const integrationMessage =
       githubRepoData?.errorMessage ||

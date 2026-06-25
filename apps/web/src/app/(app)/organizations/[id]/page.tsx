@@ -16,11 +16,12 @@ export default async function OrganizationByIdPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={async ({ role, organization }) => {
+      render={async ({ role, organization, organizationRouteIdentifier }) => {
         const isAutoTopUpEnabled = await isOrgAutoTopUpFeatureEnabled(organization.id);
         return (
           <OrganizationDashboard
             organizationId={organization.id}
+            organizationRouteIdentifier={organizationRouteIdentifier}
             role={role}
             topupAmount={topupAmount}
             isAutoTopUpEnabled={isAutoTopUpEnabled}

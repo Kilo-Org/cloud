@@ -5,6 +5,7 @@ import { organizations } from '@kilocode/db/schema';
 import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import {
+  getOrganizationAppPath,
   getOrganizationRouteIdentifier,
   isUuidOrganizationRouteIdentifier,
   type OrganizationRouteIdentifierInput,
@@ -56,4 +57,12 @@ export async function resolveOrganizationRouteParams(
 ): Promise<string | null> {
   const { id } = await params;
   return resolveOrganizationRouteIdentifier(decodeURIComponent(id));
+}
+
+export async function getOrganizationAppPathById(
+  organizationId: string,
+  suffix = ''
+): Promise<string | null> {
+  const organization = await resolveOrganizationRouteIdentifierDetails(organizationId);
+  return organization ? getOrganizationAppPath(organization, suffix) : null;
 }

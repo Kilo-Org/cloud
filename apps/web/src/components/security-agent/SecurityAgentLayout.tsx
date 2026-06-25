@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc/utils';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useSecurityAgent } from './SecurityAgentContext';
@@ -298,6 +299,7 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
   const queryClient = useQueryClient();
   const {
     organizationId,
+    organizationRouteIdentifier,
     isOrg,
     hasIntegration,
     hasPermission,
@@ -308,7 +310,11 @@ export function SecurityAgentLayout({ children }: SecurityAgentLayoutProps) {
     reauthorizeUrl,
   } = useSecurityAgent();
 
-  const basePath = isOrg ? `/organizations/${organizationId}/security-agent` : '/security-agent';
+  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
+  const basePath =
+    isOrg && organizationPathIdentifier
+      ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/security-agent')
+      : '/security-agent';
   const showSetupOnly =
     (!isLoadingPermission && !hasIntegration) || (!isLoadingConfig && !hasConfig);
 

@@ -4,6 +4,8 @@ import { organizations } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import {
   findOrganizationByRouteIdentifier,
+  getOrganizationAppPath,
+  getOrganizationAppPathForRouteIdentifier,
   getOrganizationRouteIdentifier,
   isOrganizationRouteIdentifierMatch,
   isUuidOrganizationRouteIdentifier,
@@ -25,6 +27,24 @@ describe('getOrganizationRouteIdentifier', () => {
 
   it('exports the organization slug route length', () => {
     expect(ORGANIZATION_SLUG_MAX_LENGTH).toBe(32);
+  });
+});
+
+describe('organization app paths', () => {
+  it('uses the slug in organization app paths when one exists', () => {
+    expect(getOrganizationAppPath({ id: 'org-id', slug: 'acme' }, '/payment-details')).toBe(
+      '/organizations/acme/payment-details'
+    );
+  });
+
+  it('falls back to the organization id in app paths when no slug exists', () => {
+    expect(getOrganizationAppPath({ id: 'org-id', slug: null })).toBe('/organizations/org-id');
+  });
+
+  it('encodes explicit route identifiers', () => {
+    expect(getOrganizationAppPathForRouteIdentifier('acme inc', 'code-reviews')).toBe(
+      '/organizations/acme%20inc/code-reviews'
+    );
   });
 });
 

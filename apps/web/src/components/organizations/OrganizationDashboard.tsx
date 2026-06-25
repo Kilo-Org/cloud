@@ -51,6 +51,7 @@ const addDismissedOrganization = (organizationId: string): void => {
 
 type Props = {
   organizationId: string;
+  organizationRouteIdentifier: string;
   role: OrganizationRole;
   topupAmount: number;
   isAutoTopUpEnabled: boolean;
@@ -58,6 +59,7 @@ type Props = {
 
 export function OrganizationDashboard({
   organizationId,
+  organizationRouteIdentifier,
   role,
   topupAmount,
   isAutoTopUpEnabled,
@@ -154,6 +156,7 @@ export function OrganizationDashboard({
                 ) : (
                   <OrganizationProvidersAndModelsConfigurationCard
                     organizationId={organizationId}
+                    organizationRouteIdentifier={organizationRouteIdentifier}
                     readonly={!(currentRole === 'owner' || isKiloAdmin)}
                   />
                 )}
@@ -164,7 +167,10 @@ export function OrganizationDashboard({
             <LockableContainer>
               <OrganizationAdminMembers organizationId={organizationId} />
             </LockableContainer>
-            <SeatUsageCard organizationId={organizationId} />
+            <SeatUsageCard
+              organizationId={organizationId}
+              organizationRouteIdentifier={organizationRouteIdentifier}
+            />
             {(currentRole === 'owner' || currentRole === 'billing_manager') && (
               <OrgActiveKiloclawsCard organizationId={organizationId} />
             )}

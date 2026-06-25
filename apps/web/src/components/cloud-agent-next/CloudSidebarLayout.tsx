@@ -6,6 +6,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
+import { getOrganizationAppPathForRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 import { startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from './utils/git-utils';
 import { ChatSidebar } from './ChatSidebar';
@@ -30,10 +31,15 @@ export function useSidebarToggle() {
 
 type CloudSidebarLayoutProps = {
   organizationId?: string;
+  organizationRouteIdentifier?: string;
   children: ReactNode;
 };
 
-export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLayoutProps) {
+export function CloudSidebarLayout({
+  organizationId,
+  organizationRouteIdentifier,
+  children,
+}: CloudSidebarLayoutProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentSessionId = searchParams.get('sessionId') ?? undefined;
@@ -50,6 +56,10 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
   });
   const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 30)).toISOString(), []);
+  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
+  const basePath = organizationPathIdentifier
+    ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/cloud')
+    : '/cloud';
 
   const createdOnPlatform = useMemo(() => {
     if (platformFilter.length === 0) return undefined;
@@ -109,7 +119,6 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
     async (sessionId: string) => {
       // Navigate away if deleting the current session
       if (sessionId === currentSessionId) {
-        const basePath = organizationId ? `/organizations/${organizationId}/cloud` : '/cloud';
         router.push(basePath);
       }
 
@@ -134,7 +143,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
     },
     [
       currentSessionId,
-      organizationId,
+      basePath,
       router,
       deleteSessionFromStore,
       deleteCliSessionV2,
@@ -170,6 +179,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
               sessions={sessions}
               currentSessionId={currentSessionId}
               organizationId={organizationId}
+              organizationRouteIdentifier={organizationRouteIdentifier}
               onDeleteSession={handleDeleteSession}
               onRenameSession={handleRenameSession}
               isInSheet
@@ -192,6 +202,7 @@ export function CloudSidebarLayout({ organizationId, children }: CloudSidebarLay
             sessions={sessions}
             currentSessionId={currentSessionId}
             organizationId={organizationId}
+            organizationRouteIdentifier={organizationRouteIdentifier}
             onDeleteSession={handleDeleteSession}
             onRenameSession={handleRenameSession}
             activeSessions={activeSessions}

@@ -14,6 +14,7 @@ import { db } from '@/lib/drizzle';
 import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
 import { send as sendEmail, type TemplateName } from '@/lib/email';
 import { securityFindingTemplateVars } from '@/lib/security-notification-email-vars';
+import { getOrganizationAppPathById } from '@/lib/organizations/organization-route-utils.server';
 import {
   SecurityNotificationPolicySchema,
   getEligibleSlaNotificationKind,
@@ -54,31 +55,36 @@ function formatDeadline(iso: string | null): string {
   );
 }
 
-function securityAgentUrl(
+async function securityAgentUrl(
   finding: {
     ownedByOrganizationId: string | null;
     ownedByUserId: string | null;
   },
   path: string
-): string {
+): Promise<string> {
   if (finding.ownedByOrganizationId) {
-    return `${NEXTAUTH_URL}/organizations/${finding.ownedByOrganizationId}/security-agent/${path}`;
+    const organizationPath =
+      (await getOrganizationAppPathById(
+        finding.ownedByOrganizationId,
+        `/security-agent/${path}`
+      )) ?? `/organizations/${finding.ownedByOrganizationId}/security-agent/${path}`;
+    return `${NEXTAUTH_URL}${organizationPath}`;
   }
   return `${NEXTAUTH_URL}/security-agent/${path}`;
 }
 
-function actionUrl(finding: {
+async function actionUrl(finding: {
   ownedByOrganizationId: string | null;
   ownedByUserId: string | null;
-}): string {
+}): Promise<string> {
   return securityAgentUrl(finding, 'findings');
 }
 
-function manageNotificationsUrl(finding: {
+async function manageNotificationsUrl(finding: {
   kind: 'new_finding' | 'sla_warning' | 'sla_breach';
   ownedByOrganizationId: string | null;
   ownedByUserId: string | null;
-}): string {
+}): Promise<string> {
   const tab = finding.kind === 'new_finding' ? 'notifications' : 'sla';
   return securityAgentUrl(finding, `config?tab=${tab}`);
 }
@@ -258,6 +264,10 @@ export async function POST(req: NextRequest) {
   }
 
   const templateName = notificationKindToTemplate[row.kind];
+  const [findingActionUrl, findingManageNotificationsUrl] = await Promise.all([
+    actionUrl(row),
+    manageNotificationsUrl(row),
+  ]);
   const result = await sendEmail({
     to: row.recipientEmail,
     templateName,
@@ -270,8 +280,8 @@ export async function POST(req: NextRequest) {
       ghsaId: row.ghsaId,
       cvssScore: row.cvssScore,
       slaDeadline: formatDeadline(row.slaDueAt),
-      actionUrl: actionUrl(row),
-      manageNotificationsUrl: manageNotificationsUrl(row),
+      actionUrl: findingActionUrl,
+      manageNotificationsUrl: findingManageNotificationsUrl,
     }),
   }).catch(() => null);
 

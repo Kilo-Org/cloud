@@ -62,7 +62,13 @@ function MetricWithTooltip({
     </Tooltip>
   );
 }
-export function OrganizationUsageSummaryCard({ organizationId }: { organizationId: string }) {
+export function OrganizationUsageSummaryCard({
+  organizationId,
+  organizationRouteIdentifier,
+}: {
+  organizationId: string;
+  organizationRouteIdentifier?: string;
+}) {
   const {
     error,
     data: usage_stats,
@@ -108,7 +114,6 @@ export function OrganizationUsageSummaryCard({ organizationId }: { organizationI
   const averageRequestsPerDay = Math.round((usage_stats.totalRequestCount / 30) * 10) / 10;
   const averageInputTokensPerDay = Math.round((usage_stats.totalInputTokens / 30) * 10) / 10;
   const averageOutputTokensPerDay = Math.round((usage_stats.totalOutputTokens / 30) * 10) / 10;
-
   return (
     <TooltipProvider>
       <Card>
@@ -190,15 +195,17 @@ export function OrganizationUsageSummaryCard({ organizationId }: { organizationI
             />
           </div>
 
-          <Button variant="outline" asChild>
-            <Link
-              href={`/organizations/${organizationId}/usage-details`}
-              className="whitespace-nowrap"
-            >
-              <ChartColumnIncreasing className="mr-2 h-4 w-4" />
-              View Detailed Usage
-            </Link>
-          </Button>
+          {organizationRouteIdentifier ? (
+            <Button variant="outline" asChild>
+              <Link
+                href={`/organizations/${encodeURIComponent(organizationRouteIdentifier)}/usage-details`}
+                className="whitespace-nowrap"
+              >
+                <ChartColumnIncreasing className="mr-2 h-4 w-4" />
+                View Detailed Usage
+              </Link>
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     </TooltipProvider>

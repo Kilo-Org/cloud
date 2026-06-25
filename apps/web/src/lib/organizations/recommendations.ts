@@ -16,6 +16,7 @@ import {
 } from '@/lib/organizations/feature-adoption';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 // Which surface a recommendation ties back to. Per-feature recommendations reuse
 // the feature adoption key so the UI can show the same icon; organization-level
@@ -504,7 +505,7 @@ export async function getOrganizationRecommendations(organizationId: string): Pr
   recommendations: Recommendation[];
 }> {
   const orgRows = await readDb
-    .select({ plan: organizations.plan })
+    .select({ id: organizations.id, plan: organizations.plan, slug: organizations.slug })
     .from(organizations)
     .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
     .limit(1);
@@ -525,12 +526,14 @@ export async function getOrganizationRecommendations(organizationId: string): Pr
   ]);
 
   const dismissed = new Set(dismissedRows.map(row => row.key));
-  const recommendations = buildRecommendations(organizationId, state).map(recommendation =>
-    dismissed.has(recommendation.key)
-      ? { ...recommendation, status: 'dismissed' as const }
-      : recommendation
+  const organizationRouteIdentifier = getOrganizationRouteIdentifier(organization);
+  const recommendations = buildRecommendations(organizationRouteIdentifier, state).map(
+    recommendation =>
+      dismissed.has(recommendation.key)
+        ? { ...recommendation, status: 'dismissed' as const }
+        : recommendation
   );
-  const checks = buildFeatureAdoptionChecks(organizationId, state);
+  const checks = buildFeatureAdoptionChecks(organizationRouteIdentifier, state);
 
   return { plan: organization.plan, checks, recommendations };
 }

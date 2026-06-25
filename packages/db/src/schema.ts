@@ -2223,6 +2223,32 @@ export const api_request_compress_log = pgTable(
   table => [index('idx_api_request_compress_log_created_at').on(table.created_at)]
 );
 
+export const snowflake_query_log = pgTable(
+  'snowflake_query_log',
+  {
+    id: bigserial({ mode: 'bigint' }).notNull().primaryKey(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    source: text().notNull(),
+    query_label: text().notNull(),
+    request_id: uuid().notNull(),
+    statement_handle: text(),
+    succeeded: boolean().notNull(),
+    status_code: integer(),
+    duration_ms: integer().notNull(),
+    submit_request_count: integer().default(0).notNull(),
+    poll_request_count: integer().default(0).notNull(),
+    partition_request_count: integer().default(0).notNull(),
+    http_202_count: integer().default(0).notNull(),
+    http_429_count: integer().default(0).notNull(),
+    retry_count: integer().default(0).notNull(),
+    partition_count: integer().default(0).notNull(),
+    row_count: integer(),
+    error_code: text(),
+    error_message: text(),
+  },
+  table => [index('idx_snowflake_query_log_created_at').on(table.created_at)]
+);
+
 export const http_user_agent = pgTable(
   'http_user_agent',
   {

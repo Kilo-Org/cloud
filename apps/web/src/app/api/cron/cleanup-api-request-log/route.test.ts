@@ -4,7 +4,11 @@ jest.mock('@/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
-import { api_request_compress_log, api_request_log } from '@kilocode/db/schema';
+import {
+  api_request_compress_log,
+  api_request_log,
+  snowflake_query_log,
+} from '@kilocode/db/schema';
 import { db, sql } from '@/lib/drizzle';
 import { GET } from './route';
 
@@ -52,10 +56,27 @@ async function insertApiRequestCompressLogRecord(created_at: string) {
   return row;
 }
 
+async function insertSnowflakeQueryLogRecord(created_at: string) {
+  const [row] = await db
+    .insert(snowflake_query_log)
+    .values({
+      created_at,
+      source: 'test',
+      query_label: 'test.query',
+      request_id: crypto.randomUUID(),
+      succeeded: true,
+      status_code: 200,
+      duration_ms: 100,
+    })
+    .returning();
+  return row;
+}
+
 describe('GET /api/cron/cleanup-api-request-log', () => {
   beforeEach(async () => {
     await db.delete(api_request_log).where(sql`true`);
     await db.delete(api_request_compress_log).where(sql`true`);
+    await db.delete(snowflake_query_log).where(sql`true`);
   });
 
   it('rejects requests without authorization header', async () => {
@@ -107,6 +128,23 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(body.hasMore).toBe(false);
 
     const remaining = await db.select().from(api_request_compress_log);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe(recent.id);
+  });
+
+  it('deletes expired Snowflake query records and preserves recent records', async () => {
+    await insertSnowflakeQueryLogRecord(daysAgo(45));
+    await insertSnowflakeQueryLogRecord(daysAgo(31));
+    const recent = await insertSnowflakeQueryLogRecord(daysAgo(1));
+
+    const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.deletedCount).toBe(2);
+    expect(body.hasMore).toBe(false);
+
+    const remaining = await db.select().from(snowflake_query_log);
     expect(remaining).toHaveLength(1);
     expect(remaining[0].id).toBe(recent.id);
   });

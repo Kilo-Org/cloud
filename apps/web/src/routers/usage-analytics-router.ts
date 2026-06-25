@@ -720,6 +720,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         signal =>
           executeSnowflakeStatement({
             config,
+            source: 'web',
+            queryLabel: `usage_analytics.summary_${meta.tier}`,
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
@@ -827,6 +829,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         signal =>
           executeSnowflakeStatement({
             config,
+            source: 'web',
+            queryLabel: `usage_analytics.timeseries_${meta.tier}${input.splitBy ? `_split_${input.splitBy}` : ''}`,
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
@@ -887,6 +891,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         signal =>
           executeSnowflakeStatement({
             config,
+            source: 'web',
+            queryLabel: `usage_analytics.breakdown_${meta.tier}_${input.dimension}`,
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(
@@ -979,6 +985,8 @@ export const usageAnalyticsRouter = createTRPCRouter({
         signal =>
           executeSnowflakeStatement({
             config,
+            source: 'web',
+            queryLabel: `usage_analytics.table_${meta.tier}_groupby_${requestedDims.join('+') || 'none'}`,
             statement,
             bindings: where.bindings,
             timeoutSeconds: Math.ceil(

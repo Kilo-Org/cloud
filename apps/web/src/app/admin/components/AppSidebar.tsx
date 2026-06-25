@@ -250,6 +250,11 @@ const analyticsObservabilityItems: MenuItem[] = [
     url: '/admin/api-request-log',
     icon: () => <Database />,
   },
+  {
+    title: () => 'Snowflake Queries',
+    url: '/admin/snowflake-queries',
+    icon: () => <Database />,
+  },
 ];
 
 const menuSections: MenuSection[] = [

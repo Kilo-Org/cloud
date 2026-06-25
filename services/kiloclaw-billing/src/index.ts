@@ -208,6 +208,15 @@ function nextSweep(current: BillingSweepKind): BillingSweepKind | null {
   return BILLING_SWEEP_ORDER[index + 1];
 }
 
+function runQueuedSweep(
+  env: BillingWorkerEnv,
+  message: Parameters<typeof runSweep>[1],
+  attempt: number,
+  defer?: (promise: Promise<void>) => void
+) {
+  return defer ? runSweep(env, message, attempt, defer) : runSweep(env, message, attempt);
+}
+
 function log(level: 'info' | 'warn' | 'error', message: string, fields: BillingLogFields) {
   if (level === 'error') {
     logger.withFields(fields).error(message);
@@ -481,7 +490,12 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
     );
   },
 
-  async queue(batch, env) {
+  async queue(batch, env, ctx) {
+    const defer =
+      typeof ctx.waitUntil === 'function'
+        ? (promise: Promise<void>) => ctx.waitUntil(promise)
+        : undefined;
+
     for (const message of batch.messages) {
       const parsed = BillingQueueMessageSchema.safeParse(message.body);
       if (!parsed.success) {
@@ -625,7 +639,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 renewalBoundary: parsed.data.renewalBoundary,
               });
             } else if (parsed.data.kind === 'standalone_instance_destruction') {
-              await runSweep(env, parsed.data, message.attempts);
+              await runQueuedSweep(env, parsed.data, message.attempts, defer);
               log('info', 'Completed standalone instance destruction run', {
                 event: 'run_completed',
                 outcome: 'completed',
@@ -685,7 +699,7 @@ export const handler: ExportedHandler<BillingWorkerEnv, BillingQueueMessage> = {
                 outcome: 'started',
               });
             } else {
-              await runSweep(env, parsed.data, message.attempts);
+              await runQueuedSweep(env, parsed.data, message.attempts, defer);
 
               if (parsed.data.kind === 'lifecycle') {
                 const next = nextSweep(parsed.data.sweep);

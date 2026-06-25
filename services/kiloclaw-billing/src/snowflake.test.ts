@@ -33,6 +33,9 @@ vi.mock('jose', () => ({
 import type { BillingWorkerEnv } from './types.js';
 import { getMissingSnowflakeConfig, queryKiloclawActiveUserIds } from './snowflake.js';
 
+type RecordQuery = NonNullable<Parameters<typeof queryKiloclawActiveUserIds>[0]['recordQuery']>;
+const recordQuery = vi.fn<RecordQuery>(async () => undefined);
+
 function requestUrlToString(requestUrl: RequestInfo | URL): string {
   return requestUrl instanceof Request ? requestUrl.url : requestUrl.toString();
 }
@@ -115,6 +118,7 @@ describe('queryKiloclawActiveUserIds', () => {
   beforeEach(() => {
     mockImportPKCS8.mockClear();
     mockSign.mockClear();
+    recordQuery.mockClear();
     vi.stubGlobal('crypto', webcrypto);
     vi.spyOn(webcrypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
   });
@@ -137,6 +141,7 @@ describe('queryKiloclawActiveUserIds', () => {
       env: createEnv(),
       userIds: ['user-1', 'user-2'],
       log: vi.fn(),
+      recordQuery,
     });
 
     expect([...userIds]).toEqual(['user-1', 'user-2']);
@@ -163,6 +168,65 @@ describe('queryKiloclawActiveUserIds', () => {
       '1': { type: 'TEXT', value: 'user-1' },
       '2': { type: 'TEXT', value: 'user-2' },
     });
+    expect(recordQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestId: '11111111-1111-4111-8111-111111111111',
+        succeeded: true,
+        rowCount: 2,
+        metrics: expect.objectContaining({
+          statusCode: 200,
+          submitRequestCount: 1,
+          pollRequestCount: 0,
+          retryCount: 0,
+        }),
+      })
+    );
+  });
+
+  it('defers metrics persistence without extending the query critical path', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    const pendingPersistence = new Promise<void>(() => undefined);
+    const deferred: Promise<void>[] = [];
+
+    const userIds = await queryKiloclawActiveUserIds({
+      env: createEnv(),
+      userIds: ['user-1'],
+      log: vi.fn(),
+      recordQuery: vi.fn(() => pendingPersistence),
+      defer: promise => deferred.push(promise),
+    });
+
+    expect([...userIds]).toEqual([]);
+    expect(deferred).toHaveLength(1);
+  });
+
+  it('falls back to awaiting persistence when deferral fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+    let persisted = false;
+
+    await queryKiloclawActiveUserIds({
+      env: createEnv(),
+      userIds: ['user-1'],
+      log: vi.fn(),
+      recordQuery: vi.fn(async () => {
+        persisted = true;
+      }),
+      defer: () => {
+        throw new Error('waitUntil unavailable');
+      },
+    });
+
+    expect(persisted).toBe(true);
   });
 
   it('polls the statement status endpoint after a 202 response', async () => {
@@ -191,6 +255,7 @@ describe('queryKiloclawActiveUserIds', () => {
       env: createEnv(),
       userIds: ['user-1'],
       log: vi.fn(),
+      recordQuery,
     });
 
     expect([...userIds]).toEqual(['user-1']);
@@ -206,6 +271,34 @@ describe('queryKiloclawActiveUserIds', () => {
         'x-snowflake-authorization-token-type': 'KEYPAIR_JWT',
       })
     );
+  });
+
+  it.each([
+    'https://attacker.example/api/v2/statements/handle-1',
+    'http://fyc17898.us-east-1/api/v2/statements/handle-1',
+  ])('rejects an unsafe statement status URL: %s', async statementStatusUrl => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          statementHandle: 'handle-1',
+          statementStatusUrl,
+        }),
+        {
+          status: 202,
+          headers: { 'content-type': 'application/json' },
+        }
+      )
+    );
+
+    await expect(
+      queryKiloclawActiveUserIds({
+        env: createEnv(),
+        userIds: ['user-1'],
+        log: vi.fn(),
+        recordQuery,
+      })
+    ).rejects.toThrow('Snowflake returned an unexpected statement status URL');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it('retries a 429 submit by resubmitting the POST with retry=true', async () => {
@@ -224,6 +317,7 @@ describe('queryKiloclawActiveUserIds', () => {
       env: createEnv(),
       userIds: ['user-1'],
       log: vi.fn(),
+      recordQuery,
     });
 
     await vi.runAllTimersAsync();
@@ -241,6 +335,18 @@ describe('queryKiloclawActiveUserIds', () => {
     expect(requestUrlToString(fetchSpy.mock.calls[1][0])).toContain('retry=true');
     expect(fetchSpy.mock.calls[0][1]?.method).toBe('POST');
     expect(fetchSpy.mock.calls[1][1]?.method).toBe('POST');
+    expect(recordQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        succeeded: true,
+        rowCount: 0,
+        metrics: expect.objectContaining({
+          statusCode: 200,
+          submitRequestCount: 2,
+          http429Count: 1,
+          retryCount: 1,
+        }),
+      })
+    );
   });
 
   it('includes Snowflake response details for non-422 submit failures', async () => {
@@ -257,6 +363,7 @@ describe('queryKiloclawActiveUserIds', () => {
         env: createEnv(),
         userIds: ['user-1'],
         log,
+        recordQuery,
       })
     ).rejects.toThrow('Snowflake SQL API submit failed (400): JWT token is invalid (code: 390144)');
 
@@ -266,18 +373,21 @@ describe('queryKiloclawActiveUserIds', () => {
       expect.objectContaining({
         statusCode: 400,
         snowflakeCode: '390144',
-        snowflakeMessage: 'JWT token is invalid',
-        responseBody: JSON.stringify({ code: '390144', message: 'JWT token is invalid' }),
       })
     );
+    expect(log.mock.calls[0]?.[2]).not.toHaveProperty('snowflakeMessage');
+    expect(log.mock.calls[0]?.[2]).not.toHaveProperty('responseBody');
   });
 
   it('throws on 422 query failures so the caller can fail open', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ message: 'bad statement' }), {
-        status: 422,
-        headers: { 'content-type': 'application/json' },
-      })
+      new Response(
+        JSON.stringify({ code: '001003', message: 'bad statement for secret-user-id' }),
+        {
+          status: 422,
+          headers: { 'content-type': 'application/json' },
+        }
+      )
     );
 
     await expect(
@@ -285,8 +395,19 @@ describe('queryKiloclawActiveUserIds', () => {
         env: createEnv(),
         userIds: ['user-1'],
         log: vi.fn(),
+        recordQuery,
       })
-    ).rejects.toThrow('bad statement');
+    ).rejects.toThrow('bad statement for secret-user-id');
+    expect(recordQuery).toHaveBeenCalledWith(
+      expect.objectContaining({
+        succeeded: false,
+        metrics: expect.objectContaining({
+          errorCode: '001003',
+          errorMessage: 'Snowflake rejected the query',
+        }),
+      })
+    );
+    expect(JSON.stringify(recordQuery.mock.calls[0]?.[0])).not.toContain('secret-user-id');
   });
 });
 

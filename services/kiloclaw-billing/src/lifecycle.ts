@@ -5352,7 +5352,8 @@ async function runTrialInactivityStopSweep(
   database: WorkerDb,
   env: BillingWorkerEnv,
   context: SweepExecutionContext,
-  summary: BillingSummary
+  summary: BillingSummary,
+  defer?: (promise: Promise<void>) => void
 ): Promise<void> {
   if (!isEnvFlagEnabled(env.TRIAL_INACTIVITY_STOP_ENABLED)) {
     log('info', 'Trial inactivity stop is disabled', {
@@ -5428,6 +5429,7 @@ async function runTrialInactivityStopSweep(
         log: (level, message, fields) => {
           void snowflakeLog(snowflakeContext, level, message, fields);
         },
+        defer,
       });
 
       const stopMessages: TrialInactivityStopCandidateQueueMessage[] = [];
@@ -5495,6 +5497,7 @@ async function runTrialInactivityStopSweep(
                 instanceId: row.instance_id,
               });
             },
+            defer,
           });
 
           if (activeUserIds.has(row.user_id)) {
@@ -5629,7 +5632,8 @@ export async function processTrialInactivityStopCandidate(
 export async function runSweep(
   env: BillingWorkerEnv,
   message: { runId: string; sweep: BillingMessageSweep },
-  attempt = 1
+  attempt = 1,
+  defer?: (promise: Promise<void>) => void
 ): Promise<BillingSummary> {
   const context = createSweepContext(message, attempt);
 
@@ -5709,7 +5713,7 @@ export async function runSweep(
             await runComplementaryInferenceEndedSweep(database, env, context, summary);
             break;
           case 'trial_inactivity_stop':
-            await runTrialInactivityStopSweep(database, env, context, summary);
+            await runTrialInactivityStopSweep(database, env, context, summary, defer);
             break;
         }
 

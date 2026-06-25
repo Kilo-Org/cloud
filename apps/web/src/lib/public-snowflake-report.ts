@@ -64,6 +64,8 @@ async function fetchReport<Usage>(
   try {
     const rows = await executeSnowflakeStatement({
       config,
+      source: 'web',
+      queryLabel: `public_report.${options.source}`,
       statement: options.query,
       timeoutSeconds: 30,
     });

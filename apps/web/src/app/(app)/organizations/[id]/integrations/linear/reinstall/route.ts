@@ -5,13 +5,14 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
+import { resolveOrganizationRouteParams } from '@/lib/organizations/organization-route-utils.server';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
 export async function GET(request: NextRequest, context: RouteContext) {
-  const { id } = await context.params;
+  const organizationId = await resolveOrganizationRouteParams(context.params);
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse || !user) {
     const signInUrl = new URL('/users/sign_in', request.url);
@@ -20,13 +21,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    await ensureOrganizationAccess({ user }, id, ['owner', 'billing_manager']);
-    await requireActiveSubscriptionOrTrial(id);
+    if (!organizationId) throw new Error('Organization not found');
+    await ensureOrganizationAccess({ user }, organizationId, ['owner', 'billing_manager']);
+    await requireActiveSubscriptionOrTrial(organizationId);
   } catch {
     return NextResponse.redirect(new URL('/integrations?error=unauthorized', request.url));
   }
 
   return NextResponse.redirect(
-    new URL(getPlatformOAuthConnectPath(PLATFORM.LINEAR, id), request.url)
+    new URL(getPlatformOAuthConnectPath(PLATFORM.LINEAR, organizationId), request.url)
   );
 }

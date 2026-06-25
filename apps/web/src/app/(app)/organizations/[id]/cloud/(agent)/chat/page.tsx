@@ -1,9 +1,7 @@
-import { redirect } from 'next/navigation';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { LegacySessionViewer } from '@/components/cloud-agent-next/LegacySessionViewer';
 import { CloudChatPageWrapperNext } from './CloudChatPageWrapperNext';
-import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
-import { signInUrlWithCallbackPath } from '@/lib/user/server';
+import { requireCanonicalOrganizationRouteContext } from '@/lib/organizations/organization-page-context.server';
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -11,22 +9,13 @@ type PageProps = {
 };
 
 export default async function OrganizationCloudChatPage({ params, searchParams }: PageProps) {
-  const { id } = await params;
-  const organizationId = decodeURIComponent(id);
-
-  const result = await getAuthorizedOrgContext(organizationId);
-  if (!result.success) {
-    if (result.nextResponse.status === 401) {
-      redirect(await signInUrlWithCallbackPath());
-    }
-    redirect('/profile');
-  }
-
+  const { organization, canonicalRouteIdentifier } =
+    await requireCanonicalOrganizationRouteContext(params);
   const { sessionId } = await searchParams;
 
   if (!sessionId || isNewSession(sessionId)) {
-    return <CloudChatPageWrapperNext organizationId={organizationId} />;
+    return <CloudChatPageWrapperNext organizationId={organization.id} />;
   }
 
-  return <LegacySessionViewer sessionId={sessionId} organizationId={organizationId} />;
+  return <LegacySessionViewer sessionId={sessionId} organizationId={canonicalRouteIdentifier} />;
 }

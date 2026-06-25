@@ -9,31 +9,31 @@ type AutoTriagePageProps = {
 };
 
 export default async function AutoTriagePage({ params, searchParams }: AutoTriagePageProps) {
-  const { id: organizationId } = await params;
   const search = await searchParams;
-
-  // Feature flags - use server-side check with organization ID as distinct ID
-  const isAutoTriageFeatureEnabled = await isFeatureFlagEnabled(
-    'auto-triage-feature',
-    organizationId
-  );
-  const isDevelopment = process.env.NODE_ENV === 'development';
-
-  if (!isAutoTriageFeatureEnabled && !isDevelopment) {
-    return notFound();
-  }
 
   return (
     <OrganizationByPageLayout
       params={params}
-      render={org => (
-        <AutoTriagePageClient
-          organizationId={org.organization.id}
-          organizationName={org.organization.name}
-          successMessage={search.success}
-          errorMessage={search.error}
-        />
-      )}
+      render={async ({ organization }) => {
+        const isAutoTriageFeatureEnabled = await isFeatureFlagEnabled(
+          'auto-triage-feature',
+          organization.id
+        );
+        const isDevelopment = process.env.NODE_ENV === 'development';
+
+        if (!isAutoTriageFeatureEnabled && !isDevelopment) {
+          return notFound();
+        }
+
+        return (
+          <AutoTriagePageClient
+            organizationId={organization.id}
+            organizationName={organization.name}
+            successMessage={search.success}
+            errorMessage={search.error}
+          />
+        );
+      }}
     />
   );
 }

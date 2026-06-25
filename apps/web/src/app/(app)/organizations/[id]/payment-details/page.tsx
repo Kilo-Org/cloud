@@ -7,19 +7,19 @@ export default async function OrganizationPaymentDetailsPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id: organizationId } = await params;
-  const isAutoTopUpEnabled = await isOrgAutoTopUpFeatureEnabled(organizationId);
-
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ role, organization }) => (
-        <OrganizationPaymentDetails
-          organizationId={organization.id}
-          role={role}
-          isAutoTopUpEnabled={isAutoTopUpEnabled}
-        />
-      )}
+      render={async ({ role, organization }) => {
+        const isAutoTopUpEnabled = await isOrgAutoTopUpFeatureEnabled(organization.id);
+        return (
+          <OrganizationPaymentDetails
+            organizationId={organization.id}
+            role={role}
+            isAutoTopUpEnabled={isAutoTopUpEnabled}
+          />
+        );
+      }}
     />
   );
 }

@@ -23,6 +23,7 @@ import { AppBuilderLanding } from './AppBuilderLanding';
 
 type AppBuilderPageProps = {
   organizationId?: string; // undefined for personal context
+  organizationRouteIdentifier?: string; // undefined for personal context
   projectId?: string; // undefined for new project
 };
 
@@ -46,19 +47,24 @@ function AppBuilderProjectView({ organizationId }: { organizationId?: string }) 
   );
 }
 
-export function AppBuilderPage({ organizationId, projectId }: AppBuilderPageProps) {
+export function AppBuilderPage({
+  organizationId,
+  organizationRouteIdentifier,
+  projectId,
+}: AppBuilderPageProps) {
   const router = useRouter();
+  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
 
   // Handle project creation from landing page
   const handleProjectCreated = useCallback(
     (createdProjectId: string, _prompt: string) => {
       // Navigate to the project page - ProjectLoader will handle loading
-      const newPath = organizationId
-        ? `/organizations/${organizationId}/app-builder/${createdProjectId}`
+      const newPath = organizationPathIdentifier
+        ? `/organizations/${organizationPathIdentifier}/app-builder/${createdProjectId}`
         : `/app-builder/${createdProjectId}`;
       router.replace(newPath);
     },
-    [organizationId, router]
+    [organizationPathIdentifier, router]
   );
 
   // Show landing if no projectId

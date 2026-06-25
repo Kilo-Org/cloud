@@ -6,14 +6,17 @@ export default async function OrgTownOverviewPage({
 }: {
   params: Promise<{ id: string; townId: string }>;
 }) {
-  const { id, townId } = await params;
-  const basePath = `/organizations/${id}/gastown/${townId}`;
+  const { townId } = await params;
   return (
     <OrganizationByPageLayout
       params={params}
       fullBleed
-      render={() => (
-        <TownOverviewPageClient townId={townId} basePath={basePath} organizationId={id} />
+      render={({ organization, organizationRouteIdentifier }) => (
+        <TownOverviewPageClient
+          townId={townId}
+          basePath={`/organizations/${organizationRouteIdentifier}/gastown/${townId}`}
+          organizationId={organization.id}
+        />
       )}
     />
   );

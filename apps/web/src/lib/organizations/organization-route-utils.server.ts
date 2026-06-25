@@ -45,3 +45,10 @@ export async function resolveOrganizationRouteIdentifier(
   const organization = await resolveOrganizationRouteIdentifierDetails(identifier);
   return organization?.id ?? null;
 }
+
+export async function resolveOrganizationRouteParams(
+  params: Promise<{ id: string }>
+): Promise<string | null> {
+  const { id } = await params;
+  return resolveOrganizationRouteIdentifier(decodeURIComponent(id));
+}

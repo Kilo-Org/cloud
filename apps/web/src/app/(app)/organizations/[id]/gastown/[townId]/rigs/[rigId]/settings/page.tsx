@@ -6,13 +6,13 @@ export default async function OrgRigSettingsPage({
 }: {
   params: Promise<{ id: string; townId: string; rigId: string }>;
 }) {
-  const { id: organizationId, townId, rigId } = await params;
+  const { townId, rigId } = await params;
   return (
     <OrganizationByPageLayout
       params={params}
       fullBleed
-      render={() => (
-        <RigSettingsPageClient townId={townId} rigId={rigId} organizationId={organizationId} />
+      render={({ organization }) => (
+        <RigSettingsPageClient townId={townId} rigId={rigId} organizationId={organization.id} />
       )}
     />
   );

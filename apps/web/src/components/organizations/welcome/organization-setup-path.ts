@@ -7,8 +7,6 @@ export const ORGANIZATION_ONBOARDING_SCREENS = [
 ] as const;
 
 export type OrganizationOnboardingScreen = (typeof ORGANIZATION_ONBOARDING_SCREENS)[number];
-export const SOURCE_CONTROL_PROVIDERS = ['github', 'gitlab'] as const;
-export type SourceControlProvider = (typeof SOURCE_CONTROL_PROVIDERS)[number];
 
 type SearchParamReader = {
   get(name: string): string | null;
@@ -19,13 +17,6 @@ export function getOrganizationOnboardingScreen(
 ): OrganizationOnboardingScreen | null {
   const step = searchParams.get('step');
   return ORGANIZATION_ONBOARDING_SCREENS.find(screen => screen === step) ?? null;
-}
-
-export function getSourceControlProvider(
-  searchParams: SearchParamReader
-): SourceControlProvider | null {
-  const provider = searchParams.get('provider');
-  return SOURCE_CONTROL_PROVIDERS.find(value => value === provider) ?? null;
 }
 
 export function getFirstIncompleteOnboardingScreen(

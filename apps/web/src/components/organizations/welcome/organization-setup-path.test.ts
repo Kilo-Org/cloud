@@ -6,7 +6,6 @@ import {
   getNextOnboardingScreen,
   getOrganizationOnboardingScreen,
   getPreviousOnboardingScreen,
-  getSourceControlProvider,
 } from './organization-setup-path';
 
 function checklist(done: boolean[]): OrganizationOnboardingChecklist {
@@ -35,12 +34,6 @@ describe('organization setup paths', () => {
     expect(getOrganizationOnboardingScreen(new URLSearchParams({ step: 'unknown' }))).toBeNull();
   });
 
-  it('parses supported source control providers', () => {
-    expect(getSourceControlProvider(new URLSearchParams({ provider: 'github' }))).toBe('github');
-    expect(getSourceControlProvider(new URLSearchParams({ provider: 'gitlab' }))).toBe('gitlab');
-    expect(getSourceControlProvider(new URLSearchParams({ provider: 'bitbucket' }))).toBeNull();
-  });
-
   it('selects the first incomplete screen and falls back to complete', () => {
     expect(getFirstIncompleteOnboardingScreen(checklist([false, true, false]))).toBe(
       'source-control'
@@ -52,8 +45,8 @@ describe('organization setup paths', () => {
   });
 
   it('builds canonical paths and transitions', () => {
-    expect(buildOrganizationWelcomePath('org-id', 'source-control', { provider: 'gitlab' })).toBe(
-      '/organizations/org-id/welcome?step=source-control&provider=gitlab'
+    expect(buildOrganizationWelcomePath('org-id', 'source-control')).toBe(
+      '/organizations/org-id/welcome?step=source-control'
     );
     expect(
       buildOrganizationWelcomePath('org-id', 'code-reviewer', { code_reviewer_return: 'true' })

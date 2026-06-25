@@ -42,7 +42,7 @@ describe('buildOrganizationOnboardingChecklist', () => {
 
   it('derives mixed and complete counts from the steps', () => {
     const mixed = buildOrganizationOnboardingChecklist(
-      state({ sourceControlConnected: true, connectedPlatform: 'gitlab', teamInvited: true })
+      state({ sourceControlConnected: true, connectedPlatform: 'github', teamInvited: true })
     );
     const complete = buildOrganizationOnboardingChecklist(
       state({
@@ -54,7 +54,7 @@ describe('buildOrganizationOnboardingChecklist', () => {
     );
 
     expect(mixed.completedCount).toBe(2);
-    expect(mixed.connectedPlatform).toBe('gitlab');
+    expect(mixed.connectedPlatform).toBe('github');
     expect(mixed.completedCount).toBe(mixed.steps.filter(step => step.done).length);
     expect(complete.completedCount).toBe(3);
     expect(complete.totalCount).toBe(complete.steps.length);

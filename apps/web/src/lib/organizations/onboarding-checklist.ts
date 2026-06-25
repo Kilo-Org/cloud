@@ -15,7 +15,7 @@ export {
   type OrganizationOnboardingStepKey,
 } from '@/lib/organizations/onboarding-steps';
 
-export const SourceControlPlatformSchema = z.enum(['github', 'gitlab']);
+export const SourceControlPlatformSchema = z.literal('github');
 
 export const OrganizationOnboardingStateSchema = z.object({
   sourceControlConnected: z.boolean(),
@@ -64,14 +64,14 @@ export async function getOrganizationOnboardingState(
         SELECT 1
         FROM platform_integrations
         WHERE owned_by_organization_id = organizations.id
-          AND platform IN (${PLATFORM.GITHUB}, ${PLATFORM.GITLAB})
+          AND platform = ${PLATFORM.GITHUB}
           AND ${platformIntegrationHealthSql()}
       ) AS "sourceControlConnected",
       (
         SELECT platform
         FROM platform_integrations
         WHERE owned_by_organization_id = organizations.id
-          AND platform IN (${PLATFORM.GITHUB}, ${PLATFORM.GITLAB})
+          AND platform = ${PLATFORM.GITHUB}
           AND ${platformIntegrationHealthSql()}
         ORDER BY CASE WHEN platform = ${PLATFORM.GITHUB} THEN 0 ELSE 1 END
         LIMIT 1
@@ -85,7 +85,7 @@ export async function getOrganizationOnboardingState(
           AND ${platformIntegrationHealthSql()}
         WHERE agent_configs.owned_by_organization_id = organizations.id
           AND agent_configs.agent_type = 'code_review'
-          AND agent_configs.platform IN (${PLATFORM.GITHUB}, ${PLATFORM.GITLAB})
+          AND agent_configs.platform = ${PLATFORM.GITHUB}
           AND agent_configs.is_enabled = true
       ) AS "codeReviewerEnabled",
       (

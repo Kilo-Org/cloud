@@ -34,15 +34,12 @@ describe('getOrganizationOnboardingState', () => {
     }
   });
 
-  it.each([
-    ['github', 'app'],
-    ['gitlab', 'oauth'],
-  ] as const)('accepts an active, healthy %s integration', async (platform, integrationType) => {
+  it('accepts an active, healthy GitHub integration', async () => {
     const { organization } = await createFixtureOrganization();
     await db.insert(platform_integrations).values({
       owned_by_organization_id: organization.id,
-      platform,
-      integration_type: integrationType,
+      platform: 'github',
+      integration_type: 'app',
       platform_installation_id: crypto.randomUUID(),
       integration_status: 'active',
       repository_access: 'all',
@@ -50,38 +47,46 @@ describe('getOrganizationOnboardingState', () => {
 
     const state = await getOrganizationOnboardingState(organization.id);
     expect(state.sourceControlConnected).toBe(true);
-    expect(state.connectedPlatform).toBe(platform);
+    expect(state.connectedPlatform).toBe('github');
   });
 
-  it.each([
-    ['github', 'app'],
-    ['gitlab', 'oauth'],
-  ] as const)(
-    'detects enabled Code Reviewer configuration for connected %s',
-    async (platform, integrationType) => {
-      const { owner, organization } = await createFixtureOrganization();
-      await db.insert(platform_integrations).values({
-        owned_by_organization_id: organization.id,
-        platform,
-        integration_type: integrationType,
-        platform_installation_id: crypto.randomUUID(),
-        integration_status: 'active',
-        repository_access: 'all',
-      });
-      await db.insert(agent_configs).values({
-        owned_by_organization_id: organization.id,
-        agent_type: 'code_review',
-        platform,
-        is_enabled: true,
-        created_by: owner.id,
-        config: {},
-      });
+  it('does not treat GitLab as guided source control completion', async () => {
+    const { organization } = await createFixtureOrganization();
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'gitlab',
+      integration_type: 'oauth',
+      platform_installation_id: crypto.randomUUID(),
+      integration_status: 'active',
+      repository_access: 'all',
+    });
 
-      expect((await getOrganizationOnboardingState(organization.id)).codeReviewerEnabled).toBe(
-        true
-      );
-    }
-  );
+    const state = await getOrganizationOnboardingState(organization.id);
+    expect(state.sourceControlConnected).toBe(false);
+    expect(state.connectedPlatform).toBeNull();
+  });
+
+  it('detects enabled GitHub Code Reviewer configuration', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    await db.insert(platform_integrations).values({
+      owned_by_organization_id: organization.id,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: crypto.randomUUID(),
+      integration_status: 'active',
+      repository_access: 'all',
+    });
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      is_enabled: true,
+      created_by: owner.id,
+      config: {},
+    });
+
+    expect((await getOrganizationOnboardingState(organization.id)).codeReviewerEnabled).toBe(true);
+  });
 
   it('ignores an enabled Code Reviewer config for a different platform', async () => {
     const { owner, organization } = await createFixtureOrganization();
@@ -105,40 +110,6 @@ describe('getOrganizationOnboardingState', () => {
     const state = await getOrganizationOnboardingState(organization.id);
     expect(state.connectedPlatform).toBe('github');
     expect(state.codeReviewerEnabled).toBe(false);
-  });
-
-  it('detects Code Reviewer on any healthy connected platform', async () => {
-    const { owner, organization } = await createFixtureOrganization();
-    await db.insert(platform_integrations).values([
-      {
-        owned_by_organization_id: organization.id,
-        platform: 'github',
-        integration_type: 'app',
-        platform_installation_id: crypto.randomUUID(),
-        integration_status: 'active',
-        repository_access: 'all',
-      },
-      {
-        owned_by_organization_id: organization.id,
-        platform: 'gitlab',
-        integration_type: 'oauth',
-        platform_installation_id: crypto.randomUUID(),
-        integration_status: 'active',
-        repository_access: 'all',
-      },
-    ]);
-    await db.insert(agent_configs).values({
-      owned_by_organization_id: organization.id,
-      agent_type: 'code_review',
-      platform: 'gitlab',
-      is_enabled: true,
-      created_by: owner.id,
-      config: {},
-    });
-
-    const state = await getOrganizationOnboardingState(organization.id);
-    expect(state.connectedPlatform).toBe('github');
-    expect(state.codeReviewerEnabled).toBe(true);
   });
 
   it.each(['member', 'owner', 'billing_manager'] as const)(

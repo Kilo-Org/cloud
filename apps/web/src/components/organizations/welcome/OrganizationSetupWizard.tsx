@@ -36,8 +36,6 @@ import { InviteMemberDialog } from '@/components/organizations/members/InviteMem
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { useUserOrganizationRole } from '@/components/organizations/OrganizationContext';
 import { GitHubIntegrationDetails } from '@/components/integrations/GitHubIntegrationDetails';
-import { GitLabIntegrationDetails } from '@/components/integrations/GitLabIntegrationDetails';
-import { GitLabIcon } from '@/app/collab/_components/icons/GitLabIcon';
 import { OpenInExtensionButton } from '@/components/auth/OpenInExtensionButton';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -47,17 +45,15 @@ import {
   getNextOnboardingScreen,
   getOrganizationOnboardingScreen,
   getPreviousOnboardingScreen,
-  getSourceControlProvider,
   type OrganizationOnboardingScreen,
-  type SourceControlProvider,
 } from './organization-setup-path';
 
 const STEP_CONTENT = {
   'source-control': {
     title: 'Source Control',
-    description: 'Connect GitHub or GitLab so Kilo can work with your repositories.',
-    actionLabel: 'Choose source control',
-    helpText: 'Choose the source control platform your organization uses.',
+    description: 'Connect GitHub for guided setup, or continue without GitHub if you use GitLab.',
+    actionLabel: 'Choose your source control path',
+    helpText: 'Guided source control and Code Reviewer setup currently supports GitHub.',
     docsLabel: 'Read the integrations guide',
     docsHref: 'https://kilo.ai/docs/automate/integrations',
     icon: GitBranch,
@@ -110,9 +106,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   const headingRef = useRef<HTMLHeadingElement>(null);
   const handledReturnRef = useRef<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [sourceControlProvider, setSourceControlProvider] = useState<SourceControlProvider | null>(
-    null
-  );
+  const [showGitHubSetup, setShowGitHubSetup] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [visitedSteps, setVisitedSteps] = useState<Set<OrganizationOnboardingStepKey>>(new Set());
 
@@ -124,7 +118,6 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     trpc.organizations.reviewAgent.toggleReviewAgent.mutationOptions()
   );
   const requestedScreen = getOrganizationOnboardingScreen(searchParams);
-  const requestedProvider = getSourceControlProvider(searchParams);
   const currentScreen =
     requestedScreen ??
     (checklistQuery.data
@@ -150,10 +143,6 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
   }, [checklistQuery.data, organizationId, requestedScreen, router]);
 
   useEffect(() => {
-    if (requestedProvider) setSourceControlProvider(requestedProvider);
-  }, [requestedProvider]);
-
-  useEffect(() => {
     if (!requestedScreen) return;
     headingRef.current?.focus();
     if (requestedScreen !== 'complete') {
@@ -172,15 +161,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
       searchParams.get('github_pending_approval') ??
       searchParams.get('github_action') ??
       searchParams.get('error');
-    const gitlabResult = searchParams.get('success');
-    const codeReviewerReturn = searchParams.get('code_reviewer_return');
-    const returnKey = githubResult
-      ? `github:${githubResult}`
-      : gitlabResult === 'gitlab_connected'
-        ? `gitlab:${gitlabResult}`
-        : codeReviewerReturn
-          ? `code-reviewer:${codeReviewerReturn}`
-          : null;
+    const returnKey = githubResult ? `github:${githubResult}` : null;
 
     if (!returnKey) {
       handledReturnRef.current = null;
@@ -191,14 +172,13 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
 
     const handleReturn = async () => {
       const result = await checklistQuery.refetch();
-      const cleanScreen = githubResult || gitlabResult ? 'source-control' : 'code-reviewer';
+      const cleanScreen = 'source-control';
       const completed = result.data?.steps.find(step => step.key === cleanScreen)?.done ?? false;
 
       if (searchParams.get('github_pending_approval') === 'true') {
         setStatusMessage('GitHub is waiting for an organization administrator to approve access.');
       } else if (searchParams.get('error')) {
-        const providerName = requestedProvider === 'gitlab' ? 'GitLab' : 'GitHub';
-        setStatusMessage(`${providerName} setup did not complete. Review the error and try again.`);
+        setStatusMessage('GitHub setup did not complete. Review the error and try again.');
       } else if (completed) {
         setStatusMessage(`${STEP_CONTENT[cleanScreen].title} is complete.`);
       }
@@ -220,11 +200,11 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     router.push(buildOrganizationWelcomePath(organizationId, screen), { scroll: false });
   };
 
-  const handleSourceControlDetected = async (provider: SourceControlProvider) => {
+  const handleGitHubDetected = async () => {
     const result = await checklistQuery.refetch();
     const completed = result.data?.steps.find(step => step.key === 'source-control')?.done ?? false;
     if (completed) {
-      toast.success(`${provider === 'github' ? 'GitHub' : 'GitLab'} is connected`);
+      toast.success('GitHub is connected');
       navigate('code-reviewer');
     }
   };
@@ -233,7 +213,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
     setStatusMessage('');
     const connectedPlatform = checklistQuery.data?.connectedPlatform;
     if (!connectedPlatform) {
-      const message = 'Connect GitHub or GitLab before turning on Code Reviewer.';
+      const message = 'Connect GitHub before turning on Code Reviewer.';
       setStatusMessage(message);
       toast.error(message);
       return;
@@ -250,7 +230,7 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
         result.data?.steps.find(step => step.key === 'code-reviewer')?.done ?? false;
       if (completed) {
         toast.success('Code Reviewer is on', {
-          description: `Balanced defaults are active for ${connectedPlatform === 'gitlab' ? 'GitLab' : 'GitHub'} repositories.`,
+          description: 'Balanced defaults are active for GitHub repositories.',
         });
         navigate('invite-team');
       } else {
@@ -399,17 +379,10 @@ export function OrganizationSetupWizard({ organizationId }: OrganizationSetupWiz
                     organizationId={organizationId}
                     previous={getPreviousOnboardingScreen(currentScreen)}
                     onBack={navigate}
-                    sourceControlProvider={sourceControlProvider}
-                    onSelectSourceControl={provider => {
-                      setSourceControlProvider(provider);
-                      router.push(
-                        buildOrganizationWelcomePath(organizationId, 'source-control', {
-                          provider,
-                        }),
-                        { scroll: false }
-                      );
-                    }}
-                    onSourceControlDetected={provider => void handleSourceControlDetected(provider)}
+                    showGitHubSetup={showGitHubSetup}
+                    onShowGitHubSetup={() => setShowGitHubSetup(true)}
+                    onUseGitLab={() => navigate('invite-team')}
+                    onGitHubDetected={() => void handleGitHubDetected()}
                     connectedPlatform={checklist.connectedPlatform}
                     codeReviewerPending={enableCodeReviewerMutation.isPending}
                     onEnableCodeReviewer={() => void handleEnableCodeReviewer()}
@@ -512,10 +485,11 @@ function StepScreen({
   done,
   organizationId,
   previous,
-  sourceControlProvider,
+  showGitHubSetup,
   onBack,
-  onSelectSourceControl,
-  onSourceControlDetected,
+  onShowGitHubSetup,
+  onUseGitLab,
+  onGitHubDetected,
   connectedPlatform,
   codeReviewerPending,
   onEnableCodeReviewer,
@@ -527,11 +501,12 @@ function StepScreen({
   done: boolean;
   organizationId: string;
   previous: OrganizationOnboardingScreen | null;
-  sourceControlProvider: SourceControlProvider | null;
+  showGitHubSetup: boolean;
   onBack: (screen: OrganizationOnboardingScreen) => void;
-  onSelectSourceControl: (provider: SourceControlProvider) => void;
-  onSourceControlDetected: (provider: SourceControlProvider) => void;
-  connectedPlatform: SourceControlProvider | null;
+  onShowGitHubSetup: () => void;
+  onUseGitLab: () => void;
+  onGitHubDetected: () => void;
+  connectedPlatform: 'github' | null;
   codeReviewerPending: boolean;
   onEnableCodeReviewer: () => void;
   onContinue: () => void;
@@ -539,9 +514,7 @@ function StepScreen({
 }) {
   const content = STEP_CONTENT[step];
   const Icon = content.icon;
-  const returnTo = buildOrganizationWelcomePath(organizationId, step, {
-    provider: sourceControlProvider ?? undefined,
-  });
+  const returnTo = buildOrganizationWelcomePath(organizationId, step);
 
   return (
     <>
@@ -586,18 +559,11 @@ function StepScreen({
 
         <div className="flex-1 py-6">
           <div className="min-w-0">
-            {step === 'source-control' && sourceControlProvider === 'github' && !done ? (
+            {step === 'source-control' && showGitHubSetup && !done ? (
               <GitHubIntegrationDetails
                 organizationId={organizationId}
                 appReturnPath={returnTo}
-                onInstallationDetected={() => onSourceControlDetected('github')}
-              />
-            ) : step === 'source-control' && sourceControlProvider === 'gitlab' && !done ? (
-              <GitLabIntegrationDetails
-                organizationId={organizationId}
-                appReturnPath={returnTo}
-                onInstallationDetected={() => onSourceControlDetected('gitlab')}
-                mode="connect"
+                onInstallationDetected={onGitHubDetected}
               />
             ) : (
               <div className="flex min-h-56 flex-col justify-between rounded-xl border border-border bg-surface-background p-6">
@@ -624,39 +590,47 @@ function StepScreen({
                       {content.actionLabel}
                     </Button>
                   ) : step === 'source-control' ? (
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        onClick={() => onSelectSourceControl('github')}
-                        className="flex min-h-24 items-center gap-4 rounded-lg border border-border bg-surface-inset p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                      >
-                        <span className="flex size-10 items-center justify-center rounded-md border border-border bg-surface-raised">
-                          <Github className="size-5" />
-                        </span>
-                        <span>
-                          <span className="type-heading block">GitHub</span>
-                          <span className="type-label text-muted-foreground">
-                            Connect GitHub App
+                    <div className="space-y-4">
+                      <div className="rounded-lg border border-status-info-border bg-status-info-surface p-4">
+                        <p className="type-label text-status-info">
+                          Guided setup currently supports GitHub. GitLab remains available from
+                          Integrations after onboarding.
+                        </p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={onShowGitHubSetup}
+                          className="flex min-h-24 items-center gap-4 rounded-lg border border-border bg-surface-inset p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                          <span className="flex size-10 items-center justify-center rounded-md border border-border bg-surface-raised">
+                            <Github className="size-5" />
                           </span>
-                        </span>
-                        <ArrowRight className="ml-auto size-4 text-muted-foreground" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onSelectSourceControl('gitlab')}
-                        className="flex min-h-24 items-center gap-4 rounded-lg border border-border bg-surface-inset p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                      >
-                        <span className="flex size-10 items-center justify-center rounded-md border border-border bg-surface-raised">
-                          <GitLabIcon className="size-5 text-foreground [&_path]:fill-current" />
-                        </span>
-                        <span>
-                          <span className="type-heading block">GitLab</span>
-                          <span className="type-label text-muted-foreground">
-                            OAuth or access token
+                          <span>
+                            <span className="type-heading block">Continue with GitHub</span>
+                            <span className="type-label text-muted-foreground">
+                              Connect GitHub and enable Code Reviewer
+                            </span>
                           </span>
-                        </span>
-                        <ArrowRight className="ml-auto size-4 text-muted-foreground" />
-                      </button>
+                          <ArrowRight className="ml-auto size-4 text-muted-foreground" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={onUseGitLab}
+                          className="flex min-h-24 items-center gap-4 rounded-lg border border-border bg-surface-inset p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                          <span className="flex size-10 items-center justify-center rounded-md border border-border bg-surface-raised">
+                            <GitBranch className="size-5" />
+                          </span>
+                          <span>
+                            <span className="type-heading block">I use GitLab</span>
+                            <span className="type-label text-muted-foreground">
+                              Skip GitHub-specific setup for now
+                            </span>
+                          </span>
+                          <ArrowRight className="ml-auto size-4 text-muted-foreground" />
+                        </button>
+                      </div>
                     </div>
                   ) : connectedPlatform ? (
                     <Button
@@ -674,7 +648,7 @@ function StepScreen({
                   ) : (
                     <div className="flex flex-col items-start gap-3">
                       <p className="type-label text-status-warning">
-                        Code Reviewer needs a connected GitHub or GitLab integration.
+                        Code Reviewer guided setup needs a connected GitHub integration.
                       </p>
                       <Button
                         type="button"

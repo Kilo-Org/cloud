@@ -64,6 +64,7 @@ import { organizationAutoFixRouter } from '@/routers/organizations/organization-
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
 import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
+import { ORGANIZATION_SLUG_MAX_LENGTH } from '@/lib/organizations/organization-route-utils';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -73,7 +74,10 @@ const OrganizationSlugSchema = z
   .string()
   .trim()
   .min(1, 'Organization slug is required')
-  .max(100, 'Organization slug must be less than 100 characters')
+  .max(
+    ORGANIZATION_SLUG_MAX_LENGTH,
+    `Organization slug must be less than ${ORGANIZATION_SLUG_MAX_LENGTH} characters`
+  )
   .regex(
     /^[a-z0-9][a-z0-9-]*$/,
     'Organization slug must use lowercase letters, numbers, and hyphens'

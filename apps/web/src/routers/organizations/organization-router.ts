@@ -39,7 +39,7 @@ import { organizationsSubscriptionRouter } from '@/routers/organizations/organiz
 import { organizationsSettingsRouter } from '@/routers/organizations/organization-settings-router';
 import { organizationsUsageDetailsRouter } from '@/routers/organizations/organization-usage-details-router';
 import { TRPCError } from '@trpc/server';
-import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
@@ -69,6 +69,24 @@ const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
 });
 
+const OrganizationSlugSchema = z
+  .string()
+  .trim()
+  .min(1, 'Organization slug is required')
+  .max(100, 'Organization slug must be less than 100 characters')
+  .regex(
+    /^[a-z0-9][a-z0-9-]*$/,
+    'Organization slug must use lowercase letters, numbers, and hyphens'
+  );
+
+const OrganizationRequestedSlugUpdateSchema = OrganizationIdInputSchema.extend({
+  requested_slug: OrganizationSlugSchema.nullable(),
+});
+
+const OrganizationSlugUpdateSchema = OrganizationIdInputSchema.extend({
+  slug: OrganizationSlugSchema.nullable(),
+});
+
 const OrganizationSeatsUpdateSchema = OrganizationIdInputSchema.extend({
   seatsRequired: z.boolean(),
 });
@@ -80,6 +98,26 @@ const OrganizationInvoicesInputSchema = OrganizationIdInputSchema.extend({
 function daysAgo(days: number): Date {
   const now = new Date();
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+}
+
+async function getOrganizationByActiveSlug(slug: string, organizationId: string) {
+  const [existingOrganization] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.slug, slug), ne(organizations.id, organizationId)))
+    .limit(1);
+
+  return existingOrganization ?? null;
+}
+
+async function assertActiveSlugAvailable(slug: string, organizationId: string) {
+  const existingOrganization = await getOrganizationByActiveSlug(slug, organizationId);
+  if (existingOrganization) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Requested slug is not available',
+    });
+  }
 }
 
 const MAX_ORGANIZATIONS_PER_USER = 5;
@@ -190,6 +228,31 @@ export const organizationsRouter = createTRPCRouter({
         .set({ company_domain: input.company_domain })
         .where(eq(organizations.id, input.organizationId));
       return successResult();
+    }),
+
+  updateRequestedSlug: organizationBillingMutationProcedure
+    .input(OrganizationRequestedSlugUpdateSchema)
+    .mutation(async opts => {
+      await db
+        .update(organizations)
+        .set({ requested_slug: opts.input.requested_slug })
+        .where(eq(organizations.id, opts.input.organizationId));
+      return successResult();
+    }),
+
+  requestedSlugAvailability: organizationMemberProcedure
+    .input(OrganizationRequestedSlugUpdateSchema)
+    .query(async opts => {
+      if (!opts.input.requested_slug) {
+        return { available: true };
+      }
+
+      const existingOrganization = await getOrganizationByActiveSlug(
+        opts.input.requested_slug,
+        opts.input.organizationId
+      );
+
+      return { available: !existingOrganization };
     }),
 
   withMembers: organizationMemberProcedure.query<OrganizationWithMembers>(async opts => {
@@ -365,6 +428,64 @@ export const organizationsRouter = createTRPCRouter({
       organization: {
         id: opts.input.organizationId,
         require_seats: opts.input.seatsRequired,
+      },
+    };
+  }),
+
+  updateSlug: adminProcedure.input(OrganizationSlugUpdateSchema).mutation(async opts => {
+    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
+    if (opts.input.slug) {
+      await assertActiveSlugAvailable(opts.input.slug, opts.input.organizationId);
+    }
+
+    await db
+      .update(organizations)
+      .set({ slug: opts.input.slug })
+      .where(eq(organizations.id, opts.input.organizationId));
+
+    return {
+      organization: {
+        id: opts.input.organizationId,
+        slug: opts.input.slug,
+      },
+    };
+  }),
+
+  acceptRequestedSlug: adminProcedure.input(OrganizationIdInputSchema).mutation(async opts => {
+    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
+    const organization = await getOrganizationById(opts.input.organizationId);
+    if (!organization) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+    }
+
+    const requestedSlug = OrganizationSlugSchema.parse(organization.requested_slug);
+    await assertActiveSlugAvailable(requestedSlug, opts.input.organizationId);
+
+    await db
+      .update(organizations)
+      .set({ slug: requestedSlug, requested_slug: null })
+      .where(eq(organizations.id, opts.input.organizationId));
+
+    return {
+      organization: {
+        id: opts.input.organizationId,
+        slug: requestedSlug,
+        requested_slug: null,
+      },
+    };
+  }),
+
+  declineRequestedSlug: adminProcedure.input(OrganizationIdInputSchema).mutation(async opts => {
+    await ensureOrganizationAccess(opts.ctx, opts.input.organizationId, ['owner']);
+    await db
+      .update(organizations)
+      .set({ requested_slug: null })
+      .where(eq(organizations.id, opts.input.organizationId));
+
+    return {
+      organization: {
+        id: opts.input.organizationId,
+        requested_slug: null,
       },
     };
   }),

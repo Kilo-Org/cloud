@@ -66,6 +66,7 @@ import { organizationAutoTopUpRouter } from '@/routers/organizations/organizatio
 import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
 import { ORGANIZATION_SLUG_MAX_LENGTH } from '@/lib/organizations/organization-route-utils';
+import { organizationSlugContainsReservedSubstring } from '@/lib/organizations/organization-slug';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -114,6 +115,10 @@ async function ensureOrganizationSlugUpdateAccess(ctx: TRPCContext, organization
       ? 'You do not have the required organizational role to access this feature'
       : 'You do not have access to this organization',
   });
+}
+
+function isKiloStaffUser(user: TRPCContext['user']): boolean {
+  return user.google_user_email.toLowerCase().endsWith('@kilocode.ai');
 }
 
 const OrganizationInvoicesInputSchema = OrganizationIdInputSchema.extend({
@@ -456,6 +461,16 @@ export const organizationsRouter = createTRPCRouter({
   updateSlug: baseProcedure.input(OrganizationSlugUpdateSchema).mutation(async opts => {
     await ensureOrganizationSlugUpdateAccess(opts.ctx, opts.input.organizationId);
     if (opts.input.slug) {
+      if (
+        organizationSlugContainsReservedSubstring(opts.input.slug) &&
+        !isKiloStaffUser(opts.ctx.user)
+      ) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Organization slug cannot contain reserved terms',
+        });
+      }
+
       await assertActiveSlugAvailable(opts.input.slug, opts.input.organizationId);
     }
 

@@ -73,7 +73,14 @@ describe('resolveOrganizationRouteIdentifier', () => {
   afterEach(async () => {
     await db
       .delete(organizations)
-      .where(inArray(organizations.slug, ['route-id-org', 'route-slug-org', 'deleted-route-org']));
+      .where(
+        inArray(organizations.slug, [
+          'route-id-org',
+          'route-slug-org',
+          'deleted-route-org',
+          'persisted-kilocode-org',
+        ])
+      );
   });
 
   it('resolves organization ids', async () => {
@@ -94,6 +101,17 @@ describe('resolveOrganizationRouteIdentifier', () => {
       .returning();
 
     await expect(resolveOrganizationRouteIdentifier('route-slug-org')).resolves.toBe(
+      organization.id
+    );
+  });
+
+  it('resolves already persisted slugs containing reserved terms', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: 'Persisted Kilo Slug Org', slug: 'persisted-kilocode-org' })
+      .returning();
+
+    await expect(resolveOrganizationRouteIdentifier('persisted-kilocode-org')).resolves.toBe(
       organization.id
     );
   });

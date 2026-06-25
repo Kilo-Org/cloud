@@ -10,6 +10,7 @@ import type { User, Organization } from '@kilocode/db/schema';
 let regularUser: User;
 let adminUser: User;
 let creditManagerUser: User;
+let staffCreditManagerUser: User;
 let adminWithoutCreditAccessUser: User;
 let memberUser: User;
 let nonMemberUser: User;
@@ -33,6 +34,13 @@ describe('organizations trpc router', () => {
     creditManagerUser = await insertTestUser({
       google_user_email: 'credit-manager-org@admin.example.com',
       google_user_name: 'Credit Manager Org User',
+      is_admin: true,
+      can_manage_credits: true,
+    });
+
+    staffCreditManagerUser = await insertTestUser({
+      google_user_email: 'staff-credit-manager-org@kilocode.ai',
+      google_user_name: 'Staff Credit Manager Org User',
       is_admin: true,
       can_manage_credits: true,
     });
@@ -622,6 +630,23 @@ describe('organizations trpc router', () => {
       expect(result.organization.slug).toBe('support-slug');
     });
 
+    it('allows Kilo staff to edit slugs containing reserved terms', async () => {
+      const caller = await createCallerForUser(staffCreditManagerUser.id);
+
+      const result = await caller.organizations.updateSlug({
+        organizationId: testOrganization.id,
+        slug: 'kilocode-org',
+      });
+
+      expect(result.organization.slug).toBe('kilocode-org');
+
+      const [updatedOrg] = await db
+        .select({ slug: organizations.slug })
+        .from(organizations)
+        .where(eq(organizations.id, testOrganization.id));
+      expect(updatedOrg.slug).toBe('kilocode-org');
+    });
+
     it('rejects admins without credit management access when they are not org members', async () => {
       const caller = await createCallerForUser(adminWithoutCreditAccessUser.id);
 
@@ -675,6 +700,24 @@ describe('organizations trpc router', () => {
           slug: 'invalid_slug',
         })
       ).rejects.toThrow('Organization slug must use lowercase letters, numbers, and hyphens');
+    });
+
+    it('rejects slugs containing reserved terms', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.organizations.updateSlug({
+          organizationId: testOrganization.id,
+          slug: 'my-kilo-org',
+        })
+      ).rejects.toThrow('Organization slug cannot contain reserved terms');
+
+      await expect(
+        caller.organizations.updateSlug({
+          organizationId: testOrganization.id,
+          slug: 'kilocode-org',
+        })
+      ).rejects.toThrow('Organization slug cannot contain reserved terms');
     });
   });
 

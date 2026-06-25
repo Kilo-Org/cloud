@@ -43,6 +43,12 @@ describe('Organizations', () => {
       expect(normalizeOrganizationSlug("Evan's Test Org")).toBe('evans-test-org');
       expect(normalizeOrganizationSlug('Money.7R33$')).toBe('money-7ree');
       expect(normalizeOrganizationSlug('Team_Alpha Beta.Gamma!')).toBe('teamalpha-beta-gamma');
+      expect(normalizeOrganizationSlug('Kilo Test Org')).toBe('test-org');
+      expect(normalizeOrganizationSlug('Kilocode Team')).toBe('code-team');
+      expect(normalizeOrganizationSlug('mykiloorg')).toBe('myorg');
+      expect(normalizeOrganizationSlug('Kilo')).toMatch(/^[a-z]+-[a-z]+$/);
+      expect(normalizeOrganizationSlug('')).toMatch(/^[a-z]+-[a-z]+$/);
+      expect(normalizeOrganizationSlug('!!!')).toMatch(/^[a-z]+-[a-z]+$/);
     });
 
     test('stores the normalized organization slug when creating an organization', async () => {

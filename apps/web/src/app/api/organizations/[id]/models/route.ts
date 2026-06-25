@@ -1,11 +1,17 @@
 import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/ai-gateway/models';
+import { resolveOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils.server';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const organizationId = (await params).id;
+  const routeIdentifier = (await params).id;
+  const organizationId = await resolveOrganizationRouteIdentifier(routeIdentifier);
+  if (!organizationId) {
+    return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+  }
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
 
   return handleTRPCRequest<OpenRouterModelsResponse>(request, async caller => {

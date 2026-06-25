@@ -50,6 +50,7 @@ import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useExpiringCredits } from './useExpiringCredits';
 import { useAdminOrganizationHierarchy } from '@/app/admin/api/organizations/hooks';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -166,6 +167,7 @@ function Inner(props: InnerProps) {
     deleted_at,
     auto_top_up_enabled,
   } = info;
+  const organizationRouteIdentifier = getOrganizationRouteIdentifier(info);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(name);
@@ -719,7 +721,7 @@ function Inner(props: InnerProps) {
               </TooltipProvider>
               {auto_top_up_enabled && isAutoTopUpEnabled && (
                 <Link
-                  href={`/organizations/${id}/payment-details`}
+                  href={`/organizations/${organizationRouteIdentifier}/payment-details`}
                   className="text-muted-foreground hover:text-foreground text-sm hover:underline"
                 >
                   Auto Top-up: On
@@ -729,7 +731,9 @@ function Inner(props: InnerProps) {
             <div className="mt-4 flex flex-wrap items-center gap-4">
               <BuyOrganizationCreditsDialog organizationId={id} />
               <Button variant="outline" className="whitespace-nowrap">
-                <Link href={`/organizations/${id}/payment-details`}>View Payments</Link>
+                <Link href={`/organizations/${organizationRouteIdentifier}/payment-details`}>
+                  View Payments
+                </Link>
               </Button>
             </div>
             {expiringBlocks.length > 0 && earliestExpiry && (
@@ -747,7 +751,7 @@ function Inner(props: InnerProps) {
               <label className="text-muted-foreground text-sm font-medium">Quick Actions</label>
               <div className="mt-1">
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/organizations/${id}`} target="_blank">
+                  <Link href={`/organizations/${organizationRouteIdentifier}`} target="_blank">
                     <ExternalLink className="mr-2 h-4 w-4" />
                     View Organization Page
                   </Link>

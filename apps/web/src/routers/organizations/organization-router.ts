@@ -294,7 +294,7 @@ export const organizationsRouter = createTRPCRouter({
       getOrganizationMembers(organizationId),
       resolveEffectiveOrganizationSsoPolicy(organizationId),
       db
-        .select({ id: organizations.id, name: organizations.name })
+        .select({ id: organizations.id, name: organizations.name, slug: organizations.slug })
         .from(organizations)
         .where(
           and(
@@ -328,7 +328,12 @@ export const organizationsRouter = createTRPCRouter({
     const childOrganizationsById = new Map(childOrganizations.map(child => [child.id, child]));
     const childMembershipsByUserId = new Map<
       string,
-      Array<{ id: string; name: string; role: (typeof childMembershipRows)[number]['role'] }>
+      Array<{
+        id: string;
+        name: string;
+        slug: string | null;
+        role: (typeof childMembershipRows)[number]['role'];
+      }>
     >();
     for (const row of childMembershipRows) {
       const childOrganization = childOrganizationsById.get(row.organizationId);
@@ -376,6 +381,7 @@ export const organizationsRouter = createTRPCRouter({
       .select({
         id: organizations.id,
         name: organizations.name,
+        slug: organizations.slug,
       })
       .from(organizations)
       .where(

@@ -11,6 +11,7 @@ import type { CustomResult } from '@/lib/maybe-result';
 import { successResult } from '@/lib/maybe-result';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import z from 'zod';
+import { resolveOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils.server';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
 
@@ -54,12 +55,18 @@ export async function getAuthorizedOrgContext(
   if (authFailedResponse) {
     return { success: false, nextResponse: authFailedResponse };
   }
-  const { success, data, error } = UUIDSchema.safeParse(id);
+  const { success, data } = UUIDSchema.safeParse(id);
   if (!success) {
-    return {
-      success: false,
-      nextResponse: NextResponse.json({ error: error?.message || 'Invalid data' }, { status: 400 }),
-    };
+    const organizationIdForSlug = await resolveOrganizationRouteIdentifier(id);
+    if (!organizationIdForSlug) {
+      const res = NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+      return {
+        success: false,
+        nextResponse: res,
+      };
+    }
+
+    return getAuthorizedOrgContext(organizationIdForSlug, roles, getUserFromAuthOverride);
   }
   const organizationId = data;
 

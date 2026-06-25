@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { Check, ChevronDown } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 type OrganizationSwitcherProps = {
   organizationId?: string | null;
@@ -21,6 +22,7 @@ type OrganizationSwitcherProps = {
 
 export type OrganizationSwitcherOrganization = {
   organizationId: string;
+  organizationSlug: string | null;
   organizationName: string;
   role: string;
 };
@@ -29,7 +31,7 @@ type OrganizationSwitcherViewProps = {
   organizationId?: string | null;
   organizations?: OrganizationSwitcherOrganization[];
   isPending?: boolean;
-  onOrganizationSwitch: (organizationId: string | null) => void;
+  onOrganizationSwitch: (organization: OrganizationSwitcherOrganization | null) => void;
 };
 
 const triggerClassName =
@@ -58,9 +60,14 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
     })
   );
 
-  const handleOrganizationSwitch = (orgId: string | null) => {
-    if (orgId) {
-      router.push(`/organizations/${orgId}`);
+  const handleOrganizationSwitch = (organization: OrganizationSwitcherOrganization | null) => {
+    if (organization) {
+      router.push(
+        `/organizations/${getOrganizationRouteIdentifier({
+          id: organization.organizationId,
+          slug: organization.organizationSlug,
+        })}`
+      );
     } else {
       router.push('/profile');
     }
@@ -142,7 +149,7 @@ export function OrganizationSwitcherView({
           {organizations.map(org => (
             <DropdownMenuItem
               key={org.organizationId}
-              onClick={() => onOrganizationSwitch(org.organizationId)}
+              onClick={() => onOrganizationSwitch(org)}
               className={cn(
                 menuItemClassName,
                 organizationId === org.organizationId && selectedMenuItemClassName

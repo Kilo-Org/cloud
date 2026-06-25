@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/ai-gateway/models';
+import { resolveOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils.server';
 
 const BodySchema = z.object({ modelId: z.string().trim().min(1) });
 
@@ -28,7 +29,11 @@ export async function POST(
     );
   }
 
-  const organizationId = (await params).id;
+  const routeIdentifier = (await params).id;
+  const organizationId = await resolveOrganizationRouteIdentifier(routeIdentifier);
+  if (!organizationId) {
+    return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+  }
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
 
   return handleTRPCRequest<ValidationResult>(request, async caller => {

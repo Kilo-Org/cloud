@@ -39,6 +39,7 @@ import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
@@ -62,6 +63,9 @@ export default function OrganizationAppSidebar({
 
   // Get current organization role and data
   const currentOrg = organizationData;
+  const organizationRouteIdentifier = currentOrg
+    ? getOrganizationRouteIdentifier(currentOrg)
+    : organizationId;
   const actualRole =
     currentOrg?.members.find(member => {
       if (member.status !== 'active') return false;
@@ -111,19 +115,19 @@ export default function OrganizationAppSidebar({
           {
             title: 'Welcome',
             icon: Sparkles,
-            url: `/organizations/${organizationId}/welcome`,
+            url: `/organizations/${organizationRouteIdentifier}/welcome`,
           },
         ]
       : []),
     {
       title: 'Organization',
       icon: Building,
-      url: `/organizations/${organizationId}`,
+      url: `/organizations/${organizationRouteIdentifier}`,
     },
     {
       title: 'Usage',
       icon: ChartColumnIncreasing,
-      url: `/organizations/${organizationId}/usage-details`,
+      url: `/organizations/${organizationRouteIdentifier}/usage-details`,
     },
   ];
 
@@ -139,7 +143,7 @@ export default function OrganizationAppSidebar({
     {
       title: 'Chat',
       icon: MessageSquare,
-      url: `/organizations/${organizationId}/claw/chat`,
+      url: `/organizations/${organizationRouteIdentifier}/claw/chat`,
     },
     // Agent management is admin-only for now.
     ...(user?.is_admin
@@ -147,19 +151,19 @@ export default function OrganizationAppSidebar({
           {
             title: 'Agents',
             icon: Bot,
-            url: `/organizations/${organizationId}/claw/agents`,
+            url: `/organizations/${organizationRouteIdentifier}/claw/agents`,
           },
         ]
       : []),
     {
       title: 'Settings',
       icon: Settings,
-      url: `/organizations/${organizationId}/claw/settings`,
+      url: `/organizations/${organizationRouteIdentifier}/claw/settings`,
     },
     {
       title: "What's New",
       icon: Sparkles,
-      url: `/organizations/${organizationId}/claw/changelog`,
+      url: `/organizations/${organizationRouteIdentifier}/claw/changelog`,
     },
   ];
 
@@ -175,24 +179,24 @@ export default function OrganizationAppSidebar({
           {
             title: 'App Builder',
             icon: Plus,
-            url: `/organizations/${organizationId}/app-builder`,
+            url: `/organizations/${organizationRouteIdentifier}/app-builder`,
           },
         ]
       : []),
     {
       title: 'Cloud Agent',
       icon: Cloud,
-      url: `/organizations/${organizationId}/cloud`,
+      url: `/organizations/${organizationRouteIdentifier}/cloud`,
     },
     {
       title: 'Sessions',
       icon: List,
-      url: `/organizations/${organizationId}/cloud/sessions`,
+      url: `/organizations/${organizationRouteIdentifier}/cloud/sessions`,
     },
     {
       title: 'Webhooks / Triggers',
       icon: Webhook,
-      url: `/organizations/${organizationId}/cloud/triggers`,
+      url: `/organizations/${organizationRouteIdentifier}/cloud/triggers`,
     },
     // Gastown requires non-billing_manager role; hide for billing-only users
     ...(currentRole !== 'billing_manager'
@@ -200,28 +204,32 @@ export default function OrganizationAppSidebar({
           {
             title: 'Gas Town',
             icon: Bot,
-            url: `/organizations/${organizationId}/gastown`,
+            url: `/organizations/${organizationRouteIdentifier}/gastown`,
           },
         ]
       : []),
     {
       title: 'Code Reviewer',
       icon: Bot,
-      url: `/organizations/${organizationId}/code-reviews`,
+      url: `/organizations/${organizationRouteIdentifier}/code-reviews`,
     },
     {
       title: 'Security Agent',
       icon: Shield,
-      url: `/organizations/${organizationId}/security-agent`,
+      url: `/organizations/${organizationRouteIdentifier}/security-agent`,
     },
     ...(isAutoTriageFeatureEnabled || isDevelopment
       ? [
           {
             title: 'Auto Triage',
             icon: ListChecks,
-            url: `/organizations/${organizationId}/auto-triage`,
+            url: `/organizations/${organizationRouteIdentifier}/auto-triage`,
           },
-          { title: 'Auto Fix', icon: Wrench, url: `/organizations/${organizationId}/auto-fix` },
+          {
+            title: 'Auto Fix',
+            icon: Wrench,
+            url: `/organizations/${organizationRouteIdentifier}/auto-fix`,
+          },
         ]
       : []),
     ...(ENABLE_DEPLOY_FEATURE
@@ -229,7 +237,7 @@ export default function OrganizationAppSidebar({
           {
             title: 'Deploy',
             icon: Rocket,
-            url: `/organizations/${organizationId}/deploy`,
+            url: `/organizations/${organizationRouteIdentifier}/deploy`,
           },
         ]
       : []),
@@ -238,7 +246,7 @@ export default function OrganizationAppSidebar({
           {
             title: 'Managed Indexing',
             icon: Database,
-            url: `/organizations/${organizationId}/code-indexing`,
+            url: `/organizations/${organizationRouteIdentifier}/code-indexing`,
           },
         ]
       : []),
@@ -247,7 +255,7 @@ export default function OrganizationAppSidebar({
           {
             title: 'MCP Gateway',
             icon: Cable,
-            url: `/organizations/${organizationId}/cloud/mcp-gateway`,
+            url: `/organizations/${organizationRouteIdentifier}/cloud/mcp-gateway`,
           },
         ]
       : []),
@@ -265,7 +273,7 @@ export default function OrganizationAppSidebar({
           {
             title: 'Subscriptions',
             icon: Users,
-            url: `/organizations/${organizationId}/subscriptions`,
+            url: `/organizations/${organizationRouteIdentifier}/subscriptions`,
           },
         ]
       : []),
@@ -274,7 +282,7 @@ export default function OrganizationAppSidebar({
           {
             title: 'Integrations',
             icon: Cable,
-            url: `/organizations/${organizationId}/integrations`,
+            url: `/organizations/${organizationRouteIdentifier}/integrations`,
           },
         ]
       : []),
@@ -283,21 +291,21 @@ export default function OrganizationAppSidebar({
           {
             title: 'Model Access',
             icon: Layers,
-            url: `/organizations/${organizationId}/providers-and-models`,
+            url: `/organizations/${organizationRouteIdentifier}/providers-and-models`,
           },
         ]
       : []),
     {
       title: 'Custom Modes',
       icon: Sliders,
-      url: `/organizations/${organizationId}/custom-modes`,
+      url: `/organizations/${organizationRouteIdentifier}/custom-modes`,
     },
     ...(hasOwnerLevelAccess && currentOrg?.plan === 'enterprise'
       ? [
           {
             title: 'Audit Logs',
             icon: Activity,
-            url: `/organizations/${organizationId}/audit-logs`,
+            url: `/organizations/${organizationRouteIdentifier}/audit-logs`,
           },
         ]
       : []),
@@ -306,25 +314,28 @@ export default function OrganizationAppSidebar({
           {
             title: 'Invoices',
             icon: CreditCard,
-            url: `/organizations/${organizationId}/payment-details`,
+            url: `/organizations/${organizationRouteIdentifier}/payment-details`,
           },
           {
             title: 'Bring Your Own Key (BYOK)',
             icon: Key,
-            url: `/organizations/${organizationId}/byok`,
+            url: `/organizations/${organizationRouteIdentifier}/byok`,
           },
         ]
       : []),
   ];
 
-  const kiloClawBaseUrl = `/organizations/${organizationId}/claw`;
+  const kiloClawBaseUrl = `/organizations/${organizationRouteIdentifier}/claw`;
+  const kiloClawCanonicalBaseUrl = `/organizations/${organizationId}/claw`;
   const kiloClawInstanceState = kiloClawNavStateQuery.isSuccess
     ? kiloClawNavStateQuery.data.hasActiveInstance
       ? 'present'
       : 'absent'
     : 'unknown';
   const hasKiloClawInstance = kiloClawInstanceState === 'present';
-  const isKiloClawPath = pathname === kiloClawBaseUrl || pathname.startsWith(kiloClawBaseUrl + '/');
+  const isKiloClawPath = [kiloClawBaseUrl, kiloClawCanonicalBaseUrl].some(
+    basePath => pathname === basePath || pathname.startsWith(basePath + '/')
+  );
   const [sidebarMenu, setSidebarMenu] = useState<'main' | 'kiloClaw'>(
     isKiloClawPath && hasKiloClawInstance ? 'kiloClaw' : 'main'
   );

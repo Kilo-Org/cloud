@@ -43,6 +43,7 @@ import {
 import { useSession } from 'next-auth/react';
 import { toast } from 'sonner';
 import { useOrganizationReadOnly } from '@/lib/organizations/use-organization-read-only';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -353,7 +354,11 @@ function ChildTeamsControl({
               asChild
               className="text-xs font-normal hover:bg-accent focus-visible:ring-ring/50 focus-visible:ring-[3px]"
             >
-              <Link href={`/organizations/${encodeURIComponent(child.id)}`}>{label}</Link>
+              <Link
+                href={`/organizations/${encodeURIComponent(getOrganizationRouteIdentifier(child))}`}
+              >
+                {label}
+              </Link>
             </Badge>
           );
         })}

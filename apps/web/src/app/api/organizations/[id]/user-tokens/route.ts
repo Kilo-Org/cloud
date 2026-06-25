@@ -5,16 +5,17 @@ import { generateOrganizationApiToken } from '@/lib/tokens';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const organizationId = (await params).id;
+  const routeIdentifier = (await params).id;
 
   // Verify user has access to the organization (any member role is sufficient)
-  const result = await getAuthorizedOrgContext(organizationId);
+  const result = await getAuthorizedOrgContext(routeIdentifier);
 
   if (!result.success) {
     return result.nextResponse;
   }
 
   const { user, organization } = result.data;
+  const organizationId = organization.id;
 
   // Generate the organization-scoped JWT token (15 minute expiration)
   const { token, expiresAt } = generateOrganizationApiToken(user, organizationId, user.role);

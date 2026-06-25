@@ -4,8 +4,13 @@ import { signInUrlWithCallbackPath } from '@/lib/user/server';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import type { Organization } from '@kilocode/db/schema';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import type { JSX } from 'react';
 import { OrganizationTrialWrapper } from './OrganizationTrialWrapper';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
+
+const UUID_ROUTE_IDENTIFIER_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function OrganizationByPageLayout({
   params,
@@ -37,6 +42,17 @@ export async function OrganizationByPageLayout({
     redirect('/profile');
   }
   const { user, organization } = result.data;
+  const organizationRouteIdentifier = getOrganizationRouteIdentifier(organization);
+  if (
+    UUID_ROUTE_IDENTIFIER_PATTERN.test(organizationId) &&
+    organizationRouteIdentifier !== organizationId
+  ) {
+    const pathname = (await headers()).get('x-pathname') ?? `/organizations/${id}`;
+    redirect(
+      pathname.replace(`/organizations/${id}`, `/organizations/${organizationRouteIdentifier}`)
+    );
+  }
+
   const role = user.is_admin ? 'owner' : user.role;
   return (
     <OrganizationTrialWrapper organizationId={organization.id} fullBleed={fullBleed}>

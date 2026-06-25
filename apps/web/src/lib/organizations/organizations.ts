@@ -88,6 +88,7 @@ export async function getUserOrganizationsWithSeats(
   return results.map(result => ({
     organizationName: result.organization.name,
     organizationId: result.organization.id,
+    organizationSlug: result.organization.slug,
     role: result.membership.role,
     memberCount: result.total_member_count,
     balance:

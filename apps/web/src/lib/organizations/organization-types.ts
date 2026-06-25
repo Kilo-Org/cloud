@@ -80,6 +80,7 @@ export const OrganizationSchema = z.object({
 export type UserOrganizationWithSeats = {
   organizationName: string;
   organizationId: Organization['id'];
+  organizationSlug: Organization['slug'];
   role: OrganizationRole;
   memberCount: number;
   balance: number;
@@ -121,6 +122,7 @@ export type OrganizationMember = InvitedMember | ActiveMember;
 export type ChildOrganizationSummary = {
   id: string;
   name: string;
+  slug: string | null;
 };
 
 export type ChildOrganizationMembership = ChildOrganizationSummary & {

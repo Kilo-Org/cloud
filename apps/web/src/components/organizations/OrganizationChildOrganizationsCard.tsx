@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Building2, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useOrganizationChildren } from '@/app/api/organizations/hooks';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 type Props = {
   organizationId: string;
@@ -36,7 +37,7 @@ export function OrganizationChildOrganizationsCard({ organizationId }: Props) {
             <Link
               key={child.id}
               prefetch={false}
-              href={`/organizations/${encodeURIComponent(child.id)}`}
+              href={`/organizations/${encodeURIComponent(getOrganizationRouteIdentifier(child))}`}
               className="hover:bg-surface-hover focus-visible:ring-ring -mx-2 flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
             >
               <span className="truncate font-medium" title={child.name}>

@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { BarChart3, ChevronDown, ChevronUp, Send } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,19 +17,28 @@ const askKiloChartData = [
   { date: 'Jun 24', cost: 0.31, color: 'var(--chart-2)' },
 ];
 
+type AskKiloMessage = {
+  id: string;
+  question: string;
+};
+
 export function CostInsightsAskKiloView({
   initialQuestion = 'Create a graph of my costs for the last week',
 }: {
   initialQuestion?: string;
 }) {
+  const initialMessage = initialQuestion.trim() || 'Create a graph of my costs for the last week';
   const [question, setQuestion] = useState('');
-  const [messages, setMessages] = useState([{ id: 'initial', question: initialQuestion }]);
+  const [messages, setMessages] = useState<AskKiloMessage[]>([
+    { id: 'initial', question: initialMessage },
+  ]);
   const [chartExpanded, setChartExpanded] = useState(true);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedQuestion = question.trim();
     if (!trimmedQuestion) return;
+
     setMessages(currentMessages => [
       ...currentMessages,
       { id: `question-${currentMessages.length}`, question: trimmedQuestion },
@@ -37,7 +47,7 @@ export function CostInsightsAskKiloView({
   }
 
   return (
-    <section className="flex min-h-[calc(100vh-15rem)] flex-col" aria-label="Ask Kilo conversation">
+    <section className="flex min-h-[calc(100vh-15rem)] flex-col" aria-label="Ask Kilo">
       <div className="flex-1 space-y-6">
         {messages.map(message => (
           <div key={message.id} className="space-y-6">
@@ -64,16 +74,16 @@ export function CostInsightsAskKiloView({
                 {chartExpanded && (
                   <div className="p-4">
                     <p className="type-label text-muted-foreground">
-                      Model usage · Cost · Jun 18, 2026 to Jun 24, 2026
+                      Model usage, Cost, Jun 18, 2026 to Jun 24, 2026
                     </p>
-                    <h3 className="type-body mt-5 font-medium">Cost by date</h3>
+                    <h2 className="type-body mt-5 font-medium">Cost by date</h2>
                     <figure className="mt-3">
                       <figcaption className="sr-only">
                         Daily cost from June 18 to June 24. Peak cost was $1.42 on June 18. No spend
                         occurred June 21 or June 22.
                       </figcaption>
                       <div className="grid h-64 grid-cols-[2.75rem_minmax(0,1fr)] gap-2 sm:h-80">
-                        <div className="type-label text-muted-foreground flex flex-col justify-between pb-7 text-right font-mono tabular-nums">
+                        <div className="flex flex-col justify-between pb-7 text-right type-label font-mono text-muted-foreground tabular-nums">
                           {[1.6, 1.2, 0.8, 0.4, 0].map(value => (
                             <span key={value}>${value.toFixed(2)}</span>
                           ))}
@@ -102,15 +112,15 @@ export function CostInsightsAskKiloView({
                                   backgroundColor: item.color,
                                 }}
                               />
-                              <span className="type-label text-muted-foreground absolute top-full mt-2 whitespace-nowrap font-mono max-sm:text-[10px]">
+                              <span className="absolute top-full mt-2 whitespace-nowrap type-label font-mono text-muted-foreground max-sm:text-[10px]">
                                 {item.date.replace('Jun ', '')}
                               </span>
                             </div>
                           ))}
                         </div>
                       </div>
-                      <div className="type-label text-muted-foreground mt-2 text-center sm:hidden">
-                        Jun 18–24
+                      <div className="mt-2 text-center type-label text-muted-foreground sm:hidden">
+                        Jun 18-24
                       </div>
                     </figure>
                   </div>
@@ -118,7 +128,7 @@ export function CostInsightsAskKiloView({
               </div>
 
               <div className="space-y-3 type-body text-muted-foreground">
-                <p>Here is your daily cost trend for the last 7 days (Jun 18–24):</p>
+                <p>Here is your daily cost trend for the last 7 days (Jun 18-24):</p>
                 <ul className="list-disc space-y-2 pl-6 marker:text-foreground-subtle">
                   <li>
                     <strong className="text-foreground">Total spend:</strong> $2.63 over the week
@@ -127,11 +137,11 @@ export function CostInsightsAskKiloView({
                     <strong className="text-foreground">Daily average:</strong> $0.38
                   </li>
                   <li>
-                    <strong className="text-foreground">Peak day:</strong> Jun 18 at $1.42, 54% of
-                    the week&apos;s cost
+                    <strong className="text-foreground">Peak day:</strong>
+                    <span className="ml-1">Jun 18 at $1.42, 54% of the week&apos;s cost</span>
                   </li>
                   <li>
-                    <strong className="text-foreground">Quietest days:</strong> Jun 21–22 with no
+                    <strong className="text-foreground">Quietest days:</strong> Jun 21-22 with no
                     Credit spend
                   </li>
                   <li>
@@ -149,7 +159,7 @@ export function CostInsightsAskKiloView({
         ))}
       </div>
 
-      <form onSubmit={handleSubmit} className="sticky bottom-4 mt-8">
+      <form onSubmit={handleSubmit} className="mt-8">
         <Label htmlFor="ask-kilo-follow-up" className="sr-only">
           Ask a follow-up question
         </Label>
@@ -158,7 +168,7 @@ export function CostInsightsAskKiloView({
             id="ask-kilo-follow-up"
             value={question}
             onChange={event => setQuestion(event.target.value)}
-            placeholder="Ask a follow-up about your spending..."
+            placeholder="Ask a follow-up about your spending"
             className="bg-card h-12! rounded-xl pr-14 shadow-lg"
           />
           <Button

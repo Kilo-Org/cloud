@@ -1,5 +1,5 @@
-import { CostInsightsRoutePlaceholder } from '@/components/cost-insights/CostInsightsRoutePlaceholder';
+import { CostInsightsActivityClient } from '@/components/cost-insights/CostInsightsActivityClient';
 
 export default function CostInsightsActivityPage() {
-  return <CostInsightsRoutePlaceholder section="Activity" />;
+  return <CostInsightsActivityClient />;
 }

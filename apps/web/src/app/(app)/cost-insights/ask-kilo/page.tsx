@@ -1,5 +1,16 @@
-import { CostInsightsRoutePlaceholder } from '@/components/cost-insights/CostInsightsRoutePlaceholder';
+import { CostInsightsAskKiloView } from '@/components/cost-insights';
 
-export default function CostInsightsAskKiloPage() {
-  return <CostInsightsRoutePlaceholder section="Ask Kilo" />;
+type CostInsightsAskKiloPageProps = {
+  searchParams?: Promise<{ question?: string | string[] }>;
+};
+
+export default async function CostInsightsAskKiloPage({
+  searchParams,
+}: CostInsightsAskKiloPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const question = Array.isArray(resolvedSearchParams?.question)
+    ? resolvedSearchParams.question[0]
+    : resolvedSearchParams?.question;
+
+  return <CostInsightsAskKiloView initialQuestion={question} />;
 }

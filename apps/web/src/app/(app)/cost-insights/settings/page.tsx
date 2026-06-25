@@ -1,5 +1,5 @@
-import { CostInsightsRoutePlaceholder } from '@/components/cost-insights/CostInsightsRoutePlaceholder';
+import { redirect } from 'next/navigation';
 
 export default function CostInsightsSettingsPage() {
-  return <CostInsightsRoutePlaceholder section="Alert settings" />;
+  redirect('/cost-insights/config');
 }

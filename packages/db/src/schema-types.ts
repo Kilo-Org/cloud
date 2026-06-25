@@ -624,6 +624,44 @@ export const CostInsightRollupDegradedReason = {
 export type CostInsightRollupDegradedReason =
   (typeof CostInsightRollupDegradedReason)[keyof typeof CostInsightRollupDegradedReason];
 
+export const CostInsightEventType = {
+  ConfigChanged: 'config_changed',
+  AnomalyAlert: 'anomaly_alert',
+  ThresholdCrossed: 'threshold_crossed',
+  AlertReviewed: 'alert_reviewed',
+  SuggestionCreated: 'suggestion_created',
+  SuggestionDismissed: 'suggestion_dismissed',
+  Disabled: 'disabled',
+} as const;
+
+export type CostInsightEventType = (typeof CostInsightEventType)[keyof typeof CostInsightEventType];
+
+export const CostInsightAlertKind = {
+  Anomaly: 'anomaly',
+  Threshold: 'threshold',
+} as const;
+
+export type CostInsightAlertKind = (typeof CostInsightAlertKind)[keyof typeof CostInsightAlertKind];
+
+export const CostInsightSuggestionKind = {
+  CodingPlan: 'coding_plan',
+  KiloPass: 'kilo_pass',
+} as const;
+
+export type CostInsightSuggestionKind =
+  (typeof CostInsightSuggestionKind)[keyof typeof CostInsightSuggestionKind];
+
+export const CostInsightNotificationStatus = {
+  Pending: 'pending',
+  Sending: 'sending',
+  Sent: 'sent',
+  Failed: 'failed',
+  Skipped: 'skipped',
+} as const;
+
+export type CostInsightNotificationStatus =
+  (typeof CostInsightNotificationStatus)[keyof typeof CostInsightNotificationStatus];
+
 // NOTE: Do not change these action names. Use present tense for consistency.
 export const KiloClawAdminAuditAction = z.enum([
   'kiloclaw.volume.extend',

@@ -1,6 +1,6 @@
 'use client';
 
-import { CheckCircle2 } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle2, DollarSign } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CostInsightsLoadError } from '../shared/CostInsightsLoadError';
 import { StatusBadge } from '../shared/StatusBadge';
@@ -19,30 +19,56 @@ const toneClasses = {
   danger: 'text-status-destructive',
 } satisfies Record<SpendMetric['tone'], string>;
 
+const metricIcons = {
+  activity: Activity,
+  alert: AlertTriangle,
+  check: CheckCircle2,
+  dollar: DollarSign,
+} satisfies Record<string, typeof Activity>;
+
 export function CostInsightsDashboardView({
   data,
   isLoading = false,
   isError = false,
+  onSetupAlerts,
+  onAlertAction,
+  onSuggestionDismiss,
   onAskKilo,
 }: {
-  data: CostInsightsDashboardData;
+  data?: CostInsightsDashboardData;
   isLoading?: boolean;
   isError?: boolean;
+  onSetupAlerts?: () => void;
+  onAlertAction?: (
+    alert: CostInsightsDashboardData['alerts'][number],
+    action: CostInsightsDashboardData['alerts'][number]['actions'][number]
+  ) => void;
+  onSuggestionDismiss?: (suggestionId: string) => void;
   onAskKilo?: (question: string) => void;
 }) {
   if (isLoading) return <DashboardSkeleton />;
   if (isError) return <CostInsightsLoadError />;
+  if (!data) return <CostInsightsLoadError />;
 
   return (
     <div className="space-y-6">
       <AskKiloInput owner={data.owner} onSubmit={onAskKilo} />
       {data.alerts.map((alert, index) => (
-        <ReviewBanner key={alert.type} alert={alert} primaryAction={index === 0} />
+        <ReviewBanner
+          key={alert.type}
+          alert={alert}
+          primaryAction={index === 0}
+          onAction={action => onAlertAction?.(alert, action)}
+        />
       ))}
       {data.suggestions.map(suggestion => (
-        <SuggestionCard key={suggestion.id} suggestion={suggestion} />
+        <SuggestionCard
+          key={suggestion.id}
+          suggestion={suggestion}
+          onDismiss={() => onSuggestionDismiss?.(suggestion.id)}
+        />
       ))}
-      {!data.enabled && <DisabledAlertsBanner />}
+      {!data.enabled && <DisabledAlertsBanner onSetupAlerts={onSetupAlerts} />}
 
       <section aria-labelledby="spend-summary-title">
         <div className="mb-3 flex items-end justify-between gap-4">
@@ -99,7 +125,7 @@ function DashboardSkeleton() {
 }
 
 function MetricTile({ metric }: { metric: SpendMetric }) {
-  const Icon = metric.icon;
+  const Icon = typeof metric.icon === 'string' ? metricIcons[metric.icon] : metric.icon;
   return (
     <div className="bg-card p-6">
       <div className="type-label text-muted-foreground flex items-center gap-2">

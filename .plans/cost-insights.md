@@ -4,11 +4,20 @@ This plan covers Cost Insights v1, including Spend Alerts and Cost Suggestions. 
 
 ## Status
 
-Draft plan. Core product decisions are confirmed. Storybook UI exists as design reference. Backend implementation has not started.
+Implemented in this branch. The Spend evidence data layer was implemented in commit `f060ef557`; this follow-on slice adds Spend Alert and Cost Suggestion config, owner state, events, notification delivery, evaluation, tRPC procedures, live UI wiring, sidebar attention, email templates, cron jobs, and retention.
+
+Current state:
+
+- Credit-spend capture, owner-hour rollups, canonical Postgres reads, coverage, degraded intervals, exact rolling-24-hour reads, backfill, repair, reconciliation, operator scripts, and a local dev seed are implemented.
+- Spend Alert and Cost Suggestion config, owner state, active suggestions, Cost Insight Events, notification deliveries, alert/suggestion evaluation, hourly sweep, and 90-day retention cleanup are implemented.
+- Personal and organization routes are wired to live tRPC data and mutations. `/config` is the settings route; old `/settings` paths redirect. Ask Kilo v1 routes render UI-only conversation controls without processing questions.
+- Cost Insights sidebar placement is directly below Usage. Sidebar attention uses the lightweight unreviewed-alert endpoint.
+- Post-commit evaluation scheduling is wired for web spend paths: AI Gateway, charged Exa, Coding Plan activation and renewal, and pure-credit KiloClaw enrollment. KiloClaw Worker renewal captures remain covered by the hourly evaluation sweep.
+- Production rollout is not complete. Migration deployment, coordinated web/Worker cutover, production EXPLAINs, latency and lock benchmarks, Exa historical index rollout, contiguous 7-day then 90-day reconciliation, and live notification smoke tests remain operational gates.
 
 ## Confirmed Decisions
 
-- Cost Insights is account-level surface for Spend Alerts.
+- Cost Insights is the Usage-adjacent surface for Spend Alerts.
 - Spend Alerts are opt-in for personal users and organizations.
 - Spend Alerts are alert-only.
 - Spend Alerts must not block spend, pause usage, throttle usage, suppress auto-top-up, reject paid requests, or emit Spend Alerts-specific HTTP 402 responses.
@@ -87,63 +96,81 @@ Draft plan. Core product decisions are confirmed. Storybook UI exists as design 
 - Data-layer implementation and rollout follow `.plans/cost-insights-data-layer.md`; physical schema, locking, driver-key, source-mapping, backfill, and repair mechanics remain there rather than being duplicated in this plan.
 - Implementation should ship as independently verifiable vertical slices.
 
-## Vertical Slices
+## Vertical slices
 
-Prerequisite: complete the spend-writer audit from `.plans/cost-insights-data-layer.md` so every production `microdollars_used` mutation has an included/excluded classification.
+The spend-writer audit prerequisite is complete and guarded by `apps/web/src/lib/cost-insights/spend-writer-audit.test.ts`.
 
-| Slice | Goal | Primary outcomes |
+| Slice | Status | Implemented | Remaining |
+|---|---|---|---|
+| 1. Schema and policy primitives | Implemented | Owner-hour totals, driver buckets, coverage, degraded intervals, config, owner episode state, active suggestions, Cost Insight Events, notification delivery, and pure policy helpers | Production migration deployment |
+| 2. Spend evidence data layer | Implemented locally; production rollout pending | Atomic capture for AI Gateway, charged Exa, Coding Plan, and pure-credit KiloClaw; dense hourly reads; exact rolling 24h; top drivers; canonical repair/backfill/reconciliation; local seed | Production cutover, 7-day and 90-day backfill, production reconciliation, query-plan checks, performance benchmarks, and operational telemetry |
+| 3. Spend Alert evaluation | Implemented | Fixed anomaly policy, threshold crossing logic, first-enable/re-enable evaluation, web post-spend scheduling, hourly sweep, events, notification delivery creation, and episode dedupe | Production smoke tests and KiloClaw Worker post-renewal dispatch if lower latency than hourly sweep is required |
+| 4. Cost Suggestion evaluation | Implemented | Default-on config, eligibility heuristics, evidence windows, active identity, CTA selection, dismissal, and events | Product tuning from production evidence |
+| 5. Notifications and banners | Implemented | Recipient snapshots, retryable email deliveries, dispatch-time access checks, Spend Alert email template, dashboard banners, suggestion cards, and deep links | Live email provider smoke test |
+| 6. Cost Insights UI | Implemented | Personal/org dashboard, `/config`, activity, UI-only Ask Kilo, tRPC reads/mutations, actor labels, sidebar attention, admin read-only settings, and route cleanup | Browser smoke after deployment |
+| 7. Retention and audit cleanup | Implemented | Daily deletion of 90-day events and child delivery rows while compact owner state remains | Production cron smoke |
+
+## Implementation areas
+
+| Area | Current state | Remaining work |
 |---|---|---|
-| 1. Schema and policy primitives | Establish durable storage and pure policy contracts | Alert and suggestion config/state, owner-hour total, driver-bucket, coverage, degraded-interval, and event tables; shared policy helpers; defaults and validation |
-| 2. Spend evidence data layer | Record and expose spend evidence across every Credit-spend path | Atomic Variable/Scheduled capture, dense hourly reads, exact rolling-24h reads, top drivers, 7-day enablement repair, 90-day bootstrap, reconciliation |
-| 3. Spend Alert evaluation | Detect anomalies and threshold crossings | Async post-spend evaluation, hourly sweep, event creation, exact threshold semantics, episode dedupe |
-| 4. Cost Suggestion evaluation | Create advisory cost-efficiency recommendations | Eligibility/evidence evaluation, active suggestion state, dismissal identity, suggestion events, CTA destinations |
-| 5. Notifications and banners | Surface alerts and suggestions without request-side side effects | Email dispatch with per-recipient delivery rows, owner-scoped in-app banner, active suggestion cards, Cost Insights deep links |
-| 6. Cost Insights UI | Let owners inspect evidence, configure features, and review outcomes | Dashboard, settings, event history, org member driver links, suggestion actions, sidebar attention state |
-| 7. Retention and audit cleanup | Keep event history bounded while preserving rollups and dedupe state | Daily event deletion after 90 days, notification row cleanup, owner state remains compact, rollups remain indefinite |
+| `packages/db/src/schema.ts` | Spend evidence, config, owner state, active suggestion, event, and notification delivery tables are implemented | Production migration deployment |
+| `packages/db/src/cost-insights-rollups.ts` | Transaction-bound capture is implemented for web and Worker callers | Add telemetry only if it belongs at this boundary; generic reads remain in the web repository |
+| `packages/db/src/migrations/` | Generated migrations `0173_workable_carlie_cooper.sql` and `0174_young_molecule_man.sql` contain Spend evidence and alert/suggestion/event storage | Never edit generated migration artifacts by hand |
+| `apps/web/src/lib/ai-gateway/` | Positive personal and organization Variable Credit spend captures atomically and schedules async evaluation after commit | Production smoke |
+| `apps/web/src/lib/organizations/` | Organization mutation is transaction-aware; Cost Insights reuses owner/billing-manager authorization and recipient checks | Production smoke |
+| `apps/web/src/lib/exa-usage.ts` | Charged positive Exa usage captures atomically as `other`/`exa` and schedules async evaluation after commit | Finish production partition-index rollout |
+| `apps/web/src/lib/kiloclaw/` | Pure-credit enrollment captures Scheduled Credit spend and schedules async evaluation after commit | Production smoke |
+| `services/kiloclaw-billing/` | Pure-credit renewal captures Scheduled Credit spend with request-scoped DB use | Hourly sweep evaluates renewal spend; add direct side-effect dispatch only if production latency requires it |
+| `apps/web/src/lib/coding-plans/` | Activation and renewal capture Scheduled Credit spend and schedule async evaluation after commit | Production smoke |
+| `apps/web/src/lib/cost-insights/` | Spend reads, config/state/event repositories, alert policy/evaluation, suggestion evaluation, notification workflows, jobs, retention, and presentation mapping exist | Production smoke and tuning |
+| `apps/web/src/routers/` | Personal and organization Cost Insights procedures exist for dashboard, settings, event history, acknowledgment, suggestion dismissal, and attention state | Authorization regression expansion |
+| `apps/web/src/app/(app)` | Personal and organization routes render live dashboard, activity, UI-only Ask Kilo, and `/config`; old `/settings` paths redirect | Browser smoke |
+| `apps/web/src/components/cost-insights/` | Dashboard, UI-only Ask Kilo, settings, activity, banners, suggestions, loading/error states, and actor-label display are wired to live data | Browser smoke |
+| `apps/web/src/emails/` | Spend Alert email exists with owner-correct links | Live email provider smoke |
+| `apps/web/src/app/api/cron/` and `apps/web/vercel.json` | Hourly evaluation sweep and daily 90-day retention cleanup are registered | Production cron smoke |
 
-## Implementation Areas
+## Required tests
 
-| Area | Expected change |
-|---|---|
-| `packages/db/src/schema.ts` | Add Cost Insights config, state, rollup, coverage, degraded-interval, suggestion, notification, and event tables. |
-| `packages/db/src/cost-insights-rollups.ts` | Add transaction-bound capture primitive shared by web and Worker spend paths. |
-| `packages/db/src/migrations/` | Generate migration from schema with `pnpm drizzle generate`. |
-| `apps/web/src/lib/ai-gateway/` | Classify Variable Credit spend and atomically update owner-hour rollups without changing request admission. |
-| `apps/web/src/lib/organizations/` | Consolidate organization spend mutation and defer existing low-balance email scheduling until commit. |
-| `apps/web/src/lib/exa-usage.ts` | Capture charged Exa requests as Variable Credit spend under source `other` and product `exa`. |
-| `apps/web/src/lib/kiloclaw/` | Classify pure-credit hosting enrollment as Scheduled Credit spend and update rollups. |
-| `services/kiloclaw-billing/` | Capture pure-credit KiloClaw renewals inside existing Worker billing transactions. |
-| `apps/web/src/lib/coding-plans/` | Classify plan purchases and renewals as Scheduled Credit spend when applicable. |
-| `apps/web/src/lib/cost-insights/` | Add spend reads, coverage, backfill/repair, alert evaluation, Cost Suggestion evaluation, and event workflows. |
-| `apps/web/src/routers/` | Add owner-scoped Cost Insights tRPC procedures. |
-| `apps/web/src/app/(*)` | Add personal and organization Cost Insights routes. |
-| `apps/web/src/components/` | Add dashboard, settings, banners, suggestions, and sidebar attention UI following existing app patterns. |
-| `apps/web/src/emails/` | Add Spend Alert and Cost Suggestion emails with appropriate deep links. |
+| Test area | Status | Remaining coverage |
+|---|---|---|
+| Spend-writer inventory | Done | Keep the repository guard current when new balance mutations are added |
+| Atomic capture and rollback | Done for current producers | Add real-rollup integration coverage for Coding Plan and KiloClaw paths that currently mock capture |
+| Owner isolation, UTC buckets, covered zero, unknown/degraded history | Done at repository/data-layer level | Add more API authorization and organization read-scope tests |
+| Exact rolling `[asOf - 24h, asOf)` | Done | Benchmark high-volume boundary fragments before per-spend threshold evaluation |
+| Backfill, repair, reconciliation | Partial | Add production canaries and broader degraded-interval lifecycle coverage |
+| Preset evidence ranges | Partial | Add exact 24h, 7d, 30d, and 90d bucket-count tests plus top-driver tie/category tests |
+| Config and authorization | Partial | Threshold validation has pure coverage; add router-level owner/billing-manager/member/admin tests |
+| Spend Anomaly Alerts | Partial | Policy helper coverage exists; add repository-backed dedupe, acknowledgment, and first-enable tests |
+| Spend Threshold Alerts | Partial | Add exact crossing/recovery/recrossing, adjustment, disablement, and first-enable tests |
+| Cost Suggestions | Partial | Add repository-backed default enablement, materially-new identity, CTA, and dismissal tests |
+| Non-enforcement | Partial | Targeted spend-writer tests still pass; add end-to-end proof that alerts never reject spend or change billing state |
+| Events, notifications, banners, and attention | Partial | Add event snapshot, delivery retry/revalidation, and sidebar attention tests |
+| Retention | Partial | Add retention job coverage for event and child delivery deletion without owner-state reset |
 
-## Required Tests
+## Next implementation order
 
-- Alert and suggestion config defaulting, validation, independence, authorization, and organization billing-manager access.
-- Closed spend-writer audit covering every production `microdollars_used` mutation.
-- Hourly rollup writes for AI Gateway and charged Exa Variable Credit spend plus KiloClaw and Coding Plan Scheduled Credit spend.
-- All-owner owner-hour total and driver-bucket writes plus enablement baseline reuse.
-- Spend-write rollback when required owner-hour total or driver-bucket capture cannot commit.
-- Covered zero-spend hours versus uncovered or degraded unknown hours.
-- Prior-7-day enablement backfill/repair and reconciled 90-day completeness before 30d/90d evidence is treated as complete.
-- Exact rolling `[asOf - 24h, asOf)` spend reads without UTC-bucket approximation or boundary double counting.
-- Fixed anomaly formula (`max(3 * baseline, 10 USD floor)`), 25 USD starter floor, 7-day p95 baseline, and once-per-hour dedupe.
-- Single spend-threshold crossing dedupe across exact rolling 24-hour windows.
-- Cost Suggestion eligibility, default enablement, independent disablement, evidence windows, dismissal identity, CTA destination, and non-guarantee copy.
-- Alert-only regression coverage for AI Gateway, Exa, KiloClaw, Coding Plan, and auto-top-up paths.
-- Regression coverage that Spend Alerts and Cost Suggestions never reject paid requests or alter spend/subscription state.
-- Org event evidence includes member spend drivers without exposing unauthorized org data.
-- Sidebar attention state for unreviewed alert; suggestions alone do not use alert attention semantics.
-- Email links route to the correct alert review or suggestion context.
-- Per-recipient notification retry without duplicate owner-scoped events.
-- Recipient access revalidation that skips org recipients who lost manager access before send.
-- Current-manager banner, review, suggestion CTA, and dismissal visibility for owners and billing managers.
+1. Deploy migrations and complete data-layer production rollout gates from `.plans/cost-insights-data-layer.md`.
+2. Run production EXPLAINs, capture latency and lock benchmarks, and live cron/email smoke tests.
+3. Complete contiguous 7-day then 90-day backfill, canary reconciliation, and deployment-boundary reconciliation.
+4. Add router/repository integration tests for organization authorization, alert episode dedupe, notification retry/revalidation, and retention.
+5. Decide whether KiloClaw Worker renewals need direct post-commit side-effect dispatch or whether hourly sweep latency is acceptable.
 
-## Verification
+## Verification completed
 
-- Run targeted tests for changed web, database, billing, usage, and Cost Insights areas.
-- Run targeted type checking or `scripts/typecheck-all.sh --changes-only`; avoid full monorepo typecheck unless broad changes require it.
-- Run `pnpm format` before commit.
+Implementation commit `f060ef557` was locally validated with targeted web, database, and KiloClaw Worker tests, targeted typechecks/lint, `pnpm format`, `git diff --check`, and empty-database migration bootstrap. Full monorepo typecheck was skipped under repository guidance.
+
+This branch was locally validated with:
+
+- `pnpm --filter @kilocode/db typecheck`
+- `pnpm --filter web typecheck`
+- `pnpm --filter web lint`
+- `pnpm --filter @kilocode/db lint`
+- `pnpm --filter web test -- src/lib/cost-insights/policy.test.ts src/lib/exa-usage.test.ts src/lib/coding-plans/index.test.ts src/lib/coding-plans/billing-lifecycle-cron.test.ts src/lib/usageDeduction.test.ts`
+- `pnpm format`
+- `git diff --check`
+- Disposable database migration smoke with `POSTGRES_URL=postgres://postgres:postgres@localhost:5432/<temp> pnpm drizzle migrate`
+
+`pnpm test:db` started healthy Postgres but `drizzle-kit migrate` returned an unhelpful `undefined` error because the local long-lived test database already had a migration row at the new index from prior local state. A disposable database migration smoke passed with the generated migration set. This local migration-table issue is not evidence of SQL invalidity.
+
+The local seed was run twice and reconciled across 2,160 hourly buckets with zero mismatches and zero coverage holes. Canonical totals matched rollups for personal and organization fixture owners. This validates local behavior only; it is not evidence of production rollout.

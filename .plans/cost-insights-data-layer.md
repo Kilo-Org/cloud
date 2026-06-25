@@ -2,9 +2,22 @@
 
 ## Status
 
-Ready for implementation. This plan covers Credit-spend capture, owner-hour rollups, read repositories, historical backfill, repair, and rollout validation. Alert evaluation, Cost Insight Events, notifications, tRPC routes, and UI are follow-on work.
+Implemented in commit `f060ef557` and validated against local PostgreSQL. Slices 0 through 5 are complete in code. Slice 6 has working canonical aggregation, backfill, targeted repair, reconciliation, coverage, degraded-interval handling, and operator scripts, but production execution remains pending.
 
-The business rules remain in `.specs/cost-insights.md`. Canonical terminology remains in `CONTEXT.md`. The broader feature sequence remains in `.plans/cost-insights.md`.
+Do not mark this plan complete until production EXPLAINs, capture latency and lock-contention benchmarks, production Exa historical partition indexes, coordinated web/Worker cutover, contiguous 7-day and 90-day backfill, canary reconciliation, deployment-boundary reconciliation, and production observability are complete.
+
+Alert evaluation, Cost Insight Events, notifications, tRPC routes, and UI are implemented in the follow-on Cost Insights slice described in `.plans/cost-insights.md`. Business rules remain in `.specs/cost-insights.md`; canonical terminology remains in `CONTEXT.md`.
+
+## Implemented result
+
+- Generated migration `packages/db/src/migrations/0173_workable_carlie_cooper.sql` adds four unpartitioned Spend evidence tables with owner, UTC-hour, taxonomy, amount, count, coverage, and degraded-interval constraints.
+- `@kilocode/db/cost-insights-rollups` provides validated UTC bucketing, normalized driver dimensions, versioned SHA-256 driver keys, owner-hour advisory locking, and one-statement additive total/driver capture.
+- AI Gateway, charged Exa, Coding Plan activation/renewal, and pure-credit KiloClaw enrollment/renewal capture Variable or Scheduled Credit spend in the same transaction as their source and balance mutations.
+- AI Gateway, charged Exa, Coding Plan activation/renewal, and pure-credit KiloClaw enrollment schedule Cost Insights evaluation after web transactions commit. KiloClaw Worker renewal captures are evaluated by the hourly Cost Insights sweep.
+- `apps/web/src/lib/cost-insights/spend-repository.ts` provides dense hourly reads, current-hour totals, top drivers, coverage state, and exact rolling `[asOf - 24h, asOf)` reads.
+- `apps/web/src/lib/cost-insights/canonical-sources.ts` and `rollup-maintenance.ts` provide four-source canonical aggregation, bounded absolute replacement, owner repair, reconciliation, and degraded-interval workflows.
+- `apps/web/src/scripts/db/cost-insights-rollups.ts` defaults to dry-run reconciliation and requires explicit bounded execution. `exa-usage-log-indexes.ts` performs bounded, newest-first partition-local Exa index rollout.
+- `dev/seed/cost-insights/spend-evidence.ts` creates local-only personal and organization fixtures with 90 days of sparse evidence, current-hour spikes, Scheduled spend, and member driver attribution.
 
 ## Goal
 
@@ -31,7 +44,7 @@ Every production operation that increments `microdollars_used` must update this 
 
 ### Storage shape
 
-Add four unpartitioned tables:
+The implementation adds four unpartitioned tables:
 
 1. `cost_insight_owner_hour_totals`
 2. `cost_insight_owner_hour_driver_buckets`
@@ -89,7 +102,7 @@ Use the source spend timestamp, not processing or backfill time. Normalize bucke
 
 ### Controlled schema values
 
-Add `CostInsightSpendCategory` and `CostInsightSpendSource` runtime/type values to `packages/db/src/schema-types.ts`. Register them in `SCHEMA_CHECK_ENUMS` and enforce them through `enumCheck` constraints in `packages/db/src/schema.ts`.
+`CostInsightSpendCategory`, `CostInsightSpendSource`, and `CostInsightRollupDegradedReason` are registered in `SCHEMA_CHECK_ENUMS` and enforced through `enumCheck` constraints in `packages/db/src/schema.ts`.
 
 ### Owner-hour totals
 
@@ -185,7 +198,7 @@ Create a degraded interval before an intentional capture bypass, and immediately
 
 ## Shared capture module
 
-Add a subpath-only export `@kilocode/db/cost-insights-rollups`, backed by `packages/db/src/cost-insights-rollups.ts` and exported through `packages/db/package.json`. Do not add it to the broad root barrel; explicit imports keep the billing-critical persistence boundary visible in web and Worker call sites.
+The subpath-only export `@kilocode/db/cost-insights-rollups` is backed by `packages/db/src/cost-insights-rollups.ts` and exported through `packages/db/package.json`. It is not re-exported from the broad root barrel, so the billing-critical persistence boundary remains visible in web and Worker call sites.
 
 The module owns:
 
@@ -194,7 +207,8 @@ The module owns:
 - Explicit UTC bucket calculation.
 - Transaction-scoped owner-hour advisory locking.
 - Total and driver additive upserts in a fixed lock order.
-- Generic owner-range read helpers that do not format USD or resolve labels.
+
+Generic owner-range reads live in `apps/web/src/lib/cost-insights/spend-repository.ts`. Keeping them out of the shared package avoids pulling application read policy into the billing-critical web/Worker capture boundary.
 
 Suggested input:
 
@@ -228,7 +242,7 @@ type CaptureCostInsightSpendInput = {
 6. Upsert the combined driver bucket.
 7. Increment amount and count and set `updated_at = now()` explicitly.
 
-Every writer and targeted repair acquires the same owner-hour advisory lock. This prevents an absolute repair from overwriting a concurrent live contribution. Always lock total before driver to avoid lock-order drift.
+The implemented helper performs lock acquisition, total upsert, driver upsert, and digest-collision outcome reporting in one SQL statement. Every writer and targeted repair acquires the same owner-hour advisory lock. This prevents an absolute repair from overwriting a concurrent live contribution. Total mutation precedes driver mutation in the statement.
 
 The module must accept a structural transaction writer type. It must not import the web database singleton, create a Worker database client, or cache transport-owning state. KiloClaw Worker continues creating request-scoped clients through `getWorkerDb`.
 
@@ -425,24 +439,22 @@ The existing daily rollup is a secondary checksum, not a backfill source. It lac
 
 ### Shared canonical mapping
 
-Add source-specific canonical aggregation functions under `apps/web/src/lib/cost-insights/`. Live and historical mapping must share constants for category, source, product, feature, and fallback values.
+Source-specific canonical aggregation lives in `apps/web/src/lib/cost-insights/canonical-sources.ts`. Live and historical mapping share constants for category, source, product, feature, and fallback values. Mapper fixtures cover representative values, while full real-source/live-digest parity remains a test gap.
 
-Backfill SQL may need source-specific `CASE` expressions for set-based aggregation. Add parity fixtures proving live mapping and historical mapping produce the same driver keys for representative source rows.
-
-Historical gaps map to `other`; do not infer mutable event-time data from current subscriptions or user profiles.
+Historical gaps map to `other`; the implementation does not infer mutable event-time data from current subscriptions or user profiles.
 
 ### Bulk backfill script
 
-Add an operator script under `apps/web/src/scripts/` and register it in the existing script index. It must default to dry run and require explicit execution.
+The operator script at `apps/web/src/scripts/db/cost-insights-rollups.ts` is auto-discovered by the existing script runner. It defaults to dry-run reconciliation and requires explicit execution for writes.
 
-Parameters:
+Implemented parameters:
 
-- `--execute`
-- `--start-hour`
-- `--end-hour`
-- `--max-hours`
-- `--sleep-ms`
-- Optional source/owner diagnostics without changing mapping semantics.
+- `--execute` to enable mutation; omission runs reconciliation only.
+- Required `--start-hour`, `--end-hour`, and `--max-hours` bounds.
+- Optional `--sleep-ms` pacing.
+- Optional one-time `--live-capture-start-hour` coverage initialization.
+
+Source/owner diagnostic filters and a targeted-repair command are not implemented. Add them only if they retain the same canonical mapping and bounded execution rules.
 
 Process newest completed hours first so every successful step extends one contiguous interval backward from live capture:
 
@@ -454,24 +466,24 @@ Process newest completed hours first so every successful step extends one contig
 
 Before execution, run `EXPLAIN` against production-shaped data for every source query. Confirm `microdollar_usage.created_at` range scans, Exa partition pruning, and bounded credit-transaction/term scans. Do not add or replace indexes on the large raw usage table without a separate online-index rollout plan.
 
-For each completed pre-cutover hour:
+The implemented operator processes only completed pre-cutover hours and uses this shape:
 
-1. Aggregate all four canonical source families into temporary/staging results using half-open timestamp predicates.
-2. Build owner/category totals and owner/category/source/driver buckets.
-3. In one bounded `REPEATABLE READ` transaction, delete existing aggregate rows for that hour and insert absolute staged results.
-4. Verify owner totals equal the sum of driver amounts and counts.
-5. Commit.
-6. Move `coverage_start_hour` back only when the new hour is contiguous with existing coverage.
+1. Load up to 24 hours from all four canonical source families in one read-only `REPEATABLE READ` snapshot with half-open predicates.
+2. Build owner/category totals and owner/category/source/driver buckets in memory.
+3. Process hours newest-first. For each hour, delete existing aggregate rows and insert absolute staged results in its own bounded transaction.
+4. Verify owner totals equal driver amounts and counts.
+5. Move `coverage_start_hour` backward only when the hour is contiguous with existing coverage.
+6. Reconcile the full requested range after execution. A mismatch records an unresolved degraded interval and fails the execute run.
 
-Absolute replacement makes reruns safe. Never reuse the live additive `total = total + excluded.total` behavior for backfill. Pre-cutover ranges run only after normal async persistence has drained; overlapping or unexpectedly late owner-hours use targeted advisory-locked repair instead of a global serializable transaction.
+The 24-hour source chunk avoids hourly source-query amplification while keeping writes and coverage advancement hour-sized. Absolute replacement makes reruns safe. The global path refuses live or post-cutover hours; overlapping or late owner-hours use advisory-locked targeted repair.
 
-Start with one hour per source scan and no concurrency. After benchmarks, permit a bounded multi-hour staging scan only if it reduces repeated raw-table IO while keeping replacement transactions and coverage advancement small. Bound statement and lock timeouts. Stop on elevated database load, replication lag, lock waits, or reconciliation differences.
+Production use must still set practical statement/lock limits and monitor database load, WAL, replication lag, lock waits, and reconciliation differences. The script does not stop automatically from those telemetry signals.
 
-The deployment boundary and preceding hour need a second reconciliation pass after normal async usage persistence has drained. If a later source row exposes a gap, create a degraded interval first, repair affected owner-hours, reconcile the interval, then resolve it.
+The deployment boundary and preceding hour need a second reconciliation pass after deferred usage persistence drains. If a later source row exposes a gap, create a degraded interval first, repair affected owner-hours, reconcile the interval, then resolve it. Current library functions support this lifecycle, but no single operator command performs targeted repair plus safe resolution.
 
 ### Targeted owner repair
 
-Add `repairOwnerSpendRollups(owner, startHour, endHourExclusive)` with an explicit maximum supplied by the caller. Future Spend Alert enablement uses a hard seven-day cap. Operator repair may use up to 90 days with lower concurrency and stricter timeouts.
+`repairOwnerSpendRollups(owner, startHour, endHourExclusive)` is implemented with an explicit caller-supplied maximum. Future Spend Alert enablement must use a hard seven-day cap. Operator repair may use up to 90 days with lower concurrency and stricter timeouts, but no targeted-repair CLI is available yet.
 
 For each owner-hour:
 
@@ -485,7 +497,7 @@ Delete aggregate rows when the canonical result is zero. The repair path must be
 
 ### Reconciliation
 
-Add a dry-run reconciliation mode that compares rollups with canonical source sums for bounded owner/hour samples and reports:
+Dry-run reconciliation compares rollups with canonical source sums for bounded hour ranges and reports:
 
 - Missing totals.
 - Amount differences.
@@ -498,124 +510,109 @@ Run canaries for high-volume organizations, normal personal users, Exa users, Ki
 
 ## Observability
 
-Instrument capture by source without logging sensitive request data:
+Current operator output reports backfill hour duration, staged total/driver/source counts, canonical microdollars, reconciliation mismatch classes, and coverage advancement. AI Gateway capture failures include bounded Cost Insights context without request payloads.
 
-- Capture latency.
-- Total and driver upsert failures.
-- Advisory-lock wait duration.
-- Transaction rollback count.
-- Rows and microdollars captured by source/category.
-- Backfill hour duration and staged row counts.
-- Reconciliation mismatch count and amount.
-- Coverage start and age.
-- Unresolved degraded-interval count and age.
-- Exact rolling-24h boundary-fragment query latency.
+Production instrumentation still needs:
 
-Add Sentry context with source, category, owner type, and source record ID where available. Do not attach prompts, auth headers, cookies, tokens, Exa request bodies, user email, or display name.
+- Capture latency by source and category.
+- Total/driver upsert failure and transaction rollback counts.
+- Advisory-lock wait duration and contention.
+- Captured rows and microdollars by source/category.
+- Reconciliation mismatch amount, not only count/class.
+- Coverage age and unresolved degraded-interval count/age.
+- Exact rolling-24-hour boundary query latency.
 
-Monitor database tuple/advisory lock waits, WAL volume, index growth, autovacuum lag, replica lag, and AI Gateway/Exa persistence latency through existing database telemetry.
+Do not attach prompts, auth headers, cookies, tokens, Exa request bodies, user email, or display name. Monitor tuple/advisory lock waits, WAL volume, index growth, autovacuum lag, replica lag, and AI Gateway/Exa persistence latency through existing database telemetry during rollout.
 
-## Tests
+## Test status
 
-### Schema and helper tests
+### Schema and capture
 
-- Exactly-one-owner constraints.
-- Controlled category/source constraints.
-- UTC-hour normalization across session timezones and DST boundaries.
-- Personal and organization uniqueness.
-- Driver fallback normalization, length bounds, deterministic digest, and collision mismatch failure.
-- Additive total and driver updates.
-- Amount and record-count overflow/unsafe-integer rejection.
-- Forced driver failure rolls back total and source spend transaction.
-- Concurrent updates produce exact sums.
-- Same owner/hour repair and live capture do not lose a contribution.
+| Coverage | Status | Remaining |
+|---|---|---|
+| Exactly-one-owner, controlled values, UTC normalization, owner isolation | Done | Add direct duplicate-insert assertions for both partial unique indexes if schema regression coverage needs to be stricter |
+| Driver fallback, bounds, digest determinism, collision rollback | Done | None for v1 contract |
+| Additive totals/drivers, unsafe input rejection, concurrent exact sums | Done | Add existing-row additive overflow coverage near JavaScript safe-integer limit |
+| Repair and live capture on same owner-hour | Done | None |
 
-### Source integration tests
+### Producer integration
 
-- AI personal positive spend updates raw usage, daily rollup, balance, total, and driver atomically.
-- AI organization positive spend updates raw usage, organization balance, member daily usage, total, and driver atomically.
-- AI zero-cost/BYOK rows create no Cost Insights rows.
-- Charged Exa personal and organization requests produce Variable spend.
-- Exa free allowance produces no Cost Insights spend.
-- Coding Plan activation and renewal produce Scheduled spend once.
-- KiloClaw enrollment and Worker renewal produce Scheduled spend once.
-- Duplicate KiloClaw/Coding Plan paths do not increment rollups.
-- KiloClaw settlement, credit grants, top-ups, expirations, refunds, and accounting adjustments produce no rollups.
-- Rollup failure prevents the corresponding charge/source transaction from committing.
+| Coverage | Status | Remaining |
+|---|---|---|
+| AI personal source, metadata, daily aggregate, balance, total/driver, rollback | Done | Add explicit Coding Plan-backed BYOK no-spend fixture |
+| AI organization source, balance, member usage, rollup | Partial | Add focused driver-dimension and forced organization rollback assertions |
+| Charged/free Exa personal and organization behavior | Done | None for current mapping |
+| Coding Plan activation and renewal | Partial | Existing tests verify capture inputs and rollback with a mocked helper; add real-rollup integration coverage |
+| KiloClaw enrollment and Worker renewal | Partial | Existing tests verify idempotency/capture ordering with mocked helper; add real-rollup integration coverage |
+| Explicit accounting exclusions | Partial | Add focused proof that settlement, grants, top-ups, expiration, refunds, and adjustments leave rollups unchanged |
 
-### Read tests
+### Reads and maintenance
 
-- 24h, 7d, 30d, and 90d queries return exact UTC bucket counts.
-- Covered missing hours return zero.
-- Uncovered and degraded hours remain marked unknown.
-- Category totals equal bucket totals.
-- Exact rolling-24h reads combine full rollup hours and raw boundary fragments without double counting.
-- Top drivers aggregate combined dimensions and use deterministic tie-breaking.
-- Personal and organization owner data cannot cross scopes.
+| Coverage | Status | Remaining |
+|---|---|---|
+| Covered zero versus uncovered/degraded unknown | Done | None |
+| Exact rolling 24h with raw boundary fragments | Done | Add production-shaped latency benchmark |
+| Preset ranges | Partial | Add exact 24h, 7d, 30d, and 90d bucket-count tests |
+| Top drivers | Partial | Add deterministic tie ordering, category filter, and organization-scope integration tests |
+| Canonical mapping parity | Partial | Pure mapping fixtures cover all sources; add real-source/live-digest parity fixtures for all four families |
+| Backfill rerun and zero-source deletion | Done | None |
+| Coverage advancement failures and empty hours | Remaining | Add failed-hour no-advance and empty-hour advance tests |
+| Targeted repair | Partial | Add nonzero missing/inflated correction; zero deletion and live-concurrency behavior are covered |
+| Degraded lifecycle | Partial | Suppression and resolution are covered separately; add full record, repair, reconcile, resolve test |
 
-### Backfill and repair tests
+## Delivery status
 
-- Canonical source fixtures map to the same category/source/driver values as live capture.
-- Backfill rerun produces identical totals and drivers.
-- Failed hour does not move coverage.
-- Empty source hour advances coverage without aggregate rows.
-- Unresolved degraded intervals suppress zero-fill until repair and reconciliation resolve them.
-- Targeted repair corrects missing and inflated rows.
-- Targeted repair deletes rows whose canonical source sum is zero.
-- Concurrent late source contribution plus repair is counted exactly once.
-- Historical unknown fields use `other` rather than mutable current values.
+| Slice | Status | Result or remaining gate |
+|---|---|---|
+| 0. Spend-writer audit | Done | Current production increments are classified and guarded by `spend-writer-audit.test.ts`; keep the regex inventory updated for new mutation forms |
+| 1. Schema and capture primitive | Done | Four tables, controlled values, generated migration, subpath export, capture helper, and database tests exist |
+| 2. Scheduled spend | Done in code | Coding Plan and KiloClaw web/Worker paths dual-write atomically; real-rollup producer integration tests remain desirable |
+| 3. AI Gateway consolidation | Done | Personal/organization source, charge, daily usage, and rollup share one transaction; low-balance scheduling occurs after commit |
+| 4. Exa consolidation | Done | Log, monthly counter, charge, member usage, and rollup share one transaction |
+| 5. Read repository and coverage | Done in code | Dense hourly, current hour, top drivers, exact rolling 24h, coverage, and degraded reads exist; preset/tie/scope test gaps remain |
+| 6. Backfill, repair, shadow validation | Partial | Code and local validation are complete; production indexes, EXPLAINs, cutover, 7-day/90-day runs, canaries, boundary reconciliation, and observability remain |
 
-## Delivery sequence
+## Production rollout checklist
 
-### Slice 0: spend-writer audit
+- [ ] Deploy migration before mandatory capture code can execute.
+- [ ] Roll out historical Exa partition indexes with an explicit small `--max-partitions` bound; verify created indexes are valid and ready.
+- [ ] Run production-shaped EXPLAINs for AI Gateway, Exa, Coding Plan, and KiloClaw canonical queries.
+- [ ] Benchmark capture-enabled AI Gateway and Exa persistence at production-shaped concurrency; record p50/p95/p99 latency and advisory-lock waits.
+- [ ] Coordinate web and Worker deployments, then choose the first full UTC `live_capture_start_hour` after all writers are active.
+- [ ] Let deferred AI Gateway/Exa persistence drain before replacing pre-cutover hours.
+- [ ] Backfill and reconcile the newest contiguous seven days before anomaly evaluation uses baseline history.
+- [ ] Continue contiguous backfill and reconciliation to 90 days before 30d/90d UI ranges claim complete evidence.
+- [ ] Run canaries for high-volume organizations, ordinary personal owners, Exa, KiloClaw, and Coding Plan usage.
+- [ ] Reconcile cutover hour and preceding hour again after deferred persistence drains.
+- [ ] Monitor database load, WAL, replication lag, lock waits, index growth, autovacuum, capture latency, coverage age, and degraded intervals.
+- [ ] Document or add a bounded operator workflow for targeted repair and degraded-interval resolution.
 
-Repeat the direct balance-mutation audit, classify every production mutation, and fail planning/implementation review on unexplained writers. Record exclusions and canonical source identity in tests or repository-local code comments next to the central capture contract.
+## Operator and local seed notes
 
-Outcome: implementation has a closed producer inventory before it claims complete coverage.
+`apps/web/src/scripts/db/exa-usage-log-indexes.ts` creates two partial indexes per historical Exa leaf partition with `CREATE INDEX CONCURRENTLY IF NOT EXISTS`. Future partitions receive equivalent indexes during provisioning. Production runs should always set a small `--max-partitions`; the script does not currently verify `pg_index.indisvalid`/`indisready` after a failed concurrent build.
 
-### Slice 1: schema and capture primitive
+`dev/seed/cost-insights/spend-evidence.ts` is local-only and refuses production or non-loopback database targets. It seeds dedicated personal and organization owners using AI Gateway and KiloClaw canonical rows, then writes matching rollups through the production capture helper. It does not seed Exa or Coding Plan. It also extends global local coverage, so use it on a disposable/local database rather than a clone where unrelated canonical rows may lack rollups. Fixture users have placeholder Stripe IDs and should not be used on Stripe-backed pages.
 
-Files:
+## Verification completed
 
-- `packages/db/src/schema-types.ts`
-- `packages/db/src/schema.ts`
-- `packages/db/src/cost-insights-rollups.ts`
-- `packages/db/package.json`
-- Generated migration and schema/helper tests
+Local implementation validation recorded before commit:
 
-Outcome: tables and transaction-bound capture helper exist, with no producer calling them yet.
+- 389 web and Cost Insights tests passed.
+- 41 database/schema tests passed.
+- 185 KiloClaw Worker tests passed.
+- Targeted web, database, and Worker typechecks and lint passed.
+- `pnpm format`, `git diff --check`, and `pnpm drizzle:verify-bootstrap` passed.
+- Full monorepo typecheck was skipped under repository guidance.
 
-Generate migration with `pnpm drizzle generate`. Do not hand-write or edit generated migration SQL, snapshot, or journal.
+Local operator and seed validation:
 
-### Slice 2: already-transactional scheduled spend
+- Four Exa partial indexes were created across two local historical partitions and rerun idempotently.
+- Migration tables and journal entry were confirmed in local PostgreSQL. Drizzle CLI returned exit 1 after applying the migration, so production migration execution still needs normal deployment verification.
+- One completed empty pre-seed hour was backfilled and reconciled with zero mismatches.
+- The dev seed ran twice with identical results: 374 Variable records and 6 Scheduled records.
+- All 2,160 seeded hourly buckets reconciled with zero mismatches and zero coverage holes; canonical and rollup totals matched for both fixture owners.
 
-Integrate Coding Plan activation/renewal and KiloClaw web/Worker charge paths. These paths need the least transaction restructuring and validate the shared helper in both Next.js and Cloudflare Worker environments.
-
-Outcome: all Scheduled Credit spend dual-writes atomically.
-
-### Slice 3: AI Gateway transaction consolidation
-
-Refactor personal and organization AI persistence into one caller-owned transaction, add capture, and move organization low-balance email scheduling after commit.
-
-Outcome: AI Gateway Variable Credit spend dual-writes atomically for both owner types.
-
-### Slice 4: Exa transaction consolidation
-
-Combine Exa log, monthly counter, owner charge, organization member usage, and capture in one transaction.
-
-Outcome: all known Variable Credit spend paths dual-write atomically.
-
-### Slice 5: read repository and coverage
-
-Implement dense hourly evidence, current-hour totals, exact rolling-24h composition, top drivers, coverage, and degraded-interval reads.
-
-Outcome: application work can consume one Postgres datasource without knowing source ledgers.
-
-### Slice 6: backfill, repair, and shadow validation
-
-Implement canonical aggregation, dry-run reconciliation, 7-day then 90-day backfill, and targeted owner repair.
-
-Outcome: coverage reaches 90 days with zero reconciliation differences before alerts or dashboard data rely on it.
+These results prove local behavior, not production rollout or performance acceptance.
 
 ## Verification commands
 
@@ -645,17 +642,21 @@ Benchmark AI Gateway capture against production-shaped concurrency using the exi
 
 ## Acceptance criteria
 
-- Every production `microdollars_used` increment has an explicit included/excluded classification.
-- AI Gateway, charged Exa, pure-credit KiloClaw, and Coding Plan spend update totals and one driver bucket atomically with the charge.
-- Snowflake is absent from capture, reads used for correctness, repair, and backfill.
-- A failed mandatory rollup write rolls back its source spend transaction.
-- Duplicate billing attempts do not duplicate rollups.
-- Hour keys are explicit UTC hours.
-- Personal and organization totals cannot collide or leak across scopes.
-- Covered zero-spend hours are distinguishable from unknown or degraded history.
-- Exact rolling-24h reads use rollup interiors plus canonical raw boundary fragments.
-- Newest 7 days reconcile before anomaly work starts; full 90 days reconcile before 30d/90d dashboard evidence is treated as complete.
-- Bootstrapped and newly captured rollup rows have no retention expiry.
-- Backfill and targeted repair are absolute, idempotent, bounded, and resumable.
-- No email, display name, secret, prompt, or arbitrary request payload is persisted in rollup tables.
-- Capture latency and lock contention stay within limits agreed from benchmark results.
+| Criterion | Status |
+|---|---|
+| Every current production `microdollars_used` increment has an included/excluded classification | Met; keep audit guard current |
+| AI Gateway, charged Exa, pure-credit KiloClaw, and Coding Plan spend atomically update totals and a driver bucket | Met in implementation |
+| Snowflake is absent from capture, correctness reads, repair, and backfill | Met |
+| Mandatory rollup failure rolls back source spend transaction | Met |
+| Duplicate billing attempts do not duplicate rollups | Met in implementation; real-rollup producer integration proof is partial |
+| Hour keys are explicit UTC hours | Met |
+| Personal and organization totals cannot collide or leak across scopes | Met at schema/repository level |
+| Covered zero-spend hours differ from unknown or degraded history | Met |
+| Exact rolling 24h uses rollup interiors plus canonical raw boundaries | Met |
+| Newest seven production days reconcile before anomaly work starts | Pending production rollout |
+| Full 90 production days reconcile before 30d/90d evidence claims completeness | Pending production rollout |
+| Bootstrapped and newly captured rollups have no retention expiry | Met |
+| Backfill and targeted repair are absolute, idempotent, bounded, and resumable | Met in implementation |
+| Rollups contain no email, display name, secret, prompt, or arbitrary request payload | Met |
+| Capture latency and lock contention meet agreed limits | Pending production-shaped benchmark |
+| Production telemetry detects capture failures, contention, stale coverage, and degraded intervals | Pending |

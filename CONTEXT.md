@@ -37,7 +37,7 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 | **Email Delivery** | Attempt to render and send one Security Agent Notification through Mailgun | Referring to provider side effect, retry, or acceptance | Notification event |
 | **Security Finding Activity Event** | Immutable record of one material user, system-policy, or source-driven action or outcome that changes or explains a Security Finding | Referring to evidence included in a Security Agent Audit Report | Page view, unchanged sync observation, queue claim, heartbeat |
 | **Security Agent Audit Report** | Owner-scoped, period-bounded audit view of Security Finding Activity Events grouped by Security Finding | Referring to the interactive audit report | Generic audit-log export, activity dump |
-| **Cost Insights** | Dedicated Account-section surface for viewing spend evidence, configuring Spend Alerts, and acting on Cost Suggestions | Naming the product surface, dashboard, settings, routes, or sidebar item | Spend Protection, Cost Controls |
+| **Cost Insights** | Dedicated Usage-adjacent surface for viewing spend evidence, configuring Spend Alerts, and acting on Cost Suggestions | Naming the product surface, dashboard, settings, routes, or sidebar item | Spend Protection, Cost Controls |
 | **Spend Alerts** | Owner-scoped alerting capability for unusual or excessive Credit spend | Referring to alert evaluation, emails, banners, settings, or notification policy | Spend Protection, hard limit, spend blocker |
 | **Cost Suggestion** | Optional owner-scoped recommendation based on observed Credit spend that may improve cost efficiency through an eligible Coding Plan or Kilo Pass | Referring to recommendation evaluation, dashboard cards, emails, CTA destinations, dismissal, or settings | Alert, warning, guaranteed savings, automatic optimization |
 | **Suggestion dismissal** | Authorized owner action that hides one Cost Suggestion without changing billing or future suggestion eligibility | Referring to dismissing a recommendation | Alert acknowledgment, unsubscribe, disable suggestions |
@@ -109,9 +109,9 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - Alert **Cost Insight Events** snapshot top 5 spend drivers at event creation time.
 - Cost Insight Events store direct evaluated settings in snapshots and do not require config version tracking in v1.
 - Spend Alert config events store changed fields plus resulting key settings, not full config snapshots.
-- **Cost Insights** is the dedicated Account-section surface for Spend Alerts: `/cost-insights` and `/organizations/[id]/cost-insights` are dashboard routes; `/cost-insights/config` and `/organizations/[id]/cost-insights/config` are settings routes.
+- **Cost Insights** is the dedicated Usage-adjacent surface for Spend Alerts: `/cost-insights` and `/organizations/[id]/cost-insights` are dashboard routes; `/cost-insights/config` and `/organizations/[id]/cost-insights/config` are settings routes.
 - Cost Insights dashboard shows current alert state, review actions, and spend evidence. Cost Insights settings owns Spend Alerts policy.
-- Account sidebar Cost Insights item shows attention state for unreviewed Spend Alert.
+- Cost Insights appears directly below Usage in the personal and organization sidebars and shows attention state for unreviewed Spend Alert.
 - Organization Cost Insights identifies member spend drivers and links to existing organization member daily limit controls; v1 does not add per-member Spend Alert policy.
 - Organization Cost Insights dashboard and settings are visible only to organization owners and billing managers.
 - Organization members who cannot view Cost Insights are told to contact an organization owner or billing manager.

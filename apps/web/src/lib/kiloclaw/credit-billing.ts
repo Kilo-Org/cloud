@@ -34,6 +34,7 @@ import {
   autoResumeIfSuspended,
   clearTrialInactivityStopAfterTrialTransition,
 } from '@/lib/kiloclaw/instance-lifecycle';
+import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import {
   buildAffiliateEventDedupeKey,
   enqueueAffiliateEventForUser,
@@ -1700,6 +1701,7 @@ export async function enrollWithCredits(params: {
       error: error instanceof Error ? error.message : String(error),
     });
   }
+  scheduleCostInsightEvaluationAfterSpend({ type: 'user', id: userId });
 
   // Step 5: Auto-resume if suspended (spec rule 7)
   if (transitionedFromTrial) {

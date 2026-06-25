@@ -32,7 +32,7 @@ export function CostInsightsShellView({
     { page: 'dashboard' as const, label: 'Overview', href: basePath },
     { page: 'ask' as const, label: 'Ask Kilo', href: `${basePath}/ask-kilo` },
     { page: 'events' as const, label: 'Activity', href: `${basePath}/activity` },
-    { page: 'settings' as const, label: 'Alert settings', href: `${basePath}/settings` },
+    { page: 'config' as const, label: 'Alert settings', href: `${basePath}/config` },
   ];
   const roleLabel =
     owner.authorizedRole === 'billing_manager'
@@ -67,8 +67,8 @@ export function CostInsightsShellView({
             <div className="type-body font-semibold">Kilo Cloud</div>
             <div className="type-label text-muted-foreground mt-1 truncate">{owner.name}</div>
           </div>
-          <nav aria-label="Account">
-            <div className="type-eyebrow text-muted-foreground px-2 pb-2">Account</div>
+          <nav aria-label="Usage">
+            <div className="type-eyebrow text-muted-foreground px-2 pb-2">Usage</div>
             <a
               href={basePath}
               className="bg-surface-selected text-sidebar-accent-foreground focus-visible:ring-ring flex min-h-control-touch items-center gap-2 rounded-md px-2 type-body font-medium focus-visible:ring-2 focus-visible:outline-none"

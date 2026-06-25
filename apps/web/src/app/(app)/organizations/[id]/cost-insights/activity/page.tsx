@@ -1,5 +1,12 @@
-import { CostInsightsRoutePlaceholder } from '@/components/cost-insights/CostInsightsRoutePlaceholder';
+import { CostInsightsActivityClient } from '@/components/cost-insights/CostInsightsActivityClient';
 
-export default function OrganizationCostInsightsActivityPage() {
-  return <CostInsightsRoutePlaceholder section="Activity" />;
+type OrganizationCostInsightsActivityPageProps = {
+  params: Promise<{ id: string }>;
+};
+
+export default async function OrganizationCostInsightsActivityPage({
+  params,
+}: OrganizationCostInsightsActivityPageProps) {
+  const { id } = await params;
+  return <CostInsightsActivityClient organizationId={id} />;
 }

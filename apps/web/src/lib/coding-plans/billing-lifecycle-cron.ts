@@ -6,6 +6,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 
 import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
 import { getCodingPlanPrice } from '@/lib/coding-plans/pricing';
+import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@/lib/utils.server';
 import {
@@ -274,7 +275,7 @@ async function processRenewal(
   // Renewal processing has one durable outcome per due term, guarded by row locks
   // and an idempotency key: charge and extend, start a single auto-top-up grace
   // window, wait for in-flight grace recovery, or terminate and queue revocation.
-  return database.transaction(async tx => {
+  const result = await database.transaction(async tx => {
     await tx.execute(
       sql`SELECT id FROM coding_plan_subscriptions WHERE id = ${selectedRow.id} FOR UPDATE`
     );
@@ -444,4 +445,8 @@ async function processRenewal(
     }
     return 'terminated';
   });
+  if (result === 'renewed') {
+    scheduleCostInsightEvaluationAfterSpend({ type: 'user', id: selectedRow.user_id });
+  }
+  return result;
 }

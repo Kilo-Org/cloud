@@ -10,7 +10,7 @@ const reviewActionLabels = {
   disable_threshold: 'Turn off threshold',
 } satisfies Record<DashboardAlertAction, string>;
 
-export function DisabledAlertsBanner() {
+export function DisabledAlertsBanner({ onSetupAlerts }: { onSetupAlerts?: () => void }) {
   return (
     <section
       className="border-border bg-card rounded-xl border p-6"
@@ -26,7 +26,11 @@ export function DisabledAlertsBanner() {
             optional 24-hour threshold.
           </p>
         </div>
-        <Button type="button" className="min-h-control-touch w-full sm:min-h-0 sm:w-auto">
+        <Button
+          type="button"
+          className="min-h-control-touch w-full sm:min-h-0 sm:w-auto"
+          onClick={onSetupAlerts}
+        >
           <Bell className="size-4" aria-hidden="true" /> Set up alerts
         </Button>
       </div>
@@ -37,9 +41,11 @@ export function DisabledAlertsBanner() {
 export function ReviewBanner({
   alert,
   primaryAction,
+  onAction,
 }: {
   alert: DashboardAlert;
   primaryAction: boolean;
+  onAction?: (action: DashboardAlertAction) => void;
 }) {
   const Icon = alert.type === 'threshold' ? AlertTriangle : TrendingUp;
   return (
@@ -71,7 +77,7 @@ export function ReviewBanner({
             </dl>
           )}
         </div>
-        <ReviewActions alert={alert} primaryAction={primaryAction} />
+        <ReviewActions alert={alert} primaryAction={primaryAction} onAction={onAction} />
       </div>
     </section>
   );
@@ -80,9 +86,11 @@ export function ReviewBanner({
 function ReviewActions({
   alert,
   primaryAction,
+  onAction,
 }: {
   alert: DashboardAlert;
   primaryAction: boolean;
+  onAction?: (action: DashboardAlertAction) => void;
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:w-52 lg:flex-col">
@@ -92,6 +100,7 @@ function ReviewActions({
           type="button"
           variant={index === 0 && primaryAction ? 'default' : 'outline'}
           className="min-h-control-touch w-full sm:min-h-0"
+          onClick={() => onAction?.(action)}
         >
           {action.includes('disable') ? (
             <XCircle className="size-4" aria-hidden="true" />
@@ -105,7 +114,13 @@ function ReviewActions({
   );
 }
 
-export function SuggestionCard({ suggestion }: { suggestion: CostSuggestion }) {
+export function SuggestionCard({
+  suggestion,
+  onDismiss,
+}: {
+  suggestion: CostSuggestion;
+  onDismiss?: () => void;
+}) {
   return (
     <section
       className="border-status-success-border bg-status-success-surface rounded-xl border p-6"
@@ -149,7 +164,12 @@ export function SuggestionCard({ suggestion }: { suggestion: CostSuggestion }) {
               <ArrowRight className="size-4" aria-hidden="true" />
             </a>
           </Button>
-          <Button type="button" variant="outline" className="min-h-control-touch w-full sm:min-h-0">
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-control-touch w-full sm:min-h-0"
+            onClick={onDismiss}
+          >
             <XCircle className="size-4" aria-hidden="true" />
             Dismiss suggestion
           </Button>

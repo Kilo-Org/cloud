@@ -16,7 +16,7 @@ const navItems = [
   { label: 'Overview', path: '', icon: LayoutDashboard },
   { label: 'Ask Kilo', path: '/ask-kilo', icon: MessageCircle },
   { label: 'Activity', path: '/activity', icon: Activity },
-  { label: 'Alert settings', path: '/settings', icon: Settings2 },
+  { label: 'Alert settings', path: '/config', icon: Settings2 },
 ];
 
 export function CostInsightsLayout({ basePath, children }: CostInsightsLayoutProps) {

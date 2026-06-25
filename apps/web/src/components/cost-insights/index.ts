@@ -7,6 +7,7 @@ export type {
   CostInsightsDashboardData,
   CostInsightsOwner,
   CostInsightsPage,
+  CostInsightsSettingsPatch,
   CostInsightsSettingsData,
   CostSuggestion,
   DashboardAlert,
@@ -19,7 +20,7 @@ export type {
 } from './types';
 export { CostInsightsAlertBar } from './shell/CostInsightsAlertBar';
 export { CostInsightsShellView } from './shell/CostInsightsShellView';
-export { CostInsightsDashboardView } from './overview/CostInsightsDashboardView';
 export { CostInsightsAskKiloView } from './ask-kilo/CostInsightsAskKiloView';
+export { CostInsightsDashboardView } from './overview/CostInsightsDashboardView';
 export { CostInsightsSettingsView } from './settings/CostInsightsSettingsView';
 export { CostInsightsEventHistoryView } from './activity/CostInsightsEventHistoryView';

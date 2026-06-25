@@ -12,6 +12,7 @@ import {
   validateMiniMaxCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
 import { getCodingPlanPrice, type CodingPlanId } from '@/lib/coding-plans/pricing';
+import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { db } from '@/lib/drizzle';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@/lib/utils.server';
@@ -272,6 +273,7 @@ export async function subscribeToCodingPlan(
 
   if (outcome.charged) {
     await evaluateUsageBonus(userId);
+    scheduleCostInsightEvaluationAfterSpend({ type: 'user', id: userId });
   }
   logInfo('Coding plan purchase processed', {
     user_id: userId,

@@ -59,6 +59,12 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       staleTime: SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS,
     })
   );
+  const { data: costInsightsAttention } = useQuery({
+    ...trpc.costInsights.getAttentionState.queryOptions(),
+    enabled: Boolean(user),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
@@ -71,6 +77,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     title: string;
     icon: React.ElementType;
     url: string;
+    badge?: string;
     className?: string;
   }> = [
     {
@@ -92,6 +99,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: 'Cost Insights',
       icon: ChartLine,
       url: '/cost-insights',
+      badge: costInsightsAttention?.attention === 'alert' ? 'Review' : undefined,
     },
   ];
 
@@ -233,7 +241,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     title: string;
     icon: React.ElementType;
     url: string;
-    badge?: string;
     className?: string;
   }> = [
     {

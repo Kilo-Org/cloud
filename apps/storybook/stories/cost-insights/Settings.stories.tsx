@@ -17,7 +17,7 @@ type Story = StoryObj<typeof CostInsightsSettingsView>;
 
 function renderSettings(data: CostInsightsSettingsData) {
   return (
-    <CostInsightsShellView owner={data.owner} activePage="settings">
+    <CostInsightsShellView owner={data.owner} activePage="config">
       <CostInsightsSettingsView data={data} />
     </CostInsightsShellView>
   );

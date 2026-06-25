@@ -8,11 +8,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import type { CostInsightsSettingsData } from '../types';
+import type { CostInsightsSettingsData, CostInsightsSettingsPatch } from '../types';
 
-export function CostInsightsSettingsView({ data }: { data: CostInsightsSettingsData }) {
+export function CostInsightsSettingsView({
+  data,
+  onChange,
+  onSave,
+}: {
+  data: CostInsightsSettingsData;
+  onChange?: (patch: CostInsightsSettingsPatch) => void;
+  onSave?: () => void;
+}) {
   const validation = data.validations?.[0];
   const saveLabel = data.saveState === 'saving' ? 'Saving changes...' : 'Save changes';
+  const disabled = data.readOnly || data.saveState === 'saving';
   return (
     <div className="space-y-6">
       {data.readOnly && (
@@ -56,7 +65,8 @@ export function CostInsightsSettingsView({ data }: { data: CostInsightsSettingsD
                 id="cost-suggestions-enabled"
                 className="relative before:absolute before:inset-x-0 before:-inset-y-2.5"
                 checked={data.suggestionsEnabled}
-                disabled={data.readOnly}
+                disabled={disabled}
+                onCheckedChange={suggestionsEnabled => onChange?.({ suggestionsEnabled })}
               />
             </div>
           </section>
@@ -80,7 +90,8 @@ export function CostInsightsSettingsView({ data }: { data: CostInsightsSettingsD
                 id="spend-alerts-enabled"
                 className="relative before:absolute before:inset-x-0 before:-inset-y-2.5"
                 checked={data.enabled}
-                disabled={data.readOnly}
+                disabled={disabled}
+                onCheckedChange={enabled => onChange?.({ enabled })}
               />
             </div>
           </section>
@@ -128,8 +139,9 @@ export function CostInsightsSettingsView({ data }: { data: CostInsightsSettingsD
                     type="text"
                     inputMode="decimal"
                     value={data.thresholdUsd}
-                    readOnly
-                    disabled={data.readOnly}
+                    readOnly={data.readOnly}
+                    disabled={disabled}
+                    onChange={event => onChange?.({ thresholdUsd: event.target.value })}
                     aria-invalid={Boolean(validation)}
                     aria-describedby="threshold-help threshold-error"
                   />
@@ -169,8 +181,11 @@ export function CostInsightsSettingsView({ data }: { data: CostInsightsSettingsD
           <Button
             type="button"
             className="min-h-control-touch sm:min-h-0"
-            disabled={data.saveState === 'saved' || data.saveState === 'saving'}
+            disabled={
+              data.saveState === 'saved' || data.saveState === 'saving' || Boolean(validation)
+            }
             aria-busy={data.saveState === 'saving'}
+            onClick={onSave}
           >
             {data.saveState === 'saving' ? (
               <Loader2

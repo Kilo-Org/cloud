@@ -79,6 +79,7 @@ import {
   getAiGatewayCostInsightFeatureKey,
   getAiGatewayCostInsightProductKey,
 } from '@/lib/cost-insights/canonical-sources';
+import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 
 const posthogClient = PostHogClient();
 
@@ -529,6 +530,13 @@ export async function insertUsageRecord(
       scheduleOrganizationLowBalanceAlert(
         coreUsageFields.organization_id,
         result.organizationUsage
+      );
+    }
+    if (coreUsageFields.cost > 0) {
+      scheduleCostInsightEvaluationAfterSpend(
+        coreUsageFields.organization_id
+          ? { type: 'organization', id: coreUsageFields.organization_id }
+          : { type: 'user', id: coreUsageFields.kilo_user_id }
       );
     }
     scheduleKiloPassBonusIfNeeded(coreUsageFields, result.inserted);

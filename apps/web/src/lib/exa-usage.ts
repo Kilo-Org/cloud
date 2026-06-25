@@ -13,6 +13,7 @@ import {
   COST_INSIGHT_DRIVER_FALLBACK,
   COST_INSIGHT_EXA_PRODUCT_KEY,
 } from '@kilocode/db/cost-insights-rollups';
+import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { getExaCostInsightFeatureKey } from '@/lib/exa-paths';
 
 export type ExaMonthlyUsageResult = {
@@ -143,6 +144,11 @@ export async function recordExaUsage(params: {
 
   if (organizationId && organizationUsage) {
     scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage);
+  }
+  if (chargedToBalance && costMicrodollars > 0) {
+    scheduleCostInsightEvaluationAfterSpend(
+      organizationId ? { type: 'organization', id: organizationId } : { type: 'user', id: userId }
+    );
   }
 }
 

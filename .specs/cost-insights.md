@@ -14,7 +14,7 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ## Definitions
 
-- **Cost Insights**: Dedicated account surface for viewing spend evidence and configuring Spend Alerts.
+- **Cost Insights**: Dedicated Usage-adjacent surface for viewing spend evidence and configuring Spend Alerts.
 - **Spend Alerts**: Owner-scoped alerting capability for unusual or excessive Credit spend.
 - **Spend owner**: Personal user or organization whose credit balance is charged for Credit spend.
 - **Credit spend**: Existing Kilo billing concept for any operation that increments `microdollars_used`.
@@ -67,7 +67,7 @@ Cost Insights does not replace low-balance alerts, auto-top-up setup, existing o
 2. Personal Cost Insights settings MUST be served at `/cost-insights/config`.
 3. Organization Cost Insights dashboard MUST be served at `/organizations/[id]/cost-insights`.
 4. Organization Cost Insights settings MUST be served at `/organizations/[id]/cost-insights/config`.
-5. Cost Insights MUST appear in the Account section of personal and organization sidebars.
+5. Cost Insights MUST appear directly below Usage in personal and organization sidebars.
 6. Cost Insights sidebar item MUST show attention state when owner has an unreviewed Spend Alert.
 7. Cost Insights routes MUST NOT require a feature flag in v1.
 

@@ -6,16 +6,17 @@ export type CostInsightsOwner = {
   authorizedRole?: 'personal' | 'owner' | 'billing_manager' | 'member' | 'admin';
 };
 
-export type CostInsightsPage = 'dashboard' | 'ask' | 'settings' | 'events';
+export type CostInsightsPage = 'dashboard' | 'ask' | 'events' | 'config';
 export type CostInsightsAttention = 'none' | 'alert';
 export type SpendRange = '24h' | '7d' | '30d' | '90d';
+export type SpendMetricIcon = 'activity' | 'alert' | 'check' | 'dollar';
 
 export type SpendMetric = {
   label: string;
   value: string;
   detail: string;
   tone: 'neutral' | 'success' | 'warning' | 'danger';
-  icon: LucideIcon;
+  icon: LucideIcon | SpendMetricIcon;
 };
 
 export type SpendEvidencePoint = {
@@ -113,6 +114,10 @@ export type CostInsightsSettingsData = {
   validations?: string[];
   readOnly?: boolean;
 };
+
+export type CostInsightsSettingsPatch = Partial<
+  Pick<CostInsightsSettingsData, 'enabled' | 'suggestionsEnabled' | 'thresholdUsd'>
+>;
 
 export type SettingsConfirmation =
   | 'enable_with_current_alerts'

@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import OrganizationSwitcher from './OrganizationSwitcher';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import HeaderLogo from '@/components/HeaderLogo';
@@ -40,6 +41,7 @@ import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { ENABLE_DEPLOY_FEATURE } from '@/lib/constants';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
+import { useTRPC } from '@/lib/trpc/utils';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
@@ -49,6 +51,7 @@ export default function OrganizationAppSidebar({
   organizationId,
   ...props
 }: OrganizationAppSidebarProps) {
+  const trpc = useTRPC();
   const { data: user, isLoading } = useUser();
   const pathname = usePathname();
   const { assumedRole, setAssumedRole, setOriginalRole } = useRoleTesting();
@@ -101,12 +104,19 @@ export default function OrganizationAppSidebar({
   }, [actualRole, user?.is_admin, setOriginalRole, setAssumedRole]);
 
   const hasOwnerLevelAccess = currentRole === 'owner' || currentRole === 'billing_manager';
+  const { data: costInsightsAttention } = useQuery({
+    ...trpc.organizations.costInsights.getAttentionState.queryOptions({ organizationId }),
+    enabled: hasOwnerLevelAccess || Boolean(user?.is_admin),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
 
   // Dashboard group
   const dashboardItems: Array<{
     title: string;
     icon: React.ElementType;
     url: string;
+    badge?: string;
     className?: string;
   }> = [
     ...(showWelcome
@@ -134,6 +144,7 @@ export default function OrganizationAppSidebar({
             title: 'Cost Insights',
             icon: ChartLine,
             url: `/organizations/${organizationId}/cost-insights`,
+            badge: costInsightsAttention?.attention === 'alert' ? 'Review' : undefined,
           },
         ]
       : []),

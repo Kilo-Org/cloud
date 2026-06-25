@@ -1,5 +1,5 @@
-import { CostInsightsRoutePlaceholder } from '@/components/cost-insights/CostInsightsRoutePlaceholder';
+import { CostInsightsOverviewClient } from '@/components/cost-insights/CostInsightsOverviewClient';
 
 export default function CostInsightsPage() {
-  return <CostInsightsRoutePlaceholder section="Overview" />;
+  return <CostInsightsOverviewClient basePath="/cost-insights" />;
 }

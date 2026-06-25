@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { computeDatabaseUrl } from '@kilocode/db';
 import {
@@ -9,8 +9,13 @@ import {
 } from '@kilocode/db/cost-insights-rollups';
 import {
   api_kind,
+  cost_insight_active_suggestions,
+  cost_insight_events,
+  cost_insight_notification_deliveries,
+  cost_insight_owner_configs,
   cost_insight_owner_hour_driver_buckets,
   cost_insight_owner_hour_totals,
+  cost_insight_owner_states,
   cost_insight_rollup_coverage,
   credit_transactions,
   feature,
@@ -20,6 +25,7 @@ import {
   microdollar_usage_metadata,
   organization_memberships,
   organizations,
+  type CostInsightEventSnapshot,
 } from '@kilocode/db/schema';
 import type { GatewayApiKind } from '@kilocode/db/schema-types';
 import { eq, inArray, like, or, sql } from 'drizzle-orm';
@@ -354,6 +360,97 @@ function kiloclawDescription(event: ScheduledSpendEvent): string {
   return `KiloClaw ${event.planKey} ${event.featureKey}`;
 }
 
+function suggestionKey(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function costInsightOwnerColumns(owner: CostInsightSpendOwner): {
+  owned_by_organization_id: string | null;
+  owned_by_user_id: string | null;
+} {
+  return owner.type === 'organization'
+    ? { owned_by_organization_id: owner.id, owned_by_user_id: null }
+    : { owned_by_organization_id: null, owned_by_user_id: owner.id };
+}
+
+function seedTopDrivers(
+  owner: CostInsightSpendOwner
+): NonNullable<CostInsightEventSnapshot['topDrivers']> {
+  if (owner.type === 'organization') {
+    return [
+      {
+        spendCategory: 'variable',
+        source: 'ai_gateway',
+        productKey: 'cloud-agent',
+        featureKey: 'responses',
+        modelOrPlanKey: 'openai/gpt-4.1',
+        providerKey: 'openai',
+        actorUserId: BILLING_MANAGER_ID,
+        totalMicrodollars: 18_000_000,
+        spendRecordCount: 1,
+      },
+      {
+        spendCategory: 'variable',
+        source: 'ai_gateway',
+        productKey: 'security-agent',
+        featureKey: 'messages',
+        modelOrPlanKey: 'google/gemini-2.5-pro',
+        providerKey: 'google',
+        actorUserId: ORGANIZATION_MEMBER_ID,
+        totalMicrodollars: 15_000_000,
+        spendRecordCount: 1,
+      },
+      {
+        spendCategory: 'scheduled',
+        source: 'kiloclaw',
+        productKey: COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
+        featureKey: 'renewal',
+        modelOrPlanKey: 'standard',
+        providerKey: COST_INSIGHT_DRIVER_FALLBACK,
+        actorUserId: BILLING_MANAGER_ID,
+        totalMicrodollars: 49_000_000,
+        spendRecordCount: 1,
+      },
+    ];
+  }
+
+  return [
+    {
+      spendCategory: 'variable',
+      source: 'ai_gateway',
+      productKey: 'cli',
+      featureKey: 'messages',
+      modelOrPlanKey: 'anthropic/claude-sonnet-4',
+      providerKey: 'anthropic',
+      actorUserId: PERSONAL_OWNER_ID,
+      totalMicrodollars: 12_000_000,
+      spendRecordCount: 1,
+    },
+    {
+      spendCategory: 'variable',
+      source: 'ai_gateway',
+      productKey: 'vscode-extension',
+      featureKey: 'chat_completions',
+      modelOrPlanKey: 'openai/gpt-4.1-mini',
+      providerKey: 'openai',
+      actorUserId: PERSONAL_OWNER_ID,
+      totalMicrodollars: 11_000_000,
+      spendRecordCount: 1,
+    },
+    {
+      spendCategory: 'scheduled',
+      source: 'kiloclaw',
+      productKey: COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
+      featureKey: 'renewal',
+      modelOrPlanKey: 'standard',
+      providerKey: COST_INSIGHT_DRIVER_FALLBACK,
+      actorUserId: PERSONAL_OWNER_ID,
+      totalMicrodollars: 29_000_000,
+      spendRecordCount: 1,
+    },
+  ];
+}
+
 function loginPath(email: string, callbackPath: string): string {
   const params = new URLSearchParams({ fakeUser: email, callbackPath });
   return `/users/sign_in?${params.toString()}`;
@@ -373,6 +470,302 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const coverageStartIso = new Date(currentHour - COVERAGE_DAYS * DAY_MS).toISOString();
   const variableEvents = buildVariableSpendEvents(currentHour);
   const scheduledEvents = buildScheduledSpendEvents(currentHour);
+  const suggestionWindowStart = new Date(currentHour - 7 * DAY_MS).toISOString();
+  const suggestionWindowEnd = new Date(currentHour).toISOString();
+  const personalAnomalyEventId = randomUUID();
+  const personalThresholdEventId = randomUUID();
+  const organizationAnomalyEventId = randomUUID();
+  const organizationThresholdEventId = randomUUID();
+  const personalCodingPlanSuggestionId = randomUUID();
+  const personalKiloPassSuggestionId = randomUUID();
+  const organizationCodingPlanSuggestionId = randomUUID();
+  const personalThresholdMicrodollars = 55_000_000;
+  const organizationThresholdMicrodollars = 90_000_000;
+  const costInsightSuggestionRows = [
+    {
+      id: personalCodingPlanSuggestionId,
+      ...costInsightOwnerColumns(PERSONAL_OWNER),
+      suggestion_kind: 'coding_plan',
+      suggestion_key: suggestionKey(`personal:coding-plan:${currentHourIso}`),
+      title: 'Turn repeated model usage into a Coding Plan',
+      description:
+        'Recent Claude Sonnet usage is concentrated enough to review a Coding Plan before the next burst.',
+      cta_label: 'View subscriptions',
+      cta_href: '/subscriptions',
+      evidence_window_start: suggestionWindowStart,
+      evidence_window_end: suggestionWindowEnd,
+      observed_microdollars: 126_000_000,
+      benefit_label: 'Observed spend',
+      benefit_detail: '$126 in 7 days',
+      created_at: timestampAtHourOffset(currentHour, 2),
+      updated_at: timestampAtHourOffset(currentHour, 2),
+    },
+    {
+      id: personalKiloPassSuggestionId,
+      ...costInsightOwnerColumns(PERSONAL_OWNER),
+      suggestion_kind: 'kilo_pass',
+      suggestion_key: suggestionKey(`personal:kilo-pass:${currentHourIso}`),
+      title: 'Compare Kilo Pass for recurring personal usage',
+      description:
+        'Daily personal Credit spend is steady enough to compare against Kilo Pass included credits.',
+      cta_label: 'View Kilo Pass',
+      cta_href: '/subscriptions/kilo-pass',
+      evidence_window_start: suggestionWindowStart,
+      evidence_window_end: suggestionWindowEnd,
+      observed_microdollars: 94_000_000,
+      benefit_label: 'Included credits',
+      benefit_detail: 'Plan comparison available',
+      created_at: timestampAtHourOffset(currentHour, 3),
+      updated_at: timestampAtHourOffset(currentHour, 3),
+    },
+    {
+      id: organizationCodingPlanSuggestionId,
+      ...costInsightOwnerColumns(ORGANIZATION_OWNER),
+      suggestion_kind: 'coding_plan',
+      suggestion_key: suggestionKey(`organization:coding-plan:${currentHourIso}`),
+      title: 'Review Coding Plan coverage for team runs',
+      description:
+        'Cloud Agent and Security Agent usage from team members is concentrated in a few recurring workflows.',
+      cta_label: 'View subscriptions',
+      cta_href: `/organizations/${ORGANIZATION_ID}/subscriptions`,
+      evidence_window_start: suggestionWindowStart,
+      evidence_window_end: suggestionWindowEnd,
+      observed_microdollars: 318_000_000,
+      benefit_label: 'Observed spend',
+      benefit_detail: '$318 in 7 days',
+      created_at: timestampAtHourOffset(currentHour, 2),
+      updated_at: timestampAtHourOffset(currentHour, 2),
+    },
+  ] satisfies (typeof cost_insight_active_suggestions.$inferInsert)[];
+  const costInsightEventRows = [
+    {
+      id: personalAnomalyEventId,
+      ...costInsightOwnerColumns(PERSONAL_OWNER),
+      event_type: 'anomaly_alert',
+      alert_kind: 'anomaly',
+      actor_user_id: null,
+      title: 'Spend Anomaly Alert needs review',
+      description: 'Usage-based Credit spend is above this account recent hourly pattern.',
+      snapshot: {
+        currentHourVariableMicrodollars: 32_000_000,
+        anomalyBaselineMicrodollars: 4_200_000,
+        anomalyThresholdMicrodollars: 25_000_000,
+        topDrivers: seedTopDrivers(PERSONAL_OWNER),
+      },
+      dedupe_key: `dev-seed:personal:anomaly:${currentHourIso}`,
+      occurred_at: currentHourIso,
+    },
+    {
+      id: personalThresholdEventId,
+      ...costInsightOwnerColumns(PERSONAL_OWNER),
+      event_type: 'threshold_crossed',
+      alert_kind: 'threshold',
+      actor_user_id: null,
+      title: 'Spend Threshold Alert needs review',
+      description: 'Rolling 24-hour Credit spend crossed the configured threshold.',
+      snapshot: {
+        rolling24HourMicrodollars: 74_000_000,
+        thresholdMicrodollars: personalThresholdMicrodollars,
+        topDrivers: seedTopDrivers(PERSONAL_OWNER),
+      },
+      dedupe_key: `dev-seed:personal:threshold:${currentHourIso}`,
+      occurred_at: timestampAtHourOffset(currentHour, 1),
+    },
+    {
+      ...costInsightOwnerColumns(PERSONAL_OWNER),
+      event_type: 'suggestion_created',
+      suggestion_kind: 'coding_plan',
+      active_suggestion_id: personalCodingPlanSuggestionId,
+      actor_user_id: null,
+      title: 'Cost Suggestion created',
+      description: 'Turn repeated model usage into a Coding Plan',
+      snapshot: {
+        suggestion: {
+          suggestionKey: suggestionKey(`personal:coding-plan:${currentHourIso}`),
+          evidenceWindowStart: suggestionWindowStart,
+          evidenceWindowEnd: suggestionWindowEnd,
+          observedMicrodollars: 126_000_000,
+          ctaHref: '/subscriptions',
+        },
+      },
+      dedupe_key: `dev-seed:personal:suggestion:coding-plan:${currentHourIso}`,
+      occurred_at: timestampAtHourOffset(currentHour, 2),
+    },
+    {
+      ...costInsightOwnerColumns(PERSONAL_OWNER),
+      event_type: 'suggestion_created',
+      suggestion_kind: 'kilo_pass',
+      active_suggestion_id: personalKiloPassSuggestionId,
+      actor_user_id: null,
+      title: 'Cost Suggestion created',
+      description: 'Compare Kilo Pass for recurring personal usage',
+      snapshot: {
+        suggestion: {
+          suggestionKey: suggestionKey(`personal:kilo-pass:${currentHourIso}`),
+          evidenceWindowStart: suggestionWindowStart,
+          evidenceWindowEnd: suggestionWindowEnd,
+          observedMicrodollars: 94_000_000,
+          ctaHref: '/subscriptions/kilo-pass',
+        },
+      },
+      dedupe_key: `dev-seed:personal:suggestion:kilo-pass:${currentHourIso}`,
+      occurred_at: timestampAtHourOffset(currentHour, 3),
+    },
+    {
+      ...costInsightOwnerColumns(PERSONAL_OWNER),
+      event_type: 'alert_reviewed',
+      alert_kind: 'anomaly',
+      actor_user_id: PERSONAL_OWNER_ID,
+      title: 'Spend Anomaly Alert reviewed',
+      description: 'Alert acknowledgment recorded for an earlier anomaly episode.',
+      snapshot: { currentHourVariableMicrodollars: 14_000_000 },
+      dedupe_key: `dev-seed:personal:reviewed:${currentHourIso}`,
+      occurred_at: timestampAtHourOffset(currentHour, 8),
+    },
+    {
+      ...costInsightOwnerColumns(PERSONAL_OWNER),
+      event_type: 'config_changed',
+      actor_user_id: PERSONAL_OWNER_ID,
+      title: 'Spend Alerts configured',
+      description: 'Spend Alerts and Cost Suggestions were enabled for the seed account.',
+      snapshot: {
+        changedFields: {
+          spendAlertsEnabled: { old: false, new: true },
+          spendThresholdMicrodollars: { old: null, new: personalThresholdMicrodollars },
+        },
+        settings: {
+          spendAlertsEnabled: true,
+          costSuggestionsEnabled: true,
+          spendThresholdMicrodollars: personalThresholdMicrodollars,
+        },
+      },
+      dedupe_key: `dev-seed:personal:config:${currentHourIso}`,
+      occurred_at: timestampAtHourOffset(currentHour, 18),
+    },
+    {
+      ...costInsightOwnerColumns(PERSONAL_OWNER),
+      event_type: 'disabled',
+      actor_user_id: PERSONAL_OWNER_ID,
+      title: 'Spend Alerts turned off',
+      description: 'Earlier disabled state kept in history for activity testing.',
+      snapshot: {
+        settings: {
+          spendAlertsEnabled: false,
+          costSuggestionsEnabled: true,
+          spendThresholdMicrodollars: personalThresholdMicrodollars,
+        },
+      },
+      dedupe_key: `dev-seed:personal:disabled:${currentHourIso}`,
+      occurred_at: timestampAtHourOffset(currentHour, 36),
+    },
+    {
+      id: organizationAnomalyEventId,
+      ...costInsightOwnerColumns(ORGANIZATION_OWNER),
+      event_type: 'anomaly_alert',
+      alert_kind: 'anomaly',
+      actor_user_id: null,
+      title: 'Organization spend anomaly needs review',
+      description: 'Usage-based Credit spend is above this organization recent hourly pattern.',
+      snapshot: {
+        currentHourVariableMicrodollars: 46_000_000,
+        anomalyBaselineMicrodollars: 8_600_000,
+        anomalyThresholdMicrodollars: 25_800_000,
+        topDrivers: seedTopDrivers(ORGANIZATION_OWNER),
+      },
+      dedupe_key: `dev-seed:organization:anomaly:${currentHourIso}`,
+      occurred_at: currentHourIso,
+    },
+    {
+      id: organizationThresholdEventId,
+      ...costInsightOwnerColumns(ORGANIZATION_OWNER),
+      event_type: 'threshold_crossed',
+      alert_kind: 'threshold',
+      actor_user_id: null,
+      title: 'Organization threshold needs review',
+      description: 'Rolling 24-hour organization Credit spend crossed the configured threshold.',
+      snapshot: {
+        rolling24HourMicrodollars: 128_000_000,
+        thresholdMicrodollars: organizationThresholdMicrodollars,
+        topDrivers: seedTopDrivers(ORGANIZATION_OWNER),
+      },
+      dedupe_key: `dev-seed:organization:threshold:${currentHourIso}`,
+      occurred_at: timestampAtHourOffset(currentHour, 1),
+    },
+    {
+      ...costInsightOwnerColumns(ORGANIZATION_OWNER),
+      event_type: 'suggestion_created',
+      suggestion_kind: 'coding_plan',
+      active_suggestion_id: organizationCodingPlanSuggestionId,
+      actor_user_id: null,
+      title: 'Cost Suggestion created',
+      description: 'Review Coding Plan coverage for team runs',
+      snapshot: {
+        suggestion: {
+          suggestionKey: suggestionKey(`organization:coding-plan:${currentHourIso}`),
+          evidenceWindowStart: suggestionWindowStart,
+          evidenceWindowEnd: suggestionWindowEnd,
+          observedMicrodollars: 318_000_000,
+          ctaHref: `/organizations/${ORGANIZATION_ID}/subscriptions`,
+        },
+      },
+      dedupe_key: `dev-seed:organization:suggestion:coding-plan:${currentHourIso}`,
+      occurred_at: timestampAtHourOffset(currentHour, 2),
+    },
+    {
+      ...costInsightOwnerColumns(ORGANIZATION_OWNER),
+      event_type: 'config_changed',
+      actor_user_id: BILLING_MANAGER_ID,
+      title: 'Spend Alerts configured',
+      description: 'Spend Alerts and Cost Suggestions were enabled for the seed organization.',
+      snapshot: {
+        changedFields: {
+          spendAlertsEnabled: { old: false, new: true },
+          spendThresholdMicrodollars: { old: null, new: organizationThresholdMicrodollars },
+        },
+        settings: {
+          spendAlertsEnabled: true,
+          costSuggestionsEnabled: true,
+          spendThresholdMicrodollars: organizationThresholdMicrodollars,
+        },
+      },
+      dedupe_key: `dev-seed:organization:config:${currentHourIso}`,
+      occurred_at: timestampAtHourOffset(currentHour, 18),
+    },
+  ] satisfies (typeof cost_insight_events.$inferInsert)[];
+  const costInsightStateRows = [
+    {
+      ...costInsightOwnerColumns(PERSONAL_OWNER),
+      last_evaluated_at: currentHourIso,
+      active_anomaly_event_id: personalAnomalyEventId,
+      active_anomaly_hour_start: currentHourIso,
+      active_anomaly_reviewed_at: null,
+      threshold_crossing_active: true,
+      active_threshold_event_id: personalThresholdEventId,
+      threshold_crossing_started_at: timestampAtHourOffset(currentHour, 1),
+      threshold_reviewed_at: null,
+      threshold_recovered_at: null,
+    },
+    {
+      ...costInsightOwnerColumns(ORGANIZATION_OWNER),
+      last_evaluated_at: currentHourIso,
+      active_anomaly_event_id: organizationAnomalyEventId,
+      active_anomaly_hour_start: currentHourIso,
+      active_anomaly_reviewed_at: null,
+      threshold_crossing_active: true,
+      active_threshold_event_id: organizationThresholdEventId,
+      threshold_crossing_started_at: timestampAtHourOffset(currentHour, 1),
+      threshold_reviewed_at: null,
+      threshold_recovered_at: null,
+    },
+  ] satisfies (typeof cost_insight_owner_states.$inferInsert)[];
+  const costInsightNotificationRows = [
+    { event_id: personalAnomalyEventId, recipient_user_id: PERSONAL_OWNER_ID },
+    { event_id: personalThresholdEventId, recipient_user_id: PERSONAL_OWNER_ID },
+    { event_id: organizationAnomalyEventId, recipient_user_id: PERSONAL_OWNER_ID },
+    { event_id: organizationAnomalyEventId, recipient_user_id: BILLING_MANAGER_ID },
+    { event_id: organizationThresholdEventId, recipient_user_id: PERSONAL_OWNER_ID },
+    { event_id: organizationThresholdEventId, recipient_user_id: BILLING_MANAGER_ID },
+  ] satisfies (typeof cost_insight_notification_deliveries.$inferInsert)[];
 
   const personalVariableMicrodollars = sumOwnerAmounts(variableEvents, PERSONAL_OWNER);
   const personalScheduledMicrodollars = sumOwnerAmounts(scheduledEvents, PERSONAL_OWNER);
@@ -424,6 +817,51 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
             credit_transactions.credit_category,
             `kiloclaw-subscription-commit:${CREDIT_CATEGORY_PREFIX}:%`
           )
+        )
+      );
+
+    const seedCostInsightEventIds = tx
+      .select({ id: cost_insight_events.id })
+      .from(cost_insight_events)
+      .where(
+        or(
+          eq(cost_insight_events.owned_by_user_id, PERSONAL_OWNER_ID),
+          eq(cost_insight_events.owned_by_organization_id, ORGANIZATION_ID)
+        )
+      );
+    await tx
+      .delete(cost_insight_notification_deliveries)
+      .where(inArray(cost_insight_notification_deliveries.event_id, seedCostInsightEventIds));
+    await tx
+      .delete(cost_insight_owner_states)
+      .where(
+        or(
+          eq(cost_insight_owner_states.owned_by_user_id, PERSONAL_OWNER_ID),
+          eq(cost_insight_owner_states.owned_by_organization_id, ORGANIZATION_ID)
+        )
+      );
+    await tx
+      .delete(cost_insight_events)
+      .where(
+        or(
+          eq(cost_insight_events.owned_by_user_id, PERSONAL_OWNER_ID),
+          eq(cost_insight_events.owned_by_organization_id, ORGANIZATION_ID)
+        )
+      );
+    await tx
+      .delete(cost_insight_active_suggestions)
+      .where(
+        or(
+          eq(cost_insight_active_suggestions.owned_by_user_id, PERSONAL_OWNER_ID),
+          eq(cost_insight_active_suggestions.owned_by_organization_id, ORGANIZATION_ID)
+        )
+      );
+    await tx
+      .delete(cost_insight_owner_configs)
+      .where(
+        or(
+          eq(cost_insight_owner_configs.owned_by_user_id, PERSONAL_OWNER_ID),
+          eq(cost_insight_owner_configs.owned_by_organization_id, ORGANIZATION_ID)
         )
       );
     await tx
@@ -693,6 +1131,27 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
           updated_at: sql`CURRENT_TIMESTAMP`,
         },
       });
+
+    await tx.insert(cost_insight_owner_configs).values([
+      {
+        ...costInsightOwnerColumns(PERSONAL_OWNER),
+        spend_alerts_enabled: true,
+        cost_suggestions_enabled: true,
+        spend_threshold_microdollars: personalThresholdMicrodollars,
+        spend_alerts_enabled_at: timestampAtHourOffset(currentHour, 18),
+      },
+      {
+        ...costInsightOwnerColumns(ORGANIZATION_OWNER),
+        spend_alerts_enabled: true,
+        cost_suggestions_enabled: true,
+        spend_threshold_microdollars: organizationThresholdMicrodollars,
+        spend_alerts_enabled_at: timestampAtHourOffset(currentHour, 18),
+      },
+    ]);
+    await tx.insert(cost_insight_active_suggestions).values(costInsightSuggestionRows);
+    await tx.insert(cost_insight_events).values(costInsightEventRows);
+    await tx.insert(cost_insight_owner_states).values(costInsightStateRows);
+    await tx.insert(cost_insight_notification_deliveries).values(costInsightNotificationRows);
   });
 
   console.log('');
@@ -700,6 +1159,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log('- 90 days of personal and organization Variable Credit spend.');
   console.log('- Monthly KiloClaw Scheduled Credit spend.');
   console.log('- Current-hour anomaly spikes and rolling 24-hour threshold crossings.');
+  console.log('- Active Spend Alert banners, Cost Suggestions, notification rows, and activity.');
   console.log('- Three organization members contributing distinct top spend drivers.');
   console.log('');
   console.log('Seed users are DB-only Cost Insights fixtures with placeholder Stripe IDs.');
@@ -730,5 +1190,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     personalScheduledMicrodollars,
     organizationVariableMicrodollars,
     organizationScheduledMicrodollars,
+    costInsightEventCount: costInsightEventRows.length,
+    activeSuggestionCount: costInsightSuggestionRows.length,
+    notificationDeliveryCount: costInsightNotificationRows.length,
   };
 }

@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import {
-  clearStoredAuth,
   clearStoredSession,
   createDeviceAuthRequest,
   getKiloApiBaseUrl,
@@ -80,7 +79,9 @@ export const App = (): JSX.Element => {
       }
 
       if (result.status === 'invalid') {
-        await clearStoredAuth(storage);
+        // Clear all account-scoped state (conversations included), like sign-out, so a later
+        // account on this profile never loads the expired user's data. Message returned below.
+        await clearStoredSession(storage);
         return { message: 'Your session expired. Sign in again.', status: 'signedOut' };
       }
 

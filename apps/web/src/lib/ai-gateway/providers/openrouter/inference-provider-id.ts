@@ -95,6 +95,7 @@ export type VercelUserByokInferenceProviderId = z.infer<
 >;
 
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
+  'alibaba-token-plan',
   'byteplus-coding',
   'chutes-byok',
   'codestral',
@@ -138,6 +139,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
   [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
+  [DirectUserByokInferenceProviderIdSchema.enum['alibaba-token-plan']]: 'deepseek-v3.2',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum['chutes-byok']]: 'Qwen/Qwen3-30B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',

@@ -1,7 +1,7 @@
 import { parseModelsDevProviderModels } from './sync-direct-byok';
 
 describe('parseModelsDevProviderModels', () => {
-  test('excludes deprecated models while retaining other statuses', () => {
+  test('excludes deprecated and non-text-output models while retaining other statuses', () => {
     const models = parseModelsDevProviderModels({
       models: {
         stable: {
@@ -26,6 +26,11 @@ describe('parseModelsDevProviderModels', () => {
           id: 'mimo-v2-omni',
           name: 'MiMo V2 Omni',
           status: 'deprecated',
+        },
+        imageOnly: {
+          id: 'wan2.7-image',
+          name: 'Wan2.7 Image',
+          modalities: { input: ['text'], output: ['image'] },
         },
       },
     });

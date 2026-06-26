@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import AppSidebar from './components/AppSidebar';
 import { AppTopbar } from './components/AppTopbar';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -16,7 +17,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <SidebarProvider>
             <PrefetchedOrganizations>
               <div className="flex min-h-screen w-full">
-                <AppSidebar />
+                <Suspense fallback={null}>
+                  <AppSidebar />
+                </Suspense>
                 <SidebarInset>
                   <AppTopbar />
                   <main className="bg-background w-full flex-1">{children}</main>

@@ -206,7 +206,7 @@ export async function handleStatefulPlatformOAuthConnect(
       new URL(
         buildIntegrationOAuthConnectErrorPath(
           platform,
-          organizationId ?? requestedOrganizationId,
+          organizationId,
           'oauth_init_failed'
         ),
         APP_URL

@@ -123,6 +123,20 @@ describe('GET /api/integrations/linear/connect', () => {
     expect(mockedGetLinearOAuthUrl).not.toHaveBeenCalled();
   });
 
+  test('redirects malformed organization IDs to the generic integration error path', async () => {
+    const response = await callLinearConnect(
+      makeRequest('/api/integrations/linear/connect?organizationId=not-a-uuid')
+    );
+
+    const location = response.headers.get('location');
+    expect(location).toBeTruthy();
+    const url = new URL(location ?? '');
+    expect(`${url.pathname}${url.search}`).toBe('/integrations/linear?error=oauth_init_failed');
+    expect(mockedEnsureOrganizationAccess).not.toHaveBeenCalled();
+    expect(mockedRequireActiveSubscriptionOrTrial).not.toHaveBeenCalled();
+    expect(mockedGetLinearOAuthUrl).not.toHaveBeenCalled();
+  });
+
   test('redirects inactive org subscription failures without creating an OAuth URL', async () => {
     mockedRequireActiveSubscriptionOrTrial.mockRejectedValue(new Error('inactive subscription'));
 

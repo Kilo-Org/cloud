@@ -63,7 +63,7 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
       return redirectToSignInForOAuthConnect(
         request,
         hasLegacyQueryCredentials
-          ? buildGitLabDetailCallbackPath(requestedOrganizationId)
+          ? buildGitLabDetailCallbackPathForRequestedOrganization(requestedOrganizationId)
           : undefined
       );
     }
@@ -155,6 +155,16 @@ function buildGitLabDetailCallbackPath(organizationId: string | null): string {
   }
 
   return '/integrations/gitlab';
+}
+
+function buildGitLabDetailCallbackPathForRequestedOrganization(
+  requestedOrganizationId: string | null
+): string {
+  try {
+    return buildGitLabDetailCallbackPath(parseOptionalOrganizationId(requestedOrganizationId));
+  } catch {
+    return buildGitLabDetailCallbackPath(null);
+  }
 }
 
 async function buildGitLabConnectOAuthUrl(

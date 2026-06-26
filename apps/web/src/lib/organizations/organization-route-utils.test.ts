@@ -8,6 +8,7 @@ import {
   getOrganizationAppPathForRouteIdentifier,
   getOrganizationRouteIdentifier,
   isOrganizationRouteIdentifierMatch,
+  isValidOrganizationRouteIdentifier,
   isUuidOrganizationRouteIdentifier,
   ORGANIZATION_SLUG_MAX_LENGTH,
 } from './organization-route-utils';
@@ -87,6 +88,14 @@ describe('organization route identifier matching', () => {
     expect(isUuidOrganizationRouteIdentifier('550e8400-e29b-41d4-a716-446655440000')).toBe(true);
     expect(isUuidOrganizationRouteIdentifier('acme')).toBe(false);
   });
+
+  it('validates slug route identifiers using the persisted slug format', () => {
+    expect(isValidOrganizationRouteIdentifier('acme')).toBe(true);
+    expect(isValidOrganizationRouteIdentifier('acme-')).toBe(true);
+    expect(isValidOrganizationRouteIdentifier('a'.repeat(32))).toBe(true);
+    expect(isValidOrganizationRouteIdentifier('a'.repeat(33))).toBe(false);
+    expect(isValidOrganizationRouteIdentifier('acme_inc')).toBe(false);
+  });
 });
 
 describe('resolveOrganizationRouteIdentifier', () => {
@@ -97,6 +106,7 @@ describe('resolveOrganizationRouteIdentifier', () => {
         inArray(organizations.slug, [
           'route-id-org',
           'route-slug-org',
+          'route-slug-ending-hyphen-',
           'deleted-route-org',
           'persisted-kilocode-org',
         ])
@@ -121,6 +131,17 @@ describe('resolveOrganizationRouteIdentifier', () => {
       .returning();
 
     await expect(resolveOrganizationRouteIdentifier('route-slug-org')).resolves.toBe(
+      organization.id
+    );
+  });
+
+  it('resolves persisted slugs ending with hyphen', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: 'Route Slug Ending Hyphen Org', slug: 'route-slug-ending-hyphen-' })
+      .returning();
+
+    await expect(resolveOrganizationRouteIdentifier('route-slug-ending-hyphen-')).resolves.toBe(
       organization.id
     );
   });

@@ -29,6 +29,7 @@ const mockedCreateGitLabOAuthState = jest.mocked(createGitLabOAuthState);
 const mockedStoreGitLabOAuthCredentials = jest.mocked(storeGitLabOAuthCredentials);
 
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
+const ORGANIZATION_ID = 'b41fc61e-827a-4bd4-a94f-16ae8ebf19e2';
 
 function makeRequest(pathWithQuery: string) {
   return new NextRequest(`http://localhost:3000${pathWithQuery}`);
@@ -120,7 +121,7 @@ describe('GET /api/integrations/gitlab/connect', () => {
 
     const response = await callGitLabConnect(
       makeRequest(
-        '/api/integrations/gitlab/connect?organizationId=org-gitlab-123&instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
+        `/api/integrations/gitlab/connect?organizationId=${ORGANIZATION_ID}&instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret`
       )
     );
 
@@ -129,10 +130,35 @@ describe('GET /api/integrations/gitlab/connect', () => {
     const url = new URL(location ?? '');
     expect(url.pathname).toBe('/users/sign_in');
     expect(url.searchParams.get('callbackPath')).toBe(
-      '/organizations/org-gitlab-123/integrations/gitlab'
+      `/organizations/${ORGANIZATION_ID}/integrations/gitlab`
     );
     expect(location).not.toContain('clientSecret');
     expect(location).not.toContain('client-secret');
+    expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
+    expect(mockedStoreGitLabOAuthCredentials).not.toHaveBeenCalled();
+    expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();
+  });
+
+  test('does not preserve malformed organization IDs in self-hosted sign-in callbacks', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response(null, { status: 401 }),
+    } as never);
+
+    const response = await callGitLabConnect(
+      makeRequest(
+        '/api/integrations/gitlab/connect?organizationId=not-a-uuid&instanceUrl=https%3A%2F%2Fgitlab.example.com&clientId=client-id&clientSecret=client-secret'
+      )
+    );
+
+    const location = response.headers.get('location');
+    expect(location).toBeTruthy();
+    const url = new URL(location ?? '');
+    expect(url.pathname).toBe('/users/sign_in');
+    expect(url.searchParams.get('callbackPath')).toBe('/integrations/gitlab');
+    expect(location).not.toContain('clientSecret');
+    expect(location).not.toContain('client-secret');
+    expect(location).not.toContain('not-a-uuid');
     expect(mockedCreateGitLabOAuthState).not.toHaveBeenCalled();
     expect(mockedStoreGitLabOAuthCredentials).not.toHaveBeenCalled();
     expect(mockedBuildGitLabOAuthUrl).not.toHaveBeenCalled();

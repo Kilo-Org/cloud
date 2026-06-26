@@ -12,6 +12,7 @@ import { successResult } from '@/lib/maybe-result';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import z from 'zod';
 import { resolveOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils.server';
+import { isValidOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 const warnInSentry = sentryLogger('org_auth', 'warning');
 
@@ -54,6 +55,13 @@ export async function getAuthorizedOrgContext(
   const { authFailedResponse, user } = await getUserFromAuthFn({ adminOnly: false });
   if (authFailedResponse) {
     return { success: false, nextResponse: authFailedResponse };
+  }
+  if (!isValidOrganizationRouteIdentifier(id)) {
+    const res = NextResponse.json({ error: 'Invalid organization ID' }, { status: 400 });
+    return {
+      success: false,
+      nextResponse: res,
+    };
   }
   const { success, data } = UUIDSchema.safeParse(id);
   if (!success) {

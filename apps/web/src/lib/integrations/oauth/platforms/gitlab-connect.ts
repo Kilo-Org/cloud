@@ -51,10 +51,10 @@ type GitLabOAuthConnectOptions = {
  */
 export async function handleGitLabOAuthConnect(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
+  const requestedOrganizationId = searchParams.get('organizationId');
   let organizationId: string | null = null;
 
   try {
-    organizationId = parseOptionalOrganizationId(searchParams.get('organizationId'));
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       const hasLegacyQueryCredentials =
@@ -62,10 +62,13 @@ export async function handleGitLabOAuthConnect(request: NextRequest) {
 
       return redirectToSignInForOAuthConnect(
         request,
-        hasLegacyQueryCredentials ? buildGitLabDetailCallbackPath(organizationId) : undefined
+        hasLegacyQueryCredentials
+          ? buildGitLabDetailCallbackPath(requestedOrganizationId)
+          : undefined
       );
     }
 
+    organizationId = parseOptionalOrganizationId(requestedOrganizationId);
     const instanceUrl = searchParams.get('instanceUrl') || undefined;
     const returnToParam = searchParams.get('returnTo') || undefined;
     const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;

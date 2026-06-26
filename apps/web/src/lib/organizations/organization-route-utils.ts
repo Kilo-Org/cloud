@@ -7,6 +7,7 @@ export type OrganizationRouteIdentifierInput = {
 
 const UUID_ROUTE_IDENTIFIER_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SLUG_ROUTE_IDENTIFIER_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/;
 
 export function getOrganizationRouteIdentifier(
   organization: OrganizationRouteIdentifierInput
@@ -34,6 +35,12 @@ export function getOrganizationAppPathForRouteIdentifier(
 
 export function isUuidOrganizationRouteIdentifier(identifier: string): boolean {
   return UUID_ROUTE_IDENTIFIER_PATTERN.test(identifier);
+}
+
+export function isValidOrganizationRouteIdentifier(identifier: string): boolean {
+  return (
+    isUuidOrganizationRouteIdentifier(identifier) || SLUG_ROUTE_IDENTIFIER_PATTERN.test(identifier)
+  );
 }
 
 export function isOrganizationRouteIdentifierMatch(

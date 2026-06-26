@@ -394,7 +394,7 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      const result = await getAuthorizedOrgContext('invalid-uuid', undefined, mockGetUserFromAuth);
+      const result = await getAuthorizedOrgContext('invalid uuid', undefined, mockGetUserFromAuth);
 
       expect(result.success).toBe(false);
       if (!result.success) {

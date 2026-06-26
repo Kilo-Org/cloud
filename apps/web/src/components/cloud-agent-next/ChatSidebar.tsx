@@ -312,7 +312,6 @@ export function ChatSidebar({
   sessions,
   currentSessionId,
   organizationId,
-  organizationRouteIdentifier,
   onDeleteSession,
   onRenameSession,
   isInSheet = false,
@@ -356,9 +355,8 @@ export function ChatSidebar({
     setEditingSessionId(null);
   }, []);
 
-  const organizationPathIdentifier = organizationRouteIdentifier ?? organizationId;
-  const basePath = organizationPathIdentifier
-    ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/cloud')
+  const basePath = organizationId
+    ? getOrganizationAppPathForRouteIdentifier(organizationId, '/cloud')
     : '/cloud';
   const chatPath = `${basePath}/chat`;
 

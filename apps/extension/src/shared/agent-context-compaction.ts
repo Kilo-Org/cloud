@@ -6,11 +6,11 @@ import type { KiloGatewayChatMessage } from './kilo-gateway-chat-client';
 
 export const KEEP_RECENT_EXCHANGES = 2;
 /*
- * Manual "Compact now" is explicit, so it keeps only the latest exchange. This lets a user compact
- * a short conversation (2 exchanges) instead of clicking an enabled-but-inert button;
- * auto-compaction stays at KEEP_RECENT_EXCHANGES for safer continuity near the context limit.
+ * Manual "Compact now" is explicit: it summarizes the whole conversation (keeps no recent exchange),
+ * so the user can compact whenever there is anything to compact. Auto-compaction keeps
+ * KEEP_RECENT_EXCHANGES for safer continuity near the context limit.
  */
-export const KEEP_RECENT_EXCHANGES_MANUAL = 1;
+export const KEEP_RECENT_EXCHANGES_MANUAL = 0;
 export const SUMMARY_PREFIX = '🗜️ Compacted earlier context\n\n';
 
 const SUMMARY_SYSTEM_PROMPT =
@@ -33,7 +33,8 @@ export const splitEventsForCompaction = (
     return { toKeep: events, toSummarize: [] };
   }
 
-  const boundary = userIndexes[userIndexes.length - keepRecentExchanges] ?? 0;
+  // A keep count of 0 keeps nothing: the cut falls past the last user message (whole transcript).
+  const boundary = userIndexes[userIndexes.length - keepRecentExchanges] ?? events.length;
 
   return {
     toKeep: events.slice(boundary),

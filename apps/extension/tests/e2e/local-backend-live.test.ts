@@ -931,8 +931,8 @@ test('live local backend manual Compact now compacts a frontier conversation', a
     const messageInput = sidePanel.getByLabel('Message agent');
 
     /*
-     * A short two-exchange conversation: manual "Compact now" keeps only the latest exchange, so
-     * there is still earlier history to summarize. (With the auto threshold this would be inert.)
+     * A short two-exchange conversation: manual "Compact now" summarizes the whole conversation, so
+     * it still compacts. (With the auto threshold this little history would be inert.)
      */
     for (const text of [
       'COMPACT_ONE: reply with one short sentence.',

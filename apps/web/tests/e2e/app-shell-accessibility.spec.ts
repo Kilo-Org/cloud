@@ -1,13 +1,8 @@
 import { test, expect } from '@chromatic-com/playwright';
 import { createDrizzleClient } from '@kilocode/db/client';
 import { kilocode_users } from '@kilocode/db/schema';
-import { config as loadEnv } from 'dotenv';
 import { randomUUID } from 'node:crypto';
 import { hosted_domain_specials } from '@/lib/auth/constants';
-
-loadEnv({ path: '.env' });
-loadEnv({ path: '.env.test', override: true });
-loadEnv({ path: '.env.test.local', override: true });
 
 async function seedFakeUser({ isAdmin }: { isAdmin: boolean }) {
   const uniqueId = randomUUID().slice(0, 8);
@@ -58,13 +53,19 @@ async function expectShellBasics(page: import('@playwright/test').Page) {
   await expect(page.locator('#main-content')).toBeFocused();
 
   const sidebarControls = page.getByRole('button', { name: 'Toggle sidebar' });
-  await expect(sidebarControls).toHaveCount(2);
+  await expect(sidebarControls).toHaveCount(1);
 
   for (const control of await sidebarControls.all()) {
     const box = await control.boundingBox();
     expect(box?.width).toBeGreaterThanOrEqual(44);
     expect(box?.height).toBeGreaterThanOrEqual(44);
   }
+
+  const sidebarRail = page.locator('[data-sidebar="rail"]');
+  await expect(sidebarRail).toHaveAttribute('tabindex', '-1');
+
+  const railBox = await sidebarRail.boundingBox();
+  expect(railBox?.width).toBeLessThan(44);
 }
 
 test.describe('authenticated app shell accessibility', () => {

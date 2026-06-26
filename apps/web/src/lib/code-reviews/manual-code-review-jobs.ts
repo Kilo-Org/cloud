@@ -19,11 +19,7 @@ import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
 import { fetchGitLabMergeRequest } from '@/lib/integrations/platforms/gitlab/adapter';
 import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
 import type { CodeReviewPlatform, Owner } from './core';
-import {
-  createCodeReview,
-  findActiveProviderPublishingReview,
-  findExistingReview,
-} from './db/code-reviews';
+import { createCodeReview, findActiveProviderPublishingReview } from './db/code-reviews';
 import { tryDispatchPendingReviews } from './dispatch/dispatch-pending-reviews';
 import { logExceptInTest } from '@/lib/utils.server';
 
@@ -46,7 +42,6 @@ export type ManualCodeReviewJobInput = z.infer<typeof ManualCodeReviewJobInputSc
 
 export type CreateManualCodeReviewJobResult = {
   reviewId: string;
-  reused: boolean;
   outputMode: ManualCodeReviewConfig['outputMode'];
 };
 
@@ -169,16 +164,6 @@ export async function createManualCodeReviewJob(params: {
     ? await resolveLocalPublicSource(platform, input.url)
     : await resolveConnectedProviderSource(params.owner, platform, input.url);
 
-  const existingReview = await findExistingReview(
-    source.repoFullName,
-    source.prNumber,
-    source.headSha,
-    { type: 'manual', owner: params.owner }
-  );
-  if (existingReview) {
-    return { reviewId: existingReview.id, reused: true, outputMode };
-  }
-
   if (outputMode === 'provider') {
     if (!source.integrationId) {
       throw new TRPCError({
@@ -231,17 +216,23 @@ export async function createManualCodeReviewJob(params: {
       outputMode,
     });
     await tryDispatchPendingReviews(params.owner);
-    return { reviewId, reused: false, outputMode };
+    return { reviewId, outputMode };
   } catch (error) {
-    if (getDatabaseErrorCode(error) === '23505') {
-      const racedExistingReview = await findExistingReview(
-        source.repoFullName,
-        source.prNumber,
-        source.headSha,
-        { type: 'manual', owner: params.owner }
-      );
-      if (racedExistingReview) {
-        return { reviewId: racedExistingReview.id, reused: true, outputMode };
+    if (
+      getDatabaseErrorCode(error) === '23505' &&
+      outputMode === 'provider' &&
+      source.integrationId
+    ) {
+      const activePublisher = await findActiveProviderPublishingReview({
+        platformIntegrationId: source.integrationId,
+        repoFullName: source.repoFullName,
+        prNumber: source.prNumber,
+      });
+      if (activePublisher) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'A provider-publishing Code Reviewer job is already active for this change.',
+        });
       }
     }
     throw error;

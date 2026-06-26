@@ -5,11 +5,14 @@ import {
   kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
+  organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import type { User } from '@kilocode/db/schema';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import type { Organization, User } from '@kilocode/db/schema';
+import type { ManualCodeReviewConfig } from '@kilocode/db/schema-types';
 import {
   cancelSupersededReviewsForPR,
   createCodeReview,
@@ -267,6 +270,98 @@ describe('cancelSupersededReviewsForPR', () => {
       .where(eq(cloud_agent_code_reviews.id, otherRepoId))
       .limit(1);
     expect(otherRepoRow?.status).toBe('pending');
+  });
+});
+
+describe('manual Code Reviewer review identity', () => {
+  let testUser: User;
+  let organization: Organization;
+  const createdReviewIds: string[] = [];
+  const repo = `${REPO}-manual-identity`;
+  const manualConfig: ManualCodeReviewConfig = {
+    agentConfig: {
+      review_style: 'balanced',
+      focus_areas: [],
+      model_slug: 'test-model',
+    },
+    instructions: null,
+    outputMode: 'kilo',
+  };
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    organization = await createTestOrganization(
+      'Manual Review Identity Org',
+      testUser.id,
+      0,
+      {},
+      false
+    );
+  });
+
+  afterAll(async () => {
+    for (const id of createdReviewIds) {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, id));
+    }
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function createManualReview(owner: Parameters<typeof createCodeReview>[0]['owner']) {
+    const id = await createCodeReview({
+      owner,
+      repoFullName: repo,
+      prNumber: 1,
+      prUrl: `https://github.com/${repo}/pull/1`,
+      prTitle: 'Manual PR',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'refs/pull/1/head',
+      headSha: 'manual-sha',
+      platform: 'github',
+      manualConfig,
+    });
+    createdReviewIds.push(id);
+    return id;
+  }
+
+  it('allows repeated manual rows for the same owner, repo, PR, and SHA', async () => {
+    const personalFirstId = await createManualReview({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+    const personalSecondId = await createManualReview({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+    const organizationFirstId = await createManualReview({
+      type: 'org',
+      id: organization.id,
+      userId: testUser.id,
+    });
+    const organizationSecondId = await createManualReview({
+      type: 'org',
+      id: organization.id,
+      userId: testUser.id,
+    });
+
+    const rows = await db
+      .select({ id: cloud_agent_code_reviews.id })
+      .from(cloud_agent_code_reviews)
+      .where(
+        inArray(cloud_agent_code_reviews.id, [
+          personalFirstId,
+          personalSecondId,
+          organizationFirstId,
+          organizationSecondId,
+        ])
+      );
+
+    expect(new Set(rows.map(row => row.id))).toEqual(
+      new Set([personalFirstId, personalSecondId, organizationFirstId, organizationSecondId])
+    );
   });
 });
 

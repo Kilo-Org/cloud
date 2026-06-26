@@ -355,10 +355,9 @@ export function CodeReviewJobsCard({
 
   async function handleManualJobCreated(data: {
     reviewId: string;
-    reused: boolean;
     outputMode: 'provider' | 'kilo';
   }) {
-    toast.success(data.reused ? 'Existing Code Reviewer job opened' : 'Code Reviewer job started', {
+    toast.success('Code Reviewer job started', {
       description:
         data.outputMode === 'kilo'
           ? 'Findings will appear in Kilo and will not be posted.'

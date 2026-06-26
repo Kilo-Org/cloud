@@ -1,5 +1,5 @@
 {
-  "id": "f7659f0c-8337-43ab-9a70-c094dfeba98b",
+  "id": "3fc1d536-bb45-4899-8031-f09e54ee2084",
   "prevId": "06265fd6-428e-4b7d-9092-dba307d6255e",
   "version": "7",
   "dialect": "postgresql",
@@ -4898,74 +4898,6 @@
           ],
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"manual_config\" IS NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_manual_user_repo_pr_sha": {
-          "name": "UQ_cloud_agent_code_reviews_manual_user_repo_pr_sha",
-          "columns": [
-            {
-              "expression": "owned_by_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "pr_number",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "head_sha",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"manual_config\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_manual_org_repo_pr_sha": {
-          "name": "UQ_cloud_agent_code_reviews_manual_org_repo_pr_sha",
-          "columns": [
-            {
-              "expression": "owned_by_organization_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "pr_number",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "head_sha",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"manual_config\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL",
           "concurrently": true,
           "method": "btree",
           "with": {}

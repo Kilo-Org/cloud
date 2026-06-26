@@ -33,9 +33,7 @@ import {
 
 type CodeReviewAttemptStatus = CodeReviewStatus;
 
-export type CodeReviewIdentityScope =
-  | { type: 'webhook'; platformIntegrationId: string }
-  | { type: 'manual'; owner: Owner };
+export type CodeReviewIdentityScope = { type: 'webhook'; platformIntegrationId: string };
 
 type InfraRetryAttemptResult =
   | {
@@ -151,23 +149,9 @@ function createCodeReviewErrorMetadata(params: CreateReviewParams) {
 }
 
 function codeReviewIdentityScopeConditions(scope: CodeReviewIdentityScope) {
-  if (scope.type === 'webhook') {
-    return [
-      eq(cloud_agent_code_reviews.platform_integration_id, scope.platformIntegrationId),
-      isNull(cloud_agent_code_reviews.manual_config),
-    ];
-  }
-
-  if (scope.owner.type === 'org') {
-    return [
-      eq(cloud_agent_code_reviews.owned_by_organization_id, scope.owner.id),
-      sql`${cloud_agent_code_reviews.manual_config} IS NOT NULL`,
-    ];
-  }
-
   return [
-    eq(cloud_agent_code_reviews.owned_by_user_id, scope.owner.id),
-    sql`${cloud_agent_code_reviews.manual_config} IS NOT NULL`,
+    eq(cloud_agent_code_reviews.platform_integration_id, scope.platformIntegrationId),
+    isNull(cloud_agent_code_reviews.manual_config),
   ];
 }
 

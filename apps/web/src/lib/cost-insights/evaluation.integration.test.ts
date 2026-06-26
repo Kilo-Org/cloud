@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import { captureCostInsightSpend } from '@kilocode/db/cost-insights-rollups';
 import {
+  cost_insight_evaluation_dirty_owners,
   cost_insight_events,
   cost_insight_owner_configs,
   cost_insight_owner_hour_driver_buckets,
@@ -14,7 +15,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { addHours, floorUtcHour } from './policy';
 import { getOwnerRollingDriverEvidenceExact, getOwnerRollingSpendExact } from './spend-repository';
-import { evaluateCostInsightsForOwner } from './evaluation';
+import { evaluateCostInsightsForOwner, processPendingCostInsightEvaluations } from './evaluation';
 
 const testUserIds = new Set<string>();
 
@@ -34,6 +35,9 @@ async function createUser(): Promise<string> {
 afterEach(async () => {
   for (const userId of testUserIds) {
     await db.delete(microdollar_usage).where(eq(microdollar_usage.kilo_user_id, userId));
+    await db
+      .delete(cost_insight_evaluation_dirty_owners)
+      .where(eq(cost_insight_evaluation_dirty_owners.owned_by_user_id, userId));
     await db
       .delete(cost_insight_owner_states)
       .where(eq(cost_insight_owner_states.owned_by_user_id, userId));
@@ -261,6 +265,20 @@ describe('Cost Insights evaluation integration', () => {
       spend_alerts_enabled: true,
       cost_suggestions_enabled: false,
     });
+    await db.insert(microdollar_usage).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: userId,
+      cost: 30_000_000,
+      input_tokens: 1,
+      output_tokens: 1,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: currentHourStart,
+      requested_model: 'anthropic/claude-sonnet-4',
+      model: 'anthropic/claude-sonnet-4',
+      provider: 'anthropic',
+      inference_provider: 'anthropic',
+    });
     await captureCostInsightSpend(db, {
       owner,
       actorUserId: userId,
@@ -317,9 +335,183 @@ describe('Cost Insights evaluation integration', () => {
     expect(event?.snapshot.topDrivers).toEqual([
       expect.objectContaining({
         spendCategory: 'variable',
-        productKey: 'cli',
+        modelOrPlanKey: 'anthropic/claude-sonnet-4',
         totalMicrodollars: 30_000_000,
       }),
     ]);
+  });
+
+  test('uses historical asOf for partial-hour anomaly amount and drivers', async () => {
+    const userId = await createUser();
+    const owner = { type: 'user', id: userId } as const;
+    const hourStart = '2026-06-26T10:00:00.000Z';
+    const asOf = '2026-06-26T10:30:00.000Z';
+
+    await db.insert(cost_insight_owner_configs).values({
+      owned_by_user_id: userId,
+      spend_alerts_enabled: true,
+      cost_suggestions_enabled: false,
+    });
+    for (const spend of [
+      {
+        occurredAt: '2026-06-26T10:15:00.000Z',
+        amountMicrodollars: 30_000_000,
+        model: 'anthropic/claude-sonnet-4',
+      },
+      {
+        occurredAt: '2026-06-26T10:45:00.000Z',
+        amountMicrodollars: 100_000_000,
+        model: 'openai/gpt-4.1',
+      },
+    ]) {
+      await db.insert(microdollar_usage).values({
+        id: crypto.randomUUID(),
+        kilo_user_id: userId,
+        cost: spend.amountMicrodollars,
+        input_tokens: 1,
+        output_tokens: 1,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        created_at: spend.occurredAt,
+        requested_model: spend.model,
+        model: spend.model,
+        provider: spend.model.startsWith('openai') ? 'openai' : 'anthropic',
+        inference_provider: spend.model.startsWith('openai') ? 'openai' : 'anthropic',
+      });
+      await captureCostInsightSpend(db, {
+        owner,
+        actorUserId: userId,
+        occurredAt: spend.occurredAt,
+        amountMicrodollars: spend.amountMicrodollars,
+        category: 'variable',
+        source: 'ai_gateway',
+        productKey: 'cli',
+        featureKey: 'messages',
+        modelOrPlanKey: spend.model,
+        providerKey: spend.model.startsWith('openai') ? 'openai' : 'anthropic',
+      });
+    }
+
+    const result = await evaluateCostInsightsForOwner(db, owner, { asOf });
+    const [event] = await db
+      .select({ snapshot: cost_insight_events.snapshot })
+      .from(cost_insight_events)
+      .where(eq(cost_insight_events.owned_by_user_id, userId));
+
+    expect(result.anomalyEventCreated).toBe(true);
+    expect(event?.snapshot).toMatchObject({
+      currentHourVariableMicrodollars: 30_000_000,
+      topDriversWindow: {
+        startInclusive: hourStart,
+        endExclusive: asOf,
+        spendCategory: 'variable',
+      },
+      topDrivers: [
+        expect.objectContaining({
+          modelOrPlanKey: 'anthropic/claude-sonnet-4',
+          totalMicrodollars: 30_000_000,
+        }),
+      ],
+    });
+  });
+
+  test('hourly recovery evaluates the just-completed hour at rollover', async () => {
+    const userId = await createUser();
+    const owner = { type: 'user', id: userId } as const;
+    const completedHourStart = '2026-06-26T10:00:00.000Z';
+    const completedHourEnd = '2026-06-26T11:00:00.000Z';
+    const asOf = '2026-06-26T11:05:00.000Z';
+    const occurredAt = '2026-06-26T10:59:59.000Z';
+
+    await db.insert(cost_insight_owner_configs).values({
+      owned_by_user_id: userId,
+      spend_alerts_enabled: true,
+      cost_suggestions_enabled: false,
+    });
+    await db.insert(microdollar_usage).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: userId,
+      cost: 30_000_000,
+      input_tokens: 1,
+      output_tokens: 1,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: occurredAt,
+      requested_model: 'anthropic/claude-sonnet-4',
+      model: 'anthropic/claude-sonnet-4',
+      provider: 'anthropic',
+      inference_provider: 'anthropic',
+    });
+    await captureCostInsightSpend(db, {
+      owner,
+      actorUserId: userId,
+      occurredAt,
+      amountMicrodollars: 30_000_000,
+      category: 'variable',
+      source: 'ai_gateway',
+      productKey: 'cli',
+      featureKey: 'messages',
+      modelOrPlanKey: 'anthropic/claude-sonnet-4',
+      providerKey: 'anthropic',
+    });
+
+    const result = await evaluateCostInsightsForOwner(db, owner, {
+      asOf,
+      recoverCompletedHour: true,
+    });
+    const [event] = await db
+      .select({ snapshot: cost_insight_events.snapshot })
+      .from(cost_insight_events)
+      .where(eq(cost_insight_events.owned_by_user_id, userId));
+
+    expect(result.recoveredAnomalyEventCreated).toBe(true);
+    expect(result.anomalyEventCreated).toBe(false);
+    expect(event?.snapshot.topDriversWindow).toEqual({
+      startInclusive: completedHourStart,
+      endExclusive: completedHourEnd,
+      spendCategory: 'variable',
+    });
+  });
+
+  test('coalesces multiple spend captures into one durable owner evaluation', async () => {
+    const userId = await createUser();
+    const owner = { type: 'user', id: userId } as const;
+    const occurredAt = '2026-06-26T10:15:00.000Z';
+
+    await db.insert(cost_insight_owner_configs).values({
+      owned_by_user_id: userId,
+      spend_alerts_enabled: false,
+      cost_suggestions_enabled: false,
+    });
+    for (let index = 0; index < 3; index += 1) {
+      await captureCostInsightSpend(db, {
+        owner,
+        actorUserId: userId,
+        occurredAt,
+        amountMicrodollars: 1_000_000,
+        category: 'variable',
+        source: 'ai_gateway',
+        productKey: 'cli',
+        featureKey: 'messages',
+        modelOrPlanKey: 'anthropic/claude-sonnet-4',
+        providerKey: 'anthropic',
+      });
+    }
+
+    const [dirtyOwner] = await db
+      .select()
+      .from(cost_insight_evaluation_dirty_owners)
+      .where(eq(cost_insight_evaluation_dirty_owners.owned_by_user_id, userId));
+    expect(dirtyOwner?.generation).toBe(3);
+
+    await expect(
+      processPendingCostInsightEvaluations(db, { owner, asOf: '2026-06-26T10:30:00.000Z' })
+    ).resolves.toMatchObject({ claimed: 1, evaluatedOwners: [owner], failedOwners: [] });
+    await expect(
+      db
+        .select()
+        .from(cost_insight_evaluation_dirty_owners)
+        .where(eq(cost_insight_evaluation_dirty_owners.owned_by_user_id, userId))
+    ).resolves.toHaveLength(0);
   });
 });

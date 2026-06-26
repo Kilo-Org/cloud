@@ -1,5 +1,6 @@
 import {
   buildExaUsageLogPartitionIndexDefinitions,
+  buildExaUsageLogPartitionIndexDropStatement,
   provisionExaUsageLogPartitions,
 } from '@/lib/exa-usage-partitions';
 import type { SQL } from 'drizzle-orm';
@@ -38,6 +39,17 @@ describe('Exa usage-log partition indexes', () => {
     ).toBe(true);
   });
 
+  test('builds a schema-qualified concurrent drop for a controlled index name', () => {
+    expect(
+      buildExaUsageLogPartitionIndexDropStatement(
+        'public',
+        'exa_usage_log_2026_07_charged_created_at_idx'
+      )
+    ).toBe(
+      'DROP INDEX CONCURRENTLY IF EXISTS "public"."exa_usage_log_2026_07_charged_created_at_idx"'
+    );
+  });
+
   test('rejects identifiers outside the expected catalog naming contract', () => {
     expect(() =>
       buildExaUsageLogPartitionIndexDefinitions(
@@ -53,6 +65,12 @@ describe('Exa usage-log partition indexes', () => {
         true
       )
     ).toThrow('Unsafe PostgreSQL identifier');
+    expect(() =>
+      buildExaUsageLogPartitionIndexDropStatement(
+        'public',
+        'exa_usage_log_2026_07_charged_created_at_idx"; DROP TABLE exa_usage_log; --'
+      )
+    ).toThrow('Invalid Exa usage-log partition index name');
   });
 
   test('provisions indexes only on write-free future partitions', async () => {

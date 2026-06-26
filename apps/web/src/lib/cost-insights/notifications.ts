@@ -13,7 +13,10 @@ import {
 import { costInsightOwnerBasePath } from './owner';
 import { MICRODOLLARS_PER_USD, microdollarsToUsd } from './policy';
 
-type CostInsightClaimedDeliveryRow = {
+const COST_INSIGHT_NOTIFICATION_MAX_ATTEMPTS = 5;
+const COST_INSIGHT_NOTIFICATION_LEASE_MINUTES = 15;
+
+export type CostInsightClaimedDeliveryRow = {
   delivery_id: string;
   recipient_user_id: string;
   recipient_email: string;
@@ -22,6 +25,7 @@ type CostInsightClaimedDeliveryRow = {
   title: string;
   description: string;
   alert_kind: CostInsightAlertKind | null;
+  attempt_count: number;
   snapshot: {
     thresholdMicrodollars?: number | null;
     rolling24HourMicrodollars?: number | null;
@@ -36,6 +40,7 @@ export type CostInsightNotificationDispatchSummary = {
   claimed: number;
   sent: number;
   skipped: number;
+  terminalized: number;
   failed: number;
 };
 
@@ -90,17 +95,48 @@ function amountLabels(row: CostInsightClaimedDeliveryRow): {
   };
 }
 
-async function claimPendingDeliveries(
+async function terminalizeExhaustedDeliveryClaims(database: CostInsightDatabase): Promise<number> {
+  const result = await database.execute<{ id: string }>(sql`
+    UPDATE cost_insight_notification_deliveries delivery
+    SET
+      status = 'skipped',
+      claimed_at = NULL,
+      failed_at = NULL,
+      sent_at = NULL,
+      last_error_redacted = 'stale_claim_attempts_exhausted',
+      updated_at = CURRENT_TIMESTAMP
+    WHERE delivery.status = 'sending'
+      AND delivery.attempt_count >= ${COST_INSIGHT_NOTIFICATION_MAX_ATTEMPTS}
+      AND delivery.claimed_at <= CURRENT_TIMESTAMP - make_interval(
+        mins => ${COST_INSIGHT_NOTIFICATION_LEASE_MINUTES}
+      )
+    RETURNING delivery.id
+  `);
+  return result.rows.length;
+}
+
+export async function claimPendingCostInsightNotificationDeliveries(
   database: CostInsightDatabase,
   limit: number
-): Promise<CostInsightClaimedDeliveryRow[]> {
+): Promise<{ rows: CostInsightClaimedDeliveryRow[]; terminalized: number }> {
+  const terminalized = await terminalizeExhaustedDeliveryClaims(database);
   const result = await database.execute<CostInsightClaimedDeliveryRow>(sql`
     WITH claimed AS (
       SELECT delivery.id
       FROM cost_insight_notification_deliveries delivery
-      WHERE delivery.status IN ('pending', 'failed')
-        AND delivery.next_attempt_at <= now()
-        AND delivery.attempt_count < 5
+      WHERE delivery.attempt_count < ${COST_INSIGHT_NOTIFICATION_MAX_ATTEMPTS}
+        AND (
+          (
+            delivery.status IN ('pending', 'failed')
+            AND delivery.next_attempt_at <= CURRENT_TIMESTAMP
+          )
+          OR (
+            delivery.status = 'sending'
+            AND delivery.claimed_at <= CURRENT_TIMESTAMP - make_interval(
+              mins => ${COST_INSIGHT_NOTIFICATION_LEASE_MINUTES}
+            )
+          )
+        )
       ORDER BY delivery.next_attempt_at ASC, delivery.id ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
@@ -108,19 +144,20 @@ async function claimPendingDeliveries(
       UPDATE cost_insight_notification_deliveries delivery
       SET
         status = 'sending',
-        claimed_at = now(),
+        claimed_at = CURRENT_TIMESTAMP,
         failed_at = NULL,
         sent_at = NULL,
         last_error_redacted = NULL,
         attempt_count = delivery.attempt_count + 1,
-        updated_at = now()
+        updated_at = CURRENT_TIMESTAMP
       FROM claimed
       WHERE delivery.id = claimed.id
-      RETURNING delivery.id, delivery.recipient_user_id
+      RETURNING delivery.id, delivery.recipient_user_id, delivery.attempt_count
     )
     SELECT
       updated.id AS delivery_id,
       updated.recipient_user_id,
+      updated.attempt_count,
       recipient.google_user_email AS recipient_email,
       event.owned_by_user_id,
       event.owned_by_organization_id,
@@ -137,7 +174,7 @@ async function claimPendingDeliveries(
     INNER JOIN kilocode_users recipient ON recipient.id = updated.recipient_user_id
     ORDER BY updated.id ASC
   `);
-  return result.rows;
+  return { rows: result.rows, terminalized };
 }
 
 async function markDeliverySent(database: CostInsightDatabase, deliveryId: string): Promise<void> {
@@ -191,11 +228,13 @@ export async function dispatchPendingCostInsightNotifications(
   database: CostInsightDatabase,
   limit = 25
 ): Promise<CostInsightNotificationDispatchSummary> {
-  const rows = await claimPendingDeliveries(database, limit);
+  const claim = await claimPendingCostInsightNotificationDeliveries(database, limit);
+  const rows = claim.rows;
   const summary: CostInsightNotificationDispatchSummary = {
     claimed: rows.length,
     sent: 0,
     skipped: 0,
+    terminalized: claim.terminalized,
     failed: 0,
   };
 

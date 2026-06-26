@@ -46,14 +46,16 @@ export function formatCostInsightDateTime(timestamp: string, timeZone?: string) 
   }).format(new Date(timestamp));
 }
 
-export function formatSpendEvidenceTime(
-  timestamp: string,
-  range: '1h' | '24h' | '7d',
-  timeZone?: string
-) {
+export function formatSpendEvidenceTime(timestamp: string, range: SpendRange, timeZone?: string) {
+  const dateFields =
+    range === '30d' || range === '90d'
+      ? { month: 'short' as const, day: 'numeric' as const }
+      : range === '7d'
+        ? { month: 'short' as const, day: 'numeric' as const, hour: '2-digit' as const }
+        : { hour: '2-digit' as const };
+
   return new Intl.DateTimeFormat('en-US', {
-    ...(range === '7d' ? { month: 'short', day: 'numeric' } : {}),
-    hour: '2-digit',
+    ...dateFields,
     hourCycle: 'h23',
     timeZone,
   }).format(new Date(timestamp));

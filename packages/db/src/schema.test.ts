@@ -624,7 +624,7 @@ describe('database schema', () => {
       ],
       CostInsightAlertKind: ['anomaly', 'threshold', 'threshold_7d', 'threshold_30d'],
       CostInsightSuggestionKind: ['coding_plan', 'kilo_pass'],
-      CostInsightNotificationStatus: ['pending', 'sending', 'sent', 'failed'],
+      CostInsightNotificationStatus: ['pending', 'sending', 'sent', 'failed', 'skipped'],
       CodeReviewAnalyticsCaptureStatus: ['captured', 'missing', 'invalid', 'omitted'],
       CodeReviewAnalyticsChangeType: [
         'bug_fix',

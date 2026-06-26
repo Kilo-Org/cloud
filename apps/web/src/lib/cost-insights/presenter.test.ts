@@ -4,6 +4,9 @@ import {
   formatActiveCostInsightAlerts,
   formatActiveCostInsightSuggestions,
   formatCostInsightEvents,
+  formatSpendEvidence,
+  normalizeCostInsightTimestamp,
+  organizationMemberLimitsHref,
   spendRangeStartHour,
 } from './presenter';
 
@@ -22,16 +25,32 @@ describe('Cost Insights presenter', () => {
     const state = {
       state: {
         activeAnomalyEventId: 'evt-anomaly',
+        activeAnomalyEpisodeId: 'evt-anomaly',
         activeAnomalyHourStart: '2026-06-25T19:00:00.000Z',
+        activeAnomalySnapshot: null,
         activeAnomalyReviewedAt: null,
         activeThresholdEventId: 'evt-threshold',
+        activeThresholdEpisodeId: 'evt-threshold',
         thresholdCrossingActive: true,
+        activeThresholdSnapshot: null,
         thresholdReviewedAt: null,
+        active7DayThresholdEventId: null,
+        active7DayThresholdEpisodeId: null,
+        threshold7DayCrossingActive: false,
+        active7DayThresholdSnapshot: null,
+        threshold7DayReviewedAt: null,
+        active30DayThresholdEventId: null,
+        active30DayThresholdEpisodeId: null,
+        threshold30DayCrossingActive: false,
+        active30DayThresholdSnapshot: null,
+        threshold30DayReviewedAt: null,
         lastEvaluatedAt: '2026-06-25T19:02:00.000Z',
       },
       events: [
         {
+          id: 'evt-anomaly',
           event_type: 'anomaly_alert',
+          alert_kind: 'anomaly',
           snapshot: {
             currentHourVariableMicrodollars: 112_700_000,
             anomalyBaselineMicrodollars: 6_000_000,
@@ -50,14 +69,16 @@ describe('Cost Insights presenter', () => {
               },
             ],
             topDriversWindow: {
-              startInclusive: '2026-06-25T19:00:00.000Z',
-              endExclusive: '2026-06-25T20:00:00.000Z',
+              startInclusive: '2026-06-25 21:00:00+02',
+              endExclusive: '2026-06-25 22:00:00+02',
               spendCategory: 'variable',
             },
           },
         },
         {
+          id: 'evt-threshold',
           event_type: 'threshold_crossed',
+          alert_kind: 'threshold',
           snapshot: {
             rolling24HourMicrodollars: 184_900_000,
             thresholdMicrodollars: 150_000_000,
@@ -86,6 +107,7 @@ describe('Cost Insights presenter', () => {
     expect(formatActiveCostInsightAlerts(state, { type: 'user', id: 'personal-owner' })).toEqual([
       {
         type: 'anomaly',
+        eventId: 'evt-anomaly',
         title: 'Spend is unusually high this hour',
         description: "Usage-based spend is well above this account's recent hourly pattern.",
         facts: [
@@ -117,6 +139,7 @@ describe('Cost Insights presenter', () => {
       },
       {
         type: 'threshold',
+        eventId: 'evt-threshold',
         title: '24-hour spend threshold crossed',
         description: 'Spend reached $184.90 against the $150.00 threshold.',
         facts: [
@@ -153,40 +176,38 @@ describe('Cost Insights presenter', () => {
     const state = {
       state: {
         activeAnomalyEventId: null,
+        activeAnomalyEpisodeId: null,
         activeAnomalyHourStart: null,
+        activeAnomalySnapshot: null,
         activeAnomalyReviewedAt: null,
         activeThresholdEventId: null,
+        activeThresholdEpisodeId: null,
         thresholdCrossingActive: false,
+        activeThresholdSnapshot: null,
         thresholdReviewedAt: null,
         active7DayThresholdEventId: null,
+        active7DayThresholdEpisodeId: null,
         threshold7DayCrossingActive: false,
+        active7DayThresholdSnapshot: null,
         threshold7DayReviewedAt: null,
         active30DayThresholdEventId: 'evt-threshold-30d',
+        active30DayThresholdEpisodeId: 'evt-threshold-30d',
         threshold30DayCrossingActive: true,
+        active30DayThresholdSnapshot: null,
         threshold30DayReviewedAt: null,
         lastEvaluatedAt: '2026-06-25T19:02:00.000Z',
       },
       events: [
         {
           id: 'evt-threshold-30d',
-          owned_by_user_id: 'personal-owner',
-          owned_by_organization_id: null,
           event_type: 'threshold_crossed',
           alert_kind: 'threshold_30d',
-          suggestion_kind: null,
-          active_suggestion_id: null,
-          actor_user_id: null,
-          title: '30-day Spend Threshold Alert',
-          description: 'Rolling 30-day Credit spend crossed $1,000.00.',
           snapshot: {
             thresholdWindow: 'rolling_30d',
             rolling30DayMicrodollars: 1_250_000_000,
             thresholdMicrodollars: 1_000_000_000,
             topDrivers: [],
           },
-          dedupe_key: 'threshold_30d:1000000000:2026-06-25T19:02:00.000Z',
-          occurred_at: '2026-06-25T19:02:00.000Z',
-          created_at: '2026-06-25T19:02:00.000Z',
         },
       ],
     } as Parameters<typeof formatActiveCostInsightAlerts>[0];
@@ -194,6 +215,7 @@ describe('Cost Insights presenter', () => {
     expect(formatActiveCostInsightAlerts(state, { type: 'user', id: 'personal-owner' })).toEqual([
       {
         type: 'threshold_30d',
+        eventId: 'evt-threshold-30d',
         title: '30-day spend threshold crossed',
         description: 'Spend reached $1,250.00 against the $1,000.00 threshold.',
         facts: [
@@ -211,40 +233,38 @@ describe('Cost Insights presenter', () => {
     const state = {
       state: {
         activeAnomalyEventId: null,
+        activeAnomalyEpisodeId: null,
         activeAnomalyHourStart: null,
+        activeAnomalySnapshot: null,
         activeAnomalyReviewedAt: null,
         activeThresholdEventId: null,
+        activeThresholdEpisodeId: null,
         thresholdCrossingActive: false,
+        activeThresholdSnapshot: null,
         thresholdReviewedAt: null,
         active7DayThresholdEventId: 'evt-threshold-7d',
+        active7DayThresholdEpisodeId: 'evt-threshold-7d',
         threshold7DayCrossingActive: true,
+        active7DayThresholdSnapshot: null,
         threshold7DayReviewedAt: null,
         active30DayThresholdEventId: null,
+        active30DayThresholdEpisodeId: null,
         threshold30DayCrossingActive: false,
+        active30DayThresholdSnapshot: null,
         threshold30DayReviewedAt: null,
         lastEvaluatedAt: '2026-06-25T19:02:00.000Z',
       },
       events: [
         {
           id: 'evt-threshold-7d',
-          owned_by_user_id: 'personal-owner',
-          owned_by_organization_id: null,
           event_type: 'threshold_crossed',
           alert_kind: 'threshold_7d',
-          suggestion_kind: null,
-          active_suggestion_id: null,
-          actor_user_id: null,
-          title: '7-day Spend Threshold Alert',
-          description: 'Rolling 7-day Credit spend crossed $500.00.',
           snapshot: {
             thresholdWindow: 'rolling_7d',
             rolling7DayMicrodollars: 620_000_000,
             thresholdMicrodollars: 500_000_000,
             topDrivers: [],
           },
-          dedupe_key: 'threshold_7d:500000000:2026-06-25T19:02:00.000Z',
-          occurred_at: '2026-06-25T19:02:00.000Z',
-          created_at: '2026-06-25T19:02:00.000Z',
         },
       ],
     } as Parameters<typeof formatActiveCostInsightAlerts>[0];
@@ -252,6 +272,7 @@ describe('Cost Insights presenter', () => {
     expect(formatActiveCostInsightAlerts(state, { type: 'user', id: 'personal-owner' })).toEqual([
       {
         type: 'threshold_7d',
+        eventId: 'evt-threshold-7d',
         title: '7-day spend threshold crossed',
         description: 'Spend reached $620.00 against the $500.00 threshold.',
         facts: [
@@ -352,5 +373,196 @@ describe('Cost Insights presenter', () => {
         requestCount: 4,
       },
     ]);
+  });
+
+  it('preserves uncovered hourly evidence as unavailable instead of zero spend', () => {
+    expect(
+      formatSpendEvidence(
+        [
+          {
+            hourStart: '2026-06-25 23:00:00+00',
+            variableMicrodollars: null,
+            scheduledMicrodollars: null,
+            totalMicrodollars: null,
+            variableRecordCount: null,
+            scheduledRecordCount: null,
+            isCovered: false,
+          },
+        ],
+        '24h'
+      )
+    ).toEqual([
+      {
+        label: '23',
+        periodStart: '2026-06-25T23:00:00.000Z',
+        periodEndExclusive: '2026-06-26T00:00:00.000Z',
+        coverage: 'unavailable',
+        coveredHours: 0,
+        totalHours: 1,
+        variableUsd: null,
+        scheduledUsd: null,
+      },
+    ]);
+  });
+
+  it('rejects covered evidence with missing category totals instead of coercing it to zero', () => {
+    expect(() =>
+      formatSpendEvidence(
+        [
+          {
+            hourStart: '2026-06-25T23:00:00.000Z',
+            variableMicrodollars: null,
+            scheduledMicrodollars: 1_000_000,
+            totalMicrodollars: null,
+            variableRecordCount: 0,
+            scheduledRecordCount: 1,
+            isCovered: true,
+          },
+        ],
+        '24h'
+      )
+    ).toThrow('Covered Cost Insights evidence must include both spend categories.');
+  });
+
+  it('marks aggregate evidence partial without exposing an understated covered subtotal', () => {
+    const points = [
+      {
+        hourStart: '2026-06-25T22:00:00.000Z',
+        variableMicrodollars: 2_000_000,
+        scheduledMicrodollars: 1_000_000,
+        totalMicrodollars: 3_000_000,
+        variableRecordCount: 1,
+        scheduledRecordCount: 1,
+        isCovered: true,
+      },
+      {
+        hourStart: '2026-06-25T23:00:00.000Z',
+        variableMicrodollars: null,
+        scheduledMicrodollars: null,
+        totalMicrodollars: null,
+        variableRecordCount: null,
+        scheduledRecordCount: null,
+        isCovered: false,
+      },
+      {
+        hourStart: '2026-06-26T00:00:00.000Z',
+        variableMicrodollars: null,
+        scheduledMicrodollars: null,
+        totalMicrodollars: null,
+        variableRecordCount: null,
+        scheduledRecordCount: null,
+        isCovered: false,
+      },
+    ];
+
+    expect(formatSpendEvidence(points, '30d')).toEqual([
+      {
+        label: 'Jun 25',
+        periodStart: '2026-06-25T22:00:00.000Z',
+        periodEndExclusive: '2026-06-26T00:00:00.000Z',
+        coverage: 'partial',
+        coveredHours: 1,
+        totalHours: 2,
+        variableUsd: null,
+        scheduledUsd: null,
+      },
+      {
+        label: 'Jun 26',
+        periodStart: '2026-06-26T00:00:00.000Z',
+        periodEndExclusive: '2026-06-26T01:00:00.000Z',
+        coverage: 'unavailable',
+        coveredHours: 0,
+        totalHours: 1,
+        variableUsd: null,
+        scheduledUsd: null,
+      },
+    ]);
+  });
+
+  it('retains period boundaries and sums only fully covered 90-day buckets', () => {
+    const points = Array.from({ length: 2 }, (_, index) => ({
+      hourStart: `2026-06-25T${String(22 + index).padStart(2, '0')}:00:00.000Z`,
+      variableMicrodollars: 2_000_000,
+      scheduledMicrodollars: 1_000_000,
+      totalMicrodollars: 3_000_000,
+      variableRecordCount: 1,
+      scheduledRecordCount: 1,
+      isCovered: true,
+    }));
+
+    expect(formatSpendEvidence(points, '90d')).toEqual([
+      {
+        label: 'Jun 25',
+        periodStart: '2026-06-25T22:00:00.000Z',
+        periodEndExclusive: '2026-06-26T00:00:00.000Z',
+        coverage: 'complete',
+        coveredHours: 2,
+        totalHours: 2,
+        variableUsd: 4,
+        scheduledUsd: 2,
+      },
+    ]);
+  });
+
+  it('normalizes production-shaped Postgres timestamps at the presentation boundary', () => {
+    expect(normalizeCostInsightTimestamp('2026-06-25 21:02:00+02')).toBe(
+      '2026-06-25T19:02:00.000Z'
+    );
+
+    const [event] = formatCostInsightEvents({ type: 'user', id: 'personal-owner' }, [
+      {
+        id: 'event-1',
+        eventType: 'config_changed',
+        alertKind: null,
+        suggestionKind: null,
+        actorUserId: null,
+        actorName: null,
+        title: 'Settings changed',
+        description: 'Settings changed.',
+        snapshot: {},
+        occurredAt: '2026-06-25 21:02:00+02',
+      },
+    ]);
+    expect(event?.occurredAt).toBe('2026-06-25T19:02:00.000Z');
+  });
+
+  it('links member limits only when presenter inputs prove eligibility and availability', () => {
+    const base = {
+      owner: { type: 'organization', id: 'organization-1' } as const,
+      plan: 'enterprise' as const,
+      usageLimitsEnabled: true,
+    };
+    expect(
+      organizationMemberLimitsHref({
+        ...base,
+        uiOwner: { type: 'organization', name: 'Org', authorizedRole: 'owner' },
+      })
+    ).toBe('/organizations/organization-1');
+    expect(
+      organizationMemberLimitsHref({
+        ...base,
+        uiOwner: { type: 'organization', name: 'Org', authorizedRole: 'admin' },
+      })
+    ).toBe('/organizations/organization-1');
+    expect(
+      organizationMemberLimitsHref({
+        ...base,
+        uiOwner: { type: 'organization', name: 'Org', authorizedRole: 'billing_manager' },
+      })
+    ).toBeUndefined();
+    expect(
+      organizationMemberLimitsHref({
+        ...base,
+        plan: 'teams',
+        uiOwner: { type: 'organization', name: 'Org', authorizedRole: 'owner' },
+      })
+    ).toBeUndefined();
+    expect(
+      organizationMemberLimitsHref({
+        ...base,
+        usageLimitsEnabled: false,
+        uiOwner: { type: 'organization', name: 'Org', authorizedRole: 'admin' },
+      })
+    ).toBeUndefined();
   });
 });

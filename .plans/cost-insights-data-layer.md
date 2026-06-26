@@ -589,9 +589,15 @@ Do not attach prompts, auth headers, cookies, tokens, Exa request bodies, user e
 
 ## Operator and local seed notes
 
-`apps/web/src/scripts/db/exa-usage-log-indexes.ts` creates two partial indexes per historical Exa leaf partition with `CREATE INDEX CONCURRENTLY IF NOT EXISTS`. Future partitions receive equivalent indexes during provisioning. Production runs should always set a small `--max-partitions`; the script does not currently verify `pg_index.indisvalid`/`indisready` after a failed concurrent build.
+`apps/web/src/scripts/db/exa-usage-log-indexes.ts` creates two partial indexes per historical Exa leaf partition with `CREATE INDEX CONCURRENTLY IF NOT EXISTS`. Future partitions receive equivalent indexes during provisioning. Production runs should always set a small `--max-partitions`. Before and after each planned index, the operator checks the schema-qualified `pg_index.indisvalid` and `pg_index.indisready` state; an interrupted invalid index is dropped and rebuilt concurrently.
 
-`dev/seed/cost-insights/spend-evidence.ts` is local-only and refuses production or non-loopback database targets. It seeds dedicated personal and organization owners using AI Gateway and KiloClaw canonical rows, then writes matching rollups through the production capture helper. It does not seed Exa or Coding Plan. It also extends global local coverage, so use it on a disposable/local database rather than a clone where unrelated canonical rows may lack rollups. Fixture users have placeholder Stripe IDs and should not be used on Stripe-backed pages.
+`dev/seed/cost-insights/spend-evidence.ts` is local-only and refuses production or non-loopback database targets. It seeds dedicated personal and organization owners with canonical AI Gateway, Exa, Coding Plan, and KiloClaw records and matching owner rollups. Default `--coverage-mode preserve` never deletes or rewrites global v1 coverage. For full 1h (current UTC hour), 24h, 7d, 30d, and 90d UI evidence on a disposable local database, run:
+
+```sh
+pnpm dev:seed cost-insights:spend-evidence --rollup-mode healthy --coverage-mode disposable-full
+```
+
+`disposable-full` verifies that the 90-day fixture range has no unrelated canonical records, owner rollups, or unresolved degraded intervals before replacing global v1 coverage, then verifies the written coverage state. It refuses databases containing unrelated evidence; use normal preserved coverage on shared or cloned databases.
 
 ## Verification completed
 

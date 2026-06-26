@@ -8,6 +8,11 @@ import {
 import { eq } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
+import {
+  acknowledgeCostInsightAlert,
+  costInsightRepositoryInternals,
+  updateCostInsightSettings,
+} from '@/lib/cost-insights/repository';
 import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
@@ -65,7 +70,11 @@ describe('Cost Insights router', () => {
           spend7DayThresholdUsd: null,
           spend30DayThresholdUsd: null,
         }),
-      () => caller.costInsights.acknowledgeAlert({ alertKind: 'anomaly' }),
+      () =>
+        caller.costInsights.acknowledgeAlert({
+          alertKind: 'anomaly',
+          eventId: crypto.randomUUID(),
+        }),
       () => caller.costInsights.disableThreshold(),
       () => caller.costInsights.dismissSuggestion({ suggestionId: crypto.randomUUID() }),
     ];
@@ -109,7 +118,7 @@ describe('Cost Insights router', () => {
     expect(trackingMock.trackCostInsightsUiInteraction).toHaveBeenCalledTimes(1);
   });
 
-  it('counts open alerts and suggestions for sidebar review badge', async () => {
+  it('counts only unreviewed Spend Alerts for sidebar attention', async () => {
     const user = await insertTestUser({ is_admin: true });
     await db.insert(cost_insight_owner_configs).values({
       owned_by_user_id: user.id,
@@ -183,7 +192,7 @@ describe('Cost Insights router', () => {
     const caller = await createCallerForUser(user.id);
     await expect(caller.costInsights.getAttentionState()).resolves.toEqual({
       attention: 'alert',
-      reviewItemCount: 5,
+      reviewItemCount: 4,
     });
 
     await db
@@ -285,6 +294,94 @@ describe('Cost Insights router', () => {
       active_anomaly_hour_start: null,
       active_anomaly_reviewed_at: null,
     });
+    const events = await db
+      .select({ eventType: cost_insight_events.event_type })
+      .from(cost_insight_events)
+      .where(eq(cost_insight_events.owned_by_user_id, user.id));
+    expect(events).toEqual([{ eventType: 'anomaly_alert' }]);
+  });
+
+  it('evaluates immediately after enabling Spend Alerts', async () => {
+    const user = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(user.id);
+
+    await expect(
+      caller.costInsights.updateSettings({
+        spendAlertsEnabled: true,
+        anomalyAlertsEnabled: false,
+        costSuggestionsEnabled: false,
+        spendThresholdUsd: null,
+        spend7DayThresholdUsd: null,
+        spend30DayThresholdUsd: null,
+      })
+    ).resolves.toEqual({ success: true });
+
+    const [config] = await db
+      .select({ enabled: cost_insight_owner_configs.spend_alerts_enabled })
+      .from(cost_insight_owner_configs)
+      .where(eq(cost_insight_owner_configs.owned_by_user_id, user.id));
+    const [state] = await db
+      .select({ lastEvaluatedAt: cost_insight_owner_states.last_evaluated_at })
+      .from(cost_insight_owner_states)
+      .where(eq(cost_insight_owner_states.owned_by_user_id, user.id));
+    const events = await db
+      .select({ eventType: cost_insight_events.event_type })
+      .from(cost_insight_events)
+      .where(eq(cost_insight_events.owned_by_user_id, user.id));
+
+    expect(config?.enabled).toBe(true);
+    expect(state?.lastEvaluatedAt).not.toBeNull();
+    expect(events).toEqual([{ eventType: 'config_changed' }]);
+  });
+
+  it('rolls back settings, episode clearing, and event history together', async () => {
+    const user = await insertTestUser({ is_admin: true });
+    await db.insert(cost_insight_owner_configs).values({
+      owned_by_user_id: user.id,
+      spend_alerts_enabled: true,
+      spend_alerts_enabled_at: '2026-06-25T19:00:00.000Z',
+    });
+    const [alertEvent] = await db
+      .insert(cost_insight_events)
+      .values({
+        owned_by_user_id: user.id,
+        event_type: 'anomaly_alert',
+        alert_kind: 'anomaly',
+        title: 'Spend Anomaly Alert',
+        description: 'Usage-based spend is high.',
+      })
+      .returning({ id: cost_insight_events.id });
+    if (!alertEvent) throw new Error('Cost Insights alert fixture insert failed.');
+    await db.insert(cost_insight_owner_states).values({
+      owned_by_user_id: user.id,
+      active_anomaly_event_id: alertEvent.id,
+      active_anomaly_hour_start: '2026-06-25T19:00:00.000Z',
+    });
+
+    await expect(
+      updateCostInsightSettings(db, {
+        owner: { type: 'user', id: user.id },
+        actorUserId: crypto.randomUUID(),
+        patch: { spendAlertsEnabled: false },
+      })
+    ).rejects.toThrow();
+
+    const [config] = await db
+      .select()
+      .from(cost_insight_owner_configs)
+      .where(eq(cost_insight_owner_configs.owned_by_user_id, user.id));
+    const [state] = await db
+      .select()
+      .from(cost_insight_owner_states)
+      .where(eq(cost_insight_owner_states.owned_by_user_id, user.id));
+    const events = await db
+      .select({ eventType: cost_insight_events.event_type })
+      .from(cost_insight_events)
+      .where(eq(cost_insight_events.owned_by_user_id, user.id));
+
+    expect(config?.spend_alerts_enabled).toBe(true);
+    expect(state?.active_anomaly_event_id).toBe(alertEvent.id);
+    expect(events).toEqual([{ eventType: 'anomaly_alert' }]);
   });
 
   it('turns off the threshold and clears the active threshold episode', async () => {
@@ -381,8 +478,25 @@ describe('Cost Insights router', () => {
     if (!suggestion) throw new Error('Cost Insights suggestion fixture insert failed.');
 
     const caller = await createCallerForUser(user.id);
-    await caller.costInsights.acknowledgeAlert({ alertKind: 'threshold_7d' });
-    await caller.costInsights.acknowledgeAlert({ alertKind: 'threshold_7d' });
+    await caller.costInsights.acknowledgeAlert({
+      alertKind: 'threshold_7d',
+      eventId: crypto.randomUUID(),
+    });
+    const [stateAfterStaleAcknowledgment] = await db
+      .select({ reviewedAt: cost_insight_owner_states.rolling_7_day_threshold_reviewed_at })
+      .from(cost_insight_owner_states)
+      .where(eq(cost_insight_owner_states.owned_by_user_id, user.id));
+    expect(stateAfterStaleAcknowledgment?.reviewedAt).toBeNull();
+    expect(trackingMock.trackCostInsightsAlertAction).not.toHaveBeenCalled();
+
+    await caller.costInsights.acknowledgeAlert({
+      alertKind: 'threshold_7d',
+      eventId: alertEvent.id,
+    });
+    await caller.costInsights.acknowledgeAlert({
+      alertKind: 'threshold_7d',
+      eventId: alertEvent.id,
+    });
     expect(trackingMock.trackCostInsightsAlertAction).toHaveBeenCalledTimes(1);
     expect(trackingMock.trackCostInsightsAlertAction).toHaveBeenCalledWith({
       distinctId: user.id,
@@ -405,6 +519,107 @@ describe('Cost Insights router', () => {
       suggestionKind: 'coding_plan',
       phase: 'accepted',
     });
+    const actionEvents = await db
+      .select({ eventType: cost_insight_events.event_type })
+      .from(cost_insight_events)
+      .where(eq(cost_insight_events.owned_by_user_id, user.id));
+    expect(actionEvents.filter(event => event.eventType === 'alert_reviewed')).toHaveLength(1);
+    expect(actionEvents.filter(event => event.eventType === 'suggestion_dismissed')).toHaveLength(
+      1
+    );
+  });
+
+  it('rolls back alert acknowledgment when review event insertion fails', async () => {
+    const user = await insertTestUser({ is_admin: true });
+    const [alertEvent] = await db
+      .insert(cost_insight_events)
+      .values({
+        owned_by_user_id: user.id,
+        event_type: 'threshold_crossed',
+        alert_kind: 'threshold',
+        title: '24-hour Spend Threshold Alert',
+        description: 'Rolling 24-hour spend crossed threshold.',
+      })
+      .returning({ id: cost_insight_events.id });
+    if (!alertEvent) throw new Error('Cost Insights alert fixture insert failed.');
+    await db.insert(cost_insight_owner_states).values({
+      owned_by_user_id: user.id,
+      active_threshold_event_id: alertEvent.id,
+      threshold_crossing_active: true,
+      threshold_crossing_started_at: '2026-06-25T19:00:00.000Z',
+    });
+
+    await expect(
+      acknowledgeCostInsightAlert(db, {
+        owner: { type: 'user', id: user.id },
+        alertKind: 'threshold',
+        eventId: alertEvent.id,
+        actorUserId: crypto.randomUUID(),
+      })
+    ).rejects.toThrow();
+
+    const [state] = await db
+      .select({ reviewedAt: cost_insight_owner_states.threshold_reviewed_at })
+      .from(cost_insight_owner_states)
+      .where(eq(cost_insight_owner_states.owned_by_user_id, user.id));
+    const events = await db
+      .select({ eventType: cost_insight_events.event_type })
+      .from(cost_insight_events)
+      .where(eq(cost_insight_events.owned_by_user_id, user.id));
+    expect(state?.reviewedAt).toBeNull();
+    expect(events).toEqual([{ eventType: 'threshold_crossed' }]);
+  });
+
+  it('rolls back suggestion dismissal when dismissal event insertion fails', async () => {
+    const user = await insertTestUser({ is_admin: true });
+    const [suggestion] = await db
+      .insert(cost_insight_active_suggestions)
+      .values({
+        owned_by_user_id: user.id,
+        suggestion_kind: 'kilo_pass',
+        suggestion_key: 'c'.repeat(64),
+        title: 'Review Kilo Pass coverage',
+        description: 'Kilo Pass may improve cost efficiency.',
+        cta_label: 'View Kilo Pass',
+        cta_href: '/subscriptions/kilo-pass',
+        evidence_window_start: '2026-06-18T19:00:00.000Z',
+        evidence_window_end: '2026-06-25T19:00:00.000Z',
+        observed_microdollars: 125_000_000,
+        benefit_label: 'Expert plan',
+        benefit_detail: '$199 + bonus credits',
+      })
+      .returning({ id: cost_insight_active_suggestions.id });
+    if (!suggestion) throw new Error('Cost Insights suggestion fixture insert failed.');
+
+    await expect(
+      db.transaction(async transaction =>
+        costInsightRepositoryInternals.dismissCostInsightSuggestionInTransaction(
+          transaction,
+          {
+            owner: { type: 'user', id: user.id },
+            suggestionId: suggestion.id,
+            actorUserId: user.id,
+          },
+          async () => {
+            throw new Error('Injected event insertion failure.');
+          }
+        )
+      )
+    ).rejects.toThrow('Injected event insertion failure.');
+
+    const [current] = await db
+      .select({
+        dismissedAt: cost_insight_active_suggestions.dismissed_at,
+        dismissedByUserId: cost_insight_active_suggestions.dismissed_by_user_id,
+      })
+      .from(cost_insight_active_suggestions)
+      .where(eq(cost_insight_active_suggestions.id, suggestion.id));
+    const events = await db
+      .select({ eventType: cost_insight_events.event_type })
+      .from(cost_insight_events)
+      .where(eq(cost_insight_events.owned_by_user_id, user.id));
+    expect(current).toEqual({ dismissedAt: null, dismissedByUserId: null });
+    expect(events).toEqual([]);
   });
 
   it('paginates filtered event history beyond the first 50 rows', async () => {

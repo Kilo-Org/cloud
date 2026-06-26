@@ -3,7 +3,11 @@ import { createHash } from 'node:crypto';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { WorkerDb } from './client';
-import { cost_insight_owner_hour_driver_buckets, cost_insight_owner_hour_totals } from './schema';
+import {
+  cost_insight_evaluation_dirty_owners,
+  cost_insight_owner_hour_driver_buckets,
+  cost_insight_owner_hour_totals,
+} from './schema';
 import {
   CostInsightSpendCategory,
   CostInsightSpendSource,
@@ -257,6 +261,7 @@ type CostInsightCaptureOutcome = {
 function costInsightConflictTargets(owner: CostInsightSpendOwner): {
   total: SQL;
   driver: SQL;
+  dirtyOwner: SQL;
 } {
   return owner.type === 'user'
     ? {
@@ -268,6 +273,10 @@ function costInsightConflictTargets(owner: CostInsightSpendOwner): {
           (owned_by_user_id, hour_start, spend_category, driver_key)
           WHERE owned_by_organization_id IS NULL
         `),
+        dirtyOwner: sql.raw(`
+          (owned_by_user_id)
+          WHERE owned_by_organization_id IS NULL
+        `),
       }
     : {
         total: sql.raw(`
@@ -276,6 +285,10 @@ function costInsightConflictTargets(owner: CostInsightSpendOwner): {
         `),
         driver: sql.raw(`
           (owned_by_organization_id, hour_start, spend_category, driver_key)
+          WHERE owned_by_user_id IS NULL
+        `),
+        dirtyOwner: sql.raw(`
+          (owned_by_organization_id)
           WHERE owned_by_user_id IS NULL
         `),
       };
@@ -388,9 +401,31 @@ async function writeCostInsightSpend(
         AND current_driver.provider_key = excluded.provider_key
         AND current_driver.actor_user_id = excluded.actor_user_id
       RETURNING 'ok'::text AS outcome
+    ), evaluation_dirty_upsert AS (
+      INSERT INTO ${cost_insight_evaluation_dirty_owners} AS dirty_owner (
+        owned_by_user_id,
+        owned_by_organization_id,
+        dirty_at,
+        next_attempt_at
+      )
+      SELECT
+        capture_input.owned_by_user_id,
+        capture_input.owned_by_organization_id,
+        pg_catalog.clock_timestamp(),
+        pg_catalog.clock_timestamp()
+      FROM capture_input
+      CROSS JOIN driver_upsert
+      WHERE TRUE
+      ON CONFLICT ${conflictTargets.dirtyOwner}
+      DO UPDATE SET
+        generation = dirty_owner.generation + 1,
+        dirty_at = pg_catalog.clock_timestamp(),
+        next_attempt_at = LEAST(dirty_owner.next_attempt_at, pg_catalog.clock_timestamp()),
+        updated_at = pg_catalog.clock_timestamp()
+      RETURNING 'ok'::text AS outcome
     )
     SELECT COALESCE(
-      (SELECT outcome FROM driver_upsert),
+      (SELECT outcome FROM evaluation_dirty_upsert),
       'cost_insight_driver_digest_collision'
     ) AS outcome
   `);

@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   Lightbulb,
+  Loader2,
   TrendingUp,
   XCircle,
 } from 'lucide-react';
@@ -307,11 +308,13 @@ function AlertDriverEvidencePanel({
 export function SuggestionCard({
   suggestion,
   canManage = true,
+  dismissPending = false,
   onCta,
   onDismiss,
 }: {
   suggestion: CostSuggestion;
   canManage?: boolean;
+  dismissPending?: boolean;
   onCta?: () => void;
   onDismiss?: () => void;
 }) {
@@ -356,10 +359,19 @@ export function SuggestionCard({
               type="button"
               variant="outline"
               className="min-h-control-touch w-full sm:min-h-0"
+              disabled={dismissPending}
+              aria-busy={dismissPending}
               onClick={onDismiss}
             >
-              <XCircle className="size-4" aria-hidden="true" />
-              Dismiss suggestion
+              {dismissPending ? (
+                <Loader2
+                  className="size-4 animate-spin motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+              ) : (
+                <XCircle className="size-4" aria-hidden="true" />
+              )}
+              {dismissPending ? 'Dismissing suggestion...' : 'Dismiss suggestion'}
             </Button>
           </div>
         )}

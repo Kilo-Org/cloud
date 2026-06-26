@@ -74,6 +74,15 @@ export type OwnerRollingSpendExact = {
   isComplete: boolean;
 };
 
+export type OwnerSpendDriverEvidenceExact = {
+  startInclusive: string;
+  endExclusive: string;
+  variableMicrodollars: number;
+  scheduledMicrodollars: number;
+  totalMicrodollars: number;
+  topDrivers: OwnerTopSpendDriver[];
+};
+
 export type OwnerRollingDriverEvidenceExact = {
   asOf: string;
   windowStart: string;
@@ -163,11 +172,11 @@ function ownerPredicate(
 }
 
 function normalizeDatabaseTimestamp(value: string | Date, fieldName: string): string {
-  const timestamp = value instanceof Date ? value.getTime() : Date.parse(value);
-  if (!Number.isFinite(timestamp)) {
+  const timestamp = new Date(value);
+  if (!Number.isFinite(timestamp.getTime())) {
     throw new Error(`${fieldName} is not a valid timestamp.`);
   }
-  return new Date(timestamp).toISOString();
+  return timestamp.toISOString();
 }
 
 function normalizeNullableDatabaseTimestamp(
@@ -635,42 +644,53 @@ function compareTopSpendDrivers(left: OwnerTopSpendDriver, right: OwnerTopSpendD
   return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
 }
 
-export async function getOwnerRollingDriverEvidenceExact(
+export async function getOwnerSpendDriverEvidenceExact(
   primaryDatabase: ExactRollingDatabase,
-  params: { owner: CostInsightSpendOwner; windowHours: number; asOf?: string }
-): Promise<OwnerRollingDriverEvidenceExact> {
-  const requestedAsOf =
-    params.asOf === undefined ? undefined : requireUtcTimestamp(params.asOf, 'asOf');
+  params: {
+    owner: CostInsightSpendOwner;
+    startInclusive: string;
+    endExclusive: string;
+    category?: CostInsightSpendCategory;
+  }
+): Promise<OwnerSpendDriverEvidenceExact> {
+  const startInclusive = requireUtcTimestamp(params.startInclusive, 'startInclusive');
+  const endExclusive = requireUtcTimestamp(params.endExclusive, 'endExclusive');
+  const intervalMilliseconds = Date.parse(endExclusive) - Date.parse(startInclusive);
+  if (
+    intervalMilliseconds <= 0 ||
+    intervalMilliseconds > COST_INSIGHT_MAX_HOURLY_BUCKETS * HOUR_MS
+  ) {
+    throw new Error(
+      'Cost Insights exact driver interval must be greater than zero and at most 90 days.'
+    );
+  }
 
   return primaryDatabase.transaction(
     async transaction => {
-      const asOfResult = await transaction.execute<DatabaseTimestampRow>(sql`
-        SELECT COALESCE(${requestedAsOf ?? null}::timestamptz, CURRENT_TIMESTAMP) AS value
-      `);
-      const asOfRow = asOfResult.rows[0];
-      if (!asOfRow) {
-        throw new Error('Cost Insights exact driver query could not establish an as-of value.');
-      }
-      const asOf = normalizeDatabaseTimestamp(asOfRow.value, 'as_of');
-      const windowStart = getRollingWindowFragments(asOf, params.windowHours).windowStart;
       const aggregation = await loadCanonicalCostInsightAggregation(transaction, {
         owner: params.owner,
-        startInclusive: windowStart,
-        endExclusive: asOf,
+        startInclusive,
+        endExclusive,
       });
-      const variableMicrodollars = aggregation.totals
+      const totals = params.category
+        ? aggregation.totals.filter(total => total.category === params.category)
+        : aggregation.totals;
+      const drivers = params.category
+        ? aggregation.drivers.filter(driver => driver.category === params.category)
+        : aggregation.drivers;
+      const variableMicrodollars = totals
         .filter(total => total.category === 'variable')
         .reduce(
           (sum, total) => sumSafe(sum, total.totalMicrodollars, 'exact driver variable total'),
           0
         );
-      const scheduledMicrodollars = aggregation.totals
+      const scheduledMicrodollars = totals
         .filter(total => total.category === 'scheduled')
         .reduce(
           (sum, total) => sumSafe(sum, total.totalMicrodollars, 'exact driver scheduled total'),
           0
         );
-      const topDrivers = aggregation.drivers
+      const topDrivers = drivers
         .map(driver => ({
           category: driver.category,
           source: driver.source,
@@ -686,8 +706,8 @@ export async function getOwnerRollingDriverEvidenceExact(
         .slice(0, COST_INSIGHT_MAX_TOP_DRIVERS);
 
       return {
-        asOf,
-        windowStart,
+        startInclusive,
+        endExclusive,
         variableMicrodollars,
         scheduledMicrodollars,
         totalMicrodollars: sumSafe(
@@ -700,6 +720,29 @@ export async function getOwnerRollingDriverEvidenceExact(
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );
+}
+
+export async function getOwnerRollingDriverEvidenceExact(
+  primaryDatabase: ExactRollingDatabase,
+  params: { owner: CostInsightSpendOwner; windowHours: number; asOf?: string }
+): Promise<OwnerRollingDriverEvidenceExact> {
+  const requestedAsOf =
+    params.asOf === undefined ? undefined : requireUtcTimestamp(params.asOf, 'asOf');
+  const asOf = requestedAsOf ?? new Date().toISOString();
+  const windowStart = getRollingWindowFragments(asOf, params.windowHours).windowStart;
+  const evidence = await getOwnerSpendDriverEvidenceExact(primaryDatabase, {
+    owner: params.owner,
+    startInclusive: windowStart,
+    endExclusive: asOf,
+  });
+  return {
+    asOf,
+    windowStart,
+    variableMicrodollars: evidence.variableMicrodollars,
+    scheduledMicrodollars: evidence.scheduledMicrodollars,
+    totalMicrodollars: evidence.totalMicrodollars,
+    topDrivers: evidence.topDrivers,
+  };
 }
 
 export async function getOwnerRolling24HourDriverEvidenceExact(

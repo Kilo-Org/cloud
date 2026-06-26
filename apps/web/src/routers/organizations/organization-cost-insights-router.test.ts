@@ -1,4 +1,6 @@
 import { jest } from '@jest/globals';
+import { cost_insight_events, cost_insight_owner_states } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
 import {
@@ -17,6 +19,7 @@ jest.mock('@/lib/cost-insights/posthog-tracking', () => ({
 }));
 
 const trackingMock: {
+  trackCostInsightsAlertAction: jest.Mock;
   trackCostInsightsSuggestionAction: jest.Mock;
   trackCostInsightsUiInteraction: jest.Mock;
 } = jest.requireMock('@/lib/cost-insights/posthog-tracking');
@@ -29,6 +32,7 @@ beforeAll(async () => {
 
 describe('Organization Cost Insights tracking', () => {
   beforeEach(() => {
+    trackingMock.trackCostInsightsAlertAction.mockClear();
     trackingMock.trackCostInsightsSuggestionAction.mockClear();
     trackingMock.trackCostInsightsUiInteraction.mockClear();
   });
@@ -84,6 +88,52 @@ describe('Organization Cost Insights tracking', () => {
       suggestionKind: 'kilo_pass',
       phase: 'clicked',
     });
+  });
+
+  it('acknowledges only the displayed organization alert event', async () => {
+    const owner = await insertTestUser({ is_admin: true });
+    const organization = await createOrganization('Cost Insights Review Org', owner.id);
+    const [alertEvent] = await db
+      .insert(cost_insight_events)
+      .values({
+        owned_by_organization_id: organization.id,
+        event_type: 'anomaly_alert',
+        alert_kind: 'anomaly',
+        title: 'Spend Anomaly Alert',
+        description: 'Usage-based spend is high.',
+      })
+      .returning({ id: cost_insight_events.id });
+    if (!alertEvent) throw new Error('Cost Insights alert fixture insert failed.');
+    await db.insert(cost_insight_owner_states).values({
+      owned_by_organization_id: organization.id,
+      active_anomaly_event_id: alertEvent.id,
+      active_anomaly_hour_start: '2026-06-25T19:00:00.000Z',
+    });
+    const caller = await createCallerForUser(owner.id);
+
+    await caller.organizations.costInsights.acknowledgeAlert({
+      organizationId: organization.id,
+      alertKind: 'anomaly',
+      eventId: crypto.randomUUID(),
+    });
+    let [state] = await db
+      .select({ reviewedAt: cost_insight_owner_states.active_anomaly_reviewed_at })
+      .from(cost_insight_owner_states)
+      .where(eq(cost_insight_owner_states.owned_by_organization_id, organization.id));
+    expect(state?.reviewedAt).toBeNull();
+    expect(trackingMock.trackCostInsightsAlertAction).not.toHaveBeenCalled();
+
+    await caller.organizations.costInsights.acknowledgeAlert({
+      organizationId: organization.id,
+      alertKind: 'anomaly',
+      eventId: alertEvent.id,
+    });
+    [state] = await db
+      .select({ reviewedAt: cost_insight_owner_states.active_anomaly_reviewed_at })
+      .from(cost_insight_owner_states)
+      .where(eq(cost_insight_owner_states.owned_by_organization_id, organization.id));
+    expect(state?.reviewedAt).not.toBeNull();
+    expect(trackingMock.trackCostInsightsAlertAction).toHaveBeenCalledTimes(1);
   });
 
   it('limits notification access to admin owners and billing managers', async () => {
@@ -167,6 +217,7 @@ describe('Organization Cost Insights tracking', () => {
         caller.organizations.costInsights.acknowledgeAlert({
           organizationId,
           alertKind: 'anomaly',
+          eventId: crypto.randomUUID(),
         }),
       () => caller.organizations.costInsights.disableThreshold({ organizationId }),
       () =>

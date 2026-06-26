@@ -37,10 +37,19 @@ export function parseSpendThresholdUsd(value: string | null): number | null {
   const dollars = Number.parseInt(wholePart, 10);
   const cents = Number.parseInt(centsPart.padEnd(2, '0') || '0', 10);
   const totalCents = dollars * 100 + cents;
-  if (!Number.isSafeInteger(totalCents) || totalCents <= 0) {
+  if (totalCents <= 0) {
     throw new Error('Spend threshold must be greater than $0.00.');
   }
-  return usdToMicrodollarsFromCents(totalCents);
+  if (!Number.isSafeInteger(totalCents)) {
+    throw new Error('Spend threshold is too large. Enter a smaller USD amount.');
+  }
+
+  const totalMicrodollars = usdToMicrodollarsFromCents(totalCents);
+  try {
+    return requireSafeMicrodollars(totalMicrodollars, 'Spend threshold');
+  } catch {
+    throw new Error('Spend threshold is too large. Enter a smaller USD amount.');
+  }
 }
 
 export function formatSpendThresholdUsd(value: number | null): string {
@@ -52,8 +61,8 @@ export function formatSpendThresholdUsd(value: number | null): string {
 }
 
 export function requireSafeMicrodollars(value: number, fieldName: string): number {
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw new Error(`${fieldName} must be a non-negative safe integer.`);
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${fieldName} must be a positive safe integer.`);
   }
   return value;
 }

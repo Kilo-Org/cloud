@@ -1,7 +1,10 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 
 import { db, type db as defaultDb } from '@/lib/drizzle';
-import { buildExaUsageLogPartitionIndexDefinitions } from '@/lib/exa-usage-partitions';
+import {
+  buildExaUsageLogPartitionIndexDefinitions,
+  buildExaUsageLogPartitionIndexDropStatement,
+} from '@/lib/exa-usage-partitions';
 import { sql } from 'drizzle-orm';
 
 export type ExaUsageLogIndexScriptArgs = {
@@ -15,6 +18,15 @@ type ExaUsageLogIndexDb = Pick<typeof defaultDb, 'execute'>;
 type ExaUsageLogPartitionCatalogRow = {
   schema_name: string;
   partition_name: string;
+};
+
+type ExaUsageLogIndexCatalogRow = {
+  schema_name: string;
+  index_name: string;
+  partition_schema_name: string;
+  partition_name: string;
+  is_valid: boolean;
+  is_ready: boolean;
 };
 
 function usage(): string {
@@ -106,6 +118,52 @@ export async function listExaUsageLogPartitions(
   return result.rows;
 }
 
+async function getExaUsageLogIndexState(
+  fromDb: ExaUsageLogIndexDb,
+  schemaName: string,
+  indexName: string
+): Promise<ExaUsageLogIndexCatalogRow | null> {
+  const result = await fromDb.execute<ExaUsageLogIndexCatalogRow>(sql`
+    SELECT
+      index_namespace.nspname AS schema_name,
+      index_class.relname AS index_name,
+      partition_namespace.nspname AS partition_schema_name,
+      partition_class.relname AS partition_name,
+      index_catalog.indisvalid AS is_valid,
+      index_catalog.indisready AS is_ready
+    FROM pg_catalog.pg_index AS index_catalog
+    INNER JOIN pg_catalog.pg_class AS index_class
+      ON index_class.oid = index_catalog.indexrelid
+    INNER JOIN pg_catalog.pg_namespace AS index_namespace
+      ON index_namespace.oid = index_class.relnamespace
+    INNER JOIN pg_catalog.pg_class AS partition_class
+      ON partition_class.oid = index_catalog.indrelid
+    INNER JOIN pg_catalog.pg_namespace AS partition_namespace
+      ON partition_namespace.oid = partition_class.relnamespace
+    WHERE index_namespace.nspname = ${schemaName}
+      AND index_class.relname = ${indexName}
+  `);
+
+  const [indexState] = result.rows;
+  return indexState ?? null;
+}
+
+function assertIndexTargetsPartition(
+  state: ExaUsageLogIndexCatalogRow,
+  schemaName: string,
+  partitionName: string
+): void {
+  if (
+    state.partition_schema_name !== schemaName ||
+    state.partition_name !== partitionName ||
+    state.schema_name !== schemaName
+  ) {
+    throw new Error(
+      `Index ${state.schema_name}.${state.index_name} targets ${state.partition_schema_name}.${state.partition_name}, expected ${schemaName}.${partitionName}.`
+    );
+  }
+}
+
 export async function provisionHistoricalExaUsageLogIndexes(
   fromDb: ExaUsageLogIndexDb,
   options: ExaUsageLogIndexScriptArgs
@@ -147,15 +205,48 @@ export async function provisionHistoricalExaUsageLogIndexes(
     }
 
     for (const index of plan.indexes) {
+      const initialState = await getExaUsageLogIndexState(fromDb, plan.schema_name, index.name);
+      if (initialState) {
+        assertIndexTargetsPartition(initialState, plan.schema_name, plan.partition_name);
+      }
+
+      const needsRebuild =
+        initialState !== null && (!initialState.is_valid || !initialState.is_ready);
+      const needsCreate = initialState === null || needsRebuild;
       console.log(
         JSON.stringify({
           mode: 'execute-index',
           schemaName: plan.schema_name,
           partitionName: plan.partition_name,
           indexName: index.name,
+          initialState: initialState
+            ? { valid: initialState.is_valid, ready: initialState.is_ready }
+            : null,
+          action: needsRebuild ? 'rebuild' : needsCreate ? 'create' : 'verify',
         })
       );
-      await fromDb.execute(sql.raw(index.statement));
+
+      if (needsRebuild) {
+        await fromDb.execute(
+          sql.raw(buildExaUsageLogPartitionIndexDropStatement(plan.schema_name, index.name))
+        );
+      }
+      if (needsCreate) {
+        await fromDb.execute(sql.raw(index.statement));
+      }
+
+      const finalState = await getExaUsageLogIndexState(fromDb, plan.schema_name, index.name);
+      if (!finalState) {
+        throw new Error(
+          `Index ${plan.schema_name}.${index.name} was not found after provisioning.`
+        );
+      }
+      assertIndexTargetsPartition(finalState, plan.schema_name, plan.partition_name);
+      if (!finalState.is_valid || !finalState.is_ready) {
+        throw new Error(
+          `Index ${plan.schema_name}.${index.name} is not valid and ready after provisioning (indisvalid=${finalState.is_valid}, indisready=${finalState.is_ready}).`
+        );
+      }
     }
 
     if (options.sleepMs > 0 && partitionIndex < plans.length - 1) {

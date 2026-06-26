@@ -124,9 +124,9 @@ export function CostInsightsSettingsClient({ organizationId }: CostInsightsSetti
     isError: personalUpdateError,
   } = useMutation(
     trpc.costInsights.updateSettings.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
+        await invalidateCostInsights();
         toast.success('Cost Insights settings saved');
-        void invalidateCostInsights();
       },
       onError: error => toast.error(error.message || 'Could not save Cost Insights settings'),
     })
@@ -137,9 +137,9 @@ export function CostInsightsSettingsClient({ organizationId }: CostInsightsSetti
     isError: organizationUpdateError,
   } = useMutation(
     trpc.organizations.costInsights.updateSettings.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
+        await invalidateCostInsights();
         toast.success('Cost Insights settings saved');
-        void invalidateCostInsights();
       },
       onError: error => toast.error(error.message || 'Could not save Cost Insights settings'),
     })

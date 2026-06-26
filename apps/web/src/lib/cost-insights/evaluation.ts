@@ -1,16 +1,16 @@
 import { createHash } from 'node:crypto';
 
 import type { CostInsightSpendOwner } from '@kilocode/db/cost-insights-rollups';
+import { after } from 'next/server';
 import type { CostInsightSpendCategory, CostInsightSpendSource } from '@kilocode/db/schema-types';
 import { sql } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
 import {
-  getOwnerCurrentHourSpend,
   getOwnerHourlySpend,
   getOwnerRollingDriverEvidenceExact,
   getOwnerRollingSpendExact,
-  getOwnerTopSpendDrivers,
+  getOwnerSpendDriverEvidenceExact,
   type OwnerTopSpendDriver,
 } from './spend-repository';
 import {
@@ -60,6 +60,7 @@ export type CostInsightEvaluationSummary = {
   owner: CostInsightSpendOwner;
   evaluatedAt: string;
   anomalyEventCreated: boolean;
+  recoveredAnomalyEventCreated: boolean;
   thresholdEventCreated: boolean;
   threshold7DayEventCreated: boolean;
   threshold30DayEventCreated: boolean;
@@ -166,48 +167,48 @@ export async function getCostInsightAnomalyPolicy(
 async function maybeCreateAnomalyAlert(params: {
   database: CostInsightDatabase;
   owner: CostInsightSpendOwner;
-  asOf: string;
-  currentHourStart: string;
-  currentHourVariableMicrodollars: number;
+  hourStart: string;
+  intervalEnd: string;
+  variableMicrodollars: number;
   anomalyPolicy: Awaited<ReturnType<typeof getCostInsightAnomalyPolicy>>;
   topDrivers: OwnerTopSpendDriver[];
 }): Promise<boolean> {
-  if (params.currentHourVariableMicrodollars < params.anomalyPolicy.thresholdMicrodollars) {
+  if (params.variableMicrodollars < params.anomalyPolicy.thresholdMicrodollars) {
     return false;
   }
 
   const dashboardState = await getCostInsightDashboardState(params.database, params.owner);
-  if (dashboardState.state?.activeAnomalyHourStart === params.currentHourStart) {
+  if (dashboardState.state?.activeAnomalyHourStart === params.hourStart) {
     return false;
   }
 
+  const snapshot = {
+    currentHourVariableMicrodollars: params.variableMicrodollars,
+    anomalyBaselineMicrodollars: params.anomalyPolicy.baselineMicrodollars,
+    anomalyThresholdMicrodollars: params.anomalyPolicy.thresholdMicrodollars,
+    topDrivers: topDriverSnapshot(params.topDrivers),
+    topDriversWindow: {
+      startInclusive: params.hourStart,
+      endExclusive: params.intervalEnd,
+      spendCategory: 'variable' as const,
+    },
+  };
   const event = await createCostInsightEvent(params.database, {
     owner: params.owner,
     eventType: 'anomaly_alert',
     alertKind: 'anomaly',
     title: 'Spend Anomaly Alert',
-    description: `Usage-based spend reached ${usdLabel(
-      params.currentHourVariableMicrodollars
-    )} in the current hour.`,
-    snapshot: {
-      currentHourVariableMicrodollars: params.currentHourVariableMicrodollars,
-      anomalyBaselineMicrodollars: params.anomalyPolicy.baselineMicrodollars,
-      anomalyThresholdMicrodollars: params.anomalyPolicy.thresholdMicrodollars,
-      topDrivers: topDriverSnapshot(params.topDrivers),
-      topDriversWindow: {
-        startInclusive: params.currentHourStart,
-        endExclusive: params.asOf,
-        spendCategory: 'variable',
-      },
-    },
-    dedupeKey: `anomaly:${params.currentHourStart}`,
+    description: `Usage-based spend reached ${usdLabel(params.variableMicrodollars)} during the evaluated UTC hour.`,
+    snapshot,
+    dedupeKey: `anomaly:${params.hourStart}`,
   });
   if (!event.created) return false;
 
   await markCostInsightAnomalyEpisode(params.database, {
     owner: params.owner,
     eventId: event.id,
-    hourStart: params.currentHourStart,
+    hourStart: params.hourStart,
+    snapshot,
   });
   await createCostInsightNotificationDeliveries(
     params.database,
@@ -215,6 +216,36 @@ async function maybeCreateAnomalyAlert(params: {
     await listCostInsightNotificationRecipientUserIds(params.database, params.owner)
   );
   return true;
+}
+
+async function evaluateAnomalyInterval(params: {
+  database: CostInsightDatabase;
+  owner: CostInsightSpendOwner;
+  hourStart: string;
+  intervalEnd: string;
+}): Promise<boolean> {
+  if (Date.parse(params.intervalEnd) <= Date.parse(params.hourStart)) return false;
+
+  const anomalyPolicy = await getCostInsightAnomalyPolicy(
+    params.database,
+    params.owner,
+    params.hourStart
+  );
+  const evidence = await getOwnerSpendDriverEvidenceExact(params.database, {
+    owner: params.owner,
+    startInclusive: params.hourStart,
+    endExclusive: params.intervalEnd,
+    category: 'variable',
+  });
+  return await maybeCreateAnomalyAlert({
+    database: params.database,
+    owner: params.owner,
+    hourStart: params.hourStart,
+    intervalEnd: params.intervalEnd,
+    variableMicrodollars: evidence.variableMicrodollars,
+    anomalyPolicy,
+    topDrivers: evidence.topDrivers,
+  });
 }
 
 async function maybeCreateThresholdAlert(params: {
@@ -262,22 +293,23 @@ async function maybeCreateThresholdAlert(params: {
   if (evidence.totalMicrodollars < params.thresholdMicrodollars) return false;
 
   const descriptor = thresholdWindowDescriptors[params.alertKind];
+  const snapshot = {
+    thresholdMicrodollars: params.thresholdMicrodollars,
+    thresholdWindow: descriptor.snapshotWindow,
+    ...descriptor.rollingSnapshot(evidence.totalMicrodollars),
+    topDrivers: topDriverSnapshot(evidence.topDrivers),
+    topDriversWindow: {
+      startInclusive: evidence.windowStart,
+      endExclusive: evidence.asOf,
+    },
+  };
   const event = await createCostInsightEvent(params.database, {
     owner: params.owner,
     eventType: 'threshold_crossed',
     alertKind: params.alertKind,
     title: `${descriptor.windowLabel} Spend Threshold Alert`,
     description: `Rolling ${descriptor.windowLabel} Credit spend crossed ${usdLabel(params.thresholdMicrodollars)}.`,
-    snapshot: {
-      thresholdMicrodollars: params.thresholdMicrodollars,
-      thresholdWindow: descriptor.snapshotWindow,
-      ...descriptor.rollingSnapshot(evidence.totalMicrodollars),
-      topDrivers: topDriverSnapshot(evidence.topDrivers),
-      topDriversWindow: {
-        startInclusive: evidence.windowStart,
-        endExclusive: evidence.asOf,
-      },
-    },
+    snapshot,
     dedupeKey: `${params.alertKind}:${params.thresholdMicrodollars}:${params.asOf}`,
   });
   if (!event.created) return false;
@@ -287,6 +319,7 @@ async function maybeCreateThresholdAlert(params: {
     eventId: event.id,
     crossedAt: params.asOf,
     alertKind: params.alertKind,
+    snapshot,
   });
   await createCostInsightNotificationDeliveries(
     params.database,
@@ -302,7 +335,6 @@ async function maybeCreateCostSuggestion(params: {
   topDrivers: OwnerTopSpendDriver[];
   evidenceWindowStart: string;
   evidenceWindowEnd: string;
-  evidenceWindowDays: number;
   observedMicrodollars: number;
 }): Promise<boolean> {
   const activeSuggestions = await listActiveCostInsightSuggestions(params.database, params.owner);
@@ -411,70 +443,48 @@ async function maybeCreateCostSuggestion(params: {
 async function evaluateCostInsightsForOwnerLocked(
   database: CostInsightDatabase,
   owner: CostInsightSpendOwner,
-  options: { asOf?: string } = {}
+  options: { asOf?: string; recoverCompletedHour?: boolean } = {}
 ): Promise<CostInsightEvaluationSummary> {
-  const asOf = options.asOf ?? new Date().toISOString();
+  const requestedAsOf = options.asOf ?? new Date().toISOString();
+  const asOfTimestamp = Date.parse(requestedAsOf);
+  if (!Number.isFinite(asOfTimestamp)) throw new Error('Cost Insights evaluation asOf is invalid.');
+  const asOf = new Date(asOfTimestamp).toISOString();
   const currentHourStart = floorUtcHour(new Date(asOf));
-  const topDriverEnd = addHours(currentHourStart, 1);
-  const suggestionWindowEnd = topDriverEnd;
+  const suggestionWindowEnd = asOf;
   const suggestionWindowStart = addDays(suggestionWindowEnd, -7);
 
   const config = await getCostInsightOwnerConfig(database, owner);
-  const currentHourSpend = await getOwnerCurrentHourSpend(database, owner);
-  const rolling30DaySpendPromise =
-    config?.spend_alerts_enabled && config.spend_30_day_threshold_microdollars !== null
-      ? getOwnerRollingSpendExact(database, {
-          owner,
-          asOf,
-          windowHours: 30 * 24,
-          fallbackToCanonical: true,
-        })
-      : Promise.resolve({ totalMicrodollars: null });
-  const rolling7DaySpendPromise =
+  const suggestionEvidence = await getOwnerRollingDriverEvidenceExact(database, {
+    owner,
+    asOf,
+    windowHours: 7 * 24,
+  });
+  const rolling24HourSpend = await getOwnerRollingSpendExact(database, {
+    owner,
+    asOf,
+    windowHours: 24,
+  });
+  const rolling7DaySpend =
     config?.spend_alerts_enabled && config.spend_7_day_threshold_microdollars !== null
-      ? getOwnerRollingSpendExact(database, {
+      ? await getOwnerRollingSpendExact(database, {
           owner,
           asOf,
           windowHours: 7 * 24,
           fallbackToCanonical: true,
         })
-      : Promise.resolve({ totalMicrodollars: null });
-  const [
-    anomalyTopDrivers,
-    suggestionTopDrivers,
-    suggestionHourlySpend,
-    rolling24HourSpend,
-    rolling7DaySpend,
-    rolling30DaySpend,
-  ] = await Promise.all([
-    getOwnerTopSpendDrivers(database, {
-      owner,
-      startHour: currentHourStart,
-      endHourExclusive: topDriverEnd,
-      category: 'variable',
-      limit: 5,
-    }),
-    getOwnerTopSpendDrivers(database, {
-      owner,
-      startHour: suggestionWindowStart,
-      endHourExclusive: suggestionWindowEnd,
-      limit: 5,
-    }),
-    getOwnerHourlySpend(database, {
-      owner,
-      startHour: suggestionWindowStart,
-      endHourExclusive: suggestionWindowEnd,
-    }),
-    getOwnerRollingSpendExact(database, { owner, asOf, windowHours: 24 }),
-    rolling7DaySpendPromise,
-    rolling30DaySpendPromise,
-  ]);
-  const suggestionObservedMicrodollars = suggestionHourlySpend.reduce(
-    (sum, hour) => sum + (hour.variableMicrodollars ?? 0) + (hour.scheduledMicrodollars ?? 0),
-    0
-  );
+      : { totalMicrodollars: null };
+  const rolling30DaySpend =
+    config?.spend_alerts_enabled && config.spend_30_day_threshold_microdollars !== null
+      ? await getOwnerRollingSpendExact(database, {
+          owner,
+          asOf,
+          windowHours: 30 * 24,
+          fallbackToCanonical: true,
+        })
+      : { totalMicrodollars: null };
 
   let anomalyEventCreated = false;
+  let recoveredAnomalyEventCreated = false;
   let thresholdEventCreated = false;
   let threshold7DayEventCreated = false;
   let threshold30DayEventCreated = false;
@@ -482,15 +492,20 @@ async function evaluateCostInsightsForOwnerLocked(
 
   if (config?.spend_alerts_enabled) {
     if (config.anomaly_alerts_enabled) {
-      const anomalyPolicy = await getCostInsightAnomalyPolicy(database, owner, currentHourStart);
-      anomalyEventCreated = await maybeCreateAnomalyAlert({
+      if (options.recoverCompletedHour) {
+        const completedHourStart = addHours(currentHourStart, -1);
+        recoveredAnomalyEventCreated = await evaluateAnomalyInterval({
+          database,
+          owner,
+          hourStart: completedHourStart,
+          intervalEnd: currentHourStart,
+        });
+      }
+      anomalyEventCreated = await evaluateAnomalyInterval({
         database,
         owner,
-        asOf,
-        currentHourStart,
-        currentHourVariableMicrodollars: currentHourSpend.variableMicrodollars,
-        anomalyPolicy,
-        topDrivers: anomalyTopDrivers,
+        hourStart: currentHourStart,
+        intervalEnd: asOf,
       });
     }
     thresholdEventCreated = await maybeCreateThresholdAlert({
@@ -523,11 +538,10 @@ async function evaluateCostInsightsForOwnerLocked(
     suggestionCreated = await maybeCreateCostSuggestion({
       database,
       owner,
-      topDrivers: suggestionTopDrivers,
+      topDrivers: suggestionEvidence.topDrivers,
       evidenceWindowStart: suggestionWindowStart,
       evidenceWindowEnd: suggestionWindowEnd,
-      evidenceWindowDays: 7,
-      observedMicrodollars: suggestionObservedMicrodollars,
+      observedMicrodollars: suggestionEvidence.totalMicrodollars,
     });
   }
 
@@ -536,6 +550,7 @@ async function evaluateCostInsightsForOwnerLocked(
     owner,
     evaluatedAt: asOf,
     anomalyEventCreated,
+    recoveredAnomalyEventCreated,
     thresholdEventCreated,
     threshold7DayEventCreated,
     threshold30DayEventCreated,
@@ -546,7 +561,7 @@ async function evaluateCostInsightsForOwnerLocked(
 export async function evaluateCostInsightsForOwner(
   database: CostInsightRootDatabase,
   owner: CostInsightSpendOwner,
-  options: { asOf?: string } = {}
+  options: { asOf?: string; recoverCompletedHour?: boolean } = {}
 ): Promise<CostInsightEvaluationSummary> {
   return await database.transaction(async tx => {
     const lockKey = `cost-insights-evaluation:${owner.type}:${owner.id}`;
@@ -557,17 +572,167 @@ export async function evaluateCostInsightsForOwner(
   });
 }
 
+const COST_INSIGHT_EVALUATION_LEASE_MINUTES = 5;
+
+type CostInsightClaimedDirtyOwner = {
+  id: string;
+  owned_by_user_id: string | null;
+  owned_by_organization_id: string | null;
+  generation: string | number | bigint;
+};
+
+export type CostInsightDirtyEvaluationSummary = {
+  claimed: number;
+  evaluatedOwners: CostInsightSpendOwner[];
+  failedOwners: Array<{ owner: CostInsightSpendOwner; error: string }>;
+};
+
+function ownerFromDirtyRow(row: CostInsightClaimedDirtyOwner): CostInsightSpendOwner {
+  if (row.owned_by_user_id) return { type: 'user', id: row.owned_by_user_id };
+  if (row.owned_by_organization_id) {
+    return { type: 'organization', id: row.owned_by_organization_id };
+  }
+  throw new Error('Cost Insights dirty evaluation row has no owner.');
+}
+
+async function claimDirtyCostInsightOwners(
+  database: CostInsightRootDatabase,
+  options: { limit: number; owner?: CostInsightSpendOwner }
+): Promise<CostInsightClaimedDirtyOwner[]> {
+  const ownerPredicate = options.owner
+    ? options.owner.type === 'user'
+      ? sql`dirty_owner.owned_by_user_id = ${options.owner.id} AND dirty_owner.owned_by_organization_id IS NULL`
+      : sql`dirty_owner.owned_by_organization_id = ${options.owner.id} AND dirty_owner.owned_by_user_id IS NULL`
+    : sql`TRUE`;
+  const result = await database.execute<CostInsightClaimedDirtyOwner>(sql`
+    WITH claimed AS (
+      SELECT dirty_owner.id
+      FROM cost_insight_evaluation_dirty_owners dirty_owner
+      WHERE dirty_owner.next_attempt_at <= CURRENT_TIMESTAMP
+        AND (
+          dirty_owner.claimed_at IS NULL
+          OR dirty_owner.claimed_at <= CURRENT_TIMESTAMP - make_interval(
+            mins => ${COST_INSIGHT_EVALUATION_LEASE_MINUTES}
+          )
+        )
+        AND ${ownerPredicate}
+      ORDER BY dirty_owner.dirty_at ASC, dirty_owner.id ASC
+      LIMIT ${options.limit}
+      FOR UPDATE SKIP LOCKED
+    )
+    UPDATE cost_insight_evaluation_dirty_owners dirty_owner
+    SET
+      claimed_at = CURRENT_TIMESTAMP,
+      attempt_count = dirty_owner.attempt_count + 1,
+      last_error_redacted = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    FROM claimed
+    WHERE dirty_owner.id = claimed.id
+    RETURNING
+      dirty_owner.id,
+      dirty_owner.owned_by_user_id,
+      dirty_owner.owned_by_organization_id,
+      dirty_owner.generation
+  `);
+  return result.rows;
+}
+
+async function completeDirtyCostInsightOwner(
+  database: CostInsightRootDatabase,
+  row: CostInsightClaimedDirtyOwner
+): Promise<void> {
+  await database.execute(sql`
+    WITH removed AS (
+      DELETE FROM cost_insight_evaluation_dirty_owners
+      WHERE id = ${row.id}
+        AND generation = ${row.generation}
+      RETURNING id
+    )
+    UPDATE cost_insight_evaluation_dirty_owners dirty_owner
+    SET
+      claimed_at = NULL,
+      attempt_count = 0,
+      next_attempt_at = CURRENT_TIMESTAMP,
+      last_error_redacted = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE dirty_owner.id = ${row.id}
+      AND NOT EXISTS (SELECT 1 FROM removed)
+  `);
+}
+
+async function failDirtyCostInsightOwner(
+  database: CostInsightRootDatabase,
+  row: CostInsightClaimedDirtyOwner,
+  error: string
+): Promise<void> {
+  await database.execute(sql`
+    UPDATE cost_insight_evaluation_dirty_owners
+    SET
+      claimed_at = NULL,
+      next_attempt_at = CURRENT_TIMESTAMP + INTERVAL '5 minutes',
+      last_error_redacted = ${error.slice(0, 500)},
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${row.id}
+  `);
+}
+
+export async function processPendingCostInsightEvaluations(
+  database: CostInsightRootDatabase,
+  options: {
+    limit?: number;
+    owner?: CostInsightSpendOwner;
+    asOf?: string;
+    recoverCompletedHour?: boolean;
+  } = {}
+): Promise<CostInsightDirtyEvaluationSummary> {
+  const limit = options.limit ?? 25;
+  const summary: CostInsightDirtyEvaluationSummary = {
+    claimed: 0,
+    evaluatedOwners: [],
+    failedOwners: [],
+  };
+
+  while (summary.claimed < limit) {
+    const rows = await claimDirtyCostInsightOwners(database, {
+      limit: limit - summary.claimed,
+      owner: options.owner,
+    });
+    if (rows.length === 0) break;
+    summary.claimed += rows.length;
+
+    for (const row of rows) {
+      const owner = ownerFromDirtyRow(row);
+      try {
+        await evaluateCostInsightsForOwner(database, owner, {
+          asOf: options.asOf,
+          recoverCompletedHour: options.recoverCompletedHour,
+        });
+        await completeDirtyCostInsightOwner(database, row);
+        if (
+          !summary.evaluatedOwners.some(
+            evaluatedOwner => evaluatedOwner.type === owner.type && evaluatedOwner.id === owner.id
+          )
+        ) {
+          summary.evaluatedOwners.push(owner);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        await failDirtyCostInsightOwner(database, row, message);
+        summary.failedOwners.push({ owner, error: message });
+      }
+    }
+  }
+
+  return summary;
+}
+
 export function scheduleCostInsightEvaluationAfterSpend(owner: CostInsightSpendOwner): void {
   if (process.env.NODE_ENV === 'test') return;
-  setTimeout(() => {
-    void evaluateCostInsightsForOwner(db, owner)
-      .then(() => dispatchPendingCostInsightNotifications(db, 10))
-      .catch(error => {
-        console.error('[cost-insights] post-spend evaluation failed', {
-          ownerType: owner.type,
-          ownerId: owner.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      });
-  }, 0);
+  after(async () => {
+    const evaluations = await processPendingCostInsightEvaluations(db, { limit: 2, owner });
+    await dispatchPendingCostInsightNotifications(db, 10);
+    if (evaluations.failedOwners.length > 0) {
+      console.error('[cost-insights] post-spend evaluation failed', evaluations.failedOwners[0]);
+    }
+  });
 }

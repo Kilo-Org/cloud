@@ -42,7 +42,7 @@ export const SevenDayThresholdOnly: Story = {
     ),
 };
 
-export const AlertsOffWithSavedThreshold: Story = {
+export const AlertsOffWithSavedOptions: Story = {
   render: () =>
     renderSettings(
       settingsData({

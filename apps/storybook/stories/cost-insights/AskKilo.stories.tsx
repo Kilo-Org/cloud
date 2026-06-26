@@ -11,14 +11,18 @@ const meta: Meta<typeof CostInsightsAskKiloView> = {
 export default meta;
 type Story = StoryObj<typeof CostInsightsAskKiloView>;
 
-function AskKiloStory() {
+function AskKiloStory({ initialQuestion }: { initialQuestion?: string }) {
   return (
     <CostInsightsShellView owner={personalOwner} activePage="ask">
-      <CostInsightsAskKiloView />
+      <CostInsightsAskKiloView initialQuestion={initialQuestion} />
     </CostInsightsShellView>
   );
 }
 
-export const Conversation: Story = {
+export const DisabledPreview: Story = {
   render: () => <AskKiloStory />,
+};
+
+export const DisabledPreviewWithQuestion: Story = {
+  render: () => <AskKiloStory initialQuestion="Show my spend for the last 30 days" />,
 };

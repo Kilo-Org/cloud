@@ -101,36 +101,36 @@ export function CostInsightsOverviewClient({
 
   const personalAcknowledgeMutation = useMutation(
     trpc.costInsights.acknowledgeAlert.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
+        await invalidateCostInsights();
         toast.success('Alert marked reviewed');
-        void invalidateCostInsights();
       },
       onError: error => toast.error(error.message || 'Could not mark alert reviewed'),
     })
   );
   const organizationAcknowledgeMutation = useMutation(
     trpc.organizations.costInsights.acknowledgeAlert.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
+        await invalidateCostInsights();
         toast.success('Alert marked reviewed');
-        void invalidateCostInsights();
       },
       onError: error => toast.error(error.message || 'Could not mark alert reviewed'),
     })
   );
   const personalDismissMutation = useMutation(
     trpc.costInsights.dismissSuggestion.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
+        await invalidateCostInsights();
         toast.success('Suggestion dismissed');
-        void invalidateCostInsights();
       },
       onError: error => toast.error(error.message || 'Could not dismiss suggestion'),
     })
   );
   const organizationDismissMutation = useMutation(
     trpc.organizations.costInsights.dismissSuggestion.mutationOptions({
-      onSuccess: () => {
+      onSuccess: async () => {
+        await invalidateCostInsights();
         toast.success('Suggestion dismissed');
-        void invalidateCostInsights();
       },
       onError: error => toast.error(error.message || 'Could not dismiss suggestion'),
     })
@@ -138,14 +138,15 @@ export function CostInsightsOverviewClient({
 
   const handleAlertAction = (alert: DashboardAlert, action: DashboardAlertAction) => {
     if (action === 'acknowledge') {
+      const acknowledgement = { alertKind: alert.type, eventId: alert.eventId };
       if (organizationId) {
         organizationAcknowledgeMutation.mutate({
           organizationId,
-          alertKind: alert.type,
+          ...acknowledgement,
         });
         return;
       }
-      personalAcknowledgeMutation.mutate({ alertKind: alert.type });
+      personalAcknowledgeMutation.mutate(acknowledgement);
       return;
     }
 
@@ -165,7 +166,15 @@ export function CostInsightsOverviewClient({
     router.push(`${basePath}/config`);
   };
 
+  const activeDismissMutation = organizationId
+    ? organizationDismissMutation
+    : personalDismissMutation;
+  const pendingSuggestionId = activeDismissMutation.isPending
+    ? activeDismissMutation.variables?.suggestionId
+    : undefined;
+
   const handleSuggestionDismiss = (suggestionId: string) => {
+    if (pendingSuggestionId === suggestionId) return;
     if (organizationId) {
       organizationDismissMutation.mutate({ organizationId, suggestionId });
       return;
@@ -175,16 +184,6 @@ export function CostInsightsOverviewClient({
 
   const handleSuggestionCta = (suggestion: CostSuggestion) => {
     trackSuggestionCta({ suggestionKind: suggestion.type });
-  };
-
-  const handleAskKilo = (question: string) => {
-    trackUiInteraction({
-      interaction: 'ask_kilo_question_submitted',
-      source: 'dashboard',
-      experience: 'ui_only',
-    });
-    const searchParams = new URLSearchParams({ question });
-    router.push(`${basePath}/ask-kilo?${searchParams.toString()}`);
   };
 
   const handleSpendRangeChange = (range: SpendRange) => {
@@ -206,6 +205,7 @@ export function CostInsightsOverviewClient({
       isError={dashboardError}
       activityHref={`${basePath}/activity`}
       alertActionsDisabled={alertActionsDisabled}
+      pendingSuggestionId={pendingSuggestionId}
       onRetry={() => {
         void (organizationId ? refetchOrganizationDashboard() : refetchPersonalDashboard());
       }}
@@ -218,7 +218,6 @@ export function CostInsightsOverviewClient({
       onSpendRangeChange={handleSpendRangeChange}
       onSuggestionCta={handleSuggestionCta}
       onSuggestionDismiss={handleSuggestionDismiss}
-      onAskKilo={handleAskKilo}
     />
   );
 }

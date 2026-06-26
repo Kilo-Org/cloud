@@ -31,24 +31,23 @@ const meta: Meta<typeof CostInsightsDashboardView> = {
 export default meta;
 type Story = StoryObj<typeof CostInsightsDashboardView>;
 
+type OverviewStoryOptions = {
+  isLoading?: boolean;
+  isError?: boolean;
+  attention?: 'none' | 'alert';
+  pendingSuggestionId?: string;
+};
+
 function CostInsightsOverviewStory({
   data,
   options = {},
   initialPage = 'dashboard',
 }: {
   data: CostInsightsDashboardData;
-  options?: { isLoading?: boolean; isError?: boolean; attention?: 'none' | 'alert' };
+  options?: OverviewStoryOptions;
   initialPage?: CostInsightsPage;
 }) {
   const [activePage, setActivePage] = useState<CostInsightsPage>(initialPage);
-  const [askKiloQuestion, setAskKiloQuestion] = useState(
-    'Create a graph of my costs for the last week'
-  );
-
-  function handleAskKilo(question: string) {
-    setAskKiloQuestion(question);
-    setActivePage('ask');
-  }
 
   const basePath =
     data.owner.type === 'organization'
@@ -64,24 +63,21 @@ function CostInsightsOverviewStory({
       onPageChange={setActivePage}
     >
       {activePage === 'ask' ? (
-        <CostInsightsAskKiloView initialQuestion={askKiloQuestion} />
+        <CostInsightsAskKiloView />
       ) : (
         <CostInsightsDashboardView
           data={data}
           isLoading={options.isLoading}
           isError={options.isError}
           activityHref={`${basePath}/activity`}
-          onAskKilo={handleAskKilo}
+          pendingSuggestionId={options.pendingSuggestionId}
         />
       )}
     </CostInsightsShellView>
   );
 }
 
-function renderDashboard(
-  data: CostInsightsDashboardData,
-  options: { isLoading?: boolean; isError?: boolean; attention?: 'none' | 'alert' } = {}
-) {
+function renderDashboard(data: CostInsightsDashboardData, options: OverviewStoryOptions = {}) {
   return <CostInsightsOverviewStory data={data} options={options} />;
 }
 
@@ -126,6 +122,13 @@ export const KiloPassSuggestion: Story = {
 
 export const CodingPlanSuggestion: Story = {
   render: () => renderDashboard(dashboardData({ suggestions: [codingPlanSuggestion] })),
+};
+
+export const SuggestionDismissPending: Story = {
+  render: () =>
+    renderDashboard(dashboardData({ suggestions: [kiloPassSuggestion] }), {
+      pendingSuggestionId: kiloPassSuggestion.id,
+    }),
 };
 
 export const AlertAndSuggestion: Story = {

@@ -6,13 +6,12 @@ import { formatCostInsightDateTime } from '../formatting';
 const subscribe = () => () => {};
 
 export function useViewerTimeZone() {
-  return useSyncExternalStore(
+  const useClientTimeZone = useSyncExternalStore(
     subscribe,
     () => true,
     () => false
-  )
-    ? undefined
-    : 'UTC';
+  );
+  return useClientTimeZone ? undefined : 'UTC';
 }
 
 export function LocalDateTime({

@@ -24,13 +24,25 @@ export async function GET(request: Request) {
   }
 
   const summary = await runCostInsightHourlySweep(db);
+  const hasFailures =
+    summary.failedOwners.length > 0 ||
+    summary.notifications.failed > 0 ||
+    summary.notifications.terminalized > 0;
+  if (hasFailures) {
+    sentryLogger('cron', 'error')('Cost Insights hourly sweep completed with partial failures', {
+      failedOwnerCount: summary.failedOwners.length,
+      failedNotificationCount: summary.notifications.failed,
+      terminalizedNotificationCount: summary.notifications.terminalized,
+    });
+  }
 
   return NextResponse.json(
     {
-      success: true,
+      success: !hasFailures,
+      partialFailure: hasFailures,
       summary,
       timestamp: new Date().toISOString(),
     },
-    { status: 200 }
+    { status: hasFailures ? 500 : 200 }
   );
 }

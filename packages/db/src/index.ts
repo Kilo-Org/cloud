@@ -10,6 +10,7 @@ export {
 export {
   createDrizzleClient,
   type CreateDrizzleClientOptions,
+  type DrizzleClient,
   getWorkerDb,
   type GetWorkerDbOptions,
   type WorkerDb,
@@ -77,4 +78,4 @@ export {
   type TerminalRenewalFailureRepository,
   type WaiveTerminalRenewalFailureInput,
 } from './kiloclaw-terminal-renewal-failure-repository';
-export { sql, ne } from 'drizzle-orm';
+export { and, eq, inArray, like, lt, ne, or, sql } from 'drizzle-orm';

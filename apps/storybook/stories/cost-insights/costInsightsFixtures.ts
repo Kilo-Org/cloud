@@ -28,6 +28,35 @@ function money(value: number) {
   return (value >= 100 ? wholeDollarFormatter : currencyFormatter).format(value);
 }
 
+type CompleteSpendEvidencePoint = Extract<SpendEvidencePoint, { coverage: 'complete' }>;
+type CompleteSpendEvidenceInput = Pick<
+  CompleteSpendEvidencePoint,
+  'label' | 'variableUsd' | 'scheduledUsd' | 'anomalyThresholdUsd'
+>;
+
+function completeSpendEvidence(
+  points: CompleteSpendEvidenceInput[],
+  options: { start: string; periodHours: number }
+): CompleteSpendEvidencePoint[] {
+  const startTime = new Date(options.start).getTime();
+  return points.map((point, index) => {
+    const periodStart = new Date(
+      startTime + index * options.periodHours * 60 * 60 * 1000
+    ).toISOString();
+    const periodEndExclusive = new Date(
+      startTime + (index + 1) * options.periodHours * 60 * 60 * 1000
+    ).toISOString();
+    return {
+      ...point,
+      periodStart,
+      periodEndExclusive,
+      coveredHours: options.periodHours,
+      totalHours: options.periodHours,
+      coverage: 'complete',
+    };
+  });
+}
+
 function buildSpendMetrics({
   currentHourUsd,
   baselineUsd,
@@ -106,64 +135,58 @@ export const emptyMetrics: SpendMetric[] = buildSpendMetrics({
   rolling24hUsd: 0,
 });
 
-export const evidence24h: SpendEvidencePoint[] = [
-  { label: '00:00', variableUsd: 2.4, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '01:00', variableUsd: 3.1, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '02:00', variableUsd: 1.8, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '03:00', variableUsd: 0, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '04:00', variableUsd: 4.6, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '05:00', variableUsd: 6.2, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '06:00', variableUsd: 7.4, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '07:00', variableUsd: 8.1, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '08:00', variableUsd: 11.5, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '09:00', variableUsd: 13.2, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '10:00', variableUsd: 15.4, scheduledUsd: 12, anomalyThresholdUsd: 18 },
-  { label: '11:00', variableUsd: 9.8, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-];
+export const evidence24h = completeSpendEvidence(
+  Array.from({ length: 24 }, (_, index) => ({
+    label: `${index.toString().padStart(2, '0')}:00`,
+    variableUsd: index === 3 ? 0 : 2.4 + ((index * 17) % 31) / 2,
+    scheduledUsd: index === 10 ? 12 : 0,
+    anomalyThresholdUsd: 18,
+  })),
+  { start: '2026-06-25T10:00:00.000Z', periodHours: 1 }
+);
 
-export const evidenceThisHour: SpendEvidencePoint[] = [
-  { label: '10:00', variableUsd: 112.7, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-];
+export const evidenceThisHour = completeSpendEvidence(
+  [{ label: 'Now', variableUsd: 112.7, scheduledUsd: 0, anomalyThresholdUsd: 18 }],
+  { start: '2026-06-26T09:00:00.000Z', periodHours: 1 }
+);
 
-export const evidenceAnomaly: SpendEvidencePoint[] = [
-  ...evidence24h.slice(0, 8),
-  { label: '08:00', variableUsd: 19.25, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '09:00', variableUsd: 42.8, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: '10:00', variableUsd: 74.35, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-  { label: 'Now', variableUsd: 112.7, scheduledUsd: 0, anomalyThresholdUsd: 18 },
-];
+export const evidenceAnomaly = completeSpendEvidence(
+  Array.from({ length: 24 }, (_, index) => ({
+    label: index === 23 ? 'Now' : `${index.toString().padStart(2, '0')}:00`,
+    variableUsd: index === 23 ? 112.7 : index === 22 ? 74.35 : 2.4 + ((index * 11) % 27),
+    scheduledUsd: 0,
+    anomalyThresholdUsd: 18,
+  })),
+  { start: '2026-06-25T10:00:00.000Z', periodHours: 1 }
+);
 
-export const evidence7d: SpendEvidencePoint[] = [
-  { label: 'Thu', variableUsd: 42, scheduledUsd: 12, anomalyThresholdUsd: 48 },
-  { label: 'Fri', variableUsd: 36, scheduledUsd: 0, anomalyThresholdUsd: 48 },
-  { label: 'Sat', variableUsd: 12, scheduledUsd: 0, anomalyThresholdUsd: 48 },
-  { label: 'Sun', variableUsd: 9, scheduledUsd: 0, anomalyThresholdUsd: 48 },
-  { label: 'Mon', variableUsd: 51, scheduledUsd: 0, anomalyThresholdUsd: 48 },
-  { label: 'Tue', variableUsd: 63, scheduledUsd: 0, anomalyThresholdUsd: 48 },
-  { label: 'Wed', variableUsd: 44, scheduledUsd: 24, anomalyThresholdUsd: 48 },
-];
+export const evidence7d = completeSpendEvidence(
+  Array.from({ length: 168 }, (_, index) => ({
+    label: `Hour ${index + 1}`,
+    variableUsd: index % 19 === 0 ? 0 : 3 + ((index * 13) % 47),
+    scheduledUsd: index % 72 === 24 ? 12 : 0,
+    anomalyThresholdUsd: 48,
+  })),
+  { start: '2026-06-19T10:00:00.000Z', periodHours: 1 }
+);
 
-export const evidence30d: SpendEvidencePoint[] = Array.from({ length: 30 }, (_, index) => ({
-  label: `Jun ${index + 1}`,
-  variableUsd: 18 + ((index * 13) % 47),
-  scheduledUsd: index % 7 === 2 ? 12 : 0,
-}));
+export const evidence30d = completeSpendEvidence(
+  Array.from({ length: 30 }, (_, index) => ({
+    label: `Day ${index + 1}`,
+    variableUsd: 18 + ((index * 13) % 47),
+    scheduledUsd: index % 7 === 2 ? 12 : 0,
+  })),
+  { start: '2026-05-27T10:00:00.000Z', periodHours: 24 }
+);
 
-export const evidence90d: SpendEvidencePoint[] = [
-  { label: 'Mar 30', variableUsd: 118, scheduledUsd: 12 },
-  { label: 'Apr 6', variableUsd: 142, scheduledUsd: 24 },
-  { label: 'Apr 13', variableUsd: 97, scheduledUsd: 0 },
-  { label: 'Apr 20', variableUsd: 166, scheduledUsd: 12 },
-  { label: 'Apr 27', variableUsd: 154, scheduledUsd: 24 },
-  { label: 'May 4', variableUsd: 189, scheduledUsd: 0 },
-  { label: 'May 11', variableUsd: 203, scheduledUsd: 12 },
-  { label: 'May 18', variableUsd: 171, scheduledUsd: 24 },
-  { label: 'May 25', variableUsd: 214, scheduledUsd: 0 },
-  { label: 'Jun 1', variableUsd: 226, scheduledUsd: 12 },
-  { label: 'Jun 8', variableUsd: 198, scheduledUsd: 24 },
-  { label: 'Jun 15', variableUsd: 241, scheduledUsd: 0 },
-  { label: 'Jun 22', variableUsd: 186, scheduledUsd: 12 },
-];
+export const evidence90d = completeSpendEvidence(
+  Array.from({ length: 13 }, (_, index) => ({
+    label: `Week ${index + 1}`,
+    variableUsd: 97 + ((index * 29) % 144),
+    scheduledUsd: index % 3 === 1 ? 24 : index % 3 === 0 ? 12 : 0,
+  })),
+  { start: '2026-03-28T10:00:00.000Z', periodHours: 168 }
+);
 
 export const personalDrivers: SpendDriver[] = [
   {
@@ -306,6 +329,7 @@ export function spendDriversByRange(
 
 export const anomalyAlert = {
   type: 'anomaly',
+  eventId: '00000000-0000-4000-8000-000000000001',
   title: 'Spend is unusually high this hour',
   description: "Usage-based spend is well above this account's recent hourly pattern.",
   facts: [
@@ -327,6 +351,7 @@ export const anomalyAlert = {
 
 export const thresholdAlert = {
   type: 'threshold',
+  eventId: '00000000-0000-4000-8000-000000000002',
   title: '24-hour spend threshold crossed',
   description: 'Spend reached $184.90 against the $150.00 threshold.',
   facts: [
@@ -348,6 +373,7 @@ export const thresholdAlert = {
 
 export const threshold7DayAlert = {
   type: 'threshold_7d',
+  eventId: '00000000-0000-4000-8000-000000000003',
   title: '7-day spend threshold crossed',
   description: 'Spend reached $536.40 against the $500.00 threshold.',
   facts: [

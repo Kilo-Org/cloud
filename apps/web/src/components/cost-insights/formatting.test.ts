@@ -42,13 +42,17 @@ describe('Cost Insights formatting', () => {
     expect(label).not.toContain('UTC');
   });
 
-  it('formats hourly evidence in the requested time zone', () => {
+  it('formats evidence labels in the requested time zone', () => {
     expect(formatSpendEvidenceTime('2026-06-26T08:00:00.000Z', '24h', 'America/New_York')).toBe(
       '04'
     );
     expect(formatSpendEvidenceTime('2026-06-26T08:00:00.000Z', '7d', 'America/New_York')).toBe(
       'Jun 26, 04'
     );
+    expect(formatSpendEvidenceTime('2026-06-26T00:00:00.000Z', '30d', 'America/Los_Angeles')).toBe(
+      'Jun 25'
+    );
+    expect(formatSpendEvidenceTime('2026-06-25T18:00:00.000Z', '90d', 'Asia/Tokyo')).toBe('Jun 26');
   });
 
   it('formats elapsed windows with both local dates and times', () => {

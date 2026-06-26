@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 
-import { computeDatabaseUrl } from '@kilocode/db';
+import { and, computeDatabaseUrl, eq, inArray, like, lt, or, sql } from '@kilocode/db';
 import {
   captureCostInsightSpend,
   COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
@@ -34,7 +34,6 @@ import {
   type CostInsightEventSnapshot,
 } from '@kilocode/db/schema';
 import type { CodingPlanTermKind, GatewayApiKind } from '@kilocode/db/schema-types';
-import { and, eq, inArray, like, lt, or, sql } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
 import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
@@ -56,6 +55,11 @@ type RollupMode =
   | 'repairable-drift'
   | 'unknown-taxonomy'
   | 'degraded-late';
+type CoverageMode = 'preserve' | 'disposable-full';
+type SpendEvidenceArgs = {
+  rollupMode: RollupMode;
+  coverageMode: CoverageMode;
+};
 const ROLLUP_MODES: RollupMode[] = [
   'bootstrap',
   'healthy',
@@ -82,7 +86,7 @@ const ORGANIZATION_OWNER: CostInsightSpendOwner = {
 const SEED_USER_IDS = [PERSONAL_OWNER_ID, BILLING_MANAGER_ID, ORGANIZATION_MEMBER_ID];
 
 export const usage =
-  '[--rollup-mode <bootstrap|healthy|repairable-drift|unknown-taxonomy|degraded-late>]';
+  '[--rollup-mode <bootstrap|healthy|repairable-drift|unknown-taxonomy|degraded-late>] [--coverage-mode <preserve|disposable-full>]';
 
 type VariableDriver = {
   featureKey: string;
@@ -183,27 +187,62 @@ function printUsage(): void {
   console.log('');
   console.log('Rollup modes:');
   console.log('  bootstrap         Canonical history plus repairable drift; run backfill next.');
-  console.log('  healthy           Matching rollups and complete 90-day coverage.');
-  console.log('  repairable-drift  Complete coverage with missing, late, and stale rollups.');
+  console.log('  healthy           Matching rollups for 90 days of fixture evidence.');
+  console.log('  repairable-drift  Missing, late, and stale fixture rollups for repair tests.');
   console.log('  unknown-taxonomy  Healthy data plus one dry-run-only taxonomy diagnostic.');
-  console.log('  degraded-late     Late data plus unresolved degraded interval for inspection.');
+  console.log(
+    '  degraded-late     Late data plus unresolved interval; requires disposable-full coverage.'
+  );
   console.log('');
-  console.log('Default: bootstrap. Reruns replace only this fixture data and v1 coverage state.');
+  console.log('Coverage modes:');
+  console.log('  preserve          Never modify global v1 coverage (default).');
+  console.log(
+    '  disposable-full   Replace global v1 coverage after verifying no unrelated evidence.'
+  );
+  console.log('');
+  console.log('Default: bootstrap with preserved global coverage.');
 }
 
-function parseRollupMode(args: string[]): RollupMode {
-  if (args.length === 0) return 'bootstrap';
-  if (args.length !== 2 || args[0] !== '--rollup-mode') {
-    printUsage();
-    throw new Error(`Unexpected arguments: ${args.join(' ')}`);
+export function parseSpendEvidenceArgs(args: string[]): SpendEvidenceArgs {
+  let rollupMode: RollupMode = 'bootstrap';
+  let coverageMode: CoverageMode = 'preserve';
+  const seen = new Set<string>();
+
+  for (let index = 0; index < args.length; index++) {
+    const flag = args[index];
+    if (flag !== '--rollup-mode' && flag !== '--coverage-mode') {
+      printUsage();
+      throw new Error(`Unexpected argument: ${flag}`);
+    }
+    if (seen.has(flag)) {
+      throw new Error(`Duplicate flag: ${flag}`);
+    }
+    seen.add(flag);
+
+    const value = args[index + 1];
+    if (!value || value.startsWith('--')) {
+      throw new Error(`Missing value for ${flag}`);
+    }
+    index++;
+
+    if (flag === '--rollup-mode') {
+      const requestedMode = ROLLUP_MODES.find(mode => mode === value);
+      if (!requestedMode) {
+        printUsage();
+        throw new Error(`Unknown rollup mode: ${value}`);
+      }
+      rollupMode = requestedMode;
+      continue;
+    }
+
+    if (value !== 'preserve' && value !== 'disposable-full') {
+      printUsage();
+      throw new Error(`Unknown coverage mode: ${value}`);
+    }
+    coverageMode = value;
   }
-  const requestedMode = args[1];
-  const rollupMode = ROLLUP_MODES.find(mode => mode === requestedMode);
-  if (!rollupMode) {
-    printUsage();
-    throw new Error(`Unknown rollup mode: ${requestedMode}`);
-  }
-  return rollupMode;
+
+  return { rollupMode, coverageMode };
 }
 
 function assertLocalDatabaseTarget(): { hostname: string; database: string; port: string } {
@@ -224,6 +263,144 @@ function assertLocalDatabaseTarget(): { hostname: string; database: string; port
     database: decodeURIComponent(databaseUrl.pathname.slice(1)),
     port: databaseUrl.port || '5432',
   };
+}
+
+type DisposableCoverageVerificationRow = {
+  unrelated_canonical_count: string;
+  unrelated_rollup_count: string;
+  unresolved_degraded_count: string;
+};
+
+type RollupCoverageRow = {
+  live_capture_start_hour: string;
+  coverage_start_hour: string | null;
+};
+
+export async function assertDisposableFullCoverageSafe(
+  database: Pick<ReturnType<typeof getSeedDb>, 'execute'>,
+  startHour: string,
+  endHourExclusive: string
+): Promise<void> {
+  const result = await database.execute<DisposableCoverageVerificationRow>(sql`
+    WITH unrelated_canonical AS (
+      SELECT 1
+      FROM ${microdollar_usage}
+      WHERE ${microdollar_usage.created_at} >= ${startHour}
+        AND ${microdollar_usage.created_at} < ${endHourExclusive}
+        AND ${microdollar_usage.cost} > 0
+        AND (
+          (${microdollar_usage.organization_id} IS NULL
+            AND ${microdollar_usage.kilo_user_id} <> ${PERSONAL_OWNER_ID})
+          OR (${microdollar_usage.organization_id} IS NOT NULL
+            AND ${microdollar_usage.organization_id} <> ${ORGANIZATION_ID})
+        )
+      UNION ALL
+      SELECT 1
+      FROM ${exa_usage_log}
+      WHERE ${exa_usage_log.created_at} >= ${startHour}
+        AND ${exa_usage_log.created_at} < ${endHourExclusive}
+        AND ${exa_usage_log.charged_to_balance} = TRUE
+        AND ${exa_usage_log.cost_microdollars} > 0
+        AND (
+          (${exa_usage_log.organization_id} IS NULL
+            AND ${exa_usage_log.kilo_user_id} <> ${PERSONAL_OWNER_ID})
+          OR (${exa_usage_log.organization_id} IS NOT NULL
+            AND ${exa_usage_log.organization_id} <> ${ORGANIZATION_ID})
+        )
+      UNION ALL
+      SELECT 1
+      FROM ${coding_plan_terms}
+      INNER JOIN ${credit_transactions}
+        ON ${credit_transactions.id} = ${coding_plan_terms.credit_transaction_id}
+      WHERE ${credit_transactions.created_at} >= ${startHour}
+        AND ${credit_transactions.created_at} < ${endHourExclusive}
+        AND ${credit_transactions.amount_microdollars} < 0
+        AND (
+          (${credit_transactions.organization_id} IS NULL
+            AND ${credit_transactions.kilo_user_id} <> ${PERSONAL_OWNER_ID})
+          OR (${credit_transactions.organization_id} IS NOT NULL
+            AND ${credit_transactions.organization_id} <> ${ORGANIZATION_ID})
+        )
+      UNION ALL
+      SELECT 1
+      FROM ${credit_transactions}
+      WHERE ${credit_transactions.created_at} >= ${startHour}
+        AND ${credit_transactions.created_at} < ${endHourExclusive}
+        AND ${credit_transactions.amount_microdollars} < 0
+        AND (
+          ${credit_transactions.credit_category} LIKE 'kiloclaw-subscription:%'
+          OR ${credit_transactions.credit_category} LIKE 'kiloclaw-subscription-commit:%'
+        )
+        AND (
+          (${credit_transactions.organization_id} IS NULL
+            AND ${credit_transactions.kilo_user_id} <> ${PERSONAL_OWNER_ID})
+          OR (${credit_transactions.organization_id} IS NOT NULL
+            AND ${credit_transactions.organization_id} <> ${ORGANIZATION_ID})
+        )
+    ), unrelated_rollups AS (
+      SELECT 1
+      FROM ${cost_insight_owner_hour_totals}
+      WHERE ${cost_insight_owner_hour_totals.hour_start} >= ${startHour}
+        AND ${cost_insight_owner_hour_totals.hour_start} < ${endHourExclusive}
+        AND (
+          (${cost_insight_owner_hour_totals.owned_by_organization_id} IS NULL
+            AND ${cost_insight_owner_hour_totals.owned_by_user_id} <> ${PERSONAL_OWNER_ID})
+          OR (${cost_insight_owner_hour_totals.owned_by_organization_id} IS NOT NULL
+            AND ${cost_insight_owner_hour_totals.owned_by_organization_id} <> ${ORGANIZATION_ID})
+        )
+      UNION ALL
+      SELECT 1
+      FROM ${cost_insight_owner_hour_driver_buckets}
+      WHERE ${cost_insight_owner_hour_driver_buckets.hour_start} >= ${startHour}
+        AND ${cost_insight_owner_hour_driver_buckets.hour_start} < ${endHourExclusive}
+        AND (
+          (${cost_insight_owner_hour_driver_buckets.owned_by_organization_id} IS NULL
+            AND ${cost_insight_owner_hour_driver_buckets.owned_by_user_id} <> ${PERSONAL_OWNER_ID})
+          OR (${cost_insight_owner_hour_driver_buckets.owned_by_organization_id} IS NOT NULL
+            AND ${cost_insight_owner_hour_driver_buckets.owned_by_organization_id} <> ${ORGANIZATION_ID})
+        )
+    )
+    SELECT
+      (SELECT COUNT(*)::text FROM unrelated_canonical) AS unrelated_canonical_count,
+      (SELECT COUNT(*)::text FROM unrelated_rollups) AS unrelated_rollup_count,
+      (
+        SELECT COUNT(*)::text
+        FROM ${cost_insight_rollup_degraded_intervals}
+        WHERE ${cost_insight_rollup_degraded_intervals.resolved_at} IS NULL
+          AND ${cost_insight_rollup_degraded_intervals.start_hour} < ${endHourExclusive}
+          AND ${cost_insight_rollup_degraded_intervals.end_hour_exclusive} > ${startHour}
+          AND ${cost_insight_rollup_degraded_intervals.id} <> ${DEGRADED_INTERVAL_ID}
+      ) AS unresolved_degraded_count
+  `);
+  const verification = result.rows[0];
+  if (!verification) {
+    throw new Error('Disposable full-coverage verification returned no result.');
+  }
+
+  const unrelatedCanonicalCount = Number(verification.unrelated_canonical_count);
+  const unrelatedRollupCount = Number(verification.unrelated_rollup_count);
+  const unresolvedDegradedCount = Number(verification.unresolved_degraded_count);
+  if (unrelatedCanonicalCount > 0 || unrelatedRollupCount > 0 || unresolvedDegradedCount > 0) {
+    throw new Error(
+      'Refusing disposable-full coverage: found ' +
+        `${unrelatedCanonicalCount} unrelated canonical rows, ` +
+        `${unrelatedRollupCount} unrelated rollup rows, and ` +
+        `${unresolvedDegradedCount} unrelated unresolved degraded intervals in the fixture range.`
+    );
+  }
+}
+
+async function getRollupCoverage(
+  database: Pick<ReturnType<typeof getSeedDb>, 'execute'>
+): Promise<RollupCoverageRow | null> {
+  const result = await database.execute<RollupCoverageRow>(sql`
+    SELECT
+      ${cost_insight_rollup_coverage.live_capture_start_hour} AS live_capture_start_hour,
+      ${cost_insight_rollup_coverage.coverage_start_hour} AS coverage_start_hour
+    FROM ${cost_insight_rollup_coverage}
+    WHERE ${cost_insight_rollup_coverage.rollup_version} = 1
+  `);
+  return result.rows[0] ?? null;
 }
 
 function floorUtcHour(timestamp: number): number {
@@ -629,7 +806,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     return;
   }
-  const rollupMode = parseRollupMode(args);
+  const { rollupMode, coverageMode } = parseSpendEvidenceArgs(args);
 
   const databaseTarget = assertLocalDatabaseTarget();
   const db = getSeedDb();
@@ -842,8 +1019,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         },
         settings: {
           spendAlertsEnabled: true,
+          anomalyAlertsEnabled: true,
           costSuggestionsEnabled: true,
           spendThresholdMicrodollars: personalThresholdMicrodollars,
+          spend7DayThresholdMicrodollars: null,
+          spend30DayThresholdMicrodollars: null,
         },
       },
       dedupe_key: `dev-seed:personal:config:${currentHourIso}`,
@@ -858,8 +1038,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       snapshot: {
         settings: {
           spendAlertsEnabled: false,
+          anomalyAlertsEnabled: true,
           costSuggestionsEnabled: true,
           spendThresholdMicrodollars: personalThresholdMicrodollars,
+          spend7DayThresholdMicrodollars: null,
+          spend30DayThresholdMicrodollars: null,
         },
       },
       dedupe_key: `dev-seed:personal:disabled:${currentHourIso}`,
@@ -942,8 +1125,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         },
         settings: {
           spendAlertsEnabled: true,
+          anomalyAlertsEnabled: true,
           costSuggestionsEnabled: true,
           spendThresholdMicrodollars: organizationThresholdMicrodollars,
+          spend7DayThresholdMicrodollars: null,
+          spend30DayThresholdMicrodollars: null,
         },
       },
       dedupe_key: `dev-seed:organization:config:${currentHourIso}`,
@@ -955,11 +1141,35 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       ...costInsightOwnerColumns(PERSONAL_OWNER),
       last_evaluated_at: currentHourIso,
       active_anomaly_event_id: personalAnomalyEventId,
+      active_anomaly_episode_id: personalAnomalyEventId,
       active_anomaly_hour_start: currentHourIso,
+      active_anomaly_snapshot: {
+        currentHourVariableMicrodollars: 14_000_000,
+        anomalyBaselineMicrodollars: 3_200_000,
+        anomalyThresholdMicrodollars: 10_000_000,
+        topDrivers: seedTopDrivers(PERSONAL_OWNER).filter(
+          driver => driver.spendCategory === 'variable'
+        ),
+        topDriversWindow: {
+          startInclusive: currentHourIso,
+          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          spendCategory: 'variable',
+        },
+      },
       active_anomaly_reviewed_at: null,
       threshold_crossing_active: true,
       active_threshold_event_id: personalThresholdEventId,
+      active_threshold_episode_id: personalThresholdEventId,
       threshold_crossing_started_at: timestampAtHourOffset(currentHour, 1),
+      active_threshold_snapshot: {
+        rolling24HourMicrodollars: 62_500_000,
+        thresholdMicrodollars: personalThresholdMicrodollars,
+        topDrivers: seedTopDrivers(PERSONAL_OWNER),
+        topDriversWindow: {
+          startInclusive: new Date(currentHour - 24 * HOUR_MS + 42 * 60 * 1_000).toISOString(),
+          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+        },
+      },
       threshold_reviewed_at: null,
       threshold_recovered_at: null,
     },
@@ -967,11 +1177,35 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       ...costInsightOwnerColumns(ORGANIZATION_OWNER),
       last_evaluated_at: currentHourIso,
       active_anomaly_event_id: organizationAnomalyEventId,
+      active_anomaly_episode_id: organizationAnomalyEventId,
       active_anomaly_hour_start: currentHourIso,
+      active_anomaly_snapshot: {
+        currentHourVariableMicrodollars: 46_000_000,
+        anomalyBaselineMicrodollars: 8_600_000,
+        anomalyThresholdMicrodollars: 25_800_000,
+        topDrivers: seedTopDrivers(ORGANIZATION_OWNER).filter(
+          driver => driver.spendCategory === 'variable'
+        ),
+        topDriversWindow: {
+          startInclusive: currentHourIso,
+          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          spendCategory: 'variable',
+        },
+      },
       active_anomaly_reviewed_at: null,
       threshold_crossing_active: true,
       active_threshold_event_id: organizationThresholdEventId,
+      active_threshold_episode_id: organizationThresholdEventId,
       threshold_crossing_started_at: timestampAtHourOffset(currentHour, 1),
+      active_threshold_snapshot: {
+        rolling24HourMicrodollars: 128_000_000,
+        thresholdMicrodollars: organizationThresholdMicrodollars,
+        topDrivers: seedTopDrivers(ORGANIZATION_OWNER),
+        topDriversWindow: {
+          startInclusive: new Date(currentHour - 24 * HOUR_MS + 42 * 60 * 1_000).toISOString(),
+          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+        },
+      },
       threshold_reviewed_at: null,
       threshold_recovered_at: null,
     },
@@ -1017,6 +1251,30 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     ]),
   ];
   const apiKinds = [...new Set(variableEvents.map(event => event.apiKind))];
+
+  const existingCoverage = await getRollupCoverage(db);
+  if (
+    coverageMode === 'preserve' &&
+    existingCoverage &&
+    (rollupMode === 'bootstrap' || rollupMode === 'repairable-drift')
+  ) {
+    throw new Error(
+      `Refusing ${rollupMode} fixture drift because global v1 coverage already exists. Use --rollup-mode healthy to preserve it, or use disposable-full coverage on a verified disposable database.`
+    );
+  }
+  if (coverageMode === 'preserve' && rollupMode === 'degraded-late') {
+    throw new Error(
+      'degraded-late requires --coverage-mode disposable-full because its unresolved interval is global.'
+    );
+  }
+
+  if (coverageMode === 'disposable-full') {
+    await assertDisposableFullCoverageSafe(
+      db,
+      coverageStartIso,
+      new Date(currentHour + HOUR_MS).toISOString()
+    );
+  }
 
   await ensureExaUsageLogPartitions(
     db,
@@ -1127,9 +1385,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
             like(credit_transactions.credit_category, `coding-plan:${CREDIT_CATEGORY_PREFIX}:%`)
           )
         );
-      await tx
-        .delete(cost_insight_rollup_degraded_intervals)
-        .where(eq(cost_insight_rollup_degraded_intervals.id, DEGRADED_INTERVAL_ID));
+      if (coverageMode === 'disposable-full') {
+        await tx
+          .delete(cost_insight_rollup_degraded_intervals)
+          .where(eq(cost_insight_rollup_degraded_intervals.id, DEGRADED_INTERVAL_ID));
+      }
 
       const seedCostInsightEventIds = tx
         .select({ id: cost_insight_events.id })
@@ -1191,9 +1451,11 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
             eq(cost_insight_owner_hour_totals.owned_by_organization_id, ORGANIZATION_ID)
           )
         );
-      await tx
-        .delete(cost_insight_rollup_coverage)
-        .where(eq(cost_insight_rollup_coverage.rollup_version, 1));
+      if (coverageMode === 'disposable-full') {
+        await tx
+          .delete(cost_insight_rollup_coverage)
+          .where(eq(cost_insight_rollup_coverage.rollup_version, 1));
+      }
 
       for (const user of seedUsers) {
         await tx
@@ -1646,13 +1908,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         });
       }
 
-      await tx.insert(cost_insight_rollup_coverage).values({
-        rollup_version: 1,
-        live_capture_start_hour: currentHourIso,
-        coverage_start_hour: rollupMode === 'bootstrap' ? currentHourIso : coverageStartIso,
-      });
+      if (coverageMode === 'disposable-full') {
+        await tx.insert(cost_insight_rollup_coverage).values({
+          rollup_version: 1,
+          live_capture_start_hour: currentHourIso,
+          coverage_start_hour: rollupMode === 'bootstrap' ? currentHourIso : coverageStartIso,
+        });
+      }
 
-      if (rollupMode === 'degraded-late') {
+      if (coverageMode === 'disposable-full' && rollupMode === 'degraded-late') {
         await tx.insert(cost_insight_rollup_degraded_intervals).values({
           id: DEGRADED_INTERVAL_ID,
           start_hour: lateArrivalHourIso,
@@ -1688,6 +1952,20 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw error;
   }
 
+  const finalCoverage = await getRollupCoverage(db);
+  if (coverageMode === 'disposable-full') {
+    const expectedCoverageStart = rollupMode === 'bootstrap' ? currentHourIso : coverageStartIso;
+    if (
+      !finalCoverage ||
+      new Date(finalCoverage.live_capture_start_hour).toISOString() !== currentHourIso ||
+      !finalCoverage.coverage_start_hour ||
+      new Date(finalCoverage.coverage_start_hour).toISOString() !== expectedCoverageStart
+    ) {
+      await Promise.all(seedUsers.map(user => deleteSeedStripeCustomer(user.stripeCustomerId)));
+      throw new Error('Disposable full-coverage verification failed after fixture commit.');
+    }
+  }
+
   for (const user of seedUsers) {
     const previousStripeCustomerId = previousStripeCustomerIds.get(user.id);
     if (
@@ -1711,21 +1989,27 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       '- Current-hour live capture plus missing history, late data, and one stale rollup.'
     );
   } else if (rollupMode === 'repairable-drift') {
-    console.log('- Complete coverage with one missing rollup, late record, and stale rollup.');
+    console.log('- One missing fixture rollup, late record, and stale fixture rollup.');
   } else if (rollupMode === 'unknown-taxonomy') {
     console.log('- One unknown AI Gateway product taxonomy value for dry-run diagnostics.');
   } else if (rollupMode === 'degraded-late') {
     console.log('- One late source row inside an unresolved degraded interval.');
   } else {
-    console.log('- Matching hourly rollups with complete 90-day coverage.');
+    console.log('- Matching hourly rollups for 90 days of fixture evidence.');
   }
   console.log('');
   console.log('Seed users have real Stripe test customers and support Stripe-backed pages.');
+  if (coverageMode === 'preserve') {
+    console.log('Global v1 rollup coverage was preserved.');
+  } else {
+    console.log('Global v1 rollup coverage was replaced after disposable-database verification.');
+  }
   console.log('Use development fake login to open personal or organization Cost Insights.');
 
   return {
     databaseTarget: `${databaseTarget.hostname}:${databaseTarget.port}/${databaseTarget.database}`,
     rollupMode,
+    coverageMode,
     executeSafe,
     personalOwnerId: PERSONAL_OWNER_ID,
     personalOwnerEmail: PERSONAL_OWNER_EMAIL,
@@ -1749,7 +2033,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     organizationMemberStripeCustomerId:
       seedUsers.find(user => user.id === ORGANIZATION_MEMBER_ID)?.stripeCustomerId ?? null,
     coverageStartHour: coverageStartIso,
-    rollupCoverageStartHour: rollupMode === 'bootstrap' ? currentHourIso : coverageStartIso,
+    rollupCoverageStartHour: finalCoverage?.coverage_start_hour
+      ? new Date(finalCoverage.coverage_start_hour).toISOString()
+      : null,
     currentHour: currentHourIso,
     maintenanceStartHour: rollupMode === 'bootstrap' ? coverageStartIso : maintenanceStartIso,
     maintenanceEndHour: currentHourIso,

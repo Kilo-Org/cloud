@@ -5,6 +5,7 @@ import {
   calculateAnomalyPolicy,
   formatSpendThresholdUsd,
   parseSpendThresholdUsd,
+  requireSafeMicrodollars,
 } from './policy';
 
 describe('Cost Insights policy', () => {
@@ -25,6 +26,29 @@ describe('Cost Insights policy', () => {
       expect(() => parseSpendThresholdUsd('-1')).toThrow('positive USD amount');
       expect(() => parseSpendThresholdUsd('10.001')).toThrow('positive USD amount');
       expect(() => parseSpendThresholdUsd('1,000')).toThrow('positive USD amount');
+    });
+
+    it('accepts the largest cent-precision threshold that converts safely', () => {
+      expect(parseSpendThresholdUsd('9007199254.74')).toBe(9_007_199_254_740_000);
+    });
+
+    it('rejects thresholds whose final microdollar value is unsafe', () => {
+      expect(() => parseSpendThresholdUsd('9007199254.75')).toThrow(
+        'Spend threshold is too large. Enter a smaller USD amount.'
+      );
+      expect(() => parseSpendThresholdUsd('999999999999999999999999.99')).toThrow(
+        'Spend threshold is too large. Enter a smaller USD amount.'
+      );
+    });
+  });
+
+  describe('requireSafeMicrodollars', () => {
+    it('requires a positive safe integer', () => {
+      expect(requireSafeMicrodollars(1, 'Amount')).toBe(1);
+      expect(() => requireSafeMicrodollars(0, 'Amount')).toThrow('positive safe integer');
+      expect(() => requireSafeMicrodollars(Number.MAX_SAFE_INTEGER + 1, 'Amount')).toThrow(
+        'positive safe integer'
+      );
     });
   });
 

@@ -10,13 +10,14 @@ import {
 } from '@/lib/cost-insights/presenter';
 import {
   acknowledgeCostInsightAlert,
-  clearCostInsightAlertState,
-  clearCostInsightAnomalyEpisode,
   clearCostInsightThresholdEpisode,
   createCostInsightEvent,
-  countOpenCostInsightReviewItems,
+  countUnreviewedCostInsightAlerts,
   dismissCostInsightSuggestion,
+  getCostInsightConfigChanges,
+  getCostInsightSettingsSnapshot,
   updateCostInsightOwnerConfig,
+  updateCostInsightSettings,
 } from '@/lib/cost-insights/repository';
 import { evaluateCostInsightsForOwner } from '@/lib/cost-insights/evaluation';
 import { parseSpendThresholdUsd } from '@/lib/cost-insights/policy';
@@ -45,6 +46,7 @@ const UpdateCostInsightsSettingsSchema = z.object({
 
 const AcknowledgeCostInsightAlertSchema = z.object({
   alertKind: z.enum(['anomaly', 'threshold', 'threshold_7d', 'threshold_30d']),
+  eventId: z.uuid(),
 });
 
 const DismissCostInsightSuggestionSchema = z.object({
@@ -132,84 +134,6 @@ function trackSettingsSaved(
   });
 }
 
-function changedFields(
-  previous: {
-    spend_alerts_enabled: boolean;
-    anomaly_alerts_enabled: boolean;
-    cost_suggestions_enabled: boolean;
-    spend_threshold_microdollars: number | null;
-    spend_7_day_threshold_microdollars: number | null;
-    spend_30_day_threshold_microdollars: number | null;
-  },
-  current: {
-    spend_alerts_enabled: boolean;
-    anomaly_alerts_enabled: boolean;
-    cost_suggestions_enabled: boolean;
-    spend_threshold_microdollars: number | null;
-    spend_7_day_threshold_microdollars: number | null;
-    spend_30_day_threshold_microdollars: number | null;
-  }
-) {
-  const fields: Record<string, { old: unknown; new: unknown }> = {};
-  if (previous.spend_alerts_enabled !== current.spend_alerts_enabled) {
-    fields.spendAlertsEnabled = {
-      old: previous.spend_alerts_enabled,
-      new: current.spend_alerts_enabled,
-    };
-  }
-  if (previous.anomaly_alerts_enabled !== current.anomaly_alerts_enabled) {
-    fields.anomalyAlertsEnabled = {
-      old: previous.anomaly_alerts_enabled,
-      new: current.anomaly_alerts_enabled,
-    };
-  }
-  if (previous.cost_suggestions_enabled !== current.cost_suggestions_enabled) {
-    fields.costSuggestionsEnabled = {
-      old: previous.cost_suggestions_enabled,
-      new: current.cost_suggestions_enabled,
-    };
-  }
-  if (previous.spend_threshold_microdollars !== current.spend_threshold_microdollars) {
-    fields.spendThresholdMicrodollars = {
-      old: previous.spend_threshold_microdollars,
-      new: current.spend_threshold_microdollars,
-    };
-  }
-  if (previous.spend_7_day_threshold_microdollars !== current.spend_7_day_threshold_microdollars) {
-    fields.spend7DayThresholdMicrodollars = {
-      old: previous.spend_7_day_threshold_microdollars,
-      new: current.spend_7_day_threshold_microdollars,
-    };
-  }
-  if (
-    previous.spend_30_day_threshold_microdollars !== current.spend_30_day_threshold_microdollars
-  ) {
-    fields.spend30DayThresholdMicrodollars = {
-      old: previous.spend_30_day_threshold_microdollars,
-      new: current.spend_30_day_threshold_microdollars,
-    };
-  }
-  return fields;
-}
-
-function settingsSnapshot(config: {
-  spend_alerts_enabled: boolean;
-  anomaly_alerts_enabled: boolean;
-  cost_suggestions_enabled: boolean;
-  spend_threshold_microdollars: number | null;
-  spend_7_day_threshold_microdollars: number | null;
-  spend_30_day_threshold_microdollars: number | null;
-}) {
-  return {
-    spendAlertsEnabled: config.spend_alerts_enabled,
-    anomalyAlertsEnabled: config.anomaly_alerts_enabled,
-    costSuggestionsEnabled: config.cost_suggestions_enabled,
-    spendThresholdMicrodollars: config.spend_threshold_microdollars,
-    spend7DayThresholdMicrodollars: config.spend_7_day_threshold_microdollars,
-    spend30DayThresholdMicrodollars: config.spend_30_day_threshold_microdollars,
-  };
-}
-
 async function updateOwnerSettings(params: {
   owner: { type: 'user'; id: string } | { type: 'organization'; id: string };
   actorUserId: string;
@@ -230,65 +154,19 @@ async function updateOwnerSettings(params: {
     });
   }
 
-  const { previous, current } = await updateCostInsightOwnerConfig(db, params.owner, {
-    spendAlertsEnabled: params.input.spendAlertsEnabled,
-    anomalyAlertsEnabled: params.input.anomalyAlertsEnabled,
-    costSuggestionsEnabled: params.input.costSuggestionsEnabled,
-    spendThresholdMicrodollars,
-    spend7DayThresholdMicrodollars,
-    spend30DayThresholdMicrodollars,
+  const { previous, current, hasChanges } = await updateCostInsightSettings(db, {
+    owner: params.owner,
+    actorUserId: params.actorUserId,
+    patch: {
+      spendAlertsEnabled: params.input.spendAlertsEnabled,
+      anomalyAlertsEnabled: params.input.anomalyAlertsEnabled,
+      costSuggestionsEnabled: params.input.costSuggestionsEnabled,
+      spendThresholdMicrodollars,
+      spend7DayThresholdMicrodollars,
+      spend30DayThresholdMicrodollars,
+    },
   });
 
-  const changes = changedFields(previous, current);
-  const hasChanges = Object.keys(changes).length > 0;
-  if (hasChanges && previous.spend_alerts_enabled && !current.spend_alerts_enabled) {
-    await clearCostInsightAlertState(db, params.owner);
-    await createCostInsightEvent(db, {
-      owner: params.owner,
-      eventType: 'disabled',
-      actorUserId: params.actorUserId,
-      title: 'Spend Alerts turned off',
-      description: 'Spend Alerts were disabled. Cost evidence remains visible.',
-      snapshot: {
-        changedFields: changes,
-        settings: settingsSnapshot(current),
-      },
-    });
-  } else if (hasChanges && (previous.spend_alerts_enabled || current.spend_alerts_enabled)) {
-    await createCostInsightEvent(db, {
-      owner: params.owner,
-      eventType: 'config_changed',
-      actorUserId: params.actorUserId,
-      title: 'Cost Insights settings changed',
-      description: 'Spend Alert settings were updated.',
-      snapshot: {
-        changedFields: changes,
-        settings: settingsSnapshot(current),
-      },
-    });
-  }
-
-  if (previous.anomaly_alerts_enabled && !current.anomaly_alerts_enabled) {
-    await clearCostInsightAnomalyEpisode(db, params.owner);
-  }
-  if (
-    previous.spend_threshold_microdollars !== null &&
-    current.spend_threshold_microdollars === null
-  ) {
-    await clearCostInsightThresholdEpisode(db, params.owner, null, 'threshold');
-  }
-  if (
-    previous.spend_7_day_threshold_microdollars !== null &&
-    current.spend_7_day_threshold_microdollars === null
-  ) {
-    await clearCostInsightThresholdEpisode(db, params.owner, null, 'threshold_7d');
-  }
-  if (
-    previous.spend_30_day_threshold_microdollars !== null &&
-    current.spend_30_day_threshold_microdollars === null
-  ) {
-    await clearCostInsightThresholdEpisode(db, params.owner, null, 'threshold_30d');
-  }
   if (current.spend_alerts_enabled) {
     await evaluateCostInsightsForOwner(db, params.owner);
   }
@@ -321,8 +199,8 @@ async function disableOwnerThreshold(params: {
         title: 'Cost Insights settings changed',
         description: 'Spend threshold was turned off.',
         snapshot: {
-          changedFields: changedFields(previous, current),
-          settings: settingsSnapshot(current),
+          changedFields: getCostInsightConfigChanges(previous, current),
+          settings: getCostInsightSettingsSnapshot(current),
         },
       });
     }
@@ -377,7 +255,7 @@ export const costInsightsRouter = createTRPCRouter({
     });
   }),
   getAttentionState: adminProcedure.query(async ({ ctx }) => {
-    const reviewItemCount = await countOpenCostInsightReviewItems(db, {
+    const reviewItemCount = await countUnreviewedCostInsightAlerts(db, {
       type: 'user',
       id: ctx.user.id,
     });
@@ -402,6 +280,7 @@ export const costInsightsRouter = createTRPCRouter({
       const acknowledged = await acknowledgeCostInsightAlert(db, {
         owner: { type: 'user', id: ctx.user.id },
         alertKind: input.alertKind,
+        eventId: input.eventId,
         actorUserId: ctx.user.id,
       });
       if (acknowledged) {

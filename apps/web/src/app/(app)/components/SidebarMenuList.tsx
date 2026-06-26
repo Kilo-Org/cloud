@@ -76,6 +76,11 @@ export default function SidebarMenuList({
                   <span>{item.title}</span>
                 )}
                 {item.suffixIcon && <item.suffixIcon className="ml-auto h-4 w-4" />}
+                {isNumericBadge && item.badge && (
+                  <span className="sr-only">
+                    {item.badge} {item.badge === '1' ? 'item needs' : 'items need'} review
+                  </span>
+                )}
               </>
             );
             const buttonClassName = cn(
@@ -116,6 +121,7 @@ export default function SidebarMenuList({
                 )}
                 {item.badge && (
                   <SidebarMenuBadge
+                    aria-hidden={isNumericBadge ? true : undefined}
                     className={cn(
                       'bg-brand-primary text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-[active=true]/menu-button:text-primary-foreground right-4 !top-1/2 !-translate-y-1/2 rounded-full ring-1 ring-brand-primary/30',
                       isNumericBadge

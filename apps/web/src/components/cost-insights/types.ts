@@ -19,13 +19,26 @@ export type SpendMetric = {
   icon: LucideIcon | SpendMetricIcon;
 };
 
-export type SpendEvidencePoint = {
+type SpendEvidencePointBase = {
   label: string;
-  periodStart?: string;
-  variableUsd: number;
-  scheduledUsd: number;
+  periodStart: string;
+  periodEndExclusive: string;
+  coveredHours: number;
+  totalHours: number;
   anomalyThresholdUsd?: number;
 };
+
+export type SpendEvidencePoint =
+  | (SpendEvidencePointBase & {
+      coverage: 'complete';
+      variableUsd: number;
+      scheduledUsd: number;
+    })
+  | (SpendEvidencePointBase & {
+      coverage: 'partial' | 'unavailable';
+      variableUsd: null;
+      scheduledUsd: null;
+    });
 
 export type SpendDriver = {
   id: string;
@@ -54,6 +67,7 @@ export type AlertDriverEvidence = {
 export type DashboardAlert =
   | {
       type: 'anomaly';
+      eventId: string;
       title: string;
       description: string;
       facts?: AlertFact[];
@@ -62,6 +76,7 @@ export type DashboardAlert =
     }
   | {
       type: 'threshold' | 'threshold_7d' | 'threshold_30d';
+      eventId: string;
       title: string;
       description: string;
       facts?: AlertFact[];

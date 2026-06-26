@@ -16,6 +16,8 @@ export type ExaUsageLogPartitionIndexDefinition = {
 
 const POSTGRES_IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]*$/;
 const EXA_USAGE_LOG_PARTITION_PATTERN = /^exa_usage_log_\d{4}_(?:0[1-9]|1[0-2])$/;
+const EXA_USAGE_LOG_PARTITION_INDEX_PATTERN =
+  /^exa_usage_log_\d{4}_(?:0[1-9]|1[0-2])_charged_(?:org_)?created_at_idx$/;
 const POSTGRES_IDENTIFIER_MAX_LENGTH = 63;
 
 function quoteIdentifier(identifier: string): string {
@@ -26,6 +28,17 @@ function quoteIdentifier(identifier: string): string {
     throw new Error(`Unsafe PostgreSQL identifier: ${identifier}`);
   }
   return `"${identifier}"`;
+}
+
+export function buildExaUsageLogPartitionIndexDropStatement(
+  schemaName: string,
+  indexName: string
+): string {
+  if (!EXA_USAGE_LOG_PARTITION_INDEX_PATTERN.test(indexName)) {
+    throw new Error(`Invalid Exa usage-log partition index name: ${indexName}`);
+  }
+
+  return `DROP INDEX CONCURRENTLY IF EXISTS ${quoteIdentifier(schemaName)}.${quoteIdentifier(indexName)}`;
 }
 
 export function buildExaUsageLogPartitionIndexDefinitions(

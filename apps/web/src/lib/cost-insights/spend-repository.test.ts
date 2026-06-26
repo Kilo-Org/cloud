@@ -62,7 +62,7 @@ describe('Cost Insights spend repository', () => {
   test('returns covered sparse hours as zero and uncovered hours as null', async () => {
     const executor = executorReturning([
       {
-        hour_start: '2026-06-01 00:00:00+00',
+        hour_start: '2026-06-01 02:00:00+02',
         variable_microdollars: '0',
         scheduled_microdollars: '0',
         variable_record_count: '0',

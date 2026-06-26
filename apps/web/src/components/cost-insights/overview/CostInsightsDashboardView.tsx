@@ -43,6 +43,7 @@ export function CostInsightsDashboardView({
   isError = false,
   activityHref,
   alertActionsDisabled = false,
+  pendingSuggestionId,
   onRetry,
   onSetupAlerts,
   onAlertAction,
@@ -50,13 +51,13 @@ export function CostInsightsDashboardView({
   onSpendRangeChange,
   onSuggestionCta,
   onSuggestionDismiss,
-  onAskKilo,
 }: {
   data?: CostInsightsDashboardData;
   isLoading?: boolean;
   isError?: boolean;
   activityHref?: string;
   alertActionsDisabled?: boolean;
+  pendingSuggestionId?: string;
   onRetry?: () => void;
   onSetupAlerts?: () => void;
   onAlertAction?: (
@@ -67,7 +68,6 @@ export function CostInsightsDashboardView({
   onSpendRangeChange?: (range: SpendRange) => void;
   onSuggestionCta?: (suggestion: CostInsightsDashboardData['suggestions'][number]) => void;
   onSuggestionDismiss?: (suggestionId: string) => void;
-  onAskKilo?: (question: string) => void;
 }) {
   const [selectedRange, setSelectedRange] = useState<SpendRange>();
 
@@ -92,7 +92,7 @@ export function CostInsightsDashboardView({
 
   return (
     <div className="space-y-6">
-      <AskKiloInput owner={data.owner} onSubmit={onAskKilo} />
+      <AskKiloInput owner={data.owner} />
       {data.alerts.map(alert => (
         <ReviewBanner
           key={alert.type}
@@ -109,6 +109,7 @@ export function CostInsightsDashboardView({
           key={suggestion.id}
           suggestion={suggestion}
           canManage={canManage}
+          dismissPending={pendingSuggestionId === suggestion.id}
           onCta={() => onSuggestionCta?.(suggestion)}
           onDismiss={() => onSuggestionDismiss?.(suggestion.id)}
         />

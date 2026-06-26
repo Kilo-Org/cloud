@@ -1,6 +1,6 @@
 import type { CostInsightSpendOwner } from '@kilocode/db/cost-insights-rollups';
-import { kilocode_users } from '@kilocode/db/schema';
-import { inArray } from 'drizzle-orm';
+import { kilocode_users, organizations } from '@kilocode/db/schema';
+import { eq, inArray } from 'drizzle-orm';
 
 import type {
   ActivityFilter,
@@ -158,44 +158,110 @@ function suggestionWindowDays(start: string, end: string): number {
   return Math.max(1, Math.round(elapsedDays));
 }
 
-function hourlyEvidence(points: OwnerHourlySpend[], range: SpendRange): SpendEvidencePoint[] {
-  if (range === '1h' || range === '24h' || range === '7d') {
-    return points.map(point => ({
-      label: formatHourLabel(point.hourStart, range),
-      periodStart: point.hourStart,
-      variableUsd: microdollarsToUsd(point.variableMicrodollars ?? 0),
-      scheduledUsd: microdollarsToUsd(point.scheduledMicrodollars ?? 0),
-    }));
+export function normalizeCostInsightTimestamp(value: string | Date): string {
+  return new Date(value).toISOString();
+}
+
+function requireCoveredAmounts(point: OwnerHourlySpend): {
+  variableMicrodollars: number;
+  scheduledMicrodollars: number;
+} {
+  if (point.variableMicrodollars === null || point.scheduledMicrodollars === null) {
+    throw new Error('Covered Cost Insights evidence must include both spend categories.');
+  }
+  return {
+    variableMicrodollars: point.variableMicrodollars,
+    scheduledMicrodollars: point.scheduledMicrodollars,
+  };
+}
+
+function presentEvidenceBucket(points: OwnerHourlySpend[]): SpendEvidencePoint {
+  const first = points[0];
+  const last = points.at(-1);
+  if (!first || !last) {
+    throw new Error('Cost Insights evidence buckets must contain at least one hour.');
   }
 
-  const days = new Map<string, { timestamp: string; variable: number; scheduled: number }>();
+  const covered = points.filter(point => point.isCovered);
+  const common = {
+    label: formatDayLabel(first.hourStart),
+    periodStart: normalizeCostInsightTimestamp(first.hourStart),
+    periodEndExclusive: addHours(normalizeCostInsightTimestamp(last.hourStart), 1),
+    coveredHours: covered.length,
+    totalHours: points.length,
+  };
+  if (covered.length === 0) {
+    return { ...common, coverage: 'unavailable', variableUsd: null, scheduledUsd: null };
+  }
+  if (covered.length !== points.length) {
+    return { ...common, coverage: 'partial', variableUsd: null, scheduledUsd: null };
+  }
+
+  let variableMicrodollars = 0;
+  let scheduledMicrodollars = 0;
+  for (const point of covered) {
+    const amounts = requireCoveredAmounts(point);
+    variableMicrodollars += amounts.variableMicrodollars;
+    scheduledMicrodollars += amounts.scheduledMicrodollars;
+  }
+  return {
+    ...common,
+    coverage: 'complete',
+    variableUsd: microdollarsToUsd(variableMicrodollars),
+    scheduledUsd: microdollarsToUsd(scheduledMicrodollars),
+  };
+}
+
+function groupByUtcDay(points: OwnerHourlySpend[]): OwnerHourlySpend[][] {
+  const days = new Map<string, OwnerHourlySpend[]>();
   for (const point of points) {
-    const key = point.hourStart.slice(0, 10);
-    const existing = days.get(key) ?? { timestamp: point.hourStart, variable: 0, scheduled: 0 };
-    existing.variable += point.variableMicrodollars ?? 0;
-    existing.scheduled += point.scheduledMicrodollars ?? 0;
-    days.set(key, existing);
+    const key = normalizeCostInsightTimestamp(point.hourStart).slice(0, 10);
+    const day = days.get(key) ?? [];
+    day.push(point);
+    days.set(key, day);
   }
+  return [...days.values()];
+}
 
-  if (range === '30d') {
-    return [...days.values()].map(day => ({
-      label: formatDayLabel(day.timestamp),
-      variableUsd: microdollarsToUsd(day.variable),
-      scheduledUsd: microdollarsToUsd(day.scheduled),
-    }));
-  }
-
-  const values = [...days.values()];
-  const weeks: SpendEvidencePoint[] = [];
-  for (let index = 0; index < values.length; index += 7) {
-    const chunk = values.slice(index, index + 7);
-    weeks.push({
-      label: formatDayLabel(
-        chunk[0]?.timestamp ?? points[0]?.hourStart ?? new Date().toISOString()
-      ),
-      variableUsd: microdollarsToUsd(chunk.reduce((sum, day) => sum + day.variable, 0)),
-      scheduledUsd: microdollarsToUsd(chunk.reduce((sum, day) => sum + day.scheduled, 0)),
+export function formatSpendEvidence(
+  points: OwnerHourlySpend[],
+  range: SpendRange
+): SpendEvidencePoint[] {
+  if (range === '1h' || range === '24h' || range === '7d') {
+    return points.map(point => {
+      const common = {
+        label: formatHourLabel(point.hourStart, range),
+        periodStart: normalizeCostInsightTimestamp(point.hourStart),
+        periodEndExclusive: addHours(normalizeCostInsightTimestamp(point.hourStart), 1),
+        coveredHours: point.isCovered ? 1 : 0,
+        totalHours: 1,
+      };
+      if (!point.isCovered) {
+        return {
+          ...common,
+          coverage: 'unavailable' as const,
+          variableUsd: null,
+          scheduledUsd: null,
+        };
+      }
+      const amounts = requireCoveredAmounts(point);
+      return {
+        ...common,
+        coverage: 'complete' as const,
+        variableUsd: microdollarsToUsd(amounts.variableMicrodollars),
+        scheduledUsd: microdollarsToUsd(amounts.scheduledMicrodollars),
+      };
     });
+  }
+
+  const days = groupByUtcDay(points);
+  if (range === '30d') {
+    return days.map(presentEvidenceBucket);
+  }
+
+  const weeks: SpendEvidencePoint[] = [];
+  for (let index = 0; index < days.length; index += 7) {
+    weeks.push(presentEvidenceBucket(days.slice(index, index + 7).flat()));
   }
   return weeks;
 }
@@ -208,7 +274,7 @@ async function loadRangeEvidence(
 ): Promise<SpendEvidencePoint[]> {
   const startHour = spendRangeStartHour(range, endHourExclusive);
   const points = await getOwnerHourlySpend(database, { owner, startHour, endHourExclusive });
-  return hourlyEvidence(points, range);
+  return formatSpendEvidence(points, range);
 }
 
 async function loadTopDriversByRange(
@@ -247,6 +313,43 @@ async function loadActorLabels(database: CostInsightDatabase, actorUserIds: stri
     .from(kilocode_users)
     .where(inArray(kilocode_users.id, ids));
   return new Map(rows.map(row => [row.id, row.name]));
+}
+
+export function organizationMemberLimitsHref(params: {
+  owner: CostInsightSpendOwner;
+  uiOwner: CostInsightsOwner;
+  plan: 'teams' | 'enterprise' | null;
+  usageLimitsEnabled: boolean;
+}): string | undefined {
+  if (
+    params.owner.type !== 'organization' ||
+    params.uiOwner.type !== 'organization' ||
+    (params.uiOwner.authorizedRole !== 'owner' && params.uiOwner.authorizedRole !== 'admin') ||
+    params.plan !== 'enterprise' ||
+    !params.usageLimitsEnabled
+  ) {
+    return undefined;
+  }
+  return `/organizations/${encodeURIComponent(params.owner.id)}`;
+}
+
+async function loadOrganizationMemberLimitsHref(
+  database: CostInsightDatabase,
+  owner: CostInsightSpendOwner,
+  uiOwner: CostInsightsOwner
+): Promise<string | undefined> {
+  if (owner.type !== 'organization' || uiOwner.type !== 'organization') return undefined;
+  const [organization] = await database
+    .select({ plan: organizations.plan, settings: organizations.settings })
+    .from(organizations)
+    .where(eq(organizations.id, owner.id))
+    .limit(1);
+  return organizationMemberLimitsHref({
+    owner,
+    uiOwner,
+    plan: organization?.plan ?? null,
+    usageLimitsEnabled: organization?.settings.enable_usage_limits === true,
+  });
 }
 
 function mapDrivers(
@@ -292,7 +395,7 @@ function mapDrivers(
 
 function buildMetrics(params: {
   rolling24HourMicrodollars: number | null;
-  currentHourVariableMicrodollars: number;
+  currentHourVariableMicrodollars: number | null;
   anomalyBaselineMicrodollars: number;
   anomalyThresholdMicrodollars: number;
   thresholdMicrodollars: number | null;
@@ -320,10 +423,13 @@ function buildMetrics(params: {
       label: 'Usage-based spend this hour',
       value: money(params.currentHourVariableMicrodollars),
       detail:
-        params.currentHourVariableMicrodollars >= params.anomalyThresholdMicrodollars
-          ? 'Above current alert level'
-          : `Typical hour: ${money(params.anomalyBaselineMicrodollars)}`,
+        params.currentHourVariableMicrodollars === null
+          ? 'Current-hour spend evidence is unavailable'
+          : params.currentHourVariableMicrodollars >= params.anomalyThresholdMicrodollars
+            ? 'Above current alert level'
+            : `Typical hour: ${money(params.anomalyBaselineMicrodollars)}`,
       tone:
+        params.currentHourVariableMicrodollars !== null &&
         params.currentHourVariableMicrodollars >= params.anomalyThresholdMicrodollars
           ? 'warning'
           : 'neutral',
@@ -379,8 +485,8 @@ export function formatActiveCostInsightAlerts(
                 : 'Exact alert-hour scope is unavailable for this older alert.',
               ...(driverWindow
                 ? {
-                    periodStart: driverWindow.startInclusive,
-                    periodEndExclusive: driverWindow.endExclusive,
+                    periodStart: normalizeCostInsightTimestamp(driverWindow.startInclusive),
+                    periodEndExclusive: normalizeCostInsightTimestamp(driverWindow.endExclusive),
                   }
                 : {}),
               drivers,
@@ -393,6 +499,7 @@ export function formatActiveCostInsightAlerts(
           : undefined;
       alerts.push({
         type: 'anomaly',
+        eventId: event.id,
         title: 'Spend is unusually high this hour',
         description: "Usage-based spend is well above this account's recent hourly pattern.",
         facts: [
@@ -445,8 +552,8 @@ export function formatActiveCostInsightAlerts(
           ? {
               title: `Top rolling ${presentation.windowLabel} spend drivers`,
               description: 'Captured when the threshold was crossed.',
-              periodStart: driverWindow.startInclusive,
-              periodEndExclusive: driverWindow.endExclusive,
+              periodStart: normalizeCostInsightTimestamp(driverWindow.startInclusive),
+              periodEndExclusive: normalizeCostInsightTimestamp(driverWindow.endExclusive),
               drivers,
               totalSpendUsd: microdollarsToUsd(
                 rollingMicrodollars ??
@@ -457,6 +564,7 @@ export function formatActiveCostInsightAlerts(
           : undefined;
       alerts.push({
         type: presentation.alertType,
+        eventId: event.id,
         title: `${presentation.windowLabel} spend threshold crossed`,
         description: `Spend reached ${moneyWithCents(
           rollingMicrodollars
@@ -579,7 +687,7 @@ export function formatCostInsightEvents(
     type: event.eventType === 'alert_reviewed' ? 'reviewed' : event.eventType,
     title: event.title,
     description: event.description,
-    occurredAt: event.occurredAt,
+    occurredAt: normalizeCostInsightTimestamp(event.occurredAt),
     actorLabel: event.actorName ?? undefined,
     amountLabel:
       event.snapshot.rolling30DayMicrodollars !== undefined
@@ -645,6 +753,7 @@ export async function buildCostInsightsDashboardData(params: {
     listCostInsightEvents(params.database, params.owner, { limit: 5 }),
   ]);
   const [
+    evidenceThisHour,
     evidence24h,
     evidence7d,
     evidence30d,
@@ -652,7 +761,9 @@ export async function buildCostInsightsDashboardData(params: {
     actorLabels,
     activeSuggestions,
     eventPreview,
+    memberLimitsHref,
   ] = await Promise.all([
+    loadRangeEvidence(params.database, params.owner, '1h', endHourExclusive),
     loadRangeEvidence(params.database, params.owner, '24h', endHourExclusive),
     loadRangeEvidence(params.database, params.owner, '7d', endHourExclusive),
     loadRangeEvidence(params.database, params.owner, '30d', endHourExclusive),
@@ -671,16 +782,11 @@ export async function buildCostInsightsDashboardData(params: {
       ? listActiveCostInsightSuggestions(params.database, params.owner)
       : [],
     mapEvents(params.database, params.owner, events),
+    loadOrganizationMemberLimitsHref(params.database, params.owner, params.uiOwner),
   ]);
 
-  const evidenceThisHour: SpendEvidencePoint[] = [
-    {
-      label: formatHourLabel(currentHourStart, '1h'),
-      periodStart: currentHourStart,
-      variableUsd: microdollarsToUsd(currentHourSpend.variableMicrodollars),
-      scheduledUsd: microdollarsToUsd(currentHourSpend.scheduledMicrodollars),
-    },
-  ];
+  const currentHourVariableMicrodollars =
+    evidenceThisHour[0]?.coverage === 'complete' ? currentHourSpend.variableMicrodollars : null;
   const alerts = formatActiveCostInsightAlerts(dashboardState, params.owner, actorLabels);
   return {
     enabled: config?.spend_alerts_enabled ?? false,
@@ -688,7 +794,7 @@ export async function buildCostInsightsDashboardData(params: {
     range: '7d',
     metrics: buildMetrics({
       rolling24HourMicrodollars: rolling24HourSpend.totalMicrodollars,
-      currentHourVariableMicrodollars: currentHourSpend.variableMicrodollars,
+      currentHourVariableMicrodollars,
       anomalyBaselineMicrodollars: anomalyPolicy.baselineMicrodollars,
       anomalyThresholdMicrodollars: anomalyPolicy.thresholdMicrodollars,
       thresholdMicrodollars: config?.spend_threshold_microdollars ?? null,
@@ -712,9 +818,12 @@ export async function buildCostInsightsDashboardData(params: {
     },
     alerts,
     suggestions: formatActiveCostInsightSuggestions(activeSuggestions),
-    lastEvaluatedAt: dashboardState.state?.lastEvaluatedAt ?? null,
+    lastEvaluatedAt: dashboardState.state?.lastEvaluatedAt
+      ? normalizeCostInsightTimestamp(dashboardState.state.lastEvaluatedAt)
+      : null,
     baselineMode: anomalyPolicy.mode,
     eventPreview,
+    memberLimitsHref,
   };
 }
 

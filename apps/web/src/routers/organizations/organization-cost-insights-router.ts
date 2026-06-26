@@ -11,7 +11,7 @@ import {
 } from '@/lib/cost-insights/presenter';
 import {
   acknowledgeCostInsightAlert,
-  countOpenCostInsightReviewItems,
+  countUnreviewedCostInsightAlerts,
   dismissCostInsightSuggestion,
 } from '@/lib/cost-insights/repository';
 import {
@@ -170,7 +170,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
     .input(OrganizationIdInputSchema)
     .query(async ({ ctx, input }) => {
       await resolveOrgReadContext(ctx, input.organizationId);
-      const reviewItemCount = await countOpenCostInsightReviewItems(db, {
+      const reviewItemCount = await countUnreviewedCostInsightAlerts(db, {
         type: 'organization',
         id: input.organizationId,
       });
@@ -201,6 +201,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
       const acknowledged = await acknowledgeCostInsightAlert(db, {
         owner: { type: 'organization', id: input.organizationId },
         alertKind: input.alertKind,
+        eventId: input.eventId,
         actorUserId: ctx.user.id,
       });
       if (acknowledged) {

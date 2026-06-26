@@ -136,7 +136,6 @@ export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
   members: OrganizationMember[];
   childOrganizations: ChildOrganizationSummary[];
   effectiveSsoPolicy: OrganizationSsoPolicyView;
-  next_credit_expiration_amount: number | null;
 };
 
 export type AcceptInviteResult = Result<

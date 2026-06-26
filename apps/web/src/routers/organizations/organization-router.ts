@@ -43,11 +43,7 @@ import { and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { getCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
-import {
-  processOrganizationExpirations,
-  fetchExpiringTransactionsForOrganization,
-  computeNextExpirationAmount,
-} from '@/lib/creditExpiration';
+import { processOrganizationExpirations } from '@/lib/creditExpiration';
 import { credit_transactions } from '@kilocode/db/schema';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import { organizationSsoRouter } from '@/routers/organizations/organization-sso-router';
@@ -229,7 +225,7 @@ export const organizationsRouter = createTRPCRouter({
       }
     }
 
-    const [members, ssoPolicy, childOrganizations, expiringTransactions] = await Promise.all([
+    const [members, ssoPolicy, childOrganizations] = await Promise.all([
       getOrganizationMembers(organizationId),
       resolveEffectiveOrganizationSsoPolicy(organizationId),
       db
@@ -242,18 +238,7 @@ export const organizationsRouter = createTRPCRouter({
           )
         )
         .orderBy(organizations.name),
-      organization.next_credit_expiration_at
-        ? fetchExpiringTransactionsForOrganization(organizationId)
-        : Promise.resolve(
-            [] as Awaited<ReturnType<typeof fetchExpiringTransactionsForOrganization>>
-          ),
     ]);
-
-    const next_credit_expiration_amount = computeNextExpirationAmount(
-      expiringTransactions,
-      { id: organizationId, microdollars_used: organization.microdollars_used },
-      organization.next_credit_expiration_at
-    );
 
     const activeMemberIds = members.flatMap(member =>
       member.status === 'active' ? [member.id] : []
@@ -300,7 +285,6 @@ export const organizationsRouter = createTRPCRouter({
 
     return {
       ...organization,
-      next_credit_expiration_amount,
       members: membersWithChildOrganizations,
       childOrganizations,
       effectiveSsoPolicy:

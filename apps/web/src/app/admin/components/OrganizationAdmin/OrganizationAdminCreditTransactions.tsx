@@ -1,8 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BooleanBadge } from '@/components/ui/boolean-badge';
-import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-import { useAdminOrganizationCreditTransactions } from '@/app/admin/api/organizations/hooks';
+import {
+  useAdminOrganizationCreditTransactions,
+  useAdminOrganizationNextCreditExpiration,
+} from '@/app/admin/api/organizations/hooks';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
 import { FormattedMicrodollars } from '@/components/organizations/FormattedMicrodollars';
@@ -22,8 +24,8 @@ export function OrganizationAdminCreditTransactions({
 }) {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
-  const { data: orgData } = useOrganizationWithMembers(organizationId);
   const { canManageCredits } = useAdminCreditManagementPermission();
+  const { data: nextExpirationData } = useAdminOrganizationNextCreditExpiration(organizationId);
 
   const invalidateOrgCreditQueries = () => {
     void queryClient.invalidateQueries({
@@ -31,6 +33,9 @@ export function OrganizationAdminCreditTransactions({
     });
     void queryClient.invalidateQueries({
       queryKey: trpc.organizations.admin.creditTransactions.queryKey({ organizationId }),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.organizations.admin.nextCreditExpiration.queryKey({ organizationId }),
     });
     void queryClient.invalidateQueries({
       queryKey: trpc.organizations.getCreditBlocks.queryKey({ organizationId }),
@@ -122,26 +127,26 @@ export function OrganizationAdminCreditTransactions({
             Credit Transactions ({credit_transactions.length})
           </CardTitle>
           <div className="flex flex-wrap items-center gap-3">
-            {orgData?.next_credit_expiration_at &&
-              orgData.next_credit_expiration_amount != null && (
+            {nextExpirationData?.next_credit_expiration_at &&
+              nextExpirationData.next_credit_expiration_amount != null && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className="text-muted-foreground cursor-default text-xs">
                       <FormattedMicrodollars
-                        microdollars={orgData.next_credit_expiration_amount}
+                        microdollars={nextExpirationData.next_credit_expiration_amount}
                         className="inline whitespace-nowrap"
                         inline={true}
                         decimalPlaces={2}
                       />{' '}
                       in credits{' '}
-                      {new Date(orgData.next_credit_expiration_at) > new Date()
+                      {new Date(nextExpirationData.next_credit_expiration_at) > new Date()
                         ? 'expires'
                         : 'expired'}{' '}
-                      {formatRelativeTime(orgData.next_credit_expiration_at)}
+                      {formatRelativeTime(nextExpirationData.next_credit_expiration_at)}
                     </span>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={8}>
-                    Expiration date: {formatDateOnly(orgData.next_credit_expiration_at)}
+                    Expiration date: {formatDateOnly(nextExpirationData.next_credit_expiration_at)}
                   </TooltipContent>
                 </Tooltip>
               )}

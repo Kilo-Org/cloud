@@ -514,10 +514,6 @@ export const AgentChatPanel = ({
         return;
       }
 
-      if (!globalThis.confirm('Close this conversation tab? It will stay in History.')) {
-        return;
-      }
-
       abortConversationRun(conversationId);
       setConversationStore(store =>
         closeStoredConversationTab(store, conversationId, createDefaultConversationEvents())

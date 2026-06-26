@@ -88,6 +88,7 @@ function NextCreditExpiration({ organizationId }: { organizationId: string }) {
             variant="ghost"
             size="sm"
             className="text-muted-foreground h-auto px-1 py-0 hover:text-foreground"
+            suppressHydrationWarning
           >
             <FormattedMicrodollars
               microdollars={data.next_credit_expiration_amount}
@@ -95,7 +96,9 @@ function NextCreditExpiration({ organizationId }: { organizationId: string }) {
               inline={true}
               decimalPlaces={2}
             />{' '}
-            in credits expires {formatRelativeTime(data.next_credit_expiration_at)}
+            in credits{' '}
+            {new Date(data.next_credit_expiration_at) > new Date() ? 'expires' : 'expired'}{' '}
+            {formatRelativeTime(data.next_credit_expiration_at)}
           </Button>
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={8}>

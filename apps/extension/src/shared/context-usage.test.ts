@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  formatContextSummary,
-  getContextRatio,
-  getContextTone,
-} from './context-usage';
+import { formatContextSummary, getContextRatio, getContextTone } from './context-usage';
 
 describe('context ratio', () => {
   it('returns undefined without a context length', () => {

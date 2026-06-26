@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createAssistantMessage,
-  createUserMessage,
-} from './agent-conversation';
+import { createAssistantMessage, createUserMessage } from './agent-conversation';
 import {
   KEEP_RECENT_EXCHANGES,
   SUMMARY_PREFIX,
@@ -27,11 +24,7 @@ describe('split events for compaction', () => {
     // KEEP_RECENT_EXCHANGES = 2 → keep from the 2nd-to-last user message ('two')
     expect(toKeep[0]).toMatchObject({ role: 'user', text: 'two' });
     expect(toKeep.at(-1)).toMatchObject({ text: 'a3' });
-    expect(toSummarize).toMatchObject([
-      { text: 'greeting' },
-      { text: 'one' },
-      { text: 'a1' },
-    ]);
+    expect(toSummarize).toMatchObject([{ text: 'greeting' }, { text: 'one' }, { text: 'a1' }]);
   });
 
   it('summarizes nothing when there are too few user messages', () => {

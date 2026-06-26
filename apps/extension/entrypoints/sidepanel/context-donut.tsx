@@ -1,9 +1,5 @@
 import type { JSX } from 'react';
-import {
-  formatContextSummary,
-  getContextRatio,
-  getContextTone,
-} from '@/src/shared/context-usage';
+import { formatContextSummary, getContextRatio, getContextTone } from '@/src/shared/context-usage';
 
 const toneStroke: Record<'danger' | 'safe' | 'warn', string> = {
   danger: '#f87171',

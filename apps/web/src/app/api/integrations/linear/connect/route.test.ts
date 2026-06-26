@@ -25,6 +25,7 @@ const mockedGetLinearOAuthUrl = jest.mocked(getLinearOAuthUrl);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
 const mockedRequireActiveSubscriptionOrTrial = jest.mocked(requireActiveSubscriptionOrTrial);
 const USER_ID = '034489e8-19e0-4479-9d69-2edad719e847';
+const ORGANIZATION_ID = '7e3011af-e99d-444f-8171-54c2225b87dc';
 
 function makeRequest(pathWithQuery: string) {
   return new NextRequest(`http://localhost:3000${pathWithQuery}`);
@@ -57,7 +58,7 @@ describe('GET /api/integrations/linear/connect', () => {
     } as never);
 
     const response = await callLinearConnect(
-      makeRequest('/api/integrations/linear/connect?organizationId=org-linear-123')
+      makeRequest(`/api/integrations/linear/connect?organizationId=${ORGANIZATION_ID}`)
     );
 
     const location = response.headers.get('location');
@@ -65,7 +66,7 @@ describe('GET /api/integrations/linear/connect', () => {
     const url = new URL(location ?? '');
     expect(url.pathname).toBe('/users/sign_in');
     expect(url.searchParams.get('callbackPath')).toBe(
-      '/api/integrations/linear/connect?organizationId=org-linear-123'
+      `/api/integrations/linear/connect?organizationId=${ORGANIZATION_ID}`
     );
     expect(mockedGetLinearOAuthUrl).not.toHaveBeenCalled();
   });
@@ -87,19 +88,19 @@ describe('GET /api/integrations/linear/connect', () => {
 
   test('authorizes org-scoped installs for owners and billing managers with an active subscription', async () => {
     await callLinearConnect(
-      makeRequest('/api/integrations/linear/connect?organizationId=org-linear-123')
+      makeRequest(`/api/integrations/linear/connect?organizationId=${ORGANIZATION_ID}`)
     );
 
     expect(mockedEnsureOrganizationAccess).toHaveBeenCalledWith(
       { user: expect.objectContaining({ id: USER_ID }) },
-      'org-linear-123',
+      ORGANIZATION_ID,
       ['owner', 'billing_manager']
     );
-    expect(mockedRequireActiveSubscriptionOrTrial).toHaveBeenCalledWith('org-linear-123');
+    expect(mockedRequireActiveSubscriptionOrTrial).toHaveBeenCalledWith(ORGANIZATION_ID);
     const state = mockedGetLinearOAuthUrl.mock.calls[0]?.[0];
     expect(verifyOAuthState(state ?? null)).toEqual(
       expect.objectContaining({
-        owner: 'org_org-linear-123',
+        owner: `org_${ORGANIZATION_ID}`,
         userId: USER_ID,
       })
     );
@@ -109,14 +110,14 @@ describe('GET /api/integrations/linear/connect', () => {
     mockedEnsureOrganizationAccess.mockRejectedValue(new Error('unauthorized'));
 
     const response = await callLinearConnect(
-      makeRequest('/api/integrations/linear/connect?organizationId=org-linear-123')
+      makeRequest(`/api/integrations/linear/connect?organizationId=${ORGANIZATION_ID}`)
     );
 
     const location = response.headers.get('location');
     expect(location).toBeTruthy();
     const url = new URL(location ?? '');
     expect(`${url.pathname}${url.search}`).toBe(
-      '/organizations/org-linear-123/integrations/linear?error=oauth_init_failed'
+      `/organizations/${ORGANIZATION_ID}/integrations/linear?error=oauth_init_failed`
     );
     expect(mockedRequireActiveSubscriptionOrTrial).not.toHaveBeenCalled();
     expect(mockedGetLinearOAuthUrl).not.toHaveBeenCalled();
@@ -126,14 +127,14 @@ describe('GET /api/integrations/linear/connect', () => {
     mockedRequireActiveSubscriptionOrTrial.mockRejectedValue(new Error('inactive subscription'));
 
     const response = await callLinearConnect(
-      makeRequest('/api/integrations/linear/connect?organizationId=org-linear-123')
+      makeRequest(`/api/integrations/linear/connect?organizationId=${ORGANIZATION_ID}`)
     );
 
     const location = response.headers.get('location');
     expect(location).toBeTruthy();
     const url = new URL(location ?? '');
     expect(`${url.pathname}${url.search}`).toBe(
-      '/organizations/org-linear-123/integrations/linear?error=oauth_init_failed'
+      `/organizations/${ORGANIZATION_ID}/integrations/linear?error=oauth_init_failed`
     );
     expect(mockedGetLinearOAuthUrl).not.toHaveBeenCalled();
   });

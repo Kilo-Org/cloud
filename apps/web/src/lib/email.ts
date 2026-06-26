@@ -9,6 +9,7 @@ import { db } from '@/lib/drizzle';
 import {
   getOrganizationAppPathForRouteIdentifier,
   getOrganizationRouteIdentifier,
+  isUuidOrganizationRouteIdentifier,
 } from '@/lib/organizations/organization-route-utils';
 import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -163,6 +164,10 @@ type Props = {
 };
 
 async function getOrganizationEmailPath(organizationId: string, suffix = ''): Promise<string> {
+  if (!isUuidOrganizationRouteIdentifier(organizationId)) {
+    return getOrganizationAppPathForRouteIdentifier(organizationId, suffix);
+  }
+
   const [organization] = await db
     .select({ id: organizations.id, slug: organizations.slug })
     .from(organizations)

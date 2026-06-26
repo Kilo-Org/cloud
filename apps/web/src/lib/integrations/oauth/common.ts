@@ -172,17 +172,16 @@ export async function handleStatefulPlatformOAuthConnect(
     requireActiveOrganizationSubscription,
   }: HandleStatefulOAuthConnectOptions
 ): Promise<Response> {
+  const requestedOrganizationId = request.nextUrl.searchParams.get('organizationId');
   let organizationId: string | null = null;
 
   try {
-    organizationId = parseOptionalOrganizationId(
-      request.nextUrl.searchParams.get('organizationId')
-    );
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
       return redirectToSignInForOAuthConnect(request);
     }
 
+    organizationId = parseOptionalOrganizationId(requestedOrganizationId);
     const { owner } = await resolveOAuthConnectOwner(request, user, {
       organizationRoles,
       requireActiveOrganizationSubscription,
@@ -205,7 +204,11 @@ export async function handleStatefulPlatformOAuthConnect(
 
     return NextResponse.redirect(
       new URL(
-        buildIntegrationOAuthConnectErrorPath(platform, organizationId, 'oauth_init_failed'),
+        buildIntegrationOAuthConnectErrorPath(
+          platform,
+          organizationId ?? requestedOrganizationId,
+          'oauth_init_failed'
+        ),
         APP_URL
       )
     );

@@ -2,11 +2,11 @@
 
 import { useState, type CSSProperties } from 'react';
 import { ArrowRight, Clock3 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { money, percentOf } from '../formatting';
+import { money, percentOf, spendBarHeightPercent } from '../formatting';
 import { EmptyPanel } from '../shared/EmptyPanel';
 import type { CostInsightsDashboardData, SpendRange } from '../types';
 
@@ -42,28 +42,29 @@ export function SpendEvidenceCard({ data }: { data: CostInsightsDashboardData })
             {rangeLabel}. Usage-based and scheduled spend are shown separately.
           </CardDescription>
         </div>
-        <Tabs
-          className="w-full lg:w-auto"
-          value={range}
-          onValueChange={value => {
-            if (isSpendRange(value)) setSelectedRange(value);
-          }}
+        <fieldset
+          aria-label="Spend range"
+          className="border-input bg-input-background grid w-full grid-cols-4 gap-1 rounded-md border p-1 lg:flex lg:w-auto"
         >
-          <TabsList
-            aria-label="Spend range"
-            className="border-input bg-input-background grid h-auto w-full grid-cols-4 gap-1 border lg:inline-flex lg:w-auto"
-          >
-            {(['24h', '7d', '30d', '90d'] as SpendRange[]).map(range => (
-              <TabsTrigger
-                key={range}
-                value={range}
-                className="min-h-control-touch type-label data-[state=active]:bg-surface-selected lg:min-h-9"
-              >
-                {range}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+          {(['24h', '7d', '30d', '90d'] as SpendRange[]).map(option => (
+            <Button
+              key={option}
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-pressed={range === option}
+              className={cn(
+                'min-h-control-touch px-3 type-label lg:min-h-9',
+                range === option && 'bg-surface-selected text-foreground hover:bg-surface-selected'
+              )}
+              onClick={() => {
+                if (isSpendRange(option)) setSelectedRange(option);
+              }}
+            >
+              {option}
+            </Button>
+          ))}
+        </fieldset>
       </CardHeader>
       <CardContent className="space-y-4">
         {evidence.length === 0 ? (
@@ -113,7 +114,7 @@ export function SpendEvidenceCard({ data }: { data: CostInsightsDashboardData })
                 </div>
                 {evidence.map((point, index) => {
                   const pointTotal = point.variableUsd + point.scheduledUsd;
-                  const totalHeight = Math.max(2, percentOf(pointTotal, maxSpend));
+                  const totalHeight = spendBarHeightPercent(pointTotal, maxSpend);
                   const scheduledShare = percentOf(point.scheduledUsd, pointTotal);
                   return (
                     <Tooltip key={point.label}>

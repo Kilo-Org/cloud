@@ -13,6 +13,19 @@ import { EmptyPanel } from '../shared/EmptyPanel';
 import { StatusBadge } from '../shared/StatusBadge';
 import type { CostInsightEvent } from '../types';
 
+const eventPresentation = {
+  anomaly_alert: { icon: TrendingUp, label: 'Anomaly alert', tone: 'warning' },
+  threshold_crossed: { icon: AlertTriangle, label: 'Threshold alert', tone: 'warning' },
+  suggestion_created: { icon: Lightbulb, label: 'Suggestion', tone: 'success' },
+  suggestion_dismissed: { icon: XCircle, label: 'Suggestion dismissed', tone: 'neutral' },
+  reviewed: { icon: CheckCircle2, label: 'Review', tone: 'neutral' },
+  config_changed: { icon: Settings2, label: 'Settings change', tone: 'neutral' },
+  disabled: { icon: XCircle, label: 'Settings change', tone: 'neutral' },
+} satisfies Record<
+  CostInsightEvent['type'],
+  { icon: typeof AlertTriangle; label: string; tone: 'warning' | 'success' | 'neutral' }
+>;
+
 export function EventList({
   events,
   compact = false,
@@ -25,30 +38,7 @@ export function EventList({
   return (
     <ol className="divide-border divide-y">
       {events.map(event => {
-        const Icon =
-          event.type === 'anomaly_alert'
-            ? TrendingUp
-            : event.type === 'threshold_crossed'
-              ? AlertTriangle
-              : event.type === 'suggestion_created'
-                ? Lightbulb
-                : event.type === 'reviewed'
-                  ? CheckCircle2
-                  : event.type === 'suggestion_dismissed' || event.type === 'disabled'
-                    ? XCircle
-                    : Settings2;
-        const eventLabel =
-          event.type === 'anomaly_alert'
-            ? 'Anomaly alert'
-            : event.type === 'threshold_crossed'
-              ? 'Threshold alert'
-              : event.type === 'suggestion_created'
-                ? 'Suggestion'
-                : event.type === 'suggestion_dismissed'
-                  ? 'Suggestion dismissed'
-                  : event.type === 'reviewed'
-                    ? 'Review'
-                    : 'Settings change';
+        const { icon: Icon, label: eventLabel, tone } = eventPresentation[event.type];
         const capturedSpend =
           event.topDrivers?.reduce((sum, driver) => sum + driver.spendUsd, 0) ?? 0;
         return (
@@ -58,17 +48,7 @@ export function EventList({
                 <time className="type-label text-muted-foreground block shrink-0">
                   {event.timestampLabel}
                 </time>
-                <StatusBadge
-                  tone={
-                    event.type === 'anomaly_alert' || event.type === 'threshold_crossed'
-                      ? 'warning'
-                      : event.type === 'suggestion_created'
-                        ? 'success'
-                        : 'neutral'
-                  }
-                >
-                  {eventLabel}
-                </StatusBadge>
+                <StatusBadge tone={tone}>{eventLabel}</StatusBadge>
               </div>
               <div className="min-w-0">
                 <div className="flex gap-3">
@@ -119,7 +99,7 @@ export function EventList({
                         const share = percentOf(driver.spendUsd, capturedSpend);
                         return (
                           <li
-                            key={`${event.id}-${driver.label}-${driver.actorLabel ?? 'none'}`}
+                            key={`${event.id}-${driver.id}`}
                             className="grid gap-3 px-4 py-3 lg:grid-cols-[1.5rem_minmax(0,1fr)_8rem] lg:items-center"
                           >
                             <span className="type-label text-muted-foreground hidden font-mono lg:block">

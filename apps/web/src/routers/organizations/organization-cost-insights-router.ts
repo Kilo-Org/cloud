@@ -98,13 +98,20 @@ export const organizationCostInsightsRouter = createTRPCRouter({
       readOnly: access.readOnly,
     });
   }),
-  listEvents: baseProcedure.input(OrganizationIdInputSchema).query(async ({ ctx, input }) => {
-    await resolveOrgReadContext(ctx, input.organizationId);
-    return await buildCostInsightsEventHistoryData({
-      database: db,
-      owner: { type: 'organization', id: input.organizationId },
-    });
-  }),
+  listEvents: baseProcedure
+    .input(
+      OrganizationIdInputSchema.merge(costInsightsRouterInternals.CostInsightEventHistorySchema)
+    )
+    .query(async ({ ctx, input }) => {
+      await resolveOrgReadContext(ctx, input.organizationId);
+      return await buildCostInsightsEventHistoryData({
+        database: db,
+        owner: { type: 'organization', id: input.organizationId },
+        filter: input.filter,
+        page: input.page,
+        pageSize: input.pageSize,
+      });
+    }),
   getAttentionState: baseProcedure
     .input(OrganizationIdInputSchema)
     .query(async ({ ctx, input }) => {
@@ -142,6 +149,15 @@ export const organizationCostInsightsRouter = createTRPCRouter({
         actorUserId: ctx.user.id,
       });
       return { success: true };
+    }),
+  disableThreshold: baseProcedure
+    .input(OrganizationIdInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await ensureOrgManageAccess(ctx, input.organizationId);
+      return await costInsightsRouterInternals.disableOwnerThreshold({
+        owner: { type: 'organization', id: input.organizationId },
+        actorUserId: ctx.user.id,
+      });
     }),
   dismissSuggestion: baseProcedure
     .input(

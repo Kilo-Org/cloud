@@ -21,17 +21,29 @@ export function CostInsightsOverviewClient({
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  const personalDashboardQuery = useQuery({
+  const {
+    data: personalDashboard,
+    isLoading: personalDashboardLoading,
+    isError: personalDashboardError,
+    refetch: refetchPersonalDashboard,
+  } = useQuery({
     ...trpc.costInsights.getDashboard.queryOptions(),
     enabled: !organizationId,
   });
-  const organizationDashboardQuery = useQuery({
+  const {
+    data: organizationDashboard,
+    isLoading: organizationDashboardLoading,
+    isError: organizationDashboardError,
+    refetch: refetchOrganizationDashboard,
+  } = useQuery({
     ...trpc.organizations.costInsights.getDashboard.queryOptions({
       organizationId: organizationId ?? '',
     }),
     enabled: Boolean(organizationId),
   });
-  const dashboardQuery = organizationId ? organizationDashboardQuery : personalDashboardQuery;
+  const dashboard = organizationId ? organizationDashboard : personalDashboard;
+  const dashboardLoading = organizationId ? organizationDashboardLoading : personalDashboardLoading;
+  const dashboardError = organizationId ? organizationDashboardError : personalDashboardError;
 
   const invalidateCostInsights = async () => {
     if (organizationId) {
@@ -40,7 +52,10 @@ export function CostInsightsOverviewClient({
           queryKey: trpc.organizations.costInsights.getDashboard.queryKey({ organizationId }),
         }),
         queryClient.invalidateQueries({
-          queryKey: trpc.organizations.costInsights.listEvents.queryKey({ organizationId }),
+          queryKey: trpc.organizations.costInsights.getSettings.queryKey({ organizationId }),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.costInsights.listEvents.queryKey(),
         }),
         queryClient.invalidateQueries({
           queryKey: trpc.organizations.costInsights.getAttentionState.queryKey({
@@ -54,6 +69,9 @@ export function CostInsightsOverviewClient({
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: trpc.costInsights.getDashboard.queryKey(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.costInsights.getSettings.queryKey(),
       }),
       queryClient.invalidateQueries({
         queryKey: trpc.costInsights.listEvents.queryKey(),
@@ -80,6 +98,24 @@ export function CostInsightsOverviewClient({
         void invalidateCostInsights();
       },
       onError: error => toast.error(error.message || 'Could not mark alert reviewed'),
+    })
+  );
+  const personalDisableThresholdMutation = useMutation(
+    trpc.costInsights.disableThreshold.mutationOptions({
+      onSuccess: () => {
+        toast.success('Spend threshold turned off');
+        void invalidateCostInsights();
+      },
+      onError: error => toast.error(error.message || 'Could not turn off spend threshold'),
+    })
+  );
+  const organizationDisableThresholdMutation = useMutation(
+    trpc.organizations.costInsights.disableThreshold.mutationOptions({
+      onSuccess: () => {
+        toast.success('Spend threshold turned off');
+        void invalidateCostInsights();
+      },
+      onError: error => toast.error(error.message || 'Could not turn off spend threshold'),
     })
   );
   const personalDismissMutation = useMutation(
@@ -119,6 +155,15 @@ export function CostInsightsOverviewClient({
       return;
     }
 
+    if (action === 'disable_threshold') {
+      if (organizationId) {
+        organizationDisableThresholdMutation.mutate({ organizationId });
+        return;
+      }
+      personalDisableThresholdMutation.mutate();
+      return;
+    }
+
     router.push(`${basePath}/config`);
   };
 
@@ -135,11 +180,20 @@ export function CostInsightsOverviewClient({
     router.push(`${basePath}/ask-kilo?${searchParams.toString()}`);
   };
 
+  const alertActionsDisabled = organizationId
+    ? organizationAcknowledgeMutation.isPending || organizationDisableThresholdMutation.isPending
+    : personalAcknowledgeMutation.isPending || personalDisableThresholdMutation.isPending;
+
   return (
     <CostInsightsDashboardView
-      data={dashboardQuery.data}
-      isLoading={dashboardQuery.isLoading}
-      isError={dashboardQuery.isError}
+      data={dashboard}
+      isLoading={dashboardLoading}
+      isError={dashboardError}
+      activityHref={`${basePath}/activity`}
+      alertActionsDisabled={alertActionsDisabled}
+      onRetry={() => {
+        void (organizationId ? refetchOrganizationDashboard() : refetchPersonalDashboard());
+      }}
       onSetupAlerts={() => router.push(`${basePath}/config`)}
       onAlertAction={handleAlertAction}
       onSuggestionDismiss={handleSuggestionDismiss}

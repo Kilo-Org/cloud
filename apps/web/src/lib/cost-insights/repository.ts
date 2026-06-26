@@ -17,9 +17,9 @@ import type {
   CostInsightEventType,
   CostInsightSuggestionKind,
 } from '@kilocode/db/schema-types';
-import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 
-import type { db } from '@/lib/drizzle';
+import type { db, DrizzleTransaction } from '@/lib/drizzle';
 import {
   costInsightOwnerInsertValues,
   costInsightOwnerTargetColumn,
@@ -27,7 +27,20 @@ import {
   costInsightOwnerWhere,
 } from './owner';
 
-export type CostInsightDatabase = typeof db;
+export type CostInsightDatabase = typeof db | DrizzleTransaction;
+export type CostInsightRootDatabase = typeof db;
+export type CostInsightEventFilter = 'all' | 'alerts' | 'suggestions' | 'reviews' | 'settings';
+
+const eventTypesByFilter = {
+  alerts: ['anomaly_alert', 'threshold_crossed'],
+  suggestions: ['suggestion_created', 'suggestion_dismissed'],
+  reviews: ['alert_reviewed'],
+  settings: ['config_changed', 'disabled'],
+} satisfies Record<Exclude<CostInsightEventFilter, 'all'>, CostInsightEventType[]>;
+
+function eventTypesForFilter(filter: CostInsightEventFilter): CostInsightEventType[] | null {
+  return filter === 'all' ? null : eventTypesByFilter[filter];
+}
 
 export type CostInsightConfigPatch = {
   spendAlertsEnabled?: boolean;
@@ -278,8 +291,9 @@ export async function listEnabledCostInsightOwners(
 export async function listCostInsightEvents(
   database: CostInsightDatabase,
   owner: CostInsightSpendOwner,
-  limit = 50
+  options: { limit?: number; offset?: number; filter?: CostInsightEventFilter } = {}
 ) {
+  const eventTypes = eventTypesForFilter(options.filter ?? 'all');
   return await database
     .select({
       id: cost_insight_events.id,
@@ -295,9 +309,33 @@ export async function listCostInsightEvents(
     })
     .from(cost_insight_events)
     .leftJoin(kilocode_users, eq(kilocode_users.id, cost_insight_events.actor_user_id))
-    .where(costInsightOwnerWhere(owner, cost_insight_events))
+    .where(
+      and(
+        costInsightOwnerWhere(owner, cost_insight_events),
+        eventTypes ? inArray(cost_insight_events.event_type, eventTypes) : undefined
+      )
+    )
     .orderBy(desc(cost_insight_events.occurred_at), desc(cost_insight_events.id))
-    .limit(limit);
+    .limit(options.limit ?? 50)
+    .offset(options.offset ?? 0);
+}
+
+export async function countCostInsightEvents(
+  database: CostInsightDatabase,
+  owner: CostInsightSpendOwner,
+  filter: CostInsightEventFilter = 'all'
+): Promise<number> {
+  const eventTypes = eventTypesForFilter(filter);
+  const [row] = await database
+    .select({ value: count() })
+    .from(cost_insight_events)
+    .where(
+      and(
+        costInsightOwnerWhere(owner, cost_insight_events),
+        eventTypes ? inArray(cost_insight_events.event_type, eventTypes) : undefined
+      )
+    );
+  return row?.value ?? 0;
 }
 
 export async function getCostInsightDashboardState(
@@ -392,14 +430,30 @@ export async function acknowledgeCostInsightAlert(
 ): Promise<void> {
   const state = await getOrCreateCostInsightOwnerState(database, params.owner);
   const now = sql`now()`;
-  await database
+  const [acknowledged] = await database
     .update(cost_insight_owner_states)
     .set(
       params.alertKind === 'anomaly'
         ? { active_anomaly_reviewed_at: now, updated_at: now }
         : { threshold_reviewed_at: now, updated_at: now }
     )
-    .where(eq(cost_insight_owner_states.id, state.id));
+    .where(
+      and(
+        eq(cost_insight_owner_states.id, state.id),
+        params.alertKind === 'anomaly'
+          ? and(
+              isNotNull(cost_insight_owner_states.active_anomaly_event_id),
+              isNull(cost_insight_owner_states.active_anomaly_reviewed_at)
+            )
+          : and(
+              isNotNull(cost_insight_owner_states.active_threshold_event_id),
+              isNull(cost_insight_owner_states.threshold_reviewed_at)
+            )
+      )
+    )
+    .returning({ id: cost_insight_owner_states.id });
+
+  if (!acknowledged) return;
 
   await createCostInsightEvent(database, {
     owner: params.owner,
@@ -588,4 +642,39 @@ export async function ownerHasUnreviewedCostInsightAlert(
     )
     .limit(1);
   return Boolean(row);
+}
+
+export async function countOpenCostInsightReviewItems(
+  database: CostInsightDatabase,
+  owner: CostInsightSpendOwner
+): Promise<number> {
+  const [config, state, suggestions] = await Promise.all([
+    getCostInsightOwnerConfig(database, owner),
+    database
+      .select({
+        activeAnomalyEventId: cost_insight_owner_states.active_anomaly_event_id,
+        activeAnomalyReviewedAt: cost_insight_owner_states.active_anomaly_reviewed_at,
+        activeThresholdEventId: cost_insight_owner_states.active_threshold_event_id,
+        thresholdReviewedAt: cost_insight_owner_states.threshold_reviewed_at,
+      })
+      .from(cost_insight_owner_states)
+      .where(costInsightOwnerWhere(owner, cost_insight_owner_states))
+      .limit(1),
+    database
+      .select({ value: count() })
+      .from(cost_insight_active_suggestions)
+      .where(
+        and(
+          costInsightOwnerWhere(owner, cost_insight_active_suggestions),
+          isNull(cost_insight_active_suggestions.dismissed_at)
+        )
+      ),
+  ]);
+
+  const activeState = state[0];
+  const alertCount =
+    (activeState?.activeAnomalyEventId && !activeState.activeAnomalyReviewedAt ? 1 : 0) +
+    (activeState?.activeThresholdEventId && !activeState.thresholdReviewedAt ? 1 : 0);
+  const suggestionCount = config?.cost_suggestions_enabled ?? true ? (suggestions[0]?.value ?? 0) : 0;
+  return alertCount + suggestionCount;
 }

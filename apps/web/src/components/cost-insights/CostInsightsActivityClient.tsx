@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useTRPC } from '@/lib/trpc/utils';
 import { CostInsightsEventHistoryView } from './activity/CostInsightsEventHistoryView';
+import type { ActivityFilter } from './types';
 
 type CostInsightsActivityClientProps = {
   organizationId?: string;
@@ -11,24 +13,55 @@ type CostInsightsActivityClientProps = {
 
 export function CostInsightsActivityClient({ organizationId }: CostInsightsActivityClientProps) {
   const trpc = useTRPC();
-  const personalEventsQuery = useQuery({
-    ...trpc.costInsights.listEvents.queryOptions(),
+  const [filter, setFilter] = useState<ActivityFilter>('all');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const {
+    data: personalEvents,
+    isLoading: personalEventsLoading,
+    isError: personalEventsError,
+    refetch: refetchPersonalEvents,
+  } = useQuery({
+    ...trpc.costInsights.listEvents.queryOptions({ filter, page, pageSize }),
     enabled: !organizationId,
   });
-  const organizationEventsQuery = useQuery({
+  const {
+    data: organizationEvents,
+    isLoading: organizationEventsLoading,
+    isError: organizationEventsError,
+    refetch: refetchOrganizationEvents,
+  } = useQuery({
     ...trpc.organizations.costInsights.listEvents.queryOptions({
       organizationId: organizationId ?? '',
+      filter,
+      page,
+      pageSize,
     }),
     enabled: Boolean(organizationId),
   });
-  const eventsQuery = organizationId ? organizationEventsQuery : personalEventsQuery;
+  const history = organizationId ? organizationEvents : personalEvents;
+  const isLoading = organizationId ? organizationEventsLoading : personalEventsLoading;
+  const isError = organizationId ? organizationEventsError : personalEventsError;
 
   return (
     <CostInsightsEventHistoryView
-      events={eventsQuery.data ?? []}
-      empty={(eventsQuery.data ?? []).length === 0}
-      isLoading={eventsQuery.isLoading}
-      isError={eventsQuery.isError}
+      events={history?.events ?? []}
+      empty={(history?.filter ?? filter) === 'all' && history?.totalCount === 0}
+      isLoading={isLoading}
+      isError={isError}
+      filter={history?.filter ?? filter}
+      page={history?.page ?? page}
+      pageCount={history?.pageCount ?? 1}
+      pageSize={history?.pageSize ?? pageSize}
+      totalCount={history?.totalCount ?? 0}
+      onFilterChange={nextFilter => {
+        setFilter(nextFilter);
+        setPage(1);
+      }}
+      onPageChange={setPage}
+      onRetry={() => {
+        void (organizationId ? refetchOrganizationEvents() : refetchPersonalEvents());
+      }}
     />
   );
 }

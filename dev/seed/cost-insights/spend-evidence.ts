@@ -238,7 +238,7 @@ function buildVariableSpendEvents(currentHour: number): VariableSpendEvent[] {
     });
   }
 
-  const personalSpikeAmounts = [12_000_000, 11_000_000, 9_000_000];
+  const personalSpikeAmounts = [40_000_000, 37_000_000, 35_700_000];
   for (const [index, amountMicrodollars] of personalSpikeAmounts.entries()) {
     events.push({
       ...chooseByIndex(PERSONAL_DRIVERS, index, 'personal spike driver'),
@@ -269,7 +269,7 @@ function buildScheduledSpendEvents(currentHour: number): ScheduledSpendEvent[] {
       owner: PERSONAL_OWNER,
       actorUserId: PERSONAL_OWNER_ID,
       occurredAt: new Date(currentHour).toISOString(),
-      amountMicrodollars: 29_000_000,
+      amountMicrodollars: 63_908_000,
       featureKey: 'renewal',
       planKey: 'standard',
     },
@@ -479,7 +479,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const personalCodingPlanSuggestionId = randomUUID();
   const personalKiloPassSuggestionId = randomUUID();
   const organizationCodingPlanSuggestionId = randomUUID();
-  const personalThresholdMicrodollars = 55_000_000;
+  const personalThresholdMicrodollars = 150_000_000;
   const organizationThresholdMicrodollars = 90_000_000;
   const costInsightSuggestionRows = [
     {
@@ -487,16 +487,16 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       ...costInsightOwnerColumns(PERSONAL_OWNER),
       suggestion_kind: 'coding_plan',
       suggestion_key: suggestionKey(`personal:coding-plan:${currentHourIso}`),
-      title: 'Turn repeated model usage into a Coding Plan',
+      title: 'Get more MiniMax usage with Token Plan Plus',
       description:
-        'Recent Claude Sonnet usage is concentrated enough to review a Coding Plan before the next burst.',
-      cta_label: 'View subscriptions',
+        'You spent $15.00 on MiniMax in the last 7 days, about $64 over 30 days at the same pace. Token Plan Plus costs $20 every 30 days and includes about 1.7B M3 tokens with access to the full MiniMax model family.',
+      cta_label: 'View MiniMax plan',
       cta_href: '/subscriptions',
       evidence_window_start: suggestionWindowStart,
       evidence_window_end: suggestionWindowEnd,
-      observed_microdollars: 126_000_000,
-      benefit_label: 'Observed spend',
-      benefit_detail: '$126 in 7 days',
+      observed_microdollars: 15_000_000,
+      benefit_label: 'Plan price',
+      benefit_detail: '$20 every 30 days',
       created_at: timestampAtHourOffset(currentHour, 2),
       updated_at: timestampAtHourOffset(currentHour, 2),
     },
@@ -505,18 +505,18 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       ...costInsightOwnerColumns(PERSONAL_OWNER),
       suggestion_kind: 'kilo_pass',
       suggestion_key: suggestionKey(`personal:kilo-pass:${currentHourIso}`),
-      title: 'Compare Kilo Pass for recurring personal usage',
+      title: 'Get more credits from your monthly spend with Kilo Pass Expert',
       description:
-        'Daily personal Credit spend is steady enough to compare against Kilo Pass included credits.',
-      cta_label: 'View Kilo Pass',
+        'You spent $106.90 on pay-as-you-go credits in the last 7 days, about $458 over 30 days at the same pace. Kilo Pass Expert costs $199 per month and includes $199 in paid credits, plus up to $79.60 in free bonus credits. Based on your recent spend, the plan could give you more credits for part of the spend you already make.',
+      cta_label: 'View Kilo Pass Expert',
       cta_href: '/subscriptions/kilo-pass',
       evidence_window_start: suggestionWindowStart,
       evidence_window_end: suggestionWindowEnd,
-      observed_microdollars: 94_000_000,
-      benefit_label: 'Included credits',
-      benefit_detail: 'Plan comparison available',
-      created_at: timestampAtHourOffset(currentHour, 3),
-      updated_at: timestampAtHourOffset(currentHour, 3),
+      observed_microdollars: 106_900_000,
+      benefit_label: 'Expert plan',
+      benefit_detail: '$199 + up to $79.60 bonus',
+      created_at: timestampAtHourOffset(currentHour, 1),
+      updated_at: timestampAtHourOffset(currentHour, 1),
     },
     {
       id: organizationCodingPlanSuggestionId,
@@ -544,12 +544,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       event_type: 'anomaly_alert',
       alert_kind: 'anomaly',
       actor_user_id: null,
-      title: 'Spend Anomaly Alert needs review',
-      description: 'Usage-based Credit spend is above this account recent hourly pattern.',
+      title: 'Spend is unusually high this hour',
+      description: "Usage-based spend is well above this account's recent hourly pattern.",
       snapshot: {
-        currentHourVariableMicrodollars: 32_000_000,
-        anomalyBaselineMicrodollars: 4_200_000,
-        anomalyThresholdMicrodollars: 25_000_000,
+        currentHourVariableMicrodollars: 112_700_000,
+        anomalyBaselineMicrodollars: 6_000_000,
+        anomalyThresholdMicrodollars: 18_000_000,
         topDrivers: seedTopDrivers(PERSONAL_OWNER),
       },
       dedupe_key: `dev-seed:personal:anomaly:${currentHourIso}`,
@@ -561,10 +561,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       event_type: 'threshold_crossed',
       alert_kind: 'threshold',
       actor_user_id: null,
-      title: 'Spend Threshold Alert needs review',
-      description: 'Rolling 24-hour Credit spend crossed the configured threshold.',
+      title: '24-hour spend threshold crossed',
+      description: 'Spend reached $184.90 against the $150.00 threshold.',
       snapshot: {
-        rolling24HourMicrodollars: 74_000_000,
+        rolling24HourMicrodollars: 184_900_000,
         thresholdMicrodollars: personalThresholdMicrodollars,
         topDrivers: seedTopDrivers(PERSONAL_OWNER),
       },
@@ -578,13 +578,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       active_suggestion_id: personalCodingPlanSuggestionId,
       actor_user_id: null,
       title: 'Cost Suggestion created',
-      description: 'Turn repeated model usage into a Coding Plan',
+      description: 'Get more MiniMax usage with Token Plan Plus',
       snapshot: {
         suggestion: {
           suggestionKey: suggestionKey(`personal:coding-plan:${currentHourIso}`),
           evidenceWindowStart: suggestionWindowStart,
           evidenceWindowEnd: suggestionWindowEnd,
-          observedMicrodollars: 126_000_000,
+          observedMicrodollars: 15_000_000,
           ctaHref: '/subscriptions',
         },
       },
@@ -598,13 +598,13 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       active_suggestion_id: personalKiloPassSuggestionId,
       actor_user_id: null,
       title: 'Cost Suggestion created',
-      description: 'Compare Kilo Pass for recurring personal usage',
+      description: 'Get more credits from your monthly spend with Kilo Pass Expert',
       snapshot: {
         suggestion: {
           suggestionKey: suggestionKey(`personal:kilo-pass:${currentHourIso}`),
           evidenceWindowStart: suggestionWindowStart,
           evidenceWindowEnd: suggestionWindowEnd,
-          observedMicrodollars: 94_000_000,
+          observedMicrodollars: 106_900_000,
           ctaHref: '/subscriptions/kilo-pass',
         },
       },

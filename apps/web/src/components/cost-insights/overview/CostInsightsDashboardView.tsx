@@ -30,6 +30,9 @@ export function CostInsightsDashboardView({
   data,
   isLoading = false,
   isError = false,
+  activityHref,
+  alertActionsDisabled = false,
+  onRetry,
   onSetupAlerts,
   onAlertAction,
   onSuggestionDismiss,
@@ -38,6 +41,9 @@ export function CostInsightsDashboardView({
   data?: CostInsightsDashboardData;
   isLoading?: boolean;
   isError?: boolean;
+  activityHref?: string;
+  alertActionsDisabled?: boolean;
+  onRetry?: () => void;
   onSetupAlerts?: () => void;
   onAlertAction?: (
     alert: CostInsightsDashboardData['alerts'][number],
@@ -47,8 +53,13 @@ export function CostInsightsDashboardView({
   onAskKilo?: (question: string) => void;
 }) {
   if (isLoading) return <DashboardSkeleton />;
-  if (isError) return <CostInsightsLoadError />;
-  if (!data) return <CostInsightsLoadError />;
+  if (isError) return <CostInsightsLoadError onRetry={onRetry} />;
+  if (!data) return <CostInsightsLoadError onRetry={onRetry} />;
+
+  const canManage =
+    data.owner.type === 'personal' ||
+    data.owner.authorizedRole === 'owner' ||
+    data.owner.authorizedRole === 'billing_manager';
 
   return (
     <div className="space-y-6">
@@ -58,6 +69,8 @@ export function CostInsightsDashboardView({
           key={alert.type}
           alert={alert}
           primaryAction={index === 0}
+          actionsDisabled={alertActionsDisabled}
+          canManage={canManage}
           onAction={action => onAlertAction?.(alert, action)}
         />
       ))}
@@ -65,10 +78,13 @@ export function CostInsightsDashboardView({
         <SuggestionCard
           key={suggestion.id}
           suggestion={suggestion}
+          canManage={canManage}
           onDismiss={() => onSuggestionDismiss?.(suggestion.id)}
         />
       ))}
-      {!data.enabled && <DisabledAlertsBanner onSetupAlerts={onSetupAlerts} />}
+      {!data.enabled && (
+        <DisabledAlertsBanner canManage={canManage} onSetupAlerts={onSetupAlerts} />
+      )}
 
       <section aria-labelledby="spend-summary-title">
         <div className="mb-3 flex items-end justify-between gap-4">
@@ -102,7 +118,7 @@ export function CostInsightsDashboardView({
         />
       </div>
 
-      <EventPreviewCard events={data.eventPreview} />
+      <EventPreviewCard events={data.eventPreview} activityHref={activityHref} />
     </div>
   );
 }

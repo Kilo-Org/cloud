@@ -27,6 +27,7 @@ export type SpendEvidencePoint = {
 };
 
 export type SpendDriver = {
+  id: string;
   label: string;
   source: 'ai_gateway' | 'kiloclaw' | 'coding_plan' | 'other';
   actorLabel?: string;

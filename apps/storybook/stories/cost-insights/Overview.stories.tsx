@@ -48,11 +48,17 @@ function CostInsightsOverviewStory({
     setActivePage('ask');
   }
 
+  const basePath =
+    data.owner.type === 'organization'
+      ? '/organizations/acme-cost-insights/cost-insights'
+      : '/cost-insights';
+
   return (
     <CostInsightsShellView
       owner={data.owner}
       activePage={activePage}
       attention={options.attention ?? (data.alerts.length > 0 ? 'alert' : 'none')}
+      basePath={basePath}
       onPageChange={setActivePage}
     >
       {activePage === 'ask' ? (
@@ -62,6 +68,7 @@ function CostInsightsOverviewStory({
           data={data}
           isLoading={options.isLoading}
           isError={options.isError}
+          activityHref={`${basePath}/activity`}
           onAskKilo={handleAskKilo}
         />
       )}
@@ -122,6 +129,19 @@ export const AlertAndSuggestion: Story = {
         suggestions: [kiloPassSuggestion],
         metrics: anomalyMetrics(),
         evidence: evidenceAnomaly,
+      }),
+      { attention: 'alert' }
+    ),
+};
+
+export const ReadOnlyAdmin: Story = {
+  render: () =>
+    renderDashboard(
+      dashboardData({
+        owner: { ...organizationOwner, authorizedRole: 'admin' },
+        alerts: [thresholdAlert],
+        suggestions: [kiloPassSuggestion],
+        metrics: anomalyMetrics(),
       }),
       { attention: 'alert' }
     ),

@@ -58,8 +58,11 @@ export function CostInsightsSettingsView({
               </p>
             </div>
             <div className="flex min-h-control-touch items-center gap-3">
-              <Label htmlFor="cost-suggestions-enabled">
+              <span className="type-label text-muted-foreground" aria-hidden="true">
                 {data.suggestionsEnabled ? 'On' : 'Off'}
+              </span>
+              <Label htmlFor="cost-suggestions-enabled" className="sr-only">
+                Cost Suggestions
               </Label>
               <Switch
                 id="cost-suggestions-enabled"
@@ -85,7 +88,12 @@ export function CostInsightsSettingsView({
               </p>
             </div>
             <div className="flex min-h-control-touch items-center gap-3">
-              <Label htmlFor="spend-alerts-enabled">{data.enabled ? 'On' : 'Off'}</Label>
+              <span className="type-label text-muted-foreground" aria-hidden="true">
+                {data.enabled ? 'On' : 'Off'}
+              </span>
+              <Label htmlFor="spend-alerts-enabled" className="sr-only">
+                Spend Alerts
+              </Label>
               <Switch
                 id="spend-alerts-enabled"
                 className="relative before:absolute before:inset-x-0 before:-inset-y-2.5"

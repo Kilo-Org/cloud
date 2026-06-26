@@ -13,8 +13,8 @@ import {
   clearCostInsightAlertState,
   clearCostInsightThresholdEpisode,
   createCostInsightEvent,
+  countOpenCostInsightReviewItems,
   dismissCostInsightSuggestion,
-  ownerHasUnreviewedCostInsightAlert,
   updateCostInsightOwnerConfig,
 } from '@/lib/cost-insights/repository';
 import { evaluateCostInsightsForOwner } from '@/lib/cost-insights/evaluation';
@@ -32,6 +32,12 @@ const AcknowledgeCostInsightAlertSchema = z.object({
 
 const DismissCostInsightSuggestionSchema = z.object({
   suggestionId: z.uuid(),
+});
+
+const CostInsightEventHistorySchema = z.object({
+  filter: z.enum(['all', 'alerts', 'suggestions', 'reviews', 'settings']),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().min(1).max(50),
 });
 
 function changedFields(
@@ -132,10 +138,44 @@ async function updateOwnerSettings(params: {
   ) {
     await clearCostInsightThresholdEpisode(db, params.owner, null);
   }
-  if (current.spend_alerts_enabled || current.cost_suggestions_enabled) {
+  if (current.spend_alerts_enabled) {
     await evaluateCostInsightsForOwner(db, params.owner);
   }
   return { success: true };
+}
+
+async function disableOwnerThreshold(params: {
+  owner: { type: 'user'; id: string } | { type: 'organization'; id: string };
+  actorUserId: string;
+}) {
+  return await db.transaction(async database => {
+    const { previous, current } = await updateCostInsightOwnerConfig(database, params.owner, {
+      spendThresholdMicrodollars: null,
+    });
+    await clearCostInsightThresholdEpisode(database, params.owner, null);
+
+    if (previous.spend_threshold_microdollars === null) return { success: true };
+
+    if (current.spend_alerts_enabled) {
+      await createCostInsightEvent(database, {
+        owner: params.owner,
+        eventType: 'config_changed',
+        actorUserId: params.actorUserId,
+        title: 'Cost Insights settings changed',
+        description: 'Spend threshold was turned off.',
+        snapshot: {
+          changedFields: changedFields(previous, current),
+          settings: {
+            spendAlertsEnabled: current.spend_alerts_enabled,
+            costSuggestionsEnabled: current.cost_suggestions_enabled,
+            spendThresholdMicrodollars: current.spend_threshold_microdollars,
+          },
+        },
+      });
+    }
+
+    return { success: true };
+  });
 }
 
 export const costInsightsRouter = createTRPCRouter({
@@ -153,20 +193,23 @@ export const costInsightsRouter = createTRPCRouter({
       uiOwner: { type: 'personal', name: ctx.user.google_user_name, authorizedRole: 'personal' },
     });
   }),
-  listEvents: baseProcedure.query(async ({ ctx }) => {
+  listEvents: baseProcedure.input(CostInsightEventHistorySchema).query(async ({ ctx, input }) => {
     return await buildCostInsightsEventHistoryData({
       database: db,
       owner: { type: 'user', id: ctx.user.id },
+      filter: input.filter,
+      page: input.page,
+      pageSize: input.pageSize,
     });
   }),
   getAttentionState: baseProcedure.query(async ({ ctx }) => {
+    const reviewItemCount = await countOpenCostInsightReviewItems(db, {
+      type: 'user',
+      id: ctx.user.id,
+    });
     return {
-      attention: (await ownerHasUnreviewedCostInsightAlert(db, {
-        type: 'user',
-        id: ctx.user.id,
-      }))
-        ? 'alert'
-        : 'none',
+      attention: reviewItemCount > 0 ? 'alert' : 'none',
+      reviewItemCount,
     };
   }),
   updateSettings: baseProcedure
@@ -188,6 +231,12 @@ export const costInsightsRouter = createTRPCRouter({
       });
       return { success: true };
     }),
+  disableThreshold: baseProcedure.mutation(async ({ ctx }) => {
+    return await disableOwnerThreshold({
+      owner: { type: 'user', id: ctx.user.id },
+      actorUserId: ctx.user.id,
+    });
+  }),
   dismissSuggestion: baseProcedure
     .input(DismissCostInsightSuggestionSchema)
     .mutation(async ({ ctx, input }) => {
@@ -202,7 +251,9 @@ export const costInsightsRouter = createTRPCRouter({
 
 export const costInsightsRouterInternals = {
   updateOwnerSettings,
+  disableOwnerThreshold,
   UpdateCostInsightsSettingsSchema,
   AcknowledgeCostInsightAlertSchema,
   DismissCostInsightSuggestionSchema,
+  CostInsightEventHistorySchema,
 };

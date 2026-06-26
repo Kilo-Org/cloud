@@ -162,6 +162,7 @@ export const evidence90d: SpendEvidencePoint[] = [
 
 export const personalDrivers: SpendDriver[] = [
   {
+    id: 'personal-ai-gateway-chat-completions',
     label: 'Kilo Code chat completions',
     source: 'ai_gateway',
     modelOrProvider: 'Claude Sonnet 4',
@@ -170,6 +171,7 @@ export const personalDrivers: SpendDriver[] = [
     requestCount: 318,
   },
   {
+    id: 'personal-kiloclaw-instance-runtime',
     label: 'KiloClaw instance runtime',
     source: 'kiloclaw',
     modelOrProvider: 'openclaw-standard',
@@ -178,6 +180,7 @@ export const personalDrivers: SpendDriver[] = [
     requestCount: 1,
   },
   {
+    id: 'personal-coding-plan-generation',
     label: 'Coding Plan generation',
     source: 'coding_plan',
     modelOrProvider: 'OpenAI GPT-5',
@@ -189,6 +192,7 @@ export const personalDrivers: SpendDriver[] = [
 
 export const organizationDrivers: SpendDriver[] = [
   {
+    id: 'organization-cloud-agent-incident',
     label: 'Cloud Agent production incident workspace',
     source: 'ai_gateway',
     actorLabel: 'Maya Chen',
@@ -199,6 +203,7 @@ export const organizationDrivers: SpendDriver[] = [
     href: '/organizations/acme/members/usr_01H7',
   },
   {
+    id: 'organization-kiloclaw-development',
     label: 'KiloClaw hosted development environment',
     source: 'kiloclaw',
     actorLabel: 'Noah Williams',
@@ -208,6 +213,7 @@ export const organizationDrivers: SpendDriver[] = [
     requestCount: 3,
   },
   {
+    id: 'organization-security-coding-plan',
     label: 'Security remediation coding plan',
     source: 'coding_plan',
     actorLabel: 'Priya Shah',
@@ -217,6 +223,7 @@ export const organizationDrivers: SpendDriver[] = [
     requestCount: 73,
   },
   {
+    id: 'organization-other-metered-tool',
     label: 'Unknown metered tool usage',
     source: 'other',
     actorLabel: 'Jordan Lee',
@@ -228,6 +235,7 @@ export const organizationDrivers: SpendDriver[] = [
 
 export const longLabelDrivers: SpendDriver[] = [
   {
+    id: 'organization-long-label-driver',
     label:
       'Very long Cloud Agent session label from a repository migration with multiple production branches',
     source: 'ai_gateway',

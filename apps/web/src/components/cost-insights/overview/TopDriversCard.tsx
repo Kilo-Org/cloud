@@ -20,7 +20,7 @@ export function TopDriversCard({
     <Card className="min-w-0">
       <CardHeader>
         <CardTitle className="type-heading">Where spend went</CardTitle>
-        <CardDescription>Largest contributors in the selected period.</CardDescription>
+        <CardDescription>Largest contributors in the last 24 hours.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {drivers.length === 0 ? (
@@ -31,7 +31,7 @@ export function TopDriversCard({
         ) : (
           <ol className="space-y-5 overflow-hidden">
             {drivers.slice(0, 5).map(driver => (
-              <li key={`${driver.label}-${driver.actorLabel ?? 'none'}`} className="min-w-0">
+              <li key={driver.id} className="min-w-0">
                 <DriverRow
                   driver={driver}
                   total={total}

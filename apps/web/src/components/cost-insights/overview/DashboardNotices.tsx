@@ -1,5 +1,6 @@
 import { AlertTriangle, ArrowRight, Bell, Lightbulb, TrendingUp, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import type { CostSuggestion, DashboardAlert, DashboardAlertAction } from '../types';
 
 const reviewActionLabels = {
@@ -10,7 +11,13 @@ const reviewActionLabels = {
   disable_threshold: 'Turn off threshold',
 } satisfies Record<DashboardAlertAction, string>;
 
-export function DisabledAlertsBanner({ onSetupAlerts }: { onSetupAlerts?: () => void }) {
+export function DisabledAlertsBanner({
+  canManage = true,
+  onSetupAlerts,
+}: {
+  canManage?: boolean;
+  onSetupAlerts?: () => void;
+}) {
   return (
     <section
       className="border-border bg-card rounded-xl border p-6"
@@ -19,20 +26,23 @@ export function DisabledAlertsBanner({ onSetupAlerts }: { onSetupAlerts?: () => 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 id="alerts-off-title" className="type-heading">
-            Get notified about unexpected spend
+            {canManage ? 'Get notified about unexpected spend' : 'Spend Alerts are off'}
           </h2>
           <p className="type-body text-muted-foreground mt-1 max-w-2xl">
-            Spend data stays visible. Turn on Spend Alerts for unusual hourly increases and an
-            optional 24-hour threshold.
+            {canManage
+              ? 'Spend data stays visible. Turn on Spend Alerts for unusual hourly increases and an optional 24-hour threshold.'
+              : 'Spend evidence remains available in this read-only view.'}
           </p>
         </div>
-        <Button
-          type="button"
-          className="min-h-control-touch w-full sm:min-h-0 sm:w-auto"
-          onClick={onSetupAlerts}
-        >
-          <Bell className="size-4" aria-hidden="true" /> Set up alerts
-        </Button>
+        {canManage && (
+          <Button
+            type="button"
+            className="min-h-control-touch w-full sm:min-h-0 sm:w-auto"
+            onClick={onSetupAlerts}
+          >
+            <Bell className="size-4" aria-hidden="true" /> Set up alerts
+          </Button>
+        )}
       </div>
     </section>
   );
@@ -41,10 +51,14 @@ export function DisabledAlertsBanner({ onSetupAlerts }: { onSetupAlerts?: () => 
 export function ReviewBanner({
   alert,
   primaryAction,
+  actionsDisabled = false,
+  canManage = true,
   onAction,
 }: {
   alert: DashboardAlert;
   primaryAction: boolean;
+  actionsDisabled?: boolean;
+  canManage?: boolean;
   onAction?: (action: DashboardAlertAction) => void;
 }) {
   const Icon = alert.type === 'threshold' ? AlertTriangle : TrendingUp;
@@ -53,7 +67,7 @@ export function ReviewBanner({
       className="border-status-warning-border bg-status-warning-surface rounded-xl border p-6"
       aria-labelledby={`alert-${alert.type}`}
     >
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto]">
+      <div className={cn('grid gap-5', canManage && 'lg:grid-cols-[minmax(0,1fr)_auto]')}>
         <div>
           <div className="flex gap-3">
             <Icon className="text-status-warning-icon mt-0.5 size-5 shrink-0" aria-hidden="true" />
@@ -77,7 +91,14 @@ export function ReviewBanner({
             </dl>
           )}
         </div>
-        <ReviewActions alert={alert} primaryAction={primaryAction} onAction={onAction} />
+        {canManage && (
+          <ReviewActions
+            alert={alert}
+            primaryAction={primaryAction}
+            actionsDisabled={actionsDisabled}
+            onAction={onAction}
+          />
+        )}
       </div>
     </section>
   );
@@ -86,10 +107,12 @@ export function ReviewBanner({
 function ReviewActions({
   alert,
   primaryAction,
+  actionsDisabled,
   onAction,
 }: {
   alert: DashboardAlert;
   primaryAction: boolean;
+  actionsDisabled: boolean;
   onAction?: (action: DashboardAlertAction) => void;
 }) {
   return (
@@ -100,6 +123,8 @@ function ReviewActions({
           type="button"
           variant={index === 0 && primaryAction ? 'default' : 'outline'}
           className="min-h-control-touch w-full sm:min-h-0"
+          disabled={actionsDisabled}
+          aria-busy={actionsDisabled && action === 'acknowledge'}
           onClick={() => onAction?.(action)}
         >
           {action.includes('disable') ? (
@@ -116,9 +141,11 @@ function ReviewActions({
 
 export function SuggestionCard({
   suggestion,
+  canManage = true,
   onDismiss,
 }: {
   suggestion: CostSuggestion;
+  canManage?: boolean;
   onDismiss?: () => void;
 }) {
   return (
@@ -126,7 +153,7 @@ export function SuggestionCard({
       className="border-status-success-border bg-status-success-surface rounded-xl border p-6"
       aria-labelledby={`suggestion-${suggestion.id}`}
     >
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto]">
+      <div className={cn('grid gap-5', canManage && 'lg:grid-cols-[minmax(0,1fr)_auto]')}>
         <div>
           <div className="flex gap-3">
             <Lightbulb
@@ -157,23 +184,25 @@ export function SuggestionCard({
             Benefits shown use current plan terms. Actual value depends on usage and eligibility.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row lg:w-52 lg:flex-col">
-          <Button asChild className="min-h-control-touch w-full sm:min-h-0">
-            <a href={suggestion.ctaHref}>
-              {suggestion.ctaLabel}
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </a>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-control-touch w-full sm:min-h-0"
-            onClick={onDismiss}
-          >
-            <XCircle className="size-4" aria-hidden="true" />
-            Dismiss suggestion
-          </Button>
-        </div>
+        {canManage && (
+          <div className="flex flex-col gap-2 sm:flex-row lg:w-52 lg:flex-col">
+            <Button asChild className="min-h-control-touch w-full sm:min-h-0">
+              <a href={suggestion.ctaHref}>
+                {suggestion.ctaLabel}
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </a>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-control-touch w-full sm:min-h-0"
+              onClick={onDismiss}
+            >
+              <XCircle className="size-4" aria-hidden="true" />
+              Dismiss suggestion
+            </Button>
+          </div>
+        )}
       </div>
     </section>
   );

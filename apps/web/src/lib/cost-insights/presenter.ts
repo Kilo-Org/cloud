@@ -3,7 +3,9 @@ import { kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 
 import type {
+  ActivityFilter,
   CostInsightEvent,
+  CostSuggestion,
   CostInsightsDashboardData,
   CostInsightsOwner,
   CostInsightsSettingsData,
@@ -13,9 +15,16 @@ import type {
   SpendMetric,
   SpendRange,
 } from '@/components/cost-insights/types';
-import { addHours, floorUtcHour, formatSpendThresholdUsd, microdollarsToUsd } from './policy';
+import {
+  addHours,
+  floorUtcHour,
+  formatSpendThresholdUsd,
+  microdollarsToUsd,
+  MICRODOLLARS_PER_USD,
+} from './policy';
 import { getCostInsightAnomalyPolicy } from './evaluation';
 import {
+  countCostInsightEvents,
   getCostInsightDashboardState,
   getCostInsightOwnerConfig,
   getOrCreateCostInsightOwnerConfig,
@@ -46,12 +55,33 @@ const sourceDisplay = {
   other: 'Other',
 } satisfies Record<OwnerTopSpendDriver['source'], string>;
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 function money(microdollars: number | null): string {
   if (microdollars === null) return 'Unavailable';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: microdollars >= 100_000_000 ? 0 : 2,
+  }).format(microdollarsToUsd(microdollars));
+}
+
+function moneyWithCents(microdollars: number | null): string {
+  if (microdollars === null) return 'Unavailable';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(microdollarsToUsd(microdollars));
+}
+
+function moneyRounded(microdollars: number | null): string {
+  if (microdollars === null) return 'Unavailable';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
   }).format(microdollarsToUsd(microdollars));
 }
 
@@ -87,6 +117,11 @@ function formatDayLabel(timestamp: string): string {
     day: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(timestamp));
+}
+
+function suggestionWindowDays(start: string, end: string): number {
+  const elapsedDays = (new Date(end).getTime() - new Date(start).getTime()) / MS_PER_DAY;
+  return Math.max(1, Math.round(elapsedDays));
 }
 
 function hourlyEvidence(points: OwnerHourlySpend[], range: SpendRange): SpendEvidencePoint[] {
@@ -169,6 +204,15 @@ function mapDrivers(
           ? driver.providerKey
           : undefined;
     return {
+      id: JSON.stringify([
+        driver.category,
+        driver.source,
+        driver.productKey,
+        driver.featureKey,
+        driver.modelOrPlanKey,
+        driver.providerKey,
+        driver.actorUserId,
+      ]),
       label: featureLabel ? `${primaryLabel}: ${featureLabel}` : primaryLabel,
       source: driver.source,
       actorLabel:
@@ -249,7 +293,7 @@ function buildMetrics(params: {
   ];
 }
 
-function activeAlertsFromState(
+export function formatActiveCostInsightAlerts(
   state: Awaited<ReturnType<typeof getCostInsightDashboardState>>
 ): DashboardAlert[] {
   const alerts: DashboardAlert[] = [];
@@ -257,34 +301,50 @@ function activeAlertsFromState(
     if (event.event_type === 'anomaly_alert' && !state.state?.activeAnomalyReviewedAt) {
       alerts.push({
         type: 'anomaly',
-        title: event.title,
-        description: event.description,
+        title: 'Spend is unusually high this hour',
+        description: "Usage-based spend is well above this account's recent hourly pattern.",
         facts: [
           {
-            label: 'Current hour',
-            value: money(event.snapshot.currentHourVariableMicrodollars ?? null),
+            label: 'This hour',
+            value: moneyWithCents(event.snapshot.currentHourVariableMicrodollars ?? null),
+          },
+          {
+            label: 'Typical hour',
+            value: moneyWithCents(event.snapshot.anomalyBaselineMicrodollars ?? null),
           },
           {
             label: 'Alert level',
-            value: money(event.snapshot.anomalyThresholdMicrodollars ?? null),
+            value: moneyWithCents(event.snapshot.anomalyThresholdMicrodollars ?? null),
           },
         ],
-        actions: ['acknowledge', 'view_spend', 'disable_alerts'],
+        actions: ['acknowledge', 'view_spend'],
       });
     }
     if (event.event_type === 'threshold_crossed' && !state.state?.thresholdReviewedAt) {
+      const rolling24HourMicrodollars = event.snapshot.rolling24HourMicrodollars ?? null;
+      const thresholdMicrodollars = event.snapshot.thresholdMicrodollars ?? null;
+      const amountOverMicrodollars =
+        rolling24HourMicrodollars === null || thresholdMicrodollars === null
+          ? null
+          : Math.max(0, rolling24HourMicrodollars - thresholdMicrodollars);
       alerts.push({
         type: 'threshold',
-        title: event.title,
-        description: event.description,
+        title: '24-hour spend threshold crossed',
+        description: `Spend reached ${moneyWithCents(
+          rolling24HourMicrodollars
+        )} against the ${moneyWithCents(thresholdMicrodollars)} threshold.`,
         facts: [
           {
-            label: 'Rolling spend',
-            value: money(event.snapshot.rolling24HourMicrodollars ?? null),
+            label: 'Last 24 hours',
+            value: moneyWithCents(rolling24HourMicrodollars),
           },
           {
             label: 'Threshold',
-            value: money(event.snapshot.thresholdMicrodollars ?? null),
+            value: moneyWithCents(thresholdMicrodollars),
+          },
+          {
+            label: 'Amount over',
+            value: moneyWithCents(amountOverMicrodollars),
           },
         ],
         actions: ['acknowledge', 'adjust_threshold', 'disable_threshold'],
@@ -294,7 +354,92 @@ function activeAlertsFromState(
   return alerts;
 }
 
-function mapEvents(events: Awaited<ReturnType<typeof listCostInsightEvents>>): CostInsightEvent[] {
+export function formatActiveCostInsightSuggestions(
+  suggestions: Awaited<ReturnType<typeof listActiveCostInsightSuggestions>>
+): CostSuggestion[] {
+  return suggestions.map(suggestion => {
+    const windowDays = suggestionWindowDays(
+      suggestion.evidence_window_start,
+      suggestion.evidence_window_end
+    );
+    const paceMicrodollars =
+      Math.round(((suggestion.observed_microdollars / windowDays) * 30) / MICRODOLLARS_PER_USD) *
+      MICRODOLLARS_PER_USD;
+    const planFact =
+      suggestion.suggestion_kind === 'kilo_pass'
+        ? { label: 'Expert plan', value: suggestion.benefit_detail }
+        : { label: suggestion.benefit_label, value: suggestion.benefit_detail };
+
+    return {
+      id: suggestion.id,
+      type: suggestion.suggestion_kind,
+      eyebrow: 'Cost Suggestion',
+      title: suggestion.title,
+      description: suggestion.description,
+      facts: [
+        {
+          label: `Last ${windowDays} ${windowDays === 1 ? 'day' : 'days'}`,
+          value: moneyWithCents(suggestion.observed_microdollars),
+        },
+        { label: '30-day pace', value: `~${moneyRounded(paceMicrodollars)}` },
+        planFact,
+      ],
+      ctaLabel: suggestion.cta_label,
+      ctaHref: suggestion.cta_href,
+    };
+  });
+}
+
+type ListedCostInsightEvent = Awaited<ReturnType<typeof listCostInsightEvents>>[number];
+type SnapshotTopDriver = NonNullable<ListedCostInsightEvent['snapshot']['topDrivers']>[number];
+
+function mapSnapshotDrivers(
+  owner: CostInsightSpendOwner,
+  drivers: SnapshotTopDriver[],
+  actorLabels: ReadonlyMap<string, string>
+): SpendDriver[] {
+  return drivers.map(driver => {
+    const primaryLabel =
+      driver.productKey !== 'other'
+        ? sentenceLabel(driver.productKey)
+        : sourceDisplay[driver.source];
+    const featureLabel = driver.featureKey !== 'other' ? sentenceLabel(driver.featureKey) : null;
+    const modelOrProvider =
+      driver.modelOrPlanKey !== 'other'
+        ? driver.modelOrPlanKey
+        : driver.providerKey !== 'other'
+          ? driver.providerKey
+          : undefined;
+    return {
+      id: JSON.stringify([
+        driver.spendCategory,
+        driver.source,
+        driver.productKey,
+        driver.featureKey,
+        driver.modelOrPlanKey,
+        driver.providerKey,
+        driver.actorUserId,
+      ]),
+      label: featureLabel ? `${primaryLabel}: ${featureLabel}` : primaryLabel,
+      source: driver.source,
+      actorLabel:
+        owner.type === 'organization' && driver.actorUserId
+          ? (actorLabels.get(driver.actorUserId) ?? 'Deleted member')
+          : undefined,
+      modelOrProvider,
+      category:
+        driver.spendCategory === 'variable' ? 'Variable Credit spend' : 'Scheduled Credit spend',
+      spendUsd: microdollarsToUsd(driver.totalMicrodollars),
+      requestCount: driver.spendRecordCount,
+    };
+  });
+}
+
+export function formatCostInsightEvents(
+  owner: CostInsightSpendOwner,
+  events: ListedCostInsightEvent[],
+  actorLabels: ReadonlyMap<string, string> = new Map()
+): CostInsightEvent[] {
   return events.map(event => ({
     id: event.id,
     type: event.eventType === 'alert_reviewed' ? 'reviewed' : event.eventType,
@@ -321,7 +466,23 @@ function mapEvents(events: Awaited<ReturnType<typeof listCostInsightEvents>>): C
         : event.snapshot.currentHourVariableMicrodollars !== undefined
           ? 'current hour'
           : undefined,
+    topDrivers: event.snapshot.topDrivers
+      ? mapSnapshotDrivers(owner, event.snapshot.topDrivers, actorLabels)
+      : undefined,
   }));
+}
+
+async function mapEvents(
+  database: CostInsightDatabase,
+  owner: CostInsightSpendOwner,
+  events: ListedCostInsightEvent[]
+): Promise<CostInsightEvent[]> {
+  const actorUserIds = events.flatMap(event =>
+    (event.snapshot.topDrivers ?? [])
+      .map(driver => driver.actorUserId)
+      .filter((actorUserId): actorUserId is string => Boolean(actorUserId))
+  );
+  return formatCostInsightEvents(owner, events, await loadActorLabels(database, actorUserIds));
 }
 
 export async function buildCostInsightsDashboardData(params: {
@@ -345,24 +506,32 @@ export async function buildCostInsightsDashboardData(params: {
         endHourExclusive,
         limit: 5,
       }),
-      listCostInsightEvents(params.database, params.owner, 5),
+      listCostInsightEvents(params.database, params.owner, { limit: 5 }),
     ]);
-  const [evidence24h, evidence7d, evidence30d, evidence90d, actorLabels, activeSuggestions] =
-    await Promise.all([
-      loadRangeEvidence(params.database, params.owner, '24h', endHourExclusive),
-      loadRangeEvidence(params.database, params.owner, '7d', endHourExclusive),
-      loadRangeEvidence(params.database, params.owner, '30d', endHourExclusive),
-      loadRangeEvidence(params.database, params.owner, '90d', endHourExclusive),
-      loadActorLabels(
-        params.database,
-        topDrivers.map(driver => driver.actorUserId)
-      ),
-      (config?.cost_suggestions_enabled ?? true)
-        ? listActiveCostInsightSuggestions(params.database, params.owner)
-        : [],
-    ]);
+  const [
+    evidence24h,
+    evidence7d,
+    evidence30d,
+    evidence90d,
+    actorLabels,
+    activeSuggestions,
+    eventPreview,
+  ] = await Promise.all([
+    loadRangeEvidence(params.database, params.owner, '24h', endHourExclusive),
+    loadRangeEvidence(params.database, params.owner, '7d', endHourExclusive),
+    loadRangeEvidence(params.database, params.owner, '30d', endHourExclusive),
+    loadRangeEvidence(params.database, params.owner, '90d', endHourExclusive),
+    loadActorLabels(
+      params.database,
+      topDrivers.map(driver => driver.actorUserId)
+    ),
+    (config?.cost_suggestions_enabled ?? true)
+      ? listActiveCostInsightSuggestions(params.database, params.owner)
+      : [],
+    mapEvents(params.database, params.owner, events),
+  ]);
 
-  const alerts = activeAlertsFromState(dashboardState);
+  const alerts = formatActiveCostInsightAlerts(dashboardState);
   return {
     enabled: config?.spend_alerts_enabled ?? false,
     owner: params.uiOwner,
@@ -385,24 +554,7 @@ export async function buildCostInsightsDashboardData(params: {
     },
     drivers: mapDrivers(params.owner, topDrivers, actorLabels),
     alerts,
-    suggestions: activeSuggestions.map(suggestion => ({
-      id: suggestion.id,
-      type: suggestion.suggestion_kind,
-      eyebrow: 'Cost Suggestion',
-      title: suggestion.title,
-      description: suggestion.description,
-      facts: [
-        { label: suggestion.benefit_label, value: suggestion.benefit_detail },
-        {
-          label: 'Evidence window',
-          value: `${formatDayLabel(suggestion.evidence_window_start)} to ${formatDayLabel(
-            suggestion.evidence_window_end
-          )}`,
-        },
-      ],
-      ctaLabel: suggestion.cta_label,
-      ctaHref: suggestion.cta_href,
-    })),
+    suggestions: formatActiveCostInsightSuggestions(activeSuggestions),
     lastEvaluatedLabel: dashboardState.state?.lastEvaluatedAt
       ? `Last evaluated ${new Intl.DateTimeFormat('en-US', {
           hour: 'numeric',
@@ -412,7 +564,7 @@ export async function buildCostInsightsDashboardData(params: {
         }).format(new Date(dashboardState.state.lastEvaluatedAt))}`
       : 'Not evaluated yet',
     baselineMode: anomalyPolicy.mode,
-    eventPreview: mapEvents(events),
+    eventPreview,
   };
 }
 
@@ -436,6 +588,24 @@ export async function buildCostInsightsSettingsData(params: {
 export async function buildCostInsightsEventHistoryData(params: {
   database: CostInsightDatabase;
   owner: CostInsightSpendOwner;
-}): Promise<CostInsightEvent[]> {
-  return mapEvents(await listCostInsightEvents(params.database, params.owner, 50));
+  filter: ActivityFilter;
+  page: number;
+  pageSize: number;
+}) {
+  const totalCount = await countCostInsightEvents(params.database, params.owner, params.filter);
+  const pageCount = Math.max(1, Math.ceil(totalCount / params.pageSize));
+  const page = Math.min(params.page, pageCount);
+  const events = await listCostInsightEvents(params.database, params.owner, {
+    filter: params.filter,
+    limit: params.pageSize,
+    offset: (page - 1) * params.pageSize,
+  });
+  return {
+    events: await mapEvents(params.database, params.owner, events),
+    filter: params.filter,
+    page,
+    pageCount,
+    pageSize: params.pageSize,
+    totalCount,
+  };
 }

@@ -104,9 +104,10 @@ export default function OrganizationAppSidebar({
   }, [actualRole, user?.is_admin, setOriginalRole, setAssumedRole]);
 
   const hasOwnerLevelAccess = currentRole === 'owner' || currentRole === 'billing_manager';
+  const canViewCostInsights = hasOwnerLevelAccess || Boolean(user?.is_admin);
   const { data: costInsightsAttention } = useQuery({
     ...trpc.organizations.costInsights.getAttentionState.queryOptions({ organizationId }),
-    enabled: hasOwnerLevelAccess || Boolean(user?.is_admin),
+    enabled: canViewCostInsights,
     staleTime: 60_000,
     refetchInterval: 60_000,
   });
@@ -138,7 +139,7 @@ export default function OrganizationAppSidebar({
       icon: ChartColumnIncreasing,
       url: `/organizations/${organizationId}/usage-details`,
     },
-    ...(hasOwnerLevelAccess
+    ...(canViewCostInsights
       ? [
           {
             title: 'Cost Insights',

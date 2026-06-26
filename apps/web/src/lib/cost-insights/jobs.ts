@@ -5,6 +5,7 @@ import {
   deleteExpiredCostInsightEvents,
   listEnabledCostInsightOwners,
   type CostInsightDatabase,
+  type CostInsightRootDatabase,
 } from './repository';
 import { evaluateCostInsightsForOwner } from './evaluation';
 
@@ -15,7 +16,7 @@ export type CostInsightHourlySweepSummary = {
 };
 
 export async function runCostInsightHourlySweep(
-  database: CostInsightDatabase
+  database: CostInsightRootDatabase
 ): Promise<CostInsightHourlySweepSummary> {
   const owners = await listEnabledCostInsightOwners(database);
   const failedOwners: CostInsightHourlySweepSummary['failedOwners'] = [];

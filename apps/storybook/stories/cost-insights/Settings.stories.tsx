@@ -16,8 +16,12 @@ export default meta;
 type Story = StoryObj<typeof CostInsightsSettingsView>;
 
 function renderSettings(data: CostInsightsSettingsData) {
+  const basePath =
+    data.owner.type === 'organization'
+      ? '/organizations/acme-cost-insights/cost-insights'
+      : '/cost-insights';
   return (
-    <CostInsightsShellView owner={data.owner} activePage="config">
+    <CostInsightsShellView owner={data.owner} activePage="config" basePath={basePath}>
       <CostInsightsSettingsView data={data} />
     </CostInsightsShellView>
   );

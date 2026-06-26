@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { CostInsightSpendOwner } from '@kilocode/db/cost-insights-rollups';
 import type { CostInsightSpendCategory, CostInsightSpendSource } from '@kilocode/db/schema-types';
+import { sql } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
 import {
@@ -32,11 +33,14 @@ import {
   markCostInsightThresholdEpisode,
   upsertCostInsightActiveSuggestion,
   type CostInsightDatabase,
+  type CostInsightRootDatabase,
 } from './repository';
 import { dispatchPendingCostInsightNotifications } from './notifications';
 
 const SUGGESTION_MIN_VARIABLE_MICRODOLLARS = 50 * MICRODOLLARS_PER_USD;
 const SUGGESTION_MIN_TOTAL_MICRODOLLARS = 100 * MICRODOLLARS_PER_USD;
+const KILO_PASS_EXPERT_MONTHLY_MICRODOLLARS = 199 * MICRODOLLARS_PER_USD;
+const KILO_PASS_EXPERT_BONUS_MICRODOLLARS = 79_600_000;
 
 type AlertTopDriverSnapshot = {
   spendCategory: CostInsightSpendCategory;
@@ -76,12 +80,36 @@ function usdLabel(microdollars: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    maximumFractionDigits: microdollars >= 100 * MICRODOLLARS_PER_USD ? 0 : 2,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(microdollarsToUsd(microdollars));
+}
+
+function roundedUsdLabel(microdollars: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
   }).format(microdollarsToUsd(microdollars));
 }
 
 function suggestionKey(parts: string[]): string {
   return createHash('sha256').update(parts.join('\0')).digest('hex');
+}
+
+function sentenceLabel(value: string): string {
+  return value
+    .split(/[-_:/.]+/)
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function thirtyDayPace(microdollars: number, windowDays: number): number {
+  return (
+    Math.round(((microdollars / Math.max(1, windowDays)) * 30) / MICRODOLLARS_PER_USD) *
+    MICRODOLLARS_PER_USD
+  );
 }
 
 export async function getCostInsightAnomalyPolicy(
@@ -206,16 +234,19 @@ async function maybeCreateThresholdAlert(params: {
 async function maybeCreateCostSuggestion(params: {
   database: CostInsightDatabase;
   owner: CostInsightSpendOwner;
-  asOf: string;
   topDrivers: OwnerTopSpendDriver[];
-  rolling24HourMicrodollars: number | null;
+  evidenceWindowStart: string;
+  evidenceWindowEnd: string;
+  evidenceWindowDays: number;
+  observedMicrodollars: number;
 }): Promise<boolean> {
   const activeSuggestions = await listActiveCostInsightSuggestions(params.database, params.owner);
   if (activeSuggestions.length > 0) return false;
 
   const topDriver = params.topDrivers[0];
-  const evidenceWindowEnd = floorUtcHour(new Date(params.asOf));
-  const evidenceWindowStart = addDays(evidenceWindowEnd, -7);
+  const observedPaceLabel = roundedUsdLabel(
+    thirtyDayPace(params.observedMicrodollars, params.evidenceWindowDays)
+  );
 
   const codingPlanCandidate =
     topDriver &&
@@ -223,32 +254,41 @@ async function maybeCreateCostSuggestion(params: {
     topDriver.totalMicrodollars >= SUGGESTION_MIN_VARIABLE_MICRODOLLARS;
   const kiloPassCandidate =
     params.owner.type === 'user' &&
-    (params.rolling24HourMicrodollars ?? 0) >= SUGGESTION_MIN_TOTAL_MICRODOLLARS;
+    params.observedMicrodollars >= SUGGESTION_MIN_TOTAL_MICRODOLLARS;
 
   const suggestion = codingPlanCandidate
-    ? {
-        suggestionKind: 'coding_plan' as const,
-        suggestionKey: suggestionKey([
-          params.owner.type,
-          params.owner.id,
-          'coding_plan',
-          evidenceWindowEnd.slice(0, 10),
-          topDriver.source,
-          topDriver.productKey,
-          topDriver.modelOrPlanKey,
-        ]),
-        title: 'Review Coding Plan fit',
-        description:
-          'Recent usage is concentrated enough that a Coding Plan may improve cost efficiency.',
-        ctaLabel: 'View subscriptions',
-        ctaHref:
-          params.owner.type === 'organization'
-            ? `/organizations/${params.owner.id}/subscriptions`
-            : '/subscriptions',
-        observedMicrodollars: topDriver.totalMicrodollars,
-        benefitLabel: 'Observed spend',
-        benefitDetail: usdLabel(topDriver.totalMicrodollars),
-      }
+    ? (() => {
+        const driverLabel =
+          topDriver.modelOrPlanKey !== 'other'
+            ? sentenceLabel(topDriver.modelOrPlanKey)
+            : sentenceLabel(topDriver.productKey);
+        const driverPaceLabel = roundedUsdLabel(
+          thirtyDayPace(topDriver.totalMicrodollars, params.evidenceWindowDays)
+        );
+
+        return {
+          suggestionKind: 'coding_plan' as const,
+          suggestionKey: suggestionKey([
+            params.owner.type,
+            params.owner.id,
+            'coding_plan',
+            params.evidenceWindowEnd.slice(0, 10),
+            topDriver.source,
+            topDriver.productKey,
+            topDriver.modelOrPlanKey,
+          ]),
+          title: `Review Coding Plan coverage for ${driverLabel}`,
+          description: `You spent ${usdLabel(topDriver.totalMicrodollars)} on ${driverLabel} in the last ${params.evidenceWindowDays} days, about ${driverPaceLabel} over 30 days at the same pace. A Coding Plan may improve cost efficiency for recurring model usage.`,
+          ctaLabel: 'View subscriptions',
+          ctaHref:
+            params.owner.type === 'organization'
+              ? `/organizations/${params.owner.id}/subscriptions`
+              : '/subscriptions',
+          observedMicrodollars: topDriver.totalMicrodollars,
+          benefitLabel: 'Plan option',
+          benefitDetail: 'Compare Coding Plans',
+        };
+      })()
     : kiloPassCandidate
       ? {
           suggestionKind: 'kilo_pass' as const,
@@ -256,16 +296,18 @@ async function maybeCreateCostSuggestion(params: {
             params.owner.type,
             params.owner.id,
             'kilo_pass',
-            evidenceWindowEnd.slice(0, 10),
-            String(params.rolling24HourMicrodollars ?? 0),
+            params.evidenceWindowEnd.slice(0, 10),
+            String(params.observedMicrodollars),
           ]),
-          title: 'Review Kilo Pass fit',
-          description: 'Recent pay-as-you-go spend may be a fit for Kilo Pass included credits.',
-          ctaLabel: 'View Kilo Pass',
+          title: 'Get more credits from your monthly spend with Kilo Pass Expert',
+          description: `You spent ${usdLabel(params.observedMicrodollars)} on pay-as-you-go credits in the last ${params.evidenceWindowDays} days, about ${observedPaceLabel} over 30 days at the same pace. Kilo Pass Expert costs ${roundedUsdLabel(KILO_PASS_EXPERT_MONTHLY_MICRODOLLARS)} per month and includes ${roundedUsdLabel(KILO_PASS_EXPERT_MONTHLY_MICRODOLLARS)} in paid credits, plus up to ${usdLabel(KILO_PASS_EXPERT_BONUS_MICRODOLLARS)} in free bonus credits. Based on your recent spend, the plan could give you more credits for part of the spend you already make.`,
+          ctaLabel: 'View Kilo Pass Expert',
           ctaHref: '/subscriptions/kilo-pass',
-          observedMicrodollars: params.rolling24HourMicrodollars ?? 0,
-          benefitLabel: 'Rolling spend',
-          benefitDetail: usdLabel(params.rolling24HourMicrodollars ?? 0),
+          observedMicrodollars: params.observedMicrodollars,
+          benefitLabel: 'Expert plan',
+          benefitDetail: `${roundedUsdLabel(KILO_PASS_EXPERT_MONTHLY_MICRODOLLARS)} + up to ${usdLabel(
+            KILO_PASS_EXPERT_BONUS_MICRODOLLARS
+          )} bonus`,
         }
       : null;
 
@@ -279,8 +321,8 @@ async function maybeCreateCostSuggestion(params: {
     description: suggestion.description,
     ctaLabel: suggestion.ctaLabel,
     ctaHref: suggestion.ctaHref,
-    evidenceWindowStart,
-    evidenceWindowEnd,
+    evidenceWindowStart: params.evidenceWindowStart,
+    evidenceWindowEnd: params.evidenceWindowEnd,
     observedMicrodollars: suggestion.observedMicrodollars,
     benefitLabel: suggestion.benefitLabel,
     benefitDetail: suggestion.benefitDetail,
@@ -297,8 +339,8 @@ async function maybeCreateCostSuggestion(params: {
     snapshot: {
       suggestion: {
         suggestionKey: suggestion.suggestionKey,
-        evidenceWindowStart,
-        evidenceWindowEnd,
+        evidenceWindowStart: params.evidenceWindowStart,
+        evidenceWindowEnd: params.evidenceWindowEnd,
         observedMicrodollars: suggestion.observedMicrodollars,
         ctaHref: suggestion.ctaHref,
       },
@@ -308,7 +350,7 @@ async function maybeCreateCostSuggestion(params: {
   return true;
 }
 
-export async function evaluateCostInsightsForOwner(
+async function evaluateCostInsightsForOwnerLocked(
   database: CostInsightDatabase,
   owner: CostInsightSpendOwner,
   options: { asOf?: string } = {}
@@ -317,16 +359,36 @@ export async function evaluateCostInsightsForOwner(
   const currentHourStart = floorUtcHour(new Date(asOf));
   const topDriverStart = addHours(currentHourStart, -24);
   const topDriverEnd = addHours(currentHourStart, 1);
+  const suggestionWindowEnd = topDriverEnd;
+  const suggestionWindowStart = addDays(suggestionWindowEnd, -7);
 
   const config = await getCostInsightOwnerConfig(database, owner);
   const currentHourSpend = await getOwnerCurrentHourSpend(database, owner);
-  const topDrivers = await getOwnerTopSpendDrivers(database, {
-    owner,
-    startHour: topDriverStart,
-    endHourExclusive: topDriverEnd,
-    limit: 5,
-  });
-  const rolling24HourSpend = await getOwnerRolling24HourSpendExact(database, { owner, asOf });
+  const [topDrivers, suggestionTopDrivers, suggestionHourlySpend, rolling24HourSpend] =
+    await Promise.all([
+      getOwnerTopSpendDrivers(database, {
+        owner,
+        startHour: topDriverStart,
+        endHourExclusive: topDriverEnd,
+        limit: 5,
+      }),
+      getOwnerTopSpendDrivers(database, {
+        owner,
+        startHour: suggestionWindowStart,
+        endHourExclusive: suggestionWindowEnd,
+        limit: 5,
+      }),
+      getOwnerHourlySpend(database, {
+        owner,
+        startHour: suggestionWindowStart,
+        endHourExclusive: suggestionWindowEnd,
+      }),
+      getOwnerRolling24HourSpendExact(database, { owner, asOf }),
+    ]);
+  const suggestionObservedMicrodollars = suggestionHourlySpend.reduce(
+    (sum, hour) => sum + (hour.variableMicrodollars ?? 0) + (hour.scheduledMicrodollars ?? 0),
+    0
+  );
 
   let anomalyEventCreated = false;
   let thresholdEventCreated = false;
@@ -357,9 +419,11 @@ export async function evaluateCostInsightsForOwner(
     suggestionCreated = await maybeCreateCostSuggestion({
       database,
       owner,
-      asOf,
-      topDrivers,
-      rolling24HourMicrodollars: rolling24HourSpend.totalMicrodollars,
+      topDrivers: suggestionTopDrivers,
+      evidenceWindowStart: suggestionWindowStart,
+      evidenceWindowEnd: suggestionWindowEnd,
+      evidenceWindowDays: 7,
+      observedMicrodollars: suggestionObservedMicrodollars,
     });
   }
 
@@ -371,6 +435,20 @@ export async function evaluateCostInsightsForOwner(
     thresholdEventCreated,
     suggestionCreated,
   };
+}
+
+export async function evaluateCostInsightsForOwner(
+  database: CostInsightRootDatabase,
+  owner: CostInsightSpendOwner,
+  options: { asOf?: string } = {}
+): Promise<CostInsightEvaluationSummary> {
+  return await database.transaction(async tx => {
+    const lockKey = `cost-insights-evaluation:${owner.type}:${owner.id}`;
+    await tx.execute(
+      sql`SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(${lockKey}, 0))`
+    );
+    return await evaluateCostInsightsForOwnerLocked(tx, owner, options);
+  });
 }
 
 export function scheduleCostInsightEvaluationAfterSpend(owner: CostInsightSpendOwner): void {

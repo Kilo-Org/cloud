@@ -27,3 +27,8 @@ export function percentOf(value: number, total: number) {
   if (total <= 0) return 0;
   return Math.round((value / total) * 100);
 }
+
+export function spendBarHeightPercent(value: number, maximum: number) {
+  if (value <= 0 || maximum <= 0) return 0;
+  return Math.max(2, percentOf(value, maximum));
+}

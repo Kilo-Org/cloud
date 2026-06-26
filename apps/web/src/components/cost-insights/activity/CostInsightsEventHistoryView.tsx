@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -29,38 +28,36 @@ export function CostInsightsEventHistoryView({
   empty = false,
   isLoading = false,
   isError = false,
-  initialFilter = 'all',
-  initialPage = 1,
+  filter = 'all',
+  page = 1,
+  pageCount = 1,
+  pageSize = ACTIVITY_PAGE_SIZE,
+  totalCount,
+  onFilterChange,
+  onPageChange,
+  onRetry,
 }: {
   events: CostInsightEvent[];
   empty?: boolean;
   isLoading?: boolean;
   isError?: boolean;
-  initialFilter?: ActivityFilter;
-  initialPage?: number;
+  filter?: ActivityFilter;
+  page?: number;
+  pageCount?: number;
+  pageSize?: number;
+  totalCount?: number;
+  onFilterChange?: (filter: ActivityFilter) => void;
+  onPageChange?: (page: number) => void;
+  onRetry?: () => void;
 }) {
-  const [filter, setFilter] = useState<ActivityFilter>(initialFilter);
-  const [page, setPage] = useState(initialPage);
-
   if (isLoading) return <Skeleton className="h-96 rounded-xl" />;
-  if (isError) return <CostInsightsLoadError />;
+  if (isError) return <CostInsightsLoadError onRetry={onRetry} />;
 
-  const filteredEvents = events.filter(event => {
-    if (filter === 'alerts') return ['anomaly_alert', 'threshold_crossed'].includes(event.type);
-    if (filter === 'suggestions')
-      return ['suggestion_created', 'suggestion_dismissed'].includes(event.type);
-    if (filter === 'reviews') return event.type === 'reviewed';
-    if (filter === 'settings') return ['config_changed', 'disabled'].includes(event.type);
-    return true;
-  });
-  const pageCount = Math.max(1, Math.ceil(filteredEvents.length / ACTIVITY_PAGE_SIZE));
+  const eventCount = events.length;
+  const resolvedTotalCount = totalCount ?? eventCount;
   const currentPage = Math.min(page, pageCount);
-  const pageEvents = filteredEvents.slice(
-    (currentPage - 1) * ACTIVITY_PAGE_SIZE,
-    currentPage * ACTIVITY_PAGE_SIZE
-  );
-  const firstResult = filteredEvents.length === 0 ? 0 : (currentPage - 1) * ACTIVITY_PAGE_SIZE + 1;
-  const lastResult = Math.min(currentPage * ACTIVITY_PAGE_SIZE, filteredEvents.length);
+  const firstResult = resolvedTotalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const lastResult = Math.min(currentPage * pageSize, resolvedTotalCount);
 
   return (
     <Card className="min-w-0">
@@ -72,8 +69,7 @@ export function CostInsightsEventHistoryView({
               value={filter}
               onValueChange={value => {
                 if (!isActivityFilter(value)) return;
-                setFilter(value);
-                setPage(1);
+                onFilterChange?.(value);
               }}
             >
               <SelectTrigger
@@ -92,21 +88,21 @@ export function CostInsightsEventHistoryView({
             </Select>
           </div>
           <span className="type-label text-muted-foreground" aria-live="polite">
-            {filteredEvents.length === 0
+            {resolvedTotalCount === 0
               ? 'No matching activity'
-              : `Showing ${firstResult}-${lastResult} of ${filteredEvents.length}`}
+              : `Showing ${firstResult}-${lastResult} of ${resolvedTotalCount}`}
           </span>
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        {empty || events.length === 0 ? (
+        {empty || (filter === 'all' && resolvedTotalCount === 0) ? (
           <div className="p-6">
             <EmptyPanel
               title="No activity yet"
               description="Spend alerts, suggestions, and settings changes will appear here."
             />
           </div>
-        ) : pageEvents.length === 0 ? (
+        ) : resolvedTotalCount === 0 || events.length === 0 ? (
           <div className="p-6">
             <EmptyPanel
               title="No matching activity"
@@ -114,7 +110,7 @@ export function CostInsightsEventHistoryView({
             />
           </div>
         ) : (
-          <EventList events={pageEvents} />
+          <EventList events={events} />
         )}
       </CardContent>
       {pageCount > 1 && (
@@ -126,7 +122,7 @@ export function CostInsightsEventHistoryView({
               size="sm"
               className="min-h-control-touch md:min-h-0"
               disabled={currentPage === 1}
-              onClick={() => setPage(currentPage - 1)}
+              onClick={() => onPageChange?.(currentPage - 1)}
             >
               <ChevronLeft className="size-4" aria-hidden="true" />
               Previous
@@ -140,7 +136,7 @@ export function CostInsightsEventHistoryView({
               size="sm"
               className="min-h-control-touch md:min-h-0"
               disabled={currentPage === pageCount}
-              onClick={() => setPage(currentPage + 1)}
+              onClick={() => onPageChange?.(currentPage + 1)}
             >
               Next
               <ChevronRight className="size-4" aria-hidden="true" />

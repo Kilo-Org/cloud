@@ -4,7 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { EventList } from '../activity/EventList';
 import type { CostInsightEvent } from '../types';
 
-export function EventPreviewCard({ events }: { events: CostInsightEvent[] }) {
+export function EventPreviewCard({
+  events,
+  activityHref,
+}: {
+  events: CostInsightEvent[];
+  activityHref?: string;
+}) {
   return (
     <Card className="min-w-0">
       <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -12,10 +18,14 @@ export function EventPreviewCard({ events }: { events: CostInsightEvent[] }) {
           <CardTitle className="type-heading">Recent activity</CardTitle>
           <CardDescription>Alerts, suggestions, reviews, and settings changes.</CardDescription>
         </div>
-        <Button type="button" variant="outline" className="min-h-control-touch sm:min-h-0">
-          <History className="size-4" aria-hidden="true" />
-          View all activity
-        </Button>
+        {activityHref && (
+          <Button asChild variant="outline" className="min-h-control-touch sm:min-h-0">
+            <a href={activityHref}>
+              <History className="size-4" aria-hidden="true" />
+              View all activity
+            </a>
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         <EventList events={events.slice(0, 4)} compact />

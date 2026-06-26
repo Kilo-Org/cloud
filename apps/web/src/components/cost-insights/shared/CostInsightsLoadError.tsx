@@ -1,8 +1,11 @@
+'use client';
+
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 
-export function CostInsightsLoadError() {
+export function CostInsightsLoadError({ onRetry }: { onRetry?: () => void }) {
+  const handleRetry = onRetry ?? (() => window.location.reload());
   return (
     <Alert variant="destructive">
       <AlertCircle className="size-4" aria-hidden="true" />
@@ -14,6 +17,7 @@ export function CostInsightsLoadError() {
           variant="outline"
           size="sm"
           className="min-h-control-touch md:min-h-0"
+          onClick={handleRetry}
         >
           <RefreshCw className="size-4" aria-hidden="true" /> Retry
         </Button>

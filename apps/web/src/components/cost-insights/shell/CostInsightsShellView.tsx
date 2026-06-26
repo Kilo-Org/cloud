@@ -13,6 +13,7 @@ export function CostInsightsShellView({
   attention = 'none',
   unauthorized = false,
   mobilePreview = false,
+  basePath = '/cost-insights',
   onPageChange,
   children,
 }: {
@@ -21,13 +22,10 @@ export function CostInsightsShellView({
   attention?: CostInsightsAttention;
   unauthorized?: boolean;
   mobilePreview?: boolean;
+  basePath?: string;
   onPageChange?: (page: CostInsightsPage) => void;
   children: ReactNode;
 }) {
-  const basePath =
-    owner.type === 'organization'
-      ? '/organizations/acme-cost-insights/cost-insights'
-      : '/cost-insights';
   const navItems = [
     { page: 'dashboard' as const, label: 'Overview', href: basePath },
     { page: 'ask' as const, label: 'Ask Kilo', href: `${basePath}/ask-kilo` },
@@ -107,35 +105,49 @@ export function CostInsightsShellView({
 
           <nav className="border-border bg-surface-background border-b" aria-label="Cost Insights">
             <div className="mx-auto flex max-w-[1140px] gap-1 overflow-x-auto px-4 md:px-6">
-              {navItems.map(item => (
-                <a
-                  key={item.page}
-                  href={item.href}
-                  onClick={event => {
-                    if (!onPageChange) return;
-                    event.preventDefault();
-                    onPageChange(item.page);
-                  }}
-                  aria-current={activePage === item.page ? 'page' : undefined}
-                  className={cn(
-                    'focus-visible:ring-ring flex min-h-control-touch shrink-0 items-center border-b-2 px-3 type-body font-medium focus-visible:ring-2 focus-visible:outline-none',
-                    activePage === item.page
-                      ? 'border-primary text-foreground'
-                      : 'text-muted-foreground hover:text-foreground border-transparent'
-                  )}
-                >
-                  {item.label}
-                  {item.page === 'dashboard' && attention === 'alert' && (
-                    <span className="ml-2 flex items-center gap-1.5 type-label text-status-warning">
-                      <span
-                        className="bg-status-warning-icon size-2 rounded-full"
-                        aria-hidden="true"
-                      />
-                      Review
-                    </span>
-                  )}
-                </a>
-              ))}
+              {navItems.map(item => {
+                const className = cn(
+                  'focus-visible:ring-ring flex min-h-control-touch shrink-0 items-center border-b-2 px-3 type-body font-medium focus-visible:ring-2 focus-visible:outline-none',
+                  activePage === item.page
+                    ? 'border-primary text-foreground'
+                    : 'text-muted-foreground hover:text-foreground border-transparent'
+                );
+                const content = (
+                  <>
+                    {item.label}
+                    {item.page === 'dashboard' && attention === 'alert' && (
+                      <span className="ml-2 flex items-center gap-1.5 type-label text-status-warning">
+                        <span
+                          className="bg-status-warning-icon size-2 rounded-full"
+                          aria-hidden="true"
+                        />
+                        Review
+                      </span>
+                    )}
+                  </>
+                );
+
+                return onPageChange ? (
+                  <button
+                    key={item.page}
+                    type="button"
+                    onClick={() => onPageChange(item.page)}
+                    aria-current={activePage === item.page ? 'page' : undefined}
+                    className={className}
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <a
+                    key={item.page}
+                    href={item.href}
+                    aria-current={activePage === item.page ? 'page' : undefined}
+                    className={className}
+                  >
+                    {content}
+                  </a>
+                );
+              })}
             </div>
           </nav>
 

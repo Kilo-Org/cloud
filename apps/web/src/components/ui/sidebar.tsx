@@ -267,11 +267,12 @@ function SidebarTrigger({ className, onClick, ...props }: React.ComponentProps<t
 
   return (
     <Button
+      aria-label="Toggle sidebar"
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
-      className={cn('size-7', className)}
+      className={cn('size-7 min-h-control-touch min-w-11', className)}
       onClick={event => {
         onClick?.(event);
         toggleSidebar();
@@ -289,18 +290,20 @@ function SidebarRail({ className, ...props }: React.ComponentProps<'button'>) {
 
   return (
     <button
+      type="button"
+      aria-label="Toggle sidebar"
       data-sidebar="rail"
       data-slot="sidebar-rail"
-      tabIndex={-1}
       onClick={toggleSidebar}
       title="Toggle Sidebar"
       className={cn(
-        'hover:after:bg-sidebar-border absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] sm:flex',
+        'hover:after:bg-sidebar-border focus-visible:ring-ring/50 absolute inset-y-0 z-20 hidden w-11 transition-all ease-linear focus-visible:ring-[3px] focus-visible:outline-none group-data-[side=left]:-right-5 group-data-[side=right]:-left-5 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] sm:flex',
+        'focus-visible:bg-sidebar-accent/40 focus-visible:after:bg-sidebar-ring',
         'in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize',
         '[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize',
         'hover:group-data-[collapsible=offcanvas]:bg-sidebar group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full',
-        '[[data-side=left][data-collapsible=offcanvas]_&]:-right-2',
-        '[[data-side=right][data-collapsible=offcanvas]_&]:-left-2',
+        '[[data-side=left][data-collapsible=offcanvas]_&]:-right-5',
+        '[[data-side=right][data-collapsible=offcanvas]_&]:-left-5',
         className
       )}
       {...props}
@@ -308,9 +311,9 @@ function SidebarRail({ className, ...props }: React.ComponentProps<'button'>) {
   );
 }
 
-function SidebarInset({ className, ...props }: React.ComponentProps<'main'>) {
+function SidebarInset({ className, ...props }: React.ComponentProps<'div'>) {
   return (
-    <main
+    <div
       data-slot="sidebar-inset"
       className={cn(
         // Allow main content to shrink within the sidebar+content flex row.

@@ -26,7 +26,7 @@ PORT=$(node -e "
       server.listen(port);
     });
   }
-  tryPort(${TARGET_PORT}, 10).then(p => console.log(p));
+  tryPort(${TARGET_PORT}, 10).then(p => console.log(String(p)));
 ")
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"

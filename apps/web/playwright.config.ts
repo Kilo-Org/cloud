@@ -53,7 +53,7 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: {
     // Always use dev mode for Playwright tests - never production
-    command: `dotenvx run --convention=nextjs -- pnpm next dev -p ${port}`,
+    command: 'pnpm run dev',
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
@@ -63,7 +63,11 @@ export default defineConfig({
       // Always use development mode for Playwright tests
       NODE_ENV: 'development',
       DEBUG_SHOW_DEV_UI: 'true', // Enable fake login
+      APP_URL_OVERRIDE: baseURL,
+      NEXTAUTH_URL: baseURL,
       PORT: String(port),
+      VERCEL_ENV: '',
+      VERCEL_TARGET_ENV: '',
     },
   },
 });

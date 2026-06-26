@@ -28,7 +28,9 @@ import {
 } from './agent-conversation-storage';
 import type { StoredAgentConversation } from './agent-conversation-storage';
 import { AgentFooterControls } from './agent-footer-controls';
+import { ContextDonut } from './context-donut';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
+import type { ContextUsage } from '@/src/shared/context-usage';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
 import { ConversationHistoryButton } from './conversation-history-button';
@@ -37,6 +39,8 @@ import { useGatewayModels } from './use-gateway-models';
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
+// Ponytail: stub, replaced in compaction task
+const compactActiveConversation = async (): Promise<void> => {};
 const createDefaultConversationEvents = (): AgentConversationEvent[] => [
   createAssistantMessage('Pick a tab and ask Kilo to inspect it.'),
 ];
@@ -180,6 +184,10 @@ export const AgentChatPanel = ({
   organizationId: string | undefined;
 }): JSX.Element => {
   const [draftsByConversation, setDraftsByConversation] = useState<Record<string, string>>({});
+  // Ponytail: in-memory only, recomputed from the next gateway turn after reload.
+  const [contextUsageByConversation, setContextUsageByConversation] = useState<
+    Record<string, ContextUsage>
+  >({});
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
     useStoredAgentConversations(createDefaultConversationEvents);
   const [runningConversationIds, setRunningConversationIds] = useState<string[]>([]);
@@ -222,6 +230,22 @@ export const AgentChatPanel = ({
   );
   const thinkingEffort = activeConversation.thinkingEffort ?? thinkingOptions[0] ?? '';
   const isRunning = runningConversationIds.includes(activeConversationId);
+  const activeUsage = contextUsageByConversation[activeConversationId];
+  const activePromptTokens = activeUsage?.promptTokens ?? 0;
+  const contextLength = selectedModel?.contextLength;
+  const contextDonut = useMemo(
+    () => (
+      <ContextDonut
+        canCompact={!isRunning && activePromptTokens > 0}
+        contextLength={contextLength}
+        onCompact={() => {
+          void compactActiveConversation();
+        }}
+        promptTokens={activePromptTokens}
+      />
+    ),
+    [activePromptTokens, contextLength, isRunning]
+  );
   const isModelSelectDisabled = modelOptions.length === 0;
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
   const modelControlValue = modelOptions.length === 0 ? '' : model;
@@ -400,6 +424,14 @@ export const AgentChatPanel = ({
         updateThinkingBlock(conversationId, eventId, thinkingText);
       }
     };
+    const updateRunUsage = (usage: { promptTokens: number }): void => {
+      if (isCurrentRun()) {
+        setContextUsageByConversation(current => ({
+          ...current,
+          [conversationId]: { promptTokens: usage.promptTokens },
+        }));
+      }
+    };
 
     runStatesRef.current.set(conversationId, {
       abort,
@@ -420,6 +452,7 @@ export const AgentChatPanel = ({
           conversationEvents: conversationWithUserMessage,
           fetch: fetchFromWindow,
           model: runModel,
+          onUsage: updateRunUsage,
           organizationId,
           selectedTabId: runSelectedTabId,
           signal: abort.signal,
@@ -646,6 +679,7 @@ export const AgentChatPanel = ({
 
       <footer className="border-t border-zinc-900 bg-zinc-950 px-4 py-2">
         <AgentFooterControls
+          contextDonut={contextDonut}
           inspectableTabs={inspectableTabs}
           isLoadingTabs={isLoadingTabs}
           isConversationStoreLoaded={isConversationStoreLoaded}

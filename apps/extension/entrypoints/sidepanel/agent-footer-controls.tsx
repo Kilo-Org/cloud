@@ -129,6 +129,7 @@ const ModeControl = ({
 };
 
 export const AgentFooterControls = ({
+  contextDonut,
   inspectableTabs,
   isLoadingTabs,
   isConversationStoreLoaded,
@@ -149,6 +150,7 @@ export const AgentFooterControls = ({
   thinkingEffort,
   thinkingOptions,
 }: {
+  contextDonut?: ReactNode;
   inspectableTabs: InspectableTab[];
   isLoadingTabs: boolean;
   isConversationStoreLoaded: boolean;
@@ -249,6 +251,7 @@ export const AgentFooterControls = ({
             ))
           )}
         </CompactSelectControl>
+        {contextDonut}
       </div>
       {modelLoadError === undefined ? null : (
         <div className="flex items-center justify-between gap-2">

@@ -204,11 +204,7 @@ export async function handleStatefulPlatformOAuthConnect(
 
     return NextResponse.redirect(
       new URL(
-        buildIntegrationOAuthConnectErrorPath(
-          platform,
-          organizationId,
-          'oauth_init_failed'
-        ),
+        buildIntegrationOAuthConnectErrorPath(platform, organizationId, 'oauth_init_failed'),
         APP_URL
       )
     );

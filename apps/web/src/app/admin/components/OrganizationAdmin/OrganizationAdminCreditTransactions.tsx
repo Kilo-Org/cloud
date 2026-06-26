@@ -11,7 +11,7 @@ import { Loader2, Receipt } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
-import { formatRelativeTime } from '@/lib/admin-utils';
+import { formatRelativeTime, formatDateOnly } from '@/lib/admin-utils';
 import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -122,12 +122,29 @@ export function OrganizationAdminCreditTransactions({
             Credit Transactions ({credit_transactions.length})
           </CardTitle>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-muted-foreground text-xs">
-              Next expiration:{' '}
-              {orgData?.next_credit_expiration_at
-                ? formatRelativeTime(orgData.next_credit_expiration_at)
-                : 'None'}
-            </span>
+            {orgData?.next_credit_expiration_at &&
+              orgData.next_credit_expiration_amount != null && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-muted-foreground cursor-default text-xs">
+                      <FormattedMicrodollars
+                        microdollars={orgData.next_credit_expiration_amount}
+                        className="inline whitespace-nowrap"
+                        inline={true}
+                        decimalPlaces={2}
+                      />{' '}
+                      in credits{' '}
+                      {new Date(orgData.next_credit_expiration_at) > new Date()
+                        ? 'expires'
+                        : 'expired'}{' '}
+                      {formatRelativeTime(orgData.next_credit_expiration_at)}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" sideOffset={8}>
+                    Expiration date: {formatDateOnly(orgData.next_credit_expiration_at)}
+                  </TooltipContent>
+                </Tooltip>
+              )}
             <Button
               variant="outline"
               size="sm"

@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import type { User } from '@kilocode/db/schema';
 import type { startAskUsageSession as StartAskUsageSessionFn } from './start-ask-usage-session';
@@ -61,15 +61,29 @@ jest.mock('@/lib/tokens', () => ({
 
 let startAskUsageSession: typeof StartAskUsageSessionFn;
 let usageAnalystPermission: typeof UsageAnalystPermission;
+const originalCloudAgentMcpAppBaseUrl = process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL;
 
 beforeAll(async () => {
   ({ startAskUsageSession } = await import('./start-ask-usage-session'));
   ({ usageAnalystPermission } = await import('./usage-analyst-config'));
 });
 
+afterAll(() => {
+  if (originalCloudAgentMcpAppBaseUrl === undefined) {
+    delete process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL;
+  } else {
+    process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL = originalCloudAgentMcpAppBaseUrl;
+  }
+});
+
 describe('startAskUsageSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    if (originalCloudAgentMcpAppBaseUrl === undefined) {
+      delete process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL;
+    } else {
+      process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL = originalCloudAgentMcpAppBaseUrl;
+    }
     mockMintAccessToken.mockResolvedValue({ token: 'native-mcp-token' });
     mockFindEligibleNativeMcpUser.mockResolvedValue({ id: 'user-1', is_admin: true } as User);
     mockPrepareSession.mockResolvedValue({
@@ -151,6 +165,30 @@ describe('startAskUsageSession', () => {
     expect(mockPrepareSession.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({ model: 'kilo-auto/balanced', variant: undefined })
     );
+  });
+
+  it('can use a sandbox-facing MCP URL without changing gateway public app URL', async () => {
+    process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL = 'http://host.docker.internal:3000';
+
+    await startAskUsageSession({
+      user: { id: 'user-1', is_admin: true } as User,
+      input: undefined,
+    });
+
+    expect(mockPrepareSession.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        mcpServers: {
+          kilo_usage: expect.objectContaining({
+            url: 'http://host.docker.internal:3000/mcp',
+          }),
+        },
+      })
+    );
+    expect(mockMintAccessToken).toHaveBeenCalledWith({
+      userId: 'user-1',
+      clientId: 'internal:kilo-usage-ai',
+      scopes: ['mcp:access'],
+    });
   });
 
   it('rejects ineligible admins', async () => {

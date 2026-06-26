@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, jest, test } from '@jest/globals';
+import { afterAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { GatewayError, GatewayErrorCode } from '@kilocode/mcp-gateway';
 import type * as mcpRoute from './route';
@@ -32,10 +32,24 @@ jest.mock('@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js', () =>
 }));
 
 let route: typeof mcpRoute | undefined;
+const originalCloudAgentMcpAppBaseUrl = process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL;
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  if (originalCloudAgentMcpAppBaseUrl === undefined) {
+    delete process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL;
+  } else {
+    process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL = originalCloudAgentMcpAppBaseUrl;
+  }
   route = await import('./route');
+});
+
+afterAll(() => {
+  if (originalCloudAgentMcpAppBaseUrl === undefined) {
+    delete process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL;
+  } else {
+    process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL = originalCloudAgentMcpAppBaseUrl;
+  }
 });
 
 function loadedRoute(): typeof mcpRoute {
@@ -61,6 +75,18 @@ describe('/mcp', () => {
       'authorization_uri="http://localhost:3000/api/mcp-gateway/oauth/authorize"'
     );
     expect(mockVerify).not.toHaveBeenCalled();
+  });
+
+  test('keeps CLI OAuth challenges on localhost when Cloud Agent uses Docker host', async () => {
+    process.env.MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL = 'http://host.docker.internal:3000';
+
+    const response = await loadedRoute().POST(
+      new NextRequest('http://localhost:3000/mcp', { method: 'POST' })
+    );
+
+    const challenge = response.headers.get('www-authenticate') ?? '';
+    expect(challenge).toContain('Bearer resource="http://localhost:3000/mcp"');
+    expect(challenge).not.toContain('host.docker.internal');
   });
 
   test('handles authenticated POST requests through a fresh MCP transport', async () => {

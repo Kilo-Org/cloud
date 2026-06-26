@@ -8,6 +8,7 @@ import {
   rethrowAsPaymentRequired,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@/lib/config.server';
+import { getEnvVariable } from '@/lib/dotenvx';
 import { encryptWithPublicKey } from '@/lib/encryption';
 import { createGatewayServices } from '@/lib/mcp-gateway/services';
 import { findEligibleNativeMcpUser } from '@/lib/native-mcp/oauth/native-token-verifier';
@@ -24,6 +25,13 @@ import {
   type StartAskUsageSessionInput,
   usageAnalystPermission,
 } from './usage-analyst-config';
+
+const ASK_USAGE_CLOUD_AGENT_MCP_APP_BASE_URL_ENV = 'MCP_GATEWAY_CLOUD_AGENT_APP_BASE_URL';
+
+function askUsageCloudAgentMcpUrl(appBaseUrl: string) {
+  const cloudAgentAppBaseUrl = getEnvVariable(ASK_USAGE_CLOUD_AGENT_MCP_APP_BASE_URL_ENV);
+  return nativeMcpResourceUrl(cloudAgentAppBaseUrl || appBaseUrl);
+}
 
 export async function startAskUsageSession(params: {
   user: User;
@@ -73,7 +81,7 @@ export async function startAskUsageSession(params: {
       mcpServers: {
         [ASK_USAGE_MCP_SERVER_NAME]: {
           type: 'remote',
-          url: nativeMcpResourceUrl(services.config.appBaseUrl),
+          url: askUsageCloudAgentMcpUrl(services.config.appBaseUrl),
           headers: {
             Authorization: encryptedAuthorization,
           },

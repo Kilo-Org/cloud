@@ -7,6 +7,7 @@ import {
   groupConversationEvents,
 } from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
+import { compactConversationEvents } from '@/src/shared/agent-context-compaction';
 import { defaultMode } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
@@ -31,6 +32,7 @@ import { AgentFooterControls } from './agent-footer-controls';
 import { ContextDonut } from './context-donut';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
 import type { ContextUsage } from '@/src/shared/context-usage';
+import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
 import { ConversationHistoryButton } from './conversation-history-button';
@@ -39,8 +41,6 @@ import { useGatewayModels } from './use-gateway-models';
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
   fetch(input, init);
-// Ponytail: stub, replaced in compaction task
-const compactActiveConversation = async (): Promise<void> => {};
 const createDefaultConversationEvents = (): AgentConversationEvent[] => [
   createAssistantMessage('Pick a tab and ask Kilo to inspect it.'),
 ];
@@ -89,20 +89,20 @@ export const formatSelectedTabSystemEnvironment = ({
 
 const ConversationTabs = ({
   activeConversationId,
+  busyConversationIds,
   conversations,
   isDisabled,
   onCloseConversation,
   onCreateConversation,
   onSelectConversation,
-  runningConversationIds,
 }: {
   activeConversationId: string;
+  busyConversationIds: readonly string[];
   conversations: StoredAgentConversation[];
   isDisabled: boolean;
   onCloseConversation: (conversationId: string) => void;
   onCreateConversation: () => void;
   onSelectConversation: (conversationId: string) => void;
-  runningConversationIds: readonly string[];
 }): JSX.Element => (
   <div className="border-b border-zinc-900 bg-zinc-950">
     <div
@@ -113,7 +113,7 @@ const ConversationTabs = ({
       {conversations.map(conversation => {
         const title = getStoredConversationTitle(conversation);
         const isActive = conversation.id === activeConversationId;
-        const isRunning = runningConversationIds.includes(conversation.id);
+        const isRunning = busyConversationIds.includes(conversation.id);
 
         return (
           <div
@@ -191,9 +191,12 @@ export const AgentChatPanel = ({
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
     useStoredAgentConversations(createDefaultConversationEvents);
   const [runningConversationIds, setRunningConversationIds] = useState<string[]>([]);
+  const [compactingConversationIds, setCompactingConversationIds] = useState<string[]>([]);
   const conversationStoreRef = useRef(conversationStore);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
+  // Ponytail: ref mirror exists only because auto-compact reads usage synchronously in the run's finally.
+  const latestUsageRef = useRef<Record<string, ContextUsage>>({});
   const { inspectableTabs, isLoadingTabs, tabDebuggerError } = useTabDebugger();
   const { modelLoadError, modelOptions, refetchModels } = useGatewayModels({
     auth,
@@ -230,13 +233,80 @@ export const AgentChatPanel = ({
   );
   const thinkingEffort = activeConversation.thinkingEffort ?? thinkingOptions[0] ?? '';
   const isRunning = runningConversationIds.includes(activeConversationId);
+  const isCompacting = compactingConversationIds.includes(activeConversationId);
   const activeUsage = contextUsageByConversation[activeConversationId];
   const activePromptTokens = activeUsage?.promptTokens ?? 0;
   const contextLength = selectedModel?.contextLength;
+
+  const compactConversation = useCallback(
+    async (conversationId: string): Promise<void> => {
+      if (
+        !isConversationStoreLoaded ||
+        runningConversationIds.includes(conversationId) ||
+        compactingConversationIds.includes(conversationId)
+      ) {
+        return;
+      }
+
+      const conversation = conversationStoreRef.current.conversations.find(
+        item => item.id === conversationId
+      );
+      const runModel = conversation?.model ?? modelOptions[0]?.id ?? '';
+
+      if (conversation === undefined || runModel === '') {
+        return;
+      }
+
+      setCompactingConversationIds(current => [...current, conversationId]);
+
+      try {
+        const compacted = await compactConversationEvents({
+          apiBaseUrl,
+          events: conversation.events,
+          fetch: fetchFromWindow,
+          model: runModel,
+          organizationId,
+          token: auth.token,
+        });
+
+        if (compacted !== undefined) {
+          setConversationStore(store =>
+            updateStoredConversationEvents(store, conversationId, () => compacted)
+          );
+          const nextRef = { ...latestUsageRef.current };
+          delete nextRef[conversationId];
+          latestUsageRef.current = nextRef;
+          setContextUsageByConversation(current => {
+            const next = { ...current };
+            delete next[conversationId];
+            return next;
+          });
+        }
+      } finally {
+        setCompactingConversationIds(current => current.filter(id => id !== conversationId));
+      }
+    },
+    // Ponytail: compaction is a single short gateway call; no abort wiring until it proves slow.
+    [
+      auth.token,
+      compactingConversationIds,
+      isConversationStoreLoaded,
+      modelOptions,
+      organizationId,
+      runningConversationIds,
+      setConversationStore,
+    ]
+  );
+
+  const compactActiveConversation = useCallback(
+    (): Promise<void> => compactConversation(activeConversationId),
+    [activeConversationId, compactConversation]
+  );
+
   const contextDonut = useMemo(
     () => (
       <ContextDonut
-        canCompact={!isRunning && activePromptTokens > 0}
+        canCompact={!isRunning && !isCompacting && activePromptTokens > 0}
         contextLength={contextLength}
         onCompact={() => {
           void compactActiveConversation();
@@ -244,7 +314,12 @@ export const AgentChatPanel = ({
         promptTokens={activePromptTokens}
       />
     ),
-    [activePromptTokens, contextLength, isRunning]
+    [activePromptTokens, compactActiveConversation, contextLength, isCompacting, isRunning]
+  );
+
+  const busyConversationIds = useMemo(
+    () => [...runningConversationIds, ...compactingConversationIds],
+    [compactingConversationIds, runningConversationIds]
   );
   const isModelSelectDisabled = modelOptions.length === 0;
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
@@ -253,7 +328,8 @@ export const AgentChatPanel = ({
     !isConversationStoreLoaded ||
     draft.trim() === '' ||
     modelControlValue === '' ||
-    selectedTabId === undefined;
+    selectedTabId === undefined ||
+    isCompacting;
 
   conversationStoreRef.current = conversationStore;
 
@@ -426,6 +502,10 @@ export const AgentChatPanel = ({
     };
     const updateRunUsage = (usage: { promptTokens: number }): void => {
       if (isCurrentRun()) {
+        latestUsageRef.current = {
+          ...latestUsageRef.current,
+          [conversationId]: { promptTokens: usage.promptTokens },
+        };
         setContextUsageByConversation(current => ({
           ...current,
           [conversationId]: { promptTokens: usage.promptTokens },
@@ -468,6 +548,16 @@ export const AgentChatPanel = ({
           setRunningConversationIds(currentIds =>
             currentIds.filter(currentId => currentId !== conversationId)
           );
+
+          const latest = latestUsageRef.current[conversationId]?.promptTokens ?? 0;
+          const runContextLength = modelOptions.find(
+            option => option.id === runModel
+          )?.contextLength;
+          const ratio = getContextRatio(latest, runContextLength);
+
+          if (ratio !== undefined && ratio >= AUTO_COMPACT_RATIO) {
+            void compactConversation(conversationId);
+          }
         }
       }
     })();
@@ -631,12 +721,12 @@ export const AgentChatPanel = ({
     <div className="flex min-h-0 flex-1 flex-col">
       <ConversationTabs
         activeConversationId={activeConversationId}
+        busyConversationIds={busyConversationIds}
         conversations={openConversations}
         isDisabled={!isConversationStoreLoaded}
         onCloseConversation={closeConversation}
         onCreateConversation={createConversation}
         onSelectConversation={selectConversation}
-        runningConversationIds={runningConversationIds}
       />
       <ConversationList items={groupedEvents} />
 

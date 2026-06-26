@@ -53,7 +53,7 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: {
     // Always use dev mode for Playwright tests - never production
-    command: 'pnpm run dev',
+    command: `pnpm next dev -p ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

@@ -59,7 +59,14 @@ function structuredContentForCompletedTool(toolPart: ToolPart): unknown {
   const { state } = toolPart;
   if (state.status !== 'completed') return undefined;
   const completedState = state as typeof state & { structuredContent?: unknown };
-  return completedState.structuredContent;
+  if (completedState.structuredContent !== undefined) return completedState.structuredContent;
+  if (typeof completedState.output !== 'string') return undefined;
+
+  try {
+    return JSON.parse(completedState.output);
+  } catch {
+    return undefined;
+  }
 }
 
 function columnByName(output: QueryKiloDatasetOutput): Map<string, QueryKiloDatasetColumn> {

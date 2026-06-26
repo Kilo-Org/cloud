@@ -133,11 +133,13 @@ describe('resolveAskUsageDatasetToolView', () => {
     });
   });
 
-  it('does not trust bare JSON output or MCP text content', () => {
+  it('accepts validated direct JSON output when structured content was not preserved', () => {
     expect(
       resolveAskUsageDatasetToolView(completedToolPart({ output: JSON.stringify(aggregateOutput) }))
-    ).toEqual({ kind: 'unhandled' });
+    ).toMatchObject({ kind: 'ready', renderMode: 'metric-grid' });
+  });
 
+  it('does not trust MCP text-content envelopes as dataset output', () => {
     expect(
       resolveAskUsageDatasetToolView(
         completedToolPart({

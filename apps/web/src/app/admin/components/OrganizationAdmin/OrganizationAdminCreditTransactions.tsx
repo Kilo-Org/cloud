@@ -29,7 +29,7 @@ function NextCreditExpiration({ organizationId }: { organizationId: string }) {
     );
   }
 
-  if (isError) {
+  if (isError && !data) {
     return (
       <div className="flex items-center gap-2" role="alert">
         <span className="text-status-destructive text-xs">Expiration unavailable.</span>

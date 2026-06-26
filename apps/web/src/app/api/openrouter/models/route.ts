@@ -25,6 +25,12 @@ async function tryGetUserFromAuth() {
   }
 }
 
+function visibleConcreteModelIds(models: Iterable<string>, availableModelIds: ReadonlySet<string>) {
+  return [
+    ...new Set([...models].filter(id => availableModelIds.has(id) && !isVirtualAutoModelId(id))),
+  ].sort((left, right) => left.localeCompare(right));
+}
+
 async function addAutoRoutingModels(models: OpenRouterModelsResponse['data']) {
   const availableModelIds = new Set(models.map(model => model.id));
   const [routingTableResult, autoFreeCandidates] = await Promise.all([
@@ -36,32 +42,22 @@ async function addAutoRoutingModels(models: OpenRouterModelsResponse['data']) {
     routingTableResult?.status === 200 && 'table' in routingTableResult.body
       ? routingTableResult.body.table
       : null;
-  const efficientModelIds = table
-    ? [
-        ...new Set(
-          Object.values(table.routes)
-            .flat()
-            .map(candidate => candidate.model)
-            .filter(model => availableModelIds.has(model) && !isVirtualAutoModelId(model))
-        ),
-      ].sort((left, right) => left.localeCompare(right))
-    : [];
-  const freeModelIds = [
-    ...new Set(
-      autoFreeCandidates.filter(
-        model => availableModelIds.has(model) && !isVirtualAutoModelId(model)
-      )
-    ),
-  ].sort((left, right) => left.localeCompare(right));
-  if (efficientModelIds.length === 0 && freeModelIds.length === 0) return models;
-
-  return models.map(model =>
-    model.id === KILO_AUTO_EFFICIENT_MODEL.id && efficientModelIds.length > 0
-      ? { ...model, autoRouting: { models: efficientModelIds } }
-      : model.id === KILO_AUTO_FREE_MODEL.id && freeModelIds.length > 0
-        ? { ...model, autoRouting: { models: freeModelIds } }
-        : model
+  const efficientModelIds = visibleConcreteModelIds(
+    Object.values(table?.routes ?? {})
+      .flat()
+      .map(candidate => candidate.model),
+    availableModelIds
   );
+  const freeModelIds = visibleConcreteModelIds(autoFreeCandidates, availableModelIds);
+  const autoRoutingChoices = new Map([
+    [KILO_AUTO_EFFICIENT_MODEL.id, efficientModelIds],
+    [KILO_AUTO_FREE_MODEL.id, freeModelIds],
+  ]);
+
+  return models.map(model => {
+    const modelIds = autoRoutingChoices.get(model.id);
+    return modelIds?.length ? { ...model, autoRouting: { models: modelIds } } : model;
+  });
 }
 
 /**

@@ -572,11 +572,13 @@ export const AgentChatPanel = ({
       selectedTabId: conversation.selectedTabId,
     });
     const isConversationRunning = runningConversationIds.includes(conversation.id);
+    const isConversationCompacting = compactingConversationIds.includes(conversation.id);
 
     if (
       !isConversationStoreLoaded ||
       text === '' ||
       isConversationRunning ||
+      isConversationCompacting ||
       conversationModel === '' ||
       conversationSelectedTabId === undefined
     ) {

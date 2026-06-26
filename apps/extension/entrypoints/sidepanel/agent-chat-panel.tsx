@@ -179,7 +179,7 @@ export const AgentChatPanel = ({
   onHeaderBeforeSettingsChange?: (node?: ReactNode) => void;
   organizationId: string | undefined;
 }): JSX.Element => {
-  const [draft, setDraft] = useState('');
+  const [draftsByConversation, setDraftsByConversation] = useState<Record<string, string>>({});
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
     useStoredAgentConversations(createDefaultConversationEvents);
   const [runningConversationIds, setRunningConversationIds] = useState<string[]>([]);
@@ -193,6 +193,11 @@ export const AgentChatPanel = ({
   });
   const activeConversation = getActiveStoredConversation(conversationStore);
   const { events, id: activeConversationId, mode = defaultMode } = activeConversation;
+  // Ponytail: drafts are in-memory only; they reset on reload like the rest of transient UI state.
+  const draft = draftsByConversation[activeConversationId] ?? '';
+  const setActiveDraft = (value: string): void => {
+    setDraftsByConversation(current => ({ ...current, [activeConversationId]: value }));
+  };
   const selectedTabId = getSelectedInspectableTabId({
     inspectableTabs,
     selectedTabId: activeConversation.selectedTabId,
@@ -455,7 +460,7 @@ export const AgentChatPanel = ({
       return;
     }
 
-    setDraft('');
+    setDraftsByConversation(current => ({ ...current, [activeConversationId]: '' }));
     submitMessage(text);
   };
 
@@ -475,7 +480,6 @@ export const AgentChatPanel = ({
       thinkingEffort,
     };
 
-    setDraft('');
     conversationStoreRef.current = createNextStoredConversation(
       conversationStoreRef.current,
       createDefaultConversationEvents(),
@@ -549,7 +553,6 @@ export const AgentChatPanel = ({
         return;
       }
 
-      setDraft('');
       setConversationStore(store =>
         openStoredConversation({
           conversationId,
@@ -622,7 +625,7 @@ export const AgentChatPanel = ({
           className="min-h-20 w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm leading-5 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
           id="agent-message"
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-            setDraft(event.currentTarget.value);
+            setActiveDraft(event.currentTarget.value);
           }}
           onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
             if (event.key === 'Enter' && !event.shiftKey) {

@@ -73,7 +73,6 @@ interface CompactConversationOptions {
   readonly fetch: FetchLike;
   readonly model: string;
   readonly organizationId?: string | undefined;
-  readonly signal?: AbortSignal | undefined;
   readonly token: string;
 }
 
@@ -83,7 +82,6 @@ export const compactConversationEvents = async ({
   fetch,
   model,
   organizationId,
-  signal,
   token,
 }: CompactConversationOptions): Promise<AgentConversationEvent[] | undefined> => {
   const { toKeep, toSummarize } = splitEventsForCompaction(events);
@@ -99,7 +97,6 @@ export const compactConversationEvents = async ({
     model,
     onContentDelta: () => {},
     organizationId,
-    signal,
     token,
     tools: [],
   });

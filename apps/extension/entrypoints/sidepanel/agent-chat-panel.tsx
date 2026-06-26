@@ -270,6 +270,7 @@ export const AgentChatPanel = ({
         });
 
         if (compacted !== undefined) {
+          // Ponytail: wholesale replace is safe only because the conversation can't receive new events while compacting (guarded above + send disabled). Reconcile against currentEvents if that ever changes.
           setConversationStore(store =>
             updateStoredConversationEvents(store, conversationId, () => compacted)
           );

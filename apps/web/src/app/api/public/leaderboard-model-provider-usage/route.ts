@@ -27,6 +27,8 @@ where
     and mu.provider not in ('custom', 'direct-byok')
     and mu.total_output_tokens > 0
     and mu.is_user_byok = false
+    and mu.requested_model not ilike '%clawsetup%'
+    and mu.requested_model not ilike '%mercury-edit%'
 group by 1, 2
 order by 4 desc;
 `;

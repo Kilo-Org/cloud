@@ -498,7 +498,7 @@ describe('BYOK Router', () => {
     });
   });
 
-  describe('Token Plan Plus-installed MiniMax credentials', () => {
+  describe('MiniMax Coding Plan-installed credentials', () => {
     test('rejects removed dedicated provider identity in manual creation requests', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 

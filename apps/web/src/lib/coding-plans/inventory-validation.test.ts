@@ -1,6 +1,6 @@
 import { createGateway, generateText } from 'ai';
 
-import { validateTokenPlanPlusCredential } from '@/lib/coding-plans/inventory-validation';
+import { validateMiniMaxCodingPlanCredential } from '@/lib/coding-plans/inventory-validation';
 
 jest.mock('ai', () => ({
   createGateway: jest.fn(() => jest.fn((modelId: string) => ({ modelId }))),
@@ -17,11 +17,17 @@ afterEach(() => {
   jest.clearAllMocks();
 });
 
-describe('validateTokenPlanPlusCredential', () => {
+describe('validateMiniMaxCodingPlanCredential', () => {
   it('tests MiniMax inventory credentials through ordinary BYOK routing with a minimal request', async () => {
     mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
 
-    await expect(validateTokenPlanPlusCredential('minimax-inventory-key')).resolves.toBe(true);
+    await expect(
+      validateMiniMaxCodingPlanCredential({
+        apiKey: 'minimax-inventory-key',
+        planId: 'minimax-token-plan-plus',
+        upstreamPlanId: 'minimax-token-plan-plus-123',
+      })
+    ).resolves.toBe(true);
 
     expect(createGateway).toHaveBeenCalled();
     expect(mockedGenerateText).toHaveBeenCalledWith({
@@ -40,18 +46,48 @@ describe('validateTokenPlanPlusCredential', () => {
   it('accepts a token-limited response after successful MiniMax routing', async () => {
     mockedGenerateText.mockResolvedValueOnce({ finishReason: 'length' } as never);
 
-    await expect(validateTokenPlanPlusCredential('limited-key')).resolves.toBe(true);
+    await expect(
+      validateMiniMaxCodingPlanCredential({
+        apiKey: 'limited-key',
+        planId: 'minimax-token-plan-max',
+        upstreamPlanId: 'minimax-token-plan-max-123',
+      })
+    ).resolves.toBe(true);
   });
 
   it('rejects unsuccessful model completions', async () => {
     mockedGenerateText.mockResolvedValueOnce({ finishReason: 'error' } as never);
 
-    await expect(validateTokenPlanPlusCredential('failed-key')).resolves.toBe(false);
+    await expect(
+      validateMiniMaxCodingPlanCredential({
+        apiKey: 'failed-key',
+        planId: 'minimax-token-plan-ultra',
+        upstreamPlanId: 'minimax-token-plan-ultra-123',
+      })
+    ).resolves.toBe(false);
   });
 
   it('rejects provider request failures without throwing', async () => {
     mockedGenerateText.mockRejectedValueOnce(new Error('credential rejected'));
 
-    await expect(validateTokenPlanPlusCredential('invalid-key')).resolves.toBe(false);
+    await expect(
+      validateMiniMaxCodingPlanCredential({
+        apiKey: 'invalid-key',
+        planId: 'minimax-token-plan-plus',
+        upstreamPlanId: 'minimax-token-plan-plus-123',
+      })
+    ).resolves.toBe(false);
+  });
+
+  it('rejects upstream plan IDs that do not match the selected MiniMax token tier', async () => {
+    await expect(
+      validateMiniMaxCodingPlanCredential({
+        apiKey: 'wrong-tier-key',
+        planId: 'minimax-token-plan-ultra',
+        upstreamPlanId: 'minimax-token-plan-plus-123',
+      })
+    ).resolves.toBe(false);
+
+    expect(mockedGenerateText).not.toHaveBeenCalled();
   });
 });

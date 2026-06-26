@@ -7788,6 +7788,9 @@ export const coding_plan_subscriptions = pgTable(
     uniqueIndex('UQ_coding_plan_sub_live_user_plan')
       .on(table.user_id, table.plan_id)
       .where(sql`${table.status} IN ('active', 'past_due')`),
+    uniqueIndex('UQ_coding_plan_sub_live_user_provider')
+      .on(table.user_id, table.provider_id)
+      .where(sql`${table.status} IN ('active', 'past_due')`),
     index('IDX_coding_plan_sub_status').on(table.status),
     index('IDX_coding_plan_sub_renewal').on(table.credit_renewal_at),
     index('IDX_coding_plan_sub_inventory').on(table.key_inventory_id),

@@ -10,7 +10,7 @@ import {
   terminateCodingPlanImmediately,
   uploadKeysToInventory,
 } from '@/lib/coding-plans';
-import { CODING_PLAN_CATALOG } from '@/lib/coding-plans/pricing';
+import { CODING_PLAN_CATALOG, type CodingPlanId } from '@/lib/coding-plans/pricing';
 import {
   markCredentialManuallyRevoked,
   markCredentialManualRevocationFailed,
@@ -28,8 +28,12 @@ import {
 } from '@kilocode/db/schema';
 
 const PLAN_ID = 'minimax-token-plan-plus';
+const MAX_PLAN_ID = 'minimax-token-plan-max';
+const ULTRA_PLAN_ID = 'minimax-token-plan-ultra';
 const PROVIDER_ID = 'minimax';
 const COST_MICRODOLLARS = 20_000_000;
+const MAX_COST_MICRODOLLARS = 50_000_000;
+const ULTRA_COST_MICRODOLLARS = 120_000_000;
 
 const validatedInventoryUpload = { validateCredential: async () => true };
 
@@ -37,8 +41,11 @@ function inventoryEntry(key: string, upstreamPlanId = `minimax-plan-${crypto.ran
   return `${key}::${upstreamPlanId}`;
 }
 
-async function seedInventoryKey(key = `managed-test-key-${crypto.randomUUID()}`) {
-  await uploadKeysToInventory(PLAN_ID, [inventoryEntry(key)], validatedInventoryUpload);
+async function seedInventoryKey(
+  key = `managed-test-key-${crypto.randomUUID()}`,
+  planId: CodingPlanId = PLAN_ID
+) {
+  await uploadKeysToInventory(PROVIDER_ID, planId, [inventoryEntry(key)], validatedInventoryUpload);
 }
 
 async function createUserWithBalance(microdollars: number) {
@@ -58,7 +65,7 @@ afterEach(async () => {
 });
 
 describe('coding plans', () => {
-  it('publishes the code-owned MiniMax Token Plan Plus catalog entry', () => {
+  it('publishes the code-owned MiniMax token plan catalog entries', () => {
     expect(CODING_PLAN_CATALOG[PLAN_ID]).toEqual({
       planId: PLAN_ID,
       providerName: 'MiniMax',
@@ -66,6 +73,31 @@ describe('coding plans', () => {
       providerId: PROVIDER_ID,
       costMicrodollars: COST_MICRODOLLARS,
       billingPeriodDays: 30,
+      features: expect.arrayContaining(['~1.7B tokens per month of M3 usage.']),
+    });
+    expect(CODING_PLAN_CATALOG[MAX_PLAN_ID]).toEqual({
+      planId: MAX_PLAN_ID,
+      providerName: 'MiniMax',
+      name: 'Token Plan Max',
+      providerId: PROVIDER_ID,
+      costMicrodollars: MAX_COST_MICRODOLLARS,
+      billingPeriodDays: 30,
+      features: expect.arrayContaining([
+        '~5.1B tokens per month of M3 usage.',
+        'Run 4-5 concurrent agents.',
+      ]),
+    });
+    expect(CODING_PLAN_CATALOG[ULTRA_PLAN_ID]).toEqual({
+      planId: ULTRA_PLAN_ID,
+      providerName: 'MiniMax',
+      name: 'Token Plan Ultra',
+      providerId: PROVIDER_ID,
+      costMicrodollars: ULTRA_COST_MICRODOLLARS,
+      billingPeriodDays: 30,
+      features: expect.arrayContaining([
+        '~12.5B tokens per month of M3 usage.',
+        'Run 6-7 concurrent agents.',
+      ]),
     });
   });
 
@@ -156,6 +188,82 @@ describe('coding plans', () => {
     expect(updatedUser.microdollars_used).toBe(COST_MICRODOLLARS);
   });
 
+  it('rejects a different MiniMax token plan while a MiniMax subscription is live', async () => {
+    const user = await createUserWithBalance(COST_MICRODOLLARS + MAX_COST_MICRODOLLARS);
+    await seedInventoryKey('provider-plus-key', PLAN_ID);
+    await seedInventoryKey('provider-max-key', MAX_PLAN_ID);
+    await subscribeToCodingPlan(user.id, PLAN_ID, 'activate-plus');
+
+    await expect(subscribeToCodingPlan(user.id, MAX_PLAN_ID, 'activate-max')).rejects.toThrow(
+      'MiniMax Coding Plan already has a live subscription'
+    );
+    const terms = await db.select().from(coding_plan_terms);
+    const subscriptions = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.user_id, user.id));
+    const [updatedUser] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+
+    expect(terms).toHaveLength(1);
+    expect(subscriptions).toHaveLength(1);
+    expect(updatedUser.microdollars_used).toBe(COST_MICRODOLLARS);
+  });
+
+  it('allows a fresh MiniMax token plan after the prior MiniMax subscription is canceled', async () => {
+    const user = await createUserWithBalance(COST_MICRODOLLARS + MAX_COST_MICRODOLLARS);
+    await seedInventoryKey('first-plus-key', PLAN_ID);
+    await seedInventoryKey('second-max-key', MAX_PLAN_ID);
+    const first = await subscribeToCodingPlan(user.id, PLAN_ID, 'first-plan');
+
+    await terminateCodingPlanImmediately(first.subscriptionId);
+    const second = await subscribeToCodingPlan(user.id, MAX_PLAN_ID, 'second-plan');
+
+    expect(second.subscriptionId).not.toBe(first.subscriptionId);
+    const subscriptions = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.user_id, user.id));
+    expect(subscriptions.map(subscription => subscription.status).sort()).toEqual([
+      'active',
+      'canceled',
+    ]);
+    expect(
+      subscriptions.find(subscription => subscription.id === second.subscriptionId)
+    ).toMatchObject({
+      plan_id: MAX_PLAN_ID,
+      provider_id: PROVIDER_ID,
+      cost_microdollars: MAX_COST_MICRODOLLARS,
+    });
+  });
+
+  it('cannot create two MiniMax provider subscriptions during concurrent cross-plan purchases', async () => {
+    const user = await createUserWithBalance(MAX_COST_MICRODOLLARS + ULTRA_COST_MICRODOLLARS);
+    await seedInventoryKey('concurrent-max-key', MAX_PLAN_ID);
+    await seedInventoryKey('concurrent-ultra-key', ULTRA_PLAN_ID);
+
+    const outcomes = await Promise.allSettled([
+      subscribeToCodingPlan(user.id, MAX_PLAN_ID, 'concurrent-max'),
+      subscribeToCodingPlan(user.id, ULTRA_PLAN_ID, 'concurrent-ultra'),
+    ]);
+    const subscriptions = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.user_id, user.id));
+    const [updatedUser] = await db
+      .select()
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+
+    expect(outcomes.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(subscriptions).toHaveLength(1);
+    expect([MAX_COST_MICRODOLLARS, ULTRA_COST_MICRODOLLARS]).toContain(
+      updatedUser.microdollars_used
+    );
+  });
+
   it('cannot overspend credits during concurrent purchase requests', async () => {
     const user = await createUserWithBalance(COST_MICRODOLLARS);
     await seedInventoryKey();
@@ -217,7 +325,7 @@ describe('coding plans', () => {
     });
 
     await expect(subscribeToCodingPlan(user.id, PLAN_ID, 'occupied-slot')).rejects.toThrow(
-      'Remove your existing MiniMax BYOK key'
+      'Remove your existing MiniMax BYOK key from /byok before subscribing to a MiniMax Coding Plan'
     );
     const [updatedUser] = await db
       .select()
@@ -312,12 +420,16 @@ describe('coding plans', () => {
   it('stores upstream plan IDs separately from validated inventory credentials', async () => {
     const validateCredential = jest.fn(async () => true);
 
-    await uploadKeysToInventory(PLAN_ID, ['test-api-key::minimax-upstream-plan-123'], {
+    await uploadKeysToInventory(PROVIDER_ID, PLAN_ID, ['test-api-key::minimax-upstream-plan-123'], {
       validateCredential,
     });
     const [inventory] = await db.select().from(coding_plan_key_inventory);
 
-    expect(validateCredential).toHaveBeenCalledWith('test-api-key');
+    expect(validateCredential).toHaveBeenCalledWith({
+      apiKey: 'test-api-key',
+      planId: PLAN_ID,
+      upstreamPlanId: 'minimax-upstream-plan-123',
+    });
     expect(inventory.plan_id).toBe(PLAN_ID);
     expect(inventory.upstream_plan_id).toBe('minimax-upstream-plan-123');
   });
@@ -326,36 +438,47 @@ describe('coding plans', () => {
     const validateCredential = jest.fn(async () => false);
 
     await expect(
-      uploadKeysToInventory(PLAN_ID, ['missing-plan-id'], { validateCredential })
-    ).rejects.toThrow('<api key>::<plan id>');
+      uploadKeysToInventory(PROVIDER_ID, PLAN_ID, ['missing-plan-id'], { validateCredential })
+    ).rejects.toThrow('<api key>::<upstream plan id>');
     expect(validateCredential).not.toHaveBeenCalled();
     await expect(
-      uploadKeysToInventory(PLAN_ID, ['invalid-key::minimax-plan-id'], { validateCredential })
+      uploadKeysToInventory(PROVIDER_ID, PLAN_ID, ['invalid-key::minimax-plan-id'], {
+        validateCredential,
+      })
     ).rejects.toThrow('failed validation');
-    expect(validateCredential).toHaveBeenCalledWith('invalid-key');
+    expect(validateCredential).toHaveBeenCalledWith({
+      apiKey: 'invalid-key',
+      planId: PLAN_ID,
+      upstreamPlanId: 'minimax-plan-id',
+    });
     expect(await db.select().from(coding_plan_key_inventory)).toHaveLength(0);
   });
 
   it('rejects duplicate uploaded credentials using a secret keyed fingerprint', async () => {
     await uploadKeysToInventory(
+      PROVIDER_ID,
       PLAN_ID,
       [inventoryEntry('duplicate-key', 'minimax-plan-one')],
       validatedInventoryUpload
     );
     await expect(
       uploadKeysToInventory(
+        PROVIDER_ID,
         PLAN_ID,
         [inventoryEntry('duplicate-key', 'minimax-plan-two')],
         validatedInventoryUpload
       )
     ).rejects.toThrow('already present');
     const counts = await getKeyInventoryCounts(PLAN_ID);
-    expect(counts).toEqual([{ planId: PLAN_ID, status: 'available', count: 1 }]);
+    expect(counts).toEqual([
+      { providerId: PROVIDER_ID, planId: PLAN_ID, status: 'available', count: 1 },
+    ]);
   });
 
   it('clears credential material once revocation work starts and records completion by plan ID', async () => {
     const user = await createUserWithBalance(COST_MICRODOLLARS);
     await uploadKeysToInventory(
+      PROVIDER_ID,
       PLAN_ID,
       [inventoryEntry('revoke-success-key', 'minimax-revoke-plan')],
       validatedInventoryUpload

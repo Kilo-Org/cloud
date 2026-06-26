@@ -104,9 +104,9 @@ function BYOKDescription({ showsCodingPlanKey = false }: { showsCodingPlanKey?: 
       <p>Keys you create here use provider billing instead of your Kilo balance.</p>
       {showsCodingPlanKey ? (
         <p>
-          Token Plan Plus configured your MiniMax key using Kilo Credits. Updating, disabling, or
-          deleting that key changes routing only; subscription billing continues until canceled in
-          Subscriptions.
+          The MiniMax Coding Plan configured your MiniMax key using Kilo Credits. Updating,
+          disabling, or deleting that key changes routing only; subscription billing continues until
+          canceled in Subscriptions.
         </p>
       ) : null}
     </div>
@@ -449,9 +449,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   } {
     if (action?.type === 'update') {
       return {
-        title: 'Replace Token Plan Plus MiniMax key?',
+        title: 'Replace MiniMax Coding Plan key?',
         description:
-          'Replacing this key changes MiniMax routing and makes it user-managed. Token Plan Plus billing continues until you cancel it in Subscription Center.',
+          'Replacing this key changes MiniMax routing and makes it user-managed. MiniMax Coding Plan billing continues until you cancel it in Subscription Center.',
         actionLabel: 'Replace key',
         cancelLabel: 'Keep configuration',
       };
@@ -460,15 +460,15 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       return {
         title: 'This key is managed by your coding plan',
         description:
-          'This MiniMax key routes your Token Plan Plus plan, so it can\u2019t be deleted here. To remove it, cancel the plan in Subscription Center. Your plan stays active and billed until you cancel.',
+          'This MiniMax key routes your MiniMax token plan, so it can\u2019t be deleted here. To remove it, cancel the plan in Subscription Center. Your plan stays active and billed until you cancel.',
         actionLabel: 'Go to Subscription Center',
         cancelLabel: 'Close',
       };
     }
     return {
-      title: 'Disable Token Plan Plus MiniMax key?',
+      title: 'Disable MiniMax Coding Plan key?',
       description:
-        'Disabling this key stops MiniMax routing while it is disabled. Token Plan Plus billing continues until you cancel it in Subscription Center.',
+        'Disabling this key stops MiniMax routing while it is disabled. MiniMax Coding Plan billing continues until you cancel it in Subscription Center.',
       actionLabel: 'Disable key',
       cancelLabel: 'Keep configuration',
     };
@@ -533,8 +533,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           key.provider_id === 'minimax' &&
                           key.management_source === 'coding_plan' ? (
                             <p className="text-muted-foreground mt-1 text-xs">
-                              Configured by Token Plan Plus. BYOK changes do not cancel subscription
-                              billing.
+                              Configured by MiniMax Coding Plan. BYOK changes do not cancel
+                              subscription billing.
                             </p>
                           ) : null}
                           <SupportedModelsList models={getProviderModels(key.provider_id)} />

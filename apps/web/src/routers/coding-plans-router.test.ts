@@ -17,7 +17,10 @@ import {
 } from '@kilocode/db/schema';
 
 const PLAN_ID = 'minimax-token-plan-plus';
+const MAX_PLAN_ID = 'minimax-token-plan-max';
+const ULTRA_PLAN_ID = 'minimax-token-plan-ultra';
 const COST_MICRODOLLARS = 20_000_000;
+const MAX_COST_MICRODOLLARS = 50_000_000;
 
 function inventoryEntry(key: string) {
   return `${key}::minimax-plan-${crypto.randomUUID()}`;
@@ -46,6 +49,35 @@ describe('coding plans router', () => {
         providerId: 'minimax',
         costKiloCredits: 20,
         billingPeriodDays: 30,
+        features: expect.arrayContaining(['~1.7B tokens per month of M3 usage.']),
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      },
+      {
+        planId: MAX_PLAN_ID,
+        providerName: 'MiniMax',
+        name: 'Token Plan Max',
+        providerId: 'minimax',
+        costKiloCredits: 50,
+        billingPeriodDays: 30,
+        features: expect.arrayContaining([
+          '~5.1B tokens per month of M3 usage.',
+          'Run 4-5 concurrent agents.',
+        ]),
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      },
+      {
+        planId: ULTRA_PLAN_ID,
+        providerName: 'MiniMax',
+        name: 'Token Plan Ultra',
+        providerId: 'minimax',
+        costKiloCredits: 120,
+        billingPeriodDays: 30,
+        features: expect.arrayContaining([
+          '~12.5B tokens per month of M3 usage.',
+          'Run 6-7 concurrent agents.',
+        ]),
         availabilityStatus: 'sold_out',
         notificationRequested: false,
       },
@@ -56,6 +88,7 @@ describe('coding plans router', () => {
     const user = await insertTestUser();
     const caller = await createCallerForUser(user.id);
     await uploadKeysToInventory(
+      'minimax',
       PLAN_ID,
       [inventoryEntry(`catalog-available-${crypto.randomUUID()}`)],
       {
@@ -67,6 +100,16 @@ describe('coding plans router', () => {
       expect.objectContaining({
         planId: PLAN_ID,
         availabilityStatus: 'available',
+        notificationRequested: false,
+      }),
+      expect.objectContaining({
+        planId: MAX_PLAN_ID,
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      }),
+      expect.objectContaining({
+        planId: ULTRA_PLAN_ID,
+        availabilityStatus: 'sold_out',
         notificationRequested: false,
       }),
     ]);
@@ -95,6 +138,16 @@ describe('coding plans router', () => {
         availabilityStatus: 'sold_out',
         notificationRequested: true,
       }),
+      expect.objectContaining({
+        planId: MAX_PLAN_ID,
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      }),
+      expect.objectContaining({
+        planId: ULTRA_PLAN_ID,
+        availabilityStatus: 'sold_out',
+        notificationRequested: false,
+      }),
     ]);
   });
 
@@ -106,6 +159,7 @@ describe('coding plans router', () => {
     const caller = await createCallerForUser(user.id);
     await caller.codingPlans.requestAvailabilityNotification({ planId: PLAN_ID });
     await uploadKeysToInventory(
+      'minimax',
       PLAN_ID,
       [inventoryEntry(`notify-activation-${crypto.randomUUID()}`)],
       {
@@ -127,6 +181,7 @@ describe('coding plans router', () => {
     const key = await caller.byok.create({ provider_id: 'minimax', api_key: 'existing-key' });
     await caller.byok.setEnabled({ id: key.id, is_enabled: false });
     await uploadKeysToInventory(
+      'minimax',
       PLAN_ID,
       [inventoryEntry(`unused-router-key-${crypto.randomUUID()}`)],
       {
@@ -136,7 +191,9 @@ describe('coding plans router', () => {
 
     await expect(
       caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'blocked-slot' })
-    ).rejects.toThrow('Remove your existing MiniMax BYOK key');
+    ).rejects.toThrow(
+      'Remove your existing MiniMax BYOK key from /byok before subscribing to a MiniMax Coding Plan'
+    );
     const [savedUser] = await db.select().from(kilocode_users);
     const subscriptions = await db.select().from(coding_plan_subscriptions);
     const terms = await db.select().from(coding_plan_terms);
@@ -153,6 +210,7 @@ describe('coding plans router', () => {
     });
     const otherUser = await insertTestUser();
     await uploadKeysToInventory(
+      'minimax',
       PLAN_ID,
       [inventoryEntry(`router-managed-key-${crypto.randomUUID()}`)],
       {
@@ -182,6 +240,7 @@ describe('coding plans router', () => {
       providerName: 'MiniMax',
       providerId: 'minimax',
       routeLabel: 'MiniMax via Kilo Gateway',
+      features: expect.arrayContaining(['~1.7B tokens per month of M3 usage.']),
       hasInstalledByokKey: true,
       status: 'active',
       costKiloCredits: 20,
@@ -230,6 +289,7 @@ describe('coding plans router', () => {
       microdollars_used: 0,
     });
     await uploadKeysToInventory(
+      'minimax',
       PLAN_ID,
       [inventoryEntry(`second-purchase-key-${crypto.randomUUID()}`)],
       {
@@ -245,15 +305,85 @@ describe('coding plans router', () => {
     expect(await db.select().from(coding_plan_terms)).toHaveLength(1);
   });
 
+  it('rejects subscribing to another MiniMax token plan while one is live', async () => {
+    const owner = await insertTestUser({
+      total_microdollars_acquired: COST_MICRODOLLARS + MAX_COST_MICRODOLLARS,
+      microdollars_used: 0,
+    });
+    await uploadKeysToInventory(
+      'minimax',
+      PLAN_ID,
+      [inventoryEntry(`provider-plus-key-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
+    await uploadKeysToInventory(
+      'minimax',
+      MAX_PLAN_ID,
+      [inventoryEntry(`provider-max-key-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
+    const caller = await createCallerForUser(owner.id);
+    await caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'first-provider-plan' });
+
+    await expect(
+      caller.codingPlans.subscribe({ planId: MAX_PLAN_ID, idempotencyKey: 'second-provider-plan' })
+    ).rejects.toThrow('MiniMax Coding Plan already has a live subscription');
+    expect(await db.select().from(coding_plan_terms)).toHaveLength(1);
+  });
+
+  it('accepts provider and plan when admins upload inventory', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.codingPlans.adminUploadKeys({
+        providerId: 'minimax',
+        planId: MAX_PLAN_ID,
+        entries: [inventoryEntry('admin-max-upload')],
+      })
+    ).resolves.toEqual({ inserted: 1 });
+
+    const [inventory] = await db.select().from(coding_plan_key_inventory);
+    expect(inventory).toMatchObject({
+      provider_id: 'minimax',
+      plan_id: MAX_PLAN_ID,
+      status: 'available',
+    });
+  });
+
+  it('rejects admin uploads when provider and plan do not match', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.codingPlans.adminUploadKeys({
+        providerId: 'anthropic',
+        planId: MAX_PLAN_ID,
+        entries: [inventoryEntry('admin-provider-mismatch')],
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('does not match provider'),
+    });
+  });
+
   it('reports malformed admin inventory entries as a request error', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const caller = await createCallerForUser(admin.id);
 
     await expect(
-      caller.codingPlans.adminUploadKeys({ planId: PLAN_ID, entries: ['missing-plan-id'] })
+      caller.codingPlans.adminUploadKeys({
+        providerId: 'minimax',
+        planId: PLAN_ID,
+        entries: ['missing-plan-id'],
+      })
     ).rejects.toMatchObject({
       code: 'BAD_REQUEST',
-      message: expect.stringContaining('<api key>::<plan id>'),
+      message: expect.stringContaining('<api key>::<upstream plan id>'),
     });
   });
 
@@ -281,6 +411,7 @@ describe('coding plans router', () => {
     expect(queue[0]).toMatchObject({
       inventoryKeyId: workItem.id,
       planId: PLAN_ID,
+      providerId: 'minimax',
       upstreamPlanId: 'minimax-deprovision-plan',
     });
     expect(queue[0]).not.toHaveProperty('encrypted_api_key');

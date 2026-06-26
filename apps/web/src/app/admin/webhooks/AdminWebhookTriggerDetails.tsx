@@ -21,23 +21,29 @@ import { WebhookRequestsContent } from '@/app/(app)/cloud/webhooks/[triggerId]/r
 type AdminWebhookTriggerDetailsProps = {
   params: Promise<{ id: string; triggerId: string }>;
   scope: 'user' | 'organization';
+  ownerRouteIdentifier?: string;
 };
 
 function formatTimestamp(value: string) {
   return new Date(value).toLocaleString();
 }
 
-export function AdminWebhookTriggerDetails({ params, scope }: AdminWebhookTriggerDetailsProps) {
+export function AdminWebhookTriggerDetails({
+  params,
+  scope,
+  ownerRouteIdentifier,
+}: AdminWebhookTriggerDetailsProps) {
   const { id, triggerId } = use(params);
   const trpc = useTRPC();
 
   const ownerId = decodeURIComponent(id);
+  const ownerPathIdentifier = ownerRouteIdentifier ?? ownerId;
   const isOrg = scope === 'organization';
   const listPath = isOrg
-    ? `/admin/organizations/${encodeURIComponent(ownerId)}/webhooks`
+    ? `/admin/organizations/${encodeURIComponent(ownerPathIdentifier)}/webhooks`
     : `/admin/users/${encodeURIComponent(ownerId)}/webhooks`;
   const parentPath = isOrg
-    ? `/admin/organizations/${encodeURIComponent(ownerId)}`
+    ? `/admin/organizations/${encodeURIComponent(ownerPathIdentifier)}`
     : `/admin/users/${encodeURIComponent(ownerId)}`;
 
   const triggerInput = isOrg

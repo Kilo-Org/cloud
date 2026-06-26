@@ -33,15 +33,18 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
 
 type OrganizationSearchResult = {
   id: string;
   name: string;
+  slug: string | null;
 };
 
 type OrganizationSummary = {
   id: string;
   name: string;
+  slug: string | null;
 };
 
 type OrganizationAdminHierarchyManagementProps = {
@@ -189,7 +192,7 @@ export function OrganizationAdminHierarchyManagement({
                     className="border-border bg-surface-raised flex items-center justify-between gap-3 rounded-md border px-3 py-2"
                   >
                     <Link
-                      href={`/admin/organizations/${encodeURIComponent(childOrganization.id)}`}
+                      href={`/admin/organizations/${encodeURIComponent(getOrganizationRouteIdentifier(childOrganization))}`}
                       className="text-link hover:text-link-hover min-w-0 truncate text-sm font-medium underline-offset-4 hover:underline"
                     >
                       {childOrganization.name}

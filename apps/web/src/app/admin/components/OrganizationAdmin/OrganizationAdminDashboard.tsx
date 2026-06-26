@@ -82,7 +82,10 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
                 <OrganizationAdminMembers organizationId={organizationId} showAdminLinks />
               </div>
               <div className="lg:col-span-2">
-                <OrganizationAdminWebhooks organizationId={organizationId} />
+                <OrganizationAdminWebhooks
+                  organizationId={organizationId}
+                  organizationRouteIdentifier={organizationRouteIdentifier}
+                />
               </div>
               <div className="lg:col-span-2">
                 <OrganizationAdminCreditTransactions organizationId={organizationId} />

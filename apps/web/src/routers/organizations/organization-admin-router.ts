@@ -101,6 +101,7 @@ const OrganizationSearchInputSchema = z.object({
 const OrganizationSearchResultSchema = z.object({
   id: z.string(),
   name: z.string(),
+  slug: z.string().nullable(),
 });
 
 const OrganizationCreateInputSchema = z.object({
@@ -147,6 +148,7 @@ const AdminOrganizationDetailsSchema = z.object({
 const OrganizationHierarchySummarySchema = z.object({
   id: z.string(),
   name: z.string(),
+  slug: z.string().nullable(),
 });
 
 const AdminOrganizationHierarchySchema = z.object({
@@ -570,6 +572,7 @@ export const organizationAdminRouter = createTRPCRouter({
         .select({
           parent_id: parentOrganizations.id,
           parent_name: parentOrganizations.name,
+          parent_slug: parentOrganizations.slug,
         })
         .from(organizations)
         .leftJoin(
@@ -600,6 +603,7 @@ export const organizationAdminRouter = createTRPCRouter({
           .select({
             id: organizations.id,
             name: organizations.name,
+            slug: organizations.slug,
             parent_organization_id: organizations.parent_organization_id,
           })
           .from(organizations)
@@ -610,7 +614,7 @@ export const organizationAdminRouter = createTRPCRouter({
           break;
         }
 
-        ancestors.push({ id: ancestor.id, name: ancestor.name });
+        ancestors.push({ id: ancestor.id, name: ancestor.name, slug: ancestor.slug });
         currentParentId = ancestor.parent_organization_id;
       }
 
@@ -618,6 +622,7 @@ export const organizationAdminRouter = createTRPCRouter({
         .select({
           id: organizations.id,
           name: organizations.name,
+          slug: organizations.slug,
         })
         .from(organizations)
         .where(eq(organizations.parent_organization_id, organizationId))
@@ -628,6 +633,7 @@ export const organizationAdminRouter = createTRPCRouter({
           ? {
               id: organizationHierarchy.parent_id,
               name: organizationHierarchy.parent_name ?? 'Unknown organization',
+              slug: organizationHierarchy.parent_slug,
             }
           : null,
         ancestors,
@@ -1382,6 +1388,7 @@ export const organizationAdminRouter = createTRPCRouter({
         .select({
           id: organizations.id,
           name: organizations.name,
+          slug: organizations.slug,
         })
         .from(organizations)
         .where(and(...conditions))

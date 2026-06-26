@@ -7,9 +7,15 @@ import { Webhook } from 'lucide-react';
 
 type OrganizationAdminWebhooksProps = {
   organizationId: string;
+  organizationRouteIdentifier?: string;
 };
 
-export function OrganizationAdminWebhooks({ organizationId }: OrganizationAdminWebhooksProps) {
+export function OrganizationAdminWebhooks({
+  organizationId,
+  organizationRouteIdentifier,
+}: OrganizationAdminWebhooksProps) {
+  const routeIdentifier = organizationRouteIdentifier ?? organizationId;
+
   return (
     <Card>
       <CardHeader>
@@ -20,7 +26,7 @@ export function OrganizationAdminWebhooks({ organizationId }: OrganizationAdminW
           Read-only view of webhook triggers and request history for this organization.
         </p>
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/admin/organizations/${encodeURIComponent(organizationId)}/webhooks`}>
+          <Link href={`/admin/organizations/${encodeURIComponent(routeIdentifier)}/webhooks`}>
             <Webhook className="mr-2 h-4 w-4" />
             View webhooks
           </Link>

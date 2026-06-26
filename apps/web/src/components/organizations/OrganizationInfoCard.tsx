@@ -81,6 +81,7 @@ type InnerProps = {
 type OrganizationHierarchySummary = {
   id: string;
   name: string;
+  slug: string | null;
 };
 
 type OrganizationHierarchySectionProps = {
@@ -122,7 +123,7 @@ function OrganizationHierarchySection({ parent }: OrganizationHierarchySectionPr
             <p className="text-sm text-foreground">
               Parent organization:{' '}
               <Link
-                href={`/admin/organizations/${encodeURIComponent(parent.id)}`}
+                href={`/admin/organizations/${encodeURIComponent(getOrganizationRouteIdentifier(parent))}`}
                 className="text-link hover:text-link-hover inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline"
               >
                 {parent.name}
@@ -161,7 +162,7 @@ export function ChildOrganizationsCard({ organizationId }: { organizationId: str
           {childOrganizations.map(childOrganization => (
             <Link
               key={childOrganization.id}
-              href={`/admin/organizations/${encodeURIComponent(childOrganization.id)}`}
+              href={`/admin/organizations/${encodeURIComponent(getOrganizationRouteIdentifier(childOrganization))}`}
               className="hover:bg-surface-hover flex items-center justify-between gap-3 rounded-md py-1.5 text-sm transition-colors"
             >
               <span className="truncate font-medium">{childOrganization.name}</span>

@@ -82,6 +82,7 @@ function AdminOmniboxInner({ open, setOpen }: AdminOmniboxInnerProps) {
     )
   );
   const organizationId = resolvedOrganization?.id ?? null;
+  const organizationAdminRouteIdentifier = resolvedOrganization?.routeIdentifier ?? null;
 
   // Handle role change
   const handleRoleChange = useCallback(
@@ -192,9 +193,9 @@ function AdminOmniboxInner({ open, setOpen }: AdminOmniboxInnerProps) {
                 <Building2 className="h-3 w-3" />
                 Admin Panel
               </Link>
-              {organizationId && (
+              {organizationAdminRouteIdentifier && (
                 <Link
-                  href={`/admin/organizations/${organizationId}`}
+                  href={`/admin/organizations/${encodeURIComponent(organizationAdminRouteIdentifier)}`}
                   className="inline-flex items-center gap-1 rounded bg-zinc-700 px-2 py-1 text-xs text-zinc-300 transition-colors hover:bg-zinc-600 hover:text-white"
                   onClick={() => setOpen(false)}
                 >

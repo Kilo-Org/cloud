@@ -958,22 +958,40 @@ describe('organization admin router', () => {
         expect(childHierarchy.parent).toEqual({
           id: parentOrganization.id,
           name: parentOrganization.name,
+          slug: parentOrganization.slug,
         });
         expect(childHierarchy.ancestors).toEqual([
-          { id: parentOrganization.id, name: parentOrganization.name },
-          { id: grandparentOrganization.id, name: grandparentOrganization.name },
+          {
+            id: parentOrganization.id,
+            name: parentOrganization.name,
+            slug: parentOrganization.slug,
+          },
+          {
+            id: grandparentOrganization.id,
+            name: grandparentOrganization.name,
+            slug: grandparentOrganization.slug,
+          },
         ]);
         expect(childHierarchy.children).toEqual([]);
         expect(parentHierarchy.parent).toEqual({
           id: grandparentOrganization.id,
           name: grandparentOrganization.name,
+          slug: grandparentOrganization.slug,
         });
         expect(parentHierarchy.ancestors).toEqual([
-          { id: grandparentOrganization.id, name: grandparentOrganization.name },
+          {
+            id: grandparentOrganization.id,
+            name: grandparentOrganization.name,
+            slug: grandparentOrganization.slug,
+          },
         ]);
         expect(parentHierarchy.children).toEqual([
-          { id: childOrganization.id, name: childOrganization.name },
-          { id: siblingOrganization.id, name: siblingOrganization.name },
+          { id: childOrganization.id, name: childOrganization.name, slug: childOrganization.slug },
+          {
+            id: siblingOrganization.id,
+            name: siblingOrganization.name,
+            slug: siblingOrganization.slug,
+          },
         ]);
       } finally {
         await db
@@ -1084,6 +1102,7 @@ describe('organization admin router', () => {
         expect(hierarchy.children).toContainEqual({
           id: childOrganization.id,
           name: childOrganization.name,
+          slug: childOrganization.slug,
         });
         expect(updatedChildOrganization.require_seats).toBe(false);
         expect(updatedChildOrganization.free_trial_end_at).toBeNull();

@@ -13,7 +13,10 @@ import {
   getStripeStatusLabel,
   getStripeStatusStyle,
 } from '@/lib/admin/stripe-subscription-statuses';
-import { getOrganizationAppPath } from '@/lib/organizations/organization-route-utils';
+import {
+  getOrganizationAppPath,
+  getOrganizationRouteIdentifier,
+} from '@/lib/organizations/organization-route-utils';
 
 type AdminOrganization = z.infer<typeof AdminOrganizationSchema>;
 
@@ -290,8 +293,10 @@ export function OrganizationTableBody({
   const router = useRouter();
   const colSpan = getColumnCount(variant, showDeleted, showStripeStatus, showTrialEndDate);
 
-  const handleRowClick = (organizationId: string) => {
-    router.push(`/admin/organizations/${encodeURIComponent(organizationId)}`);
+  const handleRowClick = (organization: AdminOrganization) => {
+    router.push(
+      `/admin/organizations/${encodeURIComponent(getOrganizationRouteIdentifier(organization))}`
+    );
   };
 
   if (isLoading) {
@@ -339,7 +344,7 @@ export function OrganizationTableBody({
         <TableRow
           key={organization.id}
           className="hover:bg-muted/50 cursor-pointer transition-colors"
-          onClick={() => handleRowClick(organization.id)}
+          onClick={() => handleRowClick(organization)}
         >
           {variant === 'entitlements' ? (
             <EntitlementsRow

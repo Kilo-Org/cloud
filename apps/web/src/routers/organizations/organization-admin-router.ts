@@ -208,7 +208,7 @@ const BackfillMissingSlugsOutputSchema = z.object({
   ),
 });
 
-const BACKFILL_MISSING_SLUGS_BATCH_SIZE = 50;
+const BACKFILL_MISSING_SLUGS_BATCH_SIZE = 1000;
 
 const AddMemberInputSchema = z.object({
   organizationId: z.uuid(),

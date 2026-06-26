@@ -908,8 +908,8 @@ export function NewSessionPanel({
       attachmentUpload.clearAttachments();
       setAttachmentMessageUuid(uuidv4());
 
-      const basePath = organizationPathIdentifier
-        ? getOrganizationAppPathForRouteIdentifier(organizationPathIdentifier, '/cloud')
+      const basePath = organizationId
+        ? getOrganizationAppPathForRouteIdentifier(organizationId, '/cloud')
         : '/cloud';
       router.push(`${basePath}/chat?sessionId=${result.kiloSessionId}`);
     } catch (error) {
@@ -935,7 +935,6 @@ export function NewSessionPanel({
     model,
     mode,
     organizationId,
-    organizationPathIdentifier,
     prompt,
     queryClient,
     router,

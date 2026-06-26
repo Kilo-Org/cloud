@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createAssistantMessage, createUserMessage } from './agent-conversation';
+import {
+  createAssistantMessage,
+  createEvalToolCall,
+  createToolResult,
+  createUserMessage,
+} from './agent-conversation';
 import {
   KEEP_RECENT_EXCHANGES,
   KEEP_RECENT_EXCHANGES_MANUAL,
@@ -66,6 +71,25 @@ describe('render events as transcript', () => {
     ]);
     expect(text).toContain('User: hello');
     expect(text).toContain('Assistant: hi there');
+  });
+
+  it('preserves tool inputs and result payloads', () => {
+    const text = renderEventsAsTranscript([
+      createEvalToolCall({ code: 'return document.title;', tabId: 1 }),
+      createToolResult({ ok: true, toolCallId: 'call-1', value: 'Example Domain' }),
+      createToolResult({ error: 'boom', ok: false, toolCallId: 'call-2' }),
+    ]);
+    expect(text).toContain('Tool call (eval): return document.title;');
+    expect(text).toContain('Tool result (ok): Example Domain');
+    expect(text).toContain('Tool result (error): boom');
+  });
+
+  it('truncates oversized tool result payloads', () => {
+    const text = renderEventsAsTranscript([
+      createToolResult({ ok: true, toolCallId: 'call-1', value: 'x'.repeat(5000) }),
+    ]);
+    expect(text).toContain('[truncated 3000 chars]');
+    expect(text.length).toBeLessThan(3000);
   });
 });
 

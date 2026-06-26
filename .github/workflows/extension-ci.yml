@@ -6,12 +6,16 @@ on:
     paths:
       - 'apps/extension/**'
       - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.nvmrc'
       - '.github/workflows/extension-ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'apps/extension/**'
       - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.nvmrc'
       - '.github/workflows/extension-ci.yml'
 
 concurrency:

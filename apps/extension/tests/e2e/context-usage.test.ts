@@ -176,7 +176,8 @@ test('manual "Compact now" compacts the conversation', async () => {
     await mockKiloApi(context, {
       /*
        * First call: normal user turn. Sub-threshold usage (300/1000 = 30%) leaves auto-compaction
-       * untriggered but gives the donut a non-zero token count so "Compact now" is enabled.
+       * untriggered and gives the donut a non-zero token count. "Compact now" is enabled by having
+       * summarizable history (the seeded conversation), not by this usage value.
        */
       firstCompletionEvents: [
         { choices: [{ delta: { content: 'Normal reply.' } }] },

@@ -51,6 +51,25 @@ export const hasCompactableHistory = (
   keepRecentExchanges: number = KEEP_RECENT_EXCHANGES
 ): boolean => splitEventsForCompaction(events, keepRecentExchanges).toSummarize.length > 0;
 
+// Cap each tool input/output so a big snapshot or screenshot can't blow up the summarization prompt.
+const MAX_TOOL_TEXT_CHARS = 2000;
+const truncateToolText = (text: string): string =>
+  text.length <= MAX_TOOL_TEXT_CHARS
+    ? text
+    : `${text.slice(0, MAX_TOOL_TEXT_CHARS)}… [truncated ${text.length - MAX_TOOL_TEXT_CHARS} chars]`;
+
+const stringifyToolValue = (value: unknown): string => {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
 const renderEvent = (event: AgentConversationEvent): string | undefined => {
   switch (event.type) {
     case 'message': {
@@ -60,10 +79,23 @@ const renderEvent = (event: AgentConversationEvent): string | undefined => {
       return undefined;
     }
     case 'tool-call': {
-      return `Tool call (${event.name})`;
+      // The tool input carries the facts the next turn needs (the eval code, the query/element).
+      const detail =
+        event.name === 'eval' ? event.code : (event.query ?? event.elementId ?? event.snapshotId);
+
+      return detail === undefined || detail === ''
+        ? `Tool call (${event.name})`
+        : `Tool call (${event.name}): ${truncateToolText(detail)}`;
     }
     case 'tool-result': {
-      return `Tool result (${event.ok ? 'ok' : 'error'})`;
+      if (!event.ok) {
+        return `Tool result (error): ${event.error ?? 'unknown error'}`;
+      }
+
+      // The result payload (snapshot text, eval return, element details) is often the only record.
+      return event.value === undefined
+        ? 'Tool result (ok)'
+        : `Tool result (ok): ${truncateToolText(stringifyToolValue(event.value))}`;
     }
   }
 };

@@ -65,10 +65,13 @@ import { organizationAutoFixRouter } from '@/routers/organizations/organization-
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
 import { organizationKiloclawRouter } from '@/routers/organizations/organization-kiloclaw-router';
 import { organizationBitbucketRouter } from '@/routers/organizations/organization-bitbucket-router';
-import { ORGANIZATION_SLUG_MAX_LENGTH } from '@/lib/organizations/organization-route-utils';
+import {
+  getOrganizationRouteIdentifier,
+  ORGANIZATION_SLUG_MAX_LENGTH,
+} from '@/lib/organizations/organization-route-utils';
 import { organizationSlugContainsReservedSubstring } from '@/lib/organizations/organization-slug';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
-import { getOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils';
+import { organizationFundsRouter } from '@/routers/organizations/organization-funds-router';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -200,6 +203,7 @@ export const organizationsRouter = createTRPCRouter({
   autoTopUp: organizationAutoTopUpRouter,
   kiloclaw: organizationKiloclawRouter,
   bitbucket: organizationBitbucketRouter,
+  funds: organizationFundsRouter,
 
   resolveRouteIdentifier: baseProcedure
     .input(z.object({ routeIdentifier: z.string().min(1) }))

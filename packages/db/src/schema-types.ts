@@ -923,6 +923,7 @@ export const AuditLogAction = z.enum([
   'organization.mode.delete', // ✅
   'organization.created', // ✅
   'organization.token.generate', // ✅
+  'organization.funds.distribute_to_children', // ✅
 ]);
 
 // --- EncryptedData ---

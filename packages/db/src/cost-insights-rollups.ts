@@ -327,7 +327,7 @@ async function writeCostInsightSpend(
         ${values.spendRecordCount}::bigint AS spend_record_count,
         ${lockKey}::text AS lock_key
     ), owner_hour_lock AS MATERIALIZED (
-      SELECT pg_catalog.pg_advisory_xact_lock(
+      SELECT pg_catalog.pg_advisory_xact_lock_shared(
         pg_catalog.hashtextextended(capture_input.lock_key, 0::bigint)
       ) AS acquired
       FROM capture_input

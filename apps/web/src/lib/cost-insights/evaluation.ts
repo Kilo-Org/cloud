@@ -579,6 +579,7 @@ type CostInsightClaimedDirtyOwner = {
   owned_by_user_id: string | null;
   owned_by_organization_id: string | null;
   generation: string | number | bigint;
+  claim_token: string;
 };
 
 export type CostInsightDirtyEvaluationSummary = {
@@ -599,6 +600,7 @@ async function claimDirtyCostInsightOwners(
   database: CostInsightRootDatabase,
   options: { limit: number; owner?: CostInsightSpendOwner }
 ): Promise<CostInsightClaimedDirtyOwner[]> {
+  const claimToken = crypto.randomUUID();
   const ownerPredicate = options.owner
     ? options.owner.type === 'user'
       ? sql`dirty_owner.owned_by_user_id = ${options.owner.id} AND dirty_owner.owned_by_organization_id IS NULL`
@@ -623,6 +625,7 @@ async function claimDirtyCostInsightOwners(
     UPDATE cost_insight_evaluation_dirty_owners dirty_owner
     SET
       claimed_at = CURRENT_TIMESTAMP,
+      claim_token = ${claimToken},
       attempt_count = dirty_owner.attempt_count + 1,
       last_error_redacted = NULL,
       updated_at = CURRENT_TIMESTAMP
@@ -632,7 +635,8 @@ async function claimDirtyCostInsightOwners(
       dirty_owner.id,
       dirty_owner.owned_by_user_id,
       dirty_owner.owned_by_organization_id,
-      dirty_owner.generation
+      dirty_owner.generation,
+      dirty_owner.claim_token
   `);
   return result.rows;
 }
@@ -646,16 +650,19 @@ async function completeDirtyCostInsightOwner(
       DELETE FROM cost_insight_evaluation_dirty_owners
       WHERE id = ${row.id}
         AND generation = ${row.generation}
+        AND claim_token = ${row.claim_token}
       RETURNING id
     )
     UPDATE cost_insight_evaluation_dirty_owners dirty_owner
     SET
       claimed_at = NULL,
+      claim_token = NULL,
       attempt_count = 0,
       next_attempt_at = CURRENT_TIMESTAMP,
       last_error_redacted = NULL,
       updated_at = CURRENT_TIMESTAMP
     WHERE dirty_owner.id = ${row.id}
+      AND dirty_owner.claim_token = ${row.claim_token}
       AND NOT EXISTS (SELECT 1 FROM removed)
   `);
 }
@@ -669,10 +676,12 @@ async function failDirtyCostInsightOwner(
     UPDATE cost_insight_evaluation_dirty_owners
     SET
       claimed_at = NULL,
+      claim_token = NULL,
       next_attempt_at = CURRENT_TIMESTAMP + INTERVAL '5 minutes',
       last_error_redacted = ${error.slice(0, 500)},
       updated_at = CURRENT_TIMESTAMP
     WHERE id = ${row.id}
+      AND claim_token = ${row.claim_token}
   `);
 }
 
@@ -683,9 +692,11 @@ export async function processPendingCostInsightEvaluations(
     owner?: CostInsightSpendOwner;
     asOf?: string;
     recoverCompletedHour?: boolean;
+    concurrency?: number;
   } = {}
 ): Promise<CostInsightDirtyEvaluationSummary> {
   const limit = options.limit ?? 25;
+  const concurrency = Math.max(1, Math.min(options.concurrency ?? 4, limit));
   const summary: CostInsightDirtyEvaluationSummary = {
     claimed: 0,
     evaluatedOwners: [],
@@ -694,33 +705,35 @@ export async function processPendingCostInsightEvaluations(
 
   while (summary.claimed < limit) {
     const rows = await claimDirtyCostInsightOwners(database, {
-      limit: limit - summary.claimed,
+      limit: Math.min(concurrency, limit - summary.claimed),
       owner: options.owner,
     });
     if (rows.length === 0) break;
     summary.claimed += rows.length;
 
-    for (const row of rows) {
-      const owner = ownerFromDirtyRow(row);
-      try {
-        await evaluateCostInsightsForOwner(database, owner, {
-          asOf: options.asOf,
-          recoverCompletedHour: options.recoverCompletedHour,
-        });
-        await completeDirtyCostInsightOwner(database, row);
-        if (
-          !summary.evaluatedOwners.some(
-            evaluatedOwner => evaluatedOwner.type === owner.type && evaluatedOwner.id === owner.id
-          )
-        ) {
-          summary.evaluatedOwners.push(owner);
+    await Promise.all(
+      rows.map(async row => {
+        const owner = ownerFromDirtyRow(row);
+        try {
+          await evaluateCostInsightsForOwner(database, owner, {
+            asOf: options.asOf,
+            recoverCompletedHour: options.recoverCompletedHour,
+          });
+          await completeDirtyCostInsightOwner(database, row);
+          if (
+            !summary.evaluatedOwners.some(
+              evaluatedOwner => evaluatedOwner.type === owner.type && evaluatedOwner.id === owner.id
+            )
+          ) {
+            summary.evaluatedOwners.push(owner);
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          await failDirtyCostInsightOwner(database, row, message);
+          summary.failedOwners.push({ owner, error: message });
         }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        await failDirtyCostInsightOwner(database, row, message);
-        summary.failedOwners.push({ owner, error: message });
-      }
-    }
+      })
+    );
   }
 
   return summary;

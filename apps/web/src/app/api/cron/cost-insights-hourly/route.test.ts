@@ -6,7 +6,7 @@ const mockSentryLog = jest.fn();
 jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => mockSentryLog) }));
 
 import { runCostInsightHourlySweep } from '@/lib/cost-insights/jobs';
-import { GET } from './route';
+import { GET, maxDuration } from './route';
 
 const mockRunCostInsightHourlySweep = jest.mocked(runCostInsightHourlySweep);
 
@@ -26,6 +26,10 @@ function summary(failedOwners: Array<{ owner: { type: 'user'; id: string }; erro
       terminalized: 0,
       failed: 0,
     },
+    alreadyRunning: false,
+    deadlineReached: false,
+    ownerCycleComplete: true,
+    cycleId: 'cycle-1',
   };
 }
 
@@ -69,5 +73,9 @@ describe('GET /api/cron/cost-insights-hourly', () => {
       partialFailure: false,
     });
     expect(mockSentryLog).not.toHaveBeenCalled();
+  });
+
+  test('exports a bounded function duration for resumable sweeps', () => {
+    expect(maxDuration).toBe(300);
   });
 });

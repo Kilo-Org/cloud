@@ -416,7 +416,21 @@ export function mapKiloClawCanonicalDriver(params: {
   };
 }
 
-function aggregateNormalizedCanonicalCostInsightDrivers(
+function driverDimensionsMatch(
+  left: CanonicalCostInsightDriverAggregate,
+  right: CanonicalCostInsightDriverAggregate
+): boolean {
+  return (
+    left.source === right.source &&
+    left.productKey === right.productKey &&
+    left.featureKey === right.featureKey &&
+    left.modelOrPlanKey === right.modelOrPlanKey &&
+    left.providerKey === right.providerKey &&
+    left.actorUserId === right.actorUserId
+  );
+}
+
+export function aggregateNormalizedCanonicalCostInsightDrivers(
   inputs: CanonicalCostInsightDriverAggregate[]
 ): {
   totals: CanonicalCostInsightOwnerTotal[];
@@ -434,6 +448,12 @@ function aggregateNormalizedCanonicalCostInsightDrivers(
     }
 
     const totalKey = `${ownerIdentity(input.owner)}:${input.category}`;
+    const driverIdentity = `${totalKey}:${input.driverKey}`;
+    const priorDriver = drivers.get(driverIdentity);
+    if (priorDriver && !driverDimensionsMatch(priorDriver, input)) {
+      throw new Error('Canonical Cost Insights driver digest collision.');
+    }
+
     const priorTotal = totals.get(totalKey);
     if (priorTotal) {
       priorTotal.totalMicrodollars = addSafeInteger(
@@ -455,8 +475,6 @@ function aggregateNormalizedCanonicalCostInsightDrivers(
       });
     }
 
-    const driverIdentity = `${totalKey}:${input.driverKey}`;
-    const priorDriver = drivers.get(driverIdentity);
     if (priorDriver) {
       priorDriver.totalMicrodollars = addSafeInteger(
         priorDriver.totalMicrodollars,

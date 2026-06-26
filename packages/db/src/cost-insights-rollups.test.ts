@@ -80,6 +80,32 @@ async function withCostInsightFixture(
   }
 }
 
+function costInsightOwnerHourLockKey(
+  owner: CaptureCostInsightSpendInput['owner'],
+  hourStart: string
+): string {
+  return [
+    'cost-insight-owner-hour:v1',
+    `${owner.type.length}:${owner.type}`,
+    `${owner.id.length}:${owner.id}`,
+    `${hourStart.length}:${hourStart}`,
+  ].join('|');
+}
+
+function createDeferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolvePromise: (() => void) | undefined;
+  const promise = new Promise<void>(resolve => {
+    resolvePromise = resolve;
+  });
+  return {
+    promise,
+    resolve: () => {
+      if (!resolvePromise) throw new Error('Deferred promise is not initialized.');
+      resolvePromise();
+    },
+  };
+}
+
 function captureInput(
   fixture: CostInsightTestFixture,
   overrides: Partial<CaptureCostInsightSpendInput> = {}
@@ -208,6 +234,42 @@ describe('Cost Insights rollup capture', () => {
     );
 
     expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows live capture while another transaction holds the shared owner-hour lock', async () => {
+    await withCostInsightFixture(async fixture => {
+      const input = captureInput(fixture);
+      const hourStart = getCostInsightUtcHourStart(input.occurredAt);
+      const lockKey = costInsightOwnerHourLockKey(input.owner, hourStart);
+      const lockAcquired = createDeferred();
+      const releaseLock = createDeferred();
+      const lockHolder = testDatabase.db.transaction(async tx => {
+        await tx.execute(
+          sql`SELECT pg_catalog.pg_advisory_xact_lock_shared(
+            pg_catalog.hashtextextended(${lockKey}, 0::bigint)
+          )`
+        );
+        lockAcquired.resolve();
+        await releaseLock.promise;
+      });
+
+      await lockAcquired.promise;
+      try {
+        await testDatabase.db.transaction(async tx => {
+          await tx.execute(sql`SET LOCAL lock_timeout = '500ms'`);
+          await captureCostInsightSpend(tx, input);
+        });
+      } finally {
+        releaseLock.resolve();
+        await lockHolder;
+      }
+
+      const [total] = await testDatabase.db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, fixture.userId));
+      expect(total).toMatchObject({ total_microdollars: 125, spend_record_count: 1 });
+    });
   });
 
   it('adds totals before matching driver buckets under a non-UTC database timezone', async () => {

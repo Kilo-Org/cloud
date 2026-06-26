@@ -2117,6 +2117,9 @@ export const microdollar_usage = pgTable(
     index('idx_microdollar_usage_organization_id')
       .on(table.organization_id)
       .where(isNotNull(table.organization_id)),
+    index('idx_microdollar_usage_org_created_at')
+      .on(table.organization_id, table.created_at)
+      .where(isNotNull(table.organization_id)),
   ]
 );
 
@@ -2871,6 +2874,7 @@ export const cost_insight_evaluation_dirty_owners = pgTable(
     dirty_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claim_token: uuid(),
     attempt_count: integer().default(0).notNull(),
     last_error_redacted: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -2904,11 +2908,58 @@ export const cost_insight_evaluation_dirty_owners = pgTable(
       'cost_insight_evaluation_dirty_owners_attempt_count_check',
       sql`${table.attempt_count} >= 0`
     ),
+    check(
+      'cost_insight_evaluation_dirty_owners_claim_token_check',
+      sql`(${table.claimed_at} IS NULL AND ${table.claim_token} IS NULL) OR (${table.claimed_at} IS NOT NULL AND ${table.claim_token} IS NOT NULL)`
+    ),
   ]
 );
 
 export type CostInsightEvaluationDirtyOwner =
   typeof cost_insight_evaluation_dirty_owners.$inferSelect;
+
+export const cost_insight_hourly_sweep_checkpoints = pgTable(
+  'cost_insight_hourly_sweep_checkpoints',
+  {
+    job_name: text().primaryKey().notNull(),
+    cycle_id: uuid(),
+    cycle_as_of: timestamp({ withTimezone: true, mode: 'string' }),
+    cohort_created_before: timestamp({ withTimezone: true, mode: 'string' }),
+    cursor_owner_type: text().$type<'user' | 'organization'>(),
+    cursor_owner_id: text(),
+    lease_token: uuid(),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check('cost_insight_hourly_sweep_job_name_check', sql`${table.job_name} <> ''`),
+    check(
+      'cost_insight_hourly_sweep_cursor_owner_type_check',
+      sql`${table.cursor_owner_type} IS NULL OR ${table.cursor_owner_type} IN ('user', 'organization')`
+    ),
+    check(
+      'cost_insight_hourly_sweep_cursor_check',
+      sql`(${table.cursor_owner_type} IS NULL AND ${table.cursor_owner_id} IS NULL) OR (${table.cursor_owner_type} IS NOT NULL AND ${table.cursor_owner_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_hourly_sweep_lease_check',
+      sql`(${table.lease_token} IS NULL AND ${table.lease_expires_at} IS NULL) OR (${table.lease_token} IS NOT NULL AND ${table.lease_expires_at} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_hourly_sweep_cycle_check',
+      sql`(${table.cycle_id} IS NULL AND ${table.cycle_as_of} IS NULL AND ${table.cohort_created_before} IS NULL AND ${table.started_at} IS NULL) OR (${table.cycle_id} IS NOT NULL AND ${table.cycle_as_of} IS NOT NULL AND ${table.cohort_created_before} IS NOT NULL AND ${table.started_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CostInsightHourlySweepCheckpoint =
+  typeof cost_insight_hourly_sweep_checkpoints.$inferSelect;
 
 export const cost_insight_rollup_coverage = pgTable(
   'cost_insight_rollup_coverage',
@@ -2993,48 +3044,78 @@ export const cost_insight_rollup_degraded_intervals = pgTable(
 export type CostInsightRollupDegradedInterval =
   typeof cost_insight_rollup_degraded_intervals.$inferSelect;
 
-export type CostInsightEventSnapshot = {
-  thresholdMicrodollars?: number | null;
-  thresholdWindow?: 'rolling_24h' | 'rolling_7d' | 'rolling_30d';
-  rolling24HourMicrodollars?: number | null;
-  rolling7DayMicrodollars?: number | null;
-  rolling30DayMicrodollars?: number | null;
-  currentHourVariableMicrodollars?: number | null;
-  anomalyBaselineMicrodollars?: number | null;
-  anomalyThresholdMicrodollars?: number | null;
-  topDrivers?: Array<{
-    spendCategory: CostInsightSpendCategory;
-    source: CostInsightSpendSource;
-    productKey: string;
-    featureKey: string;
-    modelOrPlanKey: string;
-    providerKey: string;
-    actorUserId: string | null;
-    totalMicrodollars: number;
-    spendRecordCount: number;
-  }>;
-  topDriversWindow?: {
-    startInclusive: string;
-    endExclusive: string;
-    spendCategory?: CostInsightSpendCategory;
-  };
-  changedFields?: Record<string, { old: unknown; new: unknown }>;
-  settings?: {
-    spendAlertsEnabled: boolean;
-    anomalyAlertsEnabled: boolean;
-    costSuggestionsEnabled: boolean;
-    spendThresholdMicrodollars: number | null;
-    spend7DayThresholdMicrodollars: number | null;
-    spend30DayThresholdMicrodollars: number | null;
-  };
-  suggestion?: {
-    suggestionKey: string;
-    evidenceWindowStart: string;
-    evidenceWindowEnd: string;
-    observedMicrodollars: number;
-    ctaHref: string;
-  };
-};
+const CostInsightSafeIntegerSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const CostInsightPositiveSafeIntegerSchema = z
+  .number()
+  .int()
+  .positive()
+  .max(Number.MAX_SAFE_INTEGER);
+const CostInsightTimestampSchema = z.string().refine(value => Number.isFinite(Date.parse(value)), {
+  message: 'Expected parseable timestamp.',
+});
+const CostInsightDriverDimensionSchema = z.string().min(1).max(128);
+
+export const CostInsightEventSnapshotSchema = z.object({
+  thresholdMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  thresholdWindow: z.enum(['rolling_24h', 'rolling_7d', 'rolling_30d']).optional(),
+  rolling24HourMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  rolling7DayMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  rolling30DayMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  currentHourVariableMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  anomalyBaselineMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  anomalyThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  topDrivers: z
+    .array(
+      z.object({
+        spendCategory: z.enum(['variable', 'scheduled']),
+        source: z.enum(['ai_gateway', 'kiloclaw', 'coding_plan', 'other']),
+        productKey: CostInsightDriverDimensionSchema,
+        featureKey: CostInsightDriverDimensionSchema,
+        modelOrPlanKey: CostInsightDriverDimensionSchema,
+        providerKey: CostInsightDriverDimensionSchema,
+        actorUserId: z.string().min(1).nullable(),
+        totalMicrodollars: CostInsightPositiveSafeIntegerSchema,
+        spendRecordCount: CostInsightPositiveSafeIntegerSchema,
+      })
+    )
+    .max(5)
+    .optional(),
+  topDriversWindow: z
+    .object({
+      startInclusive: CostInsightTimestampSchema,
+      endExclusive: CostInsightTimestampSchema,
+      spendCategory: z.enum(['variable', 'scheduled']).optional(),
+    })
+    .refine(value => Date.parse(value.endExclusive) > Date.parse(value.startInclusive), {
+      message: 'Expected topDriversWindow endExclusive to be after startInclusive.',
+    })
+    .optional(),
+  changedFields: z.record(z.string(), z.object({ old: z.unknown(), new: z.unknown() })).optional(),
+  settings: z
+    .object({
+      spendAlertsEnabled: z.boolean(),
+      anomalyAlertsEnabled: z.boolean(),
+      costSuggestionsEnabled: z.boolean(),
+      spendThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
+      spend7DayThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
+      spend30DayThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
+    })
+    .optional(),
+  suggestion: z
+    .object({
+      suggestionKey: z.string().regex(/^[0-9a-f]{64}$/),
+      evidenceWindowStart: CostInsightTimestampSchema,
+      evidenceWindowEnd: CostInsightTimestampSchema,
+      observedMicrodollars: CostInsightPositiveSafeIntegerSchema,
+      ctaHref: z.string().min(1),
+    })
+    .refine(value => Date.parse(value.evidenceWindowEnd) > Date.parse(value.evidenceWindowStart), {
+      message: 'Expected suggestion evidence window end to be after start.',
+    })
+    .optional(),
+});
+
+export type CostInsightEventSnapshot = z.infer<typeof CostInsightEventSnapshotSchema>;
 
 export const cost_insight_owner_configs = pgTable(
   'cost_insight_owner_configs',
@@ -3074,6 +3155,16 @@ export const cost_insight_owner_configs = pgTable(
     index('IDX_cost_insight_owner_configs_evaluation')
       .on(table.updated_at, table.id)
       .where(sql`${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE`),
+    index('IDX_cost_insight_owner_configs_user_active')
+      .on(table.owned_by_user_id)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND (${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE)`
+      ),
+    index('IDX_cost_insight_owner_configs_org_active')
+      .on(table.owned_by_organization_id)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND (${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE)`
+      ),
     check(
       'cost_insight_owner_configs_owner_check',
       sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
@@ -8602,6 +8693,7 @@ export const coding_plan_terms = pgTable(
       table.idempotency_key
     ),
     index('IDX_coding_plan_terms_subscription').on(table.subscription_id),
+    index('IDX_coding_plan_terms_credit_transaction').on(table.credit_transaction_id),
     enumCheck('coding_plan_terms_kind_check', table.kind, CodingPlanTermKind),
   ]
 );

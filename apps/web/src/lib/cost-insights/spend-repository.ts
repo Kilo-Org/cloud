@@ -155,6 +155,14 @@ type InteriorTotalRow = {
   total_microdollars: string | number | bigint;
 };
 
+type InteriorDriverRow = TopDriverRow & {
+  driver_key: string;
+};
+
+type MergeableSpendDriver = OwnerTopSpendDriver & {
+  driverKey: string;
+};
+
 type DatabaseTimestampRow = {
   value: string | Date;
 };
@@ -621,7 +629,7 @@ async function getInteriorRollupTotals(
 
 function compareTopSpendDrivers(left: OwnerTopSpendDriver, right: OwnerTopSpendDriver): number {
   if (left.totalMicrodollars !== right.totalMicrodollars) {
-    return right.totalMicrodollars - left.totalMicrodollars;
+    return left.totalMicrodollars > right.totalMicrodollars ? -1 : 1;
   }
   const leftKey = [
     left.category,
@@ -642,6 +650,197 @@ function compareTopSpendDrivers(left: OwnerTopSpendDriver, right: OwnerTopSpendD
     right.actorUserId,
   ].join('\u0000');
   return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+}
+
+function compareMergeableSpendDrivers(
+  left: MergeableSpendDriver,
+  right: MergeableSpendDriver
+): number {
+  const dimensionOrder = compareTopSpendDrivers(left, right);
+  if (dimensionOrder !== 0) return dimensionOrder;
+  return left.driverKey < right.driverKey ? -1 : left.driverKey > right.driverKey ? 1 : 0;
+}
+
+function haveMatchingDriverDimensions(
+  left: MergeableSpendDriver,
+  right: MergeableSpendDriver
+): boolean {
+  return (
+    left.source === right.source &&
+    left.productKey === right.productKey &&
+    left.featureKey === right.featureKey &&
+    left.modelOrPlanKey === right.modelOrPlanKey &&
+    left.providerKey === right.providerKey &&
+    left.actorUserId === right.actorUserId
+  );
+}
+
+function mergeSpendDrivers(driverGroups: MergeableSpendDriver[][]): MergeableSpendDriver[] {
+  const merged = new Map<string, MergeableSpendDriver>();
+  for (const drivers of driverGroups) {
+    for (const driver of drivers) {
+      const identity = JSON.stringify([driver.category, driver.driverKey]);
+      const existing = merged.get(identity);
+      if (!existing) {
+        merged.set(identity, {
+          ...driver,
+          totalMicrodollars: sumSafe(
+            0,
+            driver.totalMicrodollars,
+            'exact driver total_microdollars'
+          ),
+          spendRecordCount: sumSafe(0, driver.spendRecordCount, 'exact driver spend_record_count'),
+        });
+        continue;
+      }
+      if (!haveMatchingDriverDimensions(existing, driver)) {
+        throw new Error(
+          `Cost Insights driver ${identity} has mismatched dimensions across exact evidence fragments.`
+        );
+      }
+      existing.totalMicrodollars = sumSafe(
+        existing.totalMicrodollars,
+        driver.totalMicrodollars,
+        'exact driver total_microdollars'
+      );
+      existing.spendRecordCount = sumSafe(
+        existing.spendRecordCount,
+        driver.spendRecordCount,
+        'exact driver spend_record_count'
+      );
+    }
+  }
+  return [...merged.values()];
+}
+
+function summarizeSpendDrivers(drivers: MergeableSpendDriver[]): {
+  variableMicrodollars: number;
+  scheduledMicrodollars: number;
+  totalMicrodollars: number;
+  topDrivers: OwnerTopSpendDriver[];
+} {
+  let variableMicrodollars = 0;
+  let scheduledMicrodollars = 0;
+  for (const driver of drivers) {
+    if (driver.category === 'variable') {
+      variableMicrodollars = sumSafe(
+        variableMicrodollars,
+        driver.totalMicrodollars,
+        'exact driver variable total'
+      );
+    } else {
+      scheduledMicrodollars = sumSafe(
+        scheduledMicrodollars,
+        driver.totalMicrodollars,
+        'exact driver scheduled total'
+      );
+    }
+  }
+  const topDrivers = [...drivers]
+    .sort(compareMergeableSpendDrivers)
+    .slice(0, COST_INSIGHT_MAX_TOP_DRIVERS)
+    .map(driver => ({
+      category: driver.category,
+      source: driver.source,
+      productKey: driver.productKey,
+      featureKey: driver.featureKey,
+      modelOrPlanKey: driver.modelOrPlanKey,
+      providerKey: driver.providerKey,
+      actorUserId: driver.actorUserId,
+      totalMicrodollars: driver.totalMicrodollars,
+      spendRecordCount: driver.spendRecordCount,
+    }));
+  return {
+    variableMicrodollars,
+    scheduledMicrodollars,
+    totalMicrodollars: sumSafe(
+      variableMicrodollars,
+      scheduledMicrodollars,
+      'exact driver total microdollars'
+    ),
+    topDrivers,
+  };
+}
+
+async function getInteriorRollupDrivers(
+  executor: CostInsightQueryExecutor,
+  owner: CostInsightSpendOwner,
+  startInclusive: string,
+  endExclusive: string
+): Promise<MergeableSpendDriver[]> {
+  if (startInclusive === endExclusive) return [];
+  const result = await executor.execute<InteriorDriverRow>(sql`
+    SELECT
+      ${cost_insight_owner_hour_driver_buckets.spend_category} AS spend_category,
+      ${cost_insight_owner_hour_driver_buckets.driver_key} AS driver_key,
+      ${cost_insight_owner_hour_driver_buckets.source} AS source,
+      ${cost_insight_owner_hour_driver_buckets.product_key} AS product_key,
+      ${cost_insight_owner_hour_driver_buckets.feature_key} AS feature_key,
+      ${cost_insight_owner_hour_driver_buckets.model_or_plan_key} AS model_or_plan_key,
+      ${cost_insight_owner_hour_driver_buckets.provider_key} AS provider_key,
+      ${cost_insight_owner_hour_driver_buckets.actor_user_id} AS actor_user_id,
+      SUM(${cost_insight_owner_hour_driver_buckets.total_microdollars})::text
+        AS total_microdollars,
+      SUM(${cost_insight_owner_hour_driver_buckets.spend_record_count})::text
+        AS spend_record_count
+    FROM ${cost_insight_owner_hour_driver_buckets}
+    WHERE ${cost_insight_owner_hour_driver_buckets.hour_start} >= ${startInclusive}
+      AND ${cost_insight_owner_hour_driver_buckets.hour_start} < ${endExclusive}
+      AND ${ownerPredicate(
+        owner,
+        sql`${cost_insight_owner_hour_driver_buckets.owned_by_user_id}`,
+        sql`${cost_insight_owner_hour_driver_buckets.owned_by_organization_id}`
+      )}
+    GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
+    ORDER BY 1, 2, 3, 4, 5, 6, 7, 8
+  `);
+  return result.rows.map(row => ({
+    category: row.spend_category,
+    driverKey: row.driver_key,
+    source: row.source,
+    productKey: row.product_key,
+    featureKey: row.feature_key,
+    modelOrPlanKey: row.model_or_plan_key,
+    providerKey: row.provider_key,
+    actorUserId: row.actor_user_id,
+    totalMicrodollars: parseSafeDatabaseInteger(
+      row.total_microdollars,
+      'interior driver total_microdollars'
+    ),
+    spendRecordCount: parseSafeDatabaseInteger(
+      row.spend_record_count,
+      'interior driver spend_record_count'
+    ),
+  }));
+}
+
+async function getCanonicalDrivers(
+  executor: CostInsightQueryExecutor,
+  params: {
+    owner: CostInsightSpendOwner;
+    startInclusive: string;
+    endExclusive: string;
+  }
+): Promise<MergeableSpendDriver[]> {
+  if (params.startInclusive === params.endExclusive) return [];
+  const aggregation = await loadCanonicalCostInsightAggregation(executor, params);
+  return aggregation.drivers.map(driver => {
+    if (driver.owner.type !== params.owner.type || driver.owner.id !== params.owner.id) {
+      throw new Error('Canonical Cost Insights driver resolved to the wrong Spend owner.');
+    }
+    return {
+      category: driver.category,
+      driverKey: driver.driverKey,
+      source: driver.source,
+      productKey: driver.productKey,
+      featureKey: driver.featureKey,
+      modelOrPlanKey: driver.modelOrPlanKey,
+      providerKey: driver.providerKey,
+      actorUserId: driver.actorUserId,
+      totalMicrodollars: driver.totalMicrodollars,
+      spendRecordCount: driver.spendRecordCount,
+    };
+  });
 }
 
 export async function getOwnerSpendDriverEvidenceExact(
@@ -728,21 +927,64 @@ export async function getOwnerRollingDriverEvidenceExact(
 ): Promise<OwnerRollingDriverEvidenceExact> {
   const requestedAsOf =
     params.asOf === undefined ? undefined : requireUtcTimestamp(params.asOf, 'asOf');
-  const asOf = requestedAsOf ?? new Date().toISOString();
-  const windowStart = getRollingWindowFragments(asOf, params.windowHours).windowStart;
-  const evidence = await getOwnerSpendDriverEvidenceExact(primaryDatabase, {
-    owner: params.owner,
-    startInclusive: windowStart,
-    endExclusive: asOf,
-  });
-  return {
-    asOf,
-    windowStart,
-    variableMicrodollars: evidence.variableMicrodollars,
-    scheduledMicrodollars: evidence.scheduledMicrodollars,
-    totalMicrodollars: evidence.totalMicrodollars,
-    topDrivers: evidence.topDrivers,
-  };
+
+  return primaryDatabase.transaction(
+    async transaction => {
+      const asOfResult = await transaction.execute<DatabaseTimestampRow>(sql`
+        SELECT COALESCE(${requestedAsOf ?? null}::timestamptz, CURRENT_TIMESTAMP) AS value
+      `);
+      const asOfRow = asOfResult.rows[0];
+      if (!asOfRow) {
+        throw new Error('Cost Insights exact driver query could not establish an as-of value.');
+      }
+      const fragments = getRollingWindowFragments(
+        normalizeDatabaseTimestamp(asOfRow.value, 'as_of'),
+        params.windowHours
+      );
+      const coverage =
+        fragments.interiorStart === fragments.interiorEnd
+          ? null
+          : await getCostInsightRollupCoverage(transaction, {
+              startHour: fragments.interiorStart,
+              endHourExclusive: fragments.interiorEnd,
+            });
+
+      const mergedDrivers =
+        coverage?.isFullyCovered === false
+          ? mergeSpendDrivers([
+              await getCanonicalDrivers(transaction, {
+                owner: params.owner,
+                startInclusive: fragments.windowStart,
+                endExclusive: fragments.asOf,
+              }),
+            ])
+          : mergeSpendDrivers([
+              await getInteriorRollupDrivers(
+                transaction,
+                params.owner,
+                fragments.interiorStart,
+                fragments.interiorEnd
+              ),
+              await getCanonicalDrivers(transaction, {
+                owner: params.owner,
+                startInclusive: fragments.windowStart,
+                endExclusive: fragments.oldestBoundaryEnd,
+              }),
+              await getCanonicalDrivers(transaction, {
+                owner: params.owner,
+                startInclusive: fragments.currentBoundaryStart,
+                endExclusive: fragments.asOf,
+              }),
+            ]);
+      const evidence = summarizeSpendDrivers(mergedDrivers);
+      return {
+        asOf: fragments.asOf,
+        windowStart: fragments.windowStart,
+        ...evidence,
+      };
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' }
+  );
 }
 
 export async function getOwnerRolling24HourDriverEvidenceExact(

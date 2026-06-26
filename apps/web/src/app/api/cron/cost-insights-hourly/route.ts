@@ -9,6 +9,8 @@ if (!CRON_SECRET) {
   throw new Error('CRON_SECRET is not configured in environment variables');
 }
 
+export const maxDuration = 300;
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
   const expectedAuth = `Bearer ${CRON_SECRET}`;
@@ -40,6 +42,9 @@ export async function GET(request: Request) {
     {
       success: !hasFailures,
       partialFailure: hasFailures,
+      complete: summary.ownerCycleComplete,
+      deadlineReached: summary.deadlineReached,
+      alreadyRunning: summary.alreadyRunning,
       summary,
       timestamp: new Date().toISOString(),
     },

@@ -1,5 +1,6 @@
 import {
   aggregateCanonicalCostInsightDrivers,
+  aggregateNormalizedCanonicalCostInsightDrivers,
   loadCanonicalCostInsightAggregationsByHour,
   mapAiGatewayCanonicalDriver,
   mapCodingPlanCanonicalDriver,
@@ -185,6 +186,26 @@ describe('Cost Insights canonical source mapping', () => {
         driverKey: expect.stringMatching(/^[0-9a-f]{64}$/),
       }),
     ]);
+  });
+
+  test('rejects matching driver digests with different canonical dimensions', async () => {
+    const input = mapExaCanonicalDriver({
+      owner: userOwner,
+      actorUserId: 'user-1',
+      path: '/answer',
+      totalMicrodollars: 4,
+      spendRecordCount: 1,
+    }).driver;
+    const normalized = await aggregateCanonicalCostInsightDrivers([input]);
+    const driver = normalized.drivers[0];
+    if (!driver) throw new Error('Expected normalized canonical driver.');
+
+    expect(() =>
+      aggregateNormalizedCanonicalCostInsightDrivers([
+        driver,
+        { ...driver, providerKey: 'different-provider' },
+      ])
+    ).toThrow('Canonical Cost Insights driver digest collision.');
   });
 
   test('keeps multi-hour canonical source aggregates separated by UTC hour', async () => {

@@ -1,5 +1,8 @@
 import type { CostInsightSpendOwner } from '@kilocode/db/cost-insights-rollups';
-import { cost_insight_notification_deliveries } from '@kilocode/db/schema';
+import {
+  cost_insight_notification_deliveries,
+  type CostInsightEventSnapshot,
+} from '@kilocode/db/schema';
 import type { CostInsightAlertKind } from '@kilocode/db/schema-types';
 import { eq, sql } from 'drizzle-orm';
 
@@ -8,6 +11,7 @@ import { sendCostInsightSpendAlertEmail } from '@/lib/email';
 import {
   getCostInsightOwnerName,
   hasCurrentCostInsightAccess,
+  parsePersistedCostInsightEventSnapshot,
   type CostInsightDatabase,
 } from './repository';
 import { costInsightOwnerBasePath } from './owner';
@@ -26,14 +30,11 @@ export type CostInsightClaimedDeliveryRow = {
   description: string;
   alert_kind: CostInsightAlertKind | null;
   attempt_count: number;
-  snapshot: {
-    thresholdMicrodollars?: number | null;
-    rolling24HourMicrodollars?: number | null;
-    rolling7DayMicrodollars?: number | null;
-    rolling30DayMicrodollars?: number | null;
-    currentHourVariableMicrodollars?: number | null;
-    anomalyThresholdMicrodollars?: number | null;
-  };
+  snapshot: unknown;
+};
+
+type ParsedCostInsightClaimedDeliveryRow = Omit<CostInsightClaimedDeliveryRow, 'snapshot'> & {
+  snapshot: CostInsightEventSnapshot;
 };
 
 export type CostInsightNotificationDispatchSummary = {
@@ -61,7 +62,7 @@ function money(value: number | null | undefined): string {
   }).format(microdollarsToUsd(value));
 }
 
-function amountLabels(row: CostInsightClaimedDeliveryRow): {
+function amountLabels(row: ParsedCostInsightClaimedDeliveryRow): {
   primaryAmountLabel: string;
   secondaryAmountLabel: string;
 } {
@@ -239,35 +240,46 @@ export async function dispatchPendingCostInsightNotifications(
   };
 
   for (const row of rows) {
-    const owner = ownerFromDelivery(row);
-    const hasAccess = await hasCurrentCostInsightAccess(database, owner, row.recipient_user_id);
+    const snapshot = parsePersistedCostInsightEventSnapshot(row.snapshot);
+    if (!snapshot) {
+      await markDeliverySkipped(database, row.delivery_id, 'invalid_event_snapshot');
+      summary.skipped += 1;
+      continue;
+    }
+    const parsedRow = { ...row, snapshot };
+    const owner = ownerFromDelivery(parsedRow);
+    const hasAccess = await hasCurrentCostInsightAccess(
+      database,
+      owner,
+      parsedRow.recipient_user_id
+    );
     if (!hasAccess) {
-      await markDeliverySkipped(database, row.delivery_id, 'recipient_not_authorized');
+      await markDeliverySkipped(database, parsedRow.delivery_id, 'recipient_not_authorized');
       summary.skipped += 1;
       continue;
     }
 
     try {
-      const labels = amountLabels(row);
-      const result = await sendCostInsightSpendAlertEmail(row.recipient_email, {
+      const labels = amountLabels(parsedRow);
+      const result = await sendCostInsightSpendAlertEmail(parsedRow.recipient_email, {
         ownerLabel: await getCostInsightOwnerName(database, owner),
-        alertTitle: row.title,
-        alertDescription: row.description,
+        alertTitle: parsedRow.title,
+        alertDescription: parsedRow.description,
         primaryAmountLabel: labels.primaryAmountLabel,
         secondaryAmountLabel: labels.secondaryAmountLabel,
         reviewUrl: `${NEXTAUTH_URL}${costInsightOwnerBasePath(owner)}`,
       });
       if (!result.sent) {
-        await markDeliveryFailed(database, row.delivery_id, result.reason);
+        await markDeliveryFailed(database, parsedRow.delivery_id, result.reason);
         summary.failed += 1;
         continue;
       }
-      await markDeliverySent(database, row.delivery_id);
+      await markDeliverySent(database, parsedRow.delivery_id);
       summary.sent += 1;
     } catch (error) {
       await markDeliveryFailed(
         database,
-        row.delivery_id,
+        parsedRow.delivery_id,
         error instanceof Error ? error.message : String(error)
       );
       summary.failed += 1;

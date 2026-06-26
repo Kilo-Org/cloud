@@ -4,14 +4,17 @@ import {
   cost_insight_notification_deliveries,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/drizzle';
-import { claimPendingCostInsightNotificationDeliveries } from './notifications';
+import {
+  claimPendingCostInsightNotificationDeliveries,
+  dispatchPendingCostInsightNotifications,
+} from './notifications';
 
 const testUserIds = new Set<string>();
 
-async function createDelivery(): Promise<{ deliveryId: string; userId: string }> {
+async function createDelivery(): Promise<{ deliveryId: string; eventId: string; userId: string }> {
   const userId = `cost-insights-notification-${crypto.randomUUID()}`;
   testUserIds.add(userId);
   await db.insert(kilocode_users).values({
@@ -38,7 +41,7 @@ async function createDelivery(): Promise<{ deliveryId: string; userId: string }>
     .values({ event_id: event.id, recipient_user_id: userId })
     .returning({ id: cost_insight_notification_deliveries.id });
   if (!delivery) throw new Error('Test delivery insert returned no row.');
-  return { deliveryId: delivery.id, userId };
+  return { deliveryId: delivery.id, eventId: event.id, userId };
 }
 
 afterEach(async () => {
@@ -91,6 +94,31 @@ describe('Cost Insights notification claims', () => {
       attempt_count: 5,
       claimed_at: null,
       last_error_redacted: 'stale_claim_attempts_exhausted',
+    });
+  });
+
+  test('skips malformed event snapshots without retrying delivery', async () => {
+    const { deliveryId, eventId } = await createDelivery();
+    await db.execute(sql`
+      UPDATE ${cost_insight_events}
+      SET snapshot = '"malformed"'::jsonb
+      WHERE id = ${eventId}
+    `);
+
+    await expect(dispatchPendingCostInsightNotifications(db, 1)).resolves.toMatchObject({
+      claimed: 1,
+      sent: 0,
+      skipped: 1,
+      failed: 0,
+    });
+    const [delivery] = await db
+      .select()
+      .from(cost_insight_notification_deliveries)
+      .where(eq(cost_insight_notification_deliveries.id, deliveryId));
+
+    expect(delivery).toMatchObject({
+      status: 'skipped',
+      last_error_redacted: 'invalid_event_snapshot',
     });
   });
 });

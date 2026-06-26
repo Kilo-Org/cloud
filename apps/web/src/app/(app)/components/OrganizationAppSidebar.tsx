@@ -47,6 +47,10 @@ type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
 };
 
+function formatReviewItemBadge(count: number | undefined): string | undefined {
+  return count && count > 0 ? count.toLocaleString('en-US') : undefined;
+}
+
 export default function OrganizationAppSidebar({
   organizationId,
   ...props
@@ -145,7 +149,7 @@ export default function OrganizationAppSidebar({
             title: 'Cost Insights',
             icon: ChartLine,
             url: `/organizations/${organizationId}/cost-insights`,
-            badge: costInsightsAttention?.attention === 'alert' ? 'Review' : undefined,
+            badge: formatReviewItemBadge(costInsightsAttention?.reviewItemCount),
           },
         ]
       : []),

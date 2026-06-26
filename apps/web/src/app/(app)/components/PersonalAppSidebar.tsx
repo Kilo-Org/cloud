@@ -49,6 +49,10 @@ import { useTRPC } from '@/lib/trpc/utils';
 
 const SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS = 5 * 60_000;
 
+function formatReviewItemBadge(count: number | undefined): string | undefined {
+  return count && count > 0 ? count.toLocaleString('en-US') : undefined;
+}
+
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const trpc = useTRPC();
   const { data: user, isLoading } = useUser();
@@ -99,7 +103,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: 'Cost Insights',
       icon: ChartLine,
       url: '/cost-insights',
-      badge: costInsightsAttention?.attention === 'alert' ? 'Review' : undefined,
+      badge: formatReviewItemBadge(costInsightsAttention?.reviewItemCount),
     },
   ];
 

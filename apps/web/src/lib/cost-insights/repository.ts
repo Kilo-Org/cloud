@@ -675,6 +675,7 @@ export async function countOpenCostInsightReviewItems(
   const alertCount =
     (activeState?.activeAnomalyEventId && !activeState.activeAnomalyReviewedAt ? 1 : 0) +
     (activeState?.activeThresholdEventId && !activeState.thresholdReviewedAt ? 1 : 0);
-  const suggestionCount = config?.cost_suggestions_enabled ?? true ? (suggestions[0]?.value ?? 0) : 0;
+  const suggestionCount =
+    (config?.cost_suggestions_enabled ?? true) ? (suggestions[0]?.value ?? 0) : 0;
   return alertCount + suggestionCount;
 }

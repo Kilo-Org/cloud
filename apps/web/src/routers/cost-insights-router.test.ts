@@ -1,4 +1,5 @@
 import {
+  cost_insight_active_suggestions,
   cost_insight_events,
   cost_insight_owner_configs,
   cost_insight_owner_states,
@@ -10,6 +11,74 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 describe('Cost Insights router', () => {
+  it('counts open alerts and suggestions for sidebar review badge', async () => {
+    const user = await insertTestUser();
+    await db.insert(cost_insight_owner_configs).values({
+      owned_by_user_id: user.id,
+      spend_alerts_enabled: true,
+      cost_suggestions_enabled: true,
+    });
+    const [anomalyEvent, thresholdEvent] = await db
+      .insert(cost_insight_events)
+      .values([
+        {
+          owned_by_user_id: user.id,
+          event_type: 'anomaly_alert',
+          alert_kind: 'anomaly',
+          title: 'Spend Anomaly Alert',
+          description: 'Usage-based spend is high.',
+        },
+        {
+          owned_by_user_id: user.id,
+          event_type: 'threshold_crossed',
+          alert_kind: 'threshold',
+          title: 'Spend Threshold Alert',
+          description: 'Rolling spend crossed threshold.',
+        },
+      ])
+      .returning({ id: cost_insight_events.id });
+    if (!anomalyEvent || !thresholdEvent) {
+      throw new Error('Cost Insights alert event fixture insert failed.');
+    }
+    await db.insert(cost_insight_owner_states).values({
+      owned_by_user_id: user.id,
+      active_anomaly_event_id: anomalyEvent.id,
+      active_threshold_event_id: thresholdEvent.id,
+      threshold_crossing_active: true,
+      threshold_crossing_started_at: '2026-06-25T19:00:00.000Z',
+    });
+    await db.insert(cost_insight_active_suggestions).values({
+      owned_by_user_id: user.id,
+      suggestion_kind: 'kilo_pass',
+      suggestion_key: 'a'.repeat(64),
+      title: 'Review Kilo Pass coverage',
+      description: 'Kilo Pass may improve cost efficiency.',
+      cta_label: 'View Kilo Pass',
+      cta_href: '/subscriptions/kilo-pass',
+      evidence_window_start: '2026-06-18T19:00:00.000Z',
+      evidence_window_end: '2026-06-25T19:00:00.000Z',
+      observed_microdollars: 125_000_000,
+      benefit_label: 'Expert plan',
+      benefit_detail: '$199 + bonus credits',
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.costInsights.getAttentionState()).resolves.toEqual({
+      attention: 'alert',
+      reviewItemCount: 3,
+    });
+
+    await db
+      .update(cost_insight_owner_configs)
+      .set({ cost_suggestions_enabled: false })
+      .where(eq(cost_insight_owner_configs.owned_by_user_id, user.id));
+
+    await expect(caller.costInsights.getAttentionState()).resolves.toEqual({
+      attention: 'alert',
+      reviewItemCount: 2,
+    });
+  });
+
   it('turns off the threshold and clears the active threshold episode', async () => {
     const user = await insertTestUser();
     await db.insert(cost_insight_owner_configs).values({

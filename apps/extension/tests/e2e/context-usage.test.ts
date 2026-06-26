@@ -2,14 +2,42 @@
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { mockKiloApi } from './kilo-api-fixture';
+import type { Page } from '@playwright/test';
 import {
   launchExtensionContext,
   seedExtensionAuth,
   setExtensionStorage,
   startFixtureServer,
+  waitForStoredConversationText,
 } from './extension-context-fixture';
 
 const safeToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page'];
+
+/*
+ * Read the persisted conversation store as a JSON string. Storage is the source of truth and is
+ * immune to the virtualized conversation list's render/scroll timing, so assertions against it are
+ * not racy while auto-compaction rewrites events.
+ */
+const readStoredConversationsJson = (page: Page): Promise<string> =>
+  page.evaluate(async () => {
+    const storage = (
+      globalThis as typeof globalThis & {
+        chrome?: {
+          storage?: {
+            local?: { get: (keys: string[]) => Promise<Record<string, unknown>> };
+          };
+        };
+      }
+    ).chrome?.storage?.local;
+
+    if (storage === undefined) {
+      throw new Error('Extension runtime storage is unavailable.');
+    }
+
+    const items = await storage.get(['kiloAgentConversations']);
+
+    return JSON.stringify(items['kiloAgentConversations'] ?? null);
+  });
 
 const modelWithContextLength = [
   {
@@ -114,16 +142,21 @@ test('auto-compaction fires when usage exceeds 85% threshold', async () => {
     await sidePanel.getByLabel('Message agent').fill('Trigger compact');
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
     await sidePanel.getByLabel('Message agent').press('Enter');
-    await expect(sidePanel.getByText('Threshold reply.')).toBeVisible();
 
-    // Wait for the compacted prefix to appear (auto-compact fires asynchronously after the turn)
-    await expect(sidePanel.getByText(/Compacted earlier context/u)).toBeVisible({
-      timeout: 10_000,
-    });
+    /*
+     * Auto-compaction fires in the run's finally. Assert against persisted storage rather than the
+     * virtualized list, which can momentarily unmount rows while compaction rewrites events.
+     */
+    await waitForStoredConversationText(sidePanel, 'Compacted earlier context');
 
-    // Earliest seeded user messages should be gone
-    await expect(sidePanel.getByText('First message')).toBeHidden();
-    await expect(sidePanel.getByText('Second message')).toBeHidden();
+    /*
+     * The summary replaced the earliest seeded messages in the same atomic write, so once the
+     * prefix is stored the old messages are already gone.
+     */
+    const conversationsJson = await readStoredConversationsJson(sidePanel);
+    expect(conversationsJson).toContain('SUMMARY: user inspected the page.');
+    expect(conversationsJson).not.toContain('First message');
+    expect(conversationsJson).not.toContain('Second message');
 
     // The summarization call must have tool_choice: 'none' (sent with tools: [])
     const [, summarizationBody] = seenChatBodies;
@@ -141,8 +174,14 @@ test('manual "Compact now" compacts the conversation', async () => {
 
   try {
     await mockKiloApi(context, {
-      // First call: normal user turn (no threshold breach — low usage)
-      firstCompletionEvents: [{ choices: [{ delta: { content: 'Normal reply.' } }] }],
+      /*
+       * First call: normal user turn. Sub-threshold usage (300/1000 = 30%) leaves auto-compaction
+       * untriggered but gives the donut a non-zero token count so "Compact now" is enabled.
+       */
+      firstCompletionEvents: [
+        { choices: [{ delta: { content: 'Normal reply.' } }] },
+        { choices: [], usage: { completion_tokens: 10, prompt_tokens: 300, total_tokens: 310 } },
+      ],
       models: modelWithContextLength,
       // Second call: summarization triggered by "Compact now"
       secondCompletionEvents: [
@@ -172,7 +211,11 @@ test('manual "Compact now" compacts the conversation', async () => {
     await expect(sidePanel.getByText(/Compacted earlier context/u)).toBeVisible({
       timeout: 10_000,
     });
-    // Send button should be re-enabled after compaction
+    /*
+     * Compaction released the input lock: with a fresh draft, Send is enabled again. It stays
+     * disabled on an empty draft, which is unrelated to compaction.
+     */
+    await sidePanel.getByLabel('Message agent').fill('After compaction');
     await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeEnabled();
   } finally {
     await context.close();

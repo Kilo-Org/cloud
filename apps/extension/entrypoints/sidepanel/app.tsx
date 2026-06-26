@@ -50,8 +50,11 @@ export const App = (): JSX.Element => {
     isSuccess: isStoredAuthSuccess,
     refetch: refetchStoredAuth,
   } = useQuery({
-    queryFn: () => loadStoredAuth(storage),
+    // React Query forbids a queryFn resolving to undefined, but "no stored auth" is the
+    // common signed-out state; return null from the fn and map it back to undefined for the UI.
+    queryFn: async () => (await loadStoredAuth(storage)) ?? null,
     queryKey: storedAuthQueryKey,
+    select: data => data ?? undefined,
   });
   const {
     data: authValidationData,

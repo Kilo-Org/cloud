@@ -779,6 +779,12 @@ export const evalInTabWithScripting = async ({
   readonly timeoutMs?: number;
 }): Promise<EvalTabResult> => {
   try {
+    /*
+     * Soft timeout only. withTimeout rejects this promise, but a runaway model-authored snippet
+     * keeps running in the page's MAIN world after we report a timeout — scripting has no
+     * cancellation primitive. The Chrome/CDP path passes a real timeout to Runtime.evaluate; this
+     * one can't. Revisit if scripting ever gains enforced cancellation.
+     */
     const [response] = await withTimeout(
       Promise.resolve(
         scriptingApi.executeScript({

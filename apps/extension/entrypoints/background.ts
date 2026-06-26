@@ -21,6 +21,7 @@ import type {
 } from '@/src/shared/tab-debugger';
 
 interface ChromeRuntimeApi {
+  readonly id?: string;
   readonly onMessage?: {
     readonly addListener: (
       listener: (
@@ -31,6 +32,21 @@ interface ChromeRuntimeApi {
     ) => void;
   };
 }
+
+/*
+ * Trust boundary for the eval/debugger message path. Today only the extension's own pages (the
+ * side panel) can reach this listener — there is no externally_connectable and no content script.
+ * Accept only same-extension, non-tab senders so adding either later can't silently widen access
+ * to the dangerous eval path. Content scripts carry a `tab`; external pages carry a different `id`.
+ */
+const isTrustedExtensionSender = (sender: unknown, runtimeId: string | undefined): boolean => {
+  if (runtimeId === undefined || typeof sender !== 'object' || sender === null) {
+    return false;
+  }
+
+  const { id, tab } = sender as { id?: unknown; tab?: unknown };
+  return id === runtimeId && tab === undefined;
+};
 
 const handleTabDebuggerRequest = async ({
   debuggerApi,
@@ -146,7 +162,9 @@ export default defineBackground(() => {
   void enableActionClickSidePanel(chromeApi?.sidePanel);
 
   chromeApi?.runtime?.onMessage?.addListener((message, sender, sendResponse) => {
-    void sender;
+    if (!isTrustedExtensionSender(sender, chromeApi?.runtime?.id)) {
+      return;
+    }
 
     if (!isTabDebuggerRequest(message)) {
       return;

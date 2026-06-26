@@ -9,6 +9,7 @@ import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gatewa
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { GET } from './route';
 import { getBenchmarkRoutingTable } from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
@@ -31,6 +32,9 @@ jest.mock('@/lib/organizations/organization-models', () => ({
 jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getBenchmarkRoutingTable: jest.fn(),
 }));
+jest.mock('@/lib/ai-gateway/auto-model/resolution', () => ({
+  getAutoFreeCandidates: jest.fn(),
+}));
 jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -41,6 +45,7 @@ const mockedAddUserByokAvailability = jest.mocked(addUserByokAvailability);
 const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
 const mockedGetBenchmarkRoutingTable = jest.mocked(getBenchmarkRoutingTable);
+const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -80,6 +85,7 @@ describe('GET /api/openrouter/models', () => {
       status: 200,
       body: { table: null, publishedAt: null },
     });
+    mockedGetAutoFreeCandidates.mockResolvedValue([]);
   });
 
   test('leaves BYOK availability undefined for unauthenticated requests', async () => {
@@ -115,14 +121,20 @@ describe('GET /api/openrouter/models', () => {
     });
   });
 
-  test('adds efficient auto-routing models from the published routing table', async () => {
+  test('adds auto-routing models from routing sources', async () => {
     const efficientModel = makeModel('kilo-auto/efficient');
+    const freeModel = makeModel('kilo-auto/free');
     const balancedModel = makeModel('kilo-auto/balanced');
     const geminiModel = makeModel('google/gemini-2.5-flash');
     const gptMiniModel = makeModel('openai/gpt-5.4-mini');
+    const poolsideModel = makeModel('poolside/laguna-m.1:free');
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({
-      data: [efficientModel, balancedModel, geminiModel, gptMiniModel],
+      data: [efficientModel, freeModel, balancedModel, geminiModel, gptMiniModel, poolsideModel],
     });
+    mockedGetAutoFreeCandidates.mockResolvedValue([
+      'poolside/laguna-m.1:free',
+      'missing/free-model',
+    ]);
     mockedGetBenchmarkRoutingTable.mockResolvedValue({
       status: 200,
       body: {
@@ -152,9 +164,16 @@ describe('GET /api/openrouter/models', () => {
             models: ['google/gemini-2.5-flash', 'openai/gpt-5.4-mini'],
           },
         },
+        {
+          ...freeModel,
+          autoRouting: {
+            models: ['poolside/laguna-m.1:free'],
+          },
+        },
         balancedModel,
         geminiModel,
         gptMiniModel,
+        poolsideModel,
       ],
     });
   });

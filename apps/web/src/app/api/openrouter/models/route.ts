@@ -12,7 +12,8 @@ import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
 import { getBenchmarkRoutingTable } from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
-import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_EFFICIENT_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
 
 async function tryGetUserFromAuth() {
@@ -24,26 +25,42 @@ async function tryGetUserFromAuth() {
   }
 }
 
-async function addEfficientRoutingModels(models: OpenRouterModelsResponse['data']) {
-  const result = await getBenchmarkRoutingTable().catch(() => null);
-  const table = result?.status === 200 && 'table' in result.body ? result.body.table : null;
-  if (!table) return models;
-
+async function addAutoRoutingModels(models: OpenRouterModelsResponse['data']) {
   const availableModelIds = new Set(models.map(model => model.id));
-  const modelIds = [
+  const [routingTableResult, autoFreeCandidates] = await Promise.all([
+    getBenchmarkRoutingTable().catch(() => null),
+    getAutoFreeCandidates(null).catch(() => []),
+  ]);
+
+  const table =
+    routingTableResult?.status === 200 && 'table' in routingTableResult.body
+      ? routingTableResult.body.table
+      : null;
+  const efficientModelIds = table
+    ? [
+        ...new Set(
+          Object.values(table.routes)
+            .flat()
+            .map(candidate => candidate.model)
+            .filter(model => availableModelIds.has(model) && !isVirtualAutoModelId(model))
+        ),
+      ].sort((left, right) => left.localeCompare(right))
+    : [];
+  const freeModelIds = [
     ...new Set(
-      Object.values(table.routes)
-        .flat()
-        .map(candidate => candidate.model)
-        .filter(model => availableModelIds.has(model) && !isVirtualAutoModelId(model))
+      autoFreeCandidates.filter(
+        model => availableModelIds.has(model) && !isVirtualAutoModelId(model)
+      )
     ),
   ].sort((left, right) => left.localeCompare(right));
-  if (modelIds.length === 0) return models;
+  if (efficientModelIds.length === 0 && freeModelIds.length === 0) return models;
 
   return models.map(model =>
-    model.id === KILO_AUTO_EFFICIENT_MODEL.id
-      ? { ...model, autoRouting: { models: modelIds } }
-      : model
+    model.id === KILO_AUTO_EFFICIENT_MODEL.id && efficientModelIds.length > 0
+      ? { ...model, autoRouting: { models: efficientModelIds } }
+      : model.id === KILO_AUTO_FREE_MODEL.id && freeModelIds.length > 0
+        ? { ...model, autoRouting: { models: freeModelIds } }
+        : model
   );
 }
 
@@ -61,7 +78,7 @@ export async function GET(
       ? await getAvailableModelsForOrganization(auth.organizationId)
       : null;
     if (result) {
-      const models = await addEfficientRoutingModels(result.data);
+      const models = await addAutoRoutingModels(result.data);
       return NextResponse.json({
         ...result,
         data: filterByFeature(models, feature),
@@ -72,7 +89,7 @@ export async function GET(
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }
-    const models = await addEfficientRoutingModels(data.data);
+    const models = await addAutoRoutingModels(data.data);
     if (!auth?.user) {
       const experimentModels = await listAvailableExperimentModels();
       return NextResponse.json({

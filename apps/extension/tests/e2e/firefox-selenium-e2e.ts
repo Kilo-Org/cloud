@@ -1067,8 +1067,8 @@ const scenarios: FirefoxScenario[] = [
           await sendMessage(session.driver, 'Close this');
           await waitForText(session.driver, 'Close this reply.');
 
+          // Close-without-confirm: no dialog fires — tab closes immediately
           await clickButtonByLabel(session.driver, 'Close Close this');
-          await acceptAlertWithText(session.driver, 'Close this conversation tab?');
           await waitForTextGone(session.driver, 'Close this reply.');
           await waitForText(session.driver, 'Keep this reply.');
 

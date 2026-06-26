@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createAssistantMessage, createUserMessage } from './agent-conversation';
 import {
   KEEP_RECENT_EXCHANGES,
+  KEEP_RECENT_EXCHANGES_MANUAL,
   SUMMARY_PREFIX,
+  hasCompactableHistory,
   renderEventsAsTranscript,
   splitEventsForCompaction,
 } from './agent-context-compaction';
@@ -33,6 +35,24 @@ describe('split events for compaction', () => {
     expect(toSummarize).toStrictEqual([]);
     expect(toKeep).toStrictEqual(events);
   });
+
+  it('compacts a two-exchange conversation at the manual threshold (keep 1)', () => {
+    const events = [
+      createAssistantMessage('greeting'),
+      createUserMessage('one'),
+      createAssistantMessage('a1'),
+      createUserMessage('two'),
+      createAssistantMessage('a2'),
+    ];
+
+    // The auto threshold keeps everything (too few exchanges), so the manual click would be inert.
+    expect(hasCompactableHistory(events)).toBe(false);
+    expect(hasCompactableHistory(events, KEEP_RECENT_EXCHANGES_MANUAL)).toBe(true);
+
+    const { toKeep, toSummarize } = splitEventsForCompaction(events, KEEP_RECENT_EXCHANGES_MANUAL);
+    expect(toKeep[0]).toMatchObject({ role: 'user', text: 'two' });
+    expect(toSummarize).toMatchObject([{ text: 'greeting' }, { text: 'one' }, { text: 'a1' }]);
+  });
 });
 
 describe('render events as transcript', () => {
@@ -49,6 +69,7 @@ describe('render events as transcript', () => {
 describe('tuning constants', () => {
   it('exposes tuning constants', () => {
     expect(KEEP_RECENT_EXCHANGES).toBe(2);
+    expect(KEEP_RECENT_EXCHANGES_MANUAL).toBe(1);
     expect(SUMMARY_PREFIX.length).toBeGreaterThan(0);
   });
 });

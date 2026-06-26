@@ -7,7 +7,12 @@ import {
   groupConversationEvents,
 } from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
-import { compactConversationEvents } from '@/src/shared/agent-context-compaction';
+import {
+  KEEP_RECENT_EXCHANGES,
+  KEEP_RECENT_EXCHANGES_MANUAL,
+  compactConversationEvents,
+  hasCompactableHistory,
+} from '@/src/shared/agent-context-compaction';
 import { defaultMode } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
@@ -239,7 +244,10 @@ export const AgentChatPanel = ({
   const contextLength = selectedModel?.contextLength;
 
   const compactConversation = useCallback(
-    async (conversationId: string): Promise<void> => {
+    async (
+      conversationId: string,
+      keepRecentExchanges: number = KEEP_RECENT_EXCHANGES
+    ): Promise<void> => {
       if (
         !isConversationStoreLoaded ||
         runningConversationIds.includes(conversationId) ||
@@ -264,6 +272,7 @@ export const AgentChatPanel = ({
           apiBaseUrl,
           events: conversation.events,
           fetch: fetchFromWindow,
+          keepRecentExchanges,
           model: runModel,
           organizationId,
           token: auth.token,
@@ -300,14 +309,23 @@ export const AgentChatPanel = ({
   );
 
   const compactActiveConversation = useCallback(
-    (): Promise<void> => compactConversation(activeConversationId),
+    (): Promise<void> => compactConversation(activeConversationId, KEEP_RECENT_EXCHANGES_MANUAL),
     [activeConversationId, compactConversation]
+  );
+
+  /*
+   * Gate on summarizable history (not measured usage) so the button is never enabled-but-inert and
+   * still works after a reload, when in-memory usage has reset to zero.
+   */
+  const canCompactActive = useMemo(
+    () => hasCompactableHistory(events, KEEP_RECENT_EXCHANGES_MANUAL),
+    [events]
   );
 
   const contextDonut = useMemo(
     () => (
       <ContextDonut
-        canCompact={!isRunning && !isCompacting && activePromptTokens > 0}
+        canCompact={!isRunning && !isCompacting && canCompactActive}
         contextLength={contextLength}
         onCompact={() => {
           void compactActiveConversation();
@@ -315,7 +333,14 @@ export const AgentChatPanel = ({
         promptTokens={activePromptTokens}
       />
     ),
-    [activePromptTokens, compactActiveConversation, contextLength, isCompacting, isRunning]
+    [
+      activePromptTokens,
+      canCompactActive,
+      compactActiveConversation,
+      contextLength,
+      isCompacting,
+      isRunning,
+    ]
   );
 
   const busyConversationIds = useMemo(

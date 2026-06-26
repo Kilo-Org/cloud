@@ -5,6 +5,12 @@ import { fetchKiloGatewayChatCompletionStream } from './kilo-api-client';
 import type { KiloGatewayChatMessage } from './kilo-gateway-chat-client';
 
 export const KEEP_RECENT_EXCHANGES = 2;
+/*
+ * Manual "Compact now" is explicit, so it keeps only the latest exchange. This lets a user compact
+ * a short conversation (2 exchanges) instead of clicking an enabled-but-inert button;
+ * auto-compaction stays at KEEP_RECENT_EXCHANGES for safer continuity near the context limit.
+ */
+export const KEEP_RECENT_EXCHANGES_MANUAL = 1;
 export const SUMMARY_PREFIX = '🗜️ Compacted earlier context\n\n';
 
 const SUMMARY_SYSTEM_PROMPT =
@@ -16,23 +22,33 @@ const isUserMessage = (event: AgentConversationEvent): boolean =>
 // Keep complete exchanges only: cut just before the Nth-from-last user message so kept
 // Events always begin at a user turn and no tool-call/tool-result pair is split.
 export const splitEventsForCompaction = (
-  events: AgentConversationEvent[]
+  events: AgentConversationEvent[],
+  keepRecentExchanges: number = KEEP_RECENT_EXCHANGES
 ): { toKeep: AgentConversationEvent[]; toSummarize: AgentConversationEvent[] } => {
   const userIndexes = events
     .map((event, index) => (isUserMessage(event) ? index : -1))
     .filter(index => index !== -1);
 
-  if (userIndexes.length <= KEEP_RECENT_EXCHANGES) {
+  if (userIndexes.length <= keepRecentExchanges) {
     return { toKeep: events, toSummarize: [] };
   }
 
-  const boundary = userIndexes[userIndexes.length - KEEP_RECENT_EXCHANGES] ?? 0;
+  const boundary = userIndexes[userIndexes.length - keepRecentExchanges] ?? 0;
 
   return {
     toKeep: events.slice(boundary),
     toSummarize: events.slice(0, boundary),
   };
 };
+
+/*
+ * Whether compacting would actually summarize anything. Gates the "Compact now" button so it is
+ * never enabled-but-inert.
+ */
+export const hasCompactableHistory = (
+  events: AgentConversationEvent[],
+  keepRecentExchanges: number = KEEP_RECENT_EXCHANGES
+): boolean => splitEventsForCompaction(events, keepRecentExchanges).toSummarize.length > 0;
 
 const renderEvent = (event: AgentConversationEvent): string | undefined => {
   switch (event.type) {
@@ -71,6 +87,7 @@ interface CompactConversationOptions {
   readonly apiBaseUrl: string;
   readonly events: AgentConversationEvent[];
   readonly fetch: FetchLike;
+  readonly keepRecentExchanges?: number;
   readonly model: string;
   readonly organizationId?: string | undefined;
   readonly token: string;
@@ -80,11 +97,12 @@ export const compactConversationEvents = async ({
   apiBaseUrl,
   events,
   fetch,
+  keepRecentExchanges = KEEP_RECENT_EXCHANGES,
   model,
   organizationId,
   token,
 }: CompactConversationOptions): Promise<AgentConversationEvent[] | undefined> => {
-  const { toKeep, toSummarize } = splitEventsForCompaction(events);
+  const { toKeep, toSummarize } = splitEventsForCompaction(events, keepRecentExchanges);
 
   if (toSummarize.length === 0) {
     return undefined;

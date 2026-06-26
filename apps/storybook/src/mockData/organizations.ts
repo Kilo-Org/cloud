@@ -28,6 +28,7 @@ function generateMember(): OrganizationMember {
             {
               id: randomId(rng, 'org'),
               name: `Team ${randomInt(rng, 1, 9)}`,
+              slug: `team-${randomInt(rng, 1, 9)}`,
               role: 'member',
             },
           ]
@@ -56,8 +57,8 @@ export function generateOrganization(): OrganizationWithMembers {
     ...base,
     name: `Company ${randomInt(rng, 0, 999)} ${companyType}`,
     childOrganizations: [
-      { id: randomId(rng, 'org'), name: 'Platform Team' },
-      { id: randomId(rng, 'org'), name: 'Product Team' },
+      { id: randomId(rng, 'org'), name: 'Platform Team', slug: 'platform-team' },
+      { id: randomId(rng, 'org'), name: 'Product Team', slug: 'product-team' },
     ],
     members: Array.from({ length: randomInt(rng, 2, 7) }, generateMember),
     effectiveSsoPolicy: {

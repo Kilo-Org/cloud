@@ -13,16 +13,19 @@ type OrganizationSwitcherStoryProps = {
 const organizations: OrganizationSwitcherOrganization[] = [
   {
     organizationId: 'org-kilo',
+    organizationSlug: 'kilo-code',
     organizationName: 'Kilo Code',
     role: 'owner',
   },
   {
     organizationId: 'org-design',
+    organizationSlug: 'design-systems',
     organizationName: 'Design Systems',
     role: 'member',
   },
   {
     organizationId: 'org-cloud',
+    organizationSlug: 'cloud-platform',
     organizationName: 'Cloud Platform',
     role: 'member',
   },
@@ -34,6 +37,10 @@ function OrganizationSwitcherStory({
 }: OrganizationSwitcherStoryProps) {
   const [organizationId, setOrganizationId] = useState(initialOrganizationId);
 
+  const handleOrganizationSwitch = (organization: OrganizationSwitcherOrganization | null) => {
+    setOrganizationId(organization?.organizationId ?? null);
+  };
+
   return (
     <div className="bg-background p-6">
       <div className="bg-sidebar text-sidebar-foreground w-64 rounded-lg p-4">
@@ -41,7 +48,7 @@ function OrganizationSwitcherStory({
           organizationId={organizationId}
           organizations={organizations}
           isPending={isPending}
-          onOrganizationSwitch={setOrganizationId}
+          onOrganizationSwitch={handleOrganizationSwitch}
         />
       </div>
     </div>

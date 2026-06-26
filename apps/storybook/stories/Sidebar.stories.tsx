@@ -82,11 +82,13 @@ const mockUser = {
 const mockOrganizations = [
   {
     organizationId: 'org-kilo',
+    organizationSlug: 'kilo-code',
     organizationName: 'Kilo Code',
     role: 'owner',
   },
   {
     organizationId: 'org-design',
+    organizationSlug: 'design-systems',
     organizationName: 'Design Systems',
     role: 'member',
   },

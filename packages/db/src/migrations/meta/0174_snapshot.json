@@ -1,5 +1,5 @@
 {
-  "id": "7b8c6666-e963-4dea-8349-046654b55cb4",
+  "id": "f7659f0c-8337-43ab-9a70-c094dfeba98b",
   "prevId": "06265fd6-428e-4b7d-9092-dba307d6255e",
   "version": "7",
   "dialect": "postgresql",
@@ -4898,7 +4898,7 @@
           ],
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"manual_config\" IS NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -4932,7 +4932,7 @@
           ],
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"manual_config\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -4966,7 +4966,7 @@
           ],
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"manual_config\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -4994,7 +4994,7 @@
           ],
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },

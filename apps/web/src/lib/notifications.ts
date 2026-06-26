@@ -340,9 +340,6 @@ async function generateByokProvidersNotification(
       zhipuai: 'GLM Coding Plan',
       'zhipuai-coding-plan': 'GLM Coding Plan',
 
-      // Alibaba
-      'alibaba-token-plan': 'Alibaba Token Plan',
-
       // Xiaomi MiMo
       xiaomi: 'Xiaomi MiMo API Key',
       'xiaomi-mimo': 'Xiaomi MiMo API Key',

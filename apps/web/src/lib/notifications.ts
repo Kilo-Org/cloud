@@ -308,11 +308,6 @@ async function generateByokProvidersNotification(
       gemini: 'Google AI API Key',
       google: 'Google AI API Key',
 
-      // OpenAI
-      'openai-native': 'OpenAI API Key',
-      openai: 'OpenAI API Key',
-      'openai-responses': 'OpenAI API Key',
-
       // Moonshot AI / Kimi
       moonshot: 'Moonshot AI API Key',
       moonshotai: 'Moonshot AI API Key',

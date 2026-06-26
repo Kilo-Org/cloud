@@ -54,32 +54,56 @@ function NextCreditExpiration({ organizationId }: { organizationId: string }) {
     );
   }
 
+  const refreshError = isError ? (
+    <div className="flex items-center gap-1" role="alert">
+      <span className="text-status-destructive text-xs">Refresh failed.</span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2"
+        onClick={() => void refetch()}
+        disabled={isFetching}
+      >
+        {isFetching ? <Loader2 className="size-icon-sm animate-spin" /> : 'Retry'}
+      </Button>
+    </div>
+  ) : null;
+
   if (!data?.next_credit_expiration_at || data.next_credit_expiration_amount == null) {
-    return <span className="text-muted-foreground text-xs">Next expiration: None</span>;
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground text-xs">Next expiration: None</span>
+        {refreshError}
+      </div>
+    );
   }
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground h-auto px-1 py-0 hover:text-foreground"
-        >
-          <FormattedMicrodollars
-            microdollars={data.next_credit_expiration_amount}
-            className="inline whitespace-nowrap tabular-nums"
-            inline={true}
-            decimalPlaces={2}
-          />{' '}
-          in credits expires {formatRelativeTime(data.next_credit_expiration_at)}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="top" sideOffset={8}>
-        Expiration date: {formatDateOnly(data.next_credit_expiration_at)}
-      </TooltipContent>
-    </Tooltip>
+    <div className="flex items-center gap-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground h-auto px-1 py-0 hover:text-foreground"
+          >
+            <FormattedMicrodollars
+              microdollars={data.next_credit_expiration_amount}
+              className="inline whitespace-nowrap tabular-nums"
+              inline={true}
+              decimalPlaces={2}
+            />{' '}
+            in credits expires {formatRelativeTime(data.next_credit_expiration_at)}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" sideOffset={8}>
+          Expiration date: {formatDateOnly(data.next_credit_expiration_at)}
+        </TooltipContent>
+      </Tooltip>
+      {refreshError}
+    </div>
   );
 }
 

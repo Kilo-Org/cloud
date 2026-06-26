@@ -135,6 +135,7 @@ import type {
   BuildStatus,
   Provider,
   CodeReviewAgentConfig,
+  ManualCodeReviewConfig,
   ReviewMemoryEvidenceItem,
   ReviewMemoryPlatform,
   ReviewMemoryProposalStatus,
@@ -4073,6 +4074,9 @@ export const cloud_agent_code_reviews = pgTable(
       onDelete: 'set null',
     }),
 
+    // Immutable per-job manual review snapshot. Null means webhook-created review.
+    manual_config: jsonb('manual_config').$type<ManualCodeReviewConfig>(),
+
     // PR information
     repo_full_name: text().notNull(), // e.g., "owner/repo"
     pr_number: integer().notNull(),
@@ -4132,12 +4136,24 @@ export const cloud_agent_code_reviews = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Unique constraint: one review per repo+PR+SHA combination
-    uniqueIndex('UQ_cloud_agent_code_reviews_repo_pr_sha').on(
+    uniqueIndex('UQ_cloud_agent_code_reviews_webhook_integration_repo_pr_sha')
+      .on(table.platform_integration_id, table.repo_full_name, table.pr_number, table.head_sha)
+      .where(sql`${table.manual_config} IS NULL`),
+    uniqueIndex('UQ_cloud_agent_code_reviews_manual_user_repo_pr_sha')
+      .on(table.owned_by_user_id, table.repo_full_name, table.pr_number, table.head_sha)
+      .where(sql`${table.manual_config} IS NOT NULL AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_code_reviews_manual_org_repo_pr_sha')
+      .on(table.owned_by_organization_id, table.repo_full_name, table.pr_number, table.head_sha)
+      .where(
+        sql`${table.manual_config} IS NOT NULL AND ${table.owned_by_organization_id} IS NOT NULL`
+      ),
+    uniqueIndex('UQ_cloud_agent_code_reviews_active_provider_publisher').on(
+      table.platform_integration_id,
       table.repo_full_name,
-      table.pr_number,
-      table.head_sha
-    ),
+      table.pr_number
+    ).where(sql`${table.platform_integration_id} IS NOT NULL
+        AND ${table.status} IN ('pending', 'queued', 'running')
+        AND (${table.manual_config} IS NULL OR ${table.manual_config}->>'outputMode' = 'provider')`),
     // Indexes for ownership lookups
     index('idx_cloud_agent_code_reviews_owned_by_org_id').on(table.owned_by_organization_id),
     index('idx_cloud_agent_code_reviews_owned_by_user_id').on(table.owned_by_user_id),

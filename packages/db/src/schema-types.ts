@@ -1158,6 +1158,16 @@ export const CodeReviewAgentConfigSchema = z.object({
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;
 
+export const ManualCodeReviewConfigSchema = z
+  .object({
+    agentConfig: CodeReviewAgentConfigSchema,
+    instructions: z.string().max(4_000).nullable(),
+    outputMode: z.enum(['provider', 'kilo']),
+  })
+  .strict();
+
+export type ManualCodeReviewConfig = z.infer<typeof ManualCodeReviewConfigSchema>;
+
 // --- Security types ---
 
 export const DependabotAlertState = {

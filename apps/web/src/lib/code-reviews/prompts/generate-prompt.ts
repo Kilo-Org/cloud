@@ -120,6 +120,12 @@ export type GenerateReviewPromptOptions = {
   previousHeadSha?: string | null;
   /** Root REVIEW.md instructions from the base branch, replacing built-in review policy */
   repositoryReviewInstructions?: string | null;
+  /** One-off instructions for a manually created review job. */
+  manualInstructions?: string | null;
+  /** Persisted manual job output mode. Defaults to provider publishing. */
+  outputMode?: 'provider' | 'kilo';
+  /** Expected checked-out HEAD SHA for local read-only reviews. */
+  expectedHeadSha?: string | null;
 };
 
 /**
@@ -143,11 +149,30 @@ export async function generateReviewPrompt(
     gitlabContext,
     previousHeadSha,
     repositoryReviewInstructions,
+    manualInstructions,
+    outputMode = 'provider',
+    expectedHeadSha,
   } = options;
   const template = getPromptTemplate(platform);
   const platformConfig = getPlatformConfig(platform);
   const pr = prNumber || `{${platformConfig.prTerm}_NUMBER}`;
   const reviewStyle = config.review_style;
+
+  if (outputMode === 'kilo') {
+    return {
+      prompt: buildLocalReviewPrompt({
+        config,
+        repository,
+        pr,
+        platform,
+        platformTerm: platformConfig.prTerm,
+        manualInstructions,
+        repositoryReviewInstructions,
+        expectedHeadSha,
+      }),
+      version: `${template.version}-local`,
+    };
+  }
 
   // Helper to replace common placeholders
   const replacePlaceholders = (text: string, commentId?: number): string => {
@@ -186,6 +211,10 @@ export async function generateReviewPrompt(
   // 3. Custom instructions (user-provided, sanitized to prevent injection)
   if (config.custom_instructions) {
     prompt += '# CUSTOM INSTRUCTIONS\n\n' + sanitizeUserInput(config.custom_instructions) + '\n\n';
+  }
+
+  if (manualInstructions) {
+    prompt += '# PER-REVIEW INSTRUCTIONS\n\n' + sanitizeUserInput(manualInstructions) + '\n\n';
   }
 
   // 4. Hard constraints (MOST IMPORTANT - always included)
@@ -316,4 +345,73 @@ export async function generateReviewPrompt(
     prompt,
     version: template.version,
   };
+}
+
+function buildLocalReviewPrompt(params: {
+  config: CodeReviewAgentConfig;
+  repository: string;
+  pr: number | string;
+  platform: CodeReviewPlatform;
+  platformTerm: string;
+  manualInstructions?: string | null;
+  repositoryReviewInstructions?: string | null;
+  expectedHeadSha?: string | null;
+}): string {
+  const promptParts: string[] = [
+    'You are Kilo Code Reviewer. Review the checked-out change and return findings only in the final response.',
+    `Repository: ${params.repository}`,
+    `${params.platformTerm} number: ${params.pr}`,
+  ];
+
+  if (params.expectedHeadSha) {
+    promptParts.push(
+      `Expected HEAD SHA: ${params.expectedHeadSha}`,
+      'Before reviewing, verify the checked-out HEAD matches the expected SHA. If it does not match, report that mismatch and stop.'
+    );
+  }
+
+  const styleGuide = getPromptTemplate(params.platform).styleGuidance?.[params.config.review_style];
+  if (styleGuide) promptParts.push(styleGuide);
+
+  if (params.config.custom_instructions) {
+    promptParts.push('# CUSTOM INSTRUCTIONS', sanitizeUserInput(params.config.custom_instructions));
+  }
+
+  if (params.manualInstructions) {
+    promptParts.push('# PER-REVIEW INSTRUCTIONS', sanitizeUserInput(params.manualInstructions));
+  }
+
+  promptParts.push(
+    '# LOCAL REVIEW RULES',
+    '- Review the diff read-only. Do not edit files, commit, push, or create branches.',
+    '- Do not call provider CLIs or APIs. Do not post comments, notes, statuses, checks, or reactions.',
+    '- Focus on issues introduced by this change, not pre-existing unrelated code.',
+    '- Prefer concrete findings over general advice.'
+  );
+
+  promptParts.push(
+    '# WHAT TO REVIEW',
+    params.repositoryReviewInstructions
+      ? formatRepositoryReviewInstructions(params.repositoryReviewInstructions)
+      : 'Review correctness, reliability, security, data integrity, performance, maintainability, tests, and user-visible behavior.'
+  );
+
+  if (params.config.focus_areas.length > 0) {
+    promptParts.push(
+      '# FOCUS AREAS',
+      `Pay special attention to: ${params.config.focus_areas.join(', ')}`
+    );
+  }
+
+  promptParts.push(
+    '# FINAL RESPONSE FORMAT',
+    'If you find issues, return each finding with:',
+    '- Severity: critical, warning, or suggestion',
+    '- Path and line when available',
+    '- Explanation of the problem',
+    '- Suggested fix',
+    'If you find no issues, state that no Code Review Findings were found. Keep the response concise and do not include implementation logs.'
+  );
+
+  return promptParts.join('\n\n');
 }

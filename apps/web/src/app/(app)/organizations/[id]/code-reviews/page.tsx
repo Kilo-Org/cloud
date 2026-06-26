@@ -1,4 +1,5 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
+import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
 import { ReviewAgentPageClient } from './ReviewAgentPageClient';
 
 type ReviewAgentPageProps = {
@@ -9,6 +10,7 @@ type ReviewAgentPageProps = {
 export default async function ReviewAgentPage({ params, searchParams }: ReviewAgentPageProps) {
   const search = await searchParams;
   const platform = search.platform === 'gitlab' ? 'gitlab' : 'github';
+  const localCodeReviewDevelopmentEnabled = isLocalCodeReviewDevelopmentEnabled();
 
   return (
     <OrganizationByPageLayout
@@ -20,6 +22,7 @@ export default async function ReviewAgentPage({ params, searchParams }: ReviewAg
           successMessage={search.success}
           errorMessage={search.error}
           initialPlatform={platform}
+          localCodeReviewDevelopmentEnabled={localCodeReviewDevelopmentEnabled}
         />
       )}
     />

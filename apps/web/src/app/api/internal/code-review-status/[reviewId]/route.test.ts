@@ -249,6 +249,7 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     repository_review_instructions_truncated: false,
     previous_summary_body: null,
     previous_summary_head_sha: null,
+    manual_config: null,
     model: null,
     total_tokens_in: null,
     total_tokens_out: null,

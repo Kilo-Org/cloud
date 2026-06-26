@@ -92,6 +92,10 @@ import {
 import type { Owner } from '@/lib/code-reviews/core';
 import { parseCodeReviewAnalyticsManifest } from '@/lib/code-reviews/analytics/contracts';
 import { finalizeCompletedCodeReviewWithAnalytics } from '@/lib/code-reviews/analytics/db';
+import {
+  getManualCodeReviewConfig,
+  shouldPublishCodeReviewToProvider,
+} from '@/lib/code-reviews/manual-config';
 
 const CallbackTextTruncationSchema = z
   .object({
@@ -1012,6 +1016,10 @@ export async function POST(
       return NextResponse.json({ error: 'Review not found' }, { status: 404 });
     }
 
+    const manualConfig = getManualCodeReviewConfig(review);
+    const isManualReview = manualConfig !== null;
+    const shouldPublishToProvider = shouldPublishCodeReviewToProvider(review);
+
     const callbackCompletedAt = new Date();
     let attempt: CloudAgentCodeReviewAttempt;
     let latestAttempt = await getLatestCodeReviewAttempt(reviewId);
@@ -1332,7 +1340,7 @@ export async function POST(
     let providerTerminalReason = terminalReason;
     const actionRequiredReason =
       status === 'failed' ? getActionRequiredTerminalReason(terminalReason, errorMessage) : null;
-    if (actionRequiredReason) {
+    if (actionRequiredReason && !isManualReview) {
       const ownerResolution = await getTerminalOwnerResolution();
       if (ownerResolution) {
         try {
@@ -1354,7 +1362,7 @@ export async function POST(
           });
         }
       }
-    } else if (status === 'failed') {
+    } else if (status === 'failed' && !isManualReview) {
       const ownerResolution = await getTerminalOwnerResolution();
       if (ownerResolution) {
         try {
@@ -1381,9 +1389,10 @@ export async function POST(
     }
 
     // Fetch integration once — used for gate check updates and post-completion actions
-    const integration = review.platform_integration_id
-      ? await getIntegrationById(review.platform_integration_id)
-      : null;
+    const integration =
+      shouldPublishToProvider && review.platform_integration_id
+        ? await getIntegrationById(review.platform_integration_id)
+        : null;
 
     // Resolve GitLab token once, shared between gate check and reaction/footer logic
     const isGitLab = (review.platform || 'github') === PLATFORM.GITLAB;

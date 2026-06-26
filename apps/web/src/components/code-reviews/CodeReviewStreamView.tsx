@@ -436,18 +436,17 @@ export function CodeReviewStreamView({
       reviewId,
       attemptId: effectiveAttemptId,
     }),
-    // Only fetch historical data when the review is done and we have no live events
-    enabled: !!reviewId && isTerminal && events.length === 0,
+    enabled: !!reviewId && isTerminal,
   });
 
   // Populate events from historical session data
   useEffect(() => {
-    if (!isTerminal || events.length > 0) return;
+    if (!isTerminal) return;
     if (!sessionMessages?.success) return;
     if (sessionMessages.entries.length === 0) return;
 
     setEvents(sessionMessages.entries);
-  }, [isTerminal, sessionMessages, events.length]);
+  }, [isTerminal, sessionMessages]);
 
   // ---------------------------------------------------------------------------
   // Auto-scroll

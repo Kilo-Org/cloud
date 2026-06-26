@@ -119,7 +119,7 @@ export default function SidebarMenuList({
                     className={cn(
                       'bg-brand-primary text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-[active=true]/menu-button:text-primary-foreground right-4 !top-1/2 !-translate-y-1/2 rounded-full ring-1 ring-brand-primary/30',
                       isNumericBadge
-                        ? 'h-5 min-w-5 px-1.5 text-[11px] font-semibold tabular-nums'
+                        ? 'font-mono h-5 min-w-5 px-1.5 text-[11px] font-semibold tabular-nums'
                         : 'h-4 min-w-0 px-1.5 text-[10px] font-bold tracking-wide uppercase'
                     )}
                   >

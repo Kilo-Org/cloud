@@ -639,6 +639,8 @@ export type CostInsightEventType = (typeof CostInsightEventType)[keyof typeof Co
 export const CostInsightAlertKind = {
   Anomaly: 'anomaly',
   Threshold: 'threshold',
+  Threshold7Day: 'threshold_7d',
+  Threshold30Day: 'threshold_30d',
 } as const;
 
 export type CostInsightAlertKind = (typeof CostInsightAlertKind)[keyof typeof CostInsightAlertKind];

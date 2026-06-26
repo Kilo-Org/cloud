@@ -4,6 +4,7 @@ import {
   getOwnerCurrentHourSpend,
   getOwnerHourlySpend,
   getRolling24HourFragments,
+  getRollingWindowFragments,
 } from './spend-repository';
 
 const owner = { type: 'user', id: 'user-1' } as const;
@@ -23,6 +24,28 @@ describe('Cost Insights spend repository', () => {
       windowStart: '2026-06-01T12:30:00.000Z',
       oldestBoundaryEnd: '2026-06-01T13:00:00.000Z',
       interiorStart: '2026-06-01T13:00:00.000Z',
+      interiorEnd: '2026-06-02T12:00:00.000Z',
+      currentBoundaryStart: '2026-06-02T12:00:00.000Z',
+    });
+  });
+
+  test('splits an exact rolling 30-day window into raw boundaries and rollup interior', () => {
+    expect(getRollingWindowFragments('2026-06-02T12:30:00.000Z', 30 * 24)).toEqual({
+      asOf: '2026-06-02T12:30:00.000Z',
+      windowStart: '2026-05-03T12:30:00.000Z',
+      oldestBoundaryEnd: '2026-05-03T13:00:00.000Z',
+      interiorStart: '2026-05-03T13:00:00.000Z',
+      interiorEnd: '2026-06-02T12:00:00.000Z',
+      currentBoundaryStart: '2026-06-02T12:00:00.000Z',
+    });
+  });
+
+  test('splits an exact rolling 7-day window into raw boundaries and rollup interior', () => {
+    expect(getRollingWindowFragments('2026-06-02T12:30:00.000Z', 7 * 24)).toEqual({
+      asOf: '2026-06-02T12:30:00.000Z',
+      windowStart: '2026-05-26T12:30:00.000Z',
+      oldestBoundaryEnd: '2026-05-26T13:00:00.000Z',
+      interiorStart: '2026-05-26T13:00:00.000Z',
       interiorEnd: '2026-06-02T12:00:00.000Z',
       currentBoundaryStart: '2026-06-02T12:00:00.000Z',
     });

@@ -8,7 +8,8 @@ import { db } from '@/lib/drizzle';
 import {
   getOwnerCurrentHourSpend,
   getOwnerHourlySpend,
-  getOwnerRolling24HourSpendExact,
+  getOwnerRollingDriverEvidenceExact,
+  getOwnerRollingSpendExact,
   getOwnerTopSpendDrivers,
   type OwnerTopSpendDriver,
 } from './spend-repository';
@@ -34,6 +35,7 @@ import {
   upsertCostInsightActiveSuggestion,
   type CostInsightDatabase,
   type CostInsightRootDatabase,
+  type CostInsightThresholdAlertKind,
 } from './repository';
 import { dispatchPendingCostInsightNotifications } from './notifications';
 
@@ -59,8 +61,44 @@ export type CostInsightEvaluationSummary = {
   evaluatedAt: string;
   anomalyEventCreated: boolean;
   thresholdEventCreated: boolean;
+  threshold7DayEventCreated: boolean;
+  threshold30DayEventCreated: boolean;
   suggestionCreated: boolean;
 };
+
+const thresholdWindowDescriptors = {
+  threshold: {
+    windowHours: 24,
+    windowLabel: '24-hour',
+    snapshotWindow: 'rolling_24h',
+    rollingSnapshot: (microdollars: number) => ({ rolling24HourMicrodollars: microdollars }),
+  },
+  threshold_7d: {
+    windowHours: 7 * 24,
+    windowLabel: '7-day',
+    snapshotWindow: 'rolling_7d',
+    rollingSnapshot: (microdollars: number) => ({ rolling7DayMicrodollars: microdollars }),
+  },
+  threshold_30d: {
+    windowHours: 30 * 24,
+    windowLabel: '30-day',
+    snapshotWindow: 'rolling_30d',
+    rollingSnapshot: (microdollars: number) => ({ rolling30DayMicrodollars: microdollars }),
+  },
+} satisfies Record<
+  CostInsightThresholdAlertKind,
+  {
+    windowHours: number;
+    windowLabel: string;
+    snapshotWindow: 'rolling_24h' | 'rolling_7d' | 'rolling_30d';
+    rollingSnapshot: (
+      microdollars: number
+    ) =>
+      | { rolling24HourMicrodollars: number }
+      | { rolling7DayMicrodollars: number }
+      | { rolling30DayMicrodollars: number };
+  }
+>;
 
 function topDriverSnapshot(drivers: OwnerTopSpendDriver[]): AlertTopDriverSnapshot[] {
   return drivers.slice(0, 5).map(driver => ({
@@ -101,15 +139,10 @@ function sentenceLabel(value: string): string {
   return value
     .split(/[-_:/.]+/)
     .filter(Boolean)
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .map(part =>
+      part.toLowerCase() === 'cli' ? 'CLI' : part.charAt(0).toUpperCase() + part.slice(1)
+    )
     .join(' ');
-}
-
-function thirtyDayPace(microdollars: number, windowDays: number): number {
-  return (
-    Math.round(((microdollars / Math.max(1, windowDays)) * 30) / MICRODOLLARS_PER_USD) *
-    MICRODOLLARS_PER_USD
-  );
 }
 
 export async function getCostInsightAnomalyPolicy(
@@ -155,12 +188,17 @@ async function maybeCreateAnomalyAlert(params: {
     title: 'Spend Anomaly Alert',
     description: `Usage-based spend reached ${usdLabel(
       params.currentHourVariableMicrodollars
-    )} in the current UTC hour.`,
+    )} in the current hour.`,
     snapshot: {
       currentHourVariableMicrodollars: params.currentHourVariableMicrodollars,
       anomalyBaselineMicrodollars: params.anomalyPolicy.baselineMicrodollars,
       anomalyThresholdMicrodollars: params.anomalyPolicy.thresholdMicrodollars,
       topDrivers: topDriverSnapshot(params.topDrivers),
+      topDriversWindow: {
+        startInclusive: params.currentHourStart,
+        endExclusive: params.asOf,
+        spendCategory: 'variable',
+      },
     },
     dedupeKey: `anomaly:${params.currentHourStart}`,
   });
@@ -183,38 +221,64 @@ async function maybeCreateThresholdAlert(params: {
   database: CostInsightDatabase;
   owner: CostInsightSpendOwner;
   asOf: string;
+  alertKind: CostInsightThresholdAlertKind;
   thresholdMicrodollars: number | null;
-  rolling24HourMicrodollars: number | null;
-  topDrivers: OwnerTopSpendDriver[];
+  rollingMicrodollars: number | null;
 }): Promise<boolean> {
   if (params.thresholdMicrodollars === null) {
-    await clearCostInsightThresholdEpisode(params.database, params.owner, null);
+    await clearCostInsightThresholdEpisode(params.database, params.owner, null, params.alertKind);
     return false;
   }
-  if (params.rolling24HourMicrodollars === null) return false;
+  if (params.rollingMicrodollars === null) return false;
 
   const dashboardState = await getCostInsightDashboardState(params.database, params.owner);
-  if (params.rolling24HourMicrodollars < params.thresholdMicrodollars) {
-    if (dashboardState.state?.thresholdCrossingActive) {
-      await clearCostInsightThresholdEpisode(params.database, params.owner, params.asOf);
+  const crossingActive = (() => {
+    if (params.alertKind === 'threshold_7d')
+      return dashboardState.state?.threshold7DayCrossingActive;
+    if (params.alertKind === 'threshold_30d') {
+      return dashboardState.state?.threshold30DayCrossingActive;
+    }
+    return dashboardState.state?.thresholdCrossingActive;
+  })();
+  if (params.rollingMicrodollars < params.thresholdMicrodollars) {
+    if (crossingActive) {
+      await clearCostInsightThresholdEpisode(
+        params.database,
+        params.owner,
+        params.asOf,
+        params.alertKind
+      );
     }
     return false;
   }
 
-  if (dashboardState.state?.thresholdCrossingActive) return false;
+  if (crossingActive) return false;
 
+  const evidence = await getOwnerRollingDriverEvidenceExact(params.database, {
+    owner: params.owner,
+    asOf: params.asOf,
+    windowHours: thresholdWindowDescriptors[params.alertKind].windowHours,
+  });
+  if (evidence.totalMicrodollars < params.thresholdMicrodollars) return false;
+
+  const descriptor = thresholdWindowDescriptors[params.alertKind];
   const event = await createCostInsightEvent(params.database, {
     owner: params.owner,
     eventType: 'threshold_crossed',
-    alertKind: 'threshold',
-    title: 'Spend Threshold Alert',
-    description: `Rolling 24-hour Credit spend crossed ${usdLabel(params.thresholdMicrodollars)}.`,
+    alertKind: params.alertKind,
+    title: `${descriptor.windowLabel} Spend Threshold Alert`,
+    description: `Rolling ${descriptor.windowLabel} Credit spend crossed ${usdLabel(params.thresholdMicrodollars)}.`,
     snapshot: {
       thresholdMicrodollars: params.thresholdMicrodollars,
-      rolling24HourMicrodollars: params.rolling24HourMicrodollars,
-      topDrivers: topDriverSnapshot(params.topDrivers),
+      thresholdWindow: descriptor.snapshotWindow,
+      ...descriptor.rollingSnapshot(evidence.totalMicrodollars),
+      topDrivers: topDriverSnapshot(evidence.topDrivers),
+      topDriversWindow: {
+        startInclusive: evidence.windowStart,
+        endExclusive: evidence.asOf,
+      },
     },
-    dedupeKey: `threshold:${params.thresholdMicrodollars}:${params.asOf}`,
+    dedupeKey: `${params.alertKind}:${params.thresholdMicrodollars}:${params.asOf}`,
   });
   if (!event.created) return false;
 
@@ -222,6 +286,7 @@ async function maybeCreateThresholdAlert(params: {
     owner: params.owner,
     eventId: event.id,
     crossedAt: params.asOf,
+    alertKind: params.alertKind,
   });
   await createCostInsightNotificationDeliveries(
     params.database,
@@ -244,9 +309,6 @@ async function maybeCreateCostSuggestion(params: {
   if (activeSuggestions.length > 0) return false;
 
   const topDriver = params.topDrivers[0];
-  const observedPaceLabel = roundedUsdLabel(
-    thirtyDayPace(params.observedMicrodollars, params.evidenceWindowDays)
-  );
 
   const codingPlanCandidate =
     topDriver &&
@@ -262,10 +324,6 @@ async function maybeCreateCostSuggestion(params: {
           topDriver.modelOrPlanKey !== 'other'
             ? sentenceLabel(topDriver.modelOrPlanKey)
             : sentenceLabel(topDriver.productKey);
-        const driverPaceLabel = roundedUsdLabel(
-          thirtyDayPace(topDriver.totalMicrodollars, params.evidenceWindowDays)
-        );
-
         return {
           suggestionKind: 'coding_plan' as const,
           suggestionKey: suggestionKey([
@@ -277,8 +335,8 @@ async function maybeCreateCostSuggestion(params: {
             topDriver.productKey,
             topDriver.modelOrPlanKey,
           ]),
-          title: `Review Coding Plan coverage for ${driverLabel}`,
-          description: `You spent ${usdLabel(topDriver.totalMicrodollars)} on ${driverLabel} in the last ${params.evidenceWindowDays} days, about ${driverPaceLabel} over 30 days at the same pace. A Coding Plan may improve cost efficiency for recurring model usage.`,
+          title: `Consider a Coding Plan for ${driverLabel}`,
+          description: `A Coding Plan may improve cost efficiency for recurring ${driverLabel} usage.`,
           ctaLabel: 'View subscriptions',
           ctaHref:
             params.owner.type === 'organization'
@@ -299,13 +357,13 @@ async function maybeCreateCostSuggestion(params: {
             params.evidenceWindowEnd.slice(0, 10),
             String(params.observedMicrodollars),
           ]),
-          title: 'Get more credits from your monthly spend with Kilo Pass Expert',
-          description: `You spent ${usdLabel(params.observedMicrodollars)} on pay-as-you-go credits in the last ${params.evidenceWindowDays} days, about ${observedPaceLabel} over 30 days at the same pace. Kilo Pass Expert costs ${roundedUsdLabel(KILO_PASS_EXPERT_MONTHLY_MICRODOLLARS)} per month and includes ${roundedUsdLabel(KILO_PASS_EXPERT_MONTHLY_MICRODOLLARS)} in paid credits, plus up to ${usdLabel(KILO_PASS_EXPERT_BONUS_MICRODOLLARS)} in free bonus credits. Based on your recent spend, the plan could give you more credits for part of the spend you already make.`,
+          title: 'Get more credits with Kilo Pass Expert',
+          description: `The plan includes ${roundedUsdLabel(KILO_PASS_EXPERT_MONTHLY_MICRODOLLARS)} in paid credits plus up to ${usdLabel(KILO_PASS_EXPERT_BONUS_MICRODOLLARS)} in free bonus credits.`,
           ctaLabel: 'View Kilo Pass Expert',
           ctaHref: '/subscriptions/kilo-pass',
           observedMicrodollars: params.observedMicrodollars,
           benefitLabel: 'Expert plan',
-          benefitDetail: `${roundedUsdLabel(KILO_PASS_EXPERT_MONTHLY_MICRODOLLARS)} + up to ${usdLabel(
+          benefitDetail: `${roundedUsdLabel(KILO_PASS_EXPERT_MONTHLY_MICRODOLLARS)}/mo + up to ${usdLabel(
             KILO_PASS_EXPERT_BONUS_MICRODOLLARS
           )} bonus`,
         }
@@ -357,34 +415,60 @@ async function evaluateCostInsightsForOwnerLocked(
 ): Promise<CostInsightEvaluationSummary> {
   const asOf = options.asOf ?? new Date().toISOString();
   const currentHourStart = floorUtcHour(new Date(asOf));
-  const topDriverStart = addHours(currentHourStart, -24);
   const topDriverEnd = addHours(currentHourStart, 1);
   const suggestionWindowEnd = topDriverEnd;
   const suggestionWindowStart = addDays(suggestionWindowEnd, -7);
 
   const config = await getCostInsightOwnerConfig(database, owner);
   const currentHourSpend = await getOwnerCurrentHourSpend(database, owner);
-  const [topDrivers, suggestionTopDrivers, suggestionHourlySpend, rolling24HourSpend] =
-    await Promise.all([
-      getOwnerTopSpendDrivers(database, {
-        owner,
-        startHour: topDriverStart,
-        endHourExclusive: topDriverEnd,
-        limit: 5,
-      }),
-      getOwnerTopSpendDrivers(database, {
-        owner,
-        startHour: suggestionWindowStart,
-        endHourExclusive: suggestionWindowEnd,
-        limit: 5,
-      }),
-      getOwnerHourlySpend(database, {
-        owner,
-        startHour: suggestionWindowStart,
-        endHourExclusive: suggestionWindowEnd,
-      }),
-      getOwnerRolling24HourSpendExact(database, { owner, asOf }),
-    ]);
+  const rolling30DaySpendPromise =
+    config?.spend_alerts_enabled && config.spend_30_day_threshold_microdollars !== null
+      ? getOwnerRollingSpendExact(database, {
+          owner,
+          asOf,
+          windowHours: 30 * 24,
+          fallbackToCanonical: true,
+        })
+      : Promise.resolve({ totalMicrodollars: null });
+  const rolling7DaySpendPromise =
+    config?.spend_alerts_enabled && config.spend_7_day_threshold_microdollars !== null
+      ? getOwnerRollingSpendExact(database, {
+          owner,
+          asOf,
+          windowHours: 7 * 24,
+          fallbackToCanonical: true,
+        })
+      : Promise.resolve({ totalMicrodollars: null });
+  const [
+    anomalyTopDrivers,
+    suggestionTopDrivers,
+    suggestionHourlySpend,
+    rolling24HourSpend,
+    rolling7DaySpend,
+    rolling30DaySpend,
+  ] = await Promise.all([
+    getOwnerTopSpendDrivers(database, {
+      owner,
+      startHour: currentHourStart,
+      endHourExclusive: topDriverEnd,
+      category: 'variable',
+      limit: 5,
+    }),
+    getOwnerTopSpendDrivers(database, {
+      owner,
+      startHour: suggestionWindowStart,
+      endHourExclusive: suggestionWindowEnd,
+      limit: 5,
+    }),
+    getOwnerHourlySpend(database, {
+      owner,
+      startHour: suggestionWindowStart,
+      endHourExclusive: suggestionWindowEnd,
+    }),
+    getOwnerRollingSpendExact(database, { owner, asOf, windowHours: 24 }),
+    rolling7DaySpendPromise,
+    rolling30DaySpendPromise,
+  ]);
   const suggestionObservedMicrodollars = suggestionHourlySpend.reduce(
     (sum, hour) => sum + (hour.variableMicrodollars ?? 0) + (hour.scheduledMicrodollars ?? 0),
     0
@@ -392,26 +476,46 @@ async function evaluateCostInsightsForOwnerLocked(
 
   let anomalyEventCreated = false;
   let thresholdEventCreated = false;
+  let threshold7DayEventCreated = false;
+  let threshold30DayEventCreated = false;
   let suggestionCreated = false;
 
   if (config?.spend_alerts_enabled) {
-    const anomalyPolicy = await getCostInsightAnomalyPolicy(database, owner, currentHourStart);
-    anomalyEventCreated = await maybeCreateAnomalyAlert({
-      database,
-      owner,
-      asOf,
-      currentHourStart,
-      currentHourVariableMicrodollars: currentHourSpend.variableMicrodollars,
-      anomalyPolicy,
-      topDrivers,
-    });
+    if (config.anomaly_alerts_enabled) {
+      const anomalyPolicy = await getCostInsightAnomalyPolicy(database, owner, currentHourStart);
+      anomalyEventCreated = await maybeCreateAnomalyAlert({
+        database,
+        owner,
+        asOf,
+        currentHourStart,
+        currentHourVariableMicrodollars: currentHourSpend.variableMicrodollars,
+        anomalyPolicy,
+        topDrivers: anomalyTopDrivers,
+      });
+    }
     thresholdEventCreated = await maybeCreateThresholdAlert({
       database,
       owner,
       asOf,
+      alertKind: 'threshold',
       thresholdMicrodollars: config.spend_threshold_microdollars,
-      rolling24HourMicrodollars: rolling24HourSpend.totalMicrodollars,
-      topDrivers,
+      rollingMicrodollars: rolling24HourSpend.totalMicrodollars,
+    });
+    threshold7DayEventCreated = await maybeCreateThresholdAlert({
+      database,
+      owner,
+      asOf,
+      alertKind: 'threshold_7d',
+      thresholdMicrodollars: config.spend_7_day_threshold_microdollars,
+      rollingMicrodollars: rolling7DaySpend.totalMicrodollars,
+    });
+    threshold30DayEventCreated = await maybeCreateThresholdAlert({
+      database,
+      owner,
+      asOf,
+      alertKind: 'threshold_30d',
+      thresholdMicrodollars: config.spend_30_day_threshold_microdollars,
+      rollingMicrodollars: rolling30DaySpend.totalMicrodollars,
     });
   }
 
@@ -433,6 +537,8 @@ async function evaluateCostInsightsForOwnerLocked(
     evaluatedAt: asOf,
     anomalyEventCreated,
     thresholdEventCreated,
+    threshold7DayEventCreated,
+    threshold30DayEventCreated,
     suggestionCreated,
   };
 }

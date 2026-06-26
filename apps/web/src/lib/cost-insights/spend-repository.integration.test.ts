@@ -13,6 +13,7 @@ import {
 
 import {
   getOwnerHourlySpend,
+  getOwnerRolling24HourDriverEvidenceExact,
   getOwnerRolling24HourSpendExact,
   getOwnerTopSpendDrivers,
 } from './spend-repository';
@@ -149,6 +150,153 @@ describe('Cost Insights spend repository integration', () => {
       scheduledMicrodollars: null,
       totalMicrodollars: null,
     });
+  });
+
+  test('returns exact rolling 24-hour canonical driver evidence', async () => {
+    const userId = await createUser();
+    await db.insert(microdollar_usage).values([
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: userId,
+        cost: 10_000_000,
+        input_tokens: 100,
+        output_tokens: 50,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        created_at: '2026-06-01T11:29:59.999Z',
+        provider: 'anthropic',
+        model: 'claude-sonnet-4',
+        requested_model: 'claude-sonnet-4',
+        inference_provider: 'anthropic',
+        has_error: false,
+        abuse_classification: 0,
+      },
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: userId,
+        cost: 20_000_000,
+        input_tokens: 200,
+        output_tokens: 100,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        created_at: '2026-06-01T11:30:00.000Z',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        requested_model: 'gpt-4.1',
+        inference_provider: 'openai',
+        has_error: false,
+        abuse_classification: 0,
+      },
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: userId,
+        cost: 30_000_000,
+        input_tokens: 300,
+        output_tokens: 150,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        created_at: '2026-06-02T11:29:59.999Z',
+        provider: 'google',
+        model: 'gemini-2.5-pro',
+        requested_model: 'gemini-2.5-pro',
+        inference_provider: 'google',
+        has_error: false,
+        abuse_classification: 0,
+      },
+      {
+        id: crypto.randomUUID(),
+        kilo_user_id: userId,
+        cost: 40_000_000,
+        input_tokens: 400,
+        output_tokens: 200,
+        cache_write_tokens: 0,
+        cache_hit_tokens: 0,
+        created_at: '2026-06-02T11:30:00.000Z',
+        provider: 'openai',
+        model: 'gpt-5',
+        requested_model: 'gpt-5',
+        inference_provider: 'openai',
+        has_error: false,
+        abuse_classification: 0,
+      },
+    ]);
+
+    await expect(
+      getOwnerRolling24HourDriverEvidenceExact(db, {
+        owner: { type: 'user', id: userId },
+        asOf: '2026-06-02T11:30:00.000Z',
+      })
+    ).resolves.toEqual({
+      asOf: '2026-06-02T11:30:00.000Z',
+      windowStart: '2026-06-01T11:30:00.000Z',
+      variableMicrodollars: 50_000_000,
+      scheduledMicrodollars: 0,
+      totalMicrodollars: 50_000_000,
+      topDrivers: [
+        expect.objectContaining({
+          category: 'variable',
+          totalMicrodollars: 30_000_000,
+          spendRecordCount: 1,
+        }),
+        expect.objectContaining({
+          category: 'variable',
+          totalMicrodollars: 20_000_000,
+          spendRecordCount: 1,
+        }),
+      ],
+    });
+  });
+
+  test('filters top drivers to the requested hour and spend category', async () => {
+    const userId = await createUser();
+    const baseDriver = {
+      owned_by_user_id: userId,
+      source: 'ai_gateway' as const,
+      product_key: 'direct-gateway',
+      feature_key: 'chat_completions',
+      model_or_plan_key: 'model',
+      provider_key: 'provider',
+      actor_user_id: userId,
+      spend_record_count: 1,
+    };
+    await db.insert(cost_insight_owner_hour_driver_buckets).values([
+      {
+        ...baseDriver,
+        hour_start: '2026-06-01T00:00:00.000Z',
+        spend_category: 'variable',
+        driver_key: 'b'.repeat(64),
+        total_microdollars: 30,
+      },
+      {
+        ...baseDriver,
+        hour_start: '2026-06-01T00:00:00.000Z',
+        spend_category: 'scheduled',
+        driver_key: 'c'.repeat(64),
+        total_microdollars: 90,
+      },
+      {
+        ...baseDriver,
+        hour_start: '2026-05-31T23:00:00.000Z',
+        spend_category: 'variable',
+        driver_key: 'd'.repeat(64),
+        total_microdollars: 120,
+      },
+    ]);
+
+    await expect(
+      getOwnerTopSpendDrivers(db, {
+        owner: { type: 'user', id: userId },
+        startHour: '2026-06-01T00:00:00.000Z',
+        endHourExclusive: '2026-06-01T01:00:00.000Z',
+        category: 'variable',
+      })
+    ).resolves.toEqual([
+      expect.objectContaining({
+        category: 'variable',
+        totalMicrodollars: 30,
+        spendRecordCount: 1,
+      }),
+    ]);
   });
 
   test('combines rollup interior with canonical raw boundary fragments exactly once', async () => {

@@ -1,14 +1,38 @@
-import { AlertTriangle, ArrowRight, Bell, Lightbulb, TrendingUp, XCircle } from 'lucide-react';
+'use client';
+
+import { useState } from 'react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Bell,
+  ChevronDown,
+  ChevronUp,
+  Lightbulb,
+  TrendingUp,
+  XCircle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { CostSuggestion, DashboardAlert, DashboardAlertAction } from '../types';
+import {
+  formatCostInsightElapsedWindow,
+  formatCostInsightHourWindow,
+  money,
+  percentOf,
+  sourceLabels,
+} from '../formatting';
+import { useViewerTimeZone } from '../shared/LocalDateTime';
+import type {
+  AlertDriverEvidence,
+  CostSuggestion,
+  DashboardAlert,
+  DashboardAlertAction,
+} from '../types';
 
 const reviewActionLabels = {
   acknowledge: 'Mark as reviewed',
-  view_spend: 'View spend drivers',
+  view_spend: 'Show alert drivers',
   disable_alerts: 'Turn off alerts',
-  adjust_threshold: 'Change threshold',
-  disable_threshold: 'Turn off threshold',
+  manage_threshold: 'Manage threshold',
 } satisfies Record<DashboardAlertAction, string>;
 
 export function DisabledAlertsBanner({
@@ -30,7 +54,7 @@ export function DisabledAlertsBanner({
           </h2>
           <p className="type-body text-muted-foreground mt-1 max-w-2xl">
             {canManage
-              ? 'Spend data stays visible. Turn on Spend Alerts for unusual hourly increases and an optional 24-hour threshold.'
+              ? 'Spend data stays visible. Turn on Spend Alerts for unusual hourly increases and configurable rolling spend thresholds.'
               : 'Spend evidence remains available in this read-only view.'}
           </p>
         </div>
@@ -50,33 +74,43 @@ export function DisabledAlertsBanner({
 
 export function ReviewBanner({
   alert,
-  primaryAction,
+  primaryAction = false,
   actionsDisabled = false,
   canManage = true,
   onAction,
+  onDriversExpanded,
+  onExploreThisHour,
 }: {
   alert: DashboardAlert;
-  primaryAction: boolean;
+  primaryAction?: boolean;
   actionsDisabled?: boolean;
   canManage?: boolean;
   onAction?: (action: DashboardAlertAction) => void;
+  onDriversExpanded?: () => void;
+  onExploreThisHour?: () => void;
 }) {
-  const Icon = alert.type === 'threshold' ? AlertTriangle : TrendingUp;
+  const [driversExpanded, setDriversExpanded] = useState(false);
+  const Icon = alert.type === 'anomaly' ? TrendingUp : AlertTriangle;
   return (
     <section
       className="border-status-warning-border bg-status-warning-surface rounded-xl border p-6"
       aria-labelledby={`alert-${alert.type}`}
     >
-      <div className={cn('grid gap-5', canManage && 'lg:grid-cols-[minmax(0,1fr)_auto]')}>
+      <div
+        className={cn(
+          'grid gap-5',
+          (canManage || alert.driverEvidence) && 'lg:grid-cols-[minmax(0,1fr)_auto]'
+        )}
+      >
         <div>
-          <div className="flex gap-3">
+          <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1">
             <Icon className="text-status-warning-icon mt-0.5 size-5 shrink-0" aria-hidden="true" />
-            <div>
-              <h2 id={`alert-${alert.type}`} className="type-heading">
-                {alert.title}
-              </h2>
-              <p className="type-body text-muted-foreground mt-1 max-w-2xl">{alert.description}</p>
-            </div>
+            <h2 id={`alert-${alert.type}`} className="type-heading">
+              {alert.title}
+            </h2>
+            <p className="type-body text-muted-foreground col-span-2 max-w-2xl">
+              {alert.description}
+            </p>
           </div>
           {alert.facts && (
             <dl className="border-status-warning-border mt-4 grid gap-px overflow-hidden rounded-lg border sm:grid-cols-3">
@@ -90,12 +124,25 @@ export function ReviewBanner({
               ))}
             </dl>
           )}
+          {alert.driverEvidence && driversExpanded && (
+            <AlertDriverEvidencePanel
+              id={`alert-${alert.type}-drivers`}
+              evidence={alert.driverEvidence}
+              onExploreThisHour={onExploreThisHour}
+            />
+          )}
         </div>
-        {canManage && (
+        {(canManage || alert.driverEvidence) && (
           <ReviewActions
             alert={alert}
             primaryAction={primaryAction}
             actionsDisabled={actionsDisabled}
+            canManage={canManage}
+            driversExpanded={driversExpanded}
+            onToggleDrivers={() => {
+              if (!driversExpanded) onDriversExpanded?.();
+              setDriversExpanded(expanded => !expanded);
+            }}
             onAction={onAction}
           />
         )}
@@ -108,33 +155,151 @@ function ReviewActions({
   alert,
   primaryAction,
   actionsDisabled,
+  canManage,
+  driversExpanded,
+  onToggleDrivers,
   onAction,
 }: {
   alert: DashboardAlert;
   primaryAction: boolean;
   actionsDisabled: boolean;
+  canManage: boolean;
+  driversExpanded: boolean;
+  onToggleDrivers: () => void;
   onAction?: (action: DashboardAlertAction) => void;
 }) {
+  const actions = alert.actions.filter(action => canManage || action === 'view_spend');
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:w-52 lg:flex-col">
-      {alert.actions.map((action, index) => (
-        <Button
-          key={action}
-          type="button"
-          variant={index === 0 && primaryAction ? 'default' : 'outline'}
-          className="min-h-control-touch w-full sm:min-h-0"
-          disabled={actionsDisabled}
-          aria-busy={actionsDisabled && action === 'acknowledge'}
-          onClick={() => onAction?.(action)}
-        >
-          {action.includes('disable') ? (
-            <XCircle className="size-4" aria-hidden="true" />
-          ) : (
+      {actions.map(action => {
+        const isDriverToggle = action === 'view_spend';
+        const label =
+          isDriverToggle && driversExpanded ? 'Hide alert drivers' : reviewActionLabels[action];
+        return (
+          <Button
+            key={action}
+            type="button"
+            variant={action === 'acknowledge' && primaryAction ? 'default' : 'outline'}
+            className="min-h-control-touch w-full sm:min-h-0"
+            disabled={actionsDisabled && !isDriverToggle}
+            aria-busy={actionsDisabled && action === 'acknowledge'}
+            aria-expanded={isDriverToggle ? driversExpanded : undefined}
+            aria-controls={isDriverToggle ? `alert-${alert.type}-drivers` : undefined}
+            onClick={() => (isDriverToggle ? onToggleDrivers() : onAction?.(action))}
+          >
+            {action.includes('disable') ? (
+              <XCircle className="size-4" aria-hidden="true" />
+            ) : isDriverToggle && driversExpanded ? (
+              <ChevronUp className="size-4" aria-hidden="true" />
+            ) : isDriverToggle ? (
+              <ChevronDown className="size-4" aria-hidden="true" />
+            ) : (
+              <ArrowRight className="size-4" aria-hidden="true" />
+            )}
+            {label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
+function AlertDriverEvidencePanel({
+  id,
+  evidence,
+  onExploreThisHour,
+}: {
+  id: string;
+  evidence: AlertDriverEvidence;
+  onExploreThisHour?: () => void;
+}) {
+  const viewerTimeZone = useViewerTimeZone();
+  const windowLabel =
+    evidence.periodStart && evidence.periodEndExclusive
+      ? evidence.scope === 'rolling_24h' ||
+        evidence.scope === 'rolling_7d' ||
+        evidence.scope === 'rolling_30d'
+        ? formatCostInsightElapsedWindow(
+            evidence.periodStart,
+            evidence.periodEndExclusive,
+            viewerTimeZone
+          )
+        : formatCostInsightHourWindow(
+            evidence.periodStart,
+            evidence.periodEndExclusive,
+            viewerTimeZone
+          )
+      : null;
+  const description = windowLabel
+    ? `${windowLabel} - ${evidence.description}`
+    : evidence.description;
+
+  return (
+    <div id={id} className="border-border bg-surface-inset mt-5 overflow-hidden rounded-lg border">
+      <div className="border-border flex flex-col gap-3 border-b px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="type-body font-semibold">{evidence.title}</h3>
+          <p className="type-label text-muted-foreground mt-1">{description}</p>
+        </div>
+        {evidence.scope === 'current_hour' && onExploreThisHour && (
+          <Button type="button" variant="outline" size="sm" onClick={onExploreThisHour}>
+            Explore this hour
             <ArrowRight className="size-4" aria-hidden="true" />
-          )}
-          {reviewActionLabels[action]}
-        </Button>
-      ))}
+          </Button>
+        )}
+      </div>
+      <ol className="divide-border divide-y">
+        {evidence.drivers.map((driver, index) => {
+          const share = percentOf(driver.spendUsd, evidence.totalSpendUsd);
+          return (
+            <li
+              key={driver.id}
+              className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 gap-y-3 px-4 py-4 sm:grid-cols-[1.5rem_minmax(0,1fr)_auto]"
+            >
+              <span className="text-chart-1 type-label pt-0.5 font-mono font-semibold tabular-nums">
+                {index + 1}
+              </span>
+              <div className="min-w-0">
+                <div className="type-body font-medium break-words">{driver.label}</div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 type-label text-muted-foreground">
+                  <span className="border-border bg-surface-overlay text-foreground rounded-full border px-2 py-0.5">
+                    {sourceLabels[driver.source]}
+                  </span>
+                  {driver.actorLabel && <span>{driver.actorLabel}</span>}
+                  {driver.modelOrProvider && (
+                    <span className="font-mono break-all">{driver.modelOrProvider}</span>
+                  )}
+                  {evidence.scope !== 'current_hour' && <span>{driver.category}</span>}
+                </div>
+              </div>
+              <div className="col-start-2 flex items-baseline gap-2 sm:col-start-auto sm:block sm:text-right">
+                <div className="type-body font-mono font-semibold tabular-nums">
+                  {money(driver.spendUsd)}
+                </div>
+                <div className="type-label tabular-nums">
+                  {evidence.scope !== 'legacy' && (
+                    <span className="text-chart-1 font-mono font-semibold">{share}%</span>
+                  )}
+                  {evidence.scope !== 'legacy' && (
+                    <span className="text-muted-foreground"> · </span>
+                  )}
+                  <span className="text-muted-foreground">
+                    {driver.requestCount} {driver.requestCount === 1 ? 'record' : 'records'}
+                  </span>
+                </div>
+              </div>
+              {evidence.scope !== 'legacy' && (
+                <div
+                  className="bg-surface-overlay col-start-2 h-1.5 overflow-hidden rounded-full sm:col-span-2"
+                  aria-hidden="true"
+                >
+                  <div className="bg-chart-1 h-full rounded-full" style={{ width: `${share}%` }} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
@@ -142,10 +307,12 @@ function ReviewActions({
 export function SuggestionCard({
   suggestion,
   canManage = true,
+  onCta,
   onDismiss,
 }: {
   suggestion: CostSuggestion;
   canManage?: boolean;
+  onCta?: () => void;
   onDismiss?: () => void;
 }) {
   return (
@@ -155,21 +322,14 @@ export function SuggestionCard({
     >
       <div className={cn('grid gap-5', canManage && 'lg:grid-cols-[minmax(0,1fr)_auto]')}>
         <div>
-          <div className="flex gap-3">
-            <Lightbulb
-              className="text-status-success-icon mt-0.5 size-5 shrink-0"
-              aria-hidden="true"
-            />
-            <div>
-              <div className="type-eyebrow text-status-success mb-2">{suggestion.eyebrow}</div>
-              <h2 id={`suggestion-${suggestion.id}`} className="type-heading">
-                {suggestion.title}
-              </h2>
-              <p className="type-body text-muted-foreground mt-1 max-w-2xl">
-                {suggestion.description}
-              </p>
-            </div>
+          <div className="flex items-center gap-3">
+            <Lightbulb className="text-status-success-icon size-5 shrink-0" aria-hidden="true" />
+            <div className="type-eyebrow text-status-success">{suggestion.eyebrow}</div>
           </div>
+          <h2 id={`suggestion-${suggestion.id}`} className="type-heading mt-2">
+            {suggestion.title}
+          </h2>
+          <p className="type-body text-muted-foreground mt-1 max-w-2xl">{suggestion.description}</p>
           <dl className="border-status-success-border mt-4 grid gap-px overflow-hidden rounded-lg border sm:grid-cols-3">
             {suggestion.facts.map(fact => (
               <div key={fact.label} className="bg-background p-3">
@@ -181,13 +341,13 @@ export function SuggestionCard({
             ))}
           </dl>
           <p className="type-label text-muted-foreground mt-3">
-            Benefits shown use current plan terms. Actual value depends on usage and eligibility.
+            Value depends on current terms, usage, and eligibility.
           </p>
         </div>
         {canManage && (
           <div className="flex flex-col gap-2 sm:flex-row lg:w-52 lg:flex-col">
             <Button asChild className="min-h-control-touch w-full sm:min-h-0">
-              <a href={suggestion.ctaHref}>
+              <a href={suggestion.ctaHref} onClick={onCta}>
                 {suggestion.ctaLabel}
                 <ArrowRight className="size-4" aria-hidden="true" />
               </a>

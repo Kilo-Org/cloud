@@ -25,6 +25,8 @@ type CostInsightClaimedDeliveryRow = {
   snapshot: {
     thresholdMicrodollars?: number | null;
     rolling24HourMicrodollars?: number | null;
+    rolling7DayMicrodollars?: number | null;
+    rolling30DayMicrodollars?: number | null;
     currentHourVariableMicrodollars?: number | null;
     anomalyThresholdMicrodollars?: number | null;
   };
@@ -58,9 +60,25 @@ function amountLabels(row: CostInsightClaimedDeliveryRow): {
   primaryAmountLabel: string;
   secondaryAmountLabel: string;
 } {
-  if (row.alert_kind === 'threshold') {
+  if (
+    row.alert_kind === 'threshold' ||
+    row.alert_kind === 'threshold_7d' ||
+    row.alert_kind === 'threshold_30d'
+  ) {
+    const windowLabel =
+      row.alert_kind === 'threshold_7d'
+        ? '7-day'
+        : row.alert_kind === 'threshold_30d'
+          ? '30-day'
+          : '24-hour';
+    const rollingMicrodollars =
+      row.alert_kind === 'threshold_7d'
+        ? row.snapshot.rolling7DayMicrodollars
+        : row.alert_kind === 'threshold_30d'
+          ? row.snapshot.rolling30DayMicrodollars
+          : row.snapshot.rolling24HourMicrodollars;
     return {
-      primaryAmountLabel: `Rolling 24-hour spend: ${money(row.snapshot.rolling24HourMicrodollars)}`,
+      primaryAmountLabel: `Rolling ${windowLabel} spend: ${money(rollingMicrodollars)}`,
       secondaryAmountLabel: `Spend threshold: ${money(row.snapshot.thresholdMicrodollars)}`,
     };
   }

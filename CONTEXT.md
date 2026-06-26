@@ -45,8 +45,8 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 | **Spend Anomaly Alert** | Spend Alert triggered when short-window owner Credit spend exceeds that owner's normal usage pattern | Referring to hourly burst-detection Spend Alerts | Low-balance alert, threshold alert |
 | **Variable Credit spend** | Credit spend created by request-metered product usage such as token usage or metered tool/API usage | Referring to spend that can burst unexpectedly during active usage | Scheduled Credit spend |
 | **Scheduled Credit spend** | Predictable Credit spend created by subscription-like purchases, renewals, or hosting deductions | Referring to expected recurring or explicitly purchased credit deductions | Variable Credit spend |
-| **Spend Threshold Alert** | Spend Alert triggered when rolling 24-hour owner Credit spend crosses configured spend threshold | Referring to threshold notification identity or review | Warning threshold, critical threshold, quota |
-| **Spend threshold** | Optional configured rolling 24-hour owner Credit-spend amount for Spend Threshold Alerts | Referring to the single v1 threshold setting | Hard limit, budget cap, daily quota |
+| **Spend Threshold Alert** | Spend Alert triggered when owner Credit spend crosses a configured rolling 24-hour, rolling 7-day, or rolling 30-day spend threshold | Referring to threshold notification identity or review | Warning threshold, critical threshold, quota |
+| **Spend threshold** | Optional configured rolling 24-hour, rolling 7-day, or rolling 30-day owner Credit-spend amount for Spend Threshold Alerts | Referring to any supported threshold window | Hard limit, budget cap, daily quota |
 | **Alert acknowledgment** | Authorized owner action that marks the current alert episode as reviewed | Referring to review without changing settings | Email open, page view, passive acknowledge |
 | **Cost Insight Event** | Durable owner-scoped record of Spend Alert notifications, reviews, configuration changes, and disablement | Referring to 90-day Cost Insights history | Raw usage row, provider log |
 
@@ -71,9 +71,10 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - Every active Cost Suggestion provides one destination CTA and a **Suggestion dismissal** action.
 - Suggestion dismissal hides that specific recommendation, creates a **Cost Insight Event**, and does not disable future materially different Cost Suggestions.
 - Disabling Cost Suggestions suppresses new suggestion emails and active dashboard suggestions but preserves prior suggestion activity history.
-- Cost Insights v1 is publicly visible to eligible owners without a release-toggle gate.
+- During initial rollout, Cost Insights v1 is available only to users whose current Kilo platform user record has `is_admin` set to `true`; access does not depend on a release-toggle gate.
 - **Spend Alerts** are inactive until a **Spend owner** explicitly enables them.
-- First enable immediately evaluates current anomaly state and configured **Spend threshold** state.
+- **Spend Anomaly Alerts** are enabled by default whenever **Spend Alerts** are enabled, and Spend owners may opt out independently.
+- First enable immediately evaluates each enabled alert sub-option: anomaly state plus configured rolling 24-hour, rolling 7-day, and rolling 30-day **Spend threshold** state.
 - First enable can create alert email and banner when current spend already crosses enabled alert state.
 - **Spend Alerts** are alert-only. They do not block spend, pause usage, throttle usage, suppress auto-top-up, reject paid requests, or return Spend Alerts-specific HTTP 402 responses.
 - Existing low-balance and depleted-credit billing behavior remains separate from **Spend Alerts**.
@@ -87,13 +88,15 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - Owners with at least 24 completed hourly buckets use available-history p95 even before 7 full days exist.
 - Owners without at least 24 hourly baseline buckets use a starter current-hour **Variable Credit spend** floor for **Spend Anomaly Alerts**.
 - **Spend Anomaly Alerts** may fire at most once per owner per hour while anomalous spend persists.
-- **Spend Threshold Alerts** use separate notification identity from **Spend Anomaly Alerts**.
-- **Spend threshold** is a single optional rolling 24-hour USD amount stored as microdollars and displayed with cent precision.
-- **Spend Threshold Alerts** evaluate all rolling 24-hour owner Credit spend, including **Variable Credit spend** and **Scheduled Credit spend**.
-- **Spend Threshold Alerts** fire once per below-to-above threshold crossing and may fire again only after rolling spend drops below the threshold and later crosses it again.
+- **Spend Threshold Alerts** use separate notification identity from **Spend Anomaly Alerts** and from each other threshold window.
+- Spend owners may configure independent optional rolling 24-hour, rolling 7-day, and rolling 30-day **Spend thresholds**, stored as microdollars and displayed with cent precision.
+- The threshold windows are exact half-open intervals: `[asOf - 24h, asOf)`, `[asOf - 7d, asOf)`, and `[asOf - 30d, asOf)`.
+- Each **Spend Threshold Alert** evaluates all owner Credit spend in its configured rolling window, including **Variable Credit spend** and **Scheduled Credit spend**.
+- Each threshold window maintains separate crossing, review, recovery, and notification identity; it fires once per below-to-above crossing and may fire again only after spend in that window drops below its threshold and later crosses it again.
 - **Alert acknowledgment** reviews the current anomaly or threshold episode without requiring settings changes.
-- Threshold review offers acknowledge, adjust threshold, or disable threshold; acknowledge alone is allowed.
-- **Spend Alerts** are sent to the personal user's email for personal owners and to active organization owners and billing managers for organization owners.
+- Threshold review offers acknowledge and Manage threshold; management opens the matching 24-hour, 7-day, or 30-day Cost Insights setting where authorized managers can adjust or disable it.
+- Active threshold alerts expose snapshotted top drivers from the exact evaluated rolling window across Variable and Scheduled Credit spend.
+- **Spend Alerts** are sent only to Kilo platform admins: the admin personal user's email for personal owners, and active organization owners or billing managers who are also platform admins for organization owners.
 - Spend Alerts store owner-scoped **Cost Insight Events** separately from per-recipient notification delivery rows.
 - Spend Alerts snapshot intended notification recipients at event creation and revalidate recipient access before delivery.
 - Spend Alerts notification delivery rows are deleted with their parent **Cost Insight Event** after 90 days.
@@ -113,22 +116,23 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - Cost Insights dashboard shows current alert state, review actions, and spend evidence. Cost Insights settings owns Spend Alerts policy.
 - Cost Insights appears directly below Usage in the personal and organization sidebars and shows attention state for unreviewed Spend Alert.
 - Organization Cost Insights identifies member spend drivers and links to existing organization member daily limit controls; v1 does not add per-member Spend Alert policy.
-- Organization Cost Insights dashboard and settings are visible only to organization owners and billing managers.
-- Organization members who cannot view Cost Insights are told to contact an organization owner or billing manager.
-- Kilo admins may inspect Spend Alerts under existing admin patterns, but v1 disable and settings changes require owner or billing-manager authority.
+- Personal and organization Cost Insights routes, navigation, attention queries, and API procedures are visible only to users whose current Kilo platform user record has `is_admin` set to `true`.
+- Kilo platform admins may inspect organization Spend Alerts under existing admin patterns, but v1 disable and settings changes require owner or billing-manager authority.
 - Spend Alert config and review actions do not require reason text in v1; events record actor, action, old and new values where applicable, and timestamp.
 - Disabling Spend Alerts keeps the owner config row disabled rather than deleting it.
 - Re-enabling Spend Alerts reuses existing saved settings unless an authorized manager changes them.
-- Re-enabling Spend Alerts immediately evaluates current rolling spend and current-hour anomaly state.
+- Re-enabling Spend Alerts immediately evaluates each enabled sub-option: current-hour anomaly state and all three configured rolling spend threshold windows.
 - While Spend Alerts are disabled, settings changes save only and do not evaluate controls, create events, or send emails.
 - Cost Insights dashboard shows read-only recent spend evidence even when Spend Alerts are disabled.
 - Cost Insights dashboard default evidence shows a 24-hour spend summary plus a 7-day hourly chart.
-- Cost Insights dashboard supports preset evidence ranges: 24h, 7d, 30d, and 90d.
+- Cost Insights dashboard supports preset evidence ranges: current UTC hour, 24h, 7d, 30d, and 90d; the current-hour preset updates both spend evidence and top drivers.
+- Active Spend Anomaly Alerts snapshot and expose the top current-hour Variable Credit spend drivers with their UTC-hour evidence window.
 - Spend Alerts owner state stores active episode dedupe and review state separately from 90-day event history.
 - Spend Alerts owner state stores minimal current episode markers for anomaly hour, threshold crossing state, and review status.
 - Spend Alerts use dedicated normalized storage for owner configuration, owner state, hourly spend rollups, and **Cost Insight Events**.
-- V1 Cost Insights settings expose Spend Alert enablement and one optional **Spend threshold** only.
+- Cost Insights settings show Spend Anomaly Alerts, rolling 24-hour, rolling 7-day, and rolling 30-day **Spend thresholds** in that order as sub-options of Spend Alerts.
 - Enabling Spend Alerts uses already-maintained owner hourly rollups for baseline data, with Postgres source-of-truth backfill or repair when rollups are missing.
+- Threshold evaluation falls back to exact canonical Postgres source data when rolling 7-day or rolling 30-day rollup coverage is incomplete.
 - Spend Alerts store owner-hour totals separately from compact owner-hour driver buckets.
 - Spend Alerts owner-hour totals record all Credit spend and label spend category so anomaly evaluation can distinguish **Variable Credit spend** from **Scheduled Credit spend**.
 - Spend Alerts owner-hour totals are keyed by spend category, with separate rows for Variable Credit spend and Scheduled Credit spend.
@@ -146,7 +150,7 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - Spend Alerts evaluation runs asynchronously after Credit spend updates and through an hourly sweep that catches missed evaluations and rolling-window transitions.
 - Async Spend Alerts evaluation uses current config at evaluation time.
 - V1 Spend Alerts evaluation runs in `apps/web` through post-spend async execution and an app cron hourly sweep.
-- Organization **Spend Alerts** are managed by organization owners and billing managers.
+- Organization **Spend Alerts** are managed by organization owners and billing managers who are also Kilo platform admins during initial rollout.
 - A **Security Finding Activity Event** falls into a report period based on when Kilo recorded or applied it. External source timestamps are supporting evidence and do not determine report inclusion.
 - A **Security Agent Audit Report** groups every matching reportable **Security Finding Activity Event** recorded by Kilo in the selected period.
 - V1 reports persisted SLA evidence only when it can do so from trustworthy recorded data. It does not calculate historical SLA compliance percentages or introduce new SLA lifecycle semantics.
@@ -181,7 +185,7 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - A rollout baseline event records current state at actual capture time for an existing Security Finding; it is not a synthetic creation event and must not be backdated.
 - Use **Cost Insights** for the user-facing surface, **Spend Alerts** for the alerting capability, and **Cost Suggestion** for optional cost-efficiency recommendations. Do not call this feature Spend Protection or Cost Controls.
 - Do not describe a Cost Suggestion as an alert, warning, guaranteed savings, automatic optimization, or required action.
-- Use **Spend Threshold Alert** and **Spend threshold** for the single v1 threshold model. Do not introduce warning or critical threshold tiers unless the spec changes.
+- Use **Spend Threshold Alert** and **Spend threshold** for the independent rolling 24-hour, rolling 7-day, and rolling 30-day threshold windows. Do not introduce warning or critical threshold tiers.
 - Keep Spend Alerts alert-only. Do not describe them as spend blocks, hard limits, pauses, throttles, or request admission controls.
 
 ## Ambiguities
@@ -213,7 +217,7 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - Do not make Spend Alerts block, pause, throttle, suppress auto-top-up, reject paid requests, or emit Spend Alerts-specific HTTP 402 responses.
 - Do not hide v1 Cost Insights behind a release-toggle gate unless a later product decision supersedes public opt-in.
 - Do not make Spend Alerts depend on Snowflake-only usage analytics for detection.
-- Treat organization owners and billing managers as authorized managers for organization Spend Alerts.
+- During initial rollout, treat organization owners and billing managers as authorized managers for organization Spend Alerts only when they are also Kilo platform admins.
 - Surface Spend Alerts through **Cost Insights** dashboard and settings routes, not as only an embedded usage, credits, or subscriptions control.
 
 ## Decision References

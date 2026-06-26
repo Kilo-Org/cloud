@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { createTRPCRouter, baseProcedure, type TRPCContext } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import {
   buildCostInsightsDashboardData,
   buildCostInsightsEventHistoryData,
@@ -14,6 +14,13 @@ import {
   countOpenCostInsightReviewItems,
   dismissCostInsightSuggestion,
 } from '@/lib/cost-insights/repository';
+import {
+  trackCostInsightsAlertAction,
+  trackCostInsightsSuggestionAction,
+  trackCostInsightsUiInteraction,
+  type CostInsightsAuthorizedRole,
+  type CostInsightsTrackingContext,
+} from '@/lib/cost-insights/posthog-tracking';
 import { ensureOrganizationAccess, OrganizationIdInputSchema } from './utils';
 import { costInsightsRouterInternals } from '../cost-insights-router';
 
@@ -55,13 +62,37 @@ async function resolveOrgReadContext(ctx: TRPCContext, organizationId: string) {
   }
 
   const role = await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+  if (role !== 'owner' && role !== 'billing_manager') {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Only an organization owner or billing manager can view Cost Insights.',
+    });
+  }
   return { name, authorizedRole: role, readOnly: false } as const;
+}
+
+function organizationTrackingContext(
+  userId: string,
+  organizationId: string,
+  authorizedRole: CostInsightsAuthorizedRole
+): CostInsightsTrackingContext {
+  return {
+    distinctId: userId,
+    userId,
+    ownerType: 'organization',
+    organizationId,
+    authorizedRole,
+  };
 }
 
 async function ensureOrgManageAccess(ctx: TRPCContext, organizationId: string) {
   if (!ctx.user.is_admin) {
-    await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
-    return;
+    const role = await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+    if (role === 'owner' || role === 'billing_manager') return role;
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Only an organization owner or billing manager can change Cost Insights.',
+    });
   }
   const directRole = await getDirectCostInsightsRole(organizationId, ctx.user.id);
   if (directRole !== 'owner' && directRole !== 'billing_manager') {
@@ -70,10 +101,33 @@ async function ensureOrgManageAccess(ctx: TRPCContext, organizationId: string) {
       message: 'Only an organization owner or billing manager can change Cost Insights.',
     });
   }
+  return directRole;
 }
 
 export const organizationCostInsightsRouter = createTRPCRouter({
-  getDashboard: baseProcedure.input(OrganizationIdInputSchema).query(async ({ ctx, input }) => {
+  trackUiInteraction: adminProcedure
+    .input(costInsightsRouterInternals.OrganizationCostInsightsUiInteractionSchema)
+    .mutation(async ({ ctx, input }) => {
+      const access = await resolveOrgReadContext(ctx, input.organizationId);
+      trackCostInsightsUiInteraction(
+        organizationTrackingContext(ctx.user.id, input.organizationId, access.authorizedRole),
+        input
+      );
+      return { success: true };
+    }),
+  trackSuggestionCta: adminProcedure
+    .input(costInsightsRouterInternals.OrganizationCostInsightsSuggestionCtaSchema)
+    .mutation(async ({ ctx, input }) => {
+      const role = await ensureOrgManageAccess(ctx, input.organizationId);
+      trackCostInsightsSuggestionAction({
+        ...organizationTrackingContext(ctx.user.id, input.organizationId, role),
+        action: 'open_cta',
+        suggestionKind: input.suggestionKind,
+        phase: 'clicked',
+      });
+      return { success: true };
+    }),
+  getDashboard: adminProcedure.input(OrganizationIdInputSchema).query(async ({ ctx, input }) => {
     const access = await resolveOrgReadContext(ctx, input.organizationId);
     return await buildCostInsightsDashboardData({
       database: db,
@@ -85,7 +139,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
       },
     });
   }),
-  getSettings: baseProcedure.input(OrganizationIdInputSchema).query(async ({ ctx, input }) => {
+  getSettings: adminProcedure.input(OrganizationIdInputSchema).query(async ({ ctx, input }) => {
     const access = await resolveOrgReadContext(ctx, input.organizationId);
     return await buildCostInsightsSettingsData({
       database: db,
@@ -98,7 +152,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
       readOnly: access.readOnly,
     });
   }),
-  listEvents: baseProcedure
+  listEvents: adminProcedure
     .input(
       OrganizationIdInputSchema.merge(costInsightsRouterInternals.CostInsightEventHistorySchema)
     )
@@ -112,7 +166,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
         pageSize: input.pageSize,
       });
     }),
-  getAttentionState: baseProcedure
+  getAttentionState: adminProcedure
     .input(OrganizationIdInputSchema)
     .query(async ({ ctx, input }) => {
       await resolveOrgReadContext(ctx, input.organizationId);
@@ -125,53 +179,70 @@ export const organizationCostInsightsRouter = createTRPCRouter({
         reviewItemCount,
       };
     }),
-  updateSettings: baseProcedure
+  updateSettings: adminProcedure
     .input(
       OrganizationIdInputSchema.merge(costInsightsRouterInternals.UpdateCostInsightsSettingsSchema)
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureOrgManageAccess(ctx, input.organizationId);
+      const role = await ensureOrgManageAccess(ctx, input.organizationId);
       return await costInsightsRouterInternals.updateOwnerSettings({
         owner: { type: 'organization', id: input.organizationId },
         actorUserId: ctx.user.id,
+        trackingContext: organizationTrackingContext(ctx.user.id, input.organizationId, role),
         input,
       });
     }),
-  acknowledgeAlert: baseProcedure
+  acknowledgeAlert: adminProcedure
     .input(
       OrganizationIdInputSchema.merge(costInsightsRouterInternals.AcknowledgeCostInsightAlertSchema)
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureOrgManageAccess(ctx, input.organizationId);
-      await acknowledgeCostInsightAlert(db, {
+      const role = await ensureOrgManageAccess(ctx, input.organizationId);
+      const acknowledged = await acknowledgeCostInsightAlert(db, {
         owner: { type: 'organization', id: input.organizationId },
         alertKind: input.alertKind,
         actorUserId: ctx.user.id,
       });
+      if (acknowledged) {
+        trackCostInsightsAlertAction({
+          ...organizationTrackingContext(ctx.user.id, input.organizationId, role),
+          action: 'acknowledge',
+          alertKind: input.alertKind,
+        });
+      }
       return { success: true };
     }),
-  disableThreshold: baseProcedure
+  disableThreshold: adminProcedure
     .input(OrganizationIdInputSchema)
     .mutation(async ({ ctx, input }) => {
-      await ensureOrgManageAccess(ctx, input.organizationId);
+      const role = await ensureOrgManageAccess(ctx, input.organizationId);
       return await costInsightsRouterInternals.disableOwnerThreshold({
         owner: { type: 'organization', id: input.organizationId },
         actorUserId: ctx.user.id,
+        trackingContext: organizationTrackingContext(ctx.user.id, input.organizationId, role),
       });
     }),
-  dismissSuggestion: baseProcedure
+  dismissSuggestion: adminProcedure
     .input(
       OrganizationIdInputSchema.merge(
         costInsightsRouterInternals.DismissCostInsightSuggestionSchema
       )
     )
     .mutation(async ({ ctx, input }) => {
-      await ensureOrgManageAccess(ctx, input.organizationId);
-      await dismissCostInsightSuggestion(db, {
+      const role = await ensureOrgManageAccess(ctx, input.organizationId);
+      const suggestionKind = await dismissCostInsightSuggestion(db, {
         owner: { type: 'organization', id: input.organizationId },
         suggestionId: input.suggestionId,
         actorUserId: ctx.user.id,
       });
+      if (suggestionKind) {
+        trackCostInsightsSuggestionAction({
+          ...organizationTrackingContext(ctx.user.id, input.organizationId, role),
+          action: 'dismiss',
+          suggestionKind,
+          phase: 'accepted',
+        });
+      }
       return { success: true };
     }),
 });

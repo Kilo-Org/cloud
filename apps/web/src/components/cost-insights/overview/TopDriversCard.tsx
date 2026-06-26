@@ -2,16 +2,18 @@ import { UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { money, percentOf, sourceLabels } from '../formatting';
+import { money, percentOf, sourceLabels, spendRangePeriodLabel } from '../formatting';
 import { EmptyPanel } from '../shared/EmptyPanel';
-import type { CostInsightsOwner, SpendDriver } from '../types';
+import type { CostInsightsOwner, SpendDriver, SpendRange } from '../types';
 
 export function TopDriversCard({
   drivers,
+  period,
   owner,
   memberLimitsHref,
 }: {
   drivers: SpendDriver[];
+  period: SpendRange;
   owner: CostInsightsOwner;
   memberLimitsHref?: string;
 }) {
@@ -20,7 +22,7 @@ export function TopDriversCard({
     <Card className="min-w-0">
       <CardHeader>
         <CardTitle className="type-heading">Where spend went</CardTitle>
-        <CardDescription>Largest contributors in the last 24 hours.</CardDescription>
+        <CardDescription>Largest contributors in {spendRangePeriodLabel(period)}.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {drivers.length === 0 ? (
@@ -29,9 +31,12 @@ export function TopDriversCard({
             description="Products and members will appear after Credit spend is recorded."
           />
         ) : (
-          <ol className="space-y-5 overflow-hidden">
+          <ol className="grid gap-x-8 gap-y-6 overflow-hidden lg:grid-cols-2">
             {drivers.slice(0, 5).map(driver => (
-              <li key={driver.id} className="min-w-0">
+              <li
+                key={driver.id}
+                className="border-border min-w-0 border-t pt-5 first:border-t-0 first:pt-0 lg:[&:nth-child(2)]:border-t-0 lg:[&:nth-child(2)]:pt-0"
+              >
                 <DriverRow
                   driver={driver}
                   total={total}

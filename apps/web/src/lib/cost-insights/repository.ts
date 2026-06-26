@@ -42,10 +42,18 @@ function eventTypesForFilter(filter: CostInsightEventFilter): CostInsightEventTy
   return filter === 'all' ? null : eventTypesByFilter[filter];
 }
 
+export type CostInsightThresholdAlertKind = Extract<
+  CostInsightAlertKind,
+  'threshold' | 'threshold_7d' | 'threshold_30d'
+>;
+
 export type CostInsightConfigPatch = {
   spendAlertsEnabled?: boolean;
+  anomalyAlertsEnabled?: boolean;
   costSuggestionsEnabled?: boolean;
   spendThresholdMicrodollars?: number | null;
+  spend7DayThresholdMicrodollars?: number | null;
+  spend30DayThresholdMicrodollars?: number | null;
 };
 
 export type CostInsightEventInput = {
@@ -122,11 +130,20 @@ export async function updateCostInsightOwnerConfig(
     .update(cost_insight_owner_configs)
     .set({
       spend_alerts_enabled: nextSpendAlertsEnabled,
+      anomaly_alerts_enabled: patch.anomalyAlertsEnabled ?? previous.anomaly_alerts_enabled,
       cost_suggestions_enabled: patch.costSuggestionsEnabled ?? previous.cost_suggestions_enabled,
       spend_threshold_microdollars:
         patch.spendThresholdMicrodollars === undefined
           ? previous.spend_threshold_microdollars
           : patch.spendThresholdMicrodollars,
+      spend_7_day_threshold_microdollars:
+        patch.spend7DayThresholdMicrodollars === undefined
+          ? previous.spend_7_day_threshold_microdollars
+          : patch.spend7DayThresholdMicrodollars,
+      spend_30_day_threshold_microdollars:
+        patch.spend30DayThresholdMicrodollars === undefined
+          ? previous.spend_30_day_threshold_microdollars
+          : patch.spend30DayThresholdMicrodollars,
       spend_alerts_enabled_at: nextSpendAlertsEnabled
         ? (previous.spend_alerts_enabled_at ?? sql`now()`)
         : null,
@@ -173,6 +190,33 @@ export async function clearCostInsightAlertState(
       active_threshold_event_id: null,
       threshold_crossing_started_at: null,
       threshold_reviewed_at: null,
+      threshold_recovered_at: null,
+      rolling_7_day_threshold_crossing_active: false,
+      active_rolling_7_day_threshold_event_id: null,
+      rolling_7_day_threshold_crossing_started_at: null,
+      rolling_7_day_threshold_reviewed_at: null,
+      rolling_7_day_threshold_recovered_at: null,
+      rolling_30_day_threshold_crossing_active: false,
+      active_rolling_30_day_threshold_event_id: null,
+      rolling_30_day_threshold_crossing_started_at: null,
+      rolling_30_day_threshold_reviewed_at: null,
+      rolling_30_day_threshold_recovered_at: null,
+      updated_at: sql`now()`,
+    })
+    .where(eq(cost_insight_owner_states.id, state.id));
+}
+
+export async function clearCostInsightAnomalyEpisode(
+  database: CostInsightDatabase,
+  owner: CostInsightSpendOwner
+): Promise<void> {
+  const state = await getOrCreateCostInsightOwnerState(database, owner);
+  await database
+    .update(cost_insight_owner_states)
+    .set({
+      active_anomaly_event_id: null,
+      active_anomaly_hour_start: null,
+      active_anomaly_reviewed_at: null,
       updated_at: sql`now()`,
     })
     .where(eq(cost_insight_owner_states.id, state.id));
@@ -249,15 +293,24 @@ export async function listCostInsightNotificationRecipientUserIds(
   database: CostInsightDatabase,
   owner: CostInsightSpendOwner
 ): Promise<string[]> {
-  if (owner.type === 'user') return [owner.id];
+  if (owner.type === 'user') {
+    const [admin] = await database
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(and(eq(kilocode_users.id, owner.id), eq(kilocode_users.is_admin, true)))
+      .limit(1);
+    return admin ? [admin.id] : [];
+  }
 
   const rows = await database
     .select({ userId: organization_memberships.kilo_user_id })
     .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
     .where(
       and(
         eq(organization_memberships.organization_id, owner.id),
-        inArray(organization_memberships.role, ['owner', 'billing_manager'])
+        inArray(organization_memberships.role, ['owner', 'billing_manager']),
+        eq(kilocode_users.is_admin, true)
       )
     )
     .orderBy(organization_memberships.kilo_user_id);
@@ -350,15 +403,27 @@ export async function getCostInsightDashboardState(
       activeThresholdEventId: cost_insight_owner_states.active_threshold_event_id,
       thresholdCrossingActive: cost_insight_owner_states.threshold_crossing_active,
       thresholdReviewedAt: cost_insight_owner_states.threshold_reviewed_at,
+      active7DayThresholdEventId: cost_insight_owner_states.active_rolling_7_day_threshold_event_id,
+      threshold7DayCrossingActive:
+        cost_insight_owner_states.rolling_7_day_threshold_crossing_active,
+      threshold7DayReviewedAt: cost_insight_owner_states.rolling_7_day_threshold_reviewed_at,
+      active30DayThresholdEventId:
+        cost_insight_owner_states.active_rolling_30_day_threshold_event_id,
+      threshold30DayCrossingActive:
+        cost_insight_owner_states.rolling_30_day_threshold_crossing_active,
+      threshold30DayReviewedAt: cost_insight_owner_states.rolling_30_day_threshold_reviewed_at,
       lastEvaluatedAt: cost_insight_owner_states.last_evaluated_at,
     })
     .from(cost_insight_owner_states)
     .where(costInsightOwnerWhere(owner, cost_insight_owner_states))
     .limit(1);
 
-  const eventIds = [state?.activeAnomalyEventId, state?.activeThresholdEventId].filter(
-    (id): id is string => Boolean(id)
-  );
+  const eventIds = [
+    state?.activeAnomalyEventId,
+    state?.activeThresholdEventId,
+    state?.active7DayThresholdEventId,
+    state?.active30DayThresholdEventId,
+  ].filter((id): id is string => Boolean(id));
 
   const events =
     eventIds.length === 0
@@ -389,71 +454,134 @@ export async function markCostInsightAnomalyEpisode(
 
 export async function markCostInsightThresholdEpisode(
   database: CostInsightDatabase,
-  params: { owner: CostInsightSpendOwner; eventId: string; crossedAt: string }
+  params: {
+    owner: CostInsightSpendOwner;
+    eventId: string;
+    crossedAt: string;
+    alertKind: CostInsightThresholdAlertKind;
+  }
 ): Promise<void> {
   const state = await getOrCreateCostInsightOwnerState(database, params.owner);
-  await database
-    .update(cost_insight_owner_states)
-    .set({
+  const values = (() => {
+    if (params.alertKind === 'threshold_7d') {
+      return {
+        rolling_7_day_threshold_crossing_active: true,
+        active_rolling_7_day_threshold_event_id: params.eventId,
+        rolling_7_day_threshold_crossing_started_at: params.crossedAt,
+        rolling_7_day_threshold_reviewed_at: null,
+        rolling_7_day_threshold_recovered_at: null,
+        updated_at: sql`now()`,
+      };
+    }
+    if (params.alertKind === 'threshold_30d') {
+      return {
+        rolling_30_day_threshold_crossing_active: true,
+        active_rolling_30_day_threshold_event_id: params.eventId,
+        rolling_30_day_threshold_crossing_started_at: params.crossedAt,
+        rolling_30_day_threshold_reviewed_at: null,
+        rolling_30_day_threshold_recovered_at: null,
+        updated_at: sql`now()`,
+      };
+    }
+    return {
       threshold_crossing_active: true,
       active_threshold_event_id: params.eventId,
       threshold_crossing_started_at: params.crossedAt,
       threshold_reviewed_at: null,
       threshold_recovered_at: null,
       updated_at: sql`now()`,
-    })
+    };
+  })();
+  await database
+    .update(cost_insight_owner_states)
+    .set(values)
     .where(eq(cost_insight_owner_states.id, state.id));
 }
 
 export async function clearCostInsightThresholdEpisode(
   database: CostInsightDatabase,
   owner: CostInsightSpendOwner,
-  recoveredAt: string | null
+  recoveredAt: string | null,
+  alertKind: CostInsightThresholdAlertKind = 'threshold'
 ): Promise<void> {
   const state = await getOrCreateCostInsightOwnerState(database, owner);
-  await database
-    .update(cost_insight_owner_states)
-    .set({
+  const values = (() => {
+    if (alertKind === 'threshold_7d') {
+      return {
+        rolling_7_day_threshold_crossing_active: false,
+        active_rolling_7_day_threshold_event_id: null,
+        rolling_7_day_threshold_crossing_started_at: null,
+        rolling_7_day_threshold_reviewed_at: null,
+        rolling_7_day_threshold_recovered_at: recoveredAt,
+        updated_at: sql`now()`,
+      };
+    }
+    if (alertKind === 'threshold_30d') {
+      return {
+        rolling_30_day_threshold_crossing_active: false,
+        active_rolling_30_day_threshold_event_id: null,
+        rolling_30_day_threshold_crossing_started_at: null,
+        rolling_30_day_threshold_reviewed_at: null,
+        rolling_30_day_threshold_recovered_at: recoveredAt,
+        updated_at: sql`now()`,
+      };
+    }
+    return {
       threshold_crossing_active: false,
       active_threshold_event_id: null,
       threshold_crossing_started_at: null,
       threshold_reviewed_at: null,
       threshold_recovered_at: recoveredAt,
       updated_at: sql`now()`,
-    })
+    };
+  })();
+  await database
+    .update(cost_insight_owner_states)
+    .set(values)
     .where(eq(cost_insight_owner_states.id, state.id));
 }
 
 export async function acknowledgeCostInsightAlert(
   database: CostInsightDatabase,
   params: { owner: CostInsightSpendOwner; alertKind: CostInsightAlertKind; actorUserId: string }
-): Promise<void> {
+): Promise<boolean> {
   const state = await getOrCreateCostInsightOwnerState(database, params.owner);
   const now = sql`now()`;
-  const [acknowledged] = await database
-    .update(cost_insight_owner_states)
-    .set(
-      params.alertKind === 'anomaly'
-        ? { active_anomaly_reviewed_at: now, updated_at: now }
-        : { threshold_reviewed_at: now, updated_at: now }
-    )
-    .where(
-      and(
-        eq(cost_insight_owner_states.id, state.id),
-        params.alertKind === 'anomaly'
+  const reviewValues =
+    params.alertKind === 'anomaly'
+      ? { active_anomaly_reviewed_at: now, updated_at: now }
+      : params.alertKind === 'threshold_7d'
+        ? { rolling_7_day_threshold_reviewed_at: now, updated_at: now }
+        : params.alertKind === 'threshold_30d'
+          ? { rolling_30_day_threshold_reviewed_at: now, updated_at: now }
+          : { threshold_reviewed_at: now, updated_at: now };
+  const activeEpisode =
+    params.alertKind === 'anomaly'
+      ? and(
+          isNotNull(cost_insight_owner_states.active_anomaly_event_id),
+          isNull(cost_insight_owner_states.active_anomaly_reviewed_at)
+        )
+      : params.alertKind === 'threshold_7d'
+        ? and(
+            isNotNull(cost_insight_owner_states.active_rolling_7_day_threshold_event_id),
+            isNull(cost_insight_owner_states.rolling_7_day_threshold_reviewed_at)
+          )
+        : params.alertKind === 'threshold_30d'
           ? and(
-              isNotNull(cost_insight_owner_states.active_anomaly_event_id),
-              isNull(cost_insight_owner_states.active_anomaly_reviewed_at)
+              isNotNull(cost_insight_owner_states.active_rolling_30_day_threshold_event_id),
+              isNull(cost_insight_owner_states.rolling_30_day_threshold_reviewed_at)
             )
           : and(
               isNotNull(cost_insight_owner_states.active_threshold_event_id),
               isNull(cost_insight_owner_states.threshold_reviewed_at)
-            )
-      )
-    )
+            );
+  const [acknowledged] = await database
+    .update(cost_insight_owner_states)
+    .set(reviewValues)
+    .where(and(eq(cost_insight_owner_states.id, state.id), activeEpisode))
     .returning({ id: cost_insight_owner_states.id });
 
-  if (!acknowledged) return;
+  if (!acknowledged) return false;
 
   await createCostInsightEvent(database, {
     owner: params.owner,
@@ -463,9 +591,14 @@ export async function acknowledgeCostInsightAlert(
     title:
       params.alertKind === 'anomaly'
         ? 'Spend Anomaly Alert reviewed'
-        : 'Spend Threshold Alert reviewed',
+        : params.alertKind === 'threshold_7d'
+          ? '7-day Spend Threshold Alert reviewed'
+          : params.alertKind === 'threshold_30d'
+            ? '30-day Spend Threshold Alert reviewed'
+            : '24-hour Spend Threshold Alert reviewed',
     description: 'Alert acknowledgment recorded for the current episode.',
   });
+  return true;
 }
 
 export async function upsertCostInsightActiveSuggestion(
@@ -529,7 +662,7 @@ export async function listActiveCostInsightSuggestions(
 export async function dismissCostInsightSuggestion(
   database: CostInsightDatabase,
   params: { owner: CostInsightSpendOwner; suggestionId: string; actorUserId: string }
-): Promise<void> {
+): Promise<CostInsightSuggestionKind | null> {
   const [suggestion] = await database
     .update(cost_insight_active_suggestions)
     .set({
@@ -546,7 +679,7 @@ export async function dismissCostInsightSuggestion(
     )
     .returning();
 
-  if (!suggestion) return;
+  if (!suggestion) return null;
   await createCostInsightEvent(database, {
     owner: params.owner,
     eventType: 'suggestion_dismissed',
@@ -565,6 +698,7 @@ export async function dismissCostInsightSuggestion(
       },
     },
   });
+  return suggestion.suggestion_kind;
 }
 
 export async function hasCurrentCostInsightAccess(
@@ -572,15 +706,25 @@ export async function hasCurrentCostInsightAccess(
   owner: CostInsightSpendOwner,
   userId: string
 ): Promise<boolean> {
-  if (owner.type === 'user') return owner.id === userId;
+  if (owner.type === 'user') {
+    if (owner.id !== userId) return false;
+    const [admin] = await database
+      .select({ id: kilocode_users.id })
+      .from(kilocode_users)
+      .where(and(eq(kilocode_users.id, userId), eq(kilocode_users.is_admin, true)))
+      .limit(1);
+    return Boolean(admin);
+  }
   const [row] = await database
     .select({ id: organization_memberships.id })
     .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
     .where(
       and(
         eq(organization_memberships.organization_id, owner.id),
         eq(organization_memberships.kilo_user_id, userId),
-        inArray(organization_memberships.role, ['owner', 'billing_manager'])
+        inArray(organization_memberships.role, ['owner', 'billing_manager']),
+        eq(kilocode_users.is_admin, true)
       )
     )
     .limit(1);
@@ -636,6 +780,14 @@ export async function ownerHasUnreviewedCostInsightAlert(
           and(
             isNull(cost_insight_owner_states.threshold_reviewed_at),
             sql`${cost_insight_owner_states.active_threshold_event_id} IS NOT NULL`
+          ),
+          and(
+            isNull(cost_insight_owner_states.rolling_7_day_threshold_reviewed_at),
+            sql`${cost_insight_owner_states.active_rolling_7_day_threshold_event_id} IS NOT NULL`
+          ),
+          and(
+            isNull(cost_insight_owner_states.rolling_30_day_threshold_reviewed_at),
+            sql`${cost_insight_owner_states.active_rolling_30_day_threshold_event_id} IS NOT NULL`
           )
         )
       )
@@ -656,6 +808,12 @@ export async function countOpenCostInsightReviewItems(
         activeAnomalyReviewedAt: cost_insight_owner_states.active_anomaly_reviewed_at,
         activeThresholdEventId: cost_insight_owner_states.active_threshold_event_id,
         thresholdReviewedAt: cost_insight_owner_states.threshold_reviewed_at,
+        active7DayThresholdEventId:
+          cost_insight_owner_states.active_rolling_7_day_threshold_event_id,
+        threshold7DayReviewedAt: cost_insight_owner_states.rolling_7_day_threshold_reviewed_at,
+        active30DayThresholdEventId:
+          cost_insight_owner_states.active_rolling_30_day_threshold_event_id,
+        threshold30DayReviewedAt: cost_insight_owner_states.rolling_30_day_threshold_reviewed_at,
       })
       .from(cost_insight_owner_states)
       .where(costInsightOwnerWhere(owner, cost_insight_owner_states))
@@ -674,7 +832,9 @@ export async function countOpenCostInsightReviewItems(
   const activeState = state[0];
   const alertCount =
     (activeState?.activeAnomalyEventId && !activeState.activeAnomalyReviewedAt ? 1 : 0) +
-    (activeState?.activeThresholdEventId && !activeState.thresholdReviewedAt ? 1 : 0);
+    (activeState?.activeThresholdEventId && !activeState.thresholdReviewedAt ? 1 : 0) +
+    (activeState?.active7DayThresholdEventId && !activeState.threshold7DayReviewedAt ? 1 : 0) +
+    (activeState?.active30DayThresholdEventId && !activeState.threshold30DayReviewedAt ? 1 : 0);
   const suggestionCount =
     (config?.cost_suggestions_enabled ?? true) ? (suggestions[0]?.value ?? 0) : 0;
   return alertCount + suggestionCount;

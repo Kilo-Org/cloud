@@ -613,6 +613,18 @@ describe('database schema', () => {
         'reconciliation_mismatch',
         'late_source_data',
       ],
+      CostInsightEventType: [
+        'config_changed',
+        'anomaly_alert',
+        'threshold_crossed',
+        'alert_reviewed',
+        'suggestion_created',
+        'suggestion_dismissed',
+        'disabled',
+      ],
+      CostInsightAlertKind: ['anomaly', 'threshold', 'threshold_7d', 'threshold_30d'],
+      CostInsightSuggestionKind: ['coding_plan', 'kilo_pass'],
+      CostInsightNotificationStatus: ['pending', 'sending', 'sent', 'failed'],
       CodeReviewAnalyticsCaptureStatus: ['captured', 'missing', 'invalid', 'omitted'],
       CodeReviewAnalyticsChangeType: [
         'bug_fix',

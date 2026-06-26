@@ -4,11 +4,11 @@ This plan covers Cost Insights v1, including Spend Alerts and Cost Suggestions. 
 
 ## Status
 
-Implemented in this branch. The Spend evidence data layer was implemented in commit `f060ef557`; this follow-on slice adds Spend Alert and Cost Suggestion config, owner state, events, notification delivery, evaluation, tRPC procedures, live UI wiring, sidebar attention, email templates, cron jobs, and retention.
+Implemented in this branch. The Spend evidence data layer was implemented in commit `f060ef557`; this follow-on slice adds Spend Alert and Cost Suggestion config, owner state, events, notification delivery, evaluation, tRPC procedures, live UI wiring, sidebar attention, email templates, cron jobs, and retention. Rolling 7-day threshold behavior is now part of the canonical design; this documentation and analytics-contract slice does not implement its runtime storage, evaluation, or UI.
 
 Current state:
 
-- Credit-spend capture, owner-hour rollups, canonical Postgres reads, coverage, degraded intervals, exact rolling-24-hour reads, backfill, repair, reconciliation, operator scripts, and a local dev seed are implemented.
+- Credit-spend capture, owner-hour rollups, canonical Postgres reads, coverage, degraded intervals, exact rolling-window reads, backfill, repair, reconciliation, operator scripts, and a local dev seed are implemented.
 - Spend Alert and Cost Suggestion config, owner state, active suggestions, Cost Insight Events, notification deliveries, alert/suggestion evaluation, hourly sweep, and 90-day retention cleanup are implemented.
 - Personal and organization routes are wired to live tRPC data and mutations. `/config` is the settings route; old `/settings` paths redirect. Ask Kilo v1 routes render UI-only conversation controls without processing questions.
 - Cost Insights sidebar placement is directly below Usage. Sidebar attention uses the lightweight unreviewed-alert endpoint.
@@ -22,27 +22,27 @@ Current state:
 - Spend Alerts are alert-only.
 - Spend Alerts must not block spend, pause usage, throttle usage, suppress auto-top-up, reject paid requests, or emit Spend Alerts-specific HTTP 402 responses.
 - Existing depleted-credit and low-balance billing behavior remains separate.
-- Cost Insights v1 is publicly visible to eligible owners without a release-toggle gate.
+- Initial Cost Insights v1 access is limited to users whose current Kilo platform user record has `is_admin` set to `true`, without a release-toggle gate.
 - Cost Insights routes mirror Security Agent shape: dashboard plus settings for personal and organization owners.
 - Cost Insights dashboard shows read-only recent spend evidence even when Spend Alerts are disabled.
 - Cost Insights dashboard default evidence shows 24-hour spend summary plus 7-day hourly chart.
-- Cost Insights dashboard supports preset evidence ranges: 24h, 7d, 30d, and 90d.
-- Spend Alert settings expose only Spend Alert enablement and one optional spend threshold in v1.
+- Cost Insights dashboard supports preset evidence ranges: current UTC hour, 24h, 7d, 30d, and 90d; current-hour selection updates both chart evidence and top drivers.
+- Active anomaly banners expose captured current-hour Variable Credit spend drivers inline.
+- Spend Alert settings show default-on Spend Anomaly Alerts, then independent optional rolling 24-hour, rolling 7-day, and rolling 30-day thresholds in that order.
 - Cost Suggestions are enabled by default through an owner-scoped setting independent from Spend Alert enablement.
 - Disabling Cost Suggestions suppresses new suggestion emails and active suggestion cards without removing prior suggestion activity from Cost Insight Event history.
 - Active Cost Suggestions appear on the Cost Insights dashboard, with Spend Alerts taking visual and ordering priority when both are active.
 - Cost Suggestions are advisory: they do not guarantee savings, purchase or change subscriptions, or alter spend behavior.
 - V1 does not expose spend limits, spend pauses, anomaly sensitivity controls, custom anomaly multipliers, custom anomaly floors, custom recipients, product exclusions, model exclusions, or per-member Spend Alert policy.
-- First enable immediately evaluates current anomaly state and configured spend threshold state.
+- First enable immediately evaluates each enabled alert sub-option: current anomaly state and all three configured threshold windows.
 - First enable can create alert email/banner when current spend already crosses enabled alert state.
 - Disabling Spend Alerts keeps owner config row disabled rather than deleting it.
 - Re-enabling Spend Alerts reuses existing saved settings unless changed.
-- Re-enable immediately evaluates current rolling spend and current-hour anomaly state.
+- Re-enable immediately evaluates current spend for every enabled anomaly sub-option and all three configured threshold windows.
 - While disabled, settings changes save only and do not evaluate controls, create events, or send emails.
 - Spend Alerts evaluate all owner Credit spend, with anomaly alerts focused on hourly Variable Credit spend bursts.
-- Organization Cost Insights is visible and manageable only by active organization owners and billing managers.
-- Organization members without Cost Insights access are told to contact an organization owner or billing manager.
-- Kilo admins may inspect Spend Alerts under existing admin patterns but cannot disable alerts or change customer Spend Alert settings in v1 without owner/billing-manager authority.
+- Personal and organization Cost Insights routes, navigation, attention queries, and API procedures are available only to users whose current Kilo platform user record has `is_admin` set to `true`.
+- Kilo platform admins may inspect organization Spend Alerts under existing admin patterns but cannot disable alerts or change customer Spend Alert settings in v1 without owner/billing-manager authority.
 - Detection uses Postgres source-of-truth data, not Snowflake-only usage analytics.
 - Spend Alerts use dedicated normalized tables for owner config, owner state, owner-hour totals, owner-hour driver buckets, rollup coverage, degraded coverage intervals, and Cost Insight Events.
 - Owner-hour totals and driver buckets are sparse aggregates; covered zero-spend hours are derived at read time rather than stored as zero rows.
@@ -61,8 +61,10 @@ Current state:
 - Credit spend does not commit if corresponding owner-hour total or driver-bucket update fails.
 - Enablement uses existing hourly owner rollups for baseline, with Postgres backfill or repair when rollups are missing.
 - Enablement repair targets the prior 7 days; 30d and 90d dashboard evidence is not treated as complete until contiguous reconciled coverage reaches the requested range.
+- Rolling 7-day and rolling 30-day threshold evaluation falls back to exact canonical Postgres source data when rollup coverage is incomplete.
 - Initial rollout bootstraps 90 days of Postgres evidence. Bootstrapped and newly captured rollups are retained indefinitely.
 - Async evaluation uses current config at evaluation time.
+- Spend Anomaly Alerts are enabled by default under Spend Alerts and can be opted out independently.
 - V1 anomaly detection uses product-managed fixed sensitivity.
 - V1 anomaly threshold is `max(3 * baseline, 10 USD floor)` when baseline data is available.
 - Owners without at least 24 completed hourly buckets use a 25 USD current-hour Variable Credit spend starter floor.
@@ -71,14 +73,16 @@ Current state:
 - Anomaly baseline includes zero-spend completed hours in trailing 7-day window.
 - Owners with at least 24 completed hourly buckets use available-history p95 before 7 full days exist.
 - Anomaly acknowledgment reviews current UTC-hour anomaly episode; future anomalous hours can alert again.
-- Spend threshold is one optional USD cent value stored as microdollars.
-- Spend threshold crossings create email, event history, and in-app review banner.
-- Spend Threshold Alert evaluation uses exact elapsed `[asOf - 24h, asOf)` spend, not a 24-UTC-bucket approximation.
-- Threshold review offers acknowledge, adjust threshold, or disable threshold; acknowledge alone is allowed.
-- Threshold acknowledgment reviews current threshold-crossing episode until exact rolling spend falls below threshold and crosses again.
-- Disabling threshold clears current threshold episode state.
+- Spend owners can configure independent optional rolling 24-hour, rolling 7-day, and rolling 30-day USD cent values stored as microdollars.
+- Each threshold window owns independent crossing, review, recovery, notification, and in-app banner state.
+- Spend Threshold Alert evaluation uses exact elapsed `[asOf - 24h, asOf)`, `[asOf - 7d, asOf)`, or `[asOf - 30d, asOf)` spend, not aligned UTC-bucket approximations.
+- Threshold review offers acknowledge and Manage threshold; management opens the matching 24-hour, 7-day, or 30-day Cost Insights settings sub-option.
+- New threshold events snapshot top drivers from the exact evaluated rolling window and expose that evidence inline.
+- Threshold acknowledgment reviews only the matching current crossing episode until spend falls below that threshold and crosses again.
+- Disabling a threshold clears only its matching current episode state.
 - Config and review actions do not require reason text; events record actor, action, old/new values where applicable, and timestamp.
 - Event history retains summarized Cost Insight Events for 90 days.
+- Cost Insights UI timestamps render in the viewer's current time zone using 24-hour time and without a time-zone suffix; UTC remains an internal storage and evaluation boundary only.
 - Event history remains fixed to 90 days even though hourly rollups are retained indefinitely.
 - Cost Insight Events are deleted after 90 days rather than merely hidden.
 - Event retention is enforced by daily app cron deletion.
@@ -102,12 +106,12 @@ The spend-writer audit prerequisite is complete and guarded by `apps/web/src/lib
 
 | Slice | Status | Implemented | Remaining |
 |---|---|---|---|
-| 1. Schema and policy primitives | Implemented | Owner-hour totals, driver buckets, coverage, degraded intervals, config, owner episode state, active suggestions, Cost Insight Events, notification delivery, and pure policy helpers | Production migration deployment |
-| 2. Spend evidence data layer | Implemented locally; production rollout pending | Atomic capture for AI Gateway, charged Exa, Coding Plan, and pure-credit KiloClaw; dense hourly reads; exact rolling 24h; top drivers; canonical repair/backfill/reconciliation; local seed | Production cutover, 7-day and 90-day backfill, production reconciliation, query-plan checks, performance benchmarks, and operational telemetry |
-| 3. Spend Alert evaluation | Implemented | Fixed anomaly policy, threshold crossing logic, first-enable/re-enable evaluation, web post-spend scheduling, hourly sweep, events, notification delivery creation, and episode dedupe | Production smoke tests and KiloClaw Worker post-renewal dispatch if lower latency than hourly sweep is required |
+| 1. Schema and policy primitives | Implemented for existing windows | Owner-hour totals, driver buckets, coverage, degraded intervals, config, owner episode state, active suggestions, Cost Insight Events, notification delivery, and pure policy helpers | Rolling 7-day config/state/event primitives and production migration deployment |
+| 2. Spend evidence data layer | Implemented locally; production rollout pending | Atomic capture for AI Gateway, charged Exa, Coding Plan, and pure-credit KiloClaw; dense hourly reads; exact rolling-window reads; top drivers; canonical repair/backfill/reconciliation; local seed | Production cutover, 7-day and 90-day backfill, production reconciliation, query-plan checks, performance benchmarks, and operational telemetry |
+| 3. Spend Alert evaluation | Implemented for existing windows | Fixed anomaly policy, threshold crossing logic, first-enable/re-enable evaluation, web post-spend scheduling, hourly sweep, events, notification delivery creation, and episode dedupe | Rolling 7-day threshold evaluation, production smoke tests, and KiloClaw Worker post-renewal dispatch if lower latency than hourly sweep is required |
 | 4. Cost Suggestion evaluation | Implemented | Default-on config, eligibility heuristics, evidence windows, active identity, CTA selection, dismissal, and events | Product tuning from production evidence |
-| 5. Notifications and banners | Implemented | Recipient snapshots, retryable email deliveries, dispatch-time access checks, Spend Alert email template, dashboard banners, suggestion cards, and deep links | Live email provider smoke test |
-| 6. Cost Insights UI | Implemented | Personal/org dashboard, `/config`, activity, UI-only Ask Kilo, tRPC reads/mutations, actor labels, sidebar attention, admin read-only settings, and route cleanup | Browser smoke after deployment |
+| 5. Notifications and banners | Implemented for existing alert kinds | Recipient snapshots, retryable email deliveries, dispatch-time access checks, Spend Alert email template, dashboard banners, suggestion cards, and deep links | Rolling 7-day alert support and live email provider smoke test |
+| 6. Cost Insights UI | Implemented for existing windows | Personal/org dashboard, `/config`, activity, UI-only Ask Kilo, tRPC reads/mutations, actor labels, sidebar attention, admin read-only settings, and route cleanup | Rolling 7-day settings/review UI and browser smoke after deployment |
 | 7. Retention and audit cleanup | Implemented | Daily deletion of 90-day events and child delivery rows while compact owner state remains | Production cron smoke |
 
 ## Implementation areas
@@ -116,7 +120,7 @@ The spend-writer audit prerequisite is complete and guarded by `apps/web/src/lib
 |---|---|---|
 | `packages/db/src/schema.ts` | Spend evidence, config, owner state, active suggestion, event, and notification delivery tables are implemented | Production migration deployment |
 | `packages/db/src/cost-insights-rollups.ts` | Transaction-bound capture is implemented for web and Worker callers | Add telemetry only if it belongs at this boundary; generic reads remain in the web repository |
-| `packages/db/src/migrations/` | Generated migrations `0173_workable_carlie_cooper.sql` and `0174_young_molecule_man.sql` contain Spend evidence and alert/suggestion/event storage | Never edit generated migration artifacts by hand |
+| `packages/db/src/migrations/` | Generated migrations `0173_workable_carlie_cooper.sql`, `0174_young_molecule_man.sql`, and `0175_aberrant_abomination.sql` contain Spend evidence, alert/suggestion/event storage, anomaly opt-out, and 30-day threshold state | Never edit generated migration artifacts by hand |
 | `apps/web/src/lib/ai-gateway/` | Positive personal and organization Variable Credit spend captures atomically and schedules async evaluation after commit | Production smoke |
 | `apps/web/src/lib/organizations/` | Organization mutation is transaction-aware; Cost Insights reuses owner/billing-manager authorization and recipient checks | Production smoke |
 | `apps/web/src/lib/exa-usage.ts` | Charged positive Exa usage captures atomically as `other`/`exa` and schedules async evaluation after commit | Finish production partition-index rollout |
@@ -137,12 +141,12 @@ The spend-writer audit prerequisite is complete and guarded by `apps/web/src/lib
 | Spend-writer inventory | Done | Keep the repository guard current when new balance mutations are added |
 | Atomic capture and rollback | Done for current producers | Add real-rollup integration coverage for Coding Plan and KiloClaw paths that currently mock capture |
 | Owner isolation, UTC buckets, covered zero, unknown/degraded history | Done at repository/data-layer level | Add more API authorization and organization read-scope tests |
-| Exact rolling `[asOf - 24h, asOf)` | Done | Benchmark high-volume boundary fragments before per-spend threshold evaluation |
+| Exact rolling threshold windows | Done for 24-hour and 30-day windows | Add `[asOf - 7d, asOf)` coverage and benchmark high-volume boundary fragments before per-spend threshold evaluation |
 | Backfill, repair, reconciliation | Partial | Add production canaries and broader degraded-interval lifecycle coverage |
 | Preset evidence ranges | Partial | Add exact 24h, 7d, 30d, and 90d bucket-count tests plus top-driver tie/category tests |
 | Config and authorization | Partial | Threshold validation has pure coverage; add router-level owner/billing-manager/member/admin tests |
 | Spend Anomaly Alerts | Partial | Policy helper coverage exists; add repository-backed dedupe, acknowledgment, and first-enable tests |
-| Spend Threshold Alerts | Partial | Add exact crossing/recovery/recrossing, adjustment, disablement, and first-enable tests |
+| Spend Threshold Alerts | Partial | Add rolling 7-day runtime coverage plus exact crossing/recovery/recrossing, adjustment, disablement, and first-enable tests for all three windows |
 | Cost Suggestions | Partial | Add repository-backed default enablement, materially-new identity, CTA, and dismissal tests |
 | Non-enforcement | Partial | Targeted spend-writer tests still pass; add end-to-end proof that alerts never reject spend or change billing state |
 | Events, notifications, banners, and attention | Partial | Add event snapshot, delivery retry/revalidation, and sidebar attention tests |
@@ -150,11 +154,12 @@ The spend-writer audit prerequisite is complete and guarded by `apps/web/src/lib
 
 ## Next implementation order
 
-1. Deploy migrations and complete data-layer production rollout gates from `.plans/cost-insights-data-layer.md`.
-2. Run production EXPLAINs, capture latency and lock benchmarks, and live cron/email smoke tests.
-3. Complete contiguous 7-day then 90-day backfill, canary reconciliation, and deployment-boundary reconciliation.
-4. Add router/repository integration tests for organization authorization, alert episode dedupe, notification retry/revalidation, and retention.
-5. Decide whether KiloClaw Worker renewals need direct post-commit side-effect dispatch or whether hourly sweep latency is acceptable.
+1. Implement rolling 7-day threshold storage, exact evaluation, state, settings, notifications, and presentation using the canonical contracts in this plan and `.specs/cost-insights.md`.
+2. Deploy migrations and complete data-layer production rollout gates from `.plans/cost-insights-data-layer.md`.
+3. Run production EXPLAINs, capture latency and lock benchmarks, and live cron/email smoke tests.
+4. Complete contiguous 7-day then 90-day backfill, canary reconciliation, and deployment-boundary reconciliation.
+5. Add router/repository integration tests for organization authorization, alert episode dedupe, notification retry/revalidation, and retention.
+6. Decide whether KiloClaw Worker renewals need direct post-commit side-effect dispatch or whether hourly sweep latency is acceptable.
 
 ## Verification completed
 

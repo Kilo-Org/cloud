@@ -1,26 +1,35 @@
 'use client';
 
-import { useState, type CSSProperties } from 'react';
+import type { CSSProperties } from 'react';
 import { ArrowRight, Clock3 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { money, percentOf, spendBarHeightPercent } from '../formatting';
+import { formatSpendEvidenceTime, money, percentOf, spendBarHeightPercent } from '../formatting';
 import { EmptyPanel } from '../shared/EmptyPanel';
+import { LocalDateTime, useViewerTimeZone } from '../shared/LocalDateTime';
 import type { CostInsightsDashboardData, SpendRange } from '../types';
 
-function isSpendRange(value: string): value is SpendRange {
-  return ['24h', '7d', '30d', '90d'].includes(value);
-}
-
-export function SpendEvidenceCard({ data }: { data: CostInsightsDashboardData }) {
-  const [selectedRange, setSelectedRange] = useState<SpendRange>();
-  const range = selectedRange ?? data.range;
-  const evidence = range === data.range ? data.evidence : (data.evidenceByRange?.[range] ?? []);
+export function SpendEvidenceCard({
+  data,
+  range,
+}: {
+  data: CostInsightsDashboardData;
+  range: SpendRange;
+}) {
+  const viewerTimeZone = useViewerTimeZone();
+  const rawEvidence = range === data.range ? data.evidence : data.evidenceByRange[range];
+  const evidence = rawEvidence.map(point => ({
+    ...point,
+    label:
+      point.periodStart && (range === '1h' || range === '24h' || range === '7d')
+        ? formatSpendEvidenceTime(point.periodStart, range, viewerTimeZone)
+        : point.label,
+  }));
   const totals = evidence.map(point => point.variableUsd + point.scheduledUsd);
   const maxSpend = Math.max(1, ...totals);
   const rangeLabel = {
+    '1h': 'This hour',
     '24h': 'Last 24 hours',
     '7d': 'Last 7 days',
     '30d': 'Last 30 days',
@@ -30,43 +39,13 @@ export function SpendEvidenceCard({ data }: { data: CostInsightsDashboardData })
   const highest = evidence[highestIndex];
   const total = totals.reduce((sum, value) => sum + value, 0);
   const isDenseRange = range === '30d';
-  const barMinimumWidth = range === '30d' ? '0.75rem' : range === '90d' ? '1.5rem' : '2rem';
-  const chartMinimumWidth = range === '30d' ? '40rem' : '32rem';
+  const barMinimumWidth =
+    range === '1h' ? '8rem' : range === '30d' ? '0.75rem' : range === '90d' ? '1.5rem' : '2rem';
+  const chartMinimumWidth = range === '1h' ? '12rem' : range === '30d' ? '40rem' : '32rem';
 
   return (
-    <Card className="min-w-0">
-      <CardHeader className="gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <CardTitle className="type-heading">Spend over time</CardTitle>
-          <CardDescription>
-            {rangeLabel}. Usage-based and scheduled spend are shown separately.
-          </CardDescription>
-        </div>
-        <fieldset
-          aria-label="Spend range"
-          className="border-input bg-input-background grid w-full grid-cols-4 gap-1 rounded-md border p-1 lg:flex lg:w-auto"
-        >
-          {(['24h', '7d', '30d', '90d'] as SpendRange[]).map(option => (
-            <Button
-              key={option}
-              type="button"
-              variant="ghost"
-              size="sm"
-              aria-pressed={range === option}
-              className={cn(
-                'min-h-control-touch px-3 type-label lg:min-h-9',
-                range === option && 'bg-surface-selected text-foreground hover:bg-surface-selected'
-              )}
-              onClick={() => {
-                if (isSpendRange(option)) setSelectedRange(option);
-              }}
-            >
-              {option}
-            </Button>
-          ))}
-        </fieldset>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Card className="min-w-0" role="region" aria-label="Spend chart">
+      <CardContent className="space-y-4 pt-6">
         {evidence.length === 0 ? (
           <EmptyPanel
             title="No spend in this period"
@@ -101,6 +80,8 @@ export function SpendEvidenceCard({ data }: { data: CostInsightsDashboardData })
                     '--bar-count': evidence.length,
                     '--bar-min-width': barMinimumWidth,
                     minWidth: chartMinimumWidth,
+                    maxWidth: range === '1h' ? '16rem' : undefined,
+                    marginInline: range === '1h' ? 'auto' : undefined,
                   } as CSSProperties
                 }
               >
@@ -185,14 +166,20 @@ export function SpendEvidenceCard({ data }: { data: CostInsightsDashboardData })
                 })}
               </div>
             </div>
-            <div className="flex items-center gap-1.5 type-label text-muted-foreground lg:hidden">
-              Scroll chart to see all periods
-              <ArrowRight className="size-icon-sm" aria-hidden="true" />
-            </div>
+            {range !== '1h' && (
+              <div className="flex items-center gap-1.5 type-label text-muted-foreground lg:hidden">
+                Scroll chart to see all periods
+                <ArrowRight className="size-icon-sm" aria-hidden="true" />
+              </div>
+            )}
             <div className="flex flex-wrap justify-between gap-2 type-label text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Clock3 className="size-icon-sm" aria-hidden="true" />
-                {data.lastEvaluatedLabel}
+                {data.lastEvaluatedAt ? (
+                  <LocalDateTime timestamp={data.lastEvaluatedAt} prefix="Last evaluated " />
+                ) : (
+                  'Not evaluated yet'
+                )}
               </span>
               <span>{baselineLabel(data.baselineMode)}</span>
             </div>

@@ -1,10 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, DollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { spendRangePeriodLabel } from '../formatting';
 import { CostInsightsLoadError } from '../shared/CostInsightsLoadError';
 import { StatusBadge } from '../shared/StatusBadge';
-import type { CostInsightsDashboardData, SpendMetric } from '../types';
+import type { CostInsightsDashboardData, SpendMetric, SpendRange } from '../types';
 import { AskKiloInput } from './AskKiloInput';
 import { DisabledAlertsBanner, ReviewBanner, SuggestionCard } from './DashboardNotices';
 import { EventPreviewCard } from './EventPreviewCard';
@@ -26,6 +29,14 @@ const metricIcons = {
   dollar: DollarSign,
 } satisfies Record<string, typeof Activity>;
 
+const rangeOptions = [
+  { value: '1h', label: 'This hour' },
+  { value: '24h', label: '24h' },
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
+  { value: '90d', label: '90d' },
+] satisfies Array<{ value: SpendRange; label: string }>;
+
 export function CostInsightsDashboardView({
   data,
   isLoading = false,
@@ -35,6 +46,9 @@ export function CostInsightsDashboardView({
   onRetry,
   onSetupAlerts,
   onAlertAction,
+  onAlertDriversExpanded,
+  onSpendRangeChange,
+  onSuggestionCta,
   onSuggestionDismiss,
   onAskKilo,
 }: {
@@ -49,13 +63,28 @@ export function CostInsightsDashboardView({
     alert: CostInsightsDashboardData['alerts'][number],
     action: CostInsightsDashboardData['alerts'][number]['actions'][number]
   ) => void;
+  onAlertDriversExpanded?: (alertKind: CostInsightsDashboardData['alerts'][number]['type']) => void;
+  onSpendRangeChange?: (range: SpendRange) => void;
+  onSuggestionCta?: (suggestion: CostInsightsDashboardData['suggestions'][number]) => void;
   onSuggestionDismiss?: (suggestionId: string) => void;
   onAskKilo?: (question: string) => void;
 }) {
+  const [selectedRange, setSelectedRange] = useState<SpendRange>();
+
   if (isLoading) return <DashboardSkeleton />;
   if (isError) return <CostInsightsLoadError onRetry={onRetry} />;
   if (!data) return <CostInsightsLoadError onRetry={onRetry} />;
 
+  const activeRange = selectedRange ?? data.range;
+  const showThisHour = () => {
+    if (activeRange !== '1h') onSpendRangeChange?.('1h');
+    setSelectedRange('1h');
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById('spend-evidence')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
   const canManage =
     data.owner.type === 'personal' ||
     data.owner.authorizedRole === 'owner' ||
@@ -64,14 +93,15 @@ export function CostInsightsDashboardView({
   return (
     <div className="space-y-6">
       <AskKiloInput owner={data.owner} onSubmit={onAskKilo} />
-      {data.alerts.map((alert, index) => (
+      {data.alerts.map(alert => (
         <ReviewBanner
           key={alert.type}
           alert={alert}
-          primaryAction={index === 0}
           actionsDisabled={alertActionsDisabled}
           canManage={canManage}
           onAction={action => onAlertAction?.(alert, action)}
+          onDriversExpanded={() => onAlertDriversExpanded?.(alert.type)}
+          onExploreThisHour={showThisHour}
         />
       ))}
       {data.suggestions.map(suggestion => (
@@ -79,6 +109,7 @@ export function CostInsightsDashboardView({
           key={suggestion.id}
           suggestion={suggestion}
           canManage={canManage}
+          onCta={() => onSuggestionCta?.(suggestion)}
           onDismiss={() => onSuggestionDismiss?.(suggestion.id)}
         />
       ))}
@@ -109,14 +140,54 @@ export function CostInsightsDashboardView({
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
-        <SpendEvidenceCard key={data.range} data={data} />
-        <TopDriversCard
-          drivers={data.drivers}
-          owner={data.owner}
-          memberLimitsHref={data.memberLimitsHref}
-        />
-      </div>
+      <section id="spend-evidence" aria-labelledby="spend-evidence-title" className="scroll-mt-6">
+        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 id="spend-evidence-title" className="type-heading">
+              Spend over time
+            </h2>
+            <p className="type-body text-muted-foreground mt-1">
+              Usage-based spend, scheduled spend, and largest contributors for{' '}
+              {spendRangePeriodLabel(activeRange)}.
+            </p>
+          </div>
+          <fieldset
+            aria-label="Spend range"
+            className="border-input bg-input-background flex w-full gap-1 overflow-x-auto rounded-md border p-1 lg:w-auto"
+          >
+            {rangeOptions.map(option => (
+              <Button
+                key={option.value}
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-pressed={activeRange === option.value}
+                className={cn(
+                  'min-h-control-touch shrink-0 px-3 type-label lg:min-h-9',
+                  activeRange === option.value &&
+                    'bg-surface-selected text-foreground hover:bg-surface-selected'
+                )}
+                onClick={() => {
+                  if (activeRange === option.value) return;
+                  setSelectedRange(option.value);
+                  onSpendRangeChange?.(option.value);
+                }}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </fieldset>
+        </div>
+        <div className="space-y-6">
+          <SpendEvidenceCard data={data} range={activeRange} />
+          <TopDriversCard
+            drivers={data.driversByRange[activeRange]}
+            period={activeRange}
+            owner={data.owner}
+            memberLimitsHref={data.memberLimitsHref}
+          />
+        </div>
+      </section>
 
       <EventPreviewCard events={data.eventPreview} activityHref={activityHref} />
     </div>
@@ -132,9 +203,9 @@ function DashboardSkeleton() {
           <Skeleton key={index} className="h-32 rounded-none" />
         ))}
       </div>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
+      <div className="space-y-6">
         <Skeleton className="h-96 rounded-xl" />
-        <Skeleton className="h-96 rounded-xl" />
+        <Skeleton className="h-72 rounded-xl" />
       </div>
     </output>
   );

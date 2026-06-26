@@ -8,7 +8,7 @@ export type CostInsightsOwner = {
 
 export type CostInsightsPage = 'dashboard' | 'ask' | 'events' | 'config';
 export type CostInsightsAttention = 'none' | 'alert';
-export type SpendRange = '24h' | '7d' | '30d' | '90d';
+export type SpendRange = '1h' | '24h' | '7d' | '30d' | '90d';
 export type SpendMetricIcon = 'activity' | 'alert' | 'check' | 'dollar';
 
 export type SpendMetric = {
@@ -21,6 +21,7 @@ export type SpendMetric = {
 
 export type SpendEvidencePoint = {
   label: string;
+  periodStart?: string;
   variableUsd: number;
   scheduledUsd: number;
   anomalyThresholdUsd?: number;
@@ -40,20 +41,32 @@ export type SpendDriver = {
 
 export type AlertFact = { label: string; value: string };
 
+export type AlertDriverEvidence = {
+  title: string;
+  description: string;
+  periodStart?: string;
+  periodEndExclusive?: string;
+  drivers: SpendDriver[];
+  totalSpendUsd: number;
+  scope: 'current_hour' | 'rolling_24h' | 'rolling_7d' | 'rolling_30d' | 'legacy';
+};
+
 export type DashboardAlert =
   | {
       type: 'anomaly';
       title: string;
       description: string;
       facts?: AlertFact[];
+      driverEvidence?: AlertDriverEvidence;
       actions: ('acknowledge' | 'view_spend' | 'disable_alerts')[];
     }
   | {
-      type: 'threshold';
+      type: 'threshold' | 'threshold_7d' | 'threshold_30d';
       title: string;
       description: string;
       facts?: AlertFact[];
-      actions: ('acknowledge' | 'adjust_threshold' | 'disable_threshold')[];
+      driverEvidence?: AlertDriverEvidence;
+      actions: ('acknowledge' | 'view_spend' | 'manage_threshold')[];
     };
 
 export type DashboardAlertAction = DashboardAlert['actions'][number];
@@ -75,11 +88,11 @@ export type CostInsightsDashboardData = {
   range: SpendRange;
   metrics: SpendMetric[];
   evidence: SpendEvidencePoint[];
-  evidenceByRange?: Partial<Record<SpendRange, SpendEvidencePoint[]>>;
-  drivers: SpendDriver[];
+  evidenceByRange: Record<SpendRange, SpendEvidencePoint[]>;
+  driversByRange: Record<SpendRange, SpendDriver[]>;
   alerts: DashboardAlert[];
   suggestions: CostSuggestion[];
-  lastEvaluatedLabel: string;
+  lastEvaluatedAt: string | null;
   baselineMode: 'starter' | 'available-history' | 'seven-day';
   eventPreview: CostInsightEvent[];
   memberLimitsHref?: string;
@@ -99,25 +112,40 @@ export type CostInsightEvent = {
   type: CostInsightEventType;
   title: string;
   description: string;
-  timestampLabel: string;
+  occurredAt: string;
   actorLabel?: string;
   amountLabel?: string;
-  amountClassifier?: 'current hour' | 'rolling 24h' | 'last 7 days';
+  amountClassifier?: 'current hour' | 'rolling 24h' | 'rolling 7d' | 'rolling 30d' | 'last 7 days';
   topDrivers?: SpendDriver[];
 };
 
 export type CostInsightsSettingsData = {
   owner: CostInsightsOwner;
   enabled: boolean;
+  anomalyAlertsEnabled: boolean;
   suggestionsEnabled: boolean;
   thresholdUsd: string;
+  threshold7DayUsd?: string;
+  threshold30DayUsd: string;
   saveState: 'saved' | 'dirty' | 'saving' | 'error';
-  validations?: string[];
+  validations?: {
+    thresholdUsd?: string;
+    threshold7DayUsd?: string;
+    threshold30DayUsd?: string;
+  };
   readOnly?: boolean;
 };
 
 export type CostInsightsSettingsPatch = Partial<
-  Pick<CostInsightsSettingsData, 'enabled' | 'suggestionsEnabled' | 'thresholdUsd'>
+  Pick<
+    CostInsightsSettingsData,
+    | 'enabled'
+    | 'anomalyAlertsEnabled'
+    | 'suggestionsEnabled'
+    | 'thresholdUsd'
+    | 'threshold7DayUsd'
+    | 'threshold30DayUsd'
+  >
 >;
 
 export type SettingsConfirmation =

@@ -1,12 +1,14 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { useTRPC } from '@/lib/trpc/utils';
 import { CostInsightsDashboardView } from './overview/CostInsightsDashboardView';
-import type { DashboardAlert, DashboardAlertAction } from './types';
+import type { CostSuggestion, DashboardAlert, DashboardAlertAction, SpendRange } from './types';
+import { useCostInsightsTracking } from './useCostInsightsTracking';
 
 type CostInsightsOverviewClientProps = {
   organizationId?: string;
@@ -20,6 +22,8 @@ export function CostInsightsOverviewClient({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { trackSuggestionCta, trackUiInteraction } = useCostInsightsTracking(organizationId);
+  const trackedDashboardOwner = useRef<string | undefined>(undefined);
 
   const {
     data: personalDashboard,
@@ -44,6 +48,19 @@ export function CostInsightsOverviewClient({
   const dashboard = organizationId ? organizationDashboard : personalDashboard;
   const dashboardLoading = organizationId ? organizationDashboardLoading : personalDashboardLoading;
   const dashboardError = organizationId ? organizationDashboardError : personalDashboardError;
+
+  useEffect(() => {
+    if (!dashboard) return;
+    const ownerKey = organizationId ?? 'personal';
+    if (trackedDashboardOwner.current === ownerKey) return;
+    trackedDashboardOwner.current = ownerKey;
+    trackUiInteraction({
+      interaction: 'dashboard_viewed',
+      spendAlertsEnabled: dashboard.enabled,
+      hasActiveAlert: dashboard.alerts.length > 0,
+      hasActiveSuggestion: dashboard.suggestions.length > 0,
+    });
+  }, [dashboard, organizationId, trackUiInteraction]);
 
   const invalidateCostInsights = async () => {
     if (organizationId) {
@@ -100,24 +117,6 @@ export function CostInsightsOverviewClient({
       onError: error => toast.error(error.message || 'Could not mark alert reviewed'),
     })
   );
-  const personalDisableThresholdMutation = useMutation(
-    trpc.costInsights.disableThreshold.mutationOptions({
-      onSuccess: () => {
-        toast.success('Spend threshold turned off');
-        void invalidateCostInsights();
-      },
-      onError: error => toast.error(error.message || 'Could not turn off spend threshold'),
-    })
-  );
-  const organizationDisableThresholdMutation = useMutation(
-    trpc.organizations.costInsights.disableThreshold.mutationOptions({
-      onSuccess: () => {
-        toast.success('Spend threshold turned off');
-        void invalidateCostInsights();
-      },
-      onError: error => toast.error(error.message || 'Could not turn off spend threshold'),
-    })
-  );
   const personalDismissMutation = useMutation(
     trpc.costInsights.dismissSuggestion.mutationOptions({
       onSuccess: () => {
@@ -140,27 +139,26 @@ export function CostInsightsOverviewClient({
   const handleAlertAction = (alert: DashboardAlert, action: DashboardAlertAction) => {
     if (action === 'acknowledge') {
       if (organizationId) {
-        organizationAcknowledgeMutation.mutate({ organizationId, alertKind: alert.type });
+        organizationAcknowledgeMutation.mutate({
+          organizationId,
+          alertKind: alert.type,
+        });
         return;
       }
       personalAcknowledgeMutation.mutate({ alertKind: alert.type });
       return;
     }
 
-    if (action === 'view_spend') {
-      document.getElementById('spend-summary-title')?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      });
-      return;
-    }
-
-    if (action === 'disable_threshold') {
-      if (organizationId) {
-        organizationDisableThresholdMutation.mutate({ organizationId });
-        return;
-      }
-      personalDisableThresholdMutation.mutate();
+    if (action === 'view_spend') return;
+    trackUiInteraction({ interaction: 'alert_settings_clicked', action });
+    if (action === 'manage_threshold') {
+      const thresholdAnchor =
+        alert.type === 'threshold_30d'
+          ? 'spend-threshold-30d'
+          : alert.type === 'threshold_7d'
+            ? 'spend-threshold-7d'
+            : 'spend-threshold-24h';
+      router.push(`${basePath}/config#${thresholdAnchor}`);
       return;
     }
 
@@ -175,14 +173,31 @@ export function CostInsightsOverviewClient({
     personalDismissMutation.mutate({ suggestionId });
   };
 
+  const handleSuggestionCta = (suggestion: CostSuggestion) => {
+    trackSuggestionCta({ suggestionKind: suggestion.type });
+  };
+
   const handleAskKilo = (question: string) => {
+    trackUiInteraction({
+      interaction: 'ask_kilo_question_submitted',
+      source: 'dashboard',
+      experience: 'ui_only',
+    });
     const searchParams = new URLSearchParams({ question });
     router.push(`${basePath}/ask-kilo?${searchParams.toString()}`);
   };
 
+  const handleSpendRangeChange = (range: SpendRange) => {
+    trackUiInteraction({ interaction: 'spend_range_selected', range });
+  };
+
+  const handleAlertDriversExpanded = (alertKind: DashboardAlert['type']) => {
+    trackUiInteraction({ interaction: 'alert_drivers_expanded', alertKind });
+  };
+
   const alertActionsDisabled = organizationId
-    ? organizationAcknowledgeMutation.isPending || organizationDisableThresholdMutation.isPending
-    : personalAcknowledgeMutation.isPending || personalDisableThresholdMutation.isPending;
+    ? organizationAcknowledgeMutation.isPending
+    : personalAcknowledgeMutation.isPending;
 
   return (
     <CostInsightsDashboardView
@@ -194,8 +209,14 @@ export function CostInsightsOverviewClient({
       onRetry={() => {
         void (organizationId ? refetchOrganizationDashboard() : refetchPersonalDashboard());
       }}
-      onSetupAlerts={() => router.push(`${basePath}/config`)}
+      onSetupAlerts={() => {
+        trackUiInteraction({ interaction: 'setup_alerts_clicked' });
+        router.push(`${basePath}/config`);
+      }}
       onAlertAction={handleAlertAction}
+      onAlertDriversExpanded={handleAlertDriversExpanded}
+      onSpendRangeChange={handleSpendRangeChange}
+      onSuggestionCta={handleSuggestionCta}
       onSuggestionDismiss={handleSuggestionDismiss}
       onAskKilo={handleAskKilo}
     />

@@ -6,12 +6,13 @@ type OrganizationCostInsightsAskKiloPageProps = {
 };
 
 export default async function OrganizationCostInsightsAskKiloPage({
+  params,
   searchParams,
 }: OrganizationCostInsightsAskKiloPageProps) {
-  const resolvedSearchParams = await searchParams;
+  const [{ id: organizationId }, resolvedSearchParams] = await Promise.all([params, searchParams]);
   const question = Array.isArray(resolvedSearchParams?.question)
     ? resolvedSearchParams.question[0]
     : resolvedSearchParams?.question;
 
-  return <CostInsightsAskKiloView initialQuestion={question} />;
+  return <CostInsightsAskKiloView initialQuestion={question} organizationId={organizationId} />;
 }

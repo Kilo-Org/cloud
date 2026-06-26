@@ -65,7 +65,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   );
   const { data: costInsightsAttention } = useQuery({
     ...trpc.costInsights.getAttentionState.queryOptions(),
-    enabled: Boolean(user),
+    enabled: Boolean(user?.is_admin),
     staleTime: 60_000,
     refetchInterval: 60_000,
   });
@@ -99,12 +99,16 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: ChartColumnIncreasing,
       url: '/usage',
     },
-    {
-      title: 'Cost Insights',
-      icon: ChartLine,
-      url: '/cost-insights',
-      badge: formatReviewItemBadge(costInsightsAttention?.reviewItemCount),
-    },
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'Cost Insights',
+            icon: ChartLine,
+            url: '/cost-insights',
+            badge: formatReviewItemBadge(costInsightsAttention?.reviewItemCount),
+          },
+        ]
+      : []),
   ];
 
   // KiloClaw group

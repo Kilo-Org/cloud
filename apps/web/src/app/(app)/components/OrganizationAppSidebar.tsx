@@ -108,7 +108,7 @@ export default function OrganizationAppSidebar({
   }, [actualRole, user?.is_admin, setOriginalRole, setAssumedRole]);
 
   const hasOwnerLevelAccess = currentRole === 'owner' || currentRole === 'billing_manager';
-  const canViewCostInsights = hasOwnerLevelAccess || Boolean(user?.is_admin);
+  const canViewCostInsights = Boolean(user?.is_admin);
   const { data: costInsightsAttention } = useQuery({
     ...trpc.organizations.costInsights.getAttentionState.queryOptions({ organizationId }),
     enabled: canViewCostInsights,

@@ -1,5 +1,6 @@
 import { CostInsightsLayout } from '@/components/cost-insights/CostInsightsLayout';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
+import { notFound } from 'next/navigation';
 
 export const metadata = {
   title: 'Cost Insights | Kilo Code',
@@ -17,11 +18,15 @@ export default function OrganizationCostInsightsLayout({ params, children }: Lay
       params={params}
       roles={['owner', 'billing_manager']}
       fullBleed
-      render={({ organization }) => (
-        <CostInsightsLayout basePath={`/organizations/${organization.id}/cost-insights`}>
-          {children}
-        </CostInsightsLayout>
-      )}
+      render={({ organization, isGlobalAdmin }) => {
+        if (!isGlobalAdmin) notFound();
+
+        return (
+          <CostInsightsLayout basePath={`/organizations/${organization.id}/cost-insights`}>
+            {children}
+          </CostInsightsLayout>
+        );
+      }}
     />
   );
 }

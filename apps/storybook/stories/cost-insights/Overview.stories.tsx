@@ -17,6 +17,8 @@ import {
   kiloPassSuggestion,
   longLabelDrivers,
   organizationOwner,
+  spendDriversByRange,
+  threshold7DayAlert,
   thresholdAlert,
 } from './costInsightsFixtures';
 
@@ -113,6 +115,11 @@ export const AlertsNeedReview: Story = {
     ),
 };
 
+export const SevenDayThresholdAlert: Story = {
+  render: () =>
+    renderDashboard(dashboardData({ alerts: [threshold7DayAlert] }), { attention: 'alert' }),
+};
+
 export const KiloPassSuggestion: Story = {
   render: () => renderDashboard(dashboardData({ suggestions: [kiloPassSuggestion] })),
 };
@@ -160,7 +167,7 @@ export const MobileOrganizationOverview: Story = {
     renderDashboard(
       dashboardData({
         owner: organizationOwner,
-        drivers: longLabelDrivers,
+        driversByRange: spendDriversByRange(longLabelDrivers),
         memberLimitsHref: '/organizations/acme/members/limits',
       })
     ),

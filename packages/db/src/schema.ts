@@ -2935,7 +2935,10 @@ export type CostInsightRollupDegradedInterval =
 
 export type CostInsightEventSnapshot = {
   thresholdMicrodollars?: number | null;
+  thresholdWindow?: 'rolling_24h' | 'rolling_7d' | 'rolling_30d';
   rolling24HourMicrodollars?: number | null;
+  rolling7DayMicrodollars?: number | null;
+  rolling30DayMicrodollars?: number | null;
   currentHourVariableMicrodollars?: number | null;
   anomalyBaselineMicrodollars?: number | null;
   anomalyThresholdMicrodollars?: number | null;
@@ -2950,11 +2953,19 @@ export type CostInsightEventSnapshot = {
     totalMicrodollars: number;
     spendRecordCount: number;
   }>;
+  topDriversWindow?: {
+    startInclusive: string;
+    endExclusive: string;
+    spendCategory?: CostInsightSpendCategory;
+  };
   changedFields?: Record<string, { old: unknown; new: unknown }>;
   settings?: {
     spendAlertsEnabled: boolean;
+    anomalyAlertsEnabled: boolean;
     costSuggestionsEnabled: boolean;
     spendThresholdMicrodollars: number | null;
+    spend7DayThresholdMicrodollars: number | null;
+    spend30DayThresholdMicrodollars: number | null;
   };
   suggestion?: {
     suggestionKey: string;
@@ -2981,8 +2992,11 @@ export const cost_insight_owner_configs = pgTable(
       onUpdate: 'cascade',
     }),
     spend_alerts_enabled: boolean().default(false).notNull(),
+    anomaly_alerts_enabled: boolean().default(true).notNull(),
     cost_suggestions_enabled: boolean().default(true).notNull(),
     spend_threshold_microdollars: bigint({ mode: 'number' }),
+    spend_7_day_threshold_microdollars: bigint({ mode: 'number' }),
+    spend_30_day_threshold_microdollars: bigint({ mode: 'number' }),
     spend_alerts_enabled_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -3011,6 +3025,22 @@ export const cost_insight_owner_configs = pgTable(
     check(
       'cost_insight_owner_configs_threshold_safe_check',
       sql`${table.spend_threshold_microdollars} IS NULL OR ${table.spend_threshold_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_configs_7_day_threshold_positive_check',
+      sql`${table.spend_7_day_threshold_microdollars} IS NULL OR ${table.spend_7_day_threshold_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_configs_7_day_threshold_safe_check',
+      sql`${table.spend_7_day_threshold_microdollars} IS NULL OR ${table.spend_7_day_threshold_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_configs_30_day_threshold_positive_check',
+      sql`${table.spend_30_day_threshold_microdollars} IS NULL OR ${table.spend_30_day_threshold_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_configs_30_day_threshold_safe_check',
+      sql`${table.spend_30_day_threshold_microdollars} IS NULL OR ${table.spend_30_day_threshold_microdollars} <= 9007199254740991`
     ),
     check(
       'cost_insight_owner_configs_enabled_at_check',
@@ -3206,6 +3236,26 @@ export const cost_insight_owner_states = pgTable(
     threshold_crossing_started_at: timestamp({ withTimezone: true, mode: 'string' }),
     threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
     threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_7_day_threshold_crossing_active: boolean().default(false).notNull(),
+    active_rolling_7_day_threshold_event_id: uuid().references(() => cost_insight_events.id, {
+      onDelete: 'set null',
+    }),
+    rolling_7_day_threshold_crossing_started_at: timestamp({
+      withTimezone: true,
+      mode: 'string',
+    }),
+    rolling_7_day_threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_7_day_threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_30_day_threshold_crossing_active: boolean().default(false).notNull(),
+    active_rolling_30_day_threshold_event_id: uuid().references(() => cost_insight_events.id, {
+      onDelete: 'set null',
+    }),
+    rolling_30_day_threshold_crossing_started_at: timestamp({
+      withTimezone: true,
+      mode: 'string',
+    }),
+    rolling_30_day_threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_30_day_threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -3222,12 +3272,12 @@ export const cost_insight_owner_states = pgTable(
     index('IDX_cost_insight_owner_states_unreviewed_user')
       .on(table.owned_by_user_id, table.updated_at)
       .where(
-        sql`${table.owned_by_user_id} IS NOT NULL AND ((${table.active_anomaly_event_id} IS NOT NULL AND ${table.active_anomaly_reviewed_at} IS NULL) OR (${table.active_threshold_event_id} IS NOT NULL AND ${table.threshold_reviewed_at} IS NULL))`
+        sql`${table.owned_by_user_id} IS NOT NULL AND ((${table.active_anomaly_event_id} IS NOT NULL AND ${table.active_anomaly_reviewed_at} IS NULL) OR (${table.active_threshold_event_id} IS NOT NULL AND ${table.threshold_reviewed_at} IS NULL) OR (${table.active_rolling_7_day_threshold_event_id} IS NOT NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL) OR (${table.active_rolling_30_day_threshold_event_id} IS NOT NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL))`
       ),
     index('IDX_cost_insight_owner_states_unreviewed_org')
       .on(table.owned_by_organization_id, table.updated_at)
       .where(
-        sql`${table.owned_by_organization_id} IS NOT NULL AND ((${table.active_anomaly_event_id} IS NOT NULL AND ${table.active_anomaly_reviewed_at} IS NULL) OR (${table.active_threshold_event_id} IS NOT NULL AND ${table.threshold_reviewed_at} IS NULL))`
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ((${table.active_anomaly_event_id} IS NOT NULL AND ${table.active_anomaly_reviewed_at} IS NULL) OR (${table.active_threshold_event_id} IS NOT NULL AND ${table.threshold_reviewed_at} IS NULL) OR (${table.active_rolling_7_day_threshold_event_id} IS NOT NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL) OR (${table.active_rolling_30_day_threshold_event_id} IS NOT NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL))`
       ),
     check(
       'cost_insight_owner_states_owner_check',
@@ -3240,6 +3290,14 @@ export const cost_insight_owner_states = pgTable(
     check(
       'cost_insight_owner_states_threshold_active_check',
       sql`${table.threshold_crossing_active} = TRUE OR (${table.active_threshold_event_id} IS NULL AND ${table.threshold_crossing_started_at} IS NULL AND ${table.threshold_reviewed_at} IS NULL)`
+    ),
+    check(
+      'cost_insight_owner_states_7_day_threshold_active_check',
+      sql`${table.rolling_7_day_threshold_crossing_active} = TRUE OR (${table.active_rolling_7_day_threshold_event_id} IS NULL AND ${table.rolling_7_day_threshold_crossing_started_at} IS NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL)`
+    ),
+    check(
+      'cost_insight_owner_states_30_day_threshold_active_check',
+      sql`${table.rolling_30_day_threshold_crossing_active} = TRUE OR (${table.active_rolling_30_day_threshold_event_id} IS NULL AND ${table.rolling_30_day_threshold_crossing_started_at} IS NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL)`
     ),
   ]
 );

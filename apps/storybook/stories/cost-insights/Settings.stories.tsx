@@ -31,6 +31,17 @@ export const ThresholdConfigured: Story = {
   render: () => renderSettings(settingsData()),
 };
 
+export const SevenDayThresholdOnly: Story = {
+  render: () =>
+    renderSettings(
+      settingsData({
+        thresholdUsd: '',
+        threshold7DayUsd: '500.00',
+        threshold30DayUsd: '',
+      })
+    ),
+};
+
 export const AlertsOffWithSavedThreshold: Story = {
   render: () =>
     renderSettings(
@@ -52,12 +63,37 @@ export const SuggestionsOff: Story = {
     ),
 };
 
+export const SpendAnomaliesOff: Story = {
+  render: () =>
+    renderSettings(
+      settingsData({
+        anomalyAlertsEnabled: false,
+        saveState: 'dirty',
+      })
+    ),
+};
+
 export const InvalidThreshold: Story = {
   render: () =>
     renderSettings(
       settingsData({
         thresholdUsd: '10.125',
-        validations: ['Enter a threshold with no more than two decimal places.'],
+        validations: {
+          thresholdUsd: 'Enter a threshold with no more than two decimal places.',
+        },
+        saveState: 'dirty',
+      })
+    ),
+};
+
+export const InvalidSevenDayThreshold: Story = {
+  render: () =>
+    renderSettings(
+      settingsData({
+        threshold7DayUsd: '500.001',
+        validations: {
+          threshold7DayUsd: 'Enter a threshold with no more than two decimal places.',
+        },
         saveState: 'dirty',
       })
     ),

@@ -8,6 +8,7 @@ import {
   type SpendDriver,
   type SpendEvidencePoint,
   type SpendMetric,
+  type SpendRange,
   type CostInsightEvent,
 } from '@/components/cost-insights';
 
@@ -120,6 +121,10 @@ export const evidence24h: SpendEvidencePoint[] = [
   { label: '11:00', variableUsd: 9.8, scheduledUsd: 0, anomalyThresholdUsd: 18 },
 ];
 
+export const evidenceThisHour: SpendEvidencePoint[] = [
+  { label: '10:00', variableUsd: 112.7, scheduledUsd: 0, anomalyThresholdUsd: 18 },
+];
+
 export const evidenceAnomaly: SpendEvidencePoint[] = [
   ...evidence24h.slice(0, 8),
   { label: '08:00', variableUsd: 19.25, scheduledUsd: 0, anomalyThresholdUsd: 18 },
@@ -190,6 +195,36 @@ export const personalDrivers: SpendDriver[] = [
   },
 ];
 
+export const currentHourDrivers: SpendDriver[] = [
+  {
+    id: 'personal-current-hour-claude',
+    label: 'Kilo Code: Chat Completions',
+    source: 'ai_gateway',
+    modelOrProvider: 'anthropic/claude-sonnet-4',
+    category: 'Variable Credit spend',
+    spendUsd: 74.2,
+    requestCount: 184,
+  },
+  {
+    id: 'personal-current-hour-gpt',
+    label: 'Kilo Code: Responses',
+    source: 'ai_gateway',
+    modelOrProvider: 'openai/gpt-4.1',
+    category: 'Variable Credit spend',
+    spendUsd: 28.5,
+    requestCount: 61,
+  },
+  {
+    id: 'personal-current-hour-exa',
+    label: 'Exa: Search',
+    source: 'other',
+    modelOrProvider: 'exa',
+    category: 'Variable Credit spend',
+    spendUsd: 10,
+    requestCount: 25,
+  },
+];
+
 export const organizationDrivers: SpendDriver[] = [
   {
     id: 'organization-cloud-agent-incident',
@@ -248,6 +283,27 @@ export const longLabelDrivers: SpendDriver[] = [
   ...organizationDrivers,
 ];
 
+export function spendDriversByRange(
+  drivers: SpendDriver[],
+  thisHourDrivers: SpendDriver[] = drivers
+): Record<SpendRange, SpendDriver[]> {
+  const scaled = (range: SpendRange, multiplier: number) =>
+    drivers.map(driver => ({
+      ...driver,
+      id: `${driver.id}-${range}`,
+      spendUsd: Number((driver.spendUsd * multiplier).toFixed(2)),
+      requestCount: Math.round(driver.requestCount * multiplier),
+    }));
+
+  return {
+    '1h': thisHourDrivers,
+    '24h': drivers,
+    '7d': scaled('7d', 5.4),
+    '30d': scaled('30d', 18.7),
+    '90d': scaled('90d', 51.2),
+  };
+}
+
 export const anomalyAlert = {
   type: 'anomaly',
   title: 'Spend is unusually high this hour',
@@ -257,6 +313,15 @@ export const anomalyAlert = {
     { label: 'Typical hour', value: '$6.00' },
     { label: 'Alert level', value: '$18.00' },
   ],
+  driverEvidence: {
+    title: 'Top Variable Credit spend drivers',
+    description: 'Captured when the alert fired.',
+    periodStart: '2026-06-26T08:00:00.000Z',
+    periodEndExclusive: '2026-06-26T09:00:00.000Z',
+    drivers: currentHourDrivers,
+    totalSpendUsd: 112.7,
+    scope: 'current_hour',
+  },
   actions: ['acknowledge', 'view_spend'] as const,
 } satisfies DashboardAlert;
 
@@ -269,20 +334,49 @@ export const thresholdAlert = {
     { label: 'Threshold', value: '$150.00' },
     { label: 'Amount over', value: '$34.90' },
   ],
-  actions: ['acknowledge', 'adjust_threshold', 'disable_threshold'] as const,
+  driverEvidence: {
+    title: 'Top rolling 24-hour spend drivers',
+    description: 'Captured when the threshold was crossed.',
+    periodStart: '2026-06-25T08:42:00.000Z',
+    periodEndExclusive: '2026-06-26T08:42:00.000Z',
+    drivers: personalDrivers,
+    totalSpendUsd: 184.9,
+    scope: 'rolling_24h',
+  },
+  actions: ['acknowledge', 'view_spend', 'manage_threshold'] as const,
+} satisfies DashboardAlert;
+
+export const threshold7DayAlert = {
+  type: 'threshold_7d',
+  title: '7-day spend threshold crossed',
+  description: 'Spend reached $536.40 against the $500.00 threshold.',
+  facts: [
+    { label: 'Last 7 days', value: '$536.40' },
+    { label: 'Threshold', value: '$500.00' },
+    { label: 'Amount over', value: '$36.40' },
+  ],
+  driverEvidence: {
+    title: 'Top rolling 7-day spend drivers',
+    description: 'Captured when the threshold was crossed.',
+    periodStart: '2026-06-19T08:42:00.000Z',
+    periodEndExclusive: '2026-06-26T08:42:00.000Z',
+    drivers: personalDrivers,
+    totalSpendUsd: 536.4,
+    scope: 'rolling_7d',
+  },
+  actions: ['acknowledge', 'view_spend', 'manage_threshold'] as const,
 } satisfies DashboardAlert;
 
 export const kiloPassSuggestion = {
   id: 'suggestion-kilo-pass',
   type: 'kilo_pass',
   eyebrow: 'Cost suggestion',
-  title: 'Get more credits from your monthly spend with Kilo Pass Expert',
-  description:
-    'You spent $106.90 on pay-as-you-go credits in the last 7 days, about $458 over 30 days at the same pace. Kilo Pass Expert costs $199 per month and includes $199 in paid credits, plus up to $79.60 in free bonus credits. Based on your recent spend, the plan could give you more credits for part of the spend you already make.',
+  title: 'Get more credits with Kilo Pass Expert',
+  description: 'The plan includes $199 in paid credits plus up to $79.60 in free bonus credits.',
   facts: [
     { label: 'Last 7 days', value: '$106.90' },
     { label: '30-day pace', value: '~$458' },
-    { label: 'Expert plan', value: '$199 + up to $79.60 bonus' },
+    { label: 'Expert plan', value: '$199/mo + up to $79.60 bonus' },
   ],
   ctaLabel: 'View Kilo Pass Expert',
   ctaHref: '/kilo-pass',
@@ -294,7 +388,7 @@ export const codingPlanSuggestion = {
   eyebrow: 'Cost suggestion',
   title: 'Get more MiniMax usage with Token Plan Plus',
   description:
-    'You spent $15.00 on MiniMax in the last 7 days, about $64 over 30 days at the same pace. Token Plan Plus costs $20 every 30 days and includes about 1.7B M3 tokens with access to the full MiniMax model family.',
+    'The plan includes about 1.7B M3 tokens and access to the full MiniMax model family.',
   facts: [
     { label: 'Last 7 days', value: '$15.00' },
     { label: '30-day pace', value: '~$64' },
@@ -304,13 +398,24 @@ export const codingPlanSuggestion = {
   ctaHref: '/coding-plans/minimax',
 } satisfies CostSuggestion;
 
+export const threshold7DayEvent = {
+  id: 'evt-threshold-7d',
+  type: 'threshold_crossed',
+  title: '7-day spend threshold crossed',
+  description: 'Rolling 7-day Credit spend crossed $500.00.',
+  occurredAt: '2026-06-26T09:16:00.000Z',
+  amountLabel: '$536.40',
+  amountClassifier: 'rolling 7d',
+  topDrivers: organizationDrivers,
+} satisfies CostInsightEvent;
+
 export const allEvents: CostInsightEvent[] = [
   {
     id: 'evt-config',
     type: 'config_changed',
     title: 'Spend Alert settings changed',
     description: '$150 spend threshold saved.',
-    timestampLabel: 'Today, 10:42',
+    occurredAt: '2026-06-26T08:42:00.000Z',
     actorLabel: 'Maya Chen',
   },
   {
@@ -318,7 +423,7 @@ export const allEvents: CostInsightEvent[] = [
     type: 'anomaly_alert',
     title: 'Spend Anomaly Alert created',
     description: 'Current-hour Variable Credit spend crossed the anomaly threshold.',
-    timestampLabel: 'Today, 11:08',
+    occurredAt: '2026-06-26T09:08:00.000Z',
     amountLabel: '$112.70',
     amountClassifier: 'current hour',
     topDrivers: organizationDrivers,
@@ -328,17 +433,18 @@ export const allEvents: CostInsightEvent[] = [
     type: 'threshold_crossed',
     title: 'Spend threshold crossed',
     description: 'Rolling 24-hour Credit spend crossed $150.00.',
-    timestampLabel: 'Today, 11:12',
+    occurredAt: '2026-06-26T09:12:00.000Z',
     amountLabel: '$184.90',
     amountClassifier: 'rolling 24h',
     topDrivers: organizationDrivers,
   },
+  threshold7DayEvent,
   {
     id: 'evt-suggestion-created',
     type: 'suggestion_created',
     title: 'Kilo Pass Expert suggested',
     description: 'Recent pay-as-you-go spend indicated a Kilo Pass may improve cost efficiency.',
-    timestampLabel: 'Today, 11:20',
+    occurredAt: '2026-06-26T09:20:00.000Z',
     amountLabel: '$106.90',
     amountClassifier: 'last 7 days',
   },
@@ -347,7 +453,7 @@ export const allEvents: CostInsightEvent[] = [
     type: 'suggestion_dismissed',
     title: 'MiniMax plan suggestion dismissed',
     description: 'This suggestion is hidden until a materially new evaluation is available.',
-    timestampLabel: 'Today, 11:25',
+    occurredAt: '2026-06-26T09:25:00.000Z',
     actorLabel: 'Maya Chen',
   },
   {
@@ -355,7 +461,7 @@ export const allEvents: CostInsightEvent[] = [
     type: 'reviewed',
     title: 'Spend threshold alert reviewed',
     description: 'Manager acknowledged the alert and opened spend drivers.',
-    timestampLabel: 'Today, 11:31',
+    occurredAt: '2026-06-26T09:31:00.000Z',
     actorLabel: 'Priya Shah',
   },
   {
@@ -363,7 +469,7 @@ export const allEvents: CostInsightEvent[] = [
     type: 'disabled',
     title: 'Spend Alerts disabled',
     description: 'Spend Alerts stopped evaluating spend after explicit confirmation.',
-    timestampLabel: 'Yesterday, 19:04',
+    occurredAt: '2026-06-25T17:04:00.000Z',
     actorLabel: 'Maya Chen',
   },
 ];
@@ -376,7 +482,7 @@ export const longLabelEvents: CostInsightEvent[] = [
       'Spend Anomaly Alert created for a long-running migration workspace with unusually long event metadata',
     description:
       'Current-hour Variable Credit spend crossed the anomaly threshold with long model, provider, product, and actor labels.',
-    timestampLabel: 'Today, 11:58',
+    occurredAt: '2026-06-26T09:58:00.000Z',
     amountLabel: '$1,204.18',
     amountClassifier: 'current hour',
     actorLabel: 'Deleted member',
@@ -391,7 +497,7 @@ export function dashboardData(
   return {
     enabled: true,
     owner: personalOwner,
-    range: '24h',
+    range: '7d',
     metrics: buildSpendMetrics({
       currentHourUsd: 15.4,
       baselineUsd: 6,
@@ -399,17 +505,18 @@ export function dashboardData(
       rolling24hUsd: 74.25,
       thresholdUsd: 150,
     }),
-    evidence: evidence24h,
+    evidence: evidence7d,
     evidenceByRange: {
+      '1h': evidenceThisHour,
       '24h': evidence24h,
       '7d': evidence7d,
       '30d': evidence30d,
       '90d': evidence90d,
     },
-    drivers: personalDrivers,
+    driversByRange: spendDriversByRange(personalDrivers, currentHourDrivers),
     alerts: [],
     suggestions: [],
-    lastEvaluatedLabel: 'Evaluated 2 minutes ago',
+    lastEvaluatedAt: '2026-06-26T09:56:00.000Z',
     baselineMode: 'seven-day',
     eventPreview: allEvents,
     ...overrides,
@@ -422,10 +529,17 @@ export function emptyDashboardData(
   return dashboardData({
     metrics: emptyMetrics,
     evidence: [],
-    drivers: [],
+    evidenceByRange: {
+      '1h': [],
+      '24h': [],
+      '7d': [],
+      '30d': [],
+      '90d': [],
+    },
+    driversByRange: spendDriversByRange([]),
     eventPreview: [],
     baselineMode: 'starter',
-    lastEvaluatedLabel: 'No evaluation yet',
+    lastEvaluatedAt: null,
     ...overrides,
   });
 }
@@ -456,8 +570,11 @@ export function settingsData(
   return {
     owner: personalOwner,
     enabled: true,
+    anomalyAlertsEnabled: true,
     suggestionsEnabled: true,
     thresholdUsd: '150.00',
+    threshold7DayUsd: '500.00',
+    threshold30DayUsd: '1000.00',
     saveState: 'saved',
     ...overrides,
   };

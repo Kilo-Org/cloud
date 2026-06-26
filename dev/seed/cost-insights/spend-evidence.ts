@@ -3,12 +3,16 @@ import { createHash, randomUUID } from 'node:crypto';
 import { computeDatabaseUrl } from '@kilocode/db';
 import {
   captureCostInsightSpend,
+  COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
   COST_INSIGHT_DRIVER_FALLBACK,
+  COST_INSIGHT_EXA_PRODUCT_KEY,
   COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
   type CostInsightSpendOwner,
 } from '@kilocode/db/cost-insights-rollups';
 import {
   api_kind,
+  coding_plan_subscriptions,
+  coding_plan_terms,
   cost_insight_active_suggestions,
   cost_insight_events,
   cost_insight_notification_deliveries,
@@ -17,7 +21,9 @@ import {
   cost_insight_owner_hour_totals,
   cost_insight_owner_states,
   cost_insight_rollup_coverage,
+  cost_insight_rollup_degraded_intervals,
   credit_transactions,
+  exa_usage_log,
   feature,
   kilocode_users,
   microdollar_usage,
@@ -27,10 +33,11 @@ import {
   organizations,
   type CostInsightEventSnapshot,
 } from '@kilocode/db/schema';
-import type { GatewayApiKind } from '@kilocode/db/schema-types';
-import { eq, inArray, like, or, sql } from 'drizzle-orm';
+import type { CodingPlanTermKind, GatewayApiKind } from '@kilocode/db/schema-types';
+import { and, eq, inArray, like, lt, or, sql } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
+import { createSeedStripeCustomer, deleteSeedStripeCustomer } from '../lib/stripe';
 import type { SeedResult } from '../index';
 
 const HOUR_MS = 60 * 60 * 1_000;
@@ -38,6 +45,24 @@ const DAY_MS = 24 * HOUR_MS;
 const COVERAGE_DAYS = 90;
 const BALANCE_BUFFER_MICRODOLLARS = 100_000_000;
 const CREDIT_CATEGORY_PREFIX = 'dev-seed:cost-insights';
+const CODING_PLAN_ID = 'minimax-token-plan-plus';
+const CODING_PLAN_PROVIDER_ID = 'minimax';
+const CODING_PLAN_COST_MICRODOLLARS = 20_000_000;
+const UNKNOWN_FEATURE_KEY = 'dev-seed-cost-insights-unknown';
+const DEGRADED_INTERVAL_ID = '4f2fc143-4b30-4c8a-878b-df89c89c6780';
+type RollupMode =
+  | 'bootstrap'
+  | 'healthy'
+  | 'repairable-drift'
+  | 'unknown-taxonomy'
+  | 'degraded-late';
+const ROLLUP_MODES: RollupMode[] = [
+  'bootstrap',
+  'healthy',
+  'repairable-drift',
+  'unknown-taxonomy',
+  'degraded-late',
+];
 
 const PERSONAL_OWNER_ID = '4f2fc143-4b30-4c8a-878b-df89c89c6701';
 const BILLING_MANAGER_ID = '4f2fc143-4b30-4c8a-878b-df89c89c6702';
@@ -56,7 +81,8 @@ const ORGANIZATION_OWNER: CostInsightSpendOwner = {
 };
 const SEED_USER_IDS = [PERSONAL_OWNER_ID, BILLING_MANAGER_ID, ORGANIZATION_MEMBER_ID];
 
-export const usage = '';
+export const usage =
+  '[--rollup-mode <bootstrap|healthy|repairable-drift|unknown-taxonomy|degraded-late>]';
 
 type VariableDriver = {
   featureKey: string;
@@ -79,6 +105,32 @@ type ScheduledSpendEvent = {
   amountMicrodollars: number;
   featureKey: 'enrollment' | 'renewal';
   planKey: 'standard' | 'commit';
+};
+
+type ExaSpendEvent = {
+  owner: CostInsightSpendOwner;
+  actorUserId: string;
+  occurredAt: string;
+  amountMicrodollars: number;
+  path: '/search' | '/contents';
+  featureKey: 'search' | 'contents';
+};
+
+type CodingPlanSpendEvent = {
+  owner: CostInsightSpendOwner;
+  actorUserId: string;
+  occurredAt: string;
+  amountMicrodollars: number;
+  termKind: Extract<CodingPlanTermKind, 'activation' | 'renewal'>;
+};
+
+type UnattributedVariableSpendEvent = {
+  owner: CostInsightSpendOwner;
+  actorUserId: string;
+  occurredAt: string;
+  amountMicrodollars: number;
+  modelKey: string;
+  providerKey: string;
 };
 
 const PERSONAL_DRIVERS: VariableDriver[] = [
@@ -124,21 +176,34 @@ const ORGANIZATION_DRIVERS: VariableDriver[] = [
 ];
 
 function printUsage(): void {
-  console.log('Usage: pnpm dev:seed cost-insights:spend-evidence');
+  console.log(`Usage: pnpm dev:seed cost-insights:spend-evidence ${usage}`);
   console.log('');
   console.log('Creates dedicated personal and organization Spend owners with 90 days of');
-  console.log('canonical spend evidence and matching Cost Insights hourly rollups.');
+  console.log('canonical spend evidence from AI Gateway, Exa, Coding Plan, and KiloClaw.');
   console.log('');
-  console.log('The fixture includes current-hour anomaly spikes, rolling 24-hour spend above');
-  console.log('typical test thresholds, recurring Scheduled Credit spend, and organization');
-  console.log("member driver attribution. Reruns replace only this fixture's data.");
+  console.log('Rollup modes:');
+  console.log('  bootstrap         Canonical history plus repairable drift; run backfill next.');
+  console.log('  healthy           Matching rollups and complete 90-day coverage.');
+  console.log('  repairable-drift  Complete coverage with missing, late, and stale rollups.');
+  console.log('  unknown-taxonomy  Healthy data plus one dry-run-only taxonomy diagnostic.');
+  console.log('  degraded-late     Late data plus unresolved degraded interval for inspection.');
+  console.log('');
+  console.log('Default: bootstrap. Reruns replace only this fixture data and v1 coverage state.');
 }
 
-function requireNoArguments(args: string[]): void {
-  if (args.length > 0) {
+function parseRollupMode(args: string[]): RollupMode {
+  if (args.length === 0) return 'bootstrap';
+  if (args.length !== 2 || args[0] !== '--rollup-mode') {
     printUsage();
     throw new Error(`Unexpected arguments: ${args.join(' ')}`);
   }
+  const requestedMode = args[1];
+  const rollupMode = ROLLUP_MODES.find(mode => mode === requestedMode);
+  if (!rollupMode) {
+    printUsage();
+    throw new Error(`Unknown rollup mode: ${requestedMode}`);
+  }
+  return rollupMode;
 }
 
 function assertLocalDatabaseTarget(): { hostname: string; database: string; port: string } {
@@ -167,6 +232,35 @@ function floorUtcHour(timestamp: number): number {
 
 function timestampAtHourOffset(currentHour: number, hourOffset: number): string {
   return new Date(currentHour - hourOffset * HOUR_MS).toISOString();
+}
+
+async function ensureExaUsageLogPartitions(
+  database: Pick<ReturnType<typeof getSeedDb>, 'execute'>,
+  timestamps: string[]
+): Promise<void> {
+  const monthStarts = new Map<number, Date>();
+  for (const timestamp of timestamps) {
+    const date = new Date(timestamp);
+    const monthStart = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+    monthStarts.set(monthStart.getTime(), monthStart);
+  }
+
+  for (const monthStart of monthStarts.values()) {
+    const nextMonth = new Date(
+      Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1)
+    );
+    const year = String(monthStart.getUTCFullYear());
+    const month = String(monthStart.getUTCMonth() + 1).padStart(2, '0');
+    const partitionName = `exa_usage_log_${year}_${month}`;
+    if (!/^exa_usage_log_\d{4}_(?:0[1-9]|1[0-2])$/.test(partitionName)) {
+      throw new Error(`Unsafe Exa usage-log partition name: ${partitionName}`);
+    }
+    await database.execute(
+      sql.raw(
+        `CREATE TABLE IF NOT EXISTS "public"."${partitionName}" PARTITION OF "public"."exa_usage_log" FOR VALUES FROM ('${monthStart.toISOString().slice(0, 10)}') TO ('${nextMonth.toISOString().slice(0, 10)}')`
+      )
+    );
+  }
 }
 
 function chooseByIndex<T>(values: T[], index: number, label: string): T {
@@ -316,6 +410,69 @@ function buildScheduledSpendEvents(currentHour: number): ScheduledSpendEvent[] {
   ];
 }
 
+function buildExaSpendEvents(currentHour: number): ExaSpendEvent[] {
+  return [
+    {
+      owner: PERSONAL_OWNER,
+      actorUserId: PERSONAL_OWNER_ID,
+      occurredAt: timestampAtHourOffset(currentHour, 6),
+      amountMicrodollars: 1_700_000,
+      path: '/search',
+      featureKey: 'search',
+    },
+    {
+      owner: ORGANIZATION_OWNER,
+      actorUserId: ORGANIZATION_MEMBER_ID,
+      occurredAt: timestampAtHourOffset(currentHour, 9),
+      amountMicrodollars: 2_400_000,
+      path: '/contents',
+      featureKey: 'contents',
+    },
+  ];
+}
+
+function buildCodingPlanSpendEvents(currentHour: number): CodingPlanSpendEvent[] {
+  return [
+    {
+      owner: PERSONAL_OWNER,
+      actorUserId: PERSONAL_OWNER_ID,
+      occurredAt: timestampAtHourOffset(currentHour, 12),
+      amountMicrodollars: CODING_PLAN_COST_MICRODOLLARS,
+      termKind: 'activation',
+    },
+    {
+      owner: ORGANIZATION_OWNER,
+      actorUserId: BILLING_MANAGER_ID,
+      occurredAt: timestampAtHourOffset(currentHour, 14),
+      amountMicrodollars: CODING_PLAN_COST_MICRODOLLARS,
+      termKind: 'renewal',
+    },
+  ];
+}
+
+function buildUnattributedVariableSpendEvents(
+  currentHour: number
+): UnattributedVariableSpendEvent[] {
+  return [
+    {
+      owner: PERSONAL_OWNER,
+      actorUserId: PERSONAL_OWNER_ID,
+      occurredAt: timestampAtHourOffset(currentHour, 16),
+      amountMicrodollars: 620_000,
+      modelKey: 'anthropic/claude-sonnet-4',
+      providerKey: 'anthropic',
+    },
+    {
+      owner: ORGANIZATION_OWNER,
+      actorUserId: ORGANIZATION_MEMBER_ID,
+      occurredAt: timestampAtHourOffset(currentHour, 17),
+      amountMicrodollars: 940_000,
+      modelKey: 'openai/gpt-4.1-mini',
+      providerKey: 'openai',
+    },
+  ];
+}
+
 function ownerColumns(owner: CostInsightSpendOwner): {
   organizationId: string | null;
   userId: string | null;
@@ -386,8 +543,8 @@ function seedTopDrivers(
         modelOrPlanKey: 'openai/gpt-4.1',
         providerKey: 'openai',
         actorUserId: BILLING_MANAGER_ID,
-        totalMicrodollars: 18_000_000,
-        spendRecordCount: 1,
+        totalMicrodollars: 28_000_000,
+        spendRecordCount: 58,
       },
       {
         spendCategory: 'variable',
@@ -397,8 +554,8 @@ function seedTopDrivers(
         modelOrPlanKey: 'google/gemini-2.5-pro',
         providerKey: 'google',
         actorUserId: ORGANIZATION_MEMBER_ID,
-        totalMicrodollars: 15_000_000,
-        spendRecordCount: 1,
+        totalMicrodollars: 18_000_000,
+        spendRecordCount: 41,
       },
       {
         spendCategory: 'scheduled',
@@ -423,8 +580,8 @@ function seedTopDrivers(
       modelOrPlanKey: 'anthropic/claude-sonnet-4',
       providerKey: 'anthropic',
       actorUserId: PERSONAL_OWNER_ID,
-      totalMicrodollars: 12_000_000,
-      spendRecordCount: 1,
+      totalMicrodollars: 74_200_000,
+      spendRecordCount: 184,
     },
     {
       spendCategory: 'variable',
@@ -434,8 +591,19 @@ function seedTopDrivers(
       modelOrPlanKey: 'openai/gpt-4.1-mini',
       providerKey: 'openai',
       actorUserId: PERSONAL_OWNER_ID,
-      totalMicrodollars: 11_000_000,
-      spendRecordCount: 1,
+      totalMicrodollars: 28_500_000,
+      spendRecordCount: 61,
+    },
+    {
+      spendCategory: 'variable',
+      source: 'other',
+      productKey: COST_INSIGHT_EXA_PRODUCT_KEY,
+      featureKey: 'search',
+      modelOrPlanKey: COST_INSIGHT_DRIVER_FALLBACK,
+      providerKey: COST_INSIGHT_EXA_PRODUCT_KEY,
+      actorUserId: PERSONAL_OWNER_ID,
+      totalMicrodollars: 10_000_000,
+      spendRecordCount: 25,
     },
     {
       spendCategory: 'scheduled',
@@ -461,15 +629,44 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     printUsage();
     return;
   }
-  requireNoArguments(args);
+  const rollupMode = parseRollupMode(args);
 
   const databaseTarget = assertLocalDatabaseTarget();
   const db = getSeedDb();
   const currentHour = floorUtcHour(Date.now());
   const currentHourIso = new Date(currentHour).toISOString();
   const coverageStartIso = new Date(currentHour - COVERAGE_DAYS * DAY_MS).toISOString();
+  const maintenanceStartIso = timestampAtHourOffset(currentHour, 25);
+  const lateArrivalHourIso = timestampAtHourOffset(currentHour, 4);
+  const staleRollupHourIso = timestampAtHourOffset(currentHour, 25);
   const variableEvents = buildVariableSpendEvents(currentHour);
   const scheduledEvents = buildScheduledSpendEvents(currentHour);
+  const exaEvents = buildExaSpendEvents(currentHour);
+  const codingPlanEvents = buildCodingPlanSpendEvents(currentHour);
+  const unattributedVariableEvents = buildUnattributedVariableSpendEvents(currentHour);
+  const includesLateArrival =
+    rollupMode === 'bootstrap' ||
+    rollupMode === 'repairable-drift' ||
+    rollupMode === 'degraded-late';
+  const includesUnknownTaxonomy = rollupMode === 'unknown-taxonomy';
+  const lateArrivalEvent: UnattributedVariableSpendEvent = {
+    owner: PERSONAL_OWNER,
+    actorUserId: PERSONAL_OWNER_ID,
+    occurredAt: lateArrivalHourIso,
+    amountMicrodollars: 780_000,
+    modelKey: 'google/gemini-2.5-pro',
+    providerKey: 'google',
+  };
+  const unknownTaxonomyEvent: VariableSpendEvent = {
+    owner: PERSONAL_OWNER,
+    actorUserId: PERSONAL_OWNER_ID,
+    occurredAt: timestampAtHourOffset(currentHour, 20),
+    amountMicrodollars: 510_000,
+    featureKey: UNKNOWN_FEATURE_KEY,
+    apiKind: 'messages',
+    modelKey: 'anthropic/claude-sonnet-4',
+    providerKey: 'anthropic',
+  };
   const suggestionWindowStart = new Date(currentHour - 7 * DAY_MS).toISOString();
   const suggestionWindowEnd = new Date(currentHour).toISOString();
   const personalAnomalyEventId = randomUUID();
@@ -489,7 +686,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       suggestion_key: suggestionKey(`personal:coding-plan:${currentHourIso}`),
       title: 'Get more MiniMax usage with Token Plan Plus',
       description:
-        'You spent $15.00 on MiniMax in the last 7 days, about $64 over 30 days at the same pace. Token Plan Plus costs $20 every 30 days and includes about 1.7B M3 tokens with access to the full MiniMax model family.',
+        'The plan includes about 1.7B M3 tokens and access to the full MiniMax model family.',
       cta_label: 'View MiniMax plan',
       cta_href: '/subscriptions',
       evidence_window_start: suggestionWindowStart,
@@ -505,16 +702,16 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       ...costInsightOwnerColumns(PERSONAL_OWNER),
       suggestion_kind: 'kilo_pass',
       suggestion_key: suggestionKey(`personal:kilo-pass:${currentHourIso}`),
-      title: 'Get more credits from your monthly spend with Kilo Pass Expert',
+      title: 'Get more credits with Kilo Pass Expert',
       description:
-        'You spent $106.90 on pay-as-you-go credits in the last 7 days, about $458 over 30 days at the same pace. Kilo Pass Expert costs $199 per month and includes $199 in paid credits, plus up to $79.60 in free bonus credits. Based on your recent spend, the plan could give you more credits for part of the spend you already make.',
+        'The plan includes $199 in paid credits plus up to $79.60 in free bonus credits.',
       cta_label: 'View Kilo Pass Expert',
       cta_href: '/subscriptions/kilo-pass',
       evidence_window_start: suggestionWindowStart,
       evidence_window_end: suggestionWindowEnd,
       observed_microdollars: 106_900_000,
       benefit_label: 'Expert plan',
-      benefit_detail: '$199 + up to $79.60 bonus',
+      benefit_detail: '$199/mo + up to $79.60 bonus',
       created_at: timestampAtHourOffset(currentHour, 1),
       updated_at: timestampAtHourOffset(currentHour, 1),
     },
@@ -523,16 +720,15 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       ...costInsightOwnerColumns(ORGANIZATION_OWNER),
       suggestion_kind: 'coding_plan',
       suggestion_key: suggestionKey(`organization:coding-plan:${currentHourIso}`),
-      title: 'Review Coding Plan coverage for team runs',
-      description:
-        'Cloud Agent and Security Agent usage from team members is concentrated in a few recurring workflows.',
+      title: 'Consider a Coding Plan for team runs',
+      description: 'A Coding Plan may improve cost efficiency for recurring team workflows.',
       cta_label: 'View subscriptions',
       cta_href: `/organizations/${ORGANIZATION_ID}/subscriptions`,
       evidence_window_start: suggestionWindowStart,
       evidence_window_end: suggestionWindowEnd,
       observed_microdollars: 318_000_000,
-      benefit_label: 'Observed spend',
-      benefit_detail: '$318 in 7 days',
+      benefit_label: 'Plan option',
+      benefit_detail: 'Compare Coding Plans',
       created_at: timestampAtHourOffset(currentHour, 2),
       updated_at: timestampAtHourOffset(currentHour, 2),
     },
@@ -550,7 +746,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         currentHourVariableMicrodollars: 112_700_000,
         anomalyBaselineMicrodollars: 6_000_000,
         anomalyThresholdMicrodollars: 18_000_000,
-        topDrivers: seedTopDrivers(PERSONAL_OWNER),
+        topDrivers: seedTopDrivers(PERSONAL_OWNER).filter(
+          driver => driver.spendCategory === 'variable'
+        ),
+        topDriversWindow: {
+          startInclusive: currentHourIso,
+          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          spendCategory: 'variable',
+        },
       },
       dedupe_key: `dev-seed:personal:anomaly:${currentHourIso}`,
       occurred_at: currentHourIso,
@@ -567,6 +770,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         rolling24HourMicrodollars: 184_900_000,
         thresholdMicrodollars: personalThresholdMicrodollars,
         topDrivers: seedTopDrivers(PERSONAL_OWNER),
+        topDriversWindow: {
+          startInclusive: new Date(currentHour - 24 * HOUR_MS + 42 * 60 * 1_000).toISOString(),
+          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+        },
       },
       dedupe_key: `dev-seed:personal:threshold:${currentHourIso}`,
       occurred_at: timestampAtHourOffset(currentHour, 1),
@@ -598,7 +805,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       active_suggestion_id: personalKiloPassSuggestionId,
       actor_user_id: null,
       title: 'Cost Suggestion created',
-      description: 'Get more credits from your monthly spend with Kilo Pass Expert',
+      description: 'Get more credits with Kilo Pass Expert',
       snapshot: {
         suggestion: {
           suggestionKey: suggestionKey(`personal:kilo-pass:${currentHourIso}`),
@@ -670,7 +877,14 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         currentHourVariableMicrodollars: 46_000_000,
         anomalyBaselineMicrodollars: 8_600_000,
         anomalyThresholdMicrodollars: 25_800_000,
-        topDrivers: seedTopDrivers(ORGANIZATION_OWNER),
+        topDrivers: seedTopDrivers(ORGANIZATION_OWNER).filter(
+          driver => driver.spendCategory === 'variable'
+        ),
+        topDriversWindow: {
+          startInclusive: currentHourIso,
+          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          spendCategory: 'variable',
+        },
       },
       dedupe_key: `dev-seed:organization:anomaly:${currentHourIso}`,
       occurred_at: currentHourIso,
@@ -687,6 +901,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         rolling24HourMicrodollars: 128_000_000,
         thresholdMicrodollars: organizationThresholdMicrodollars,
         topDrivers: seedTopDrivers(ORGANIZATION_OWNER),
+        topDriversWindow: {
+          startInclusive: new Date(currentHour - 24 * HOUR_MS + 42 * 60 * 1_000).toISOString(),
+          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+        },
       },
       dedupe_key: `dev-seed:organization:threshold:${currentHourIso}`,
       occurred_at: timestampAtHourOffset(currentHour, 1),
@@ -698,7 +916,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       active_suggestion_id: organizationCodingPlanSuggestionId,
       actor_user_id: null,
       title: 'Cost Suggestion created',
-      description: 'Review Coding Plan coverage for team runs',
+      description: 'Consider a Coding Plan for team runs',
       snapshot: {
         suggestion: {
           suggestionKey: suggestionKey(`organization:coding-plan:${currentHourIso}`),
@@ -767,260 +985,397 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     { event_id: organizationThresholdEventId, recipient_user_id: BILLING_MANAGER_ID },
   ] satisfies (typeof cost_insight_notification_deliveries.$inferInsert)[];
 
-  const personalVariableMicrodollars = sumOwnerAmounts(variableEvents, PERSONAL_OWNER);
-  const personalScheduledMicrodollars = sumOwnerAmounts(scheduledEvents, PERSONAL_OWNER);
-  const organizationVariableMicrodollars = sumOwnerAmounts(variableEvents, ORGANIZATION_OWNER);
-  const organizationScheduledMicrodollars = sumOwnerAmounts(scheduledEvents, ORGANIZATION_OWNER);
+  const canonicalVariableSpendEvents = [
+    ...variableEvents,
+    ...exaEvents,
+    ...unattributedVariableEvents,
+    ...(includesLateArrival ? [lateArrivalEvent] : []),
+    ...(includesUnknownTaxonomy ? [unknownTaxonomyEvent] : []),
+  ];
+  const canonicalScheduledSpendEvents = [...scheduledEvents, ...codingPlanEvents];
+  const personalVariableMicrodollars = sumOwnerAmounts(
+    canonicalVariableSpendEvents,
+    PERSONAL_OWNER
+  );
+  const personalScheduledMicrodollars = sumOwnerAmounts(
+    canonicalScheduledSpendEvents,
+    PERSONAL_OWNER
+  );
+  const organizationVariableMicrodollars = sumOwnerAmounts(
+    canonicalVariableSpendEvents,
+    ORGANIZATION_OWNER
+  );
+  const organizationScheduledMicrodollars = sumOwnerAmounts(
+    canonicalScheduledSpendEvents,
+    ORGANIZATION_OWNER
+  );
 
-  const featureKeys = [...new Set(variableEvents.map(event => event.featureKey))];
+  const featureKeys = [
+    ...new Set([
+      ...variableEvents.map(event => event.featureKey),
+      ...(includesUnknownTaxonomy ? [UNKNOWN_FEATURE_KEY] : []),
+    ]),
+  ];
   const apiKinds = [...new Set(variableEvents.map(event => event.apiKind))];
 
-  await db.transaction(async tx => {
-    const seedUsageIds = tx
-      .select({ id: microdollar_usage.id })
-      .from(microdollar_usage)
-      .where(
-        or(
-          inArray(microdollar_usage.kilo_user_id, SEED_USER_IDS),
-          eq(microdollar_usage.organization_id, ORGANIZATION_ID)
-        )
-      );
+  await ensureExaUsageLogPartitions(
+    db,
+    exaEvents.map(event => event.occurredAt)
+  );
 
-    await tx
-      .delete(microdollar_usage_metadata)
-      .where(inArray(microdollar_usage_metadata.id, seedUsageIds));
-    await tx
-      .delete(microdollar_usage_daily)
-      .where(
-        or(
-          inArray(microdollar_usage_daily.kilo_user_id, SEED_USER_IDS),
-          eq(microdollar_usage_daily.organization_id, ORGANIZATION_ID)
-        )
-      );
-    await tx
-      .delete(microdollar_usage)
-      .where(
-        or(
-          inArray(microdollar_usage.kilo_user_id, SEED_USER_IDS),
-          eq(microdollar_usage.organization_id, ORGANIZATION_ID)
-        )
-      );
-    await tx
-      .delete(credit_transactions)
-      .where(
-        or(
-          like(
-            credit_transactions.credit_category,
-            `kiloclaw-subscription:${CREDIT_CATEGORY_PREFIX}:%`
-          ),
-          like(
-            credit_transactions.credit_category,
-            `kiloclaw-subscription-commit:${CREDIT_CATEGORY_PREFIX}:%`
+  const seedUserProfiles = [
+    {
+      id: PERSONAL_OWNER_ID,
+      email: PERSONAL_OWNER_EMAIL,
+      name: 'Morgan Lee',
+      isAdmin: true,
+    },
+    {
+      id: BILLING_MANAGER_ID,
+      email: BILLING_MANAGER_EMAIL,
+      name: 'Priya Shah',
+      isAdmin: true,
+    },
+    {
+      id: ORGANIZATION_MEMBER_ID,
+      email: ORGANIZATION_MEMBER_EMAIL,
+      name: 'Diego Santos',
+      isAdmin: false,
+    },
+  ];
+  const previousSeedUsers = await db
+    .select({
+      id: kilocode_users.id,
+      stripeCustomerId: kilocode_users.stripe_customer_id,
+    })
+    .from(kilocode_users)
+    .where(inArray(kilocode_users.id, SEED_USER_IDS));
+  const previousStripeCustomerIds = new Map(
+    previousSeedUsers.map(user => [user.id, user.stripeCustomerId])
+  );
+  const seedUsers: Array<{
+    id: string;
+    email: string;
+    name: string;
+    isAdmin: boolean;
+    stripeCustomerId: string;
+  }> = [];
+
+  try {
+    for (const user of seedUserProfiles) {
+      const stripeCustomer = await createSeedStripeCustomer({
+        email: user.email,
+        name: user.name,
+        kiloUserId: user.id,
+      });
+      seedUsers.push({ ...user, stripeCustomerId: stripeCustomer.id });
+    }
+
+    await db.transaction(async tx => {
+      const seedUsageIds = tx
+        .select({ id: microdollar_usage.id })
+        .from(microdollar_usage)
+        .where(
+          or(
+            inArray(microdollar_usage.kilo_user_id, SEED_USER_IDS),
+            eq(microdollar_usage.organization_id, ORGANIZATION_ID)
           )
-        )
-      );
+        );
 
-    const seedCostInsightEventIds = tx
-      .select({ id: cost_insight_events.id })
-      .from(cost_insight_events)
-      .where(
-        or(
-          eq(cost_insight_events.owned_by_user_id, PERSONAL_OWNER_ID),
-          eq(cost_insight_events.owned_by_organization_id, ORGANIZATION_ID)
-        )
-      );
-    await tx
-      .delete(cost_insight_notification_deliveries)
-      .where(inArray(cost_insight_notification_deliveries.event_id, seedCostInsightEventIds));
-    await tx
-      .delete(cost_insight_owner_states)
-      .where(
-        or(
-          eq(cost_insight_owner_states.owned_by_user_id, PERSONAL_OWNER_ID),
-          eq(cost_insight_owner_states.owned_by_organization_id, ORGANIZATION_ID)
-        )
-      );
-    await tx
-      .delete(cost_insight_events)
-      .where(
-        or(
-          eq(cost_insight_events.owned_by_user_id, PERSONAL_OWNER_ID),
-          eq(cost_insight_events.owned_by_organization_id, ORGANIZATION_ID)
-        )
-      );
-    await tx
-      .delete(cost_insight_active_suggestions)
-      .where(
-        or(
-          eq(cost_insight_active_suggestions.owned_by_user_id, PERSONAL_OWNER_ID),
-          eq(cost_insight_active_suggestions.owned_by_organization_id, ORGANIZATION_ID)
-        )
-      );
-    await tx
-      .delete(cost_insight_owner_configs)
-      .where(
-        or(
-          eq(cost_insight_owner_configs.owned_by_user_id, PERSONAL_OWNER_ID),
-          eq(cost_insight_owner_configs.owned_by_organization_id, ORGANIZATION_ID)
-        )
-      );
-    await tx
-      .delete(cost_insight_owner_hour_driver_buckets)
-      .where(
-        or(
-          eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, PERSONAL_OWNER_ID),
-          eq(cost_insight_owner_hour_driver_buckets.owned_by_organization_id, ORGANIZATION_ID)
-        )
-      );
-    await tx
-      .delete(cost_insight_owner_hour_totals)
-      .where(
-        or(
-          eq(cost_insight_owner_hour_totals.owned_by_user_id, PERSONAL_OWNER_ID),
-          eq(cost_insight_owner_hour_totals.owned_by_organization_id, ORGANIZATION_ID)
-        )
-      );
-
-    const seedUsers = [
-      {
-        id: PERSONAL_OWNER_ID,
-        email: PERSONAL_OWNER_EMAIL,
-        name: 'Morgan Lee',
-        stripeCustomerId: 'cus_dev_seed_cost_insights_owner',
-      },
-      {
-        id: BILLING_MANAGER_ID,
-        email: BILLING_MANAGER_EMAIL,
-        name: 'Priya Shah',
-        stripeCustomerId: 'cus_dev_seed_cost_insights_billing',
-      },
-      {
-        id: ORGANIZATION_MEMBER_ID,
-        email: ORGANIZATION_MEMBER_EMAIL,
-        name: 'Diego Santos',
-        stripeCustomerId: 'cus_dev_seed_cost_insights_member',
-      },
-    ];
-
-    for (const user of seedUsers) {
       await tx
-        .insert(kilocode_users)
-        .values({
-          id: user.id,
-          google_user_email: user.email,
-          google_user_name: user.name,
-          google_user_image_url: `https://example.com/dev-seed/${user.id}.png`,
-          stripe_customer_id: user.stripeCustomerId,
-          normalized_email: user.email,
-          has_validation_stytch: true,
-          customer_source: 'dev-seed',
-          microdollars_used: 0,
-          total_microdollars_acquired: BALANCE_BUFFER_MICRODOLLARS,
-        })
-        .onConflictDoUpdate({
-          target: kilocode_users.id,
-          set: {
+        .delete(microdollar_usage_metadata)
+        .where(inArray(microdollar_usage_metadata.id, seedUsageIds));
+      await tx
+        .delete(microdollar_usage_daily)
+        .where(
+          or(
+            inArray(microdollar_usage_daily.kilo_user_id, SEED_USER_IDS),
+            eq(microdollar_usage_daily.organization_id, ORGANIZATION_ID)
+          )
+        );
+      await tx
+        .delete(microdollar_usage)
+        .where(
+          or(
+            inArray(microdollar_usage.kilo_user_id, SEED_USER_IDS),
+            eq(microdollar_usage.organization_id, ORGANIZATION_ID)
+          )
+        );
+      await tx
+        .delete(exa_usage_log)
+        .where(
+          or(
+            inArray(exa_usage_log.kilo_user_id, SEED_USER_IDS),
+            eq(exa_usage_log.organization_id, ORGANIZATION_ID)
+          )
+        );
+      await tx
+        .delete(coding_plan_subscriptions)
+        .where(inArray(coding_plan_subscriptions.user_id, SEED_USER_IDS));
+      await tx
+        .delete(credit_transactions)
+        .where(
+          or(
+            like(
+              credit_transactions.credit_category,
+              `kiloclaw-subscription:${CREDIT_CATEGORY_PREFIX}:%`
+            ),
+            like(
+              credit_transactions.credit_category,
+              `kiloclaw-subscription-commit:${CREDIT_CATEGORY_PREFIX}:%`
+            ),
+            like(credit_transactions.credit_category, `coding-plan:${CREDIT_CATEGORY_PREFIX}:%`)
+          )
+        );
+      await tx
+        .delete(cost_insight_rollup_degraded_intervals)
+        .where(eq(cost_insight_rollup_degraded_intervals.id, DEGRADED_INTERVAL_ID));
+
+      const seedCostInsightEventIds = tx
+        .select({ id: cost_insight_events.id })
+        .from(cost_insight_events)
+        .where(
+          or(
+            eq(cost_insight_events.owned_by_user_id, PERSONAL_OWNER_ID),
+            eq(cost_insight_events.owned_by_organization_id, ORGANIZATION_ID)
+          )
+        );
+      await tx
+        .delete(cost_insight_notification_deliveries)
+        .where(inArray(cost_insight_notification_deliveries.event_id, seedCostInsightEventIds));
+      await tx
+        .delete(cost_insight_owner_states)
+        .where(
+          or(
+            eq(cost_insight_owner_states.owned_by_user_id, PERSONAL_OWNER_ID),
+            eq(cost_insight_owner_states.owned_by_organization_id, ORGANIZATION_ID)
+          )
+        );
+      await tx
+        .delete(cost_insight_events)
+        .where(
+          or(
+            eq(cost_insight_events.owned_by_user_id, PERSONAL_OWNER_ID),
+            eq(cost_insight_events.owned_by_organization_id, ORGANIZATION_ID)
+          )
+        );
+      await tx
+        .delete(cost_insight_active_suggestions)
+        .where(
+          or(
+            eq(cost_insight_active_suggestions.owned_by_user_id, PERSONAL_OWNER_ID),
+            eq(cost_insight_active_suggestions.owned_by_organization_id, ORGANIZATION_ID)
+          )
+        );
+      await tx
+        .delete(cost_insight_owner_configs)
+        .where(
+          or(
+            eq(cost_insight_owner_configs.owned_by_user_id, PERSONAL_OWNER_ID),
+            eq(cost_insight_owner_configs.owned_by_organization_id, ORGANIZATION_ID)
+          )
+        );
+      await tx
+        .delete(cost_insight_owner_hour_driver_buckets)
+        .where(
+          or(
+            eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, PERSONAL_OWNER_ID),
+            eq(cost_insight_owner_hour_driver_buckets.owned_by_organization_id, ORGANIZATION_ID)
+          )
+        );
+      await tx
+        .delete(cost_insight_owner_hour_totals)
+        .where(
+          or(
+            eq(cost_insight_owner_hour_totals.owned_by_user_id, PERSONAL_OWNER_ID),
+            eq(cost_insight_owner_hour_totals.owned_by_organization_id, ORGANIZATION_ID)
+          )
+        );
+      await tx
+        .delete(cost_insight_rollup_coverage)
+        .where(eq(cost_insight_rollup_coverage.rollup_version, 1));
+
+      for (const user of seedUsers) {
+        await tx
+          .insert(kilocode_users)
+          .values({
+            id: user.id,
             google_user_email: user.email,
             google_user_name: user.name,
             google_user_image_url: `https://example.com/dev-seed/${user.id}.png`,
+            stripe_customer_id: user.stripeCustomerId,
             normalized_email: user.email,
             has_validation_stytch: true,
             customer_source: 'dev-seed',
+            is_admin: user.isAdmin,
             microdollars_used: 0,
             total_microdollars_acquired: BALANCE_BUFFER_MICRODOLLARS,
-          },
-        });
-    }
+          })
+          .onConflictDoUpdate({
+            target: kilocode_users.id,
+            set: {
+              google_user_email: user.email,
+              google_user_name: user.name,
+              google_user_image_url: `https://example.com/dev-seed/${user.id}.png`,
+              stripe_customer_id: user.stripeCustomerId,
+              normalized_email: user.email,
+              has_validation_stytch: true,
+              customer_source: 'dev-seed',
+              is_admin: user.isAdmin,
+              microdollars_used: 0,
+              total_microdollars_acquired: BALANCE_BUFFER_MICRODOLLARS,
+            },
+          });
+      }
 
-    await tx
-      .insert(organizations)
-      .values({
-        id: ORGANIZATION_ID,
-        name: ORGANIZATION_NAME,
-        created_by_kilo_user_id: PERSONAL_OWNER_ID,
-        plan: 'teams',
-        seat_count: 3,
-        require_seats: true,
-        microdollars_used: 0,
-        microdollars_balance: BALANCE_BUFFER_MICRODOLLARS,
-        total_microdollars_acquired: BALANCE_BUFFER_MICRODOLLARS,
-      })
-      .onConflictDoUpdate({
-        target: organizations.id,
-        set: {
+      await tx
+        .insert(organizations)
+        .values({
+          id: ORGANIZATION_ID,
           name: ORGANIZATION_NAME,
           created_by_kilo_user_id: PERSONAL_OWNER_ID,
           plan: 'teams',
           seat_count: 3,
           require_seats: true,
-          deleted_at: null,
           microdollars_used: 0,
           microdollars_balance: BALANCE_BUFFER_MICRODOLLARS,
           total_microdollars_acquired: BALANCE_BUFFER_MICRODOLLARS,
+        })
+        .onConflictDoUpdate({
+          target: organizations.id,
+          set: {
+            name: ORGANIZATION_NAME,
+            created_by_kilo_user_id: PERSONAL_OWNER_ID,
+            plan: 'teams',
+            seat_count: 3,
+            require_seats: true,
+            deleted_at: null,
+            microdollars_used: 0,
+            microdollars_balance: BALANCE_BUFFER_MICRODOLLARS,
+            total_microdollars_acquired: BALANCE_BUFFER_MICRODOLLARS,
+          },
+        });
+
+      const memberships = [
+        {
+          organization_id: ORGANIZATION_ID,
+          kilo_user_id: PERSONAL_OWNER_ID,
+          role: 'owner',
         },
+        {
+          organization_id: ORGANIZATION_ID,
+          kilo_user_id: BILLING_MANAGER_ID,
+          role: 'billing_manager',
+        },
+        {
+          organization_id: ORGANIZATION_ID,
+          kilo_user_id: ORGANIZATION_MEMBER_ID,
+          role: 'member',
+        },
+      ] satisfies (typeof organization_memberships.$inferInsert)[];
+
+      for (const membership of memberships) {
+        await tx
+          .insert(organization_memberships)
+          .values(membership)
+          .onConflictDoUpdate({
+            target: [
+              organization_memberships.organization_id,
+              organization_memberships.kilo_user_id,
+            ],
+            set: { role: membership.role },
+          });
+      }
+
+      await tx
+        .insert(feature)
+        .values(featureKeys.map(featureKey => ({ feature: featureKey })))
+        .onConflictDoNothing();
+      await tx
+        .insert(api_kind)
+        .values(apiKinds.map(apiKind => ({ api_kind: apiKind })))
+        .onConflictDoNothing();
+
+      const featureRows = await tx
+        .select({ id: feature.feature_id, value: feature.feature })
+        .from(feature)
+        .where(inArray(feature.feature, featureKeys));
+      const apiKindRows = await tx
+        .select({ id: api_kind.api_kind_id, value: api_kind.api_kind })
+        .from(api_kind)
+        .where(inArray(api_kind.api_kind, apiKinds));
+      const featureIds = new Map<string, number>(featureRows.map(row => [row.value, row.id]));
+      const apiKindIds = new Map<string, number>(apiKindRows.map(row => [row.value, row.id]));
+
+      const preparedVariableEvents = variableEvents.map((event, index) => {
+        const id = randomUUID();
+        return {
+          event,
+          usage: {
+            id,
+            kilo_user_id: event.actorUserId,
+            organization_id: ownerColumns(event.owner).organizationId,
+            cost: event.amountMicrodollars,
+            input_tokens: 2_000 + (index % 8) * 750,
+            output_tokens: 800 + (index % 5) * 450,
+            cache_write_tokens: index % 3 === 0 ? 400 : 0,
+            cache_hit_tokens: index % 2 === 0 ? 1_200 : 0,
+            created_at: event.occurredAt,
+            provider: event.providerKey,
+            model: event.modelKey,
+            requested_model: event.modelKey,
+            inference_provider: event.providerKey,
+            has_error: false,
+            abuse_classification: 0,
+          } satisfies typeof microdollar_usage.$inferInsert,
+          metadata: {
+            id,
+            created_at: event.occurredAt,
+            message_id: `${CREDIT_CATEGORY_PREFIX}:usage:${index}`,
+            feature_id: requireLookupId(featureIds, event.featureKey, 'feature'),
+            api_kind_id: requireLookupId(apiKindIds, event.apiKind, 'API kind'),
+            streamed: index % 2 === 0,
+            is_byok: false,
+            is_user_byok: false,
+            has_tools: true,
+          } satisfies typeof microdollar_usage_metadata.$inferInsert,
+        };
       });
 
-    const memberships = [
-      {
-        organization_id: ORGANIZATION_ID,
-        kilo_user_id: PERSONAL_OWNER_ID,
-        role: 'owner',
-      },
-      {
-        organization_id: ORGANIZATION_ID,
-        kilo_user_id: BILLING_MANAGER_ID,
-        role: 'billing_manager',
-      },
-      {
-        organization_id: ORGANIZATION_ID,
-        kilo_user_id: ORGANIZATION_MEMBER_ID,
-        role: 'member',
-      },
-    ] satisfies (typeof organization_memberships.$inferInsert)[];
-
-    for (const membership of memberships) {
+      await tx.insert(microdollar_usage).values(preparedVariableEvents.map(item => item.usage));
       await tx
-        .insert(organization_memberships)
-        .values(membership)
-        .onConflictDoUpdate({
-          target: [organization_memberships.organization_id, organization_memberships.kilo_user_id],
-          set: { role: membership.role },
+        .insert(microdollar_usage_metadata)
+        .values(preparedVariableEvents.map(item => item.metadata));
+
+      for (const event of variableEvents) {
+        await captureCostInsightSpend(tx, {
+          owner: event.owner,
+          actorUserId: event.actorUserId,
+          occurredAt: event.occurredAt,
+          amountMicrodollars: event.amountMicrodollars,
+          category: 'variable',
+          source: 'ai_gateway',
+          productKey: event.featureKey,
+          featureKey: event.apiKind,
+          modelOrPlanKey: event.modelKey,
+          providerKey: event.providerKey,
         });
-    }
+      }
 
-    await tx
-      .insert(feature)
-      .values(featureKeys.map(featureKey => ({ feature: featureKey })))
-      .onConflictDoNothing();
-    await tx
-      .insert(api_kind)
-      .values(apiKinds.map(apiKind => ({ api_kind: apiKind })))
-      .onConflictDoNothing();
-
-    const featureRows = await tx
-      .select({ id: feature.feature_id, value: feature.feature })
-      .from(feature)
-      .where(inArray(feature.feature, featureKeys));
-    const apiKindRows = await tx
-      .select({ id: api_kind.api_kind_id, value: api_kind.api_kind })
-      .from(api_kind)
-      .where(inArray(api_kind.api_kind, apiKinds));
-    const featureIds = new Map<string, number>(featureRows.map(row => [row.value, row.id]));
-    const apiKindIds = new Map<string, number>(apiKindRows.map(row => [row.value, row.id]));
-
-    const preparedVariableEvents = variableEvents.map((event, index) => {
-      const id = randomUUID();
-      return {
-        event,
-        usage: {
-          id,
+      const rawOnlyVariableEvents = [
+        ...unattributedVariableEvents,
+        ...(includesLateArrival ? [lateArrivalEvent] : []),
+      ];
+      await tx.insert(microdollar_usage).values(
+        rawOnlyVariableEvents.map(event => ({
+          id: randomUUID(),
           kilo_user_id: event.actorUserId,
           organization_id: ownerColumns(event.owner).organizationId,
           cost: event.amountMicrodollars,
-          input_tokens: 2_000 + (index % 8) * 750,
-          output_tokens: 800 + (index % 5) * 450,
-          cache_write_tokens: index % 3 === 0 ? 400 : 0,
-          cache_hit_tokens: index % 2 === 0 ? 1_200 : 0,
+          input_tokens: 1_500,
+          output_tokens: 600,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
           created_at: event.occurredAt,
           provider: event.providerKey,
           model: event.modelKey,
@@ -1028,147 +1383,354 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
           inference_provider: event.providerKey,
           has_error: false,
           abuse_classification: 0,
-        } satisfies typeof microdollar_usage.$inferInsert,
-        metadata: {
-          id,
-          created_at: event.occurredAt,
-          message_id: `${CREDIT_CATEGORY_PREFIX}:usage:${index}`,
-          feature_id: requireLookupId(featureIds, event.featureKey, 'feature'),
-          api_kind_id: requireLookupId(apiKindIds, event.apiKind, 'API kind'),
-          streamed: index % 2 === 0,
+        })) satisfies (typeof microdollar_usage.$inferInsert)[]
+      );
+      for (const event of unattributedVariableEvents) {
+        await captureCostInsightSpend(tx, {
+          owner: event.owner,
+          actorUserId: event.actorUserId,
+          occurredAt: event.occurredAt,
+          amountMicrodollars: event.amountMicrodollars,
+          category: 'variable',
+          source: 'ai_gateway',
+          productKey: COST_INSIGHT_DRIVER_FALLBACK,
+          featureKey: COST_INSIGHT_DRIVER_FALLBACK,
+          modelOrPlanKey: event.modelKey,
+          providerKey: event.providerKey,
+        });
+      }
+
+      if (includesUnknownTaxonomy) {
+        const unknownUsageId = randomUUID();
+        await tx.insert(microdollar_usage).values({
+          id: unknownUsageId,
+          kilo_user_id: unknownTaxonomyEvent.actorUserId,
+          organization_id: ownerColumns(unknownTaxonomyEvent.owner).organizationId,
+          cost: unknownTaxonomyEvent.amountMicrodollars,
+          input_tokens: 1_800,
+          output_tokens: 700,
+          cache_write_tokens: 0,
+          cache_hit_tokens: 0,
+          created_at: unknownTaxonomyEvent.occurredAt,
+          provider: unknownTaxonomyEvent.providerKey,
+          model: unknownTaxonomyEvent.modelKey,
+          requested_model: unknownTaxonomyEvent.modelKey,
+          inference_provider: unknownTaxonomyEvent.providerKey,
+          has_error: false,
+          abuse_classification: 0,
+        });
+        await tx.insert(microdollar_usage_metadata).values({
+          id: unknownUsageId,
+          created_at: unknownTaxonomyEvent.occurredAt,
+          message_id: `${CREDIT_CATEGORY_PREFIX}:unknown-taxonomy`,
+          feature_id: requireLookupId(featureIds, UNKNOWN_FEATURE_KEY, 'feature'),
+          api_kind_id: requireLookupId(apiKindIds, unknownTaxonomyEvent.apiKind, 'API kind'),
+          streamed: false,
           is_byok: false,
           is_user_byok: false,
           has_tools: true,
-        } satisfies typeof microdollar_usage_metadata.$inferInsert,
-      };
-    });
+        });
+        await captureCostInsightSpend(tx, {
+          owner: unknownTaxonomyEvent.owner,
+          actorUserId: unknownTaxonomyEvent.actorUserId,
+          occurredAt: unknownTaxonomyEvent.occurredAt,
+          amountMicrodollars: unknownTaxonomyEvent.amountMicrodollars,
+          category: 'variable',
+          source: 'ai_gateway',
+          productKey: COST_INSIGHT_DRIVER_FALLBACK,
+          featureKey: unknownTaxonomyEvent.apiKind,
+          modelOrPlanKey: unknownTaxonomyEvent.modelKey,
+          providerKey: unknownTaxonomyEvent.providerKey,
+        });
+      }
 
-    await tx.insert(microdollar_usage).values(preparedVariableEvents.map(item => item.usage));
-    await tx
-      .insert(microdollar_usage_metadata)
-      .values(preparedVariableEvents.map(item => item.metadata));
+      await tx.insert(exa_usage_log).values(
+        exaEvents.map(event => ({
+          id: randomUUID(),
+          kilo_user_id: event.actorUserId,
+          organization_id: ownerColumns(event.owner).organizationId,
+          path: event.path,
+          cost_microdollars: event.amountMicrodollars,
+          charged_to_balance: true,
+          feature_id: `${CREDIT_CATEGORY_PREFIX}:exa`,
+          type: 'cost-insights-seed',
+          created_at: event.occurredAt,
+        })) satisfies (typeof exa_usage_log.$inferInsert)[]
+      );
+      for (const event of exaEvents) {
+        await captureCostInsightSpend(tx, {
+          owner: event.owner,
+          actorUserId: event.actorUserId,
+          occurredAt: event.occurredAt,
+          amountMicrodollars: event.amountMicrodollars,
+          category: 'variable',
+          source: 'other',
+          productKey: COST_INSIGHT_EXA_PRODUCT_KEY,
+          featureKey: event.featureKey,
+          modelOrPlanKey: COST_INSIGHT_DRIVER_FALLBACK,
+          providerKey: COST_INSIGHT_EXA_PRODUCT_KEY,
+        });
+      }
 
-    for (const event of variableEvents) {
-      await captureCostInsightSpend(tx, {
-        owner: event.owner,
-        actorUserId: event.actorUserId,
-        occurredAt: event.occurredAt,
-        amountMicrodollars: event.amountMicrodollars,
-        category: 'variable',
-        source: 'ai_gateway',
-        productKey: event.featureKey,
-        featureKey: event.apiKind,
-        modelOrPlanKey: event.modelKey,
-        providerKey: event.providerKey,
+      const scheduledRows = scheduledEvents.map((event, index) => ({
+        id: randomUUID(),
+        kilo_user_id: event.actorUserId,
+        organization_id: ownerColumns(event.owner).organizationId,
+        amount_microdollars: -event.amountMicrodollars,
+        is_free: false,
+        description: kiloclawDescription(event),
+        credit_category: kiloclawCreditCategory(event, index),
+        created_at: event.occurredAt,
+        check_category_uniqueness: false,
+      })) satisfies (typeof credit_transactions.$inferInsert)[];
+
+      await tx.insert(credit_transactions).values(scheduledRows);
+
+      for (const event of scheduledEvents) {
+        await captureCostInsightSpend(tx, {
+          owner: event.owner,
+          actorUserId: event.actorUserId,
+          occurredAt: event.occurredAt,
+          amountMicrodollars: event.amountMicrodollars,
+          category: 'scheduled',
+          source: 'kiloclaw',
+          productKey: COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
+          featureKey: event.featureKey,
+          modelOrPlanKey: event.planKey,
+          providerKey: COST_INSIGHT_DRIVER_FALLBACK,
+        });
+      }
+
+      const preparedCodingPlanEvents = codingPlanEvents.map((event, index) => {
+        const subscriptionId = randomUUID();
+        const transactionId = randomUUID();
+        const periodStart = event.occurredAt;
+        const periodEnd = new Date(Date.parse(periodStart) + 30 * DAY_MS).toISOString();
+        return {
+          event,
+          subscription: {
+            id: subscriptionId,
+            user_id: event.actorUserId,
+            plan_id: CODING_PLAN_ID,
+            provider_id: CODING_PLAN_PROVIDER_ID,
+            status: 'canceled',
+            cost_microdollars: event.amountMicrodollars,
+            billing_period_days: 30,
+            current_period_start: periodStart,
+            current_period_end: periodEnd,
+            credit_renewal_at: periodEnd,
+            canceled_at: currentHourIso,
+            cancellation_reason: 'user_canceled',
+          } satisfies typeof coding_plan_subscriptions.$inferInsert,
+          transaction: {
+            id: transactionId,
+            kilo_user_id: event.actorUserId,
+            organization_id: ownerColumns(event.owner).organizationId,
+            amount_microdollars: -event.amountMicrodollars,
+            is_free: false,
+            description: `Coding Plan ${event.termKind}: MiniMax Token Plan Plus`,
+            credit_category: `coding-plan:${CREDIT_CATEGORY_PREFIX}:${index}:${event.termKind}`,
+            check_category_uniqueness: true,
+            created_at: event.occurredAt,
+          } satisfies typeof credit_transactions.$inferInsert,
+          term: {
+            id: randomUUID(),
+            subscription_id: subscriptionId,
+            user_id: event.actorUserId,
+            plan_id: CODING_PLAN_ID,
+            kind: event.termKind,
+            idempotency_key: `${CREDIT_CATEGORY_PREFIX}:coding-plan:${index}:${event.termKind}`,
+            period_start: periodStart,
+            period_end: periodEnd,
+            cost_microdollars: event.amountMicrodollars,
+            credit_transaction_id: transactionId,
+          } satisfies typeof coding_plan_terms.$inferInsert,
+        };
       });
-    }
+      await tx
+        .insert(coding_plan_subscriptions)
+        .values(preparedCodingPlanEvents.map(item => item.subscription));
+      await tx
+        .insert(credit_transactions)
+        .values(preparedCodingPlanEvents.map(item => item.transaction));
+      await tx.insert(coding_plan_terms).values(preparedCodingPlanEvents.map(item => item.term));
+      for (const event of codingPlanEvents) {
+        await captureCostInsightSpend(tx, {
+          owner: event.owner,
+          actorUserId: event.actorUserId,
+          occurredAt: event.occurredAt,
+          amountMicrodollars: event.amountMicrodollars,
+          category: 'scheduled',
+          source: 'coding_plan',
+          productKey: COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
+          featureKey: event.termKind,
+          modelOrPlanKey: CODING_PLAN_ID,
+          providerKey: CODING_PLAN_PROVIDER_ID,
+        });
+      }
 
-    const scheduledRows = scheduledEvents.map((event, index) => ({
-      id: randomUUID(),
-      kilo_user_id: event.actorUserId,
-      organization_id: ownerColumns(event.owner).organizationId,
-      amount_microdollars: -event.amountMicrodollars,
-      is_free: false,
-      description: kiloclawDescription(event),
-      credit_category: kiloclawCreditCategory(event, index),
-      created_at: event.occurredAt,
-      check_category_uniqueness: false,
-    })) satisfies (typeof credit_transactions.$inferInsert)[];
+      const personalSpendMicrodollars =
+        personalVariableMicrodollars + personalScheduledMicrodollars;
+      const organizationSpendMicrodollars =
+        organizationVariableMicrodollars + organizationScheduledMicrodollars;
 
-    await tx.insert(credit_transactions).values(scheduledRows);
+      await tx
+        .update(kilocode_users)
+        .set({
+          microdollars_used: personalSpendMicrodollars,
+          total_microdollars_acquired: personalSpendMicrodollars + BALANCE_BUFFER_MICRODOLLARS,
+        })
+        .where(eq(kilocode_users.id, PERSONAL_OWNER_ID));
+      await tx
+        .update(organizations)
+        .set({
+          microdollars_used: organizationSpendMicrodollars,
+          microdollars_balance: BALANCE_BUFFER_MICRODOLLARS,
+          total_microdollars_acquired: organizationSpendMicrodollars + BALANCE_BUFFER_MICRODOLLARS,
+        })
+        .where(eq(organizations.id, ORGANIZATION_ID));
 
-    for (const event of scheduledEvents) {
-      await captureCostInsightSpend(tx, {
-        owner: event.owner,
-        actorUserId: event.actorUserId,
-        occurredAt: event.occurredAt,
-        amountMicrodollars: event.amountMicrodollars,
-        category: 'scheduled',
-        source: 'kiloclaw',
-        productKey: COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
-        featureKey: event.featureKey,
-        modelOrPlanKey: event.planKey,
-        providerKey: COST_INSIGHT_DRIVER_FALLBACK,
-      });
-    }
+      if (rollupMode === 'bootstrap') {
+        const completedSeedDrivers = and(
+          lt(cost_insight_owner_hour_driver_buckets.hour_start, currentHourIso),
+          or(
+            eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, PERSONAL_OWNER_ID),
+            eq(cost_insight_owner_hour_driver_buckets.owned_by_organization_id, ORGANIZATION_ID)
+          )
+        );
+        const completedSeedTotals = and(
+          lt(cost_insight_owner_hour_totals.hour_start, currentHourIso),
+          or(
+            eq(cost_insight_owner_hour_totals.owned_by_user_id, PERSONAL_OWNER_ID),
+            eq(cost_insight_owner_hour_totals.owned_by_organization_id, ORGANIZATION_ID)
+          )
+        );
+        await tx.delete(cost_insight_owner_hour_driver_buckets).where(completedSeedDrivers);
+        await tx.delete(cost_insight_owner_hour_totals).where(completedSeedTotals);
+      }
 
-    const personalSpendMicrodollars = personalVariableMicrodollars + personalScheduledMicrodollars;
-    const organizationSpendMicrodollars =
-      organizationVariableMicrodollars + organizationScheduledMicrodollars;
+      if (rollupMode === 'repairable-drift') {
+        const missingRollupHour = timestampAtHourOffset(currentHour, 2);
+        await tx
+          .delete(cost_insight_owner_hour_driver_buckets)
+          .where(
+            and(
+              eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, PERSONAL_OWNER_ID),
+              eq(cost_insight_owner_hour_driver_buckets.hour_start, missingRollupHour),
+              eq(cost_insight_owner_hour_driver_buckets.spend_category, 'variable')
+            )
+          );
+        await tx
+          .delete(cost_insight_owner_hour_totals)
+          .where(
+            and(
+              eq(cost_insight_owner_hour_totals.owned_by_user_id, PERSONAL_OWNER_ID),
+              eq(cost_insight_owner_hour_totals.hour_start, missingRollupHour),
+              eq(cost_insight_owner_hour_totals.spend_category, 'variable')
+            )
+          );
+      }
 
-    await tx
-      .update(kilocode_users)
-      .set({
-        microdollars_used: personalSpendMicrodollars,
-        total_microdollars_acquired: personalSpendMicrodollars + BALANCE_BUFFER_MICRODOLLARS,
-      })
-      .where(eq(kilocode_users.id, PERSONAL_OWNER_ID));
-    await tx
-      .update(organizations)
-      .set({
-        microdollars_used: organizationSpendMicrodollars,
-        microdollars_balance: BALANCE_BUFFER_MICRODOLLARS,
-        total_microdollars_acquired: organizationSpendMicrodollars + BALANCE_BUFFER_MICRODOLLARS,
-      })
-      .where(eq(organizations.id, ORGANIZATION_ID));
+      if (rollupMode === 'bootstrap' || rollupMode === 'repairable-drift') {
+        await captureCostInsightSpend(tx, {
+          owner: ORGANIZATION_OWNER,
+          actorUserId: BILLING_MANAGER_ID,
+          occurredAt: staleRollupHourIso,
+          amountMicrodollars: 880_000,
+          category: 'variable',
+          source: 'ai_gateway',
+          productKey: COST_INSIGHT_DRIVER_FALLBACK,
+          featureKey: COST_INSIGHT_DRIVER_FALLBACK,
+          modelOrPlanKey: 'stale-rollup-only',
+          providerKey: 'dev-seed',
+        });
+      }
 
-    await tx
-      .insert(cost_insight_rollup_coverage)
-      .values({
+      await tx.insert(cost_insight_rollup_coverage).values({
         rollup_version: 1,
         live_capture_start_hour: currentHourIso,
-        coverage_start_hour: coverageStartIso,
-      })
-      .onConflictDoUpdate({
-        target: cost_insight_rollup_coverage.rollup_version,
-        set: {
-          live_capture_start_hour: sql`COALESCE(${cost_insight_rollup_coverage.live_capture_start_hour}, ${currentHourIso})`,
-          coverage_start_hour: sql`LEAST(
-            COALESCE(${cost_insight_rollup_coverage.coverage_start_hour}, ${coverageStartIso}),
-            ${coverageStartIso},
-            COALESCE(${cost_insight_rollup_coverage.live_capture_start_hour}, ${currentHourIso})
-          )`,
-          updated_at: sql`CURRENT_TIMESTAMP`,
-        },
+        coverage_start_hour: rollupMode === 'bootstrap' ? currentHourIso : coverageStartIso,
       });
 
-    await tx.insert(cost_insight_owner_configs).values([
-      {
-        ...costInsightOwnerColumns(PERSONAL_OWNER),
-        spend_alerts_enabled: true,
-        cost_suggestions_enabled: true,
-        spend_threshold_microdollars: personalThresholdMicrodollars,
-        spend_alerts_enabled_at: timestampAtHourOffset(currentHour, 18),
-      },
-      {
-        ...costInsightOwnerColumns(ORGANIZATION_OWNER),
-        spend_alerts_enabled: true,
-        cost_suggestions_enabled: true,
-        spend_threshold_microdollars: organizationThresholdMicrodollars,
-        spend_alerts_enabled_at: timestampAtHourOffset(currentHour, 18),
-      },
-    ]);
-    await tx.insert(cost_insight_active_suggestions).values(costInsightSuggestionRows);
-    await tx.insert(cost_insight_events).values(costInsightEventRows);
-    await tx.insert(cost_insight_owner_states).values(costInsightStateRows);
-    await tx.insert(cost_insight_notification_deliveries).values(costInsightNotificationRows);
-  });
+      if (rollupMode === 'degraded-late') {
+        await tx.insert(cost_insight_rollup_degraded_intervals).values({
+          id: DEGRADED_INTERVAL_ID,
+          start_hour: lateArrivalHourIso,
+          end_hour_exclusive: new Date(Date.parse(lateArrivalHourIso) + HOUR_MS).toISOString(),
+          source: 'ai_gateway',
+          reason: 'late_source_data',
+        });
+      }
 
+      await tx.insert(cost_insight_owner_configs).values([
+        {
+          ...costInsightOwnerColumns(PERSONAL_OWNER),
+          spend_alerts_enabled: true,
+          cost_suggestions_enabled: true,
+          spend_threshold_microdollars: personalThresholdMicrodollars,
+          spend_alerts_enabled_at: timestampAtHourOffset(currentHour, 18),
+        },
+        {
+          ...costInsightOwnerColumns(ORGANIZATION_OWNER),
+          spend_alerts_enabled: true,
+          cost_suggestions_enabled: true,
+          spend_threshold_microdollars: organizationThresholdMicrodollars,
+          spend_alerts_enabled_at: timestampAtHourOffset(currentHour, 18),
+        },
+      ]);
+      await tx.insert(cost_insight_active_suggestions).values(costInsightSuggestionRows);
+      await tx.insert(cost_insight_events).values(costInsightEventRows);
+      await tx.insert(cost_insight_owner_states).values(costInsightStateRows);
+      await tx.insert(cost_insight_notification_deliveries).values(costInsightNotificationRows);
+    });
+  } catch (error) {
+    await Promise.all(seedUsers.map(user => deleteSeedStripeCustomer(user.stripeCustomerId)));
+    throw error;
+  }
+
+  for (const user of seedUsers) {
+    const previousStripeCustomerId = previousStripeCustomerIds.get(user.id);
+    if (
+      previousStripeCustomerId &&
+      previousStripeCustomerId !== user.stripeCustomerId &&
+      !previousStripeCustomerId.startsWith('cus_dev_seed_')
+    ) {
+      await deleteSeedStripeCustomer(previousStripeCustomerId);
+    }
+  }
+
+  const executeSafe = rollupMode !== 'unknown-taxonomy' && rollupMode !== 'degraded-late';
   console.log('');
-  console.log('This fixture represents:');
+  console.log(`This fixture represents (${rollupMode} rollup mode):`);
   console.log('- 90 days of personal and organization Variable Credit spend.');
-  console.log('- Monthly KiloClaw Scheduled Credit spend.');
-  console.log('- Current-hour anomaly spikes and rolling 24-hour threshold crossings.');
-  console.log('- Active Spend Alert banners, Cost Suggestions, notification rows, and activity.');
-  console.log('- Three organization members contributing distinct top spend drivers.');
+  console.log('- AI Gateway, Exa, Coding Plan, and KiloClaw canonical source records.');
+  console.log('- Missing AI Gateway metadata with controlled fallback driver dimensions.');
+  console.log('- Current-hour anomalies, Spend Alerts, Cost Suggestions, and activity history.');
+  if (rollupMode === 'bootstrap') {
+    console.log(
+      '- Current-hour live capture plus missing history, late data, and one stale rollup.'
+    );
+  } else if (rollupMode === 'repairable-drift') {
+    console.log('- Complete coverage with one missing rollup, late record, and stale rollup.');
+  } else if (rollupMode === 'unknown-taxonomy') {
+    console.log('- One unknown AI Gateway product taxonomy value for dry-run diagnostics.');
+  } else if (rollupMode === 'degraded-late') {
+    console.log('- One late source row inside an unresolved degraded interval.');
+  } else {
+    console.log('- Matching hourly rollups with complete 90-day coverage.');
+  }
   console.log('');
-  console.log('Seed users are DB-only Cost Insights fixtures with placeholder Stripe IDs.');
-  console.log('Use development fake login; avoid Stripe-backed billing pages with these users.');
+  console.log('Seed users have real Stripe test customers and support Stripe-backed pages.');
+  console.log('Use development fake login to open personal or organization Cost Insights.');
 
   return {
     databaseTarget: `${databaseTarget.hostname}:${databaseTarget.port}/${databaseTarget.database}`,
+    rollupMode,
+    executeSafe,
     personalOwnerId: PERSONAL_OWNER_ID,
     personalOwnerEmail: PERSONAL_OWNER_EMAIL,
+    personalStripeCustomerId:
+      seedUsers.find(user => user.id === PERSONAL_OWNER_ID)?.stripeCustomerId ?? null,
     personalPath: '/cost-insights',
     personalLoginPath: loginPath(PERSONAL_OWNER_EMAIL, '/cost-insights'),
     organizationId: ORGANIZATION_ID,
@@ -1180,12 +1742,32 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     ),
     billingManagerId: BILLING_MANAGER_ID,
     billingManagerEmail: BILLING_MANAGER_EMAIL,
+    billingManagerStripeCustomerId:
+      seedUsers.find(user => user.id === BILLING_MANAGER_ID)?.stripeCustomerId ?? null,
     organizationMemberId: ORGANIZATION_MEMBER_ID,
     organizationMemberEmail: ORGANIZATION_MEMBER_EMAIL,
+    organizationMemberStripeCustomerId:
+      seedUsers.find(user => user.id === ORGANIZATION_MEMBER_ID)?.stripeCustomerId ?? null,
     coverageStartHour: coverageStartIso,
+    rollupCoverageStartHour: rollupMode === 'bootstrap' ? currentHourIso : coverageStartIso,
     currentHour: currentHourIso,
-    variableRecordCount: variableEvents.length,
-    scheduledRecordCount: scheduledEvents.length,
+    maintenanceStartHour: rollupMode === 'bootstrap' ? coverageStartIso : maintenanceStartIso,
+    maintenanceEndHour: currentHourIso,
+    lateArrivalHour: includesLateArrival ? lateArrivalHourIso : null,
+    staleRollupHour:
+      rollupMode === 'bootstrap' || rollupMode === 'repairable-drift' ? staleRollupHourIso : null,
+    aiGatewayRecordCount:
+      variableEvents.length +
+      unattributedVariableEvents.length +
+      (includesLateArrival ? 1 : 0) +
+      (includesUnknownTaxonomy ? 1 : 0),
+    exaRecordCount: exaEvents.length,
+    codingPlanRecordCount: codingPlanEvents.length,
+    kiloclawRecordCount: scheduledEvents.length,
+    variableRecordCount: canonicalVariableSpendEvents.length,
+    scheduledRecordCount: canonicalScheduledSpendEvents.length,
+    missingMetadataRecordCount: unattributedVariableEvents.length,
+    unknownTaxonomyRecordCount: includesUnknownTaxonomy ? 1 : 0,
     personalVariableMicrodollars,
     personalScheduledMicrodollars,
     organizationVariableMicrodollars,

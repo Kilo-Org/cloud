@@ -12,6 +12,7 @@ import type { db } from '@/lib/drizzle';
 import {
   COST_INSIGHT_ROLLUP_VERSION,
   getCanonicalOwnerSpendTotals,
+  loadCanonicalCostInsightAggregation,
   parseSafeDatabaseInteger,
   requireUtcHour,
   requireUtcTimestamp,
@@ -64,7 +65,7 @@ export type CostInsightRollupCoverage = {
   isFullyCovered: boolean;
 };
 
-export type OwnerRolling24HourSpendExact = {
+export type OwnerRollingSpendExact = {
   asOf: string;
   windowStart: string;
   variableMicrodollars: number | null;
@@ -73,7 +74,16 @@ export type OwnerRolling24HourSpendExact = {
   isComplete: boolean;
 };
 
-export type Rolling24HourFragments = {
+export type OwnerRollingDriverEvidenceExact = {
+  asOf: string;
+  windowStart: string;
+  variableMicrodollars: number;
+  scheduledMicrodollars: number;
+  totalMicrodollars: number;
+  topDrivers: OwnerTopSpendDriver[];
+};
+
+export type RollingWindowFragments = {
   asOf: string;
   windowStart: string;
   oldestBoundaryEnd: string;
@@ -81,6 +91,10 @@ export type Rolling24HourFragments = {
   interiorEnd: string;
   currentBoundaryStart: string;
 };
+
+export type OwnerRolling24HourSpendExact = OwnerRollingSpendExact;
+export type OwnerRolling24HourDriverEvidenceExact = OwnerRollingDriverEvidenceExact;
+export type Rolling24HourFragments = RollingWindowFragments;
 
 type DenseHourlySpendRow = {
   hour_start: string | Date;
@@ -194,10 +208,16 @@ function ceilUtcHour(timestamp: number): number {
   return Math.ceil(timestamp / HOUR_MS) * HOUR_MS;
 }
 
-export function getRolling24HourFragments(asOfInput: string): Rolling24HourFragments {
+export function getRollingWindowFragments(
+  asOfInput: string,
+  windowHours: number
+): RollingWindowFragments {
+  if (!Number.isSafeInteger(windowHours) || windowHours <= 0 || windowHours > 24 * 90) {
+    throw new Error('Cost Insights rolling window must contain between 1 and 2160 hours.');
+  }
   const asOf = requireUtcTimestamp(asOfInput, 'asOf');
   const asOfTimestamp = Date.parse(asOf);
-  const windowStartTimestamp = asOfTimestamp - 24 * HOUR_MS;
+  const windowStartTimestamp = asOfTimestamp - windowHours * HOUR_MS;
   const oldestBoundaryEndTimestamp = ceilUtcHour(windowStartTimestamp);
   const currentBoundaryStartTimestamp = floorUtcHour(asOfTimestamp);
   return {
@@ -208,6 +228,10 @@ export function getRolling24HourFragments(asOfInput: string): Rolling24HourFragm
     interiorEnd: new Date(currentBoundaryStartTimestamp).toISOString(),
     currentBoundaryStart: new Date(currentBoundaryStartTimestamp).toISOString(),
   };
+}
+
+export function getRolling24HourFragments(asOfInput: string): Rolling24HourFragments {
+  return getRollingWindowFragments(asOfInput, 24);
 }
 
 export async function getOwnerHourlySpend(
@@ -586,10 +610,117 @@ async function getInteriorRollupTotals(
   return { variableMicrodollars, scheduledMicrodollars };
 }
 
-export async function getOwnerRolling24HourSpendExact(
+function compareTopSpendDrivers(left: OwnerTopSpendDriver, right: OwnerTopSpendDriver): number {
+  if (left.totalMicrodollars !== right.totalMicrodollars) {
+    return right.totalMicrodollars - left.totalMicrodollars;
+  }
+  const leftKey = [
+    left.category,
+    left.source,
+    left.productKey,
+    left.featureKey,
+    left.modelOrPlanKey,
+    left.providerKey,
+    left.actorUserId,
+  ].join('\u0000');
+  const rightKey = [
+    right.category,
+    right.source,
+    right.productKey,
+    right.featureKey,
+    right.modelOrPlanKey,
+    right.providerKey,
+    right.actorUserId,
+  ].join('\u0000');
+  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+}
+
+export async function getOwnerRollingDriverEvidenceExact(
+  primaryDatabase: ExactRollingDatabase,
+  params: { owner: CostInsightSpendOwner; windowHours: number; asOf?: string }
+): Promise<OwnerRollingDriverEvidenceExact> {
+  const requestedAsOf =
+    params.asOf === undefined ? undefined : requireUtcTimestamp(params.asOf, 'asOf');
+
+  return primaryDatabase.transaction(
+    async transaction => {
+      const asOfResult = await transaction.execute<DatabaseTimestampRow>(sql`
+        SELECT COALESCE(${requestedAsOf ?? null}::timestamptz, CURRENT_TIMESTAMP) AS value
+      `);
+      const asOfRow = asOfResult.rows[0];
+      if (!asOfRow) {
+        throw new Error('Cost Insights exact driver query could not establish an as-of value.');
+      }
+      const asOf = normalizeDatabaseTimestamp(asOfRow.value, 'as_of');
+      const windowStart = getRollingWindowFragments(asOf, params.windowHours).windowStart;
+      const aggregation = await loadCanonicalCostInsightAggregation(transaction, {
+        owner: params.owner,
+        startInclusive: windowStart,
+        endExclusive: asOf,
+      });
+      const variableMicrodollars = aggregation.totals
+        .filter(total => total.category === 'variable')
+        .reduce(
+          (sum, total) => sumSafe(sum, total.totalMicrodollars, 'exact driver variable total'),
+          0
+        );
+      const scheduledMicrodollars = aggregation.totals
+        .filter(total => total.category === 'scheduled')
+        .reduce(
+          (sum, total) => sumSafe(sum, total.totalMicrodollars, 'exact driver scheduled total'),
+          0
+        );
+      const topDrivers = aggregation.drivers
+        .map(driver => ({
+          category: driver.category,
+          source: driver.source,
+          productKey: driver.productKey,
+          featureKey: driver.featureKey,
+          modelOrPlanKey: driver.modelOrPlanKey,
+          providerKey: driver.providerKey,
+          actorUserId: driver.actorUserId,
+          totalMicrodollars: driver.totalMicrodollars,
+          spendRecordCount: driver.spendRecordCount,
+        }))
+        .sort(compareTopSpendDrivers)
+        .slice(0, COST_INSIGHT_MAX_TOP_DRIVERS);
+
+      return {
+        asOf,
+        windowStart,
+        variableMicrodollars,
+        scheduledMicrodollars,
+        totalMicrodollars: sumSafe(
+          variableMicrodollars,
+          scheduledMicrodollars,
+          'exact driver total microdollars'
+        ),
+        topDrivers,
+      };
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' }
+  );
+}
+
+export async function getOwnerRolling24HourDriverEvidenceExact(
   primaryDatabase: ExactRollingDatabase,
   params: { owner: CostInsightSpendOwner; asOf?: string }
-): Promise<OwnerRolling24HourSpendExact> {
+): Promise<OwnerRolling24HourDriverEvidenceExact> {
+  return await getOwnerRollingDriverEvidenceExact(primaryDatabase, {
+    ...params,
+    windowHours: 24,
+  });
+}
+
+export async function getOwnerRollingSpendExact(
+  primaryDatabase: ExactRollingDatabase,
+  params: {
+    owner: CostInsightSpendOwner;
+    windowHours: number;
+    asOf?: string;
+    fallbackToCanonical?: boolean;
+  }
+): Promise<OwnerRollingSpendExact> {
   const requestedAsOf =
     params.asOf === undefined ? undefined : requireUtcTimestamp(params.asOf, 'asOf');
 
@@ -602,8 +733,9 @@ export async function getOwnerRolling24HourSpendExact(
       if (!asOfRow) {
         throw new Error('Cost Insights exact rolling query could not establish an as-of value.');
       }
-      const fragments = getRolling24HourFragments(
-        normalizeDatabaseTimestamp(asOfRow.value, 'as_of')
+      const fragments = getRollingWindowFragments(
+        normalizeDatabaseTimestamp(asOfRow.value, 'as_of'),
+        params.windowHours
       );
       const {
         asOf,
@@ -622,6 +754,25 @@ export async function getOwnerRolling24HourSpendExact(
               endHourExclusive: interiorEnd,
             });
       if (coverage && !coverage.isFullyCovered) {
+        if (params.fallbackToCanonical) {
+          const canonical = await getCanonicalOwnerSpendTotals(transaction, {
+            owner: params.owner,
+            startInclusive: windowStart,
+            endExclusive: asOf,
+          });
+          return {
+            asOf,
+            windowStart,
+            variableMicrodollars: canonical.variableMicrodollars,
+            scheduledMicrodollars: canonical.scheduledMicrodollars,
+            totalMicrodollars: sumSafe(
+              canonical.variableMicrodollars,
+              canonical.scheduledMicrodollars,
+              'canonical rolling total microdollars'
+            ),
+            isComplete: true,
+          };
+        }
         return {
           asOf,
           windowStart,
@@ -693,4 +844,14 @@ export async function getOwnerRolling24HourSpendExact(
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );
+}
+
+export async function getOwnerRolling24HourSpendExact(
+  primaryDatabase: ExactRollingDatabase,
+  params: { owner: CostInsightSpendOwner; asOf?: string }
+): Promise<OwnerRolling24HourSpendExact> {
+  return await getOwnerRollingSpendExact(primaryDatabase, {
+    ...params,
+    windowHours: 24,
+  });
 }

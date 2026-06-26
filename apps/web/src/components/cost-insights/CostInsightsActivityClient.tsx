@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useTRPC } from '@/lib/trpc/utils';
 import { CostInsightsEventHistoryView } from './activity/CostInsightsEventHistoryView';
 import type { ActivityFilter } from './types';
+import { useCostInsightsTracking } from './useCostInsightsTracking';
 
 type CostInsightsActivityClientProps = {
   organizationId?: string;
@@ -13,6 +14,8 @@ type CostInsightsActivityClientProps = {
 
 export function CostInsightsActivityClient({ organizationId }: CostInsightsActivityClientProps) {
   const trpc = useTRPC();
+  const { trackUiInteraction } = useCostInsightsTracking(organizationId);
+  const trackedActivityOwner = useRef<string | undefined>(undefined);
   const [filter, setFilter] = useState<ActivityFilter>('all');
   const [page, setPage] = useState(1);
   const pageSize = 10;
@@ -43,6 +46,14 @@ export function CostInsightsActivityClient({ organizationId }: CostInsightsActiv
   const isLoading = organizationId ? organizationEventsLoading : personalEventsLoading;
   const isError = organizationId ? organizationEventsError : personalEventsError;
 
+  useEffect(() => {
+    if (!history) return;
+    const ownerKey = organizationId ?? 'personal';
+    if (trackedActivityOwner.current === ownerKey) return;
+    trackedActivityOwner.current = ownerKey;
+    trackUiInteraction({ interaction: 'activity_viewed' });
+  }, [history, organizationId, trackUiInteraction]);
+
   return (
     <CostInsightsEventHistoryView
       events={history?.events ?? []}
@@ -55,10 +66,21 @@ export function CostInsightsActivityClient({ organizationId }: CostInsightsActiv
       pageSize={history?.pageSize ?? pageSize}
       totalCount={history?.totalCount ?? 0}
       onFilterChange={nextFilter => {
+        if (nextFilter !== filter) {
+          trackUiInteraction({ interaction: 'activity_filter_selected', filter: nextFilter });
+        }
         setFilter(nextFilter);
         setPage(1);
       }}
-      onPageChange={setPage}
+      onPageChange={nextPage => {
+        if (nextPage !== page) {
+          trackUiInteraction({
+            interaction: 'activity_page_selected',
+            direction: nextPage > page ? 'next' : 'previous',
+          });
+        }
+        setPage(nextPage);
+      }}
       onRetry={() => {
         void (organizationId ? refetchOrganizationEvents() : refetchPersonalEvents());
       }}

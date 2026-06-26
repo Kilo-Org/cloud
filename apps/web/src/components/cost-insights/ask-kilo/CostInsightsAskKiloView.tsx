@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { BarChart3, ChevronDown, ChevronUp, Send } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useCostInsightsTracking } from '../useCostInsightsTracking';
 
 const askKiloChartData = [
   { date: 'Jun 18', cost: 1.42, color: 'var(--chart-1)' },
@@ -24,9 +25,13 @@ type AskKiloMessage = {
 
 export function CostInsightsAskKiloView({
   initialQuestion = 'Create a graph of my costs for the last week',
+  organizationId,
 }: {
   initialQuestion?: string;
+  organizationId?: string;
 }) {
+  const { trackUiInteraction } = useCostInsightsTracking(organizationId);
+  const trackedAskKiloOwner = useRef<string | undefined>(undefined);
   const initialMessage = initialQuestion.trim() || 'Create a graph of my costs for the last week';
   const [question, setQuestion] = useState('');
   const [messages, setMessages] = useState<AskKiloMessage[]>([
@@ -34,11 +39,23 @@ export function CostInsightsAskKiloView({
   ]);
   const [chartExpanded, setChartExpanded] = useState(true);
 
+  useEffect(() => {
+    const ownerKey = organizationId ?? 'personal';
+    if (trackedAskKiloOwner.current === ownerKey) return;
+    trackedAskKiloOwner.current = ownerKey;
+    trackUiInteraction({ interaction: 'ask_kilo_viewed' });
+  }, [organizationId, trackUiInteraction]);
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedQuestion = question.trim();
     if (!trimmedQuestion) return;
 
+    trackUiInteraction({
+      interaction: 'ask_kilo_question_submitted',
+      source: 'follow_up',
+      experience: 'ui_only',
+    });
     setMessages(currentMessages => [
       ...currentMessages,
       { id: `question-${currentMessages.length}`, question: trimmedQuestion },

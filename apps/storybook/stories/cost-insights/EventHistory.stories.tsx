@@ -12,6 +12,7 @@ import {
   longLabelEvents,
   organizationOwner,
   personalOwner,
+  threshold7DayEvent,
 } from './costInsightsFixtures';
 
 const paginatedEvents = Array.from({ length: 23 }, (_, index): CostInsightEvent => {
@@ -20,8 +21,12 @@ const paginatedEvents = Array.from({ length: 23 }, (_, index): CostInsightEvent 
   return {
     ...event,
     id: `${event.id}-${index}`,
-    timestampLabel:
-      index < 5 ? event.timestampLabel : `${Math.floor(index / 5) + 1} days ago, 09:15`,
+    occurredAt:
+      index < 5
+        ? event.occurredAt
+        : new Date(
+            new Date(event.occurredAt).getTime() - (Math.floor(index / 5) + 1) * 24 * 60 * 60 * 1000
+          ).toISOString(),
   };
 });
 
@@ -90,6 +95,10 @@ function renderActivity(
 
 export const ActivityHistory: Story = {
   render: () => renderActivity(paginatedEvents, organizationOwner),
+};
+
+export const SevenDayThresholdActivity: Story = {
+  render: () => renderActivity([threshold7DayEvent], organizationOwner),
 };
 
 export const Empty: Story = {

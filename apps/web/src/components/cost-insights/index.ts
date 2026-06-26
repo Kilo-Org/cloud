@@ -1,5 +1,6 @@
 export type {
   ActivityFilter,
+  AlertDriverEvidence,
   AlertFact,
   CostInsightEvent,
   CostInsightEventType,

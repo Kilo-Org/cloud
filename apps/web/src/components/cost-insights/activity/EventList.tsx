@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { money, percentOf, sourceLabels } from '../formatting';
 import { EmptyPanel } from '../shared/EmptyPanel';
+import { LocalDateTime } from '../shared/LocalDateTime';
 import { StatusBadge } from '../shared/StatusBadge';
 import type { CostInsightEvent } from '../types';
 
@@ -45,9 +46,10 @@ export function EventList({
           <li key={event.id} className={cn(compact ? 'py-5 first:pt-0 last:pb-0' : 'p-4 sm:p-6')}>
             <div className="grid gap-3 lg:grid-cols-[7.5rem_minmax(0,1fr)_auto] lg:gap-5">
               <div className="flex items-center gap-3 lg:flex-col lg:items-start lg:gap-2">
-                <time className="type-label text-muted-foreground block shrink-0">
-                  {event.timestampLabel}
-                </time>
+                <LocalDateTime
+                  timestamp={event.occurredAt}
+                  className="type-label text-muted-foreground block shrink-0"
+                />
                 <StatusBadge tone={tone}>{eventLabel}</StatusBadge>
               </div>
               <div className="min-w-0">

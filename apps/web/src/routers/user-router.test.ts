@@ -162,7 +162,6 @@ describe('user router - getAutoTopUpPaymentMethod', () => {
       enabled: true,
       amountCents: 5000,
       thresholdCents: 500,
-      configured: false,
       paymentMethod: null,
     });
     expect(mockRetrievePaymentMethodInfo).toHaveBeenCalledWith(undefined);
@@ -183,7 +182,6 @@ describe('user router - getAutoTopUpPaymentMethod', () => {
       enabled: false,
       amountCents: 10000,
       thresholdCents: 500,
-      configured: true,
       paymentMethod: null,
     });
   });
@@ -209,7 +207,6 @@ describe('user router - getAutoTopUpPaymentMethod', () => {
       enabled: true,
       amountCents: 2000,
       thresholdCents: 500,
-      configured: true,
       paymentMethod: {
         type: 'card',
         last4: '4242',

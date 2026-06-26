@@ -128,7 +128,7 @@ export const mockKiloApi = async (
         id: model.id,
         name: model.name,
         opencode: { variants: model.variants ?? { high: {}, low: {}, medium: {} } },
-        ...(model.contextLength !== undefined ? { context_length: model.contextLength } : {}),
+        ...(model.contextLength === undefined ? {} : { context_length: model.contextLength }),
       };
 
       return Object.assign(
@@ -171,7 +171,9 @@ export const mockKiloApi = async (
       Array.isArray(parsedBody.data.tools) &&
       parsedBody.data.tools.length === 0;
 
-    if (!isSummarizationCall) {
+    if (isSummarizationCall) {
+      // Summarization calls skip normal-turn assertions (tool_choice: 'none', tools: [])
+    } else {
       expect(body).toMatchObject({ stream: true, tool_choice: 'auto' });
       expect(parsedBody.success ? expectedModelIds.includes(parsedBody.data.model) : false).toBe(
         true

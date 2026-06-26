@@ -470,28 +470,6 @@ const waitForTextGone = async (driver: WebDriver, text: string): Promise<void> =
   );
 };
 
-const acceptAlertWithText = async (driver: WebDriver, text: string): Promise<void> => {
-  await driver.wait(
-    async () => {
-      try {
-        const alert = await driver.switchTo().alert();
-        const alertText = await alert.getText();
-
-        if (!alertText.includes(text)) {
-          return false;
-        }
-
-        await alert.accept();
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    waitMs,
-    `Timed out waiting for alert text: ${text}`
-  );
-};
-
 const findManifestUrl = async (driver: WebDriver): Promise<string> => {
   await driver.get('about:debugging#/runtime/this-firefox');
   await waitForText(driver, 'Kilo Extension');

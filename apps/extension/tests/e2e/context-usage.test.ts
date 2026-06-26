@@ -20,7 +20,6 @@ const modelWithContextLength = [
   },
 ];
 
-
 // Three-user-message conversation for compaction (splitEventsForCompaction needs >KEEP_RECENT_EXCHANGES=2 user messages)
 const seededConversationStore = {
   activeConversationId: 'conv-1',
@@ -94,11 +93,11 @@ test('auto-compaction fires when usage exceeds 85% threshold', async () => {
         { choices: [], usage: { completion_tokens: 10, prompt_tokens: 900, total_tokens: 910 } },
       ],
       models: modelWithContextLength,
-      seenChatBodies,
       // Second call: the summarization request (tool_choice: 'none')
       secondCompletionEvents: [
         { choices: [{ delta: { content: 'SUMMARY: user inspected the page.' } }] },
       ],
+      seenChatBodies,
       toolNames: safeToolNames,
     });
 
@@ -127,7 +126,7 @@ test('auto-compaction fires when usage exceeds 85% threshold', async () => {
     await expect(sidePanel.getByText('Second message')).toBeHidden();
 
     // The summarization call must have tool_choice: 'none' (sent with tools: [])
-    const summarizationBody = seenChatBodies[1];
+    const [, summarizationBody] = seenChatBodies;
     expect(summarizationBody).toMatchObject({ tool_choice: 'none' });
   } finally {
     await context.close();

@@ -212,8 +212,9 @@ export function useAdminOrganizationCreditTransactions(organizationId: string) {
 export function useAdminOrganizationNextCreditExpiration(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(
-    trpc.organizations.admin.nextCreditExpiration.queryOptions({
-      organizationId,
-    })
+    trpc.organizations.admin.nextCreditExpiration.queryOptions(
+      { organizationId },
+      { refetchInterval: 60_000 }
+    )
   );
 }

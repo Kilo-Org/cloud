@@ -559,7 +559,7 @@ export const organizationAdminRouter = createTRPCRouter({
     .input(OrganizationIdInputSchema)
     .output(
       z.object({
-        next_credit_expiration_at: z.string().nullable(),
+        next_credit_expiration_at: z.string().datetime().nullable(),
         next_credit_expiration_amount: z.number().nullable(),
       })
     )
@@ -579,7 +579,7 @@ export const organizationAdminRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        const expiryResult = await processOrganizationExpirations(
+        await processOrganizationExpirations(
           {
             id: organizationId,
             microdollars_used: organization.microdollars_used,
@@ -588,23 +588,24 @@ export const organizationAdminRouter = createTRPCRouter({
           },
           new Date()
         );
-        if (expiryResult) {
-          organization = (await getOrganizationById(organizationId)) ?? organization;
-        }
+        organization = (await getOrganizationById(organizationId)) ?? organization;
       }
 
-      const expiringTransactions = organization.next_credit_expiration_at
+      const next_credit_expiration_at = organization.next_credit_expiration_at
+        ? new Date(organization.next_credit_expiration_at).toISOString()
+        : null;
+      const expiringTransactions = next_credit_expiration_at
         ? await fetchExpiringTransactionsForOrganization(organizationId)
         : [];
 
       const next_credit_expiration_amount = computeNextExpirationAmount(
         expiringTransactions,
         { id: organizationId, microdollars_used: organization.microdollars_used },
-        organization.next_credit_expiration_at
+        next_credit_expiration_at
       );
 
       return {
-        next_credit_expiration_at: organization.next_credit_expiration_at,
+        next_credit_expiration_at,
         next_credit_expiration_amount,
       };
     }),

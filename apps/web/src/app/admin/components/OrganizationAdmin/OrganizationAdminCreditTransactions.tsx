@@ -17,6 +17,72 @@ import { formatRelativeTime, formatDateOnly } from '@/lib/admin-utils';
 import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
+function NextCreditExpiration({ organizationId }: { organizationId: string }) {
+  const { data, isLoading, isError, isFetching, refetch } =
+    useAdminOrganizationNextCreditExpiration(organizationId);
+
+  if (isLoading) {
+    return (
+      <span className="text-muted-foreground text-xs" aria-live="polite">
+        Loading next expiration...
+      </span>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex items-center gap-2" role="alert">
+        <span className="text-status-destructive text-xs">Expiration unavailable.</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2"
+          onClick={() => void refetch()}
+          disabled={isFetching}
+        >
+          {isFetching ? (
+            <>
+              <Loader2 className="size-icon-sm animate-spin" />
+              Retrying...
+            </>
+          ) : (
+            'Retry'
+          )}
+        </Button>
+      </div>
+    );
+  }
+
+  if (!data?.next_credit_expiration_at || data.next_credit_expiration_amount == null) {
+    return <span className="text-muted-foreground text-xs">Next expiration: None</span>;
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground h-auto px-1 py-0 hover:text-foreground"
+        >
+          <FormattedMicrodollars
+            microdollars={data.next_credit_expiration_amount}
+            className="inline whitespace-nowrap tabular-nums"
+            inline={true}
+            decimalPlaces={2}
+          />{' '}
+          in credits expires {formatRelativeTime(data.next_credit_expiration_at)}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={8}>
+        Expiration date: {formatDateOnly(data.next_credit_expiration_at)}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function OrganizationAdminCreditTransactions({
   organizationId,
 }: {
@@ -25,7 +91,6 @@ export function OrganizationAdminCreditTransactions({
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const { canManageCredits } = useAdminCreditManagementPermission();
-  const { data: nextExpirationData } = useAdminOrganizationNextCreditExpiration(organizationId);
 
   const invalidateOrgCreditQueries = () => {
     void queryClient.invalidateQueries({
@@ -127,29 +192,7 @@ export function OrganizationAdminCreditTransactions({
             Credit Transactions ({credit_transactions.length})
           </CardTitle>
           <div className="flex flex-wrap items-center gap-3">
-            {nextExpirationData?.next_credit_expiration_at &&
-              nextExpirationData.next_credit_expiration_amount != null && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-muted-foreground cursor-default text-xs">
-                      <FormattedMicrodollars
-                        microdollars={nextExpirationData.next_credit_expiration_amount}
-                        className="inline whitespace-nowrap"
-                        inline={true}
-                        decimalPlaces={2}
-                      />{' '}
-                      in credits{' '}
-                      {new Date(nextExpirationData.next_credit_expiration_at) > new Date()
-                        ? 'expires'
-                        : 'expired'}{' '}
-                      {formatRelativeTime(nextExpirationData.next_credit_expiration_at)}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" sideOffset={8}>
-                    Expiration date: {formatDateOnly(nextExpirationData.next_credit_expiration_at)}
-                  </TooltipContent>
-                </Tooltip>
-              )}
+            <NextCreditExpiration organizationId={organizationId} />
             <Button
               variant="outline"
               size="sm"

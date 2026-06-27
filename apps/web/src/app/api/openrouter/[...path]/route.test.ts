@@ -408,6 +408,19 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedGetProvider).toHaveBeenCalledTimes(1);
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.model).toBe('openai/gpt-4o');
   });
+
+  it('rejects with 403 country_not_allowed when provider resolution is forbidden', async () => {
+    mockedGetProvider.mockResolvedValueOnce({ kind: 'forbidden' });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-internal/custom-model')) as never);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      error_type: 'country_not_allowed',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
 });
 
 describe('kilo-auto/efficient classifier billing', () => {

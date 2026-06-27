@@ -1516,11 +1516,20 @@ export const CustomLlmApiConfigSchema = z.object({
 
 export type CustomLlmApiConfig = z.infer<typeof CustomLlmApiConfigSchema>;
 
+// ISO 3166-1 alpha-2 country codes (e.g. "US", "GB") sourced from Vercel's
+// `x-vercel-ip-country` request header. When non-empty, requests whose
+// resolved country is not in the list are rejected at the LLM request level.
+// Case-insensitive at enforcement; entries are validated as 2 characters.
+export const CustomLlmCountryCodesSchema = z.array(z.string().length(2));
+
+export type CustomLlmCountryCodes = z.infer<typeof CustomLlmCountryCodesSchema>;
+
 export const CustomLlmDefinitionSchema = z
   .object({
     display_name: z.string(),
     api_key: z.string(),
     organization_ids: z.array(z.string()),
+    country_codes: CustomLlmCountryCodesSchema.optional(),
     pricing: CustomLlmPricingSchema.optional(),
   })
   .and(CustomLlmMetadataSchema)

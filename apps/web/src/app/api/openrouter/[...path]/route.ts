@@ -52,6 +52,7 @@ import {
   usageLimitExceededResponse,
   wrapInSafeNextResponse,
   forbiddenFreeModelResponse,
+  customLlmCountryNotAllowedResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
@@ -239,6 +240,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
   // Extract IP early (needed for free model routing fallback and rate limiting)
   const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  // Vercel sets `x-vercel-ip-country` to the ISO 3166-1 alpha-2 country code
+  // of the client. Used to enforce a custom LLM's `country_codes` allow-list.
+  const clientCountry = request.headers.get('x-vercel-ip-country')?.trim() || null;
 
   const modeHeader = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
@@ -544,6 +548,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     organizationId,
     taskId,
     clientIp: ipAddress ?? null,
+    clientCountry,
     machineId: machineIdHeader,
   });
   if (initialProviderResultForAbuseService.kind === 'not-found') {
@@ -553,6 +558,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   }
   if (initialProviderResultForAbuseService.kind === 'unavailable') {
     return temporarilyUnavailableResponse();
+  }
+  if (initialProviderResultForAbuseService.kind === 'forbidden') {
+    return customLlmCountryNotAllowedResponse(effectiveModelIdLowerCased);
   }
   let effectiveProviderContext = initialProviderResultForAbuseService;
 
@@ -661,6 +669,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       organizationId,
       taskId,
       clientIp: ipAddress ?? null,
+      clientCountry,
       machineId: machineIdHeader,
     });
     if (quarantineProviderResult.kind === 'not-found') {
@@ -674,6 +683,12 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
       }
       return temporarilyUnavailableResponse();
+    }
+    if (quarantineProviderResult.kind === 'forbidden') {
+      if (rulesEngineDecision.delayMs > 0) {
+        await sleepForRulesEngineAction(rulesEngineDecision.delayMs);
+      }
+      return customLlmCountryNotAllowedResponse(effectiveModelIdLowerCased);
     }
 
     effectiveProviderContext = quarantineProviderResult;

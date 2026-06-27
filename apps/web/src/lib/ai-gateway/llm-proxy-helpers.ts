@@ -325,6 +325,14 @@ export function featureExclusiveModelResponse(modelId: string) {
   );
 }
 
+export function customLlmCountryNotAllowedResponse(modelId: string) {
+  const error = `${modelId} is not available in the requester's country.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.country_not_allowed, message: error },
+    { status: 403 }
+  );
+}
+
 export function storeAndPreviousResponseIdIsNotSupported() {
   const error = 'The store and previous_response_id fields are not supported.';
   return NextResponse.json(

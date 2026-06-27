@@ -17,6 +17,7 @@ import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
 import { CustomLlmDefinitionSchema } from '@kilocode/db';
 import { buildDirectProvider } from '@/lib/ai-gateway/experiments/build-direct-provider';
+import { isCountryAllowed } from '@/lib/ai-gateway/custom-llm/country-access';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 import {
   pickModelExperimentVariant,
@@ -50,12 +51,15 @@ export type GetProviderProviderResult = {
 /**
  * Discriminated routing result. `not-found` maps to the local
  * model-unavailable response (used by paused experiments); `unavailable`
- * maps to a 503 temporarily-unavailable response (cache/DB/config failure).
+ * maps to a 503 temporarily-unavailable response (cache/DB/config failure);
+ * `forbidden` maps to a 403 response (e.g. a custom LLM whose `country_codes`
+ * allow-list does not include the requester's country).
  */
 export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'not-found' }
-  | { kind: 'unavailable' };
+  | { kind: 'unavailable' }
+  | { kind: 'forbidden' };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
@@ -91,8 +95,9 @@ async function checkDirectBYOK(
 
 async function checkCustomLlm(
   requestedModel: string,
-  organizationId: string
-): Promise<GetProviderProviderResult | null> {
+  organizationId: string,
+  clientCountry: string | null
+): Promise<GetProviderResult | null> {
   const [row] = await db
     .select()
     .from(custom_llm2)
@@ -104,6 +109,13 @@ async function checkCustomLlm(
   const customLlm = parsedCustomLlm.data;
   if (!customLlm || !customLlm.organization_ids.includes(organizationId)) {
     return null;
+  }
+  // `country_codes` is an allow-list of ISO 3166-1 alpha-2 codes sourced from
+  // Vercel's `x-vercel-ip-country` header. An empty/absent list allows all
+  // countries; a configured list fails closed when the request country is
+  // unknown or not in the list.
+  if (!isCountryAllowed(customLlm.country_codes, clientCountry)) {
+    return { kind: 'forbidden' };
   }
   return {
     kind: 'provider',
@@ -153,13 +165,26 @@ export type GetProviderInput = {
    *  allocation subject for experiment routing when no userId/machineId
    *  is available. */
   clientIp: string | null;
+  /** Resolved client country (ISO 3166-1 alpha-2) from Vercel's
+   *  `x-vercel-ip-country` header. Used to enforce a custom LLM's
+   *  `country_codes` allow-list. */
+  clientCountry: string | null;
   /** Machine identifier from `x-kilocode-machineid`. Used as the machine-
    *  cohort allocation subject for experiment routing. */
   machineId: string | null;
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const { requestedModel, request, user, organizationId, taskId, clientIp, machineId } = input;
+  const {
+    requestedModel,
+    request,
+    user,
+    organizationId,
+    taskId,
+    clientIp,
+    clientCountry,
+    machineId,
+  } = input;
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
   if (directByokByok) {
@@ -220,7 +245,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   }
 
   if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId) {
-    const customLlmResult = await checkCustomLlm(requestedModel, organizationId);
+    const customLlmResult = await checkCustomLlm(requestedModel, organizationId, clientCountry);
     if (customLlmResult) {
       return customLlmResult;
     }

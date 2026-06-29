@@ -199,6 +199,49 @@ describe('Bitbucket Workspace Access Token repository cache', () => {
     expect(mockFetchBitbucketRepositoriesFromTokenService).not.toHaveBeenCalled();
   });
 
+  it('force-refreshes an organization cache for a member repository listing', async () => {
+    const member = await insertTestUser();
+    await db.insert(organization_memberships).values({
+      organization_id: organization.id,
+      kilo_user_id: member.id,
+      role: 'member',
+    });
+    const integration = await insertStaticIntegration(organization.id, user.id);
+    mockFetchBitbucketRepositoriesFromTokenService.mockResolvedValue({
+      status: 'available',
+      repositories: [REFRESHED_REPOSITORY],
+    });
+
+    await expect(
+      fetchBitbucketRepositoriesForOrganization(organization.id, member.id, true)
+    ).resolves.toMatchObject({
+      status: 'available',
+      repositories: [REFRESHED_REPOSITORY],
+      syncedAt: expect.any(String),
+    });
+    expect(mockFetchBitbucketRepositoriesFromTokenService).toHaveBeenCalledWith(
+      member.id,
+      organization.id
+    );
+
+    const [updated] = await db
+      .select({
+        repositories: platform_integrations.repositories,
+        syncedAt: platform_integrations.repositories_synced_at,
+      })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integration.id));
+    expect(updated?.repositories).toEqual([
+      {
+        id: REFRESHED_REPOSITORY.id,
+        name: REFRESHED_REPOSITORY.name,
+        full_name: REFRESHED_REPOSITORY.fullName,
+        private: REFRESHED_REPOSITORY.private,
+      },
+    ]);
+    expect(updated?.syncedAt).toBeTruthy();
+  });
+
   it('reads status with a canonicalized uppercase organization UUID', async () => {
     const integration = await insertStaticIntegration(organization.id, user.id);
 

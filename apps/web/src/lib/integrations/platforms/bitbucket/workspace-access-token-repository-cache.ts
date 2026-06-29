@@ -75,9 +75,21 @@ type RefreshRepositoriesInput = {
   expectedIntegrationId: string;
 };
 
+type RefreshRepositoriesForMemberInput = {
+  organizationId: string;
+  kiloUserId: string;
+};
+
 type WorkspaceIdentity = {
   uuid: string;
   slug: string;
+};
+
+type ParsedIntegration = NonNullable<Awaited<ReturnType<typeof loadParsedIntegration>>>;
+type RefreshableParsedIntegration = ParsedIntegration & {
+  state: 'usable';
+  workspaceIdentity: WorkspaceIdentity;
+  credential: NonNullable<ParsedIntegration['credential']>;
 };
 
 export class BitbucketWorkspaceAccessTokenRepositoryCacheAuthorizationError extends Error {
@@ -260,6 +272,16 @@ async function loadParsedIntegration(organizationId: string) {
   return row ? parseIntegration(row, organizationId) : null;
 }
 
+function isRefreshableIntegration(
+  integration: ParsedIntegration
+): integration is RefreshableParsedIntegration {
+  return (
+    integration.state === 'usable' &&
+    Boolean(integration.workspaceIdentity) &&
+    Boolean(integration.credential)
+  );
+}
+
 function notConnectedStatus() {
   return {
     status: 'not_connected' as const,
@@ -398,23 +420,61 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositories({
   if (integration.row.integrationId !== canonicalExpectedIntegrationId) {
     return { status: 'invalid_request' };
   }
-  if (
-    integration.state === 'reconnect_required' ||
-    !integration.workspaceIdentity ||
-    !integration.credential
-  ) {
+  if (!isRefreshableIntegration(integration)) {
     return { status: 'reconnect_required' };
   }
+
+  return refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
+    organizationId: canonicalOrganizationId,
+    kiloUserId,
+    integration,
+    requireOrganizationManager: true,
+  });
+}
+
+export async function refreshBitbucketWorkspaceAccessTokenRepositoriesForMember({
+  organizationId,
+  kiloUserId,
+}: RefreshRepositoriesForMemberInput): Promise<BitbucketWorkspaceAccessTokenRepositoryListResult> {
+  const canonicalOrganizationId = canonicalizeUuid(organizationId);
+  if (!canonicalOrganizationId) {
+    return { status: 'invalid_request' };
+  }
+
+  const integration = await loadParsedIntegration(canonicalOrganizationId);
+  if (!integration) return { status: 'not_connected' };
+  if (!isRefreshableIntegration(integration)) {
+    return { status: 'reconnect_required' };
+  }
+
+  return refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
+    organizationId: canonicalOrganizationId,
+    kiloUserId,
+    integration,
+    requireOrganizationManager: false,
+  });
+}
+
+async function refreshLoadedBitbucketWorkspaceAccessTokenRepositories({
+  organizationId,
+  kiloUserId,
+  integration,
+  requireOrganizationManager,
+}: {
+  organizationId: string;
+  kiloUserId: string;
+  integration: RefreshableParsedIntegration;
+  requireOrganizationManager: boolean;
+}): Promise<BitbucketWorkspaceAccessTokenRepositoryListResult> {
   const workspaceIdentity = integration.workspaceIdentity;
   const credential = integration.credential;
-
   const providerResult = await fetchBitbucketWorkspaceAccessTokenRepositoriesFromTokenService(
     kiloUserId,
-    canonicalOrganizationId
+    organizationId
   );
   const stillCurrent = await db.transaction(async tx => {
-    await lockBitbucketWorkspaceAccessTokenOrganization(tx, canonicalOrganizationId);
-    return isObservedCredentialGenerationCurrent(tx, canonicalOrganizationId, {
+    await lockBitbucketWorkspaceAccessTokenOrganization(tx, organizationId);
+    return isObservedCredentialGenerationCurrent(tx, organizationId, {
       integrationId: integration.row.integrationId,
       credentialId: credential.id,
       credentialVersion: credential.version,
@@ -422,7 +482,7 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositories({
   });
   if (!stillCurrent) {
     return readCachedBitbucketWorkspaceAccessTokenRepositories({
-      organizationId: canonicalOrganizationId,
+      organizationId,
     });
   }
   if (providerResult.status !== 'available') return providerResult;
@@ -457,12 +517,14 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositories({
   let updated: boolean;
   try {
     updated = await db.transaction(async tx => {
-      await lockBitbucketWorkspaceAccessTokenOrganization(tx, canonicalOrganizationId);
-      await requireBitbucketWorkspaceAccessTokenOrganizationManager(
-        tx,
-        canonicalOrganizationId,
-        kiloUserId
-      );
+      await lockBitbucketWorkspaceAccessTokenOrganization(tx, organizationId);
+      if (requireOrganizationManager) {
+        await requireBitbucketWorkspaceAccessTokenOrganizationManager(
+          tx,
+          organizationId,
+          kiloUserId
+        );
+      }
       const currentCredential = tx
         .select({ id: platform_access_token_credentials.id })
         .from(platform_access_token_credentials)
@@ -473,7 +535,7 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositories({
               platform_access_token_credentials.platform_integration_id,
               integration.row.integrationId
             ),
-            eq(platform_access_token_credentials.owned_by_organization_id, canonicalOrganizationId),
+            eq(platform_access_token_credentials.owned_by_organization_id, organizationId),
             eq(platform_access_token_credentials.credential_version, credential.version)
           )
         );
@@ -487,7 +549,7 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositories({
         .where(
           and(
             eq(platform_integrations.id, integration.row.integrationId),
-            eq(platform_integrations.owned_by_organization_id, canonicalOrganizationId),
+            eq(platform_integrations.owned_by_organization_id, organizationId),
             isNull(platform_integrations.owned_by_user_id),
             eq(platform_integrations.platform, BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM),
             eq(
@@ -515,7 +577,7 @@ export async function refreshBitbucketWorkspaceAccessTokenRepositories({
 
   if (!updated) {
     return readCachedBitbucketWorkspaceAccessTokenRepositories({
-      organizationId: canonicalOrganizationId,
+      organizationId,
     });
   }
   return { ...providerResult, syncedAt };

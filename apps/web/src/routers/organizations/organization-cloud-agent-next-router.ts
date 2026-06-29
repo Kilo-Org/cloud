@@ -187,6 +187,7 @@ const ListGitLabRepositoriesInput = z.object({
 
 const ListBitbucketRepositoriesInput = z.object({
   organizationId: z.uuid(),
+  forceRefresh: z.boolean().optional().default(false),
 });
 
 /**
@@ -645,6 +646,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(ListBitbucketRepositoriesInput)
     .output(BitbucketOrganizationRepositoryListResultSchema)
     .query(async ({ ctx, input }) => {
-      return fetchBitbucketRepositoriesForOrganization(input.organizationId, ctx.user.id);
+      return fetchBitbucketRepositoriesForOrganization(
+        input.organizationId,
+        ctx.user.id,
+        input.forceRefresh
+      );
     }),
 });

@@ -67,7 +67,8 @@ const mockFetchBitbucketRepositoriesForOrganization =
   jest.fn<
     (
       organizationId: string,
-      kiloUserId: string
+      kiloUserId: string,
+      forceRefresh?: boolean
     ) => Promise<BitbucketOrganizationRepositoryListResult>
   >();
 const mockGetBalanceForOrganizationUser =
@@ -188,6 +189,7 @@ let createCaller: (ctx: { user: User }) => {
   }) => Promise<unknown>;
   listBitbucketRepositories: (input: {
     organizationId: string;
+    forceRefresh?: boolean;
   }) => Promise<BitbucketOrganizationRepositoryListResult>;
   checkEligibility: (input: { organizationId: string }) => Promise<{
     balance: number;
@@ -563,7 +565,7 @@ describe('organizationCloudAgentNextRouter Bitbucket repository listing', () => 
     jest.clearAllMocks();
   });
 
-  it('forwards exact organization ownership without a provider-refresh control', async () => {
+  it('forwards exact organization ownership without forcing provider refresh by default', async () => {
     const result = {
       status: 'available' as const,
       repositories: [],
@@ -579,7 +581,30 @@ describe('organizationCloudAgentNextRouter Bitbucket repository listing', () => 
     ).resolves.toEqual(result);
     expect(mockFetchBitbucketRepositoriesForOrganization).toHaveBeenCalledWith(
       ORGANIZATION_ID,
-      'member-1'
+      'member-1',
+      false
+    );
+  });
+
+  it('lets organization members force-refresh Bitbucket repositories through listing', async () => {
+    const result = {
+      status: 'available' as const,
+      repositories: [],
+      syncedAt: '2026-06-23T08:00:00.000Z',
+    };
+    mockFetchBitbucketRepositoriesForOrganization.mockResolvedValue(result);
+    const caller = createCaller({ user: { id: 'member-1', is_admin: false } as User });
+
+    await expect(
+      caller.listBitbucketRepositories({
+        organizationId: ORGANIZATION_ID,
+        forceRefresh: true,
+      })
+    ).resolves.toEqual(result);
+    expect(mockFetchBitbucketRepositoriesForOrganization).toHaveBeenCalledWith(
+      ORGANIZATION_ID,
+      'member-1',
+      true
     );
   });
 

@@ -439,11 +439,11 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     data: bitbucketRepoData,
     isLoading: isLoadingBitbucketRepos,
     error: bitbucketRepoError,
-    refetch: refetchBitbucketRepositories,
     isRefetching: isRefetchingBitbucketRepos,
   } = useQuery({
     ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
       organizationId: organizationId ?? '',
+      forceRefresh: false,
     }),
     enabled: Boolean(organizationId),
   });
@@ -673,6 +673,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
         const repositoryQueryKey =
           trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
             organizationId,
+            forceRefresh: false,
           });
         switch (result.status) {
           case 'available':
@@ -716,19 +717,33 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       return;
     }
 
-    const result = await refetchBitbucketRepositories();
-    if (result.error) throw result.error;
-    if (result.data?.status && result.data.status !== 'available') {
-      throw new Error(getBitbucketRepositoryRefreshFailureMessage(result.data.status));
+    const result = await queryClient.fetchQuery(
+      trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
+        organizationId,
+        forceRefresh: true,
+      })
+    );
+    queryClient.setQueryData(
+      trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
+        organizationId,
+        forceRefresh: false,
+      }),
+      result
+    );
+    void queryClient.invalidateQueries({
+      queryKey: trpc.organizations.bitbucket.getStatus.queryKey({ organizationId }),
+    });
+    if (result.status !== 'available') {
+      throw new Error(getBitbucketRepositoryRefreshFailureMessage(result.status));
     }
   }, [
     bitbucketStatusData?.canManage,
     bitbucketStatusData?.integrationId,
     organizationId,
     queryClient,
-    refetchBitbucketRepositories,
     refreshBitbucketRepositoriesFromProvider,
     trpc.organizations.bitbucket.getStatus,
+    trpc.organizations.cloudAgentNext.listBitbucketRepositories,
   ]);
 
   const shouldRefreshBitbucketRepositories =

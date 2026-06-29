@@ -9,7 +9,10 @@ import {
   type BitbucketOrganizationRepositoryListResult,
 } from '@/lib/integrations/platforms/bitbucket/oauth-integration';
 import { listBitbucketRepositories } from '@/lib/integrations/platforms/bitbucket/repository-cache';
-import { readCachedBitbucketWorkspaceAccessTokenRepositories } from '@/lib/integrations/platforms/bitbucket/workspace-access-token-repository-cache';
+import {
+  readCachedBitbucketWorkspaceAccessTokenRepositories,
+  refreshBitbucketWorkspaceAccessTokenRepositoriesForMember,
+} from '@/lib/integrations/platforms/bitbucket/workspace-access-token-repository-cache';
 import { platform_integrations } from '@kilocode/db/schema';
 
 async function findBitbucketIntegrationType(organizationId: string) {
@@ -29,13 +32,20 @@ async function findBitbucketIntegrationType(organizationId: string) {
 
 export async function fetchBitbucketRepositoriesForOrganization(
   organizationId: string,
-  kiloUserId: string
+  kiloUserId: string,
+  forceRefresh = false
 ): Promise<BitbucketOrganizationRepositoryListResult> {
   const canonicalOrganizationId = z.uuid().safeParse(organizationId);
   if (!canonicalOrganizationId.success) return { status: 'invalid_request' };
 
   const integrationType = await findBitbucketIntegrationType(canonicalOrganizationId.data);
   if (integrationType === 'workspace_access_token') {
+    if (forceRefresh) {
+      return refreshBitbucketWorkspaceAccessTokenRepositoriesForMember({
+        organizationId: canonicalOrganizationId.data,
+        kiloUserId,
+      });
+    }
     return readCachedBitbucketWorkspaceAccessTokenRepositories({
       organizationId: canonicalOrganizationId.data,
     });
@@ -44,6 +54,7 @@ export async function fetchBitbucketRepositoriesForOrganization(
     return listBitbucketRepositories({
       owner: { type: 'org', id: canonicalOrganizationId.data },
       kiloUserId,
+      forceRefresh,
     });
   }
   if (integrationType) return { status: 'reconnect_required' };

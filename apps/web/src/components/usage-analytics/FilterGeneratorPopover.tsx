@@ -28,8 +28,6 @@ import type { Granularity } from './types';
 type FilterGeneratorPopoverProps = {
   /** Query scope (to populate value suggestions). */
   organizationId: string | null;
-  /** Multi-org aggregate scope (parent + children), when viewing all orgs. */
-  organizationIds: string[] | null;
   dateRange: DateRange;
   personalScope: PersonalScope;
   /**
@@ -61,7 +59,6 @@ const DIMENSIONS_ORG: Dimension[] = ['feature', 'model', 'mode', 'user', 'provid
 
 export function FilterGeneratorPopover({
   organizationId,
-  organizationIds,
   dateRange,
   personalScope,
   canFilterByUser,
@@ -79,9 +76,6 @@ export function FilterGeneratorPopover({
 
   const dimensionOptions = canFilterByUser ? DIMENSIONS_ORG : DIMENSIONS_PERSONAL;
 
-  const scopeOrganizationIds =
-    organizationIds && organizationIds.length > 0 ? organizationIds : undefined;
-
   const trpc = useTRPC();
   const { data: breakdown, isLoading } = useQuery({
     ...trpc.usageAnalytics.getBreakdown.queryOptions({
@@ -89,9 +83,7 @@ export function FilterGeneratorPopover({
       endDate: dateRange.endDate,
       granularity,
       costSource,
-      // In multi-org aggregate mode the server keys off `organizationIds`.
-      organizationId: scopeOrganizationIds ? undefined : (organizationId ?? undefined),
-      organizationIds: scopeOrganizationIds,
+      organizationId: organizationId ?? undefined,
       personalScope,
       viewAs,
       dimension,
@@ -109,12 +101,8 @@ export function FilterGeneratorPopover({
     () => (dimension === 'user' ? suggestionKeys : []),
     [dimension, suggestionKeys]
   );
-  const resolutionOrgIds = useMemo(
-    () => scopeOrganizationIds ?? (organizationId ? [organizationId] : []),
-    [scopeOrganizationIds, organizationId]
-  );
   const { data: userSuggestionResolution, isLoading: userSuggestionResolutionLoading } =
-    useResolveOrgUsers(resolutionOrgIds, userSuggestionIds);
+    useResolveOrgUsers(organizationId, userSuggestionIds);
   const isResolvingUserSuggestions =
     dimension === 'user' && userSuggestionIds.length > 0 && userSuggestionResolutionLoading;
   const resolvedUsersById = useMemo(

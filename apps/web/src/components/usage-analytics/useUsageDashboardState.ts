@@ -20,19 +20,9 @@ export type DashboardState = {
   filters: UsageFilters;
   groupBy: Dimension | 'none';
   personalView: string;
-  /**
-   * Org-context scope selection. One of:
-   *   - `'self'` — the caller's own usage in the page org (default)
-   *   - `'all-orgs'` — org-wide aggregate across a parent org + its children
-   *   - any other string — an organization id, viewed org-wide
-   * Only meaningful in the organization context; ignored in personal context.
-   */
-  orgScope: string;
+  viewAs: 'self' | 'org-wide';
   usageView: OrganizationUsageView;
 };
-
-export const ORG_SCOPE_SELF = 'self';
-export const ORG_SCOPE_ALL_ORGS = 'all-orgs';
 
 const VALID_PERIODS: PeriodOption[] = ['today', 'yesterday', '7d', '30d', '1y'];
 const VALID_GRANULARITIES: Granularity[] = ['hour', 'day', 'week', 'month'];
@@ -209,7 +199,8 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     const personalView =
       params.get('personalView') ?? defaultState?.personalView ?? 'personal-only';
 
-    const orgScope = params.get('scope') ?? defaultState?.orgScope ?? ORG_SCOPE_SELF;
+    const viewAsRaw = params.get('viewAs');
+    const viewAs = viewAsRaw === 'org-wide' ? 'org-wide' : (defaultState?.viewAs ?? 'self');
 
     const usageViewRaw = params.get('view');
     const usageView = VALID_USAGE_VIEWS.includes(usageViewRaw as OrganizationUsageView)
@@ -226,7 +217,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
       filters,
       groupBy,
       personalView,
-      orgScope,
+      viewAs,
       usageView,
     };
   });
@@ -266,7 +257,8 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
           ? (groupByRaw as Dimension | 'none')
           : state.groupBy;
       const personalView = params.get('personalView') ?? state.personalView;
-      const orgScope = params.get('scope') ?? state.orgScope;
+      const viewAsRaw = params.get('viewAs');
+      const viewAs = viewAsRaw === 'org-wide' ? 'org-wide' : state.viewAs;
       const usageViewRaw = params.get('view');
       const usageView = VALID_USAGE_VIEWS.includes(usageViewRaw as OrganizationUsageView)
         ? (usageViewRaw as OrganizationUsageView)
@@ -281,7 +273,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
         filters,
         groupBy,
         personalView,
-        orgScope,
+        viewAs,
         usageView,
       });
 
@@ -301,7 +293,7 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     state.chartMetric,
     state.groupBy,
     state.personalView,
-    state.orgScope,
+    state.viewAs,
     state.usageView,
   ]);
 
@@ -337,13 +329,11 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
       params.delete('personalView');
     }
 
-    if (state.orgScope && state.orgScope !== ORG_SCOPE_SELF) {
-      params.set('scope', state.orgScope);
+    if (state.viewAs === 'org-wide') {
+      params.set('viewAs', 'org-wide');
     } else {
-      params.delete('scope');
+      params.delete('viewAs');
     }
-    // Drop the legacy org-wide param once migrated to `scope` (see dashboard).
-    params.delete('viewAs');
 
     if (state.usageView === 'overview') {
       params.delete('view');

@@ -425,8 +425,12 @@ export function CodeReviewJobsCard({
             Review one {platformLabel} {changeLabel} with the selected model and instructions.
           </DialogDescription>
         </DialogHeader>
-        <form id="manual-code-review-job-form" onSubmit={handleManualJobSubmit} className="min-h-0">
-          <div className="flex min-h-0 flex-col gap-4 overflow-y-auto pr-1">
+        <form
+          id="manual-code-review-job-form"
+          onSubmit={handleManualJobSubmit}
+          className="min-h-0 overflow-y-auto pr-1"
+        >
+          <div className="flex flex-col gap-4">
             {localCodeReviewDevelopmentEnabled && (
               <Alert>
                 <AlertCircle className="h-4 w-4" />

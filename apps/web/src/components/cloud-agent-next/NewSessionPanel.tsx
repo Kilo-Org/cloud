@@ -97,6 +97,11 @@ import {
   getGitHubIdentityHintDismissed,
   markGitHubIdentityHintDismissed,
 } from '@/components/cloud-agent-next/github-identity-hint';
+import {
+  getBitbucketRepositoryRefreshFailureMessage,
+  refreshSessionRepositories,
+  shouldIncludeBitbucketRepositoryRefresh,
+} from '@/components/cloud-agent-next/repository-refresh';
 
 type Repository = {
   id: string | number;
@@ -434,8 +439,16 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     data: bitbucketRepoData,
     isLoading: isLoadingBitbucketRepos,
     error: bitbucketRepoError,
+    refetch: refetchBitbucketRepositories,
+    isRefetching: isRefetchingBitbucketRepos,
   } = useQuery({
     ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
+      organizationId: organizationId ?? '',
+    }),
+    enabled: Boolean(organizationId),
+  });
+  const { data: bitbucketStatusData } = useQuery({
+    ...trpc.organizations.bitbucket.getStatus.queryOptions({
       organizationId: organizationId ?? '',
     }),
     enabled: Boolean(organizationId),
@@ -649,18 +662,105 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       ),
     });
 
+  const {
+    mutateAsync: refreshBitbucketRepositoriesFromProvider,
+    isPending: isRefreshingBitbucketRepos,
+  } = useMutation(
+    trpc.organizations.bitbucket.refreshRepositories.mutationOptions({
+      onSuccess: result => {
+        if (!organizationId) return;
+
+        const repositoryQueryKey =
+          trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
+            organizationId,
+          });
+        switch (result.status) {
+          case 'available':
+          case 'not_connected':
+          case 'workspace_selection_required':
+          case 'reconnect_required':
+          case 'invalid_request':
+          case 'insufficient_permissions':
+            queryClient.setQueryData(repositoryQueryKey, result);
+            break;
+          case 'temporarily_unavailable':
+            break;
+        }
+
+        void queryClient.invalidateQueries({
+          queryKey: trpc.organizations.bitbucket.getStatus.queryKey({ organizationId }),
+        });
+      },
+    })
+  );
+
+  const refreshBitbucketRepositories = useCallback(async () => {
+    if (!organizationId) return;
+
+    const bitbucketStatus =
+      bitbucketStatusData ??
+      (await queryClient.fetchQuery(
+        trpc.organizations.bitbucket.getStatus.queryOptions({
+          organizationId,
+        })
+      ));
+
+    if (bitbucketStatus.integrationId && bitbucketStatus.canManage) {
+      const result = await refreshBitbucketRepositoriesFromProvider({
+        organizationId,
+        integrationId: bitbucketStatus.integrationId,
+      });
+      if (result.status !== 'available') {
+        throw new Error(getBitbucketRepositoryRefreshFailureMessage(result.status));
+      }
+      return;
+    }
+
+    const result = await refetchBitbucketRepositories();
+    if (result.error) throw result.error;
+    if (result.data?.status && result.data.status !== 'available') {
+      throw new Error(getBitbucketRepositoryRefreshFailureMessage(result.data.status));
+    }
+  }, [
+    bitbucketStatusData?.canManage,
+    bitbucketStatusData?.integrationId,
+    organizationId,
+    queryClient,
+    refetchBitbucketRepositories,
+    refreshBitbucketRepositoriesFromProvider,
+    trpc.organizations.bitbucket.getStatus,
+  ]);
+
+  const shouldRefreshBitbucketRepositories =
+    organizationId && shouldIncludeBitbucketRepositoryRefresh(bitbucketRepoData?.status);
+
   const refreshRepositories = useCallback(async () => {
     try {
-      await Promise.all([refreshGitHubRepositories(), refreshGitLabRepositories()]);
-      toast.success('GitHub and GitLab repositories refreshed');
+      await refreshSessionRepositories({
+        refreshGitHubRepositories,
+        refreshGitLabRepositories,
+        refreshBitbucketRepositories: shouldRefreshBitbucketRepositories
+          ? refreshBitbucketRepositories
+          : undefined,
+      });
+      toast.success('Repositories refreshed');
     } catch (error) {
       toast.error('Failed to refresh repositories', {
         description: error instanceof Error ? error.message : 'Unknown error',
       });
     }
-  }, [refreshGitHubRepositories, refreshGitLabRepositories]);
+  }, [
+    refreshBitbucketRepositories,
+    refreshGitHubRepositories,
+    refreshGitLabRepositories,
+    shouldRefreshBitbucketRepositories,
+  ]);
 
-  const isRefreshingRepos = isRefreshingGitHubRepos || isRefreshingGitLabRepos;
+  const isRefreshingRepos =
+    isRefreshingGitHubRepos ||
+    isRefreshingGitLabRepos ||
+    isRefreshingBitbucketRepos ||
+    isRefetchingBitbucketRepos;
 
   // ---------------------------------------------------------------------------
   // Integration missing check
@@ -1341,9 +1441,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                     className="mx-auto"
                   >
                     <RefreshCw className={cn('size-3.5', isRefreshingRepos && 'animate-spin')} />
-                    {isRefreshingRepos
-                      ? 'Refreshing GitHub and GitLab...'
-                      : 'Refresh GitHub and GitLab'}
+                    {isRefreshingRepos ? 'Refreshing repositories...' : 'Refresh repositories'}
                   </UIButton>
                 </div>
               ) : (
@@ -1355,8 +1453,8 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                       onClick={() => void refreshRepositories()}
                       disabled={isRefreshingRepos}
                       className="text-muted-foreground hover:text-foreground shrink-0 rounded-sm p-1 disabled:opacity-50"
-                      aria-label="Refresh GitHub and GitLab repositories"
-                      title="Refresh GitHub and GitLab repositories"
+                      aria-label="Refresh repositories"
+                      title="Refresh repositories"
                     >
                       <RefreshCw
                         className={cn('h-3.5 w-3.5', isRefreshingRepos && 'animate-spin')}

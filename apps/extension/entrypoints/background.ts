@@ -36,11 +36,15 @@ interface ChromeRuntimeApi {
 /*
  * Trust boundary for the eval/debugger message path. Today only the extension's own pages (the
  * side panel) can reach this listener — there is no externally_connectable and no content script.
- * Accept only same-extension senders whose origin is this extension, so adding a content script
+ * Accept only same-extension senders whose origin is an extension page, so adding a content script
  * later can't silently widen access to the dangerous eval path: a content script shares the
- * extension `id` but reports the host page's origin, while an extension page reports
- * `chrome-extension://<id>`.
+ * extension `id` but reports the host page's web origin, while an extension page reports an
+ * extension-scheme origin (`chrome-extension://` on Chrome, `moz-extension://` on Firefox).
  */
+const isExtensionScheme = (value: unknown): boolean =>
+  typeof value === 'string' &&
+  (value.startsWith('chrome-extension://') || value.startsWith('moz-extension://'));
+
 const isTrustedExtensionSender = (sender: unknown, runtimeId: string | undefined): boolean => {
   if (runtimeId === undefined || typeof sender !== 'object' || sender === null) {
     return false;
@@ -48,15 +52,8 @@ const isTrustedExtensionSender = (sender: unknown, runtimeId: string | undefined
 
   const { id, origin, url } = sender as { id?: unknown; origin?: unknown; url?: unknown };
 
-  if (id !== runtimeId) {
-    return false;
-  }
-
-  const extensionOrigin = `chrome-extension://${runtimeId}`;
-
-  return (
-    origin === extensionOrigin || (typeof url === 'string' && url.startsWith(`${extensionOrigin}/`))
-  );
+  // Same-extension is already pinned by `id === runtimeId`, so origin only separates an extension page from a content script.
+  return id === runtimeId && (isExtensionScheme(origin) || isExtensionScheme(url));
 };
 
 const handleTabDebuggerRequest = async ({

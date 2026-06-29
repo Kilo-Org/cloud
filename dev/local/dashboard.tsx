@@ -132,7 +132,11 @@ function doShowGroup(
   const current = viewedRef.current;
   const result = showGroupInTmux(sessionName, runningServiceNames, currentViewedEncoded(current));
   if (result !== currentViewedEncoded(current)) {
-    viewedRef.current = { kind: 'group', groupId, serviceNames: runningServiceNames };
+    const joinedServiceNames = result.split(',').filter(Boolean);
+    viewedRef.current =
+      joinedServiceNames.length > 0
+        ? { kind: 'group', groupId, serviceNames: joinedServiceNames }
+        : null;
   }
 }
 

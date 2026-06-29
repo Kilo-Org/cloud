@@ -29,8 +29,6 @@ export const GATEWAY_METADATA_REDIS_KEYS = {
 export const directByokModelsRedisKey = (providerId: DirectUserByokInferenceProviderId) =>
   redisKey(`ai-gateway.metadata.direct-byok-models:${providerId}`);
 
-export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
-
 export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
   'public-api:leaderboard-model-provider-usage'
 );

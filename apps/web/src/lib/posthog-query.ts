@@ -1,7 +1,4 @@
 import { getEnvVariable } from '@/lib/dotenvx';
-import { redisClient } from '@/lib/redis';
-import { posthogQueryRedisKey } from '@/lib/redis-keys';
-import * as z from 'zod';
 
 /**
  * NOTE: This is a copy from the landing page project.
@@ -56,51 +53,5 @@ export async function posthogQuery(name: string, query: string): Promise<PostHog
   return {
     status: 'ok',
     body: await response.json(),
-  };
-}
-
-const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24 hours
-const MEMORY_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
-
-export function cachedPosthogQuery<Output>(schema: z.ZodType<Output[]>) {
-  const parse = (name: string, raw: unknown): Output[] => {
-    const result = schema.safeParse(raw);
-    if (!result.success) {
-      throw new Error(`${name} parse failed: ${z.prettifyError(result.error)}`);
-    }
-    return result.data;
-  };
-
-  const memoryCache = new Map<string, { value: Output[]; at: number }>();
-
-  return async (name: string, query: string): Promise<Output[]> => {
-    const memoryCached = memoryCache.get(name);
-    if (memoryCached && Date.now() - memoryCached.at < MEMORY_CACHE_TTL_MS) {
-      return memoryCached.value;
-    }
-
-    const key = posthogQueryRedisKey(name);
-
-    const cached = await redisClient.get<string>(key);
-    if (cached !== null) {
-      const data = parse(name, JSON.parse(cached));
-      memoryCache.set(name, { value: data, at: Date.now() });
-      return data;
-    }
-
-    const startTime = performance.now();
-    const response = await posthogQuery(name, query);
-    if (response.status !== 'ok') {
-      throw new Error(`${name} query failed: ${JSON.stringify(response.error, undefined, 2)}`);
-    }
-    const data = parse(name, response.body.results);
-    console.debug(
-      `[cachedPosthogQuery] ${name} returned ${data.length} rows in ${performance.now() - startTime}ms`
-    );
-
-    await redisClient.set(key, JSON.stringify(response.body.results), { ex: CACHE_TTL_SECONDS });
-    memoryCache.set(name, { value: data, at: Date.now() });
-
-    return data;
   };
 }

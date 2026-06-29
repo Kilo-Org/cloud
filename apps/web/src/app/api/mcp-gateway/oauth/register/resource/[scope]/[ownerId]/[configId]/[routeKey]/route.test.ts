@@ -81,4 +81,31 @@ describe('POST /api/mcp-gateway/oauth/register/resource/...', () => {
     expect(response.status).toBe(201);
     expect(calls).toEqual(['rate-limit', 'resolve-route', 'register-client']);
   });
+
+  test('consumes the public rate limit before validating route params', async () => {
+    const { POST } = await import('./route');
+    const response = await POST(
+      new NextRequest(
+        'http://localhost:3000/api/mcp-gateway/oauth/register/resource/user/user-1/not-a-uuid/short',
+        {
+          method: 'POST',
+          body: JSON.stringify({ token_endpoint_auth_method: 'none' }),
+          headers: { 'Content-Type': 'application/json' },
+        }
+      ),
+      {
+        params: Promise.resolve({
+          scope: 'user',
+          ownerId: 'user-1',
+          configId: 'not-a-uuid',
+          routeKey: 'short',
+        }),
+      }
+    );
+
+    expect(response.status).toBe(400);
+    expect(calls).toEqual(['rate-limit']);
+    expect(mockResolveRouteParams).not.toHaveBeenCalled();
+    expect(mockRegisterClient).not.toHaveBeenCalled();
+  });
 });

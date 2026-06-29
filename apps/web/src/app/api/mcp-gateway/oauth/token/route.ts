@@ -15,7 +15,7 @@ const tokenResponseHeaders = {
   Pragma: 'no-cache',
 };
 
-function withTokenResponseHeaders(response: NextResponse) {
+export function withTokenResponseHeaders(response: NextResponse) {
   response.headers.set('Cache-Control', tokenResponseHeaders['Cache-Control']);
   response.headers.set('Pragma', tokenResponseHeaders.Pragma);
   return response;

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Writable } from 'node:stream';
 import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
 import {
   createSafeProcessDiagnostic,
@@ -43,6 +44,8 @@ export type RestoreSessionOptions = {
 };
 
 const KILO_IMPORT_TIMEOUT_MS = 120_000;
+const JQ_SANITIZE_TOKEN_COUNTS_FILTER =
+  'walk(if type == "object" and ((.tokens? | type) == "object") then .tokens |= walk(if type == "number" and . < 0 then 0 else . end) else . end)';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -368,6 +371,142 @@ async function validateSnapshotInfoId(
   }
 }
 
+function tokenSanitizationTempPath(snapshotPath: string): string {
+  return path.join(
+    path.dirname(snapshotPath),
+    `.kilo-sanitized-${path.basename(snapshotPath)}-${process.pid}-${Date.now()}`
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+async function sanitizeSnapshotTokenCountsWithJq(
+  snapshotPath: string,
+  signal?: AbortSignal
+): Promise<boolean> {
+  const tempPath = tokenSanitizationTempPath(snapshotPath);
+  try {
+    signal?.throwIfAborted();
+    const proc = Bun.spawn(['jq', '-c', JQ_SANITIZE_TOKEN_COUNTS_FILTER, snapshotPath], {
+      stdout: 'pipe',
+      stderr: 'ignore',
+      signal,
+    });
+    const writeOutput = proc.stdout.pipeTo(Writable.toWeb(fs.createWriteStream(tempPath)));
+    const exitCode = await proc.exited;
+    await writeOutput;
+    signal?.throwIfAborted();
+    if (exitCode !== 0) {
+      log(`snapshot_token_sanitization_jq_unavailable exitCode=${exitCode}`);
+      return false;
+    }
+    fs.renameSync(tempPath, snapshotPath);
+    return true;
+  } catch {
+    signal?.throwIfAborted();
+    log('snapshot_token_sanitization_jq_unavailable');
+    return false;
+  } finally {
+    fs.rmSync(tempPath, { force: true });
+  }
+}
+
+function clampNegativeTokenCountNumbers(value: unknown): number {
+  let clamped = 0;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) {
+      const item = value[index];
+      if (typeof item === 'number' && item < 0) {
+        value[index] = 0;
+        clamped++;
+      } else {
+        clamped += clampNegativeTokenCountNumbers(item);
+      }
+    }
+    return clamped;
+  }
+
+  if (!isRecord(value)) return 0;
+
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === 'number' && item < 0) {
+      value[key] = 0;
+      clamped++;
+    } else {
+      clamped += clampNegativeTokenCountNumbers(item);
+    }
+  }
+  return clamped;
+}
+
+function sanitizeSnapshotTokenCountsValue(value: unknown): number {
+  let clamped = 0;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      clamped += sanitizeSnapshotTokenCountsValue(item);
+    }
+    return clamped;
+  }
+
+  if (!isRecord(value)) return 0;
+
+  for (const [key, item] of Object.entries(value)) {
+    if (key === 'tokens' && typeof item === 'object' && item !== null) {
+      clamped += clampNegativeTokenCountNumbers(item);
+      continue;
+    }
+    clamped += sanitizeSnapshotTokenCountsValue(item);
+  }
+  return clamped;
+}
+
+async function sanitizeSnapshotTokenCountsWithBun(
+  snapshotPath: string,
+  signal?: AbortSignal
+): Promise<boolean> {
+  let parsed: unknown;
+  try {
+    signal?.throwIfAborted();
+    parsed = await Bun.file(snapshotPath).json();
+    signal?.throwIfAborted();
+  } catch {
+    signal?.throwIfAborted();
+    log('snapshot_token_sanitization_parse_failed');
+    return false;
+  }
+
+  const clamped = sanitizeSnapshotTokenCountsValue(parsed);
+  if (clamped === 0) return true;
+
+  try {
+    signal?.throwIfAborted();
+    await Bun.write(snapshotPath, JSON.stringify(parsed));
+    signal?.throwIfAborted();
+    return true;
+  } catch {
+    signal?.throwIfAborted();
+    log('snapshot_token_sanitization_write_failed');
+    return false;
+  }
+}
+
+async function sanitizeSnapshotTokenCounts(
+  snapshotPath: string,
+  signal?: AbortSignal
+): Promise<void> {
+  if (await sanitizeSnapshotTokenCountsWithJq(snapshotPath, signal)) {
+    log('snapshot token counts sanitized');
+    return;
+  }
+  if (await sanitizeSnapshotTokenCountsWithBun(snapshotPath, signal)) {
+    log('snapshot token counts sanitized');
+    return;
+  }
+  log('snapshot token count sanitization skipped');
+}
+
 // jq filter that extracts diffs from the snapshot JSON using last-write-wins
 // deduplication by file path. Runs as a subprocess so the full parsed snapshot
 // is never loaded into the main process's heap — jq's C-native parser uses
@@ -585,6 +724,8 @@ export async function restoreSession(
   }
 
   try {
+    await sanitizeSnapshotTokenCounts(tmpPath, options.signal);
+
     // ---- Step 2: Run kilo import ----
     const importStartedAt = Date.now();
     log(

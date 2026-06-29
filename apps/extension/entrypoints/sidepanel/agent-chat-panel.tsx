@@ -1,6 +1,13 @@
 /* eslint-disable import/max-dependencies, max-lines */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { ChangeEvent, JSX, KeyboardEvent, ReactNode } from 'react';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
+import {
+  compactingConversationIdsAtom,
+  contextUsageAtomFamily,
+  draftAtomFamily,
+  runningConversationIdsAtom,
+} from './agent-chat-atoms';
 import {
   createAssistantMessage,
   createUserMessage,
@@ -36,7 +43,6 @@ import type { StoredAgentConversation } from './agent-conversation-storage';
 import { AgentFooterControls } from './agent-footer-controls';
 import { ContextDonut } from './context-donut';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
-import type { ContextUsage } from '@/src/shared/context-usage';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
@@ -188,20 +194,16 @@ export const AgentChatPanel = ({
   onHeaderBeforeSettingsChange?: (node?: ReactNode) => void;
   organizationId: string | undefined;
 }): JSX.Element => {
-  const [draftsByConversation, setDraftsByConversation] = useState<Record<string, string>>({});
-  // Ponytail: in-memory only, recomputed from the next gateway turn after reload.
-  const [contextUsageByConversation, setContextUsageByConversation] = useState<
-    Record<string, ContextUsage>
-  >({});
+  const store = useStore();
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
     useStoredAgentConversations(createDefaultConversationEvents);
-  const [runningConversationIds, setRunningConversationIds] = useState<string[]>([]);
-  const [compactingConversationIds, setCompactingConversationIds] = useState<string[]>([]);
+  const runningConversationIds = useAtomValue(runningConversationIdsAtom);
+  const setRunningConversationIds = useSetAtom(runningConversationIdsAtom);
+  const compactingConversationIds = useAtomValue(compactingConversationIdsAtom);
+  const setCompactingConversationIds = useSetAtom(compactingConversationIdsAtom);
   const conversationStoreRef = useRef(conversationStore);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
-  // Ponytail: ref mirror exists only because auto-compact reads usage synchronously in the run's finally.
-  const latestUsageRef = useRef<Record<string, ContextUsage>>({});
   const { inspectableTabs, isLoadingTabs, tabDebuggerError } = useTabDebugger();
   const { modelLoadError, modelOptions, refetchModels } = useGatewayModels({
     auth,
@@ -209,11 +211,8 @@ export const AgentChatPanel = ({
   });
   const activeConversation = getActiveStoredConversation(conversationStore);
   const { events, id: activeConversationId, mode = defaultMode } = activeConversation;
-  // Ponytail: drafts are in-memory only; they reset on reload like the rest of transient UI state.
-  const draft = draftsByConversation[activeConversationId] ?? '';
-  const setActiveDraft = (value: string): void => {
-    setDraftsByConversation(current => ({ ...current, [activeConversationId]: value }));
-  };
+  const draft = useAtomValue(draftAtomFamily(activeConversationId));
+  const setActiveDraft = useSetAtom(draftAtomFamily(activeConversationId));
   const selectedTabId = getSelectedInspectableTabId({
     inspectableTabs,
     selectedTabId: activeConversation.selectedTabId,
@@ -239,7 +238,7 @@ export const AgentChatPanel = ({
   const thinkingEffort = activeConversation.thinkingEffort ?? thinkingOptions[0] ?? '';
   const isRunning = runningConversationIds.includes(activeConversationId);
   const isCompacting = compactingConversationIds.includes(activeConversationId);
-  const activeUsage = contextUsageByConversation[activeConversationId];
+  const activeUsage = useAtomValue(contextUsageAtomFamily(activeConversationId));
   const activePromptTokens = activeUsage?.promptTokens ?? 0;
   const contextLength = selectedModel?.contextLength;
 
@@ -250,8 +249,8 @@ export const AgentChatPanel = ({
     ): Promise<void> => {
       if (
         !isConversationStoreLoaded ||
-        runningConversationIds.includes(conversationId) ||
-        compactingConversationIds.includes(conversationId)
+        store.get(runningConversationIdsAtom).includes(conversationId) ||
+        store.get(compactingConversationIdsAtom).includes(conversationId)
       ) {
         return;
       }
@@ -280,17 +279,10 @@ export const AgentChatPanel = ({
 
         if (compacted !== undefined) {
           // Ponytail: wholesale replace is safe only because the conversation can't receive new events while compacting (guarded above + send disabled). Reconcile against currentEvents if that ever changes.
-          setConversationStore(store =>
-            updateStoredConversationEvents(store, conversationId, () => compacted)
+          setConversationStore(currentStore =>
+            updateStoredConversationEvents(currentStore, conversationId, () => compacted)
           );
-          const nextRef = { ...latestUsageRef.current };
-          delete nextRef[conversationId];
-          latestUsageRef.current = nextRef;
-          setContextUsageByConversation(current => {
-            const next = { ...current };
-            delete next[conversationId];
-            return next;
-          });
+          store.set(contextUsageAtomFamily(conversationId), undefined);
         }
       } finally {
         setCompactingConversationIds(current => current.filter(id => id !== conversationId));
@@ -299,12 +291,12 @@ export const AgentChatPanel = ({
     // Ponytail: compaction is a single short gateway call; no abort wiring until it proves slow.
     [
       auth.token,
-      compactingConversationIds,
       isConversationStoreLoaded,
       modelOptions,
       organizationId,
-      runningConversationIds,
       setConversationStore,
+      setCompactingConversationIds,
+      store,
     ]
   );
 
@@ -392,8 +384,8 @@ export const AgentChatPanel = ({
       return;
     }
 
-    setConversationStore(store =>
-      updateStoredConversationSettings(store, activeConversationId, {
+    setConversationStore(currentStore =>
+      updateStoredConversationSettings(currentStore, activeConversationId, {
         selectedTabId: nextSelectedTabId,
       })
     );
@@ -410,8 +402,8 @@ export const AgentChatPanel = ({
     }
 
     if (!modelOptions.some(option => option.id === model)) {
-      setConversationStore(store =>
-        updateStoredConversationSettings(store, activeConversationId, {
+      setConversationStore(currentStore =>
+        updateStoredConversationSettings(currentStore, activeConversationId, {
           model: modelOptions[0]?.id ?? '',
         })
       );
@@ -424,8 +416,8 @@ export const AgentChatPanel = ({
     }
 
     if (!thinkingOptions.includes(thinkingEffort)) {
-      setConversationStore(store =>
-        updateStoredConversationSettings(store, activeConversationId, {
+      setConversationStore(currentStore =>
+        updateStoredConversationSettings(currentStore, activeConversationId, {
           thinkingEffort: thinkingOptions[0] ?? '',
         })
       );
@@ -433,8 +425,8 @@ export const AgentChatPanel = ({
   }, [activeConversationId, setConversationStore, thinkingEffort, thinkingOptions]);
 
   const appendEvents = (conversationId: string, nextEvents: AgentConversationEvent[]): void => {
-    setConversationStore(store =>
-      updateStoredConversationEvents(store, conversationId, currentEvents => [
+    setConversationStore(currentStore =>
+      updateStoredConversationEvents(currentStore, conversationId, currentEvents => [
         ...currentEvents,
         ...nextEvents,
       ])
@@ -442,8 +434,8 @@ export const AgentChatPanel = ({
   };
 
   const updateAssistantMessage = (conversationId: string, eventId: string, text: string): void => {
-    setConversationStore(store =>
-      updateStoredConversationEvents(store, conversationId, currentEvents =>
+    setConversationStore(currentStore =>
+      updateStoredConversationEvents(currentStore, conversationId, currentEvents =>
         currentEvents.map(event =>
           event.id === eventId && event.type === 'message' && event.role === 'assistant'
             ? { ...event, text }
@@ -454,8 +446,8 @@ export const AgentChatPanel = ({
   };
 
   const updateThinkingBlock = (conversationId: string, eventId: string, text: string): void => {
-    setConversationStore(store =>
-      updateStoredConversationEvents(store, conversationId, currentEvents =>
+    setConversationStore(currentStore =>
+      updateStoredConversationEvents(currentStore, conversationId, currentEvents =>
         currentEvents.map(event =>
           event.id === eventId && event.type === 'thinking' ? { ...event, text } : event
         )
@@ -475,8 +467,8 @@ export const AgentChatPanel = ({
       conversationStoreRef.current.activeConversationId,
       settings
     );
-    setConversationStore(store =>
-      updateStoredConversationSettings(store, store.activeConversationId, settings)
+    setConversationStore(currentStore =>
+      updateStoredConversationSettings(currentStore, currentStore.activeConversationId, settings)
     );
   };
 
@@ -528,14 +520,7 @@ export const AgentChatPanel = ({
     };
     const updateRunUsage = (usage: { promptTokens: number }): void => {
       if (isCurrentRun()) {
-        latestUsageRef.current = {
-          ...latestUsageRef.current,
-          [conversationId]: { promptTokens: usage.promptTokens },
-        };
-        setContextUsageByConversation(current => ({
-          ...current,
-          [conversationId]: { promptTokens: usage.promptTokens },
-        }));
+        store.set(contextUsageAtomFamily(conversationId), { promptTokens: usage.promptTokens });
       }
     };
 
@@ -575,7 +560,7 @@ export const AgentChatPanel = ({
             currentIds.filter(currentId => currentId !== conversationId)
           );
 
-          const latest = latestUsageRef.current[conversationId]?.promptTokens ?? 0;
+          const latest = store.get(contextUsageAtomFamily(conversationId))?.promptTokens ?? 0;
           const runContextLength = modelOptions.find(
             option => option.id === runModel
           )?.contextLength;
@@ -597,8 +582,10 @@ export const AgentChatPanel = ({
       inspectableTabs,
       selectedTabId: conversation.selectedTabId,
     });
-    const isConversationRunning = runningConversationIds.includes(conversation.id);
-    const isConversationCompacting = compactingConversationIds.includes(conversation.id);
+    const isConversationRunning = store.get(runningConversationIdsAtom).includes(conversation.id);
+    const isConversationCompacting = store
+      .get(compactingConversationIdsAtom)
+      .includes(conversation.id);
 
     if (
       !isConversationStoreLoaded ||
@@ -611,7 +598,7 @@ export const AgentChatPanel = ({
       return;
     }
 
-    setDraftsByConversation(current => ({ ...current, [activeConversationId]: '' }));
+    store.set(draftAtomFamily(activeConversationId), '');
     submitMessage(text);
   };
 
@@ -651,13 +638,16 @@ export const AgentChatPanel = ({
     setConversationStore(conversationStoreRef.current);
   };
 
-  const abortConversationRun = useCallback((conversationId: string): void => {
-    runStatesRef.current.get(conversationId)?.abort.abort();
-    runStatesRef.current.delete(conversationId);
-    setRunningConversationIds(currentIds =>
-      currentIds.filter(currentId => currentId !== conversationId)
-    );
-  }, []);
+  const abortConversationRun = useCallback(
+    (conversationId: string): void => {
+      runStatesRef.current.get(conversationId)?.abort.abort();
+      runStatesRef.current.delete(conversationId);
+      setRunningConversationIds(currentIds =>
+        currentIds.filter(currentId => currentId !== conversationId)
+      );
+    },
+    [setRunningConversationIds]
+  );
 
   const closeConversation = useCallback(
     (conversationId: string): void => {
@@ -666,8 +656,8 @@ export const AgentChatPanel = ({
       }
 
       abortConversationRun(conversationId);
-      setConversationStore(store =>
-        closeStoredConversationTab(store, conversationId, createDefaultConversationEvents())
+      setConversationStore(currentStore =>
+        closeStoredConversationTab(currentStore, conversationId, createDefaultConversationEvents())
       );
     },
     [abortConversationRun, isConversationStoreLoaded, setConversationStore]
@@ -687,8 +677,8 @@ export const AgentChatPanel = ({
       }
 
       abortConversationRun(conversationId);
-      setConversationStore(store =>
-        deleteStoredConversation(store, conversationId, createDefaultConversationEvents())
+      setConversationStore(currentStore =>
+        deleteStoredConversation(currentStore, conversationId, createDefaultConversationEvents())
       );
     },
     [abortConversationRun, conversationStore, isConversationStoreLoaded, setConversationStore]
@@ -700,17 +690,19 @@ export const AgentChatPanel = ({
         return;
       }
 
-      setConversationStore(store =>
+      const runningIds = store.get(runningConversationIdsAtom);
+
+      setConversationStore(currentStore =>
         openStoredConversation({
           conversationId,
           isActiveConversationEmpty:
-            !runningConversationIds.includes(store.activeConversationId) &&
-            isStoredConversationEmpty(getActiveStoredConversation(store)),
-          store,
+            !runningIds.includes(currentStore.activeConversationId) &&
+            isStoredConversationEmpty(getActiveStoredConversation(currentStore)),
+          store: currentStore,
         })
       );
     },
-    [isConversationStoreLoaded, runningConversationIds, setConversationStore]
+    [isConversationStoreLoaded, setConversationStore, store]
   );
 
   useEffect(() => {

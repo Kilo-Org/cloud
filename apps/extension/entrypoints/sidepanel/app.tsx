@@ -21,6 +21,7 @@ import {
   SignedOutView,
   ValidationErrorView,
 } from './auth-views';
+import { clearPerConversationAtoms } from './agent-chat-atoms';
 
 const pollIntervalMs = 3000;
 const apiBaseUrl = getKiloApiBaseUrl();
@@ -86,6 +87,7 @@ export const App = (): JSX.Element => {
       if (result.status === 'invalid') {
         // Clear all account-scoped state (conversations included) like sign-out so a later account on this profile never loads the expired user's data. Message returned below.
         await clearStoredSession(storage);
+        clearPerConversationAtoms();
         return { message: 'Your session expired. Sign in again.', status: 'signedOut' };
       }
 
@@ -188,6 +190,7 @@ export const App = (): JSX.Element => {
       try {
         await clearStoredSession(storage);
       } finally {
+        clearPerConversationAtoms();
         queryClient.setQueryData(storedAuthQueryKey, undefined);
         if (storedAuth !== undefined) {
           queryClient.setQueryData(getAuthValidationQueryKey(storedAuth.token), {

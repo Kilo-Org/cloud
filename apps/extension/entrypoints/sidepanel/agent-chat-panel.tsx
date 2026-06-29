@@ -6,6 +6,7 @@ import {
   compactingConversationIdsAtom,
   contextUsageAtomFamily,
   draftAtomFamily,
+  evictConversationAtoms,
   runningConversationIdsAtom,
 } from './agent-chat-atoms';
 import {
@@ -587,8 +588,7 @@ export const AgentChatPanel = ({
         deleteStoredConversation(currentStore, conversationId, createDefaultConversationEvents())
       );
       // Free per-conversation atoms; a deleted conversation can never be reopened.
-      draftAtomFamily.remove(conversationId);
-      contextUsageAtomFamily.remove(conversationId);
+      evictConversationAtoms(conversationId);
     },
     [abortConversationRun, conversationStore, isConversationStoreLoaded, setConversationStore]
   );
@@ -600,16 +600,21 @@ export const AgentChatPanel = ({
       }
 
       const runningIds = store.get(runningConversationIdsAtom);
-
-      setConversationStore(currentStore =>
-        openStoredConversation({
-          conversationId,
-          isActiveConversationEmpty:
-            !runningIds.includes(currentStore.activeConversationId) &&
-            isStoredConversationEmpty(getActiveStoredConversation(currentStore)),
-          store: currentStore,
-        })
-      );
+      const currentStore = conversationStoreRef.current;
+      const nextStore = openStoredConversation({
+        conversationId,
+        isActiveConversationEmpty:
+          !runningIds.includes(currentStore.activeConversationId) &&
+          isStoredConversationEmpty(getActiveStoredConversation(currentStore)),
+        store: currentStore,
+      });
+      // Opening history can drop the active empty conversation; free its atoms.
+      for (const conversation of currentStore.conversations) {
+        if (!nextStore.conversations.some(next => next.id === conversation.id)) {
+          evictConversationAtoms(conversation.id);
+        }
+      }
+      setConversationStore(nextStore);
     },
     [isConversationStoreLoaded, setConversationStore, store]
   );

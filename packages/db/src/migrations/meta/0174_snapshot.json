@@ -1,5 +1,5 @@
 {
-  "id": "7c7ccdbc-6f20-458b-8fc4-e425c11b1955",
+  "id": "cbfd7a64-9b3c-4921-b49a-767118157334",
   "prevId": "06265fd6-428e-4b7d-9092-dba307d6255e",
   "version": "7",
   "dialect": "postgresql",
@@ -18030,7 +18030,7 @@
           ],
           "isUnique": false,
           "where": "\"mcp_gateway_audit_events\".\"oauth_grant_id\" is not null",
-          "concurrently": true,
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },
@@ -18345,7 +18345,7 @@
           ],
           "isUnique": false,
           "where": "\"mcp_gateway_authorization_codes\".\"oauth_grant_id\" is not null",
-          "concurrently": true,
+          "concurrently": false,
           "method": "btree",
           "with": {}
         }
@@ -18638,7 +18638,7 @@
           ],
           "isUnique": false,
           "where": "\"mcp_gateway_authorization_requests\".\"oauth_grant_id\" is not null",
-          "concurrently": true,
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },
@@ -20198,7 +20198,7 @@
           ],
           "isUnique": false,
           "where": "\"mcp_gateway_pending_provider_authorizations\".\"oauth_grant_id\" is not null",
-          "concurrently": true,
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },
@@ -20706,7 +20706,7 @@
           ],
           "isUnique": false,
           "where": "\"mcp_gateway_refresh_tokens\".\"oauth_grant_id\" is not null",
-          "concurrently": true,
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },

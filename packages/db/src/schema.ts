@@ -8653,7 +8653,6 @@ export const mcp_gateway_authorization_requests = pgTable(
     index('IDX_mcp_gateway_authorization_requests_config').on(table.config_id),
     index('IDX_mcp_gateway_authorization_requests_grant')
       .on(table.oauth_grant_id)
-      .concurrently()
       .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_authorization_requests_user').on(table.kilo_user_id),
     index('IDX_mcp_gateway_authorization_requests_expires_at').on(table.expires_at),
@@ -8722,7 +8721,6 @@ export const mcp_gateway_authorization_codes = pgTable(
     index('IDX_mcp_gateway_authorization_codes_client').on(table.oauth_client_id),
     index('IDX_mcp_gateway_authorization_codes_grant')
       .on(table.oauth_grant_id)
-      .concurrently()
       .where(isNotNull(table.oauth_grant_id)),
     enumCheck(
       'mcp_gateway_authorization_codes_owner_scope',
@@ -8775,7 +8773,6 @@ export const mcp_gateway_refresh_tokens = pgTable(
     index('IDX_mcp_gateway_refresh_tokens_user').on(table.kilo_user_id),
     index('IDX_mcp_gateway_refresh_tokens_grant')
       .on(table.oauth_grant_id)
-      .concurrently()
       .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_refresh_tokens_config').on(table.config_id),
     index('IDX_mcp_gateway_refresh_tokens_consumed_at').on(table.consumed_at),
@@ -8838,7 +8835,6 @@ export const mcp_gateway_pending_provider_authorizations = pgTable(
     index('IDX_mcp_gateway_pending_provider_authorizations_config').on(table.config_id),
     index('IDX_mcp_gateway_pending_provider_authorizations_grant')
       .on(table.oauth_grant_id)
-      .concurrently()
       .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_pending_provider_authorizations_expires_at').on(table.expires_at),
     check(
@@ -8932,7 +8928,6 @@ export const mcp_gateway_audit_events = pgTable(
     index('IDX_mcp_gateway_audit_events_config').on(table.config_id),
     index('IDX_mcp_gateway_audit_events_grant')
       .on(table.oauth_grant_id)
-      .concurrently()
       .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_audit_events_owner').on(table.owner_scope, table.owner_id),
     index('IDX_mcp_gateway_audit_events_created_at').on(table.created_at),

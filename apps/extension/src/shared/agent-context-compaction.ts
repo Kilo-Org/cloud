@@ -1,6 +1,9 @@
 import { createAssistantMessage } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
-import { isViewportScreenshotValue } from './agent-conversation-persistence';
+import {
+  isPersistedScreenshotStub,
+  isViewportScreenshotValue,
+} from './agent-conversation-persistence';
 import type { FetchLike } from './auth';
 import { fetchKiloGatewayChatCompletionStream } from './kilo-api-client';
 import type { KiloGatewayChatMessage } from './kilo-gateway-chat-client';
@@ -97,8 +100,9 @@ const renderEvent = (event: AgentConversationEvent): string | undefined => {
         return 'Tool result (ok)';
       }
 
-      // A screenshot value is a base64 data URL; keep a placeholder out of the summary, not the PNG.
-      if (isViewportScreenshotValue(event.value)) {
+      // A screenshot value is a base64 data URL (live) or a stripped {mediaType, note} stub
+      // (after a reload); keep a placeholder out of the summary either way, never the PNG or its JSON.
+      if (isViewportScreenshotValue(event.value) || isPersistedScreenshotStub(event.value)) {
         return `Tool result (ok): [${event.value.mediaType} screenshot omitted]`;
       }
 

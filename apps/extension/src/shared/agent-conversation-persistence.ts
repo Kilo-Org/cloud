@@ -14,6 +14,18 @@ export const isViewportScreenshotValue = (
   'mediaType' in value &&
   typeof value.mediaType === 'string';
 
+// The persisted counterpart of a screenshot result: dataUrl stripped, mediaType + note kept.
+export const isPersistedScreenshotStub = (
+  value: unknown
+): value is { readonly mediaType: string; readonly note: string } =>
+  typeof value === 'object' &&
+  value !== null &&
+  !('dataUrl' in value) &&
+  'mediaType' in value &&
+  typeof value.mediaType === 'string' &&
+  'note' in value &&
+  typeof value.note === 'string';
+
 const toPersistedToolResult = (
   event: ToolResultEvent,
   toolCall: ToolCallEvent | undefined

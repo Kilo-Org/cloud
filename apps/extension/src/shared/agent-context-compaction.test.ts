@@ -97,6 +97,21 @@ describe('render events as transcript', () => {
     expect(text).not.toContain('AAAA');
   });
 
+  it('omits persisted screenshot stubs instead of dumping their JSON into the transcript', () => {
+    const text = renderEventsAsTranscript([
+      createToolResult({
+        ok: true,
+        toolCallId: 'call-1',
+        value: {
+          mediaType: 'image/png',
+          note: 'Viewport screenshot omitted from persisted history.',
+        },
+      }),
+    ]);
+    expect(text).toContain('[image/png screenshot omitted]');
+    expect(text).not.toContain('note');
+  });
+
   it('truncates oversized tool result payloads', () => {
     const text = renderEventsAsTranscript([
       createToolResult({ ok: true, toolCallId: 'call-1', value: 'x'.repeat(5000) }),

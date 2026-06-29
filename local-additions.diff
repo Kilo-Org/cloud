@@ -1,0 +1,1118 @@
+diff --git a/apps/web/src/components/cloud-agent-next/NewSessionPanel.tsx b/apps/web/src/components/cloud-agent-next/NewSessionPanel.tsx
+index fa293c529..4f3e4df6d 100644
+--- a/apps/web/src/components/cloud-agent-next/NewSessionPanel.tsx
++++ b/apps/web/src/components/cloud-agent-next/NewSessionPanel.tsx
+@@ -141,11 +141,11 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
+   // Eligibility
+   // ---------------------------------------------------------------------------
+   const personalEligibilityQuery = useQuery({
+-    ...trpc.cloudAgent.checkEligibility.queryOptions(),
++    ...trpc.cloudAgentNext.checkEligibility.queryOptions(),
+     enabled: !organizationId,
+   });
+   const orgEligibilityQuery = useQuery({
+-    ...trpc.organizations.cloudAgent.checkEligibility.queryOptions({
++    ...trpc.organizations.cloudAgentNext.checkEligibility.queryOptions({
+       organizationId: organizationId || '',
+     }),
+     enabled: !!organizationId,
+diff --git a/apps/web/src/components/cloud-agent/session-config.ts b/apps/web/src/components/cloud-agent/session-config.ts
+index 52d69d67c..d01128d61 100644
+--- a/apps/web/src/components/cloud-agent/session-config.ts
++++ b/apps/web/src/components/cloud-agent/session-config.ts
+@@ -51,7 +51,7 @@ export type BuildSessionConfigOptions = {
+  * Build a SessionConfig with clear precedence order.
+  *
+  * Precedence for mode/model:
+- *   1. resumeConfig (from ResumeConfigModal or CLI resume flow)
++ *   1. resumeConfig (from the CLI resume flow)
+  *   2. dbSession (last_mode/last_model from database)
+  *   3. defaults (defaultMode/defaultModel or 'code'/'')
+  *
+diff --git a/apps/web/src/components/cloud-agent/types.ts b/apps/web/src/components/cloud-agent/types.ts
+index 8d58f6791..ea6eb5e97 100644
+--- a/apps/web/src/components/cloud-agent/types.ts
++++ b/apps/web/src/components/cloud-agent/types.ts
+@@ -17,7 +17,7 @@ import type { Images } from '@/lib/images-schema';
+ 
+ /**
+  * Valid mode values for cloud agent sessions.
+- * Matches agentModeSchema in cloud-agent-schemas.ts
++ * Shared with webhook configuration and historical session rendering.
+  */
+ export type AgentMode = 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
+ 
+@@ -27,7 +27,7 @@ export type AgentMode = 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
+ 
+ /**
+  * Configuration collected when resuming a CLI session in cloud-agent.
+- * Used by ResumeConfigModal and session configuration logic.
++ * Used by historical session configuration logic.
+  */
+ export type ResumeConfig = {
+   mode: AgentMode;
+diff --git a/apps/web/src/components/code-reviews/CodeReviewStreamView.tsx b/apps/web/src/components/code-reviews/CodeReviewStreamView.tsx
+index 48f7c0860..fe70744d0 100644
+--- a/apps/web/src/components/code-reviews/CodeReviewStreamView.tsx
++++ b/apps/web/src/components/code-reviews/CodeReviewStreamView.tsx
+@@ -19,8 +19,8 @@ import {
+   type ConnectionState,
+ } from '@/lib/cloud-agent-next/websocket-manager';
+ import type { CloudAgentEvent, StreamError } from '@/lib/cloud-agent-next/event-types';
+-import type { ReviewEvent } from '@/lib/code-reviews/client/code-review-worker-client';
+ import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
++import { getCodeReviewDisplayBehavior } from './code-review-stream-behavior';
+ 
+ type CodeReviewStreamViewProps = {
+   reviewId: string;
+@@ -141,19 +141,6 @@ function toDisplayEventFromKilocode(
+   return null;
+ }
+ 
+-// ---------------------------------------------------------------------------
+-// SSE/cloud-agent event conversion (polling flow)
+-// ---------------------------------------------------------------------------
+-
+-function reviewEventToDisplayEvent(event: ReviewEvent): DisplayEvent {
+-  return {
+-    timestamp: event.timestamp,
+-    message: event.message || 'Event received',
+-    content: event.content,
+-    eventType: event.eventType,
+-  };
+-}
+-
+ // ---------------------------------------------------------------------------
+ // Shared helpers
+ // ---------------------------------------------------------------------------
+@@ -266,13 +253,13 @@ export function CodeReviewStreamView({
+     refetchInterval: query => {
+       const data = query.state.data;
+       if (!data?.success) return 2000;
+-      // Terminal state — stop polling
+-      if (['completed', 'failed', 'cancelled'].includes(data.status)) return false;
+-      // cloud-agent-next (v2) mode: stop once we have the cloudAgentSessionId for WebSocket
+-      if (data.agentVersion === 'v2' && data.cloudAgentSessionId) return false;
+-      // cloud-agent (v1) mode: stop once we have stream info (polling handles the rest)
+-      if (data.agentVersion !== 'v2') return false;
+-      return 2000;
++
++      const behavior = getCodeReviewDisplayBehavior({
++        agentVersion: data.agentVersion,
++        status: data.status,
++        cloudAgentSessionId: data.cloudAgentSessionId,
++      });
++      return behavior.shouldPollStatus ? 2000 : false;
+     },
+     enabled: !!reviewId,
+   });
+@@ -280,8 +267,18 @@ export function CodeReviewStreamView({
+   const cloudAgentSessionId = streamInfo?.success ? streamInfo.cloudAgentSessionId : null;
+   const organizationId = streamInfo?.success ? streamInfo.organizationId : undefined;
+   const reviewStatus = streamInfo?.success ? streamInfo.status : undefined;
+-
+-  // Determine mode from the agent version recorded at dispatch time
++  const displayBehavior = streamInfo?.success
++    ? getCodeReviewDisplayBehavior({
++        agentVersion: streamInfo.agentVersion,
++        status: streamInfo.status,
++        cloudAgentSessionId: streamInfo.cloudAgentSessionId,
++      })
++    : null;
++  const isHistoricalReview = displayBehavior?.isHistorical ?? false;
++  const isTerminal = displayBehavior?.isTerminal ?? false;
++  const shouldLoadHistory = displayBehavior?.shouldLoadHistory ?? false;
++
++  // Only current Cloud Agent Next attempts have a live runtime connection.
+   const useWebSocket = streamInfo?.success
+     ? streamInfo.agentVersion === 'v2' && isSelectedLatestAttempt
+     : false;
+@@ -397,57 +394,25 @@ export function CodeReviewStreamView({
+   }, [useWebSocket, cloudAgentSessionId, isComplete, getTicket, handleEvent, handleWsError]);
+ 
+   // ---------------------------------------------------------------------------
+-  // Mode B: Polling (SSE/cloud-agent flow)
++  // Historical session data
+   // ---------------------------------------------------------------------------
+ 
+-  const { data: polledEvents } = useQuery({
+-    ...trpc.codeReviews.getReviewEvents.queryOptions({ reviewId }),
+-    refetchInterval: isComplete ? false : 2000,
+-    // Only poll when NOT using WebSocket mode and the review exists
+-    enabled: !!reviewId && !useWebSocket && isSelectedLatestAttempt && !!streamInfo?.success,
+-  });
+-
+-  // Sync polled events into display events
+-  useEffect(() => {
+-    if (useWebSocket) return; // WebSocket mode handles its own events
+-    if (!polledEvents?.success) return;
+-
+-    const displayEvents = polledEvents.events.map(reviewEventToDisplayEvent);
+-    setEvents(displayEvents);
+-
+-    // Check for completion in polled events
+-    const lastEvent = polledEvents.events[polledEvents.events.length - 1];
+-    if (lastEvent?.eventType === 'complete') {
+-      setIsComplete(true);
+-      onComplete?.();
+-    }
+-  }, [useWebSocket, polledEvents, onComplete]);
+-
+-  // ---------------------------------------------------------------------------
+-  // Mode C: Historical session data (completed reviews)
+-  // ---------------------------------------------------------------------------
+-
+-  const isTerminal = ['completed', 'failed', 'cancelled', 'interrupted'].includes(
+-    reviewStatus ?? ''
+-  );
+-
+   const { data: sessionMessages, isLoading: isLoadingHistory } = useQuery({
+     ...trpc.codeReviews.getSessionMessages.queryOptions({
+       reviewId,
+       attemptId: effectiveAttemptId,
+     }),
+-    // Only fetch historical data when the review is done and we have no live events
+-    enabled: !!reviewId && isTerminal && events.length === 0,
++    enabled: !!reviewId && shouldLoadHistory && events.length === 0,
+   });
+ 
+   // Populate events from historical session data
+   useEffect(() => {
+-    if (!isTerminal || events.length > 0) return;
++    if (!shouldLoadHistory || events.length > 0) return;
+     if (!sessionMessages?.success) return;
+     if (sessionMessages.entries.length === 0) return;
+ 
+     setEvents(sessionMessages.entries);
+-  }, [isTerminal, sessionMessages, events.length]);
++  }, [shouldLoadHistory, sessionMessages, events.length]);
+ 
+   // ---------------------------------------------------------------------------
+   // Auto-scroll
+@@ -503,9 +468,9 @@ export function CodeReviewStreamView({
+           <div className="flex min-w-0 flex-wrap items-center gap-2">
+             <Terminal className="h-4 w-4" />
+             <CardTitle className="shrink-0 text-sm font-medium">
+-              {isTerminal ? 'Session Log' : 'Code Review Progress'}
++              {shouldLoadHistory ? 'Session Log' : 'Code Review Progress'}
+             </CardTitle>
+-            {isTerminal && cloudAgentSessionId && (
++            {shouldLoadHistory && cloudAgentSessionId && (
+               <span
+                 title={cloudAgentSessionId}
+                 className="bg-muted text-muted-foreground max-w-[min(20rem,50vw)] truncate rounded px-2 py-0.5 font-mono text-xs font-normal"
+@@ -532,7 +497,12 @@ export function CodeReviewStreamView({
+                 </Select>
+               </div>
+             )}
+-            {isComplete ? (
++            {isHistoricalReview && !isTerminal ? (
++              <Badge variant="secondary" className="gap-1.5">
++                <AlertCircle className="h-3 w-3" />
++                Historical
++              </Badge>
++            ) : isComplete ? (
+               reviewStatus === 'failed' ? (
+                 <Badge variant="destructive" className="gap-1.5">
+                   <XCircle className="h-3 w-3" />
+@@ -579,12 +549,12 @@ export function CodeReviewStreamView({
+             setAutoScroll(isAtBottom);
+           }}
+         >
+-          {events.length === 0 && !isComplete ? (
++          {events.length === 0 && !shouldLoadHistory ? (
+             <div className="flex items-center gap-2 text-slate-400">
+               <Loader2 className="h-4 w-4 animate-spin" />
+               <span>Waiting for events...</span>
+             </div>
+-          ) : events.length === 0 && isComplete ? (
++          ) : events.length === 0 ? (
+             <div className="text-slate-500">
+               {isLoadingHistory ? (
+                 <div className="flex items-center gap-2">
+@@ -615,7 +585,7 @@ export function CodeReviewStreamView({
+                   )}
+                 </div>
+               ))}
+-              {!isComplete && (
++              {!isComplete && !isHistoricalReview && (
+                 <div className="flex items-center gap-2 px-2 py-1 text-slate-500">
+                   <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
+                   <span>Live</span>
+diff --git a/apps/web/src/components/code-reviews/code-review-stream-behavior.test.ts b/apps/web/src/components/code-reviews/code-review-stream-behavior.test.ts
+new file mode 100644
+index 000000000..2ba0fe17c
+--- /dev/null
++++ b/apps/web/src/components/code-reviews/code-review-stream-behavior.test.ts
+@@ -0,0 +1,48 @@
++import { getCodeReviewDisplayBehavior } from './code-review-stream-behavior';
++
++describe('getCodeReviewDisplayBehavior', () => {
++  it('loads persisted history without polling for a nonterminal V1 review', () => {
++    expect(
++      getCodeReviewDisplayBehavior({
++        agentVersion: 'v1',
++        status: 'running',
++        cloudAgentSessionId: 'agent_historical',
++      })
++    ).toEqual({
++      isHistorical: true,
++      isTerminal: false,
++      shouldLoadHistory: true,
++      shouldPollStatus: false,
++    });
++  });
++
++  it('keeps an active V2 review on the live stream path', () => {
++    expect(
++      getCodeReviewDisplayBehavior({
++        agentVersion: 'v2',
++        status: 'running',
++        cloudAgentSessionId: 'agent_current',
++      })
++    ).toEqual({
++      isHistorical: false,
++      isTerminal: false,
++      shouldLoadHistory: false,
++      shouldPollStatus: false,
++    });
++  });
++
++  it('polls while a V2 review is waiting for its session', () => {
++    expect(
++      getCodeReviewDisplayBehavior({
++        agentVersion: 'v2',
++        status: 'queued',
++        cloudAgentSessionId: null,
++      })
++    ).toEqual({
++      isHistorical: false,
++      isTerminal: false,
++      shouldLoadHistory: false,
++      shouldPollStatus: true,
++    });
++  });
++});
+diff --git a/apps/web/src/components/code-reviews/code-review-stream-behavior.ts b/apps/web/src/components/code-reviews/code-review-stream-behavior.ts
+new file mode 100644
+index 000000000..c64ba70b1
+--- /dev/null
++++ b/apps/web/src/components/code-reviews/code-review-stream-behavior.ts
+@@ -0,0 +1,28 @@
++const TERMINAL_REVIEW_STATUSES = new Set(['completed', 'failed', 'cancelled', 'interrupted']);
++
++type CodeReviewStreamSnapshot = {
++  agentVersion: string;
++  status: string;
++  cloudAgentSessionId: string | null;
++};
++
++type CodeReviewDisplayBehavior = {
++  isHistorical: boolean;
++  isTerminal: boolean;
++  shouldLoadHistory: boolean;
++  shouldPollStatus: boolean;
++};
++
++export function getCodeReviewDisplayBehavior(
++  snapshot: CodeReviewStreamSnapshot
++): CodeReviewDisplayBehavior {
++  const isHistorical = snapshot.agentVersion !== 'v2';
++  const isTerminal = TERMINAL_REVIEW_STATUSES.has(snapshot.status);
++
++  return {
++    isHistorical,
++    isTerminal,
++    shouldLoadHistory: isHistorical || isTerminal,
++    shouldPollStatus: !isHistorical && !isTerminal && !snapshot.cloudAgentSessionId,
++  };
++}
+diff --git a/apps/web/src/components/shared/AdvancedConfig.tsx b/apps/web/src/components/shared/AdvancedConfig.tsx
+index af91ff721..707abd007 100644
+--- a/apps/web/src/components/shared/AdvancedConfig.tsx
++++ b/apps/web/src/components/shared/AdvancedConfig.tsx
+@@ -1,9 +1,7 @@
+ /**
+  * AdvancedConfig - Shared component for advanced configuration (profiles, env vars, setup commands)
+  *
+- * Used by:
+- * - CloudSessionsPage for manual cloud agent sessions
+- * - Webhook trigger forms for automatic triggers
++ * Used by Cloud Agent Next sessions and webhook trigger forms.
+  *
+  * Orchestrates:
+  * - ProfileSelector - Select a saved profile (handles secrets)
+diff --git a/apps/web/src/lib/cloud-agent-next/event-types.ts b/apps/web/src/lib/cloud-agent-next/event-types.ts
+index f192cf876..eaf864738 100644
+--- a/apps/web/src/lib/cloud-agent-next/event-types.ts
++++ b/apps/web/src/lib/cloud-agent-next/event-types.ts
+@@ -19,7 +19,7 @@ export type CloudAgentEvent = {
+ 
+ /**
+  * Error codes for WebSocket protocol errors.
+- * These match the WS_* codes from cloud-agent/src/websocket/types.ts.
++ * These match the WS_* codes from cloud-agent-next/src/websocket/types.ts.
+  */
+ export type StreamErrorCode =
+   | 'WS_PROTOCOL_ERROR'
+diff --git a/apps/web/src/lib/cloud-agent/event-normalizer.ts b/apps/web/src/lib/cloud-agent/event-normalizer.ts
+index e606d7e7d..56946ab33 100644
+--- a/apps/web/src/lib/cloud-agent/event-normalizer.ts
++++ b/apps/web/src/lib/cloud-agent/event-normalizer.ts
+@@ -19,7 +19,7 @@ export type V1Event = {
+ 
+ /**
+  * Error codes for WebSocket protocol errors.
+- * These match the WS_* codes from cloud-agent/src/websocket/types.ts.
++ * These match the WS_* codes owned by cloud-agent-next/src/websocket/types.ts.
+  */
+ export type StreamErrorCode =
+   | 'WS_PROTOCOL_ERROR'
+diff --git a/apps/web/src/lib/code-reviews/dispatch/dispatch-pending-reviews.ts b/apps/web/src/lib/code-reviews/dispatch/dispatch-pending-reviews.ts
+index 229e2e84b..db1173e6f 100644
+--- a/apps/web/src/lib/code-reviews/dispatch/dispatch-pending-reviews.ts
++++ b/apps/web/src/lib/code-reviews/dispatch/dispatch-pending-reviews.ts
+@@ -500,7 +500,6 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
+     return false;
+   }
+ 
+-  const agentVersion = 'v2';
+   const attempt = await ensureCurrentCodeReviewAttemptFromReview(review, shouldEnrollAnalytics);
+   const analyticsEnabledAtDispatch =
+     owner.type === 'org' && attempt.analytics_enabled_at_dispatch === true;
+@@ -551,7 +550,6 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
+       ...dispatchPayload,
+       attemptId: attempt.id,
+       skipBalanceCheck: true,
+-      agentVersion,
+     });
+   } catch (dispatchError) {
+     errorExceptInTest('[dispatchReview] Worker dispatch failed, leaving review queued', {
+@@ -568,7 +566,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
+   try {
+     await db
+       .update(cloud_agent_code_reviews)
+-      .set({ agent_version: agentVersion })
++      .set({ agent_version: 'v2' })
+       .where(eq(cloud_agent_code_reviews.id, review.id));
+   } catch (error) {
+     errorExceptInTest('[dispatchReview] Failed to persist agent version after dispatch', {
+@@ -577,7 +575,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
+     });
+     captureException(error, {
+       tags: { operation: 'dispatch-review-record-agent-version' },
+-      extra: { reviewId: review.id, owner, agentVersion },
++      extra: { reviewId: review.id, owner },
+     });
+   }
+ 
+diff --git a/apps/web/src/routers/cli-sessions-router.test.ts b/apps/web/src/routers/cli-sessions-router.test.ts
+index 13e5143e3..58a55c621 100644
+--- a/apps/web/src/routers/cli-sessions-router.test.ts
++++ b/apps/web/src/routers/cli-sessions-router.test.ts
+@@ -30,14 +30,6 @@ jest.mock('@/lib/r2/cli-sessions', () => ({
+   }),
+ }));
+ 
+-const deleteCloudAgentSessionMock = jest.fn().mockResolvedValue({ success: true });
+-
+-jest.mock('@/lib/cloud-agent/cloud-agent-client', () => ({
+-  createCloudAgentClient: jest.fn(() => ({
+-    deleteSession: deleteCloudAgentSessionMock,
+-  })),
+-}));
+-
+ jest.mock('@/lib/config.server', () => {
+   const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
+   return {
+@@ -74,10 +66,6 @@ describe('cli-sessions-router', () => {
+     testOrganization = org;
+   });
+ 
+-  beforeEach(() => {
+-    deleteCloudAgentSessionMock.mockClear();
+-  });
+-
+   describe('list procedure', () => {
+     let _testSessionIds: string[];
+ 
+@@ -1323,18 +1311,50 @@ describe('cli-sessions-router', () => {
+       expect(sessions).toHaveLength(0);
+     });
+ 
+-    it('should attempt to delete linked cloud-agent session when present', async () => {
++    it('should delete a historical cloud-agent session locally without contacting its worker', async () => {
+       const caller = await createCallerForUser(regularUser.id);
++      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
++      const fetchSpy = jest.spyOn(global, 'fetch');
+ 
+       await db
+         .update(cliSessions)
+         .set({ cloud_agent_session_id: 'agent_test_session' })
+         .where(eq(cliSessions.session_id, deleteSessionId));
+ 
+-      await caller.cliSessions.delete({ session_id: deleteSessionId });
++      const result = await caller.cliSessions.delete({ session_id: deleteSessionId });
++
++      expect(result).toEqual({ success: true, session_id: deleteSessionId });
++      expect(deleteBlobs).toHaveBeenCalledWith(deleteSessionId, [
++        { folderName: 'sessions', filename: 'api_conversation_history' },
++        { folderName: 'sessions', filename: 'task_metadata' },
++        { folderName: 'sessions', filename: 'ui_messages' },
++        { folderName: 'sessions', filename: 'git_state' },
++      ]);
++      expect(fetchSpy).not.toHaveBeenCalled();
++
++      const sessions = await db
++        .select()
++        .from(cliSessions)
++        .where(eq(cliSessions.session_id, deleteSessionId));
++      expect(sessions).toHaveLength(0);
+ 
+-      expect(deleteCloudAgentSessionMock).toHaveBeenCalledWith('agent_test_session');
+-      expect(deleteCloudAgentSessionMock).toHaveBeenCalledTimes(1);
++      fetchSpy.mockRestore();
++    });
++
++    it('should preserve the database row when blob deletion fails', async () => {
++      const caller = await createCallerForUser(regularUser.id);
++      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
++      jest.mocked(deleteBlobs).mockRejectedValueOnce(new Error('R2 deletion failed'));
++
++      await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).rejects.toThrow(
++        'R2 deletion failed'
++      );
++
++      const sessions = await db
++        .select()
++        .from(cliSessions)
++        .where(eq(cliSessions.session_id, deleteSessionId));
++      expect(sessions).toHaveLength(1);
+     });
+ 
+     it('should throw NOT_FOUND when deleting other user session', async () => {
+diff --git a/apps/web/src/routers/cli-sessions-router.ts b/apps/web/src/routers/cli-sessions-router.ts
+index da35febf8..30b7241e6 100644
+--- a/apps/web/src/routers/cli-sessions-router.ts
++++ b/apps/web/src/routers/cli-sessions-router.ts
+@@ -29,8 +29,6 @@ import {
+ } from '@/lib/r2/cli-sessions';
+ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+ import { getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
+-import { createCloudAgentClient } from '@/lib/cloud-agent/cloud-agent-client';
+-import { generateApiToken } from '@/lib/tokens';
+ import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
+ 
+ export const BLOB_TYPES = [
+@@ -478,13 +476,7 @@ export const cliSessionsRouter = createTRPCRouter({
+   delete: baseProcedure.input(DeleteSessionInputSchema).mutation(async ({ ctx, input }) => {
+     const { session_id } = input;
+ 
+-    const session = await getSessionWithExistsCheck(session_id, ctx.user.id);
+-
+-    if (session.cloud_agent_session_id) {
+-      const authToken = generateApiToken(ctx.user);
+-      const cloudAgentClient = createCloudAgentClient(authToken);
+-      await cloudAgentClient.deleteSession(session.cloud_agent_session_id);
+-    }
++    await getSessionWithExistsCheck(session_id, ctx.user.id);
+ 
+     const blobsToDelete: { folderName: FolderName; filename: FileName }[] = BLOB_TYPES.map(
+       filename => ({ folderName: 'sessions', filename })
+diff --git a/apps/web/src/routers/cloud-agent-next-router.test.ts b/apps/web/src/routers/cloud-agent-next-router.test.ts
+index fbb11293d..ef25f3d86 100644
+--- a/apps/web/src/routers/cloud-agent-next-router.test.ts
++++ b/apps/web/src/routers/cloud-agent-next-router.test.ts
+@@ -51,6 +51,27 @@ const mockIsFeatureFlagEnabledOrDevelopment =
+   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
+ const mockVerifyUserOwnsSessionV2ByCloudAgentId =
+   jest.fn<() => Promise<{ kiloSessionId: string } | null>>();
++const mockGetBalanceForUser = jest.fn<(user: User) => Promise<{ balance: number }>>();
++const mockFetchGitHubRepositoriesForUser = jest.fn<
++  (
++    userId: string,
++    forceRefresh: boolean
++  ) => Promise<{
++    repositories: unknown[];
++    integrationInstalled: boolean;
++    syncedAt: null;
++  }>
++>();
++const mockFetchGitLabRepositoriesForUser = jest.fn<
++  (
++    userId: string,
++    forceRefresh: boolean
++  ) => Promise<{
++    repositories: unknown[];
++    integrationInstalled: boolean;
++    syncedAt: null;
++  }>
++>();
+ 
+ jest.mock('@/lib/tokens', () => ({
+   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
+@@ -65,6 +86,20 @@ jest.mock('@/lib/posthog-feature-flags', () => ({
+   isFeatureFlagEnabledOrDevelopment: mockIsFeatureFlagEnabledOrDevelopment,
+ }));
+ 
++jest.mock('@/lib/user/balance', () => ({
++  getBalanceForUser: mockGetBalanceForUser,
++}));
++
++jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
++  fetchGitHubRepositoriesForUser: mockFetchGitHubRepositoriesForUser,
++}));
++
++jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
++  buildGitLabCloneUrl: jest.fn(),
++  fetchGitLabRepositoriesForUser: mockFetchGitLabRepositoriesForUser,
++  getGitLabInstanceUrlForUser: jest.fn(),
++}));
++
+ jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
+   generateImageUploadUrl: jest.fn(),
+   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
+@@ -104,6 +139,9 @@ let createCaller: (ctx: { user: User }) => {
+     contentType: 'application/pdf';
+     contentLength: number;
+   }) => Promise<unknown>;
++  checkEligibility: () => Promise<{ balance: number; minBalance: number; isEligible: boolean }>;
++  listGitHubRepositories: (input: { forceRefresh: boolean }) => Promise<unknown>;
++  listGitLabRepositories: (input: { forceRefresh: boolean }) => Promise<unknown>;
+ };
+ 
+ beforeAll(async () => {
+@@ -185,6 +223,49 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
+   });
+ });
+ 
++describe('cloudAgentNextRouter helper procedures', () => {
++  beforeEach(() => {
++    jest.clearAllMocks();
++  });
++
++  it.each([
++    { balance: 1, isEligible: true },
++    { balance: 0.99, isEligible: false },
++  ])('reports eligibility for a $balance balance', async ({ balance, isEligible }) => {
++    mockGetBalanceForUser.mockResolvedValue({ balance });
++    const user = { id: 'user-eligibility', is_admin: false } as User;
++    const caller = createCaller({ user });
++
++    await expect(caller.checkEligibility()).resolves.toEqual({
++      balance,
++      minBalance: 1,
++      isEligible,
++    });
++    expect(mockGetBalanceForUser).toHaveBeenCalledWith(user);
++    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
++  });
++
++  it.each([
++    ['GitHub', 'listGitHubRepositories', mockFetchGitHubRepositoriesForUser],
++    ['GitLab', 'listGitLabRepositories', mockFetchGitLabRepositoriesForUser],
++  ] as const)(
++    'lists %s repositories without creating a runtime client',
++    async (_, method, fetchRepositories) => {
++      const repositories = {
++        repositories: [],
++        integrationInstalled: true,
++        syncedAt: null,
++      };
++      fetchRepositories.mockResolvedValue(repositories);
++      const caller = createCaller({ user: { id: 'user-repositories', is_admin: false } as User });
++
++      await expect(caller[method]({ forceRefresh: true })).resolves.toEqual(repositories);
++      expect(fetchRepositories).toHaveBeenCalledWith('user-repositories', true);
++      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
++    }
++  );
++});
++
+ describe('cloudAgentNextRouter.prepareSession', () => {
+   beforeEach(() => {
+     jest.clearAllMocks();
+diff --git a/apps/web/src/routers/cloud-agent-next-router.ts b/apps/web/src/routers/cloud-agent-next-router.ts
+index 14744d90a..f64afc5d6 100644
+--- a/apps/web/src/routers/cloud-agent-next-router.ts
++++ b/apps/web/src/routers/cloud-agent-next-router.ts
+@@ -47,6 +47,9 @@ import { db } from '@/lib/drizzle';
+ import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
+ import { TRPCError } from '@trpc/server';
+ import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
++import { getBalanceForUser } from '@/lib/user/balance';
++
++const MIN_BALANCE_DOLLARS = 1;
+ 
+ function buildTerminalUrl(params: {
+   cloudAgentSessionId: string;
+@@ -390,6 +393,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
+       return await client.getSession(input.cloudAgentSessionId);
+     }),
+ 
++  checkEligibility: baseProcedure.query(async ({ ctx }) => {
++    const { balance } = await getBalanceForUser(ctx.user);
++    return {
++      balance,
++      minBalance: MIN_BALANCE_DOLLARS,
++      isEligible: balance >= MIN_BALANCE_DOLLARS,
++    };
++  }),
++
+   /**
+    * List GitHub repositories available for cloud agent sessions.
+    */
+diff --git a/apps/web/src/routers/code-reviews-router.test.ts b/apps/web/src/routers/code-reviews-router.test.ts
+index dd717fbcd..99554f764 100644
+--- a/apps/web/src/routers/code-reviews-router.test.ts
++++ b/apps/web/src/routers/code-reviews-router.test.ts
+@@ -2,6 +2,7 @@ const mockCancelReview = jest.fn();
+ const mockTryDispatchPendingReviews = jest.fn();
+ const mockSyncWebhooksForRepositories = jest.fn();
+ const mockGetValidGitLabToken = jest.fn();
++const mockGetBlobContent = jest.fn();
+ 
+ jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
+   codeReviewWorkerClient: {
+@@ -21,6 +22,10 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
+   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+ }));
+ 
++jest.mock('@/lib/r2/cli-sessions', () => ({
++  getBlobContent: (...args: unknown[]) => mockGetBlobContent(...args),
++}));
++
+ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+   createCheckRun: jest.fn(),
+   updateCheckRun: jest.fn(),
+@@ -39,6 +44,7 @@ import {
+   agent_configs,
+   cloud_agent_code_review_attempts,
+   cloud_agent_code_reviews,
++  cliSessions,
+   kilocode_users,
+   microdollar_usage,
+   microdollar_usage_metadata,
+@@ -112,11 +118,13 @@ describe('codeReviewRouter.cancel', () => {
+     await db
+       .delete(cloud_agent_code_reviews)
+       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
++    await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
+     await db
+       .delete(platform_integrations)
+       .where(eq(platform_integrations.owned_by_user_id, testUser.id));
+     mockCancelReview.mockReset();
+     mockTryDispatchPendingReviews.mockReset();
++    mockGetBlobContent.mockReset();
+     mockUpdateCheckRun.mockReset();
+   });
+ 
+@@ -688,9 +696,11 @@ describe('codeReviewRouter attempts', () => {
+     await db
+       .delete(cloud_agent_code_reviews)
+       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
++    await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
+     await db.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, testUser.id));
+     mockCancelReview.mockReset();
+     mockTryDispatchPendingReviews.mockReset();
++    mockGetBlobContent.mockReset();
+   });
+ 
+   afterAll(async () => {
+@@ -897,4 +907,47 @@ describe('codeReviewRouter attempts', () => {
+       })
+     ).rejects.toThrow('Code review attempt not found');
+   });
++
++  it('loads a historical V1 review from PostgreSQL and R2 without a worker request', async () => {
++    const cliSessionId = crypto.randomUUID();
++    await db.insert(cliSessions).values({
++      session_id: cliSessionId,
++      kilo_user_id: testUser.id,
++      title: 'Historical V1 code review',
++      created_on_platform: 'vscode',
++      ui_messages_blob_url: `sessions/${cliSessionId}/ui_messages.json`,
++    });
++    const [review] = await db
++      .insert(cloud_agent_code_reviews)
++      .values(
++        reviewValues(testUser.id, 'completed', {
++          agent_version: 'v1',
++          cli_session_id: cliSessionId,
++        })
++      )
++      .returning({ id: cloud_agent_code_reviews.id });
++    mockGetBlobContent.mockResolvedValue([
++      {
++        type: 'say',
++        say: 'completion_result',
++        text: 'Historical review result',
++        ts: Date.now(),
++      },
++    ]);
++    const fetchSpy = jest.spyOn(global, 'fetch');
++
++    try {
++      const caller = await createCallerForUser(testUser.id);
++      const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
++
++      expect(result).toMatchObject({
++        success: true,
++        entries: [{ eventType: 'text', message: 'Historical review result' }],
++      });
++      expect(mockGetBlobContent).toHaveBeenCalledWith(`sessions/${cliSessionId}/ui_messages.json`);
++      expect(fetchSpy).not.toHaveBeenCalled();
++    } finally {
++      fetchSpy.mockRestore();
++    }
++  });
+ });
+diff --git a/apps/web/src/routers/organizations/organization-cloud-agent-next-router.test.ts b/apps/web/src/routers/organizations/organization-cloud-agent-next-router.test.ts
+index 16af128f0..c81c8cd4b 100644
+--- a/apps/web/src/routers/organizations/organization-cloud-agent-next-router.test.ts
++++ b/apps/web/src/routers/organizations/organization-cloud-agent-next-router.test.ts
+@@ -1,9 +1,11 @@
+ import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
+ import { createCallerFactory } from '@/lib/trpc/init';
+ import type * as TrpcInitModule from '@/lib/trpc/init';
++import type * as ZodModule from 'zod';
+ import type { User } from '@kilocode/db/schema';
+ import type * as BitbucketIntegrationHelpers from '@/lib/cloud-agent/bitbucket-integration-helpers';
+ import type { BitbucketOrganizationRepositoryListResult } from '@/lib/cloud-agent/bitbucket-integration-helpers';
++import { TRPCError } from '@trpc/server';
+ 
+ const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
+ 
+@@ -68,6 +70,29 @@ const mockFetchBitbucketRepositoriesForOrganization =
+       kiloUserId: string
+     ) => Promise<BitbucketOrganizationRepositoryListResult>
+   >();
++const mockGetBalanceForOrganizationUser =
++  jest.fn<(organizationId: string, userId: string) => Promise<{ balance: number }>>();
++const mockFetchGitHubRepositoriesForOrganization = jest.fn<
++  (
++    organizationId: string,
++    forceRefresh: boolean
++  ) => Promise<{
++    repositories: unknown[];
++    integrationInstalled: boolean;
++    syncedAt: null;
++  }>
++>();
++const mockFetchGitLabRepositoriesForOrganization = jest.fn<
++  (
++    organizationId: string,
++    forceRefresh: boolean
++  ) => Promise<{
++    repositories: unknown[];
++    integrationInstalled: boolean;
++    syncedAt: null;
++  }>
++>();
++const mockEnsureOrganizationAccess = jest.fn<(userId: string, organizationId: string) => void>();
+ 
+ jest.mock('@/lib/tokens', () => ({
+   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
+@@ -89,21 +114,42 @@ jest.mock('@/lib/cloud-agent/bitbucket-integration-helpers', () => ({
+   fetchBitbucketRepositoriesForOrganization: mockFetchBitbucketRepositoriesForOrganization,
+ }));
+ 
+-jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
+-  generateImageUploadUrl: jest.fn(),
+-  generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
++jest.mock('@/lib/organizations/organization-usage', () => ({
++  getBalanceForOrganizationUser: mockGetBalanceForOrganizationUser,
++}));
++
++jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
++  fetchGitHubRepositoriesForOrganization: mockFetchGitHubRepositoriesForOrganization,
++}));
++
++jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
++  buildGitLabCloneUrl: jest.fn(),
++  fetchGitLabRepositoriesForOrganization: mockFetchGitLabRepositoriesForOrganization,
++  getGitLabInstanceUrlForOrganization: jest.fn(),
+ }));
+ 
+ jest.mock('@/lib/cloud-agent/session-ownership', () => ({
+   verifyOrgOwnsSessionV2ByCloudAgentId: mockVerifyOrgOwnsSessionV2ByCloudAgentId,
+ }));
+ 
++jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
++  generateImageUploadUrl: jest.fn(),
++  generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
++}));
++
+ jest.mock('@/routers/organizations/utils', () => {
+   const trpcInit = jest.requireActual<typeof TrpcInitModule>('@/lib/trpc/init');
++  const zod = jest.requireActual<typeof ZodModule>('zod');
++  const organizationProcedure = trpcInit.baseProcedure
++    .input(zod.object({ organizationId: zod.uuid() }))
++    .use(async ({ ctx, input, next }) => {
++      mockEnsureOrganizationAccess(ctx.user.id, input.organizationId);
++      return next();
++    });
+ 
+   return {
+-    organizationMemberProcedure: trpcInit.baseProcedure,
+-    organizationMemberMutationProcedure: trpcInit.baseProcedure,
++    organizationMemberProcedure: organizationProcedure,
++    organizationMemberMutationProcedure: organizationProcedure,
+   };
+ });
+ 
+@@ -143,6 +189,40 @@ let createCaller: (ctx: { user: User }) => {
+   listBitbucketRepositories: (input: {
+     organizationId: string;
+   }) => Promise<BitbucketOrganizationRepositoryListResult>;
++  checkEligibility: (input: { organizationId: string }) => Promise<{
++    balance: number;
++    minBalance: number;
++    isEligible: boolean;
++  }>;
++  listGitHubRepositories: (input: {
++    organizationId: string;
++    forceRefresh: boolean;
++  }) => Promise<unknown>;
++  listGitLabRepositories: (input: {
++    organizationId: string;
++    forceRefresh: boolean;
++  }) => Promise<unknown>;
++  refreshTerminalTicket: (input: {
++    organizationId: string;
++    cloudAgentSessionId: string;
++    ptyId: string;
++  }) => Promise<{ ticket: string; wsUrl: string }>;
++  createTerminal: (input: {
++    organizationId: string;
++    cloudAgentSessionId: string;
++  }) => Promise<unknown>;
++  resizeTerminal: (input: {
++    organizationId: string;
++    cloudAgentSessionId: string;
++    ptyId: string;
++    cols: number;
++    rows: number;
++  }) => Promise<unknown>;
++  closeTerminal: (input: {
++    organizationId: string;
++    cloudAgentSessionId: string;
++    ptyId: string;
++  }) => Promise<unknown>;
+ };
+ 
+ beforeAll(async () => {
+@@ -150,6 +230,10 @@ beforeAll(async () => {
+   createCaller = createCallerFactory(mod.organizationCloudAgentNextRouter);
+ });
+ 
++beforeEach(() => {
++  mockEnsureOrganizationAccess.mockImplementation(() => undefined);
++});
++
+ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
+   beforeEach(() => {
+     jest.clearAllMocks();
+@@ -231,6 +315,124 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
+   });
+ });
+ 
++describe('organizationCloudAgentNextRouter helper procedures', () => {
++  beforeEach(() => {
++    jest.clearAllMocks();
++    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
++  });
++
++  it.each([
++    { balance: 1, isEligible: true },
++    { balance: 0.99, isEligible: false },
++  ])('reports organization eligibility for a $balance balance', async ({ balance, isEligible }) => {
++    mockGetBalanceForOrganizationUser.mockResolvedValue({ balance });
++    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
++
++    await expect(caller.checkEligibility({ organizationId: ORGANIZATION_ID })).resolves.toEqual({
++      balance,
++      minBalance: 1,
++      isEligible,
++    });
++    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith('member-user', ORGANIZATION_ID);
++    expect(mockGetBalanceForOrganizationUser).toHaveBeenCalledWith(ORGANIZATION_ID, 'member-user');
++    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
++  });
++
++  it('rejects eligibility checks before reading balance when membership is denied', async () => {
++    mockEnsureOrganizationAccess.mockImplementation(() => {
++      throw new TRPCError({
++        code: 'UNAUTHORIZED',
++        message: 'You do not have access to this organization',
++      });
++    });
++    const caller = createCaller({ user: { id: 'non-member', is_admin: false } as User });
++
++    await expect(caller.checkEligibility({ organizationId: ORGANIZATION_ID })).rejects.toThrow(
++      'You do not have access to this organization'
++    );
++    expect(mockGetBalanceForOrganizationUser).not.toHaveBeenCalled();
++  });
++
++  it.each([
++    ['GitHub', 'listGitHubRepositories', mockFetchGitHubRepositoriesForOrganization],
++    ['GitLab', 'listGitLabRepositories', mockFetchGitLabRepositoriesForOrganization],
++  ] as const)(
++    'lists organization %s repositories without creating a runtime client',
++    async (_, method, fetchRepositories) => {
++      const repositories = {
++        repositories: [],
++        integrationInstalled: true,
++        syncedAt: null,
++      };
++      fetchRepositories.mockResolvedValue(repositories);
++      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
++
++      await expect(
++        caller[method]({ organizationId: ORGANIZATION_ID, forceRefresh: true })
++      ).resolves.toEqual(repositories);
++      expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith('member-user', ORGANIZATION_ID);
++      expect(fetchRepositories).toHaveBeenCalledWith(ORGANIZATION_ID, true);
++      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
++    }
++  );
++});
++
++describe('organizationCloudAgentNextRouter terminal ownership', () => {
++  const organizationCloudAgentSessionId = 'agent_terminal_ticket_org_owned';
++  const personalCloudAgentSessionId = 'agent_terminal_ticket_org_personal';
++
++  beforeEach(() => {
++    jest.clearAllMocks();
++    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
++  });
++
++  it('issues a terminal ticket for a session owned by the organization', async () => {
++    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue({
++      kiloSessionId: 'ses_12345678901234567890123456',
++    });
++    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
++
++    const result = await caller.refreshTerminalTicket({
++      organizationId: ORGANIZATION_ID,
++      cloudAgentSessionId: organizationCloudAgentSessionId,
++      ptyId: 'pty_org_owned',
++    });
++
++    expect(result.ticket).toEqual(expect.any(String));
++    expect(result.wsUrl).toContain(`cloudAgentSessionId=${organizationCloudAgentSessionId}`);
++  });
++
++  it.each([
++    ['refreshing a ticket', 'refreshTerminalTicket'],
++    ['creating a terminal', 'createTerminal'],
++    ['resizing a terminal', 'resizeTerminal'],
++    ['closing a terminal', 'closeTerminal'],
++  ] as const)('rejects %s for a session outside the organization', async (_, method) => {
++    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue(null);
++    const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
++    const baseInput = {
++      organizationId: ORGANIZATION_ID,
++      cloudAgentSessionId: personalCloudAgentSessionId,
++    };
++
++    const call =
++      method === 'refreshTerminalTicket'
++        ? caller.refreshTerminalTicket({ ...baseInput, ptyId: 'pty_org_other' })
++        : method === 'createTerminal'
++          ? caller.createTerminal(baseInput)
++          : method === 'resizeTerminal'
++            ? caller.resizeTerminal({
++                ...baseInput,
++                ptyId: 'pty_org_other',
++                cols: 120,
++                rows: 32,
++              })
++            : caller.closeTerminal({ ...baseInput, ptyId: 'pty_org_other' });
++
++    await expect(call).rejects.toThrow('Organization does not own this session');
++  });
++});
++
+ describe('organizationCloudAgentNextRouter.prepareSession', () => {
+   beforeEach(() => {
+     jest.clearAllMocks();
+diff --git a/apps/web/src/routers/organizations/organization-cloud-agent-next-router.ts b/apps/web/src/routers/organizations/organization-cloud-agent-next-router.ts
+index d42d307ab..c32e48ce9 100644
+--- a/apps/web/src/routers/organizations/organization-cloud-agent-next-router.ts
++++ b/apps/web/src/routers/organizations/organization-cloud-agent-next-router.ts
+@@ -55,6 +55,9 @@ import { db } from '@/lib/drizzle';
+ import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
+ import { TRPCError } from '@trpc/server';
+ import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
++import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
++
++const MIN_BALANCE_DOLLARS = 1;
+ 
+ function buildTerminalUrl(params: {
+   cloudAgentSessionId: string;
+@@ -565,6 +568,17 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
+       return await client.getSession(input.cloudAgentSessionId);
+     }),
+ 
++  checkEligibility: organizationMemberProcedure
++    .input(z.object({ organizationId: z.uuid() }))
++    .query(async ({ ctx, input }) => {
++      const { balance } = await getBalanceForOrganizationUser(input.organizationId, ctx.user.id);
++      return {
++        balance,
++        minBalance: MIN_BALANCE_DOLLARS,
++        isEligible: balance >= MIN_BALANCE_DOLLARS,
++      };
++    }),
++
+   /**
+    * List GitHub repositories available for cloud agent sessions (organization context).
+    */
+@@ -586,7 +600,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
+         errorMessage: z.string().optional(),
+       })
+     )
+-    .query(async ({ ctx: _ctx, input }) => {
++    .query(async ({ input }) => {
+       const result = await fetchGitHubRepositoriesForOrganization(
+         input.organizationId,
+         input.forceRefresh
+@@ -619,7 +633,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
+         errorMessage: z.string().optional(),
+       })
+     )
+-    .query(async ({ ctx: _ctx, input }) => {
++    .query(async ({ input }) => {
+       const result = await fetchGitLabRepositoriesForOrganization(
+         input.organizationId,
+         input.forceRefresh
+diff --git a/scripts/changed-workspaces.sh b/scripts/changed-workspaces.sh
+index 3f7da539f..40905719b 100755
+--- a/scripts/changed-workspaces.sh
++++ b/scripts/changed-workspaces.sh
+@@ -6,7 +6,7 @@ set -euo pipefail
+ #
+ # Usage:
+ #   scripts/changed-workspaces.sh                                    # all changed workspaces with tests
+-#   scripts/changed-workspaces.sh --exclude services/cloud-agent --exclude services/cloud-agent-next  # skip specific dirs
++#   scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web  # skip specific dirs
+ 
+ excludes=()
+ while [[ $# -gt 0 ]]; do
+diff --git a/services/cloud-agent-next/src/router.test.ts b/services/cloud-agent-next/src/router.test.ts
+index 3eab2bc9b..0dd0401b5 100644
+--- a/services/cloud-agent-next/src/router.test.ts
++++ b/services/cloud-agent-next/src/router.test.ts
+@@ -119,8 +119,8 @@ function legacySessionMetadata(input: Record<string, unknown>): CloudAgentSessio
+ // Note: Balance validation is now handled in the worker entry point (index.ts)
+ // via pre-flight validation before the tRPC handler is called.
+ // This returns proper HTTP status codes (401, 402) instead of SSE error events.
+-// See cloud-agent/src/balance-validation.ts for the implementation.
+-// Tests for balance validation are in cloud-agent/src/balance-validation.test.ts
++// See cloud-agent-next/src/balance-validation.ts for the implementation.
++// Tests for balance validation are in cloud-agent-next/src/balance-validation.test.ts
+ 
+ describe('router sessionId validation', () => {
+   it('should reject invalid session ID formats', () => {

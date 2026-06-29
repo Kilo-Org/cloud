@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import {
-  getPublicSnowflakeReport,
+  createPublicSnowflakeReport,
   publicSnowflakeReportOptions,
 } from '@/lib/public-snowflake-report';
 import { LEADERBOARD_MODEL_USAGE_REDIS_KEY } from '@/lib/redis-keys';
@@ -60,15 +60,13 @@ function parseModelUsage(rows: string[][]): ModelUsage[] {
   });
 }
 
-export async function GET() {
-  return getPublicSnowflakeReport({
-    cacheKey: LEADERBOARD_MODEL_USAGE_REDIS_KEY,
-    errorMessage: 'Failed to fetch leaderboard model usage',
-    parseRows: parseModelUsage,
-    query: LEADERBOARD_MODEL_USAGE_QUERY,
-    schema: modelUsageSchema,
-    source: 'public-leaderboard-model-usage-api',
-  });
-}
+export const GET = createPublicSnowflakeReport({
+  cacheKey: LEADERBOARD_MODEL_USAGE_REDIS_KEY,
+  errorMessage: 'Failed to fetch leaderboard model usage',
+  parseRows: parseModelUsage,
+  query: LEADERBOARD_MODEL_USAGE_QUERY,
+  schema: modelUsageSchema,
+  source: 'public-leaderboard-model-usage-api',
+});
 
 export const OPTIONS = publicSnowflakeReportOptions;

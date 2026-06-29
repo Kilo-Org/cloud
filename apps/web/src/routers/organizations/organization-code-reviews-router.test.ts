@@ -79,4 +79,27 @@ describe('organization review agent router: toggleReviewAgent', () => {
     const logs = await settingsChangeAuditLogs(organization.id);
     expect(logs).toEqual([{ message: 'Enabled AI Code Review Agent for github' }]);
   });
+
+  it('does not audit re-enabling an already-enabled agent', async () => {
+    const { owner, organization } = await createFixtureOrganization();
+    const caller = await createCallerForUser(owner.id);
+
+    // First enable creates the config and audits once.
+    await caller.organizations.reviewAgent.toggleReviewAgent({
+      organizationId: organization.id,
+      platform: 'github',
+      isEnabled: true,
+    });
+
+    // Repeating the same enable is a no-op and must not add another audit row.
+    const result = await caller.organizations.reviewAgent.toggleReviewAgent({
+      organizationId: organization.id,
+      platform: 'github',
+      isEnabled: true,
+    });
+
+    expect(result).toEqual({ success: true, isEnabled: true });
+    const logs = await settingsChangeAuditLogs(organization.id);
+    expect(logs).toEqual([{ message: 'Enabled AI Code Review Agent for github' }]);
+  });
 });

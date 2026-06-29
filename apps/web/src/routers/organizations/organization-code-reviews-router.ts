@@ -353,7 +353,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         let didChange = false;
         if (existingConfig) {
           await setAgentEnabled(input.organizationId, 'code_review', platform, input.isEnabled);
-          didChange = true;
+          // Re-toggling to the same value is a no-op and must not be audited.
+          didChange = existingConfig.is_enabled !== input.isEnabled;
         } else if (input.isEnabled) {
           await upsertAgentConfig({
             organizationId: input.organizationId,

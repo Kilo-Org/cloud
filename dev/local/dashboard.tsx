@@ -303,6 +303,7 @@ function Dashboard({
     () => new Map(initialServiceNames.map(n => [n, 'starting' as const]))
   );
   const [selectedIdx, setSelectedIdx] = useState(0);
+  const [, bumpViewedRevision] = useState(0);
 
   const viewedRef = useRef<ViewedTarget>(
     initialViewed ? { kind: 'service' as const, name: initialViewed } : null
@@ -319,6 +320,7 @@ function Dashboard({
     toggleGroupOn: (_groupId: string) => {},
     toggleGroupOff: (_groupId: string) => {},
     showGroup: (_groupId: string) => {},
+    showService: (_serviceName: string) => {},
   });
 
   // --- Restore sidebar width after terminal resize / tab switch ---
@@ -345,6 +347,22 @@ function Dashboard({
 
   // --- Derived ---
   const sidebarItems = useMemo(() => buildSidebarItems(enabledGroups), [enabledGroups]);
+
+  const showServiceView = useCallback((serviceName: string) => {
+    const previous = currentViewedEncoded(viewedRef.current);
+    doShowService(serviceName, viewedRef);
+    if (currentViewedEncoded(viewedRef.current) !== previous) {
+      bumpViewedRevision(revision => revision + 1);
+    }
+  }, []);
+
+  const showGroupView = useCallback((groupId: string, runningServiceNames: string[]) => {
+    const previous = currentViewedEncoded(viewedRef.current);
+    doShowGroup(groupId, runningServiceNames, viewedRef);
+    if (currentViewedEncoded(viewedRef.current) !== previous) {
+      bumpViewedRevision(revision => revision + 1);
+    }
+  }, []);
 
   // --- Status polling ---
   useEffect(() => {
@@ -447,7 +465,7 @@ function Dashboard({
 
           // Show the group in multi-pane view
           const running = getGroupServiceNames(groupId).filter(n => nextRunningServices.has(n));
-          doShowGroup(groupId, running, viewedRef);
+          showGroupView(groupId, running);
 
           // Phase 1 is complete; keep UI responsive while tunnel gate runs in background.
           togglingRef.current = false;
@@ -516,7 +534,7 @@ function Dashboard({
             const updatedRunning = getGroupServiceNames(groupId).filter(n =>
               runningAfterCapture.has(n)
             );
-            doShowGroup(groupId, updatedRunning, viewedRef);
+            showGroupView(groupId, updatedRunning);
           }
 
           startTimeRef.current = Date.now();
@@ -527,7 +545,7 @@ function Dashboard({
         }
       })();
     },
-    [runningServices]
+    [runningServices, showGroupView]
   );
 
   // --- Toggle group OFF ---
@@ -556,7 +574,7 @@ function Dashboard({
         for (const name of toStop) allRunning.delete(name);
         const replacement = findViewableService([...allRunning], allRunning);
         if (replacement) {
-          doShowService(replacement, viewedRef);
+          showServiceView(replacement);
         }
       }
 
@@ -586,15 +604,15 @@ function Dashboard({
       });
       togglingRef.current = false;
     },
-    [enabledGroups, runningServices]
+    [enabledGroups, runningServices, showServiceView]
   );
 
   const showGroup = useCallback(
     (groupId: string) => {
       const running = getGroupServiceNames(groupId).filter(n => runningServices.has(n));
-      doShowGroup(groupId, running, viewedRef);
+      showGroupView(groupId, running);
     },
-    [runningServices]
+    [runningServices, showGroupView]
   );
 
   mouseStateRef.current = {
@@ -604,6 +622,7 @@ function Dashboard({
     toggleGroupOn,
     toggleGroupOff,
     showGroup,
+    showService: showServiceView,
   };
 
   // --- Keyboard ---
@@ -632,7 +651,7 @@ function Dashboard({
         if (enabledGroups.has(item.groupId)) {
           // Group is running — show all its services in multi-pane view
           const running = getGroupServiceNames(item.groupId).filter(n => runningServices.has(n));
-          doShowGroup(item.groupId, running, viewedRef);
+          showGroupView(item.groupId, running);
         } else {
           // Group is off — start it (which will also show it)
           if (!alwaysOnGroupIds.has(item.groupId)) {
@@ -642,7 +661,7 @@ function Dashboard({
       } else {
         // Service: show single pane
         if (runningServices.has(item.name)) {
-          doShowService(item.name, viewedRef);
+          showServiceView(item.name);
         }
       }
       return;
@@ -662,7 +681,7 @@ function Dashboard({
       } else {
         // Service: show single pane (same as Enter for services)
         if (runningServices.has(item.name)) {
-          doShowService(item.name, viewedRef);
+          showServiceView(item.name);
         }
       }
       return;
@@ -724,6 +743,7 @@ function Dashboard({
           runningServices: running,
           toggleGroupOn: onGroupOn,
           showGroup: onShowGroup,
+          showService: onShowService,
         } = mouseStateRef.current;
 
         // 2 header rows, then visible items starting from scrollRef offset
@@ -747,7 +767,7 @@ function Dashboard({
           }
         } else {
           if (running.has(item.name)) {
-            doShowService(item.name, viewedRef);
+            onShowService(item.name);
           }
         }
       }

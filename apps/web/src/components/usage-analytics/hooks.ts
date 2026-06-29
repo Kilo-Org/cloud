@@ -119,12 +119,6 @@ export type ViewAs = 'self' | 'org-wide';
 
 type CommonArgs = {
   organizationId: string | null;
-  /**
-   * Multi-org aggregate ("All Organizations"). When set and non-empty, the
-   * server aggregates org-wide usage across these orgs and ignores
-   * `organizationId` / `viewAs`.
-   */
-  organizationIds?: string[] | null;
   dateRange: DateRange;
   granularity: Granularity;
   costSource: CostSource;
@@ -154,17 +148,12 @@ function pickFiltersInput(filters: UsageFilters) {
 }
 
 function commonFilters(args: CommonArgs) {
-  const organizationIds =
-    args.organizationIds && args.organizationIds.length > 0 ? args.organizationIds : undefined;
   return {
     startDate: args.dateRange.startDate,
     endDate: args.dateRange.endDate,
     granularity: args.granularity,
     costSource: args.costSource,
-    // In multi-org aggregate mode the server keys off `organizationIds`; don't
-    // also send a single `organizationId` (they are mutually exclusive).
-    organizationId: organizationIds ? undefined : (args.organizationId ?? undefined),
-    organizationIds,
+    organizationId: args.organizationId ?? undefined,
     personalScope: args.personalScope ?? 'personal-only',
     viewAs: args.viewAs ?? 'self',
     ...pickFiltersInput(args.filters),
@@ -235,22 +224,16 @@ export function useUsageTable(
   });
 }
 
-export function useResolveOrgUsers(organizationIds: string[], userIds: string[]) {
+export function useResolveOrgUsers(organizationId: string | null, userIds: string[]) {
   const trpc = useTRPC();
   const dedupedIds = useMemo(() => Array.from(new Set(userIds)).sort(), [userIds]);
-  const dedupedOrgIds = useMemo(
-    () => Array.from(new Set(organizationIds)).sort(),
-    [organizationIds]
-  );
   // Pass the real input only when we have a legitimate org scope and a
   // non-empty id list. Using `skipToken` (instead of a placeholder UUID +
   // `enabled: false`) guarantees the server never receives a sentinel id
   // even if future call sites drop the `enabled` gate.
   return useQuery(
     trpc.usageAnalytics.resolveOrgUsers.queryOptions(
-      dedupedOrgIds.length > 0 && dedupedIds.length > 0
-        ? { organizationIds: dedupedOrgIds, userIds: dedupedIds }
-        : skipToken
+      organizationId && dedupedIds.length > 0 ? { organizationId, userIds: dedupedIds } : skipToken
     )
   );
 }

@@ -4,6 +4,7 @@ import {
   createSafeToolDefinitions,
 } from '@/src/shared/agent-llm-harness';
 import { runLlmTurn } from '@/src/shared/agent-llm-turn-runner-core';
+import type { OnTurnUsage } from '@/src/shared/agent-llm-turn-runner-core';
 import { maxAgentToolRounds } from '@/src/shared/agent-tool-round-limit';
 import type { FetchLike } from '@/src/shared/auth';
 import { executeEvalToolCall } from './agent-eval-runtime';
@@ -18,6 +19,7 @@ interface RunDangerousLlmTurnOptions {
   readonly model: string;
   readonly organizationId?: string | undefined;
   readonly selectedTabId: number;
+  readonly onUsage?: OnTurnUsage | undefined;
   readonly signal?: AbortSignal | undefined;
   readonly supportsImages?: boolean;
   readonly thinkingEffort?: string | undefined;

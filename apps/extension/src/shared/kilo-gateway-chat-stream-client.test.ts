@@ -1,7 +1,10 @@
 /* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { fetchKiloGatewayChatCompletionStream } from './kilo-api-client';
+import {
+  fetchKiloGatewayChatCompletionStream,
+  parseKiloGatewayChatCompletionStream,
+} from './kilo-api-client';
 import type { FetchLike } from './auth';
 
 const jsonRequestBodySchema = z.record(z.string(), z.unknown());
@@ -461,5 +464,19 @@ describe('kilo gateway chat stream client', () => {
     });
 
     expect(seenBody).not.toHaveProperty('reasoning');
+  });
+
+  it('extracts usage from the trailing usage chunk', () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":1200,"completion_tokens":34,"total_tokens":1234}}\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+
+    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+
+    expect(completion.usage).toStrictEqual({
+      promptTokens: 1200,
+    });
   });
 });

@@ -1,12 +1,26 @@
 /* eslint-disable import/max-dependencies, max-lines */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ChangeEvent, JSX, KeyboardEvent, ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import type { JSX, ReactNode } from 'react';
+import { useAtomValue, useSetAtom, useStore } from 'jotai';
+import {
+  compactingConversationIdsAtom,
+  contextUsageAtomFamily,
+  draftAtomFamily,
+  evictConversationAtoms,
+  runningConversationIdsAtom,
+} from './agent-chat-atoms';
 import {
   createAssistantMessage,
   createUserMessage,
   groupConversationEvents,
 } from '@/src/shared/agent-conversation';
 import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
+import {
+  KEEP_RECENT_EXCHANGES,
+  KEEP_RECENT_EXCHANGES_MANUAL,
+  compactConversationEvents,
+  hasCompactableHistory,
+} from '@/src/shared/agent-context-compaction';
 import { defaultMode } from '@/src/shared/agent-chat-placeholder';
 import { getKiloApiBaseUrl } from '@/src/shared/auth';
 import type { StoredAuth } from '@/src/shared/auth';
@@ -17,7 +31,6 @@ import {
   getActiveStoredConversation,
   getOpenStoredConversations,
   getSortedStoredConversationHistory,
-  getStoredConversationTitle,
   isStoredConversationEmpty,
   isStoredConversationOpen,
   openStoredConversation,
@@ -26,11 +39,14 @@ import {
   updateStoredConversationSettings,
   useStoredAgentConversations,
 } from './agent-conversation-storage';
-import type { StoredAgentConversation } from './agent-conversation-storage';
 import { AgentFooterControls } from './agent-footer-controls';
+import { ContextDonut } from './context-donut';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
+import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
+import { ConversationTabs } from './conversation-tabs';
+import { MessageComposer } from './message-composer';
 import { ConversationHistoryButton } from './conversation-history-button';
 import { useGatewayModels } from './use-gateway-models';
 
@@ -83,93 +99,6 @@ export const formatSelectedTabSystemEnvironment = ({
 }): string =>
   `<system_environment>\nSelected tab title: ${sanitizeTabContextText(title)}\nSelected tab URL: ${sanitizeTabContextUrl(url)}\nCurrent time: ${new Date().toISOString()}\nTimezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}\n</system_environment>`;
 
-const ConversationTabs = ({
-  activeConversationId,
-  conversations,
-  isDisabled,
-  onCloseConversation,
-  onCreateConversation,
-  onSelectConversation,
-  runningConversationIds,
-}: {
-  activeConversationId: string;
-  conversations: StoredAgentConversation[];
-  isDisabled: boolean;
-  onCloseConversation: (conversationId: string) => void;
-  onCreateConversation: () => void;
-  onSelectConversation: (conversationId: string) => void;
-  runningConversationIds: readonly string[];
-}): JSX.Element => (
-  <div className="border-b border-zinc-900 bg-zinc-950">
-    <div
-      aria-label="Conversation tabs"
-      className="agent-conversation-scrollbar flex min-w-0 items-center gap-1 overflow-x-auto px-2 py-2"
-      role="tablist"
-    >
-      {conversations.map(conversation => {
-        const title = getStoredConversationTitle(conversation);
-        const isActive = conversation.id === activeConversationId;
-        const isRunning = runningConversationIds.includes(conversation.id);
-
-        return (
-          <div
-            className={
-              isActive
-                ? 'flex h-8 max-w-44 shrink-0 items-center rounded-md border border-[#EDFF00]/70 bg-zinc-900 text-zinc-50'
-                : 'flex h-8 max-w-44 shrink-0 items-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100'
-            }
-            key={conversation.id}
-          >
-            <button
-              aria-selected={isActive}
-              className="flex h-full min-w-0 items-center gap-1.5 px-2 text-left text-xs font-medium outline-none focus:ring-2 focus:ring-[#EDFF00]/50 disabled:cursor-not-allowed disabled:text-zinc-600"
-              disabled={isDisabled}
-              onClick={() => {
-                onSelectConversation(conversation.id);
-              }}
-              role="tab"
-              title={title}
-              type="button"
-            >
-              {isRunning ? (
-                <span
-                  aria-hidden="true"
-                  className="size-2 shrink-0 animate-pulse rounded-full bg-[#EDFF00]"
-                />
-              ) : null}
-              <span className="truncate">{title}</span>
-            </button>
-            <button
-              aria-label={`Close ${title}`}
-              className="mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-zinc-500 outline-none transition hover:bg-zinc-800 hover:text-zinc-100 focus:ring-2 focus:ring-[#EDFF00]/50"
-              disabled={isDisabled}
-              onClick={() => {
-                onCloseConversation(conversation.id);
-              }}
-              type="button"
-            >
-              <span aria-hidden="true" className="text-sm leading-none">
-                x
-              </span>
-            </button>
-          </div>
-        );
-      })}
-      <button
-        aria-label="New conversation"
-        className="flex size-8 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 outline-none transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:ring-2 focus:ring-[#EDFF00]/50 disabled:cursor-not-allowed disabled:text-zinc-600"
-        disabled={isDisabled}
-        onClick={onCreateConversation}
-        type="button"
-      >
-        <span aria-hidden="true" className="text-lg leading-none">
-          +
-        </span>
-      </button>
-    </div>
-  </div>
-);
-
 export const AgentChatPanel = ({
   auth,
   onHeaderBeforeSettingsChange,
@@ -179,10 +108,13 @@ export const AgentChatPanel = ({
   onHeaderBeforeSettingsChange?: (node?: ReactNode) => void;
   organizationId: string | undefined;
 }): JSX.Element => {
-  const [draft, setDraft] = useState('');
+  const store = useStore();
   const [conversationStore, setConversationStore, isConversationStoreLoaded] =
     useStoredAgentConversations(createDefaultConversationEvents);
-  const [runningConversationIds, setRunningConversationIds] = useState<string[]>([]);
+  const runningConversationIds = useAtomValue(runningConversationIdsAtom);
+  const setRunningConversationIds = useSetAtom(runningConversationIdsAtom);
+  const compactingConversationIds = useAtomValue(compactingConversationIdsAtom);
+  const setCompactingConversationIds = useSetAtom(compactingConversationIdsAtom);
   const conversationStoreRef = useRef(conversationStore);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
@@ -217,14 +149,112 @@ export const AgentChatPanel = ({
   );
   const thinkingEffort = activeConversation.thinkingEffort ?? thinkingOptions[0] ?? '';
   const isRunning = runningConversationIds.includes(activeConversationId);
+  const isCompacting = compactingConversationIds.includes(activeConversationId);
+  const activeUsage = useAtomValue(contextUsageAtomFamily(activeConversationId));
+  const activePromptTokens = activeUsage?.promptTokens ?? 0;
+  const contextLength = selectedModel?.contextLength;
+
+  const compactConversation = useCallback(
+    async (
+      conversationId: string,
+      keepRecentExchanges: number = KEEP_RECENT_EXCHANGES
+    ): Promise<void> => {
+      if (
+        !isConversationStoreLoaded ||
+        store.get(runningConversationIdsAtom).includes(conversationId) ||
+        store.get(compactingConversationIdsAtom).includes(conversationId)
+      ) {
+        return;
+      }
+
+      const conversation = conversationStoreRef.current.conversations.find(
+        item => item.id === conversationId
+      );
+      const runModel = conversation?.model ?? modelOptions[0]?.id ?? '';
+
+      if (conversation === undefined || runModel === '') {
+        return;
+      }
+
+      setCompactingConversationIds(current => [...current, conversationId]);
+
+      try {
+        const compacted = await compactConversationEvents({
+          apiBaseUrl,
+          events: conversation.events,
+          fetch: fetchFromWindow,
+          keepRecentExchanges,
+          model: runModel,
+          organizationId,
+          token: auth.token,
+        });
+
+        if (compacted !== undefined) {
+          // Wholesale replace is safe only because the conversation can't receive new events while compacting (guarded above + send disabled). Reconcile against currentEvents if that ever changes.
+          setConversationStore(currentStore =>
+            updateStoredConversationEvents(currentStore, conversationId, () => compacted)
+          );
+          store.set(contextUsageAtomFamily(conversationId), undefined);
+        }
+      } finally {
+        setCompactingConversationIds(current => current.filter(id => id !== conversationId));
+      }
+    },
+    // Compaction is a single short gateway call; no abort wiring until it proves slow.
+    [
+      auth.token,
+      isConversationStoreLoaded,
+      modelOptions,
+      organizationId,
+      setConversationStore,
+      setCompactingConversationIds,
+      store,
+    ]
+  );
+
+  const compactActiveConversation = useCallback(
+    (): Promise<void> => compactConversation(activeConversationId, KEEP_RECENT_EXCHANGES_MANUAL),
+    [activeConversationId, compactConversation]
+  );
+
+  /*
+   * Gate on summarizable history (not measured usage) so the button is never enabled-but-inert and
+   * still works after a reload, when in-memory usage has reset to zero.
+   */
+  const canCompactActive = useMemo(
+    () => hasCompactableHistory(events, KEEP_RECENT_EXCHANGES_MANUAL),
+    [events]
+  );
+
+  const contextDonut = useMemo(
+    () => (
+      <ContextDonut
+        canCompact={!isRunning && !isCompacting && canCompactActive}
+        contextLength={contextLength}
+        onCompact={() => {
+          void compactActiveConversation();
+        }}
+        promptTokens={activePromptTokens}
+      />
+    ),
+    [
+      activePromptTokens,
+      canCompactActive,
+      compactActiveConversation,
+      contextLength,
+      isCompacting,
+      isRunning,
+    ]
+  );
+
   const isModelSelectDisabled = modelOptions.length === 0;
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
   const modelControlValue = modelOptions.length === 0 ? '' : model;
-  const isSendDisabled =
-    !isConversationStoreLoaded ||
-    draft.trim() === '' ||
-    modelControlValue === '' ||
-    selectedTabId === undefined;
+  const canSend =
+    isConversationStoreLoaded &&
+    modelControlValue !== '' &&
+    selectedTabId !== undefined &&
+    !isCompacting;
 
   conversationStoreRef.current = conversationStore;
 
@@ -261,8 +291,8 @@ export const AgentChatPanel = ({
       return;
     }
 
-    setConversationStore(store =>
-      updateStoredConversationSettings(store, activeConversationId, {
+    setConversationStore(currentStore =>
+      updateStoredConversationSettings(currentStore, activeConversationId, {
         selectedTabId: nextSelectedTabId,
       })
     );
@@ -279,8 +309,8 @@ export const AgentChatPanel = ({
     }
 
     if (!modelOptions.some(option => option.id === model)) {
-      setConversationStore(store =>
-        updateStoredConversationSettings(store, activeConversationId, {
+      setConversationStore(currentStore =>
+        updateStoredConversationSettings(currentStore, activeConversationId, {
           model: modelOptions[0]?.id ?? '',
         })
       );
@@ -293,8 +323,8 @@ export const AgentChatPanel = ({
     }
 
     if (!thinkingOptions.includes(thinkingEffort)) {
-      setConversationStore(store =>
-        updateStoredConversationSettings(store, activeConversationId, {
+      setConversationStore(currentStore =>
+        updateStoredConversationSettings(currentStore, activeConversationId, {
           thinkingEffort: thinkingOptions[0] ?? '',
         })
       );
@@ -302,8 +332,8 @@ export const AgentChatPanel = ({
   }, [activeConversationId, setConversationStore, thinkingEffort, thinkingOptions]);
 
   const appendEvents = (conversationId: string, nextEvents: AgentConversationEvent[]): void => {
-    setConversationStore(store =>
-      updateStoredConversationEvents(store, conversationId, currentEvents => [
+    setConversationStore(currentStore =>
+      updateStoredConversationEvents(currentStore, conversationId, currentEvents => [
         ...currentEvents,
         ...nextEvents,
       ])
@@ -311,8 +341,8 @@ export const AgentChatPanel = ({
   };
 
   const updateAssistantMessage = (conversationId: string, eventId: string, text: string): void => {
-    setConversationStore(store =>
-      updateStoredConversationEvents(store, conversationId, currentEvents =>
+    setConversationStore(currentStore =>
+      updateStoredConversationEvents(currentStore, conversationId, currentEvents =>
         currentEvents.map(event =>
           event.id === eventId && event.type === 'message' && event.role === 'assistant'
             ? { ...event, text }
@@ -323,8 +353,8 @@ export const AgentChatPanel = ({
   };
 
   const updateThinkingBlock = (conversationId: string, eventId: string, text: string): void => {
-    setConversationStore(store =>
-      updateStoredConversationEvents(store, conversationId, currentEvents =>
+    setConversationStore(currentStore =>
+      updateStoredConversationEvents(currentStore, conversationId, currentEvents =>
         currentEvents.map(event =>
           event.id === eventId && event.type === 'thinking' ? { ...event, text } : event
         )
@@ -344,8 +374,8 @@ export const AgentChatPanel = ({
       conversationStoreRef.current.activeConversationId,
       settings
     );
-    setConversationStore(store =>
-      updateStoredConversationSettings(store, store.activeConversationId, settings)
+    setConversationStore(currentStore =>
+      updateStoredConversationSettings(currentStore, currentStore.activeConversationId, settings)
     );
   };
 
@@ -395,6 +425,11 @@ export const AgentChatPanel = ({
         updateThinkingBlock(conversationId, eventId, thinkingText);
       }
     };
+    const updateRunUsage = (usage: { promptTokens: number }): void => {
+      if (isCurrentRun()) {
+        store.set(contextUsageAtomFamily(conversationId), { promptTokens: usage.promptTokens });
+      }
+    };
 
     runStatesRef.current.set(conversationId, {
       abort,
@@ -415,6 +450,7 @@ export const AgentChatPanel = ({
           conversationEvents: conversationWithUserMessage,
           fetch: fetchFromWindow,
           model: runModel,
+          onUsage: updateRunUsage,
           organizationId,
           selectedTabId: runSelectedTabId,
           signal: abort.signal,
@@ -430,32 +466,46 @@ export const AgentChatPanel = ({
           setRunningConversationIds(currentIds =>
             currentIds.filter(currentId => currentId !== conversationId)
           );
+
+          const latest = store.get(contextUsageAtomFamily(conversationId))?.promptTokens ?? 0;
+          const runContextLength = modelOptions.find(
+            option => option.id === runModel
+          )?.contextLength;
+          const ratio = getContextRatio(latest, runContextLength);
+
+          if (ratio !== undefined && ratio >= AUTO_COMPACT_RATIO) {
+            void compactConversation(conversationId);
+          }
         }
       }
     })();
   };
 
   const submitDraft = (): void => {
-    const text = draft.trim();
+    const text = store.get(draftAtomFamily(activeConversationId)).trim();
     const conversation = getActiveStoredConversation(conversationStoreRef.current);
     const conversationModel = conversation.model ?? modelOptions[0]?.id ?? '';
     const conversationSelectedTabId = getSelectedInspectableTabId({
       inspectableTabs,
       selectedTabId: conversation.selectedTabId,
     });
-    const isConversationRunning = runningConversationIds.includes(conversation.id);
+    const isConversationRunning = store.get(runningConversationIdsAtom).includes(conversation.id);
+    const isConversationCompacting = store
+      .get(compactingConversationIdsAtom)
+      .includes(conversation.id);
 
     if (
       !isConversationStoreLoaded ||
       text === '' ||
       isConversationRunning ||
+      isConversationCompacting ||
       conversationModel === '' ||
       conversationSelectedTabId === undefined
     ) {
       return;
     }
 
-    setDraft('');
+    store.set(draftAtomFamily(activeConversationId), '');
     submitMessage(text);
   };
 
@@ -475,7 +525,6 @@ export const AgentChatPanel = ({
       thinkingEffort,
     };
 
-    setDraft('');
     conversationStoreRef.current = createNextStoredConversation(
       conversationStoreRef.current,
       createDefaultConversationEvents(),
@@ -496,13 +545,16 @@ export const AgentChatPanel = ({
     setConversationStore(conversationStoreRef.current);
   };
 
-  const abortConversationRun = useCallback((conversationId: string): void => {
-    runStatesRef.current.get(conversationId)?.abort.abort();
-    runStatesRef.current.delete(conversationId);
-    setRunningConversationIds(currentIds =>
-      currentIds.filter(currentId => currentId !== conversationId)
-    );
-  }, []);
+  const abortConversationRun = useCallback(
+    (conversationId: string): void => {
+      runStatesRef.current.get(conversationId)?.abort.abort();
+      runStatesRef.current.delete(conversationId);
+      setRunningConversationIds(currentIds =>
+        currentIds.filter(currentId => currentId !== conversationId)
+      );
+    },
+    [setRunningConversationIds]
+  );
 
   const closeConversation = useCallback(
     (conversationId: string): void => {
@@ -510,13 +562,9 @@ export const AgentChatPanel = ({
         return;
       }
 
-      if (!globalThis.confirm('Close this conversation tab? It will stay in History.')) {
-        return;
-      }
-
       abortConversationRun(conversationId);
-      setConversationStore(store =>
-        closeStoredConversationTab(store, conversationId, createDefaultConversationEvents())
+      setConversationStore(currentStore =>
+        closeStoredConversationTab(currentStore, conversationId, createDefaultConversationEvents())
       );
     },
     [abortConversationRun, isConversationStoreLoaded, setConversationStore]
@@ -536,9 +584,11 @@ export const AgentChatPanel = ({
       }
 
       abortConversationRun(conversationId);
-      setConversationStore(store =>
-        deleteStoredConversation(store, conversationId, createDefaultConversationEvents())
+      setConversationStore(currentStore =>
+        deleteStoredConversation(currentStore, conversationId, createDefaultConversationEvents())
       );
+      // Free per-conversation atoms; a deleted conversation can never be reopened.
+      evictConversationAtoms(conversationId);
     },
     [abortConversationRun, conversationStore, isConversationStoreLoaded, setConversationStore]
   );
@@ -549,18 +599,25 @@ export const AgentChatPanel = ({
         return;
       }
 
-      setDraft('');
-      setConversationStore(store =>
-        openStoredConversation({
-          conversationId,
-          isActiveConversationEmpty:
-            !runningConversationIds.includes(store.activeConversationId) &&
-            isStoredConversationEmpty(getActiveStoredConversation(store)),
-          store,
-        })
-      );
+      const runningIds = store.get(runningConversationIdsAtom);
+      const currentStore = conversationStoreRef.current;
+      const nextStore = openStoredConversation({
+        conversationId,
+        isActiveConversationEmpty:
+          !runningIds.includes(currentStore.activeConversationId) &&
+          isStoredConversationEmpty(getActiveStoredConversation(currentStore)),
+        store: currentStore,
+      });
+      // Opening history can drop the active empty conversation; free its atoms.
+      for (const conversation of currentStore.conversations) {
+        if (!nextStore.conversations.some(next => next.id === conversation.id)) {
+          evictConversationAtoms(conversation.id);
+        }
+      }
+      conversationStoreRef.current = nextStore;
+      setConversationStore(nextStore);
     },
-    [isConversationStoreLoaded, runningConversationIds, setConversationStore]
+    [isConversationStoreLoaded, setConversationStore, store]
   );
 
   useEffect(() => {
@@ -604,49 +661,20 @@ export const AgentChatPanel = ({
         onCloseConversation={closeConversation}
         onCreateConversation={createConversation}
         onSelectConversation={selectConversation}
-        runningConversationIds={runningConversationIds}
       />
       <ConversationList items={groupedEvents} />
 
-      <form
-        className="border-t border-zinc-900 px-4 py-3"
-        onSubmit={event => {
-          event.preventDefault();
-          submitDraft();
-        }}
-      >
-        <label className="sr-only" htmlFor="agent-message">
-          Message agent
-        </label>
-        <textarea
-          className="min-h-20 w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm leading-5 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
-          id="agent-message"
-          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-            setDraft(event.currentTarget.value);
-          }}
-          onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              submitDraft();
-            }
-          }}
-          placeholder="Ask Kilo to inspect this tab..."
-          value={draft}
-        />
-        <div className="mt-2 grid gap-2">
-          <button
-            className="h-9 w-full rounded-md bg-[#EDFF00] px-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-            disabled={isRunning ? false : isSendDisabled}
-            onClick={isRunning ? stopRun : undefined}
-            type={isRunning ? 'button' : 'submit'}
-          >
-            {isRunning ? 'Stop' : 'Send message'}
-          </button>
-        </div>
-      </form>
+      <MessageComposer
+        activeConversationId={activeConversationId}
+        canSend={canSend}
+        isRunning={isRunning}
+        onStop={stopRun}
+        onSubmit={submitDraft}
+      />
 
       <footer className="border-t border-zinc-900 bg-zinc-950 px-4 py-2">
         <AgentFooterControls
+          contextDonut={contextDonut}
           inspectableTabs={inspectableTabs}
           isLoadingTabs={isLoadingTabs}
           isConversationStoreLoaded={isConversationStoreLoaded}

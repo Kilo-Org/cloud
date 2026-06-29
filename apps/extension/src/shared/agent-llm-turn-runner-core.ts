@@ -9,6 +9,12 @@ import type { EvalTabResult } from './tab-debugger';
 
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
 
+export interface TurnUsage {
+  readonly promptTokens: number;
+}
+
+export type OnTurnUsage = (usage: TurnUsage) => void;
+
 interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly apiBaseUrl: string;
   readonly appendEvents: (events: AgentConversationEvent[]) => void;
@@ -19,6 +25,7 @@ interface RunLlmTurnOptions<ToolCall extends ToolCallEvent> {
   readonly maxToolRounds: number;
   readonly model: string;
   readonly noResponseMessage: string;
+  readonly onUsage?: OnTurnUsage | undefined;
   readonly organizationId?: string | undefined;
   readonly signal?: AbortSignal | undefined;
   readonly supportsImages?: boolean | undefined;
@@ -60,6 +67,7 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
   maxToolRounds,
   model,
   noResponseMessage,
+  onUsage,
   organizationId,
   signal,
   supportsImages = false,
@@ -132,6 +140,10 @@ export const runLlmTurn = async <ToolCall extends ToolCallEvent>({
         updateThinkingBlock(streamedThinkingEventId, streamedThinkingText);
       }
     );
+
+    if (completion.usage !== undefined) {
+      onUsage?.(completion.usage);
+    }
 
     if (streamedThinkingEventId !== undefined) {
       const finalStreamedThinkingText = completion.reasoning ?? streamedThinkingText;

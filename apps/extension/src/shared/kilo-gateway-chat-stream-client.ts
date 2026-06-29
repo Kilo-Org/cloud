@@ -36,6 +36,7 @@ interface StreamingAccumulator {
   reasoning: string;
   reasoningDetailsByIndex: Map<number, Record<string, unknown>>;
   toolCallsByIndex: Map<number, StreamingToolCallBuffer>;
+  usage: KiloGatewayChatCompletion['usage'];
 }
 
 interface StreamingDeltaHandlers {
@@ -81,6 +82,10 @@ const streamingToolCallDeltaSchema = z.object({
   id: z.string().optional(),
   index: z.number(),
 });
+// Only prompt_tokens is consumed (the context-usage ratio); other usage fields are ignored.
+const usageSchema = z.object({
+  prompt_tokens: z.number(),
+});
 const streamDataSchema = z.object({
   choices: z.array(
     z.object({
@@ -92,6 +97,7 @@ const streamDataSchema = z.object({
       }),
     })
   ),
+  usage: usageSchema.nullable().optional(),
 });
 // Reasoning blocks stream incrementally like content: text accumulates while structural fields (type/signature/data/index) carry their final value. Providers may require these signed/encrypted blocks replayed verbatim on the assistant tool-call message or they reject the continuation.
 const appendableReasoningKeys = new Set(['data', 'summary', 'text']);
@@ -247,6 +253,10 @@ const applyStreamingData = (
     return;
   }
 
+  if (parsed.data.usage !== undefined && parsed.data.usage !== null) {
+    accumulator.usage = { promptTokens: parsed.data.usage.prompt_tokens };
+  }
+
   const choice = parsed.data.choices.at(0);
 
   if (choice === undefined) {
@@ -287,6 +297,7 @@ const toCompletion = (accumulator: StreamingAccumulator): KiloGatewayChatComplet
     ...(accumulator.content === '' ? {} : { content: accumulator.content }),
     ...(accumulator.reasoning === '' ? {} : { reasoning: accumulator.reasoning }),
     ...(reasoningDetails.length === 0 ? {} : { reasoningDetails }),
+    ...(accumulator.usage === undefined ? {} : { usage: accumulator.usage }),
     toolCalls: [...accumulator.toolCallsByIndex.values()].map(toolCall =>
       parseToolCallBuffer(toolCall)
     ),
@@ -305,6 +316,7 @@ export const parseKiloGatewayChatCompletionStream = (
     reasoning: '',
     reasoningDetailsByIndex: new Map(),
     toolCallsByIndex: new Map(),
+    usage: undefined,
   };
   const handlers = { onContentDelta, onReasoningDelta };
 
@@ -362,6 +374,7 @@ const consumeKiloGatewayChatCompletionStream = async (
     reasoning: '',
     reasoningDetailsByIndex: new Map(),
     toolCallsByIndex: new Map(),
+    usage: undefined,
   };
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -393,6 +406,7 @@ export const fetchKiloGatewayChatCompletionStream = async ({
     messages,
     model,
     stream: true,
+    stream_options: { include_usage: true },
     temperature: 0,
     tool_choice: tools.length === 0 ? 'none' : 'auto',
     tools,

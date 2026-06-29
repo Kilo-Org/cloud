@@ -124,7 +124,6 @@ export const AgentChatPanel = ({
   });
   const activeConversation = getActiveStoredConversation(conversationStore);
   const { events, id: activeConversationId, mode = defaultMode } = activeConversation;
-  const draft = useAtomValue(draftAtomFamily(activeConversationId));
   const selectedTabId = getSelectedInspectableTabId({
     inspectableTabs,
     selectedTabId: activeConversation.selectedTabId,
@@ -482,7 +481,7 @@ export const AgentChatPanel = ({
   };
 
   const submitDraft = (): void => {
-    const text = draft.trim();
+    const text = store.get(draftAtomFamily(activeConversationId)).trim();
     const conversation = getActiveStoredConversation(conversationStoreRef.current);
     const conversationModel = conversation.model ?? modelOptions[0]?.id ?? '';
     const conversationSelectedTabId = getSelectedInspectableTabId({
@@ -587,6 +586,9 @@ export const AgentChatPanel = ({
       setConversationStore(currentStore =>
         deleteStoredConversation(currentStore, conversationId, createDefaultConversationEvents())
       );
+      // Free per-conversation atoms; a deleted conversation can never be reopened.
+      draftAtomFamily.remove(conversationId);
+      contextUsageAtomFamily.remove(conversationId);
     },
     [abortConversationRun, conversationStore, isConversationStoreLoaded, setConversationStore]
   );

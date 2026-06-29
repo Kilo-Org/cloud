@@ -390,9 +390,7 @@ async function mirrorToRedis(values: {
   }
   await Promise.all(entries.map(([key, value]) => redisClient.set(key, JSON.stringify(value))));
 
-  // Per-model existence markers let the routing hot path check "does this model
-  // exist at this gateway?" without re-reading and parsing the whole catalog
-  // above. Best-effort: the catalog blobs (and their DB-backed snapshot) remain
+  // Best-effort: the catalog blobs above (and their DB snapshot) stay
   // authoritative, so a marker-write failure must not fail the sync run.
   try {
     await Promise.all([

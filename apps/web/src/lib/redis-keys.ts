@@ -30,16 +30,8 @@ export const directByokModelsRedisKey = (providerId: DirectUserByokInferenceProv
   redisKey(`ai-gateway.metadata.direct-byok-models:${providerId}`);
 
 /**
- * Per-model "this model is routable at <gateway>" marker keys.
- *
- * Written for every routable language model during provider sync, these let the
- * routing hot path answer "does this model exist?" with a single tiny Redis read
- * instead of loading and zod-parsing the entire model catalog blob just to build
- * a membership Set.
- *
- * The markers carry a TTL (see `GATEWAY_MODEL_EXISTENCE_TTL_SECONDS`) so they
- * eventually expire when sync stops refreshing a removed model — sync runs never
- * delete markers explicitly.
+ * Per-model "this model is routable at <gateway>" marker keys, written for every
+ * routable language model during provider sync. See `gateway-model-existence.ts`.
  */
 export type GatewayModelExistenceProvider = 'openrouter' | 'vercel';
 

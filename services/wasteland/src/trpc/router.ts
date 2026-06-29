@@ -273,6 +273,7 @@ const WantedBoardBrowseInput = z.object({
 const WantedBoardCountsInput = z.object({
   wastelandId: z.string().uuid(),
   search: z.string().trim().min(1).max(200).optional(),
+  includeForkBranches: z.boolean().optional(),
 });
 
 export const wastelandRouter = router({
@@ -1064,6 +1065,7 @@ export const wastelandRouter = router({
       try {
         return await wantedBoard.getWantedBoardCounts(ctx.env, input.wastelandId, ctx.userId, {
           search: input.search,
+          includeForkBranches: input.includeForkBranches,
         });
       } catch (err) {
         if (err instanceof WantedBoardOpError && err.code === 'PRECONDITION_FAILED') {

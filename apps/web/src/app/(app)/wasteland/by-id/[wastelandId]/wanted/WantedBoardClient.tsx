@@ -252,8 +252,9 @@ export function WantedBoardClient({
     return {
       wastelandId,
       ...(trimmedSearch ? { search: trimmedSearch } : {}),
+      includeForkBranches: !isUpstream,
     };
-  }, [wastelandId, search]);
+  }, [wastelandId, search, isUpstream]);
 
   const wantedQuery = useQuery({
     ...trpc.wasteland.browseWantedBoard.queryOptions(wantedBoardInput),

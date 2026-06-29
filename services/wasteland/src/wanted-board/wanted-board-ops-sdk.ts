@@ -136,7 +136,7 @@ export async function getWantedBoardCounts(
   env: Env,
   wastelandId: string,
   userId: string,
-  options?: { search?: string }
+  options?: { search?: string; includeForkBranches?: boolean }
 ): Promise<WantedBoardCounts> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
   return countWantedBoardByStatusViaSdk(ctx, options);

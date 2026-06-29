@@ -188,6 +188,52 @@ describe('browseViaSdk', () => {
     expect(sql).toContain('GROUP BY status');
   });
 
+  it('counts fork branch overlays when requested', async () => {
+    const { fetch } = makeFetch([
+      readRows([
+        fixtureWantedRow({
+          id: 'w-1',
+          title: 'Visible task',
+          status: 'open',
+          updated_at: '2024-01-01 00:00:00',
+        }),
+      ]),
+      readRows([]),
+      readRows([]),
+      readRows([]),
+      readRows([]),
+      readRows([]),
+      {
+        status: 200,
+        body: { branches: [{ branch_name: 'wl/alice/w-1' }, { branch_name: 'wl/alice/w-2' }] },
+      },
+      readRows([
+        fixtureWantedRow({
+          id: 'w-1',
+          title: 'Visible task',
+          status: 'claimed',
+          updated_at: '2024-01-02 00:00:00',
+        }),
+      ]),
+      readRows([
+        fixtureWantedRow({
+          id: 'w-2',
+          title: 'Visible fork task',
+          status: 'in_review',
+          updated_at: '2024-01-02 00:00:00',
+        }),
+      ]),
+    ]);
+
+    const result = await countWantedBoardByStatusViaSdk(
+      baseCtx,
+      { search: 'visible', includeForkBranches: true },
+      fetch
+    );
+
+    expect(result).toMatchObject({ open: 0, claimed: 1, in_review: 1 });
+  });
+
   it('prefers fork row when a wl/<rig>/* branch is ahead of upstream main', async () => {
     // Fork wins only when its `updated_at` is strictly newer than the
     // upstream main row's — that's the SDK's "fork has fresh in-progress

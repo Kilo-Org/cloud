@@ -210,11 +210,43 @@ function buildCountsSql(search: string | undefined): string {
   return sql;
 }
 
+function rowMatchesSearch(row: Record<string, unknown>, search: string | undefined): boolean {
+  if (!search) return true;
+  const q = search.toLowerCase();
+  const toSearchText = (value: unknown) =>
+    typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+  return [row.title, row.description, row.tags].some(value =>
+    toSearchText(value).toLowerCase().includes(q)
+  );
+}
+
+function countRowsByStatus(
+  rows: Array<Record<string, unknown>>,
+  search: string | undefined
+): WantedBoardCounts {
+  const counts = zeroWantedBoardCounts();
+  for (const row of rows) {
+    if (!rowMatchesSearch(row, search)) continue;
+    const status = typeof row.status === 'string' ? row.status : null;
+    if (status !== null && status in counts) {
+      counts[status as keyof WantedBoardCounts] += 1;
+    }
+  }
+  return counts;
+}
+
 export async function countWantedBoardByStatusViaSdk(
   ctx: SdkContext,
-  options?: { search?: string },
+  options?: { search?: string; includeForkBranches?: boolean },
   fetchImpl?: typeof fetch
 ): Promise<WantedBoardCounts> {
+  if (options?.includeForkBranches) {
+    return countRowsByStatus(
+      await browseViaSdk(ctx, { includeForkBranches: true }, fetchImpl),
+      options.search
+    );
+  }
+
   const slash = ctx.upstream.indexOf('/');
   if (slash <= 0) {
     throw new WantedBoardOpError('Counts failed: upstream is invalid', 'PRECONDITION_FAILED');

@@ -9,7 +9,7 @@ export const WantedItemOutput = z.object({
   item_id: z.string(),
   title: z.string(),
   description: z.string(),
-  status: z.enum(['open', 'claimed', 'done']),
+  status: z.enum(['open', 'claimed', 'in_review', 'completed', 'validated', 'withdrawn']),
   priority: z.enum(['low', 'medium', 'high', 'critical']),
   type: z.enum(['feature', 'bug', 'docs', 'other']),
   claimed_by: z.string().nullable(),

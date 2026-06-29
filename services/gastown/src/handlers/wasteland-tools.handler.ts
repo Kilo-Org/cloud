@@ -33,6 +33,15 @@ const WastelandDoneBody = z.object({
   evidence: z.string().url(),
 });
 
+const WastelandWantedStatus = z.enum([
+  'open',
+  'claimed',
+  'in_review',
+  'completed',
+  'validated',
+  'withdrawn',
+]);
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /** Resolve the userId of the caller from the mayor auth middleware. */
@@ -94,9 +103,19 @@ export async function handleWastelandBrowse(c: Context<GastownEnv>, params: { to
 
   const statusRaw = c.req.query('status');
   const limitRaw = c.req.query('limit');
+  let status: z.infer<typeof WastelandWantedStatus> | undefined;
 
-  if (statusRaw && !['open', 'claimed', 'done'].includes(statusRaw)) {
-    return c.json(resError('Invalid status filter. Must be one of: open, claimed, done'), 400);
+  if (statusRaw) {
+    const parsed = WastelandWantedStatus.safeParse(statusRaw);
+    if (!parsed.success) {
+      return c.json(
+        resError(
+          `Invalid status filter. Must be one of: ${WastelandWantedStatus.options.join(', ')}`
+        ),
+        400
+      );
+    }
+    status = parsed.data;
   }
 
   const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
@@ -111,7 +130,7 @@ export async function handleWastelandBrowse(c: Context<GastownEnv>, params: { to
   const result = await c.env.WASTELAND_SERVICE.browseWantedBoard({
     wastelandId,
     userId,
-    status: statusRaw,
+    status,
     limit,
     includeForkBranches: false,
   });

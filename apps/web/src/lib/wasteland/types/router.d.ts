@@ -338,6 +338,7 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
       input: {
         wastelandId: string;
         search?: string;
+        includeForkBranches?: boolean;
       };
       output: {
         open: number;
@@ -1248,6 +1249,7 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
           input: {
             wastelandId: string;
             search?: string;
+            includeForkBranches?: boolean;
           };
           output: {
             open: number;

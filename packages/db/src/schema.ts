@@ -8651,7 +8651,9 @@ export const mcp_gateway_authorization_requests = pgTable(
   table => [
     uniqueIndex('UQ_mcp_gateway_authorization_requests_state_hash').on(table.request_state_hash),
     index('IDX_mcp_gateway_authorization_requests_config').on(table.config_id),
-    index('IDX_mcp_gateway_authorization_requests_grant').on(table.oauth_grant_id),
+    index('IDX_mcp_gateway_authorization_requests_grant')
+      .on(table.oauth_grant_id)
+      .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_authorization_requests_user').on(table.kilo_user_id),
     index('IDX_mcp_gateway_authorization_requests_expires_at').on(table.expires_at),
     enumCheck(
@@ -8717,7 +8719,9 @@ export const mcp_gateway_authorization_codes = pgTable(
     uniqueIndex('UQ_mcp_gateway_authorization_codes_code_hash').on(table.code_hash),
     index('IDX_mcp_gateway_authorization_codes_expires_at').on(table.expires_at),
     index('IDX_mcp_gateway_authorization_codes_client').on(table.oauth_client_id),
-    index('IDX_mcp_gateway_authorization_codes_grant').on(table.oauth_grant_id),
+    index('IDX_mcp_gateway_authorization_codes_grant')
+      .on(table.oauth_grant_id)
+      .where(isNotNull(table.oauth_grant_id)),
     enumCheck(
       'mcp_gateway_authorization_codes_owner_scope',
       table.owner_scope,
@@ -8767,7 +8771,9 @@ export const mcp_gateway_refresh_tokens = pgTable(
   table => [
     uniqueIndex('UQ_mcp_gateway_refresh_tokens_token_hash').on(table.token_hash),
     index('IDX_mcp_gateway_refresh_tokens_user').on(table.kilo_user_id),
-    index('IDX_mcp_gateway_refresh_tokens_grant').on(table.oauth_grant_id),
+    index('IDX_mcp_gateway_refresh_tokens_grant')
+      .on(table.oauth_grant_id)
+      .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_refresh_tokens_config').on(table.config_id),
     index('IDX_mcp_gateway_refresh_tokens_consumed_at').on(table.consumed_at),
     enumCheck('mcp_gateway_refresh_tokens_owner_scope', table.owner_scope, MCPGatewayOwnerScope),
@@ -8827,7 +8833,9 @@ export const mcp_gateway_pending_provider_authorizations = pgTable(
   table => [
     uniqueIndex('UQ_mcp_gateway_pending_provider_authorizations_state_hash').on(table.state_hash),
     index('IDX_mcp_gateway_pending_provider_authorizations_config').on(table.config_id),
-    index('IDX_mcp_gateway_pending_provider_authorizations_grant').on(table.oauth_grant_id),
+    index('IDX_mcp_gateway_pending_provider_authorizations_grant')
+      .on(table.oauth_grant_id)
+      .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_pending_provider_authorizations_expires_at').on(table.expires_at),
     check(
       'mcp_gateway_pending_provider_authorizations_config_version_positive',
@@ -8918,7 +8926,9 @@ export const mcp_gateway_audit_events = pgTable(
   },
   table => [
     index('IDX_mcp_gateway_audit_events_config').on(table.config_id),
-    index('IDX_mcp_gateway_audit_events_grant').on(table.oauth_grant_id),
+    index('IDX_mcp_gateway_audit_events_grant')
+      .on(table.oauth_grant_id)
+      .where(isNotNull(table.oauth_grant_id)),
     index('IDX_mcp_gateway_audit_events_owner').on(table.owner_scope, table.owner_id),
     index('IDX_mcp_gateway_audit_events_created_at').on(table.created_at),
     enumCheck('mcp_gateway_audit_events_owner_scope', table.owner_scope, MCPGatewayOwnerScope),

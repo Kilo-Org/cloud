@@ -614,6 +614,7 @@ export const AgentChatPanel = ({
           evictConversationAtoms(conversation.id);
         }
       }
+      conversationStoreRef.current = nextStore;
       setConversationStore(nextStore);
     },
     [isConversationStoreLoaded, setConversationStore, store]

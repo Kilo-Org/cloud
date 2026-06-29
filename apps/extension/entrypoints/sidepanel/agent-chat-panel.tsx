@@ -425,8 +425,10 @@ export const AgentChatPanel = ({
         updateThinkingBlock(conversationId, eventId, thinkingText);
       }
     };
+    let currentRunHasUsage = false;
     const updateRunUsage = (usage: { promptTokens: number }): void => {
       if (isCurrentRun()) {
+        currentRunHasUsage = true;
         store.set(contextUsageAtomFamily(conversationId), { promptTokens: usage.promptTokens });
       }
     };
@@ -473,7 +475,11 @@ export const AgentChatPanel = ({
           )?.contextLength;
           const ratio = getContextRatio(latest, runContextLength);
 
-          if (ratio !== undefined && ratio >= AUTO_COMPACT_RATIO) {
+          /*
+           * Only auto-compact off a usage value this run actually produced; a run that fails
+           * before any usage chunk would otherwise compact on the prior run's stale count.
+           */
+          if (currentRunHasUsage && ratio !== undefined && ratio >= AUTO_COMPACT_RATIO) {
             void compactConversation(conversationId);
           }
         }

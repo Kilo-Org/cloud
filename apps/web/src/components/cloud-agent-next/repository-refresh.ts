@@ -30,6 +30,12 @@ export function shouldIncludeBitbucketRepositoryRefresh(
   return status === 'available' || status === 'temporarily_unavailable';
 }
 
+export function shouldCacheBitbucketRepositoryRefreshResult(
+  status: BitbucketRepositoryRefreshStatus
+): boolean {
+  return status !== 'temporarily_unavailable';
+}
+
 export function getBitbucketRepositoryRefreshFailureMessage(
   status: Exclude<BitbucketRepositoryRefreshStatus, 'available'>
 ): string {

@@ -100,6 +100,7 @@ import {
 import {
   getBitbucketRepositoryRefreshFailureMessage,
   refreshSessionRepositories,
+  shouldCacheBitbucketRepositoryRefreshResult,
   shouldIncludeBitbucketRepositoryRefresh,
 } from '@/components/cloud-agent-next/repository-refresh';
 
@@ -723,13 +724,15 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
         forceRefresh: true,
       })
     );
-    queryClient.setQueryData(
-      trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
-        organizationId,
-        forceRefresh: false,
-      }),
-      result
-    );
+    if (shouldCacheBitbucketRepositoryRefreshResult(result.status)) {
+      queryClient.setQueryData(
+        trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({
+          organizationId,
+          forceRefresh: false,
+        }),
+        result
+      );
+    }
     void queryClient.invalidateQueries({
       queryKey: trpc.organizations.bitbucket.getStatus.queryKey({ organizationId }),
     });

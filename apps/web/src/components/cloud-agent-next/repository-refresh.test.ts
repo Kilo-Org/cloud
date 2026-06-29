@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import {
   refreshSessionRepositories,
+  shouldCacheBitbucketRepositoryRefreshResult,
   shouldIncludeBitbucketRepositoryRefresh,
 } from './repository-refresh';
 
@@ -26,5 +27,11 @@ describe('refreshSessionRepositories', () => {
     expect(shouldIncludeBitbucketRepositoryRefresh('temporarily_unavailable')).toBe(true);
     expect(shouldIncludeBitbucketRepositoryRefresh('not_connected')).toBe(false);
     expect(shouldIncludeBitbucketRepositoryRefresh(undefined)).toBe(false);
+  });
+
+  it('preserves cached Bitbucket repositories during temporary provider outages', () => {
+    expect(shouldCacheBitbucketRepositoryRefreshResult('available')).toBe(true);
+    expect(shouldCacheBitbucketRepositoryRefreshResult('reconnect_required')).toBe(true);
+    expect(shouldCacheBitbucketRepositoryRefreshResult('temporarily_unavailable')).toBe(false);
   });
 });

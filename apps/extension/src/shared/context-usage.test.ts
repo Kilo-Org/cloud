@@ -29,4 +29,8 @@ describe('context summary formatting', () => {
   it('omits percent without a context length', () => {
     expect(formatContextSummary(1200, undefined as number | undefined)).toBe('1,200 tokens');
   });
+
+  it('caps the percent at 100% when tokens exceed the window', () => {
+    expect(formatContextSummary(300_000, 200_000)).toBe('300,000 / 200,000 tokens (100%)');
+  });
 });

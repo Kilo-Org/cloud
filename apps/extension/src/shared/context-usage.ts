@@ -39,7 +39,7 @@ export const formatContextSummary = (
     return `${formatCount(promptTokens)} tokens`;
   }
 
-  // Clamp keeps a malformed (e.g. NaN) promptTokens from rendering as "NaN%".
+  // Clamp caps the displayed percent at 100% when prompt tokens exceed the context window.
   const percent = Math.round(clamp01(promptTokens / contextLength) * 100);
 
   return `${formatCount(promptTokens)} / ${formatCount(contextLength)} tokens (${percent}%)`;

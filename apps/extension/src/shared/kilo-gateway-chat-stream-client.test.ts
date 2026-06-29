@@ -476,9 +476,7 @@ describe('kilo gateway chat stream client', () => {
     const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
 
     expect(completion.usage).toStrictEqual({
-      completionTokens: 34,
       promptTokens: 1200,
-      totalTokens: 1234,
     });
   });
 });

@@ -87,9 +87,7 @@ describe('agent LLM turn runner core', () => {
     });
 
     expect(usageCalls).toContainEqual({
-      completionTokens: 5,
       promptTokens: 999,
-      totalTokens: 1004,
     });
   });
 

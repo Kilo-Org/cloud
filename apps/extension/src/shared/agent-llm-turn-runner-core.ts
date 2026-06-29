@@ -10,9 +10,7 @@ import type { EvalTabResult } from './tab-debugger';
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
 
 export interface TurnUsage {
-  readonly completionTokens: number;
   readonly promptTokens: number;
-  readonly totalTokens: number;
 }
 
 export type OnTurnUsage = (usage: TurnUsage) => void;

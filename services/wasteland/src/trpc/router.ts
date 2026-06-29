@@ -28,6 +28,7 @@ import {
   RpcWastelandConfigOutput,
   RpcWastelandCredentialStatusOutput,
   RpcConnectedTownOutput,
+  RpcWantedBoardCountsOutput,
   RpcWantedBoardRowOutput,
   RpcInboxItemOutput,
   RpcUpstreamAdminVerifyOutput,
@@ -250,6 +251,29 @@ async function requireOwnerAccess(env: Env, ctx: TRPCContext, wastelandId: strin
 }
 
 // ── Router ─────────────────────────────────────────────────────────────
+
+const WantedBoardStatusInput = z.enum([
+  'open',
+  'claimed',
+  'in_review',
+  'completed',
+  'validated',
+  'withdrawn',
+]);
+
+const WantedBoardBrowseInput = z.object({
+  wastelandId: z.string().uuid(),
+  status: WantedBoardStatusInput.optional(),
+  search: z.string().trim().min(1).max(200).optional(),
+  sort: z.enum(['priority', 'activity']).optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+  includeForkBranches: z.boolean().optional(),
+});
+
+const WantedBoardCountsInput = z.object({
+  wastelandId: z.string().uuid(),
+  search: z.string().trim().min(1).max(200).optional(),
+});
 
 export const wastelandRouter = router({
   // ── Create ──────────────────────────────────────────────────────────
@@ -1005,16 +1029,52 @@ export const wastelandRouter = router({
   // ── Wanted Board ──────────────────────────────────────────────────
 
   browseWantedBoard: procedure
-    .input(z.object({ wastelandId: z.string().uuid() }))
+    .input(WantedBoardBrowseInput)
     .output(z.array(RpcWantedBoardRowOutput))
     .query(async ({ ctx, input }) => {
       await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
       try {
-        return await wantedBoard.browseWantedBoard(ctx.env, input.wastelandId, ctx.userId);
+        const filter =
+          input.status || input.search || input.sort || input.limit
+            ? {
+                status: input.status,
+                search: input.search,
+                sort: input.sort,
+                limit: input.limit,
+              }
+            : undefined;
+        return await wantedBoard.browseWantedBoard(ctx.env, input.wastelandId, ctx.userId, {
+          filter,
+          includeForkBranches: input.includeForkBranches,
+        });
       } catch (err) {
         // Browse degrades to empty list if not yet configured
         if (err instanceof WantedBoardOpError && err.code === 'PRECONDITION_FAILED') {
           return [];
+        }
+        return wantedBoardErrorToTRPC(err);
+      }
+    }),
+
+  getWantedBoardCounts: procedure
+    .input(WantedBoardCountsInput)
+    .output(RpcWantedBoardCountsOutput)
+    .query(async ({ ctx, input }) => {
+      await resolveWastelandOwnership(ctx.env, ctx, input.wastelandId);
+      try {
+        return await wantedBoard.getWantedBoardCounts(ctx.env, input.wastelandId, ctx.userId, {
+          search: input.search,
+        });
+      } catch (err) {
+        if (err instanceof WantedBoardOpError && err.code === 'PRECONDITION_FAILED') {
+          return {
+            open: 0,
+            claimed: 0,
+            in_review: 0,
+            completed: 0,
+            validated: 0,
+            withdrawn: 0,
+          };
         }
         return wantedBoardErrorToTRPC(err);
       }

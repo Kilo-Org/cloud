@@ -32,8 +32,29 @@ function wrap<T>(fn: () => Promise<T>): Promise<WastelandRpcResult<T>> {
 }
 
 export class WastelandRPCEntrypoint extends WorkerEntrypoint<Env> {
-  async browseWantedBoard(params: { wastelandId: string; userId: string }) {
-    return wrap(() => wantedBoard.browseWantedBoard(this.env, params.wastelandId, params.userId));
+  async browseWantedBoard(params: {
+    wastelandId: string;
+    userId: string;
+    status?: string;
+    search?: string;
+    sort?: 'priority' | 'activity';
+    limit?: number;
+    includeForkBranches?: boolean;
+  }) {
+    return wrap(() =>
+      wantedBoard.browseWantedBoard(this.env, params.wastelandId, params.userId, {
+        filter:
+          params.status || params.search || params.sort || params.limit
+            ? {
+                status: params.status,
+                search: params.search,
+                sort: params.sort,
+                limit: params.limit,
+              }
+            : undefined,
+        includeForkBranches: params.includeForkBranches,
+      })
+    );
   }
 
   async claimWantedItem(params: {

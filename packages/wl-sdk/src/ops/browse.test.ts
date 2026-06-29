@@ -151,6 +151,30 @@ describe('browse', () => {
     expect(decodeURIComponent(calls[0].url)).toContain('LIMIT 10');
   });
 
+  it('supports activity sorting and skipping fork branch overlay reads', async () => {
+    const { fetch: f, calls } = makeFetch([
+      {
+        status: 200,
+        body: { query_execution_status: 'Success', rows: [] },
+      },
+    ]);
+    const result = await browse({
+      auth: { token: 't' },
+      upstream: { owner: 'hop', db: 'wl' },
+      fork: { forkOwner: 'alice', forkDb: 'wl' },
+      rigHandle: 'alice',
+      filter: { status: 'open', sort: 'activity', limit: 50 },
+      includeForkBranches: false,
+      fetch: f,
+    });
+    expect(result.ok).toBe(true);
+    expect(calls).toHaveLength(1);
+    const sql = decodeURIComponent(calls[0].url);
+    expect(sql).toContain("status = 'open'");
+    expect(sql).toContain('ORDER BY COALESCE(updated_at, created_at) DESC, created_at DESC');
+    expect(sql).toContain('LIMIT 50');
+  });
+
   it('applies search filter as a literal substring match', async () => {
     const { fetch: f, calls } = makeFetch([
       {

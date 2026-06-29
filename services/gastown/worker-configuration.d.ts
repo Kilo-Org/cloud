@@ -27,10 +27,15 @@ type WastelandRpcFailure = {
 };
 type WastelandRpcResult<T> = WastelandRpcSuccess<T> | WastelandRpcFailure;
 type WastelandService = {
-	browseWantedBoard(params: {
-		wastelandId: string;
-		userId: string;
-	}): Promise<WastelandRpcResult<Array<Record<string, unknown>>>>;
+		browseWantedBoard(params: {
+			wastelandId: string;
+			userId: string;
+			status?: string;
+			search?: string;
+			sort?: 'priority' | 'activity';
+			limit?: number;
+			includeForkBranches?: boolean;
+		}): Promise<WastelandRpcResult<Array<Record<string, unknown>>>>;
 	claimWantedItem(params: {
 		wastelandId: string;
 		userId: string;

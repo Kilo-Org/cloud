@@ -20,6 +20,7 @@ import {
   acceptViaSdk,
   browseViaSdk,
   claimViaSdk,
+  countWantedBoardByStatusViaSdk,
   closeViaSdk,
   doneViaSdk,
   postViaSdk,
@@ -147,6 +148,44 @@ describe('browseViaSdk', () => {
     // Subsequent fetch lists branches on the fork.
     const branchListCall = calls.find(c => c.url.includes('/alice/wl/branches'));
     expect(branchListCall).toBeDefined();
+  });
+
+  it('passes filtered fast-list options to the SDK browse path', async () => {
+    const { fetch, calls } = makeFetch([readRows([fixtureWantedRow({ id: 'w-1' })])]);
+
+    const result = await browseViaSdk(
+      baseCtx,
+      {
+        filter: { status: 'open', sort: 'activity', limit: 50 },
+        includeForkBranches: false,
+      },
+      fetch
+    );
+
+    expect(result).toHaveLength(1);
+    expect(calls).toHaveLength(1);
+    const sql = decodeURIComponent(calls[0].url);
+    expect(sql).toContain("status = 'open'");
+    expect(sql).toContain('ORDER BY COALESCE(updated_at, created_at) DESC, created_at DESC');
+    expect(sql).toContain('LIMIT 50');
+  });
+
+  it('counts upstream wanted rows by status', async () => {
+    const { fetch, calls } = makeFetch([
+      readRows([
+        { status: 'open', item_count: '12' },
+        { status: 'claimed', item_count: 3 },
+        { status: 'completed', item_count: '9' },
+      ]),
+    ]);
+
+    const result = await countWantedBoardByStatusViaSdk(baseCtx, { search: "bob's" }, fetch);
+
+    expect(result).toMatchObject({ open: 12, claimed: 3, completed: 9, in_review: 0 });
+    const sql = decodeURIComponent(calls[0].url);
+    expect(sql).toContain('SELECT status, COUNT(*) AS item_count FROM wanted');
+    expect(sql).toContain("INSTR(title, 'bob''s') > 0");
+    expect(sql).toContain('GROUP BY status');
   });
 
   it('prefers fork row when a wl/<rig>/* branch is ahead of upstream main', async () => {

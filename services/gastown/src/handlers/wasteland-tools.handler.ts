@@ -111,21 +111,16 @@ export async function handleWastelandBrowse(c: Context<GastownEnv>, params: { to
   const result = await c.env.WASTELAND_SERVICE.browseWantedBoard({
     wastelandId,
     userId,
+    status: statusRaw,
+    limit,
+    includeForkBranches: false,
   });
 
   if (!result.success) {
     return wastelandFailureToResponse(c, result);
   }
 
-  let items = result.data;
-  if (statusRaw) {
-    items = items.filter(item => item.status === statusRaw);
-  }
-  if (limit !== undefined) {
-    items = items.slice(0, limit);
-  }
-
-  return c.json(resSuccess(items));
+  return c.json(resSuccess(result.data));
 }
 
 /**

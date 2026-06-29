@@ -350,8 +350,10 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         };
 
         const existingConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
+        let didChange = false;
         if (existingConfig) {
           await setAgentEnabled(input.organizationId, 'code_review', platform, input.isEnabled);
+          didChange = true;
         } else if (input.isEnabled) {
           await upsertAgentConfig({
             organizationId: input.organizationId,
@@ -361,18 +363,22 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             createdBy: ctx.user.id,
             config: createDefaultCodeReviewConfig(),
           });
+          didChange = true;
         }
         await clearCodeReviewActionRequiredState({ owner, platform });
 
-        // Audit log
-        await createAuditLog({
-          organization_id: input.organizationId,
-          action: 'organization.settings.change',
-          actor_id: ctx.user.id,
-          actor_email: ctx.user.google_user_email,
-          actor_name: ctx.user.google_user_name,
-          message: `${input.isEnabled ? 'Enabled' : 'Disabled'} AI Code Review Agent for ${platform}`,
-        });
+        // Only audit a real state transition. Disabling a platform that never
+        // had a config row is a no-op and must not log a false "Disabled" event.
+        if (didChange) {
+          await createAuditLog({
+            organization_id: input.organizationId,
+            action: 'organization.settings.change',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            message: `${input.isEnabled ? 'Enabled' : 'Disabled'} AI Code Review Agent for ${platform}`,
+          });
+        }
 
         return { success: true, isEnabled: input.isEnabled };
       } catch (error) {

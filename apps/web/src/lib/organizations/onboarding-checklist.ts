@@ -171,20 +171,23 @@ async function hasHumanMemberOtherThanCreator(
  * The team step is satisfied by a pending invitation, or by a second human
  * having joined. When the creator is known we only need one human besides them;
  * when the creator is unknown we require at least two humans overall.
+ *
+ * The invitation and membership checks are independent, so we run them
+ * concurrently to keep this off the critical path of a single round-trip.
  */
 async function hasInvitedTeam(organization: {
   id: string;
   createdByKiloUserId: string | null;
 }): Promise<boolean> {
-  if (await hasPendingInvitation(organization.id)) {
-    return true;
-  }
+  const { id, createdByKiloUserId } = organization;
+  const [pendingInvitation, hasQualifyingMembers] = await Promise.all([
+    hasPendingInvitation(id),
+    createdByKiloUserId !== null
+      ? hasHumanMemberOtherThanCreator(id, createdByKiloUserId)
+      : countHumanMembers(id).then(humanMemberCount => humanMemberCount >= 2),
+  ]);
 
-  if (organization.createdByKiloUserId !== null) {
-    return hasHumanMemberOtherThanCreator(organization.id, organization.createdByKiloUserId);
-  }
-
-  return (await countHumanMembers(organization.id)) >= 2;
+  return pendingInvitation || hasQualifyingMembers;
 }
 
 export async function getOrganizationOnboardingState(

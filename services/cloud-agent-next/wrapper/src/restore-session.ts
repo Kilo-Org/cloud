@@ -378,10 +378,6 @@ function tokenSanitizationTempPath(snapshotPath: string): string {
   );
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 async function sanitizeSnapshotTokenCountsWithJq(
   snapshotPath: string,
   signal?: AbortSignal
@@ -413,94 +409,11 @@ async function sanitizeSnapshotTokenCountsWithJq(
   }
 }
 
-function clampNegativeTokenCountNumbers(value: unknown): number {
-  let clamped = 0;
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index++) {
-      const item = value[index];
-      if (typeof item === 'number' && item < 0) {
-        value[index] = 0;
-        clamped++;
-      } else {
-        clamped += clampNegativeTokenCountNumbers(item);
-      }
-    }
-    return clamped;
-  }
-
-  if (!isRecord(value)) return 0;
-
-  for (const [key, item] of Object.entries(value)) {
-    if (typeof item === 'number' && item < 0) {
-      value[key] = 0;
-      clamped++;
-    } else {
-      clamped += clampNegativeTokenCountNumbers(item);
-    }
-  }
-  return clamped;
-}
-
-function sanitizeSnapshotTokenCountsValue(value: unknown): number {
-  let clamped = 0;
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      clamped += sanitizeSnapshotTokenCountsValue(item);
-    }
-    return clamped;
-  }
-
-  if (!isRecord(value)) return 0;
-
-  for (const [key, item] of Object.entries(value)) {
-    if (key === 'tokens' && typeof item === 'object' && item !== null) {
-      clamped += clampNegativeTokenCountNumbers(item);
-      continue;
-    }
-    clamped += sanitizeSnapshotTokenCountsValue(item);
-  }
-  return clamped;
-}
-
-async function sanitizeSnapshotTokenCountsWithBun(
-  snapshotPath: string,
-  signal?: AbortSignal
-): Promise<boolean> {
-  let parsed: unknown;
-  try {
-    signal?.throwIfAborted();
-    parsed = await Bun.file(snapshotPath).json();
-    signal?.throwIfAborted();
-  } catch {
-    signal?.throwIfAborted();
-    log('snapshot_token_sanitization_parse_failed');
-    return false;
-  }
-
-  const clamped = sanitizeSnapshotTokenCountsValue(parsed);
-  if (clamped === 0) return true;
-
-  try {
-    signal?.throwIfAborted();
-    await Bun.write(snapshotPath, JSON.stringify(parsed));
-    signal?.throwIfAborted();
-    return true;
-  } catch {
-    signal?.throwIfAborted();
-    log('snapshot_token_sanitization_write_failed');
-    return false;
-  }
-}
-
 async function sanitizeSnapshotTokenCounts(
   snapshotPath: string,
   signal?: AbortSignal
 ): Promise<void> {
   if (await sanitizeSnapshotTokenCountsWithJq(snapshotPath, signal)) {
-    log('snapshot token counts sanitized');
-    return;
-  }
-  if (await sanitizeSnapshotTokenCountsWithBun(snapshotPath, signal)) {
     log('snapshot token counts sanitized');
     return;
   }

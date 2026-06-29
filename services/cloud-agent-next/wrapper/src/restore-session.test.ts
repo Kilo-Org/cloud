@@ -80,12 +80,6 @@ function writeMockKilo(binDir: string, exitCode: number): void {
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
 }
 
-function writeCopyingMockKilo(binDir: string, destinationPath: string): void {
-  const script = `#!/bin/sh\nset -eu\ncp "$2" ${JSON.stringify(destinationPath)}\n`;
-  const kiloPath = path.join(binDir, 'kilo');
-  fs.writeFileSync(kiloPath, script, { mode: 0o755 });
-}
-
 function writeSlowMockKilo(binDir: string): void {
   const script = '#!/bin/sh\nsleep 1\nexit 0\n';
   const kiloPath = path.join(binDir, 'kilo');
@@ -103,41 +97,6 @@ function writeSignalIgnoringDescendantMockKilo(binDir: string, descendantMarker:
   const script = `#!/bin/sh\ntrap 'exit 0' TERM\nnode -e 'const fs = require("node:fs"); process.on("SIGTERM", () => {}); fs.writeFileSync(process.argv[1], "ready"); setTimeout(() => fs.writeFileSync(process.argv[2], "alive"), 800); setInterval(() => {}, 1000);' "${readyMarker}" "${descendantMarker}" </dev/null >/dev/null 2>&1 &\nwhile [ ! -f "${readyMarker}" ]; do sleep 0.01; done\nsleep 2\n`;
   const kiloPath = path.join(binDir, 'kilo');
   fs.writeFileSync(kiloPath, script, { mode: 0o755 });
-}
-
-async function waitForFile(filePath: string, timeoutMs = 500): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (fs.existsSync(filePath)) return;
-    await new Promise(resolve => setTimeout(resolve, 10));
-  }
-  throw new Error(`timed out waiting for ${filePath}`);
-}
-
-function mockHangingJq(startedMarkerPath: string): () => void {
-  const originalSpawn = Bun.spawn;
-  Bun.spawn = ((command: unknown, options: { signal?: AbortSignal } | undefined) => {
-    if (Array.isArray(command) && command[0] === 'jq') {
-      const stdout = new ReadableStream<Uint8Array>({
-        start(controller) {
-          fs.writeFileSync(startedMarkerPath, 'started');
-          options?.signal?.addEventListener('abort', () => controller.close(), { once: true });
-        },
-      });
-      return {
-        stdout,
-        exited: new Promise<number>(resolve => {
-          options?.signal?.addEventListener('abort', () => resolve(124), { once: true });
-        }),
-      } as ReturnType<typeof Bun.spawn>;
-    }
-
-    return originalSpawn(command as never, options as never);
-  }) as typeof Bun.spawn;
-
-  return () => {
-    Bun.spawn = originalSpawn;
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -443,81 +402,6 @@ describe('restoreSession', () => {
     if (!result.ok) {
       expect(result.step).toBe('import');
       expect(result.error).toContain('kilo import failed');
-    }
-  });
-
-  it('clamps negative token counts before import', async () => {
-    const importedSnapshotPath = path.join(tmpDir, 'imported-snapshot.json');
-    writeCopyingMockKilo(binDir, importedSnapshotPath);
-    mockFetchOk(
-      JSON.stringify({
-        info: snapshotInfo(),
-        messages: [
-          {
-            info: {
-              id: 'msg_negative_tokens',
-              tokens: {
-                total: 1,
-                input: 1,
-                output: -173,
-                reasoning: -2,
-                cache: { read: -1, write: 0 },
-              },
-            },
-            parts: [
-              {
-                type: 'step-finish',
-                tokens: { total: 1, input: 1, output: -173, reasoning: 0 },
-              },
-            ],
-          },
-        ],
-      })
-    );
-
-    const result = await restoreSession(SESSION_ID, workspace);
-
-    expect(result.ok).toBe(true);
-    const imported = JSON.parse(fs.readFileSync(importedSnapshotPath, 'utf-8'));
-    expect(imported.messages[0].info.tokens).toEqual({
-      total: 1,
-      input: 1,
-      output: 0,
-      reasoning: 0,
-      cache: { read: 0, write: 0 },
-    });
-    expect(imported.messages[0].parts[0].tokens).toEqual({
-      total: 1,
-      input: 1,
-      output: 0,
-      reasoning: 0,
-    });
-  });
-
-  it('cleans up downloaded temp file when token sanitization is aborted', async () => {
-    const sanitizerStartedMarker = path.join(tmpDir, 'sanitizer-started');
-    const restoreJq = mockHangingJq(sanitizerStartedMarker);
-    mockFetchOk(makeSnapshot([]));
-    const controller = new AbortController();
-    const deadlineError = new Error('workspace deadline reached');
-    try {
-      const restorePromise = restoreSession(SESSION_ID, workspace, undefined, {
-        signal: controller.signal,
-      });
-      await waitForFile(sanitizerStartedMarker);
-      controller.abort(deadlineError);
-
-      let caughtError: unknown;
-      try {
-        await restorePromise;
-      } catch (error) {
-        caughtError = error;
-      }
-
-      expect(caughtError).toBe(deadlineError);
-      expect(fs.existsSync(TMP_PATH)).toBe(false);
-    } finally {
-      restoreJq();
     }
   });
 

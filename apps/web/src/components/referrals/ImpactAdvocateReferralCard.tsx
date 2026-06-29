@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle } from 'lucide-react';
-import { createElement, useEffect, useState } from 'react';
+import React, { createElement, useEffect, useState } from 'react';
 
 import {
   buildImpactAdvocateTokenUrl,

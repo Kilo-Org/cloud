@@ -56,8 +56,7 @@ import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-
 import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
 import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
-
-const MIN_BALANCE_DOLLARS = 1;
+import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -572,11 +571,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
       const { balance } = await getBalanceForOrganizationUser(input.organizationId, ctx.user.id);
-      return {
-        balance,
-        minBalance: MIN_BALANCE_DOLLARS,
-        isEligible: balance >= MIN_BALANCE_DOLLARS,
-      };
+      return buildCloudAgentNextEligibility(balance);
     }),
 
   /**

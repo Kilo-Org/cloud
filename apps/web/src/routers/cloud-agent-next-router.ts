@@ -48,8 +48,7 @@ import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session
 import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
 import { getBalanceForUser } from '@/lib/user/balance';
-
-const MIN_BALANCE_DOLLARS = 1;
+import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -395,11 +394,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
   checkEligibility: baseProcedure.query(async ({ ctx }) => {
     const { balance } = await getBalanceForUser(ctx.user);
-    return {
-      balance,
-      minBalance: MIN_BALANCE_DOLLARS,
-      isEligible: balance >= MIN_BALANCE_DOLLARS,
-    };
+    return buildCloudAgentNextEligibility(balance);
   }),
 
   /**

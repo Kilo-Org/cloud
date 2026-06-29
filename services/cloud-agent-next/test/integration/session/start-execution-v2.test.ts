@@ -101,6 +101,41 @@ describe('CloudAgentSession message admission', () => {
     expect(result.pending[0]?.intent?.turn).toMatchObject({ attachments });
   });
 
+  it('rejects registration metadata with an untyped repository', async () => {
+    const userId = 'user_untyped_repository' as const;
+    const sessionId = 'agent_untyped_repository' as const;
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      const registration = await instance.registerSession({
+        ...groupedRegisterSessionInput({
+          sessionId,
+          userId,
+          prompt: 'review PR 4273',
+          mode: 'code',
+          model: 'test-model',
+          kiloSessionId: '31313131-3131-4131-9131-313131313131',
+          kilocodeToken: 'token-untyped-repository',
+        }),
+        repository: {
+          repo: 'Kilo-Org/cloud',
+          branch: 'refs/pull/4273/head',
+        } as any,
+      });
+      const metadata = await instance.getMetadata();
+
+      return { registration, metadata };
+    });
+
+    expect(result.registration).toEqual({
+      success: false,
+      error: 'Invalid metadata: repository.type must be github, gitlab, bitbucket, or git',
+    });
+    expect(result.metadata).toBeNull();
+  });
+
   it('surfaces initial admission failure after retaining registered DO metadata', async () => {
     const userId = 'user_grouped_start_failure' as const;
     const sessionId = 'agent_grouped_start_failure' as const;

@@ -751,6 +751,46 @@ describe('prepareReviewPayload', () => {
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });
 
+  it('builds typed GitHub cloud-agent input for Kilo-Org/cloud PR 4273', async () => {
+    const repo = 'Kilo-Org/cloud';
+    const prNumber = 4273;
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, integration.id, {
+          repo_full_name: repo,
+          pr_number: prNumber,
+          pr_url: `https://github.com/${repo}/pull/${prNumber}`,
+          head_ref: 'chore/local-testing-code-reviews',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected inserted review');
+    }
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: {
+        type: 'user',
+        id: testUser.id,
+        userId: testUser.id,
+      },
+      agentConfig: {
+        config: baseAgentConfig,
+      },
+      platform: 'github',
+    });
+
+    expect(payload.sessionInput).toMatchObject({
+      githubRepo: repo,
+      platform: 'github',
+      upstreamBranch: 'refs/pull/4273/head',
+    });
+    expect(payload.sessionInput).not.toHaveProperty('repository');
+  });
+
   it('does not continue previous cloud-agent sessions for GitHub pull-ref reviews', async () => {
     const prNumber = 1235;
     mockFindPreviousCompletedReview.mockResolvedValueOnce({

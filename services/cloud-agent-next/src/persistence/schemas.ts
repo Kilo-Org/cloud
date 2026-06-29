@@ -100,13 +100,24 @@ export const EncryptedSecretsSchema = z
 
 export type EncryptedSecrets = z.infer<typeof EncryptedSecretsSchema>;
 
-const gitBranchForbiddenCharacterPattern = /[\x00-\x20\x7f~^:?*\[\\']/;
+const forbiddenGitBranchCharacters = new Set(['~', '^', ':', '?', '*', '[', '\\', "'"]);
+
+function containsForbiddenGitBranchCharacter(value: string): boolean {
+  for (const character of value) {
+    const charCode = character.charCodeAt(0);
+    if (charCode <= 32 || charCode === 127 || forbiddenGitBranchCharacters.has(character)) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 function isShellSafeGitBranchName(value: string): boolean {
   if (value === '@') return false;
   if (value.startsWith('-') || value.startsWith('/') || value.endsWith('/')) return false;
   if (value.endsWith('.') || value.includes('..') || value.includes('//')) return false;
-  if (value.includes('@{') || gitBranchForbiddenCharacterPattern.test(value)) return false;
+  if (value.includes('@{') || containsForbiddenGitBranchCharacter(value)) return false;
 
   return value
     .split('/')

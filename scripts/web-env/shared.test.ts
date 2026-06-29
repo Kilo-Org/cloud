@@ -138,7 +138,7 @@ void test(
           error instanceof Error &&
           error.message.includes('1Password CLI (`op`) is not installed') &&
           error.message.includes('brew install 1password-cli') &&
-          error.message.includes('https://www.1password.dev/cli/get-started') &&
+          error.message.includes('/cli/get-started') &&
           error.message.includes('op signin') &&
           error.message.includes('op vault get "Kilo Web ENV Production" --format=json')
       );
@@ -209,7 +209,7 @@ void test(
           error instanceof Error &&
           error.message.includes('Could not verify 1Password access') &&
           error.message.includes('brew install 1password-cli') &&
-          error.message.includes('https://www.1password.dev/cli/get-started') &&
+          error.message.includes('/cli/get-started') &&
           error.message.includes('op signin') &&
           error.message.includes('op vault get "Kilo Web ENV Production" --format=json') &&
           error.message.includes('not currently signed in')

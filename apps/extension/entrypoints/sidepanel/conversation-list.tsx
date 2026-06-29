@@ -88,36 +88,6 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
     }
   }, []);
 
-  // Drive the scroll to the bottom directly on the DOM node across a few frames so late virtualizer row measurements cannot leave us short. Every pass re-checks the stuck flag, so a user scroll-up that flips it stops the chain immediately.
-  const pinToBottom = useCallback((): void => {
-    cancelPin();
-
-    const runPass = (remainingPasses: number): void => {
-      const element = listRef.current;
-
-      if (element === null || !isStuckToBottomRef.current || items.length === 0) {
-        pinFrameRef.current = null;
-        return;
-      }
-
-      virtualizer.scrollToIndex(items.length - 1, { align: 'end' });
-      element.scrollTop = element.scrollHeight;
-      lastPinnedTopRef.current = element.scrollTop;
-      lastScrollTopRef.current = element.scrollTop;
-
-      if (remainingPasses > 0) {
-        pinFrameRef.current = requestAnimationFrame(() => {
-          runPass(remainingPasses - 1);
-        });
-        return;
-      }
-
-      pinFrameRef.current = null;
-    };
-
-    runPass(5);
-  }, [cancelPin, items.length, virtualizer]);
-
   const releaseToManualScroll = useCallback((): void => {
     if (!isStuckToBottomRef.current) {
       return;
@@ -136,6 +106,49 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
     isStuckToBottomRef.current = true;
     setShowJumpButton(false);
   }, []);
+
+  // Pin to the bottom across a few frames so late virtualizer measurements cannot leave us short. An auto-pin (force false) bails when the position sits above the last pin: a scrollbar drag's scroll event can coalesce with our pin write so handleScroll misses it, but sampling scrollTop here catches the upward move and releases instead of yanking the view back.
+  const pinToBottom = useCallback(
+    (force = false): void => {
+      cancelPin();
+
+      const runPass = (remainingPasses: number, allowRelease: boolean): void => {
+        const element = listRef.current;
+
+        if (element === null || !isStuckToBottomRef.current || items.length === 0) {
+          pinFrameRef.current = null;
+          return;
+        }
+
+        if (
+          allowRelease &&
+          lastPinnedTopRef.current - element.scrollTop > 16 &&
+          !isScrolledToBottom(element)
+        ) {
+          releaseToManualScroll();
+          return;
+        }
+
+        virtualizer.scrollToIndex(items.length - 1, { align: 'end' });
+        element.scrollTop = element.scrollHeight;
+        lastPinnedTopRef.current = element.scrollTop;
+        lastScrollTopRef.current = element.scrollTop;
+
+        if (remainingPasses > 0) {
+          pinFrameRef.current = requestAnimationFrame(() => {
+            runPass(remainingPasses - 1, true);
+          });
+          return;
+        }
+
+        pinFrameRef.current = null;
+      };
+
+      // A forced pin (jump-to-latest) re-pins from wherever the user is, so it skips the release check on its first pass; later passes re-enable it once the fresh baseline is set.
+      runPass(5, !force);
+    },
+    [cancelPin, items.length, releaseToManualScroll, virtualizer]
+  );
 
   // Bind scroll detection straight to the DOM node so upward intent is seen on the input event itself, before any in-flight pin can write the position back to the bottom.
   useEffect(() => {
@@ -209,7 +222,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
 
   const jumpToLatest = (): void => {
     followBottomAgain();
-    pinToBottom();
+    pinToBottom(true);
   };
   const virtualItems = virtualizer.getVirtualItems();
 

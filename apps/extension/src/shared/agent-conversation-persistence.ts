@@ -3,7 +3,7 @@ import type { AgentConversationEvent } from './agent-conversation';
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
 
-const isViewportScreenshotValue = (
+export const isViewportScreenshotValue = (
   value: unknown
 ): value is { readonly mediaType: string; readonly dataUrl: string } =>
   typeof value === 'object' &&

@@ -1,5 +1,6 @@
 import { createAssistantMessage } from './agent-conversation';
 import type { AgentConversationEvent } from './agent-conversation';
+import { isViewportScreenshotValue } from './agent-conversation-persistence';
 import type { FetchLike } from './auth';
 import { fetchKiloGatewayChatCompletionStream } from './kilo-api-client';
 import type { KiloGatewayChatMessage } from './kilo-gateway-chat-client';
@@ -92,10 +93,17 @@ const renderEvent = (event: AgentConversationEvent): string | undefined => {
         return `Tool result (error): ${event.error ?? 'unknown error'}`;
       }
 
+      if (event.value === undefined) {
+        return 'Tool result (ok)';
+      }
+
+      // A screenshot value is a base64 data URL; keep a placeholder out of the summary, not the PNG.
+      if (isViewportScreenshotValue(event.value)) {
+        return `Tool result (ok): [${event.value.mediaType} screenshot omitted]`;
+      }
+
       // The result payload (snapshot text, eval return, element details) is often the only record.
-      return event.value === undefined
-        ? 'Tool result (ok)'
-        : `Tool result (ok): ${truncateToolText(stringifyToolValue(event.value))}`;
+      return `Tool result (ok): ${truncateToolText(stringifyToolValue(event.value))}`;
     }
   }
 };

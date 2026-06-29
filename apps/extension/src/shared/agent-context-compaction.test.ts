@@ -84,6 +84,19 @@ describe('render events as transcript', () => {
     expect(text).toContain('Tool result (error): boom');
   });
 
+  it('omits screenshot data URLs instead of dumping base64 into the transcript', () => {
+    const dataUrl = `data:image/png;base64,${'A'.repeat(5000)}`;
+    const text = renderEventsAsTranscript([
+      createToolResult({
+        ok: true,
+        toolCallId: 'call-1',
+        value: { dataUrl, mediaType: 'image/png' },
+      }),
+    ]);
+    expect(text).toContain('[image/png screenshot omitted]');
+    expect(text).not.toContain('AAAA');
+  });
+
   it('truncates oversized tool result payloads', () => {
     const text = renderEventsAsTranscript([
       createToolResult({ ok: true, toolCallId: 'call-1', value: 'x'.repeat(5000) }),

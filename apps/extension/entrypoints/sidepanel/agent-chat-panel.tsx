@@ -190,7 +190,7 @@ export const AgentChatPanel = ({
         });
 
         if (compacted !== undefined) {
-          // Ponytail: wholesale replace is safe only because the conversation can't receive new events while compacting (guarded above + send disabled). Reconcile against currentEvents if that ever changes.
+          // Wholesale replace is safe only because the conversation can't receive new events while compacting (guarded above + send disabled). Reconcile against currentEvents if that ever changes.
           setConversationStore(currentStore =>
             updateStoredConversationEvents(currentStore, conversationId, () => compacted)
           );
@@ -200,7 +200,7 @@ export const AgentChatPanel = ({
         setCompactingConversationIds(current => current.filter(id => id !== conversationId));
       }
     },
-    // Ponytail: compaction is a single short gateway call; no abort wiring until it proves slow.
+    // Compaction is a single short gateway call; no abort wiring until it proves slow.
     [
       auth.token,
       isConversationStoreLoaded,

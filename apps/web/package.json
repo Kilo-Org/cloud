@@ -129,7 +129,6 @@
     "discord.js": "14.25.1",
     "drizzle-orm": "catalog:",
     "emoji-mart": "5.6.0",
-    "event-source-polyfill": "1.0.31",
     "eventsource-parser": "3.0.8",
     "fflate": "0.8.2",
     "form-data": "4.0.5",

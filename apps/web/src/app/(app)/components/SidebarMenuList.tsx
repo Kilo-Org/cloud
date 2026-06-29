@@ -92,7 +92,12 @@ export default function SidebarMenuList({
                     isActive={isActive}
                     size={item.subtitle ? 'lg' : 'default'}
                   >
-                    <Link href={item.url} prefetch={false} className={buttonClassName}>
+                    <Link
+                      href={item.url}
+                      prefetch={false}
+                      className={buttonClassName}
+                      aria-current={isActive ? 'page' : undefined}
+                    >
                       {content}
                     </Link>
                   </SidebarMenuButton>
@@ -103,6 +108,7 @@ export default function SidebarMenuList({
                     isActive={isActive}
                     size={item.subtitle ? 'lg' : 'default'}
                     className={cn('cursor-pointer', buttonClassName)}
+                    aria-current={isActive ? 'page' : undefined}
                   >
                     {content}
                   </SidebarMenuButton>

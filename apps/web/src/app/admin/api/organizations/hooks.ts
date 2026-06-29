@@ -5,6 +5,9 @@ import { useInvalidateAllOrganizationData } from '@/app/api/organizations/hooks'
 import { useTRPC } from '@/lib/trpc/utils';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
 import type { StripeSubscriptionStatusValue } from '@/lib/admin/stripe-subscription-statuses';
+import { useEffect } from 'react';
+
+const MAX_TIMEOUT_MS = 2_147_483_647;
 
 export function useDeleteOrganization() {
   const queryClient = useQueryClient();
@@ -207,4 +210,39 @@ export function useAdminOrganizationCreditTransactions(organizationId: string) {
       organizationId,
     })
   );
+}
+
+export function useAdminOrganizationNextCreditExpiration(organizationId: string) {
+  const trpc = useTRPC();
+  const query = useQuery(
+    trpc.organizations.admin.nextCreditExpiration.queryOptions({
+      organizationId,
+    })
+  );
+  const nextExpirationAt = query.data?.next_credit_expiration_at;
+  const refetch = query.refetch;
+
+  useEffect(() => {
+    if (!nextExpirationAt) return;
+
+    const expirationTime = new Date(nextExpirationAt).getTime();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const scheduleRefetch = () => {
+      const remainingMs = expirationTime - Date.now();
+      if (remainingMs <= 0) {
+        void refetch();
+        return;
+      }
+
+      timeoutId = setTimeout(scheduleRefetch, Math.min(remainingMs + 100, MAX_TIMEOUT_MS));
+    };
+
+    scheduleRefetch();
+    return () => {
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
+  }, [nextExpirationAt, refetch]);
+
+  return query;
 }

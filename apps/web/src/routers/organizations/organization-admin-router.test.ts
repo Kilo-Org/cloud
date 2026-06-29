@@ -548,6 +548,112 @@ describe('organization admin router', () => {
     });
   });
 
+  describe('nextCreditExpiration', () => {
+    beforeEach(async () => {
+      await db
+        .delete(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+      await db
+        .update(organizations)
+        .set({
+          total_microdollars_acquired: 20_000_000,
+          microdollars_used: 0,
+          microdollars_balance: 20_000_000,
+          next_credit_expiration_at: null,
+        })
+        .where(eq(organizations.id, testOrganization.id));
+    });
+
+    it('returns the next expiration timestamp as UTC ISO', async () => {
+      const expiryDate = '2030-03-01T12:34:56.789Z';
+      await db
+        .update(organizations)
+        .set({ next_credit_expiration_at: expiryDate })
+        .where(eq(organizations.id, testOrganization.id));
+      await db.insert(credit_transactions).values({
+        kilo_user_id: adminUser.id,
+        organization_id: testOrganization.id,
+        amount_microdollars: 20_000_000,
+        is_free: true,
+        expiry_date: expiryDate,
+        expiration_baseline_microdollars_used: 0,
+        original_baseline_microdollars_used: 0,
+      });
+
+      const caller = await createCallerForUser(adminWithoutCreditAccess.id);
+      const result = await caller.organizations.admin.nextCreditExpiration({
+        organizationId: testOrganization.id,
+      });
+
+      expect(result).toEqual({
+        next_credit_expiration_at: expiryDate,
+        next_credit_expiration_amount: 20_000_000,
+      });
+    });
+
+    it('returns the next valid expiration after concurrent overdue processing', async () => {
+      const expiredDate = '2024-01-01T00:00:00.000Z';
+      const futureDate = '2030-01-01T00:00:00.000Z';
+      await db
+        .update(organizations)
+        .set({ next_credit_expiration_at: expiredDate })
+        .where(eq(organizations.id, testOrganization.id));
+      await db.insert(credit_transactions).values([
+        {
+          kilo_user_id: adminUser.id,
+          organization_id: testOrganization.id,
+          amount_microdollars: 10_000_000,
+          is_free: true,
+          expiry_date: expiredDate,
+          expiration_baseline_microdollars_used: 0,
+          original_baseline_microdollars_used: 0,
+        },
+        {
+          kilo_user_id: adminUser.id,
+          organization_id: testOrganization.id,
+          amount_microdollars: 10_000_000,
+          is_free: true,
+          expiry_date: futureDate,
+          expiration_baseline_microdollars_used: 0,
+          original_baseline_microdollars_used: 0,
+        },
+      ]);
+
+      const firstCaller = await createCallerForUser(adminWithoutCreditAccess.id);
+      const secondCaller = await createCallerForUser(adminWithoutCreditAccess.id);
+      const results = await Promise.all([
+        firstCaller.organizations.admin.nextCreditExpiration({
+          organizationId: testOrganization.id,
+        }),
+        secondCaller.organizations.admin.nextCreditExpiration({
+          organizationId: testOrganization.id,
+        }),
+      ]);
+
+      expect(results).toEqual([
+        {
+          next_credit_expiration_at: futureDate,
+          next_credit_expiration_amount: 10_000_000,
+        },
+        {
+          next_credit_expiration_at: futureDate,
+          next_credit_expiration_amount: 10_000_000,
+        },
+      ]);
+
+      const expirationTransactions = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, testOrganization.id),
+            eq(credit_transactions.credit_category, 'credits_expired')
+          )
+        );
+      expect(expirationTransactions).toHaveLength(1);
+    });
+  });
+
   describe('nullifyCredits — expiration state', () => {
     beforeEach(async () => {
       await db

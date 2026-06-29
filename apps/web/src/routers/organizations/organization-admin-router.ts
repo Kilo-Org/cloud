@@ -48,6 +48,11 @@ import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organ
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getAdminCreditTransactionsForOrganization } from '@/lib/creditTransactions';
 import {
+  fetchExpiringTransactionsForOrganization,
+  computeNextExpirationAmount,
+  processOrganizationExpirations,
+} from '@/lib/creditExpiration';
+import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
 } from '@kilocode/organization-entitlement';
@@ -548,6 +553,61 @@ export const organizationAdminRouter = createTRPCRouter({
     .output(z.array(AdminCreditTransactionSchema))
     .query(async ({ input }) => {
       return getAdminCreditTransactionsForOrganization(input.organizationId);
+    }),
+
+  nextCreditExpiration: adminProcedure
+    .input(OrganizationIdInputSchema)
+    .output(
+      z.object({
+        next_credit_expiration_at: z.string().datetime().nullable(),
+        next_credit_expiration_amount: z.number().nullable(),
+      })
+    )
+    .query(async ({ input }) => {
+      const organizationId = input.organizationId;
+      let organization = await getOrganizationById(organizationId);
+
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      // Process pending credit expirations before returning stale balance/amount
+      if (
+        organization.next_credit_expiration_at &&
+        new Date() >= new Date(organization.next_credit_expiration_at)
+      ) {
+        await processOrganizationExpirations(
+          {
+            id: organizationId,
+            microdollars_used: organization.microdollars_used,
+            next_credit_expiration_at: organization.next_credit_expiration_at,
+            total_microdollars_acquired: organization.total_microdollars_acquired,
+          },
+          new Date()
+        );
+        organization = (await getOrganizationById(organizationId)) ?? organization;
+      }
+
+      const next_credit_expiration_at = organization.next_credit_expiration_at
+        ? new Date(organization.next_credit_expiration_at).toISOString()
+        : null;
+      const expiringTransactions = next_credit_expiration_at
+        ? await fetchExpiringTransactionsForOrganization(organizationId)
+        : [];
+
+      const next_credit_expiration_amount = computeNextExpirationAmount(
+        expiringTransactions,
+        { id: organizationId, microdollars_used: organization.microdollars_used },
+        next_credit_expiration_at
+      );
+
+      return {
+        next_credit_expiration_at,
+        next_credit_expiration_amount,
+      };
     }),
 
   grantCredit: creditManagerProcedure

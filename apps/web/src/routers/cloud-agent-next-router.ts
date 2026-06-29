@@ -47,6 +47,8 @@ import { db } from '@/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
+import { getBalanceForUser } from '@/lib/user/balance';
+import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -389,6 +391,11 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
       return await client.getSession(input.cloudAgentSessionId);
     }),
+
+  checkEligibility: baseProcedure.query(async ({ ctx }) => {
+    const { balance } = await getBalanceForUser(ctx.user);
+    return buildCloudAgentNextEligibility(balance);
+  }),
 
   /**
    * List GitHub repositories available for cloud agent sessions.

@@ -224,6 +224,33 @@ export async function processLocalExpirations(
   return { total_microdollars_acquired: new_total_microdollars_acquired };
 }
 
+/**
+ * Computes the total unused credit amount (in microdollars) that will expire at the
+ * next expiration date, given a list of unprocessed expiring transactions.
+ *
+ * Uses the same expiry-claiming algorithm as computeExpiration to ensure the
+ * returned amount is consistent with processOrganizationExpirations.
+ *
+ * Returns null when there is no upcoming expiration or when all credits expiring
+ * at that date have already been consumed.
+ */
+export function computeNextExpirationAmount(
+  transactions: ExpiringTransaction[],
+  entity: EntityForExpiration,
+  nextExpirationAt: string | null
+): number | null {
+  if (!nextExpirationAt) return null;
+
+  const result = computeExpiration(transactions, entity, new Date(nextExpirationAt), 'system');
+
+  const totalExpiring = result.newTransactions.reduce(
+    (sum, t) => sum + -(t.amount_microdollars ?? 0),
+    0
+  );
+
+  return totalExpiring > 0 ? totalExpiring : null;
+}
+
 export async function fetchExpiringTransactionsForOrganization(
   organizationId: string,
   fromDb: typeof db = db

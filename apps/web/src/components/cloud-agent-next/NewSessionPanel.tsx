@@ -141,11 +141,11 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   // Eligibility
   // ---------------------------------------------------------------------------
   const personalEligibilityQuery = useQuery({
-    ...trpc.cloudAgent.checkEligibility.queryOptions(),
+    ...trpc.cloudAgentNext.checkEligibility.queryOptions(),
     enabled: !organizationId,
   });
   const orgEligibilityQuery = useQuery({
-    ...trpc.organizations.cloudAgent.checkEligibility.queryOptions({
+    ...trpc.organizations.cloudAgentNext.checkEligibility.queryOptions({
       organizationId: organizationId || '',
     }),
     enabled: !!organizationId,

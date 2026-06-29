@@ -221,6 +221,11 @@ const OpenRouterModelSchema = z.object({
   isFree: z.boolean().optional(),
   mayTrainOnYourPrompts: z.boolean().optional(),
   hasUserByokAvailable: z.boolean().optional(),
+  autoRouting: z
+    .object({
+      models: z.array(z.string()),
+    })
+    .optional(),
   terminalBench: z
     .object({
       overallScore: z.number(),

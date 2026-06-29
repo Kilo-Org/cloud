@@ -170,11 +170,19 @@ export async function getProfileOrganizations(userId: User['id']): Promise<Profi
       and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
     );
 
-  return results.map(result => ({
-    id: result.organization.id,
-    name: result.organization.name,
-    role: result.membership.role,
-  }));
+  const parentOrganizationIdsWithMembershipInAChild = new Set(
+    results.flatMap(result =>
+      result.organization.parent_organization_id ? [result.organization.parent_organization_id] : []
+    )
+  );
+
+  return results
+    .filter(result => !parentOrganizationIdsWithMembershipInAChild.has(result.organization.id))
+    .map(result => ({
+      id: result.organization.id,
+      name: result.organization.name,
+      role: result.membership.role,
+    }));
 }
 
 export async function createOrganization(

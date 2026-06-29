@@ -119,8 +119,8 @@ function legacySessionMetadata(input: Record<string, unknown>): CloudAgentSessio
 // Note: Balance validation is now handled in the worker entry point (index.ts)
 // via pre-flight validation before the tRPC handler is called.
 // This returns proper HTTP status codes (401, 402) instead of SSE error events.
-// See cloud-agent/src/balance-validation.ts for the implementation.
-// Tests for balance validation are in cloud-agent/src/balance-validation.test.ts
+// See cloud-agent-next/src/balance-validation.ts for the implementation.
+// Tests for balance validation are in cloud-agent-next/src/balance-validation.test.ts
 
 describe('router sessionId validation', () => {
   it('should reject invalid session ID formats', () => {

@@ -11,6 +11,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
 import {
   getUserOrganizationsWithSeats,
+  getProfileOrganizations,
   createOrganization,
   addUserToOrganization,
   addSsoUserToOrganization,
@@ -95,6 +96,110 @@ describe('Organizations', () => {
       const result = await getUserOrganizationsWithSeats(user1.id);
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('getProfileOrganizations', () => {
+    test('returns standalone organizations', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Standalone Organization', user.id);
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result).toEqual([
+        {
+          id: organization.id,
+          name: organization.name,
+          role: 'owner',
+        },
+      ]);
+    });
+
+    test('hides a parent when the user is also a member of its child', async () => {
+      const user = await insertTestUser();
+      const parent = await createOrganization('Parent Organization', user.id);
+      const child = await createOrganization('Child Organization', user.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result).toEqual([
+        {
+          id: child.id,
+          name: child.name,
+          role: 'owner',
+        },
+      ]);
+    });
+
+    test('returns a parent when the user has no child membership', async () => {
+      const user = await insertTestUser();
+      const childOwner = await insertTestUser();
+      const parent = await createOrganization('Parent Organization', user.id);
+      const child = await createOrganization('Child Organization', childOwner.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result).toEqual([
+        {
+          id: parent.id,
+          name: parent.name,
+          role: 'owner',
+        },
+      ]);
+    });
+
+    test('returns a child when the user has no parent membership', async () => {
+      const hierarchyOwner = await insertTestUser();
+      const user = await insertTestUser();
+      const parent = await createOrganization('Parent Organization', hierarchyOwner.id);
+      const child = await createOrganization('Child Organization', hierarchyOwner.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await addUserToOrganization(child.id, user.id, 'member');
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result).toEqual([
+        {
+          id: child.id,
+          name: child.name,
+          role: 'member',
+        },
+      ]);
+    });
+
+    test('keeps unrelated organizations alongside child memberships', async () => {
+      const user = await insertTestUser();
+      const parent = await createOrganization('Parent Organization', user.id);
+      const childOne = await createOrganization('First Child', user.id);
+      const childTwo = await createOrganization('Second Child', user.id);
+      const unrelated = await createOrganization('Unrelated Organization', user.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, childOne.id));
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, childTwo.id));
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result).toHaveLength(3);
+      expect(result.map(organization => organization.id)).toEqual(
+        expect.arrayContaining([childOne.id, childTwo.id, unrelated.id])
+      );
+      expect(result.map(organization => organization.id)).not.toContain(parent.id);
     });
   });
 

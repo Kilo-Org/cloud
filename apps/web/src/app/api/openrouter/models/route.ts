@@ -11,6 +11,10 @@ import { filterByFeature } from '@/lib/ai-gateway/models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
 import { readDb } from '@/lib/drizzle';
+import { getBenchmarkRoutingTable } from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import { KILO_AUTO_EFFICIENT_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
+import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
 
 async function tryGetUserFromAuth() {
   try {
@@ -19,6 +23,41 @@ async function tryGetUserFromAuth() {
     console.error('[tryGetUserFromAuth] failed to get user from auth', e);
     return { user: null, organizationId: null };
   }
+}
+
+function visibleConcreteModelIds(models: Iterable<string>, availableModelIds: ReadonlySet<string>) {
+  return [
+    ...new Set([...models].filter(id => availableModelIds.has(id) && !isVirtualAutoModelId(id))),
+  ].sort((left, right) => left.localeCompare(right));
+}
+
+async function addAutoRoutingModels(models: OpenRouterModelsResponse['data']) {
+  const availableModelIds = new Set(models.map(model => model.id));
+  const [routingTableResult, autoFreeCandidates] = await Promise.all([
+    getBenchmarkRoutingTable().catch(() => null),
+    getAutoFreeCandidates(null).catch(() => []),
+  ]);
+
+  const table =
+    routingTableResult?.status === 200 && 'table' in routingTableResult.body
+      ? routingTableResult.body.table
+      : null;
+  const efficientModelIds = visibleConcreteModelIds(
+    Object.values(table?.routes ?? {})
+      .flat()
+      .map(candidate => candidate.model),
+    availableModelIds
+  );
+  const freeModelIds = visibleConcreteModelIds(autoFreeCandidates, availableModelIds);
+  const autoRoutingChoices = new Map([
+    [KILO_AUTO_EFFICIENT_MODEL.id, efficientModelIds],
+    [KILO_AUTO_FREE_MODEL.id, freeModelIds],
+  ]);
+
+  return models.map(model => {
+    const modelIds = autoRoutingChoices.get(model.id);
+    return modelIds?.length ? { ...model, autoRouting: { models: modelIds } } : model;
+  });
 }
 
 /**
@@ -35,9 +74,10 @@ export async function GET(
       ? await getAvailableModelsForOrganization(auth.organizationId)
       : null;
     if (result) {
+      const models = await addAutoRoutingModels(result.data);
       return NextResponse.json({
         ...result,
-        data: filterByFeature(result.data, feature),
+        data: filterByFeature(models, feature),
       });
     }
 
@@ -45,10 +85,11 @@ export async function GET(
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }
+    const models = await addAutoRoutingModels(data.data);
     if (!auth?.user) {
       const experimentModels = await listAvailableExperimentModels();
       return NextResponse.json({
-        data: filterByFeature(data.data.concat(experimentModels), feature),
+        data: filterByFeature(models.concat(experimentModels), feature),
       });
     }
 
@@ -58,7 +99,7 @@ export async function GET(
       getUserByokProviderIds(readDb, auth.user.id),
     ]);
     const modelsWithByokAvailability = await addUserByokAvailability(
-      data.data,
+      models,
       enabledByokProviderIds
     );
     return NextResponse.json({

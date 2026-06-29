@@ -1,7 +1,7 @@
 import { captureException } from '@sentry/nextjs';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Organization } from '@kilocode/db/schema';
-import { organizations } from '@kilocode/db/schema';
+import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
@@ -188,10 +188,33 @@ export type LogResult = {
   logCount: number;
 };
 
+const orgHasModelRestrictions = sql<boolean>`(
+  jsonb_typeof(${organizations.settings}->'provider_allow_list') = 'array'
+  OR (
+    jsonb_typeof(${organizations.settings}->'model_deny_list') = 'array'
+    AND jsonb_array_length(${organizations.settings}->'model_deny_list') > 0
+  )
+)`;
+
+const orgHasCurrentEntitlement = sql<boolean>`(
+  ${organizations.require_seats} = false
+  OR ${organizations.settings}->>'suppress_trial_messaging' = 'true'
+  OR ${organizations.settings}->>'oss_sponsorship_tier' IS NOT NULL
+  OR coalesce(${organizations.free_trial_end_at}, ${organizations.created_at} + interval '14 days') >= now() - interval '3 days'
+  OR coalesce((
+    SELECT ${organization_seats_purchases.subscription_status} <> 'ended'
+    FROM ${organization_seats_purchases}
+    WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+    ORDER BY ${organization_seats_purchases.created_at} DESC
+    LIMIT 1
+  ), false)
+)`;
+
 /**
  * Compute the diff between the previous and current OpenRouter snapshots and
- * write one audit log row per enterprise organization whose effective model
- * availability changed. Attributed to `System` via null actor fields.
+ * write one audit log row per active enterprise organization with explicit
+ * model/provider restrictions whose effective model availability changed.
+ * Attributed to `System` via null actor fields.
  *
  * Safe to call from inside a background job; individual per-org failures are
  * reported to Sentry and do not break the rest of the loop.
@@ -209,7 +232,14 @@ export async function logAutoModelChangesForAllOrgs(
   const enterpriseOrgs = await db
     .select()
     .from(organizations)
-    .where(eq(organizations.plan, 'enterprise'));
+    .where(
+      and(
+        eq(organizations.plan, 'enterprise'),
+        isNull(organizations.deleted_at),
+        orgHasModelRestrictions,
+        orgHasCurrentEntitlement
+      )
+    );
 
   let logCount = 0;
   for (const organization of enterpriseOrgs) {

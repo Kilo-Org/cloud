@@ -1,4 +1,25 @@
 import { defineConfig, devices } from '@playwright/test';
+import { config as loadEnv } from 'dotenv';
+
+const e2eEnvKeys = new Set<string>();
+
+function loadE2eEnvFile(path: string, override = false) {
+  const result = loadEnv({ path, override });
+  for (const key of Object.keys(result.parsed ?? {})) {
+    e2eEnvKeys.add(key);
+  }
+}
+
+loadE2eEnvFile('.env');
+loadE2eEnvFile('.env.test', true);
+loadE2eEnvFile('.env.test.local', true);
+
+const e2eEnv = Object.fromEntries(
+  [...e2eEnvKeys].flatMap(key => {
+    const value = process.env[key];
+    return value === undefined ? [] : [[key, value]];
+  })
+);
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 // Use localhost instead of 127.0.0.1 to match cookie domain
@@ -53,17 +74,22 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: {
     // Always use dev mode for Playwright tests - never production
-    command: `dotenvx run --convention=nextjs -- pnpm next dev -p ${port}`,
+    command: `pnpm run copy:swagger-ui-assets && pnpm next dev -p ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     stdout: 'ignore',
     stderr: 'pipe',
     env: {
+      ...e2eEnv,
       // Always use development mode for Playwright tests
       NODE_ENV: 'development',
       DEBUG_SHOW_DEV_UI: 'true', // Enable fake login
+      APP_URL_OVERRIDE: baseURL,
+      NEXTAUTH_URL: baseURL,
       PORT: String(port),
+      VERCEL_ENV: '',
+      VERCEL_TARGET_ENV: '',
     },
   },
 });

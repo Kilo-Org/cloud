@@ -1,6 +1,6 @@
 /* eslint-disable import/max-dependencies, max-lines */
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { ChangeEvent, JSX, KeyboardEvent, ReactNode } from 'react';
+import type { JSX, ReactNode } from 'react';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import {
   compactingConversationIdsAtom,
@@ -30,7 +30,6 @@ import {
   getActiveStoredConversation,
   getOpenStoredConversations,
   getSortedStoredConversationHistory,
-  getStoredConversationTitle,
   isStoredConversationEmpty,
   isStoredConversationOpen,
   openStoredConversation,
@@ -39,13 +38,14 @@ import {
   updateStoredConversationSettings,
   useStoredAgentConversations,
 } from './agent-conversation-storage';
-import type { StoredAgentConversation } from './agent-conversation-storage';
 import { AgentFooterControls } from './agent-footer-controls';
 import { ContextDonut } from './context-donut';
 import { runDangerousLlmTurn, runSafeLlmTurn } from './agent-turn-runners';
 import { AUTO_COMPACT_RATIO, getContextRatio } from '@/src/shared/context-usage';
 import { useTabDebugger } from './use-tab-debugger';
 import { ConversationList } from './conversation-list';
+import { ConversationTabs } from './conversation-tabs';
+import { MessageComposer } from './message-composer';
 import { ConversationHistoryButton } from './conversation-history-button';
 import { useGatewayModels } from './use-gateway-models';
 
@@ -98,93 +98,6 @@ export const formatSelectedTabSystemEnvironment = ({
 }): string =>
   `<system_environment>\nSelected tab title: ${sanitizeTabContextText(title)}\nSelected tab URL: ${sanitizeTabContextUrl(url)}\nCurrent time: ${new Date().toISOString()}\nTimezone: ${new Intl.DateTimeFormat().resolvedOptions().timeZone}\n</system_environment>`;
 
-const ConversationTabs = ({
-  activeConversationId,
-  busyConversationIds,
-  conversations,
-  isDisabled,
-  onCloseConversation,
-  onCreateConversation,
-  onSelectConversation,
-}: {
-  activeConversationId: string;
-  busyConversationIds: readonly string[];
-  conversations: StoredAgentConversation[];
-  isDisabled: boolean;
-  onCloseConversation: (conversationId: string) => void;
-  onCreateConversation: () => void;
-  onSelectConversation: (conversationId: string) => void;
-}): JSX.Element => (
-  <div className="border-b border-zinc-900 bg-zinc-950">
-    <div
-      aria-label="Conversation tabs"
-      className="agent-conversation-scrollbar flex min-w-0 items-center gap-1 overflow-x-auto px-2 py-2"
-      role="tablist"
-    >
-      {conversations.map(conversation => {
-        const title = getStoredConversationTitle(conversation);
-        const isActive = conversation.id === activeConversationId;
-        const isRunning = busyConversationIds.includes(conversation.id);
-
-        return (
-          <div
-            className={
-              isActive
-                ? 'flex h-8 max-w-44 shrink-0 items-center rounded-md border border-[#EDFF00]/70 bg-zinc-900 text-zinc-50'
-                : 'flex h-8 max-w-44 shrink-0 items-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100'
-            }
-            key={conversation.id}
-          >
-            <button
-              aria-selected={isActive}
-              className="flex h-full min-w-0 items-center gap-1.5 px-2 text-left text-xs font-medium outline-none focus:ring-2 focus:ring-[#EDFF00]/50 disabled:cursor-not-allowed disabled:text-zinc-600"
-              disabled={isDisabled}
-              onClick={() => {
-                onSelectConversation(conversation.id);
-              }}
-              role="tab"
-              title={title}
-              type="button"
-            >
-              {isRunning ? (
-                <span
-                  aria-hidden="true"
-                  className="size-2 shrink-0 animate-pulse rounded-full bg-[#EDFF00]"
-                />
-              ) : null}
-              <span className="truncate">{title}</span>
-            </button>
-            <button
-              aria-label={`Close ${title}`}
-              className="mr-1 flex size-6 shrink-0 items-center justify-center rounded-sm text-zinc-500 outline-none transition hover:bg-zinc-800 hover:text-zinc-100 focus:ring-2 focus:ring-[#EDFF00]/50"
-              disabled={isDisabled}
-              onClick={() => {
-                onCloseConversation(conversation.id);
-              }}
-              type="button"
-            >
-              <span aria-hidden="true" className="text-sm leading-none">
-                x
-              </span>
-            </button>
-          </div>
-        );
-      })}
-      <button
-        aria-label="New conversation"
-        className="flex size-8 shrink-0 items-center justify-center rounded-md border border-zinc-800 bg-zinc-950 text-zinc-300 outline-none transition hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100 focus:ring-2 focus:ring-[#EDFF00]/50 disabled:cursor-not-allowed disabled:text-zinc-600"
-        disabled={isDisabled}
-        onClick={onCreateConversation}
-        type="button"
-      >
-        <span aria-hidden="true" className="text-lg leading-none">
-          +
-        </span>
-      </button>
-    </div>
-  </div>
-);
-
 export const AgentChatPanel = ({
   auth,
   onHeaderBeforeSettingsChange,
@@ -212,7 +125,6 @@ export const AgentChatPanel = ({
   const activeConversation = getActiveStoredConversation(conversationStore);
   const { events, id: activeConversationId, mode = defaultMode } = activeConversation;
   const draft = useAtomValue(draftAtomFamily(activeConversationId));
-  const setActiveDraft = useSetAtom(draftAtomFamily(activeConversationId));
   const selectedTabId = getSelectedInspectableTabId({
     inspectableTabs,
     selectedTabId: activeConversation.selectedTabId,
@@ -335,19 +247,14 @@ export const AgentChatPanel = ({
     ]
   );
 
-  const busyConversationIds = useMemo(
-    () => [...runningConversationIds, ...compactingConversationIds],
-    [compactingConversationIds, runningConversationIds]
-  );
   const isModelSelectDisabled = modelOptions.length === 0;
   const isThinkingSelectDisabled = thinkingOptions.length === 0;
   const modelControlValue = modelOptions.length === 0 ? '' : model;
-  const isSendDisabled =
-    !isConversationStoreLoaded ||
-    draft.trim() === '' ||
-    modelControlValue === '' ||
-    selectedTabId === undefined ||
-    isCompacting;
+  const canSend =
+    isConversationStoreLoaded &&
+    modelControlValue !== '' &&
+    selectedTabId !== undefined &&
+    !isCompacting;
 
   conversationStoreRef.current = conversationStore;
 
@@ -741,7 +648,6 @@ export const AgentChatPanel = ({
     <div className="flex min-h-0 flex-1 flex-col">
       <ConversationTabs
         activeConversationId={activeConversationId}
-        busyConversationIds={busyConversationIds}
         conversations={openConversations}
         isDisabled={!isConversationStoreLoaded}
         onCloseConversation={closeConversation}
@@ -750,42 +656,13 @@ export const AgentChatPanel = ({
       />
       <ConversationList items={groupedEvents} />
 
-      <form
-        className="border-t border-zinc-900 px-4 py-3"
-        onSubmit={event => {
-          event.preventDefault();
-          submitDraft();
-        }}
-      >
-        <label className="sr-only" htmlFor="agent-message">
-          Message agent
-        </label>
-        <textarea
-          className="min-h-20 w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm leading-5 text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-[#EDFF00] focus:ring-2 focus:ring-[#EDFF00]/30"
-          id="agent-message"
-          onChange={(event: ChangeEvent<HTMLTextAreaElement>) => {
-            setActiveDraft(event.currentTarget.value);
-          }}
-          onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              submitDraft();
-            }
-          }}
-          placeholder="Ask Kilo to inspect this tab..."
-          value={draft}
-        />
-        <div className="mt-2 grid gap-2">
-          <button
-            className="h-9 w-full rounded-md bg-[#EDFF00] px-3 text-sm font-semibold text-zinc-950 transition hover:bg-[#d9ea00] focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500"
-            disabled={isRunning ? false : isSendDisabled}
-            onClick={isRunning ? stopRun : undefined}
-            type={isRunning ? 'button' : 'submit'}
-          >
-            {isRunning ? 'Stop' : 'Send message'}
-          </button>
-        </div>
-      </form>
+      <MessageComposer
+        activeConversationId={activeConversationId}
+        canSend={canSend}
+        isRunning={isRunning}
+        onStop={stopRun}
+        onSubmit={submitDraft}
+      />
 
       <footer className="border-t border-zinc-900 bg-zinc-950 px-4 py-2">
         <AgentFooterControls

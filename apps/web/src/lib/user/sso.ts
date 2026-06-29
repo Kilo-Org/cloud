@@ -5,13 +5,14 @@ import { WorkOS } from '@workos-inc/node';
 import 'server-only';
 import { captureException } from '@sentry/nextjs';
 import {
-  addUserToOrganization,
+  addSsoUserToOrganization,
   getOrganizationById,
   getOrganizationMembers,
 } from '@/lib/organizations/organizations';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { sendOrgSSOUserJoinedEmail } from '@/lib/email';
 import { SSO_SIGNIN_PATH } from '@/lib/auth/constants';
+import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 
 const workos = new WorkOS(WORKOS_API_KEY);
 
@@ -46,6 +47,13 @@ async function processSSOInternal(
     );
   }
 
+  const authority = await resolveSsoAuthorityForDomain(userDomain);
+  if (authority.status !== 'required' || authority.sourceOrganizationId !== orgExternalId) {
+    throw new Error(
+      `WorkOS organization does not match the active SSO authority for ${userDomain}`
+    );
+  }
+
   const kiloOrg = await getOrganizationById(orgExternalId);
   if (!kiloOrg) {
     throw new Error(
@@ -73,7 +81,7 @@ async function processSSOInternal(
 
   const savedUser = res.user;
   // add user to organization since its been fully created
-  const added = await addUserToOrganization(kiloOrg.id, savedUser.id, 'member');
+  const added = await addSsoUserToOrganization(kiloOrg.id, savedUser.id);
   if (added) {
     // get all owners for org
     const members = await getOrganizationMembers(kiloOrg.id);

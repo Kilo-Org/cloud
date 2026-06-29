@@ -1,9 +1,7 @@
 /**
  * AdvancedConfig - Shared component for advanced configuration (profiles, env vars, setup commands)
  *
- * Used by:
- * - CloudSessionsPage for manual cloud agent sessions
- * - Webhook trigger forms for automatic triggers
+ * Used by Cloud Agent Next sessions and webhook trigger forms.
  *
  * Orchestrates:
  * - ProfileSelector - Select a saved profile (handles secrets)

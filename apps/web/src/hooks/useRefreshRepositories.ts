@@ -39,7 +39,10 @@ export function useRefreshRepositories({
   const refresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      const freshData = await queryClient.fetchQuery(getRefreshQueryOptions());
+      const freshData = await queryClient.fetchQuery({
+        ...getRefreshQueryOptions(),
+        staleTime: 0,
+      });
       queryClient.setQueryData(getCacheQueryKey(), freshData);
       if (!silent) toast.success('Repositories refreshed');
     } catch (error) {

@@ -27,6 +27,9 @@ export type TransformRequestContext = {
   originalHeaders: FraudDetectionHeaders;
   extraHeaders: Record<string, string>;
   userByok: BYOKResult[] | null;
+  kilo_user_id: string;
+  organization_id: string | null;
+  session_id: string | null;
 };
 
 export type GatewayChatApiKind = GatewayRequest['kind'];
@@ -36,5 +39,5 @@ export type Provider = {
   apiUrl: string;
   apiKey: string;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
-  transformRequest(context: TransformRequestContext): void;
+  transformRequest(context: TransformRequestContext): Promise<void>;
 };

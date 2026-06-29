@@ -11,12 +11,25 @@ import {
   type NewSecurityRemediationAttempt,
   type SecurityRemediationAttempt,
 } from '@kilocode/db/schema';
-import { SecurityAuditLogAction } from '@kilocode/db/schema-types';
+import {
+  SecurityAuditLogAction,
+  SecurityFindingAuditSourceContext,
+} from '@kilocode/db/schema-types';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
+import {
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  buildSecurityFindingAuditHumanActor,
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+  type SecurityFindingAuditActor,
+  type SecurityFindingAuditEventFinding,
+  type SecurityFindingAuditOwner,
+  type SecurityFindingAuditWriterDb,
+} from '@kilocode/worker-utils/security-finding-audit';
 import {
   computeSecurityRemediationAnalysisFingerprint,
   decideSecurityRemediationEligibility,
-  type SecurityRemediationCapabilityReason,
+  type SecurityRemediationAdmissionRejectionReason,
   type SecurityRemediationOrigin,
 } from '@kilocode/worker-utils/security-remediation-policy';
 import { and, asc, desc, eq, inArray, isNull, lte, sql } from 'drizzle-orm';
@@ -27,6 +40,7 @@ import {
   parseSecurityConfig,
   resolveAutoAnalysisActor,
   type ActorUser,
+  type AuthoritativeActorUser,
   type SecurityFindingRecord,
 } from './db/queries.js';
 import { InsufficientCreditsError } from './launch.js';
@@ -183,8 +197,21 @@ type AdmissionResult =
     }
   | {
       admitted: false;
-      reason: SecurityRemediationCapabilityReason;
+      reason: SecurityRemediationAdmissionRejectionReason;
     };
+
+function rejectRemediationAdmission(params: {
+  findingId: string;
+  origin: SecurityRemediationOrigin;
+  reason: SecurityRemediationAdmissionRejectionReason;
+}): AdmissionResult {
+  logger.info('Security remediation admission rejected', {
+    finding_id: params.findingId,
+    origin: params.origin,
+    reason: params.reason,
+  });
+  return { admitted: false, reason: params.reason };
+}
 
 type ApplyAutoRemediationCommandResult = {
   scanned: number;
@@ -246,6 +273,83 @@ function ownerValues(owner: QueueOwner) {
     owned_by_organization_id: owner.type === 'org' ? owner.id : null,
     owned_by_user_id: owner.type === 'user' ? owner.id : null,
   };
+}
+
+function toFindingAuditOwner(finding: SecurityFindingRecord): SecurityFindingAuditOwner {
+  if (finding.owned_by_organization_id) {
+    return { type: 'organization', organizationId: finding.owned_by_organization_id };
+  }
+  if (finding.owned_by_user_id) {
+    return { type: 'user', userId: finding.owned_by_user_id };
+  }
+  throw new Error('Security remediation finding has no audit owner');
+}
+
+function findingAuditOwnerKey(finding: SecurityFindingRecord): string {
+  if (finding.owned_by_organization_id) return `organization:${finding.owned_by_organization_id}`;
+  if (finding.owned_by_user_id) return `user:${finding.owned_by_user_id}`;
+  throw new Error('Security remediation finding has no audit owner');
+}
+
+function toFindingAuditRecord(finding: SecurityFindingRecord): SecurityFindingAuditEventFinding {
+  return finding;
+}
+
+async function writeRemediationFindingAuditEvent(
+  db: SecurityFindingAuditWriterDb,
+  params: {
+    finding: SecurityFindingRecord;
+    attempt: Pick<
+      SecurityRemediationAttempt,
+      | 'id'
+      | 'remediation_id'
+      | 'origin'
+      | 'requested_by_user_id'
+      | 'remediation_model_slug'
+      | 'branch_name'
+    >;
+    action: SecurityAuditLogAction;
+    actor: SecurityFindingAuditActor;
+    occurredAt: string;
+    beforeState?: Record<string, string | number | boolean | null>;
+    afterState?: Record<string, string | number | boolean | null>;
+    metadata?: Record<string, string | number | boolean | null>;
+  }
+): Promise<void> {
+  await insertSecurityFindingAuditEvent(db, {
+    owner: toFindingAuditOwner(params.finding),
+    finding: toFindingAuditRecord(params.finding),
+    actor: params.actor,
+    action: params.action,
+    occurredAt: params.occurredAt,
+    eventKey: deriveSecurityFindingAuditEventKey([
+      findingAuditOwnerKey(params.finding),
+      params.finding.id,
+      params.action,
+      params.attempt.id,
+    ]),
+    sourceContext: SecurityFindingAuditSourceContext.RemediationCallback,
+    snapshotExtras: { remediation_attempt_id: params.attempt.id },
+    beforeState: params.beforeState,
+    afterState: params.afterState,
+    metadata: {
+      remediation_id: params.attempt.remediation_id,
+      attempt_id: params.attempt.id,
+      origin: params.attempt.origin,
+      remediation_model_slug: params.attempt.remediation_model_slug,
+      branch_name: params.attempt.branch_name,
+      ...params.metadata,
+    },
+  });
+}
+
+function toSecurityFindingAuditHumanActor(actor: AuthoritativeActorUser) {
+  return buildSecurityFindingAuditHumanActor({
+    id: actor.id,
+    email: actor.email,
+    name: actor.name,
+    isAdmin: actor.is_admin,
+  });
 }
 
 function ownerWhereAgentConfig(owner: QueueOwner) {
@@ -471,6 +575,47 @@ async function markAttemptQueueAdmissionFailed(db: WorkerDb, attemptId: string):
       .where(eq(security_remediation_attempts.id, attemptId))
       .returning();
     if (!attempt) return;
+    const [finding] = await tx
+      .select({
+        id: security_findings.id,
+        platform_integration_id: security_findings.platform_integration_id,
+        repo_full_name: security_findings.repo_full_name,
+        source: security_findings.source,
+        source_id: security_findings.source_id,
+        created_at: security_findings.created_at,
+        status: security_findings.status,
+        severity: security_findings.severity,
+        package_name: security_findings.package_name,
+        package_ecosystem: security_findings.package_ecosystem,
+        dependency_scope: security_findings.dependency_scope,
+        cve_id: security_findings.cve_id,
+        ghsa_id: security_findings.ghsa_id,
+        cwe_ids: security_findings.cwe_ids,
+        cvss_score: security_findings.cvss_score,
+        dependabot_html_url: security_findings.dependabot_html_url,
+        title: security_findings.title,
+        description: security_findings.description,
+        vulnerable_version_range: security_findings.vulnerable_version_range,
+        patched_version: security_findings.patched_version,
+        manifest_path: security_findings.manifest_path,
+        first_detected_at: security_findings.first_detected_at,
+        fixed_at: security_findings.fixed_at,
+        sla_due_at: security_findings.sla_due_at,
+        raw_data: security_findings.raw_data,
+        last_synced_at: security_findings.last_synced_at,
+        analysis_status: security_findings.analysis_status,
+        analysis: security_findings.analysis,
+        analysis_started_at: security_findings.analysis_started_at,
+        analysis_completed_at: security_findings.analysis_completed_at,
+        session_id: security_findings.session_id,
+        cli_session_id: security_findings.cli_session_id,
+        ignored_reason: security_findings.ignored_reason,
+        owned_by_organization_id: security_findings.owned_by_organization_id,
+        owned_by_user_id: security_findings.owned_by_user_id,
+      })
+      .from(security_findings)
+      .where(eq(security_findings.id, attempt.finding_id))
+      .limit(1);
     await tx
       .update(security_remediations)
       .set({
@@ -481,6 +626,21 @@ async function markAttemptQueueAdmissionFailed(db: WorkerDb, attemptId: string):
         updated_at: sql`now()`,
       })
       .where(eq(security_remediations.id, attempt.remediation_id));
+    if (finding) {
+      await writeRemediationFindingAuditEvent(tx, {
+        finding,
+        attempt,
+        action: SecurityAuditLogAction.RemediationFailed,
+        actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+        occurredAt: new Date().toISOString(),
+        beforeState: { remediation_status: 'queued' },
+        afterState: {
+          remediation_status: 'failed',
+          failure_code: 'QUEUE_ADMISSION_FAILED',
+        },
+        metadata: { failure_code: 'QUEUE_ADMISSION_FAILED' },
+      });
+    }
   });
 }
 
@@ -489,7 +649,7 @@ async function recordRemediationAudit(params: {
   finding: SecurityFindingRecord;
   remediationId: string;
   attemptId: string;
-  action: SecurityAuditLogAction;
+  action: SecurityAuditLogAction.RemediationStarted | SecurityAuditLogAction.RemediationRetried;
   actorId?: string | null;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
@@ -510,20 +670,47 @@ async function recordRemediationAudit(params: {
   });
 }
 
+function logNonReportableRemediationAuditWriteFailure(
+  params: {
+    remediationId: string;
+    attemptId: string;
+    action: SecurityAuditLogAction.RemediationStarted | SecurityAuditLogAction.RemediationRetried;
+  },
+  error: unknown
+): void {
+  logger.error('Non-reportable remediation audit write failed', {
+    remediation_id: params.remediationId,
+    attempt_id: params.attemptId,
+    action: params.action,
+    error: error instanceof Error ? error.message : String(error),
+  });
+}
+
 export async function admitRemediationAttempt(params: {
   db: WorkerDb;
   findingId: string;
   origin: SecurityRemediationOrigin;
   owner?: QueueOwner;
   requestedByUserId?: string | null;
+  requestedByActor?: AuthoritativeActorUser | null;
   allowManualRetry?: boolean;
   runtimeConfig?: RuntimeConfig;
 }): Promise<AdmissionResult> {
   const finding = await getSecurityFindingById(params.db, params.findingId);
-  if (!finding) return { admitted: false, reason: 'analysis_required' };
+  if (!finding) {
+    return rejectRemediationAdmission({
+      findingId: params.findingId,
+      origin: params.origin,
+      reason: 'finding_not_found',
+    });
+  }
   const owner = params.owner ?? ownerFromFinding(finding);
   if (!owner || !findingMatchesOwner(finding, owner)) {
-    return { admitted: false, reason: 'repo_not_in_scope' };
+    return rejectRemediationAdmission({
+      findingId: params.findingId,
+      origin: params.origin,
+      reason: 'repo_not_in_scope',
+    });
   }
 
   const runtime = params.runtimeConfig ?? (await getRuntimeConfig(params.db, owner));
@@ -541,8 +728,29 @@ export async function admitRemediationAttempt(params: {
 
   const acceptedAnalysisFingerprint = decision.analysisFingerprint;
   const acceptedAnalysisCompletedAt = decision.analysisCompletedAt;
-  if (!decision.eligible || !acceptedAnalysisFingerprint || !acceptedAnalysisCompletedAt) {
-    return { admitted: false, reason: decision.reason };
+  if (!decision.eligible) {
+    return rejectRemediationAdmission({
+      findingId: params.findingId,
+      origin: params.origin,
+      reason: decision.reason === 'eligible' ? 'analysis_required' : decision.reason,
+    });
+  }
+  if (!acceptedAnalysisFingerprint || !acceptedAnalysisCompletedAt) {
+    return rejectRemediationAdmission({
+      findingId: params.findingId,
+      origin: params.origin,
+      reason: 'analysis_required',
+    });
+  }
+
+  const auditActor =
+    params.origin === 'auto_policy'
+      ? SECURITY_FINDING_AUDIT_SYSTEM_ACTOR
+      : params.requestedByActor
+        ? toSecurityFindingAuditHumanActor(params.requestedByActor)
+        : null;
+  if (!auditActor) {
+    throw new Error('Human remediation request requires an authoritative actor');
   }
 
   return params.db.transaction(async tx => {
@@ -629,6 +837,18 @@ export async function admitRemediationAttempt(params: {
       })
       .where(eq(security_remediations.id, remediation.id));
 
+    await writeRemediationFindingAuditEvent(tx, {
+      finding,
+      attempt,
+      action: SecurityAuditLogAction.RemediationQueued,
+      actor: auditActor,
+      occurredAt: new Date().toISOString(),
+      afterState: {
+        remediation_status: 'queued',
+        attempt_number: attemptNumber,
+      },
+    });
+
     return {
       admitted: true,
       remediationId: remediation.id,
@@ -683,6 +903,7 @@ function nextRetryAt(attemptCount: number): string {
 async function transitionAttemptLaunchFailure(params: {
   db: WorkerDb;
   attempt: SecurityRemediationAttempt;
+  finding?: SecurityFindingRecord;
   failureCode: string;
   errorMessage: string;
   retryable: boolean;
@@ -720,6 +941,18 @@ async function transitionAttemptLaunchFailure(params: {
           updated_at: sql`now()`,
         })
         .where(eq(security_remediations.id, params.attempt.remediation_id));
+      if (params.finding) {
+        await writeRemediationFindingAuditEvent(tx, {
+          finding: params.finding,
+          attempt: params.attempt,
+          action: SecurityAuditLogAction.RemediationFailed,
+          actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+          occurredAt: new Date().toISOString(),
+          beforeState: { remediation_status: params.attempt.status },
+          afterState: { remediation_status: 'failed', failure_code: params.failureCode },
+          metadata: { failure_code: params.failureCode },
+        });
+      }
     }
   });
 }
@@ -727,6 +960,7 @@ async function transitionAttemptLaunchFailure(params: {
 async function blockAttempt(params: {
   db: WorkerDb;
   attempt: SecurityRemediationAttempt;
+  finding?: SecurityFindingRecord;
   reason: string;
   summary: string;
 }): Promise<void> {
@@ -751,6 +985,18 @@ async function blockAttempt(params: {
         updated_at: sql`now()`,
       })
       .where(eq(security_remediations.id, params.attempt.remediation_id));
+    if (params.finding) {
+      await writeRemediationFindingAuditEvent(tx, {
+        finding: params.finding,
+        attempt: params.attempt,
+        action: SecurityAuditLogAction.RemediationBlocked,
+        actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+        occurredAt: new Date().toISOString(),
+        beforeState: { remediation_status: params.attempt.status },
+        afterState: { remediation_status: 'blocked', blocked_reason_code: params.reason },
+        metadata: { blocked_reason_code: params.reason },
+      });
+    }
   });
 }
 
@@ -847,6 +1093,7 @@ async function finalizeAttemptCancellation(params: {
     attempt: params.attempt,
     result: { status: 'cancelled', summary: params.summary, validation: [] },
     finalAssistantMessage: undefined,
+    actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
   });
 }
 
@@ -1048,6 +1295,7 @@ export async function processRemediationAttempt(params: {
     await blockAttempt({
       db,
       attempt,
+      finding,
       reason: decision.reason.toUpperCase(),
       summary: `Remediation no longer eligible: ${decision.reason}`,
     });
@@ -1060,6 +1308,7 @@ export async function processRemediationAttempt(params: {
     await blockAttempt({
       db,
       attempt,
+      finding,
       reason: 'COVERED_BY_EXISTING_REMEDIATION_PR',
       summary: 'Another open remediation PR covers same package and manifest',
     });
@@ -1071,6 +1320,7 @@ export async function processRemediationAttempt(params: {
     await transitionAttemptLaunchFailure({
       db,
       attempt,
+      finding,
       failureCode: 'ACTOR_RESOLUTION_FAILED',
       errorMessage: 'Remediation actor unavailable',
       retryable: false,
@@ -1080,20 +1330,32 @@ export async function processRemediationAttempt(params: {
 
   try {
     await launchAttempt({ db, env: params.env, attempt, finding, owner, actor });
-    await recordRemediationAudit({
-      db,
-      finding,
-      remediationId: attempt.remediation_id,
-      attemptId: attempt.id,
-      action: SecurityAuditLogAction.RemediationStarted,
-      actorId: attempt.requested_by_user_id,
-      metadata: { origin: attempt.origin, dispatchId: params.dispatchId },
-    });
+    try {
+      await recordRemediationAudit({
+        db,
+        finding,
+        remediationId: attempt.remediation_id,
+        attemptId: attempt.id,
+        action: SecurityAuditLogAction.RemediationStarted,
+        actorId: attempt.requested_by_user_id,
+        metadata: { origin: attempt.origin, dispatchId: params.dispatchId },
+      });
+    } catch (auditError) {
+      logNonReportableRemediationAuditWriteFailure(
+        {
+          remediationId: attempt.remediation_id,
+          attemptId: attempt.id,
+          action: SecurityAuditLogAction.RemediationStarted,
+        },
+        auditError
+      );
+    }
     return 'launched';
   } catch (error) {
     await transitionAttemptLaunchFailure({
       db,
       attempt,
+      finding,
       failureCode:
         error instanceof InsufficientCreditsError ? 'INSUFFICIENT_CREDITS' : 'LAUNCH_UPSTREAM_5XX',
       errorMessage: error instanceof Error ? error.message : String(error),
@@ -1247,6 +1509,7 @@ async function finalizeAttemptOutcome(params: {
   attempt: SecurityRemediationAttempt;
   result: StructuredRemediationResult;
   finalAssistantMessage: string | undefined;
+  actor: SecurityFindingAuditActor;
 }): Promise<void> {
   const status = params.result.status;
   const auditAction =
@@ -1299,20 +1562,29 @@ async function finalizeAttemptOutcome(params: {
         updated_at: sql`now()`,
       })
       .where(eq(security_remediations.id, params.attempt.remediation_id));
-  });
-  await recordRemediationAudit({
-    db: params.db,
-    finding: params.finding,
-    remediationId: params.attempt.remediation_id,
-    attemptId: params.attempt.id,
-    action: auditAction,
-    actorId: params.attempt.requested_by_user_id,
-    metadata: {
-      origin: params.attempt.origin,
-      prUrl: params.result.prUrl ?? null,
-      prNumber: params.result.prNumber ?? null,
-      status,
-    },
+    await writeRemediationFindingAuditEvent(tx, {
+      finding: params.finding,
+      attempt: params.attempt,
+      action: auditAction,
+      actor: params.actor,
+      occurredAt: new Date().toISOString(),
+      beforeState: { remediation_status: params.attempt.status },
+      afterState: {
+        remediation_status: status,
+        ...(params.result.prNumber ? { pr_number: params.result.prNumber } : {}),
+        ...(params.result.draft !== undefined && params.result.draft !== null
+          ? { pr_draft: params.result.draft }
+          : {}),
+      },
+      metadata: {
+        status,
+        ...(params.result.prUrl ? { pr_url: params.result.prUrl } : {}),
+        ...(params.result.prNumber ? { pr_number: params.result.prNumber } : {}),
+        validation_count: params.result.validation?.length ?? 0,
+        ...(status === 'failed' ? { failure_code: 'CLOUD_AGENT_FAILED' } : {}),
+        ...(status === 'blocked' ? { blocked_reason_code: 'blocked' } : {}),
+      },
+    });
   });
 }
 
@@ -1344,15 +1616,16 @@ async function finalizeAttemptAsFailed(params: {
         updated_at: sql`now()`,
       })
       .where(eq(security_remediations.id, params.attempt.remediation_id));
-  });
-  await recordRemediationAudit({
-    db: params.db,
-    finding: params.finding,
-    remediationId: params.attempt.remediation_id,
-    attemptId: params.attempt.id,
-    action: SecurityAuditLogAction.RemediationFailed,
-    actorId: params.attempt.requested_by_user_id,
-    metadata: { failureCode: params.failureCode },
+    await writeRemediationFindingAuditEvent(tx, {
+      finding: params.finding,
+      attempt: params.attempt,
+      action: SecurityAuditLogAction.RemediationFailed,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+      occurredAt: new Date().toISOString(),
+      beforeState: { remediation_status: params.attempt.status },
+      afterState: { remediation_status: 'failed', failure_code: params.failureCode },
+      metadata: { failure_code: params.failureCode },
+    });
   });
 }
 
@@ -1401,6 +1674,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
           validation: [],
         },
         finalAssistantMessage: params.payload.lastAssistantMessageText,
+        actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
       });
       return { status: 'cancelled-finalized' };
     }
@@ -1451,6 +1725,7 @@ export async function finalizeRemediationCallbackFromEnv(params: {
     attempt,
     result,
     finalAssistantMessage: params.payload.lastAssistantMessageText,
+    actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
   });
   return { status: `${result.status}-finalized` };
 }
@@ -1462,13 +1737,20 @@ export async function startManualRemediation(params: {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const owner = commandOwner(params.request.owner);
   const actor = await getAnalysisActorById(db, params.request.actorUserId);
-  if (!actor) return { admitted: false, reason: 'security_agent_disabled' };
+  if (!actor) {
+    return rejectRemediationAdmission({
+      findingId: params.request.findingId,
+      origin: 'manual',
+      reason: 'security_agent_disabled',
+    });
+  }
   const result = await admitRemediationAttempt({
     db,
     findingId: params.request.findingId,
     origin: 'manual',
     owner,
     requestedByUserId: params.request.actorUserId,
+    requestedByActor: actor,
     allowManualRetry: params.request.retry,
   });
   if (!result.admitted) return result;
@@ -1478,19 +1760,30 @@ export async function startManualRemediation(params: {
     await markAttemptQueueAdmissionFailed(db, result.attemptId);
     throw error;
   }
-  const finding = await getSecurityFindingById(db, params.request.findingId);
-  if (finding) {
-    await recordRemediationAudit({
-      db,
-      finding,
-      remediationId: result.remediationId,
-      attemptId: result.attemptId,
-      action: params.request.retry
-        ? SecurityAuditLogAction.RemediationRetried
-        : SecurityAuditLogAction.RemediationQueued,
-      actorId: params.request.actorUserId,
-      metadata: { origin: 'manual' },
-    });
+  if (params.request.retry) {
+    const finding = await getSecurityFindingById(db, params.request.findingId);
+    if (finding) {
+      try {
+        await recordRemediationAudit({
+          db,
+          finding,
+          remediationId: result.remediationId,
+          attemptId: result.attemptId,
+          action: SecurityAuditLogAction.RemediationRetried,
+          actorId: params.request.actorUserId,
+          metadata: { origin: 'manual' },
+        });
+      } catch (auditError) {
+        logNonReportableRemediationAuditWriteFailure(
+          {
+            remediationId: result.remediationId,
+            attemptId: result.attemptId,
+            action: SecurityAuditLogAction.RemediationRetried,
+          },
+          auditError
+        );
+      }
+    }
   }
   return result;
 }
@@ -1510,6 +1803,8 @@ export async function applyAutoRemediationCommand(params: {
     owner.type === 'org'
       ? eq(security_findings.owned_by_organization_id, owner.id)
       : eq(security_findings.owned_by_user_id, owner.id);
+  const actor = await getAnalysisActorById(db, params.command.actorUserId);
+  if (!actor) throw new Error('Bulk remediation actor unavailable');
   const runtime = await getRuntimeConfig(db, owner);
   const candidateRows = await db
     .select({ id: security_findings.id })
@@ -1546,6 +1841,7 @@ export async function applyAutoRemediationCommand(params: {
         origin: 'bulk_existing',
         owner,
         requestedByUserId: params.command.actorUserId,
+        requestedByActor: actor,
         runtimeConfig: runtime,
       });
       if (result.admitted) {
@@ -1590,18 +1886,6 @@ export async function maybeAdmitAutoRemediationForCompletedAnalysis(params: {
     await markAttemptQueueAdmissionFailed(params.db, result.attemptId);
     throw error;
   }
-  const finding = await getSecurityFindingById(params.db, params.findingId);
-  if (finding) {
-    await recordRemediationAudit({
-      db: params.db,
-      finding,
-      remediationId: result.remediationId,
-      attemptId: result.attemptId,
-      action: SecurityAuditLogAction.RemediationQueued,
-      actorId: null,
-      metadata: { origin: 'auto_policy' },
-    });
-  }
   return result;
 }
 
@@ -1611,6 +1895,9 @@ export async function cancelRemediation(params: {
 }): Promise<{ success: true; status: 'cancelled' | 'cancellation_requested' }> {
   const db = getWorkerDb(params.env.HYPERDRIVE.connectionString, { statement_timeout: 30_000 });
   const owner = commandOwner(params.request.owner);
+  const actor = await getAnalysisActorById(db, params.request.actorUserId);
+  if (!actor) throw new Error('Remediation actor unavailable');
+  const auditActor = toSecurityFindingAuditHumanActor(actor);
   const ownerCondition =
     owner.type === 'org'
       ? eq(security_remediation_attempts.owned_by_organization_id, owner.id)
@@ -1630,6 +1917,7 @@ export async function cancelRemediation(params: {
         attempt,
         result: { status: 'cancelled', summary: 'Cancelled before launch', validation: [] },
         finalAssistantMessage: undefined,
+        actor: auditActor,
       });
     } else {
       await db.transaction(async tx => {
@@ -1665,16 +1953,13 @@ export async function cancelRemediation(params: {
     })
     .where(eq(security_remediation_attempts.id, attempt.id));
   if (attempt.cloud_agent_session_id) {
-    const actor = await getAnalysisActorById(db, params.request.actorUserId);
-    if (actor) {
-      const nextAuthSecret = await params.env.NEXTAUTH_SECRET.get();
-      const authToken = await generateApiToken(actor, nextAuthSecret, params.env.ENVIRONMENT);
-      await interruptCloudAgentSession({
-        env: params.env,
-        authToken,
-        cloudAgentSessionId: attempt.cloud_agent_session_id,
-      });
-    }
+    const nextAuthSecret = await params.env.NEXTAUTH_SECRET.get();
+    const authToken = await generateApiToken(actor, nextAuthSecret, params.env.ENVIRONMENT);
+    await interruptCloudAgentSession({
+      env: params.env,
+      authToken,
+      cloudAgentSessionId: attempt.cloud_agent_session_id,
+    });
   }
   return { success: true, status: 'cancellation_requested' };
 }

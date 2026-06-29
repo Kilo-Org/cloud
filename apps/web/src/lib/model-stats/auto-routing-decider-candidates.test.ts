@@ -50,6 +50,7 @@ describe('summarizeAutoRoutingDeciderCandidates', () => {
         row('model/one-attempt', AUTO_DECIDER_MIN_COST_USD + 1, { nAttempts: 1 }),
         row('model/floored-maximum', AUTO_DECIDER_MAX_COST_USD + 0.99),
         row('kilo/openai/gpt-5.5', 24),
+        row('kilo-auto/efficient', 20),
         row('model/too-expensive', AUTO_DECIDER_MAX_COST_USD + 1),
         row('model/inactive', 20, { active: false }),
         row('kilo-internal/custom', 20),

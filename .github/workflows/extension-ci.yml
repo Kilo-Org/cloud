@@ -1,0 +1,120 @@
+name: extension CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/extension/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.nvmrc'
+      - '.github/workflows/extension-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/extension/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.nvmrc'
+      - '.github/workflows/extension-ci.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Compiler, linter, formatting and unit tests, via the extension's own `verify`
+  # script so the extension's stricter (type-aware) oxlint config is what runs.
+  verify:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify (typecheck, lint, format, unit tests)
+        run: pnpm --filter kilo-extension verify
+
+  # Prove the Firefox MV3 target still builds (the Chrome build runs inside e2e).
+  build-firefox:
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build (Firefox MV3)
+        run: pnpm --filter kilo-extension build:firefox
+
+  # Chrome end-to-end tests. `e2e:chrome` builds the Chrome MV3 bundle first, so this
+  # also covers the Chrome build. Firefox Selenium e2e (`e2e:firefox`) is intentionally
+  # not run here: it relies on geckodriver tab detection that is unreliable headless.
+  e2e-chrome:
+    needs: verify
+    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          lfs: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter kilo-extension exec playwright install --with-deps chromium
+
+      - name: Run Chrome e2e (builds the Chrome MV3 bundle first)
+        run: pnpm --filter kilo-extension e2e:chrome
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: extension-playwright-report
+          path: |
+            apps/extension/playwright-report
+            apps/extension/test-results
+          retention-days: 7
+          if-no-files-found: ignore

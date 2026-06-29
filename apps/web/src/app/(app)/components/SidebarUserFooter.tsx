@@ -49,13 +49,13 @@ export default function SidebarUserFooter({ user, isLoading }: SidebarUserFooter
         </div>
       ) : user ? (
         <div className="flex items-center gap-3 p-2">
-          <Avatar className="h-8 w-8 overflow-hidden rounded-full">
+          <Avatar className="bg-surface-overlay h-8 w-8 overflow-hidden rounded-full border border-border text-foreground">
             <AvatarImage
               src={user.google_user_image_url}
               alt={user.google_user_name}
               className="h-full w-full object-cover"
             />
-            <AvatarFallback className="bg-muted flex h-full w-full items-center justify-center text-sm font-medium">
+            <AvatarFallback className="bg-surface-overlay flex h-full w-full items-center justify-center text-sm font-medium">
               {getUserInitials(user.google_user_name)}
             </AvatarFallback>
           </Avatar>

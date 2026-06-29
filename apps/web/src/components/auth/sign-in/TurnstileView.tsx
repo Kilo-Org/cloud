@@ -66,8 +66,9 @@ export function TurnstileView({
 
         {turnstileError && (
           <button
+            type="button"
             onClick={onRetry}
-            className="mx-auto block rounded-md bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+            className="bg-primary text-primary-foreground hover:bg-primary-hover focus-visible:ring-ring mx-auto block rounded-md px-4 py-2 text-sm focus-visible:ring-[3px] focus-visible:outline-none"
           >
             Try Again
           </button>
@@ -75,7 +76,11 @@ export function TurnstileView({
       </div>
 
       {onBack && backButtonText && (
-        <button onClick={onBack} className="text-muted-foreground mt-4 text-sm hover:underline">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-muted-foreground mt-4 text-sm hover:underline"
+        >
           ← Back to {backButtonText}
         </button>
       )}

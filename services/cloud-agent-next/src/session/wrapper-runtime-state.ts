@@ -1,13 +1,20 @@
 import { z } from 'zod';
-import type {
-  WrapperInstanceLease,
-  WrapperStopReason,
-  WrapperStopTarget,
+import {
+  WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON,
+  type WrapperInspectionFailureReason,
+  type WrapperInstanceLease,
+  type WrapperStopReason,
+  type WrapperStopTarget,
 } from '../agent-sandbox/protocol.js';
+import { isGeneratedSharedSandboxId } from '../sandbox-id.js';
+import type { SandboxId } from '../types.js';
 
 const WRAPPER_RUNTIME_STATE_KEY = 'wrapper_runtime_state';
 const WRAPPER_RUN_MESSAGE_INDEX_VERSION = 1;
 const WRAPPER_LEASE_KEY = 'wrapper_lease';
+const SANDBOX_RECOVERY_STATE_KEY = 'sandbox_recovery_state';
+const CLEANUP_EXHAUSTED_ROLLBACK_FENCE_MS = 100 * 365 * 24 * 60 * 60 * 1_000;
+export const WRAPPER_STOP_MAX_ATTEMPTS = 5;
 
 const wrapperInstanceLeaseSchema = z.object({
   instanceId: z.string().min(1),
@@ -33,39 +40,118 @@ const wrapperStopReasonSchema = z.enum([
   'observation-failed',
 ]);
 
-const wrapperLeaseSchema = z.discriminatedUnion('state', [
-  z.object({ state: z.literal('none'), nextInstanceGeneration: z.number().int().positive() }),
+const SharedSandboxRouteKeySchema = z.custom<SandboxId>(
+  value => typeof value === 'string' && isGeneratedSharedSandboxId(value)
+);
+const sharedSandboxFailoverPublicationSchema = z.discriminatedUnion('status', [
   z.object({
-    state: z.literal('owns_wrapper'),
-    nextInstanceGeneration: z.number().int().positive(),
-    instance: wrapperInstanceLeaseSchema,
-    startupDeadlineAt: z.number().int().nonnegative().optional(),
-    keepWarmUntil: z.number().int().nonnegative().optional(),
-  }),
-  z.object({
-    state: z.literal('stop_needed'),
-    nextInstanceGeneration: z.number().int().positive(),
-    target: wrapperStopTargetSchema,
-    reason: wrapperStopReasonSchema,
-    requestedAt: z.number().int().nonnegative(),
+    status: z.literal('pending'),
+    routeKey: SharedSandboxRouteKeySchema,
+    failedAttempts: z.number().int().nonnegative(),
     nextAttemptAt: z.number().int().nonnegative(),
-    attempts: z.number().int().nonnegative(),
-    lastError: z.string().optional(),
   }),
   z.object({
-    state: z.literal('stopping'),
-    nextInstanceGeneration: z.number().int().positive(),
-    target: wrapperStopTargetSchema,
-    reason: wrapperStopReasonSchema,
-    requestedAt: z.number().int().nonnegative(),
-    attemptId: z.string().min(1),
-    attemptStartedAt: z.number().int().nonnegative(),
-    attemptDeadlineAt: z.number().int().nonnegative(),
-    attempts: z.number().int().nonnegative(),
+    status: z.literal('recorded'),
+    routeKey: SharedSandboxRouteKeySchema,
+  }),
+  z.object({
+    status: z.literal('not-applicable'),
+  }),
+  z.object({
+    status: z.literal('exhausted'),
+    routeKey: SharedSandboxRouteKeySchema,
+    failedAttempts: z.number().int().positive(),
   }),
 ]);
+const sandboxRecoveryStateSchema = z
+  .object({
+    listProcessesTimeouts: z.number().int().positive(),
+    failoverPublication: sharedSandboxFailoverPublicationSchema.optional(),
+  })
+  .superRefine((state, context) => {
+    if (state.failoverPublication && state.listProcessesTimeouts < 2) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Shared sandbox failover publication requires two inspection timeouts',
+        path: ['listProcessesTimeouts'],
+      });
+    }
+  });
+
+const wrapperLeaseSchema = z
+  .discriminatedUnion('state', [
+    z.object({
+      state: z.literal('none'),
+      nextInstanceGeneration: z.number().int().positive(),
+    }),
+    z.object({
+      state: z.literal('owns_wrapper'),
+      nextInstanceGeneration: z.number().int().positive(),
+      instance: wrapperInstanceLeaseSchema,
+      startupDeadlineAt: z.number().int().nonnegative().optional(),
+      keepWarmUntil: z.number().int().nonnegative().optional(),
+    }),
+    z.object({
+      state: z.literal('stop_needed'),
+      nextInstanceGeneration: z.number().int().positive(),
+      target: wrapperStopTargetSchema,
+      reason: wrapperStopReasonSchema,
+      requestedAt: z.number().int().nonnegative(),
+      nextAttemptAt: z.number().int().nonnegative(),
+      attempts: z.number().int().nonnegative(),
+      lastError: z.string().optional(),
+      exhaustedAt: z.number().int().nonnegative().optional(),
+    }),
+    z.object({
+      state: z.literal('stopping'),
+      nextInstanceGeneration: z.number().int().positive(),
+      target: wrapperStopTargetSchema,
+      reason: wrapperStopReasonSchema,
+      requestedAt: z.number().int().nonnegative(),
+      attemptId: z.string().min(1),
+      attemptStartedAt: z.number().int().nonnegative(),
+      attemptDeadlineAt: z.number().int().nonnegative(),
+      attempts: z.number().int().nonnegative(),
+    }),
+  ])
+  .superRefine((lease, context) => {
+    if (
+      lease.state === 'stop_needed' &&
+      lease.exhaustedAt !== undefined &&
+      (lease.attempts < WRAPPER_STOP_MAX_ATTEMPTS ||
+        lease.nextAttemptAt < lease.exhaustedAt + CLEANUP_EXHAUSTED_ROLLBACK_FENCE_MS)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Exhausted cleanup requires its full attempt budget and rollback fence',
+        path: ['exhaustedAt'],
+      });
+    }
+  });
 
 export type WrapperLease = z.infer<typeof wrapperLeaseSchema>;
+export type SandboxRecoveryState = z.infer<typeof sandboxRecoveryStateSchema>;
+
+export type SandboxRecoveryEvent =
+  | {
+      type: 'inspection_failed';
+      reason?: WrapperInspectionFailureReason;
+      startsRecovery?: boolean;
+    }
+  | { type: 'prepare_failover'; routeKey: SandboxId; now: number }
+  | {
+      type: 'record_failover_retry';
+      routeKey: SandboxId;
+      expectedFailedAttempts: number;
+      nextAttemptAt: number;
+    }
+  | { type: 'settle_failover'; outcome: 'not-applicable' }
+  | {
+      type: 'settle_failover';
+      outcome: 'recorded' | 'exhausted';
+      routeKey: SandboxId;
+      expectedFailedAttempts: number;
+    };
 
 export type WrapperLeaseEvent =
   | { type: 'allocate'; instance: WrapperInstanceLease; startupDeadlineAt: number }
@@ -78,16 +164,44 @@ export type WrapperLeaseEvent =
   | { type: 'begin_stop_attempt'; attemptId: string; now: number; attemptDeadlineAt: number }
   | { type: 'stop_absent'; attemptId: string }
   | { type: 'stop_not_confirmed'; attemptId: string; retryAt: number; error: string }
-  | { type: 'stop_attempt_expired'; attemptId: string; retryAt: number };
+  | { type: 'stop_attempt_expired'; attemptId: string; retryAt: number }
+  | { type: 'cleanup_exhausted'; attemptId?: string; now: number; error: string };
 
 export const emptyWrapperLease = (): WrapperLease => ({
   state: 'none',
   nextInstanceGeneration: 1,
 });
 
+const persistedLeaseGenerationSchema = z.object({
+  nextInstanceGeneration: z.number().int().positive(),
+});
+
+async function quarantineInvalidWrapperLease(
+  storage: DurableObjectStorage,
+  stored: unknown
+): Promise<WrapperLease> {
+  const generation = persistedLeaseGenerationSchema.safeParse(stored);
+  const now = Date.now();
+  const quarantined: WrapperLease = {
+    state: 'stop_needed',
+    nextInstanceGeneration: generation.success ? generation.data.nextInstanceGeneration : 1,
+    target: { kind: 'session' },
+    reason: 'observation-failed',
+    requestedAt: now,
+    nextAttemptAt: now + CLEANUP_EXHAUSTED_ROLLBACK_FENCE_MS,
+    attempts: WRAPPER_STOP_MAX_ATTEMPTS,
+    lastError: 'Invalid persisted wrapper lease',
+    exhaustedAt: now,
+  };
+  await storage.put(WRAPPER_LEASE_KEY, wrapperLeaseSchema.parse(quarantined));
+  return quarantined;
+}
+
 export async function getWrapperLease(storage: DurableObjectStorage): Promise<WrapperLease> {
-  const parsed = wrapperLeaseSchema.safeParse(await storage.get(WRAPPER_LEASE_KEY));
-  return parsed.success ? parsed.data : emptyWrapperLease();
+  const stored = await storage.get(WRAPPER_LEASE_KEY);
+  if (stored === undefined) return emptyWrapperLease();
+  const parsed = wrapperLeaseSchema.safeParse(stored);
+  return parsed.success ? parsed.data : quarantineInvalidWrapperLease(storage, stored);
 }
 
 export async function putWrapperLease(
@@ -95,6 +209,132 @@ export async function putWrapperLease(
   lease: WrapperLease
 ): Promise<void> {
   await storage.put(WRAPPER_LEASE_KEY, wrapperLeaseSchema.parse(lease));
+}
+
+export async function getSandboxRecoveryState(
+  storage: DurableObjectStorage
+): Promise<SandboxRecoveryState | undefined> {
+  const stored = await storage.get(SANDBOX_RECOVERY_STATE_KEY);
+  if (stored === undefined) return undefined;
+  const parsed = sandboxRecoveryStateSchema.safeParse(stored);
+  if (!parsed.success) throw new Error('Invalid persisted sandbox recovery state');
+  return parsed.data;
+}
+
+export async function putSandboxRecoveryState(
+  storage: DurableObjectStorage,
+  state: SandboxRecoveryState
+): Promise<void> {
+  await storage.put(SANDBOX_RECOVERY_STATE_KEY, sandboxRecoveryStateSchema.parse(state));
+}
+
+export async function recordSandboxInspectionFailure(
+  storage: DurableObjectStorage,
+  reason: WrapperInspectionFailureReason | undefined,
+  options?: { startsRecovery?: boolean }
+): Promise<SandboxRecoveryState | undefined> {
+  const current = await getSandboxRecoveryState(storage);
+  const updated = reduceSandboxRecoveryState(current, {
+    type: 'inspection_failed',
+    reason,
+    ...options,
+  });
+  if (updated !== current && updated !== undefined) {
+    await putSandboxRecoveryState(storage, updated);
+  }
+  return updated;
+}
+
+export async function clearSettledSandboxRecovery(storage: DurableObjectStorage): Promise<void> {
+  const state = await getSandboxRecoveryState(storage);
+  if (
+    state?.failoverPublication?.status === 'pending' ||
+    (state && state.listProcessesTimeouts >= 2 && !state.failoverPublication)
+  ) {
+    return;
+  }
+  await storage.delete(SANDBOX_RECOVERY_STATE_KEY);
+}
+
+export function reduceSandboxRecoveryState(
+  state: SandboxRecoveryState | undefined,
+  event: SandboxRecoveryEvent
+): SandboxRecoveryState | undefined {
+  switch (event.type) {
+    case 'inspection_failed':
+      if (event.reason !== WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON) return state;
+      if (event.startsRecovery && state?.failoverPublication?.status !== 'pending') {
+        return { listProcessesTimeouts: 1 };
+      }
+      return {
+        ...state,
+        listProcessesTimeouts: (state?.listProcessesTimeouts ?? 0) + 1,
+      };
+    case 'prepare_failover':
+      if (!state || state.listProcessesTimeouts < 2 || state.failoverPublication) return state;
+      return {
+        ...state,
+        failoverPublication: {
+          status: 'pending',
+          routeKey: event.routeKey,
+          failedAttempts: 0,
+          nextAttemptAt: event.now,
+        },
+      };
+    case 'record_failover_retry': {
+      const publication = state?.failoverPublication;
+      if (
+        !state ||
+        publication?.status !== 'pending' ||
+        publication.routeKey !== event.routeKey ||
+        publication.failedAttempts !== event.expectedFailedAttempts
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        failoverPublication: {
+          ...publication,
+          failedAttempts: publication.failedAttempts + 1,
+          nextAttemptAt: event.nextAttemptAt,
+        },
+      };
+    }
+    case 'settle_failover': {
+      if (!state || state.listProcessesTimeouts < 2) return state;
+      const publication = state.failoverPublication;
+      if (event.outcome === 'not-applicable') {
+        if (publication !== undefined) return state;
+        return { ...state, failoverPublication: { status: 'not-applicable' } };
+      }
+      if (
+        publication?.status !== 'pending' ||
+        publication.routeKey !== event.routeKey ||
+        publication.failedAttempts !== event.expectedFailedAttempts
+      ) {
+        return state;
+      }
+      return {
+        ...state,
+        failoverPublication:
+          event.outcome === 'recorded'
+            ? { status: 'recorded', routeKey: event.routeKey }
+            : {
+                status: 'exhausted',
+                routeKey: event.routeKey,
+                failedAttempts: publication.failedAttempts + 1,
+              },
+      };
+    }
+  }
+}
+
+export function nextSandboxRecoveryDeadline(
+  state: SandboxRecoveryState | undefined
+): number | undefined {
+  return state?.failoverPublication?.status === 'pending'
+    ? state.failoverPublication.nextAttemptAt
+    : undefined;
 }
 
 export function reduceWrapperLease(state: WrapperLease, event: WrapperLeaseEvent): WrapperLease {
@@ -131,7 +371,7 @@ export function reduceWrapperLease(state: WrapperLease, event: WrapperLeaseEvent
         return state;
       return { state: 'none', nextInstanceGeneration: state.nextInstanceGeneration };
     case 'request_stop':
-      if (state.state === 'stopping' || state.state === 'stop_needed') return state;
+      if (state.state !== 'none' && state.state !== 'owns_wrapper') return state;
       return {
         state: 'stop_needed',
         nextInstanceGeneration: state.nextInstanceGeneration,
@@ -181,10 +421,36 @@ export function reduceWrapperLease(state: WrapperLease, event: WrapperLeaseEvent
         attempts: state.attempts,
         lastError: 'Stop attempt deadline expired',
       };
+    case 'cleanup_exhausted':
+      if (
+        (state.state !== 'stop_needed' && state.state !== 'stopping') ||
+        state.attempts < WRAPPER_STOP_MAX_ATTEMPTS
+      ) {
+        return state;
+      }
+      if (state.state === 'stopping' && state.attemptId !== event.attemptId) return state;
+      return {
+        state: 'stop_needed',
+        nextInstanceGeneration: state.nextInstanceGeneration,
+        target: state.target,
+        reason: state.reason,
+        requestedAt: state.requestedAt,
+        nextAttemptAt: event.now + CLEANUP_EXHAUSTED_ROLLBACK_FENCE_MS,
+        attempts: state.attempts,
+        lastError: event.error,
+        exhaustedAt: event.now,
+      };
   }
 }
 
+export function isWrapperCleanupExhausted(
+  lease: WrapperLease
+): lease is Extract<WrapperLease, { state: 'stop_needed' }> & { exhaustedAt: number } {
+  return lease.state === 'stop_needed' && lease.exhaustedAt !== undefined;
+}
+
 export function nextWrapperCleanupDeadline(lease: WrapperLease): number | undefined {
+  if (isWrapperCleanupExhausted(lease)) return undefined;
   if (lease.state === 'stop_needed') return lease.nextAttemptAt;
   if (lease.state === 'stopping') return lease.attemptDeadlineAt;
   return undefined;

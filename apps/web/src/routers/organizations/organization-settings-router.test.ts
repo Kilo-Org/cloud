@@ -663,4 +663,90 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.minimum_balance_alert_email).toBeUndefined();
     });
   });
+
+  describe('updateRecommendationsDigest procedure', () => {
+    afterEach(async () => {
+      // Reset settings between cases so each starts from a clean slate.
+      await updateOrganizationSettings(testOrganization.id, {});
+    });
+
+    it('should enable the recommendations digest (enterprise org)', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      const result = await caller.organizations.settings.updateRecommendationsDigest({
+        organizationId: testOrganization.id,
+        enabled: true,
+      });
+
+      expect(result.settings.recommendations_digest_enabled).toBe(true);
+
+      const updatedOrg = await getOrganizationById(testOrganization.id);
+      expect(updatedOrg?.settings?.recommendations_digest_enabled).toBe(true);
+    });
+
+    it('should disable the digest and remove the flag', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await caller.organizations.settings.updateRecommendationsDigest({
+        organizationId: testOrganization.id,
+        enabled: true,
+      });
+
+      const result = await caller.organizations.settings.updateRecommendationsDigest({
+        organizationId: testOrganization.id,
+        enabled: false,
+      });
+
+      expect(result.settings.recommendations_digest_enabled).toBeUndefined();
+
+      const updatedOrg = await getOrganizationById(testOrganization.id);
+      expect(updatedOrg?.settings?.recommendations_digest_enabled).toBeUndefined();
+    });
+
+    it('should throw UNAUTHORIZED error for non-owner users', async () => {
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.updateRecommendationsDigest({
+          organizationId: testOrganization.id,
+          enabled: true,
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+
+    it('should throw FORBIDDEN for non-enterprise organizations', async () => {
+      const teamsOrg = await createTestOrganization('Teams Org Digest', owner.id, 0, {}, true);
+
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateRecommendationsDigest({
+          organizationId: teamsOrg.id,
+          enabled: true,
+        })
+      ).rejects.toThrow('The recommendations digest is not available for this organization.');
+
+      await db.delete(organizations).where(eq(organizations.id, teamsOrg.id));
+    });
+
+    it('should preserve other settings when toggling the digest', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await updateOrganizationSettings(testOrganization.id, {
+        model_deny_list: ['gpt-4'],
+        minimum_balance: 100,
+        minimum_balance_alert_email: ['alert@example.com'],
+      });
+
+      const result = await caller.organizations.settings.updateRecommendationsDigest({
+        organizationId: testOrganization.id,
+        enabled: true,
+      });
+
+      expect(result.settings.model_deny_list).toEqual(['gpt-4']);
+      expect(result.settings.minimum_balance).toBe(100);
+      expect(result.settings.minimum_balance_alert_email).toEqual(['alert@example.com']);
+      expect(result.settings.recommendations_digest_enabled).toBe(true);
+    });
+  });
 });

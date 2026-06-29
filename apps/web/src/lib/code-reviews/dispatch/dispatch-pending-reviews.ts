@@ -500,7 +500,6 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     return false;
   }
 
-  const agentVersion = 'v2';
   const attempt = await ensureCurrentCodeReviewAttemptFromReview(review, shouldEnrollAnalytics);
   const analyticsEnabledAtDispatch =
     owner.type === 'org' && attempt.analytics_enabled_at_dispatch === true;
@@ -551,7 +550,6 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       ...dispatchPayload,
       attemptId: attempt.id,
       skipBalanceCheck: true,
-      agentVersion,
     });
   } catch (dispatchError) {
     errorExceptInTest('[dispatchReview] Worker dispatch failed, leaving review queued', {
@@ -568,7 +566,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
   try {
     await db
       .update(cloud_agent_code_reviews)
-      .set({ agent_version: agentVersion })
+      .set({ agent_version: 'v2' })
       .where(eq(cloud_agent_code_reviews.id, review.id));
   } catch (error) {
     errorExceptInTest('[dispatchReview] Failed to persist agent version after dispatch', {
@@ -577,7 +575,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     });
     captureException(error, {
       tags: { operation: 'dispatch-review-record-agent-version' },
-      extra: { reviewId: review.id, owner, agentVersion },
+      extra: { reviewId: review.id, owner },
     });
   }
 

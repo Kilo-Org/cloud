@@ -34,6 +34,8 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 | **SLA Breach Notification** | Security Agent Notification admitted when eligible finding reaches or passes persisted SLA deadline | Referring to at-or-after-deadline event | Overdue alert, breach reminder |
 | **Notification Recipient** | User authorized to receive one Security Agent Notification: personal owner or current organization owner | Referring to per-user event identity and authorization | Subscriber, watcher, all organization members |
 | **Email Delivery** | Attempt to render and send one Security Agent Notification through Mailgun | Referring to provider side effect, retry, or acceptance | Notification event |
+| **Security Finding Activity Event** | Immutable record of one material user, system-policy, or source-driven action or outcome that changes or explains a Security Finding | Referring to evidence included in a Security Agent Audit Report | Page view, unchanged sync observation, queue claim, heartbeat |
+| **Security Agent Audit Report** | Owner-scoped, period-bounded audit view of Security Finding Activity Events grouped by Security Finding | Referring to the interactive audit report | Generic audit-log export, activity dump |
 
 ## Relationships
 
@@ -44,9 +46,26 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - A **Security Finding** can create at most one **Security Agent Notification** of each kind per **Notification Recipient**.
 - A **New-finding Notification** depends on first insertion into Kilo, not source alert creation time.
 - An **SLA Warning Notification** and **SLA Breach Notification** use persisted `sla_due_at`; warning does not suppress later breach.
+- A Security Agent Audit Report may show a persisted SLA deadline and recorded outcome when trustworthy evidence exists. V1 does not redefine live SLA behavior or calculate authoritative historical SLA compliance.
 - A **Notification Recipient** for an organization finding is a current organization member with role `owner`.
 - An **Email Delivery** realizes a durable **Security Agent Notification** and may be retried without creating new event identity.
 - A **Security Remediation** belongs to one **Security Finding** and can have one or more **Security Remediation Attempts**.
+- A **Security Finding Activity Event** belongs to one Security Agent owner and one Security Finding, including after that finding is deleted.
+- A **Security Finding Activity Event** falls into a report period based on when Kilo recorded or applied it. External source timestamps are supporting evidence and do not determine report inclusion.
+- A **Security Agent Audit Report** groups every matching reportable **Security Finding Activity Event** recorded by Kilo in the selected period.
+- V1 reports persisted SLA evidence only when it can do so from trustworthy recorded data. It does not calculate historical SLA compliance percentages or introduce new SLA lifecycle semantics.
+- A personal **Security Agent Audit Report** is available only to its owning user. An organization report is available to organization owners, billing managers, and audited Kilo platform admins, not ordinary members.
+- Security Agent Audit Report access has no separate plan or active-subscription gate; authorized owners retain read-only historical access after cancellation or disablement.
+- A **Security Agent Audit Report** includes owner history from current, deselected, unavailable, and deleted repository scope. Current Security Agent repository selection does not limit historical evidence; an explicit report repository filter may narrow displayed Security Finding groups by exact recorded repository full name.
+- Human activity in a **Security Agent Audit Report** uses an event-time display name and stable typed actor reference; automated activity uses explicit system attribution. Actor and notification recipient emails are not report evidence.
+- Deleting an actor's Kilo account anonymizes their dedicated identity fields in organization-owned Security Finding Activity Events while preserving stable non-PII attribution and event evidence. Identity-bearing values do not belong in event snapshots or arbitrary metadata.
+- Superseded Security Findings remain separate report groups and show their canonical Security Finding ID when recorded; canonical remediation evidence is not copied into superseded groups.
+- Each v1 report range is capped at 90 inclusive calendar days.
+- A report displays its reliable event-coverage start and labels supplemental legacy activity as potentially incomplete.
+- Disabling Security Agent or its integration does not hide authorized historical Security Agent Audit Reports.
+- `security_audit_log` is the canonical ledger for Security Finding Activity Events; finding events are distinguished by stable finding identity.
+- A reportable local Security Finding state transition and its Security Finding Activity Event are atomic. External side effects use a durable request event and terminal outcome event without keeping database transactions open across network calls.
+- Security Agent Audit Reports include structured, sanitized analysis and remediation outcomes, not prompts, raw analysis markdown, transcripts, assistant messages, full execution logs, or recipient-level notification history.
 
 ## Agent Rules
 
@@ -62,6 +81,8 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - Keep notification eligibility and outbox transitions in **Security Sync**. Keep rendering and Mailgun access in **Security Agent Email Delivery**.
 - Keep notification config parsing and pure eligibility semantics in **Shared Security Notification Policy** so web and Worker cannot drift.
 - Do not call organization members or billing managers **Notification Recipients** unless they also hold current organization `owner` role.
+- Treat "all activity" in a **Security Agent Audit Report** as all material actions and outcomes recorded by Kilo, not every internal processing step or an attestation that legacy history is exhaustive. Exclude reads, unchanged sync observations, queue claims, heartbeats, and retries with no new finding-level outcome.
+- A rollout baseline event records current state at actual capture time for an existing Security Finding; it is not a synthetic creation event and must not be backdated.
 
 ## Ambiguities
 
@@ -90,3 +111,4 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - `.plans/code-review-analytics.md` defines prospective Review Analytics collection, taxonomy, persistence, and metric semantics.
 - `.specs/security-agent.md` defines Security Agent Auto Remediation and notification guarantees.
 - `.plans/security-agent-notifications.md` records notification implementation and rollout design.
+- `.plans/security-agent-audit-report.md` records Security Agent Audit Report implementation and evidence design.

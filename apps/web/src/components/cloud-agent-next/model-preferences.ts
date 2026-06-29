@@ -51,7 +51,9 @@ export function parseLastUsedRepo(rawValue: string | null): LastUsedRepo | null 
       'fullName' in parsed &&
       typeof parsed.fullName === 'string' &&
       'platform' in parsed &&
-      (parsed.platform === 'github' || parsed.platform === 'gitlab')
+      (parsed.platform === 'github' ||
+        parsed.platform === 'gitlab' ||
+        parsed.platform === 'bitbucket')
     ) {
       return { fullName: parsed.fullName, platform: parsed.platform };
     }
@@ -83,6 +85,7 @@ export function getPreferredInitialRepo({
   lastUsedRepo,
   isLoadingGitHubRepos,
   isLoadingGitLabRepos,
+  isLoadingBitbucketRepos,
 }: {
   availableRepos: RepositoryOption[];
   recentRepos: RepositoryOption[];
@@ -90,6 +93,7 @@ export function getPreferredInitialRepo({
   lastUsedRepo: LastUsedRepo | null;
   isLoadingGitHubRepos: boolean;
   isLoadingGitLabRepos: boolean;
+  isLoadingBitbucketRepos: boolean;
 }): RepositoryOption | undefined {
   if (lastUsedRepo) {
     const match = availableRepos.find(
@@ -98,9 +102,15 @@ export function getPreferredInitialRepo({
     if (match) return match;
 
     const isSavedRepoLoading =
-      lastUsedRepo.platform === 'github' ? isLoadingGitHubRepos : isLoadingGitLabRepos;
+      lastUsedRepo.platform === 'github'
+        ? isLoadingGitHubRepos
+        : lastUsedRepo.platform === 'gitlab'
+          ? isLoadingGitLabRepos
+          : isLoadingBitbucketRepos;
     if (isSavedRepoLoading) return undefined;
   }
+
+  if (isLoadingGitHubRepos || isLoadingGitLabRepos || isLoadingBitbucketRepos) return undefined;
 
   return recentRepos[0] ?? onlyAvailableRepo;
 }

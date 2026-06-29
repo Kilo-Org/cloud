@@ -230,6 +230,11 @@
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
     },
   ],
+  "kv_namespaces": [
+    {
+      "binding": "SHARED_SANDBOX_OVERRIDES",
+    },
+  ],
 
   /**
    * Queue Bindings
@@ -275,6 +280,11 @@
           "binding": "HYPERDRIVE",
           "id": "624ec80650dd414199349f4e217ddb10",
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+        },
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "SHARED_SANDBOX_OVERRIDES",
         },
       ],
       "vars": {

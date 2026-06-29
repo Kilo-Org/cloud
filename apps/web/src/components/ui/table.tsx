@@ -2,48 +2,48 @@
 
 import * as React from 'react';
 
+import {
+  tableBodyClassName,
+  tableCaptionClassName,
+  tableCellClassName,
+  tableClassName,
+  tableFooterClassName,
+  tableHeadClassName,
+  tableHeaderClassName,
+  tableRowClassName,
+} from '@/components/ui/primitive-classnames';
 import { cn } from '@/lib/utils';
 
 function Table({ className, ...props }: React.ComponentProps<'table'>) {
-  return <table className={cn('w-full caption-bottom text-sm', className)} {...props} />;
+  return <table className={cn(tableClassName, className)} {...props} />;
 }
 
 function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
-  return <thead className={cn('border-b', className)} {...props} />;
+  return <thead className={cn(tableHeaderClassName, className)} {...props} />;
 }
 
 function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
-  return <tbody className={cn('[&_tr:last-child]:border-0', className)} {...props} />;
+  return <tbody className={cn(tableBodyClassName, className)} {...props} />;
 }
 
 function TableFooter({ className, ...props }: React.ComponentProps<'tfoot'>) {
-  return <tfoot className={cn('bg-muted/50 border-t font-medium', className)} {...props} />;
+  return <tfoot className={cn(tableFooterClassName, className)} {...props} />;
 }
 
 function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
-  return (
-    <tr className={cn('hover:bg-muted/50 border-b transition-colors', className)} {...props} />
-  );
+  return <tr className={cn(tableRowClassName, className)} {...props} />;
 }
 
 function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
-  return (
-    <th
-      className={cn(
-        'text-foreground h-10 px-2 text-left align-middle font-medium whitespace-nowrap',
-        className
-      )}
-      {...props}
-    />
-  );
+  return <th className={cn(tableHeadClassName, className)} {...props} />;
 }
 
 function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
-  return <td className={cn('px-2 py-1 align-middle', className)} {...props} />;
+  return <td className={cn(tableCellClassName, className)} {...props} />;
 }
 
 function TableCaption({ className, ...props }: React.ComponentProps<'caption'>) {
-  return <caption className={cn('text-muted-foreground mt-4 text-sm', className)} {...props} />;
+  return <caption className={cn(tableCaptionClassName, className)} {...props} />;
 }
 
 export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption };

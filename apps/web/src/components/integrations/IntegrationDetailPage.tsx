@@ -69,6 +69,18 @@ const integrationDetailRegistry = {
       );
     },
   },
+  [PLATFORM.BITBUCKET]: {
+    title: 'Bitbucket Integration',
+    userSubtitle: 'Bitbucket is available for Kilo organizations',
+    organizationSubtitle: organizationName =>
+      `Manage the Bitbucket Cloud workspace for ${organizationName}`,
+    render: async ({ organizationId, search }) => {
+      if (!organizationId) notFound();
+      const { BitbucketIntegrationDetails } =
+        await import('@/components/integrations/BitbucketIntegrationDetails');
+      return <BitbucketIntegrationDetails organizationId={organizationId} error={search.error} />;
+    },
+  },
   [PLATFORM.SLACK]: {
     title: 'Slack Integration',
     userSubtitle: 'Connect your Slack workspace to receive notifications',
@@ -209,6 +221,7 @@ export async function UserIntegrationDetailPage({
   searchParams: IntegrationDetailSearchParams;
 }) {
   const detailPlatform = getIntegrationDetailPlatform(platform);
+  if (detailPlatform === PLATFORM.BITBUCKET) notFound();
   const entry = getIntegrationDetailEntry(detailPlatform);
   await getUserFromAuthOrRedirect('/users/sign_in');
   const search = await searchParams;

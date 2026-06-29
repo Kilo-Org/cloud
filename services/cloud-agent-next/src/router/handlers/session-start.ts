@@ -27,6 +27,7 @@ import {
 } from './session-prepare.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
+import { assertBitbucketRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
 
 type SessionStartHandlers = {
   start: typeof startSessionHandler;
@@ -42,6 +43,28 @@ function startInputToSessionCreateRequest(
   const repo = input.repository;
   const profile = input.profile;
 
+  let repository: SessionCreateRequest['repository'];
+  switch (repo.type) {
+    case 'github':
+      repository = { type: 'github', repo: repo.repo, branch: repo.branch };
+      break;
+    case 'gitlab':
+      repository = { type: 'gitlab', url: repo.url, branch: repo.branch };
+      break;
+    case 'bitbucket':
+      repository = {
+        type: 'bitbucket',
+        url: repo.url,
+        workspaceUuid: repo.workspaceUuid,
+        repositoryUuid: repo.repositoryUuid,
+        branch: repo.branch,
+      };
+      break;
+    case 'git':
+      repository = { type: 'git', url: repo.url, token: repo.token, branch: repo.branch };
+      break;
+  }
+
   return {
     initialTurn: {
       type: 'prompt',
@@ -50,12 +73,7 @@ function startInputToSessionCreateRequest(
       attachments: input.message.attachments ?? input.message.images,
     },
     agent: input.agent,
-    repository:
-      repo.type === 'github'
-        ? { type: 'github', repo: repo.repo, branch: repo.branch }
-        : repo.type === 'gitlab'
-          ? { type: 'gitlab', url: repo.url, branch: repo.branch }
-          : { type: 'git', url: repo.url, token: repo.token, branch: repo.branch },
+    repository,
     profile: profile
       ? {
           id: profile.id,
@@ -108,6 +126,12 @@ const startSessionHandler = protectedProcedure
         db = getPgDb(ctx.env);
         await assertOrganizationMembership(db, ctx.userId, organizationId);
       }
+      await assertBitbucketRepositoryAccessBeforeSessionCreation({
+        env: ctx.env,
+        userId: ctx.userId,
+        orgId: organizationId,
+        repository: request.repository,
+      });
 
       const policy = profileResolutionPolicyForSessionCreateOrigin(
         input.options?.createdOnPlatform

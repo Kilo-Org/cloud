@@ -124,8 +124,18 @@ describe('detectGitPlatform', () => {
     expect(detectGitPlatform('ssh://git@gitlab.com/group/project.git')).toBe('gitlab');
   });
 
-  test('Bitbucket returns undefined', () => {
-    expect(detectGitPlatform('https://bitbucket.org/owner/repo.git')).toBeUndefined();
+  test('Bitbucket HTTPS', () => {
+    expect(detectGitPlatform('https://bitbucket.org/workspace/repo.git')).toBe('bitbucket');
+  });
+
+  test('Bitbucket SSH', () => {
+    expect(detectGitPlatform('git@bitbucket.org:workspace/repo.git')).toBe('bitbucket');
+  });
+
+  test('Bitbucket browse URL', () => {
+    expect(detectGitPlatform('https://bitbucket.org/workspace/repo/pull-requests/1')).toBe(
+      'bitbucket'
+    );
   });
 
   test('null returns undefined', () => {
@@ -186,6 +196,22 @@ describe('extractRepoFromGitUrl', () => {
     );
   });
 
+  test('Bitbucket HTTPS extracts workspace/repo', () => {
+    expect(extractRepoFromGitUrl('https://bitbucket.org/workspace/repo.git')).toBe(
+      'workspace/repo'
+    );
+  });
+
+  test('Bitbucket SSH extracts workspace/repo', () => {
+    expect(extractRepoFromGitUrl('git@bitbucket.org:workspace/repo.git')).toBe('workspace/repo');
+  });
+
+  test('Bitbucket browse URL extracts workspace/repo', () => {
+    expect(extractRepoFromGitUrl('https://bitbucket.org/workspace/repo/pull-requests/1')).toBe(
+      'workspace/repo'
+    );
+  });
+
   test('null returns undefined', () => {
     expect(extractRepoFromGitUrl(null)).toBeUndefined();
   });
@@ -202,6 +228,12 @@ describe('buildPrepareSessionRepoParams', () => {
     expect(buildPrepareSessionRepoParams({ repo: 'group/project', platform: 'gitlab' })).toEqual({
       gitlabProject: 'group/project',
     });
+  });
+
+  test('bitbucket platform requires structured repository identity', () => {
+    expect(
+      buildPrepareSessionRepoParams({ repo: 'workspace/repo', platform: 'bitbucket' })
+    ).toBeNull();
   });
 
   test('null repo returns null', () => {
@@ -224,6 +256,12 @@ describe('findAllGitPlatformUrls', () => {
     expect(
       findAllGitPlatformUrls('See https://gitlab.com/group/project/-/merge_requests/1')
     ).toEqual(['https://gitlab.com/group/project/-/merge_requests/1']);
+  });
+
+  test('extracts Bitbucket URL', () => {
+    expect(
+      findAllGitPlatformUrls('See https://bitbucket.org/workspace/repo/pull-requests/1')
+    ).toEqual(['https://bitbucket.org/workspace/repo/pull-requests/1']);
   });
 
   test('returns all URLs in order when multiple are present', () => {

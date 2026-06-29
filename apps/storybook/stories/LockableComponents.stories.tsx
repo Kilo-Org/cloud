@@ -15,7 +15,7 @@ import { LockableContainer } from '@/components/organizations/LockableContainer'
 import { Label } from '@/components/ui/label';
 
 const meta: Meta = {
-  title: 'Components/Wrappers/LockableMode',
+  title: 'Components/Utilities/LockableMode',
   parameters: {
     layout: 'centered',
     chromatic: { disableSnapshot: true },

@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import type { WorkerDb } from '@kilocode/db/client';
 import { deriveCallbackToken } from '@kilocode/worker-utils';
+import { buildSecurityFindingAnalysisInput } from '@kilocode/worker-utils/security-remediation-policy';
 import {
   clearAnalysisStatus,
   getSecurityFindingById,
@@ -171,6 +172,7 @@ export async function startSecurityAnalysis(
   if (!finding) {
     return { started: false, error: `Finding not found: ${params.findingId}` };
   }
+  const findingDataSnapshot = buildSecurityFindingAnalysisInput(finding);
 
   const leaseAcquired = await tryAcquireAnalysisStartLease(params.db, params.findingId);
   if (!leaseAcquired) {
@@ -214,6 +216,7 @@ export async function startSecurityAnalysis(
     if (!runSandbox) {
       const triageOnlyAnalysis: SecurityFindingAnalysis = {
         triage,
+        findingDataSnapshot,
         analyzedAt: new Date().toISOString(),
         modelUsed: params.triageModel,
         triageModel: params.triageModel,
@@ -241,6 +244,7 @@ export async function startSecurityAnalysis(
 
     const partialAnalysis: SecurityFindingAnalysis = {
       triage,
+      findingDataSnapshot,
       analyzedAt: new Date().toISOString(),
       modelUsed: params.analysisModel,
       triageModel: params.triageModel,

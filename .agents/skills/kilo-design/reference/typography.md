@@ -24,24 +24,16 @@ Kilo-specific rules:
   billing, usage counters, tables, KPIs, timers.
 - **Disable code ligatures** (`font-variant-ligatures: none;`) only on
   surfaces where glyph-accurate code matters (terminals, diff views).
-- **Dark-first line-height bump.** Kilo's default theme is dark. Light text
-  on dark reads as lighter weight — prefer the upper end of `line-height`
-  ranges (1.55–1.65 for body).
-- Logo wordmark is `text-3xl font-bold`; topbars/pages derive their scale
-  from there.
-- Known token mismatch: `globals.css` maps Tailwind to `--font-geist-*`
-  variables that no longer exist. `font-sans` / `font-mono` utilities may
-  fall back to system fonts until this is fixed. For now, rely on the font
-  variables Inter/Roboto Mono apply via the `<html>` classList in
-  `layout.tsx`. Do not paper over this mismatch per component; it is a
-  design-system issue.
+- **Use exact role metrics.** `type-title`, `type-heading`, `type-body-lg`, `type-body`, `type-label`, `type-eyebrow`, and `type-code` implement `DESIGN.md`; do not independently bump line-height or weight.
+- Page titles use `type-title` (`1.5rem / 600 / 1.2`). Logo lockups may retain their existing brand-specific styling.
+- `globals.css` maps `font-sans` and `font-mono` to the variables loaded by `layout.tsx`. Do not add per-component font fallbacks.
 
 Absolute rejects in Kilo product UI:
 
 - New font families outside the three listed above.
 - Gradient text.
 - ALL-CAPS body copy (short labels/eyebrows OK with added tracking).
-- Font sizes not on the Tailwind scale.
+- Font sizes outside canonical `type-*` utilities or an approved brand/marketing scale.
 - Fluid `clamp()` in product UI.
 
 ---
@@ -78,9 +70,7 @@ and commit. Do not mix multiple scales.
 Cap body width in the 45–75ch band (`max-width: 65ch`). Narrow columns need
 tighter leading; wide columns need more.
 
-**Dark mode compensation.** Light text on dark reads lighter than dark on
-light. Bump line-height by 0.05–0.1, add a trace of letter-spacing (0.01em),
-and step body weight up one notch if the text looks thin.
+**Dark mode compensation.** Light text on dark can read lighter than dark on light. Kilo's canonical type roles already account for product density. Do not alter their line-height, tracking, or weight per component; propose a contract change if readability testing shows a systemic issue.
 
 **Paragraph rhythm.** Use either space between paragraphs or first-line
 indent. Never both. Product UI uses space.
@@ -173,15 +163,13 @@ to `0.12em`).
 
 ## Typography System Architecture
 
-Name tokens semantically (`--text-body`, `--text-heading`), not by value
-(`--font-size-16`). In Kilo, prefer Tailwind's `text-*` scale and the
-`--font-sans` / `--font-mono` / `--font-jetbrains` variables directly.
+Name tokens semantically, not by value. In Kilo product UI, prefer canonical `type-*` utilities. Use `font-sans`, `font-mono`, or `.font-jetbrains` only when a complete role utility does not apply.
 
 ## Accessibility
 
 - **Never disable zoom.** `user-scalable=no` breaks accessibility.
 - **Use `rem`/`em` for font sizes.** Never `px` for body text.
-- **Minimum 16px body text.** Smaller than this fails WCAG on mobile.
+- **Mobile readability.** Use the `type-body-lg` utility for long-form mobile reading. Keep form controls at 16px where needed to prevent browser zoom. The canonical compact product `body` role remains 14px.
 - **Adequate touch targets.** Text links need padding or line-height that
   yields a 44px+ tap target.
 

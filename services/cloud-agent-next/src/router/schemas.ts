@@ -388,9 +388,11 @@ export const PrepareSessionInput = z
         'Git token for generic git repositories. Ignored when platform selects a managed provider.'
       ),
     platform: z
-      .enum(['github', 'gitlab'])
+      .enum(['github', 'gitlab', 'bitbucket'])
       .optional()
       .describe('Git platform type for correct token/env var handling'),
+    bitbucketWorkspaceUuid: z.string().uuid().optional(),
+    bitbucketRepositoryUuid: z.string().uuid().optional(),
 
     // Optional configuration
     envVars: envVarsSchema.optional().describe('Environment variables to inject into the session'),
@@ -512,6 +514,27 @@ export const PrepareSessionInput = z
     message: 'Must provide either githubRepo or gitUrl, but not both',
     path: ['githubRepo'],
   })
+  .superRefine((data, ctx) => {
+    const hasBitbucketIds =
+      data.bitbucketWorkspaceUuid !== undefined && data.bitbucketRepositoryUuid !== undefined;
+    if (
+      (data.bitbucketWorkspaceUuid === undefined) !==
+      (data.bitbucketRepositoryUuid === undefined)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['bitbucketWorkspaceUuid'],
+        message: 'Bitbucket workspace and repository UUIDs must be provided together',
+      });
+    }
+    if ((data.platform === 'bitbucket') !== hasBitbucketIds) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['platform'],
+        message: 'Bitbucket identity is required only for Bitbucket repositories',
+      });
+    }
+  })
   .superRefine(rejectAmbiguousAttachments)
   .refine(requiresAppendSystemPrompt, {
     message: 'appendSystemPrompt is required when mode is custom',
@@ -560,6 +583,13 @@ export const RepositoryInputSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('gitlab'),
     url: gitUrlSchema.describe('GitLab repository HTTPS URL'),
+    branch: branchNameSchema.optional().describe('Branch to checkout'),
+  }),
+  z.object({
+    type: z.literal('bitbucket'),
+    url: gitUrlSchema.describe('Bitbucket Cloud repository HTTPS URL'),
+    workspaceUuid: z.string().uuid(),
+    repositoryUuid: z.string().uuid(),
     branch: branchNameSchema.optional().describe('Branch to checkout'),
   }),
   z.object({
@@ -802,7 +832,7 @@ export const GetSessionOutput = z.object({
   // Repository info (no tokens)
   githubRepo: z.string().optional().describe('GitHub repository in org/repo format'),
   gitUrl: z.string().optional().describe('Generic git URL'),
-  platform: z.enum(['github', 'gitlab']).optional().describe('Git platform type'),
+  platform: z.enum(['github', 'gitlab', 'bitbucket']).optional().describe('Git platform type'),
 
   // Execution params
   prompt: z.string().optional().describe('Task prompt'),

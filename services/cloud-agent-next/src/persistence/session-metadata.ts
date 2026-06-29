@@ -1,5 +1,7 @@
 import * as z from 'zod';
 
+import { isGeneratedSharedSandboxId } from '../sandbox-id.js';
+import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import type { SandboxId } from '../types.js';
 import {
@@ -16,6 +18,11 @@ const SandboxIdSchema = z
     s => /^(ses|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
     'Invalid sandboxId format'
   )
+  .transform(s => s as SandboxId);
+
+const SharedSandboxIdSchema = z
+  .string()
+  .refine(isGeneratedSharedSandboxId, 'Invalid shared sandbox ID format')
   .transform(s => s as SandboxId);
 
 const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
@@ -60,6 +67,17 @@ const MetadataRepositorySchema = z.discriminatedUnion('type', [
       platform: z.literal('gitlab').optional(),
       gitlabTokenManaged: z.boolean().optional(),
       ...RepositoryCommonSchema,
+    })
+    .strip(),
+  z
+    .object({
+      type: z.literal('bitbucket'),
+      url: z.string(),
+      platform: z.literal('bitbucket').optional(),
+      workspaceUuid: z.string().uuid(),
+      repositoryUuid: z.string().uuid(),
+      bitbucketTokenManaged: z.boolean().optional(),
+      upstreamBranch: branchNameSchema.optional(),
     })
     .strip(),
   z
@@ -125,16 +143,55 @@ const MetadataCallbackSchema = z
   })
   .strip();
 
+const MetadataSharedSandboxRouteSchema = z
+  .object({
+    kind: z.literal('shared'),
+    routeKey: SharedSandboxIdSchema,
+    suffix: z.literal(SHARED_SANDBOX_FAILOVER_SUFFIX).optional(),
+  })
+  .strip();
+
 const MetadataWorkspaceSchema = z
   .object({
     sandboxId: SandboxIdSchema.optional(),
+    sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     workspacePath: z.string().optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
     shallow: z.boolean().optional(),
     devcontainerRequested: z.boolean().optional(),
   })
-  .strip();
+  .strip()
+  .superRefine((workspace, context) => {
+    const route = workspace.sandboxRoute;
+    if (!route) return;
+    const sandboxId = workspace.sandboxId;
+    if (!sandboxId || !isGeneratedSharedSandboxId(sandboxId)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Shared sandbox route requires a shared sandbox ID',
+        path: ['sandboxId'],
+      });
+      return;
+    }
+    if (sandboxId.slice(0, 3) !== route.routeKey.slice(0, 3)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Shared sandbox route and assignment prefixes must match',
+        path: ['sandboxId'],
+      });
+    }
+    if (
+      (route.suffix === undefined && sandboxId !== route.routeKey) ||
+      (route.suffix !== undefined && sandboxId === route.routeKey)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Shared sandbox assignment does not match its route suffix',
+        path: ['sandboxId'],
+      });
+    }
+  });
 
 const MetadataDevContainerSchema = z
   .object({

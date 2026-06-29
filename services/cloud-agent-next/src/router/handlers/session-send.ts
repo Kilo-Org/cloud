@@ -12,6 +12,7 @@ import { logger, withLogTags } from '../../logger.js';
 import { SendMessageInput, ExecutionResponse } from '../schemas.js';
 import { preflightAndQueuePromptMessage } from '../../session/queue-message.js';
 import type { SessionId } from '../../types/ids.js';
+import { requireCurrentSessionAccess } from '../../session-access.js';
 
 type SessionSendHandlers = {
   send: typeof sendMessageHandler;
@@ -29,6 +30,12 @@ const sendMessageHandler = protectedProcedure
       const sessionId = input.cloudAgentSessionId as SessionId;
       logger.setTags({ userId: ctx.userId, sessionId });
       logger.info('Sending message via unified send endpoint');
+      await requireCurrentSessionAccess({
+        env: ctx.env,
+        kiloUserId: ctx.userId,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        validatedSessionAccess: ctx.validatedSessionAccess,
+      });
       const queuedMessage = {
         cloudAgentSessionId: input.cloudAgentSessionId,
         turn: {

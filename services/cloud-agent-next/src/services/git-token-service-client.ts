@@ -1,5 +1,10 @@
 import { logger } from '../logger.js';
-import type { GitAuthorConfig, GitTokenService, ManagedGitHubFallbackReason } from '../types.js';
+import type {
+  BitbucketTokenFailureReason,
+  GitAuthorConfig,
+  GitTokenService,
+  ManagedGitHubFallbackReason,
+} from '../types.js';
 
 type GitTokenServiceEnv = {
   GIT_TOKEN_SERVICE?: GitTokenService;
@@ -179,6 +184,42 @@ export async function resolveCloudAgentGitHubAuthForRepo(
 export type ResolveManagedGitLabTokenResult =
   | { success: true; token: string; glabIsOAuth2: boolean }
   | { success: false; reason: string };
+
+export type ResolveManagedBitbucketTokenResult =
+  | { success: true; token: string }
+  | { success: false; reason: BitbucketTokenFailureReason };
+
+export async function resolveManagedBitbucketToken(
+  env: GitTokenServiceEnv,
+  params: {
+    userId: string;
+    orgId: string;
+    workspaceUuid: string;
+    repositoryUuid: string;
+    repositoryUrl: string;
+  }
+): Promise<ResolveManagedBitbucketTokenResult> {
+  if (!params.orgId) {
+    return { success: false, reason: 'invalid_request' };
+  }
+
+  try {
+    if (!env.GIT_TOKEN_SERVICE?.getBitbucketToken) {
+      logger.warn('Bitbucket git-token-service binding is not configured');
+      return { success: false, reason: 'temporarily_unavailable' };
+    }
+    const result = await env.GIT_TOKEN_SERVICE.getBitbucketToken(params);
+    if (result.success) {
+      logger.info('Resolved Bitbucket token via git-token-service');
+      return { success: true, token: result.token };
+    }
+    logger.withFields({ reason: result.reason }).info('Bitbucket token lookup failed');
+    return { success: false, reason: result.reason };
+  } catch {
+    logger.error('Failed to call git-token-service getBitbucketToken');
+    return { success: false, reason: 'temporarily_unavailable' };
+  }
+}
 
 export async function resolveManagedGitLabToken(
   env: GitTokenServiceEnv,

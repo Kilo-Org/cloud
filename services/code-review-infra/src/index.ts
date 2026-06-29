@@ -6,14 +6,11 @@
  *
  * Architecture:
  * - POST /review - Create and start a code review (returns 202 immediately)
- * - GET /reviews/:reviewId/events - Get events for a review (SSE flow only)
  * - POST /reviews/:reviewId/cancel - Cancel a running review
  * - GET /health - Health check endpoint
  *
  * Features:
- * - Durable Objects support two execution modes (feature-flagged):
- *   - Default: cloud-agent SSE streaming (initiateSessionAsync)
- *   - cloud-agent-next: prepareSession + initiateFromKilocodeSessionV2 with callback
+ * - Durable Objects dispatch Cloud Agent Next sessions with callback completion
  * - Concurrency control handled in Next.js (dispatch logic)
  * - Fire-and-forget from Next.js dispatch
  */
@@ -67,7 +64,6 @@ app.post('/review', async (c: Context<HonoEnv>) => {
   console.log('[POST /review] Received review request', {
     reviewId: body.reviewId,
     owner: body.owner,
-    agentVersion: body.agentVersion,
   });
 
   // Create DO name from reviewId (concurrency controlled by Next.js dispatch)
@@ -92,7 +88,6 @@ app.post('/review', async (c: Context<HonoEnv>) => {
         sessionInput: body.sessionInput,
         owner: body.owner,
         skipBalanceCheck: body.skipBalanceCheck,
-        agentVersion: body.agentVersion,
         previousCloudAgentSessionId: body.previousCloudAgentSessionId,
         repositorySize: body.repositorySize,
       }),
@@ -100,7 +95,6 @@ app.post('/review', async (c: Context<HonoEnv>) => {
   );
 
   // Fire-and-forget: trigger review execution via HTTP context (no 15-min wall time limit)
-  // Routes to cloud-agent SSE or cloud-agent-next based on useCloudAgentNext flag
   c.executionCtx.waitUntil(
     withDORetry(
       () => c.env.CODE_REVIEW_ORCHESTRATOR.get(id),
@@ -128,30 +122,6 @@ app.post('/review', async (c: Context<HonoEnv>) => {
   };
 
   return c.json(response, 202);
-});
-
-// Route: GET /reviews/:reviewId/events (used by SSE/cloud-agent flow for event polling)
-app.get('/reviews/:reviewId/events', async (c: Context<HonoEnv>) => {
-  const reviewId = c.req.param('reviewId');
-  const attemptId = c.req.query('attemptId') ?? undefined;
-
-  if (!reviewId) {
-    return c.json({ error: 'reviewId parameter required' }, 400);
-  }
-
-  console.log('[GET /reviews/:reviewId/events] Fetching events', { reviewId });
-
-  // Get Durable Object ID
-  const id = c.env.CODE_REVIEW_ORCHESTRATOR.idFromName(doNameForAttempt(reviewId, attemptId));
-
-  // Get events via RPC with retry
-  const result = await withDORetry(
-    () => c.env.CODE_REVIEW_ORCHESTRATOR.get(id),
-    stub => stub.getEvents(),
-    'getEvents'
-  );
-
-  return c.json(result);
 });
 
 // Route: GET /reviews/:reviewId/status

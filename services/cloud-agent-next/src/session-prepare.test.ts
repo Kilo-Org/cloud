@@ -1,11 +1,12 @@
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
+import type * as SandboxIdModule from './sandbox-id.js';
 import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schemas from './router/schemas.js';
 
 const {
   generateSessionIdMock,
-  generateSandboxIdMock,
+  generateSandboxRoutingTargetMock,
   createCliSessionMock,
   deleteCliSessionMock,
   createSessionReportMock,
@@ -20,7 +21,9 @@ const {
   assertKiloModelAvailableMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
-  generateSandboxIdMock: vi.fn().mockResolvedValue('sb-test-123'),
+  generateSandboxRoutingTargetMock: vi
+    .fn()
+    .mockResolvedValue({ kind: 'isolated', sandboxId: 'sb-test-123' }),
   createCliSessionMock: vi.fn().mockResolvedValue({ created: true }),
   deleteCliSessionMock: vi.fn().mockResolvedValue({ deleted: true }),
   createSessionReportMock: vi.fn().mockResolvedValue(undefined),
@@ -58,10 +61,14 @@ vi.mock('./utils/kilo-session-id.js', () => ({
   generateKiloSessionId: vi.fn(() => 'cli-session-abc123'),
 }));
 
-vi.mock('./sandbox-id.js', () => ({
-  generateSandboxId: generateSandboxIdMock,
-  getSandboxNamespace: vi.fn(),
-}));
+vi.mock('./sandbox-id.js', async importOriginal => {
+  const actual = await importOriginal<typeof SandboxIdModule>();
+  return {
+    ...actual,
+    generateSandboxRoutingTarget: generateSandboxRoutingTargetMock,
+    getSandboxNamespace: vi.fn(),
+  };
+});
 
 vi.mock('./telemetry/session-reports.js', () => ({
   createCloudAgentSessionReport: createSessionReportMock,
@@ -243,7 +250,10 @@ describe('prepareSession endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
-    generateSandboxIdMock.mockResolvedValue('sb-test-123');
+    generateSandboxRoutingTargetMock.mockResolvedValue({
+      kind: 'isolated',
+      sandboxId: 'sb-test-123',
+    });
     createCliSessionMock.mockResolvedValue({ created: true });
     deleteCliSessionMock.mockResolvedValue({ deleted: true });
     createSessionReportMock.mockResolvedValue(undefined);
@@ -651,8 +661,54 @@ describe('prepareSession endpoint', () => {
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
   });
 
+  it('persists the shared sandbox selected by the KV suffix', async () => {
+    const routeKey = 'usr-000000000000000000000000000000000000000000000000';
+    const failoverSandboxId = 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df';
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+      kind: 'shared',
+      routeKey,
+    });
+    const overrideStore = {
+      get: vi.fn().mockResolvedValue('shared-slot-v1'),
+      put: vi.fn(),
+    };
+    const doStub = createMockDOStub();
+    const context = createInternalApiContext({ doStub });
+    Object.assign(context.env, { SHARED_SANDBOX_OVERRIDES: overrideStore });
+    const caller = appRouter.createCaller(context);
+
+    await caller.start({
+      message: { prompt: 'Use the assigned shared sandbox' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+    });
+
+    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledOnce();
+    expect(overrideStore.get).toHaveBeenCalledWith(`shared-sandbox-route:${routeKey}`);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: {
+          sandboxId: failoverSandboxId,
+          shallow: undefined,
+          sandboxRoute: {
+            kind: 'shared',
+            routeKey,
+            suffix: 'shared-slot-v1',
+          },
+        },
+      })
+    );
+    expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sandboxId: failoverSandboxId }),
+      expect.any(Object)
+    );
+  });
+
   it('creates auto-initiated devcontainer sessions with grouped DIND sandbox intent', async () => {
-    generateSandboxIdMock.mockResolvedValueOnce('dind-abcdef');
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+      kind: 'isolated',
+      sandboxId: 'dind-abcdef',
+    });
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
 
@@ -665,7 +721,7 @@ describe('prepareSession endpoint', () => {
       devcontainer: true,
     });
 
-    expect(generateSandboxIdMock).toHaveBeenCalledWith(
+    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
       undefined,
       undefined,
       'test-user-123',
@@ -939,7 +995,10 @@ describe('start endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
-    generateSandboxIdMock.mockResolvedValue('sb-test-123');
+    generateSandboxRoutingTargetMock.mockResolvedValue({
+      kind: 'isolated',
+      sandboxId: 'sb-test-123',
+    });
     createCliSessionMock.mockResolvedValue({ created: true });
     deleteCliSessionMock.mockResolvedValue({ deleted: true });
     createSessionReportMock.mockResolvedValue(undefined);
@@ -1139,7 +1198,7 @@ describe('start endpoint', () => {
       })
     ).rejects.toThrow('session report unavailable');
 
-    expect(generateSandboxIdMock).not.toHaveBeenCalled();
+    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(recordVisibleSessionOutcomeMock).not.toHaveBeenCalled();
     expect(recordInitialAdmissionMock).not.toHaveBeenCalled();
@@ -1148,7 +1207,9 @@ describe('start endpoint', () => {
   });
 
   it('records sandbox identity failure without claiming visible-row compensation', async () => {
-    generateSandboxIdMock.mockRejectedValueOnce(new Error('sandbox identity unavailable'));
+    generateSandboxRoutingTargetMock.mockRejectedValueOnce(
+      new Error('sandbox identity unavailable')
+    );
     const caller = appRouter.createCaller(createInternalApiContext({}));
 
     await expect(
@@ -1195,9 +1256,9 @@ describe('start endpoint', () => {
     createSessionReportMock.mockImplementationOnce(async () => {
       steps.push('session-report');
     });
-    generateSandboxIdMock.mockImplementationOnce(async () => {
+    generateSandboxRoutingTargetMock.mockImplementationOnce(async () => {
       steps.push('sandbox');
-      return 'sb-test-123';
+      return { kind: 'isolated', sandboxId: 'sb-test-123' };
     });
     recordSandboxIdentityMock.mockImplementationOnce(async () => {
       steps.push('sandbox-report');

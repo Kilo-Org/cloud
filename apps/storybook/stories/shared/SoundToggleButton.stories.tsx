@@ -19,7 +19,7 @@ function SoundToggleButtonStory({ enabled: initialEnabled = true, size = 'sm' }:
 }
 
 const meta: Meta<typeof SoundToggleButtonStory> = {
-  title: 'Shared/SoundToggleButton',
+  title: 'Components/Actions/SoundToggleButton',
   component: SoundToggleButtonStory,
   tags: ['autodocs'],
   parameters: {

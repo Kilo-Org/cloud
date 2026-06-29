@@ -82,7 +82,7 @@ function getIconForState(state: OrgTrialStatus, className?: string) {
 function getButtonVariantForState(state: OrgTrialStatus): ButtonVariant {
   switch (state) {
     case 'trial_active':
-      return 'blue';
+      return 'primary';
     case 'trial_ending_soon':
       return 'warning';
     case 'trial_ending_very_soon':

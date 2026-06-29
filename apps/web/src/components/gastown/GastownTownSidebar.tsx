@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  SidebarRail,
 } from '@/components/ui/sidebar';
 import {
   ArrowLeft,
@@ -136,7 +137,11 @@ export function GastownTownSidebar({
                       isActive={isActive(item.url)}
                       data-onboarding-target={item.onboardingTarget}
                     >
-                      <Link href={item.url} prefetch={false}>
+                      <Link
+                        href={item.url}
+                        prefetch={false}
+                        aria-current={isActive(item.url) ? 'page' : undefined}
+                      >
                         <item.icon className="size-4" />
                         <span>{item.title}</span>
                       </Link>
@@ -169,7 +174,11 @@ export function GastownTownSidebar({
                       >
                         <SidebarMenuItem>
                           <SidebarMenuButton asChild isActive={isActive(rigPath)}>
-                            <Link href={rigPath} prefetch={false}>
+                            <Link
+                              href={rigPath}
+                              prefetch={false}
+                              aria-current={isActive(rigPath) ? 'page' : undefined}
+                            >
                               <div className="flex size-4 items-center justify-center rounded bg-white/[0.06] text-[9px] font-bold text-white/50">
                                 {rig.name.charAt(0).toUpperCase()}
                               </div>
@@ -191,7 +200,11 @@ export function GastownTownSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild isActive={isActive(`${basePath}/settings`)}>
-              <Link href={`${basePath}/settings`} prefetch={false}>
+              <Link
+                href={`${basePath}/settings`}
+                prefetch={false}
+                aria-current={isActive(`${basePath}/settings`) ? 'page' : undefined}
+              >
                 <Settings className="size-4" />
                 <span>Settings</span>
               </Link>
@@ -199,6 +212,7 @@ export function GastownTownSidebar({
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

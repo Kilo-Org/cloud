@@ -1,0 +1,16 @@
+ALTER TABLE "security_audit_log" DROP CONSTRAINT "security_audit_log_action_check";--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD COLUMN "actor_type" text;--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD COLUMN "finding_id" uuid;--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD COLUMN "occurred_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD COLUMN "source_occurred_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD COLUMN "event_key" text;--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD COLUMN "schema_version" smallint;--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD COLUMN "finding_snapshot" jsonb;--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD COLUMN "source_context" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_security_audit_log_org_event_key" ON "security_audit_log" USING btree ("owned_by_organization_id","event_key") WHERE "security_audit_log"."owned_by_organization_id" IS NOT NULL AND "security_audit_log"."event_key" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_security_audit_log_user_event_key" ON "security_audit_log" USING btree ("owned_by_user_id","event_key") WHERE "security_audit_log"."owned_by_user_id" IS NOT NULL AND "security_audit_log"."event_key" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX "IDX_security_audit_log_org_occurred" ON "security_audit_log" USING btree ("owned_by_organization_id","occurred_at","id") WHERE "security_audit_log"."owned_by_organization_id" IS NOT NULL AND "security_audit_log"."occurred_at" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX "IDX_security_audit_log_user_occurred" ON "security_audit_log" USING btree ("owned_by_user_id","occurred_at","id") WHERE "security_audit_log"."owned_by_user_id" IS NOT NULL AND "security_audit_log"."occurred_at" IS NOT NULL;--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD CONSTRAINT "security_audit_log_actor_type_check" CHECK ("security_audit_log"."actor_type" IN ('customer_user', 'kilo_admin', 'system'));--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD CONSTRAINT "security_audit_log_source_context_check" CHECK ("security_audit_log"."source_context" IN ('security_sync', 'web', 'analysis_worker', 'remediation_callback', 'rollout_baseline'));--> statement-breakpoint
+ALTER TABLE "security_audit_log" ADD CONSTRAINT "security_audit_log_action_check" CHECK ("security_audit_log"."action" IN ('security.finding.created', 'security.finding.severity_changed', 'security.finding.status_change', 'security.finding.dismissed', 'security.finding.auto_dismissed', 'security.finding.superseded', 'security.finding.analysis_started', 'security.finding.analysis_completed', 'security.finding.analysis_failed', 'security.remediation.queued', 'security.remediation.started', 'security.remediation.pr_opened', 'security.remediation.failed', 'security.remediation.blocked', 'security.remediation.no_changes_needed', 'security.remediation.cancelled', 'security.remediation.retried', 'security.finding.deleted', 'security.config.enabled', 'security.config.disabled', 'security.config.updated', 'security.sync.triggered', 'security.sync.completed', 'security.audit_log.exported', 'security.audit_report.generated'));

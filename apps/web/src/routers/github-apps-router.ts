@@ -21,6 +21,7 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { APP_URL } from '@/lib/constants';
 import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
+import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import {
   disconnectGitHubUserAuthorization,
@@ -108,7 +109,7 @@ export const githubAppsRouter = createTRPCRouter({
         permissions: integration.permissions,
         events: integration.scopes,
         repositorySelection: integration.repository_access,
-        repositories: integration.repositories,
+        repositories: requireNumericPlatformRepositories(integration.repositories),
         suspendedAt: integration.suspended_at,
         suspendedBy: integration.suspended_by,
         installedAt: integration.installed_at,

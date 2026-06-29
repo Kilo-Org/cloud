@@ -35,3 +35,17 @@ GITHUB_LITE_APP_PRIVATE_KEY=
 # GitLab App credentials (optional, used as fallback when metadata lacks client credentials)
 GITLAB_CLIENT_ID=
 GITLAB_CLIENT_SECRET=
+
+# Bitbucket Cloud OAuth consumer credentials shared with Web
+BITBUCKET_CLIENT_ID=
+BITBUCKET_CLIENT_SECRET=
+# Shared RSA/AES envelope keypair for persisted Bitbucket OAuth and Workspace Access Token credentials.
+# Generate outside the repository and never commit key material:
+#   pnpm exec tsx dev/generate-rsa-env-keypair.ts -- --out-dir <secure-output-dir> \
+#     --public-env BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY \
+#     --private-env BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY
+# Use the same key ID and public key in Web; keep the private key in this Worker only.
+# Provision both key values as per-Worker secrets because they exceed Secrets Store's size limit.
+BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID=
+BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY=
+BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY=

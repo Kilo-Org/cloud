@@ -5,6 +5,7 @@ import type {
   OpenRouterChatCompletionRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import crypto from 'crypto';
+import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
 
 const BINARY_DATA_REPLACEMENT =
@@ -79,7 +80,7 @@ function deduplicateToolUses(assistantMessage: OpenAI.ChatCompletionAssistantMes
     if (toolCallIds.has(toolCall.id)) {
       const toolName = toolCall.type === 'function' ? toolCall.function?.name : 'unknown';
       console.warn(
-        `[repairTools] removing duplicate use of tool ${toolName} with tool call id ${toolCall.id}`
+        `[repairChatCompletionsTools] removing duplicate use of tool ${toolName} with tool call id ${toolCall.id}`
       );
       return false;
     }
@@ -88,7 +89,7 @@ function deduplicateToolUses(assistantMessage: OpenAI.ChatCompletionAssistantMes
   });
 }
 
-export function repairTools(requestToMutate: OpenRouterChatCompletionRequest) {
+export function repairChatCompletionsTools(requestToMutate: OpenRouterChatCompletionRequest) {
   const groups = groupByAssistantMessage(requestToMutate.messages);
 
   for (const group of groups) {
@@ -109,7 +110,7 @@ export function repairTools(requestToMutate: OpenRouterChatCompletionRequest) {
       }
       const toolName = toolCall.type === 'function' ? toolCall.function?.name : 'unknown';
       console.warn(
-        `[repairTools] inserting missing result for tool ${toolName} with tool call id ${toolCall.id}`
+        `[repairChatCompletionsTools] inserting missing result for tool ${toolName} with tool call id ${toolCall.id}`
       );
       missingResults.push({
         role: 'tool',
@@ -123,7 +124,7 @@ export function repairTools(requestToMutate: OpenRouterChatCompletionRequest) {
     group.otherMessages = group.otherMessages.filter(message => {
       if (message.role === 'tool' && !toolCallIdsToVerify.delete(message.tool_call_id)) {
         console.warn(
-          `[repairTools] deleting duplicate/orphan tool result for tool call id ${message.tool_call_id}`
+          `[repairChatCompletionsTools] deleting duplicate/orphan tool result for tool call id ${message.tool_call_id}`
         );
         return false;
       }
@@ -217,42 +218,110 @@ function sanitizeResponsesToolResults(body: GatewayResponsesRequest): void {
   }
 }
 
-export function repairMessagesTools(body: GatewayMessagesRequest): void {
-  for (const msg of body.messages) {
-    if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue;
-    const toolUseIds = new Set<string>();
-    msg.content = msg.content.filter(block => {
-      if (typeof block !== 'object' || block.type !== 'tool_use') return true;
-      if (toolUseIds.has(block.id)) {
-        console.warn(`[repairMessagesTools] removing duplicate tool_use block with id ${block.id}`);
-        return false;
-      }
-      toolUseIds.add(block.id);
-      return true;
-    });
-  }
+function groupMessagesByAssistant(messages: Anthropic.MessageParam[]) {
+  const groups = new Array<{
+    assistantMessage?: Anthropic.MessageParam;
+    otherMessages: Anthropic.MessageParam[];
+  }>();
 
-  const allToolUseIds = new Set<string>();
-  for (const msg of body.messages) {
-    if (msg.role !== 'assistant' || !Array.isArray(msg.content)) continue;
-    for (const block of msg.content) {
-      if (typeof block === 'object' && block.type === 'tool_use') {
-        allToolUseIds.add(block.id);
-      }
+  groups.push({ otherMessages: [] });
+
+  for (const message of messages) {
+    if (message.role === 'assistant') {
+      groups.push({ assistantMessage: message, otherMessages: [] });
+    } else {
+      groups.at(-1)?.otherMessages.push(message);
     }
   }
 
-  for (const msg of body.messages) {
-    if (msg.role !== 'user' || !Array.isArray(msg.content)) continue;
-    msg.content = msg.content.filter(block => {
-      if (typeof block !== 'object' || block.type !== 'tool_result') return true;
-      if (allToolUseIds.has(block.tool_use_id)) return true;
+  return groups;
+}
+
+function deduplicateMessagesToolUses(message: Anthropic.MessageParam): void {
+  if (!Array.isArray(message.content)) return;
+
+  const toolUseIds = new Set<string>();
+  message.content = message.content.filter(block => {
+    if (block.type !== 'tool_use') return true;
+    if (toolUseIds.has(block.id)) {
       console.warn(
-        `[repairMessagesTools] removing orphan tool_result for tool_use_id ${block.tool_use_id}`
+        `[repairMessagesTools] removing duplicate use of tool ${block.name} with tool call id ${block.id}`
       );
       return false;
-    });
+    }
+    toolUseIds.add(block.id);
+    return true;
+  });
+}
+
+export function repairMessagesTools(body: GatewayMessagesRequest): void {
+  const groups = groupMessagesByAssistant(body.messages);
+
+  for (const group of groups) {
+    if (group.assistantMessage) {
+      deduplicateMessagesToolUses(group.assistantMessage);
+    }
+
+    const toolUses =
+      group.assistantMessage && Array.isArray(group.assistantMessage.content)
+        ? group.assistantMessage.content.filter(block => block.type === 'tool_use')
+        : [];
+    const expectedToolUseIds = new Set(toolUses.map(block => block.id));
+    const matchedToolUseIds = new Set<string>();
+    const existingResults = new Array<Anthropic.ToolResultBlockParam>();
+
+    for (const message of group.otherMessages) {
+      if (!Array.isArray(message.content)) continue;
+      message.content = message.content.filter(block => {
+        if (block.type !== 'tool_result') return true;
+        if (
+          !expectedToolUseIds.has(block.tool_use_id) ||
+          matchedToolUseIds.has(block.tool_use_id)
+        ) {
+          console.warn(
+            `[repairMessagesTools] deleting duplicate/orphan tool result for tool call id ${block.tool_use_id}`
+          );
+          return false;
+        }
+        matchedToolUseIds.add(block.tool_use_id);
+        existingResults.push(block);
+        return false;
+      });
+    }
+
+    const missingResults = new Array<Anthropic.ToolResultBlockParam>();
+    for (const toolUse of toolUses) {
+      if (matchedToolUseIds.has(toolUse.id)) continue;
+      console.warn(
+        `[repairMessagesTools] inserting missing result for tool ${toolUse.name} with tool call id ${toolUse.id}`
+      );
+      missingResults.push({
+        type: 'tool_result',
+        tool_use_id: toolUse.id,
+        content: 'Tool execution was interrupted before completion.',
+      });
+    }
+
+    const results = [...missingResults, ...existingResults];
+    if (results.length > 0) {
+      const firstUserMessage = group.otherMessages[0];
+      if (firstUserMessage) {
+        firstUserMessage.content = Array.isArray(firstUserMessage.content)
+          ? [...results, ...firstUserMessage.content]
+          : [...results, { type: 'text', text: firstUserMessage.content }];
+      } else {
+        group.otherMessages.push({ role: 'user', content: results });
+      }
+    }
+
+    group.otherMessages = group.otherMessages.filter(
+      message => !Array.isArray(message.content) || message.content.length > 0
+    );
   }
+
+  body.messages = groups.flatMap(group =>
+    group.assistantMessage ? [group.assistantMessage, ...group.otherMessages] : group.otherMessages
+  );
 }
 
 function sanitizeMessagesToolResults(body: GatewayMessagesRequest): void {

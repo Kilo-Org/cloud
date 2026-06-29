@@ -40,6 +40,8 @@ import {
   FeedbackSource,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
+  SecurityFindingAuditSourceContext,
   SecurityFindingNotificationKind,
   SecurityFindingNotificationStatus,
   KiloClawPlan,
@@ -190,6 +192,10 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassScheduledChangeStatus,
   CliSessionSharedState,
   SecurityAuditLogAction,
+  SecurityAuditLogActorType,
+  SecurityFindingAuditSourceContext,
+  SecurityFindingNotificationKind,
+  SecurityFindingNotificationStatus,
   KiloClawPlan,
   KiloClawScheduledPlan,
   KiloClawScheduledBy,
@@ -422,6 +428,7 @@ export const kilocode_users = pgTable(
       mode: 'string',
     }),
     openrouter_upstream_safety_identifier: text(),
+    openrouter_downstream_safety_identifier: text(),
     vercel_downstream_safety_identifier: text(),
     customer_source: text(),
     signup_ip: text(),
@@ -444,6 +451,10 @@ export const kilocode_users = pgTable(
     uniqueIndex('UQ_kilocode_users_openrouter_upstream_safety_identifier')
       .on(table.openrouter_upstream_safety_identifier)
       .where(sql`${table.openrouter_upstream_safety_identifier} IS NOT NULL`),
+    uniqueIndex('UQ_kilocode_users_openrouter_downstream_safety_identifier')
+      .on(table.openrouter_downstream_safety_identifier)
+      .concurrently()
+      .where(sql`${table.openrouter_downstream_safety_identifier} IS NOT NULL`),
     uniqueIndex('UQ_kilocode_users_vercel_downstream_safety_identifier')
       .on(table.vercel_downstream_safety_identifier)
       .where(sql`${table.vercel_downstream_safety_identifier} IS NOT NULL`),
@@ -2195,6 +2206,22 @@ export const api_request_log = pgTable(
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
 
+export const api_request_compress_log = pgTable(
+  'api_request_compress_log',
+  {
+    id: bigserial({ mode: 'bigint' }).notNull().primaryKey(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    kilo_user_id: text().notNull(),
+    organization_id: text(),
+    session_id: text(),
+    provider: text().notNull(),
+    model: text().notNull(),
+    request: jsonb().notNull(),
+    result: jsonb().notNull(),
+  },
+  table => [index('idx_api_request_compress_log_created_at').on(table.created_at)]
+);
+
 export const http_user_agent = pgTable(
   'http_user_agent',
   {
@@ -2623,13 +2650,21 @@ export const organizations = pgTable(
     created_by_kilo_user_id: text(),
     deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
     sso_domain: text(),
+    parent_organization_id: uuid().references((): AnyPgColumn => organizations.id, {
+      onDelete: 'restrict',
+    }),
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
     company_domain: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
+    check(
+      'organizations_not_parented_by_self_check',
+      sql`${table.parent_organization_id} IS NULL OR ${table.parent_organization_id} <> ${table.id}`
+    ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
+    index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
   ]
 );
 
@@ -2689,6 +2724,10 @@ export const organization_invitations = pgTable(
     token: text().notNull(),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     accepted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    authentication_requirement: text().$type<'default' | 'workos'>().default('default').notNull(),
+    sso_source_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'restrict',
+    }),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull()
@@ -2968,7 +3007,7 @@ export const platform_integrations = pgTable(
 
     // Repository access (GitHub's value: 'all' or 'selected')
     repository_access: text(), // nullable for pending installations
-    repositories: jsonb().$type<PlatformRepository[]>(),
+    repositories: jsonb().$type<PlatformRepository<number | string>[]>(),
     repositories_synced_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
     auth_invalid_reason: text(),
@@ -3012,6 +3051,14 @@ export const platform_integrations = pgTable(
     uniqueIndex('UQ_platform_integrations_linear_platform_inst')
       .on(table.platform, table.platform_installation_id)
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_user_bitbucket')
+      .on(table.owned_by_user_id)
+      .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_platform_integrations_org_bitbucket')
+      .on(table.owned_by_organization_id)
+      .where(
+        sql`${table.platform} = 'bitbucket' AND ${table.owned_by_organization_id} IS NOT NULL`
+      ),
     index('IDX_platform_integrations_owned_by_org_id').on(table.owned_by_organization_id),
     index('IDX_platform_integrations_owned_by_user_id').on(table.owned_by_user_id),
     index('IDX_platform_integrations_platform_inst_id').on(table.platform_installation_id),
@@ -3087,6 +3134,82 @@ export const user_github_app_tokens = pgTable(
 
 export type UserGitHubAppToken = typeof user_github_app_tokens.$inferSelect;
 export type NewUserGitHubAppToken = typeof user_github_app_tokens.$inferInsert;
+
+export const platform_oauth_credentials = pgTable(
+  'platform_oauth_credentials',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid()
+      .notNull()
+      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
+    platform: text().notNull(),
+    authorized_by_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    provider_subject_id: text().notNull(),
+    provider_subject_login: text().notNull(),
+    access_token_encrypted: text().notNull(),
+    access_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    refresh_token_encrypted: text().notNull(),
+    refresh_token_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    credential_version: integer().notNull().default(1),
+    revoked_at: timestamp({ withTimezone: true, mode: 'string' }),
+    revocation_reason: text(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_platform_oauth_credentials_platform_integration_id').on(
+      table.platform_integration_id
+    ),
+    index('IDX_platform_oauth_credentials_authorized_by_user_id').on(table.authorized_by_user_id),
+  ]
+);
+
+export type PlatformOAuthCredential = typeof platform_oauth_credentials.$inferSelect;
+export type NewPlatformOAuthCredential = typeof platform_oauth_credentials.$inferInsert;
+
+export const platform_access_token_credentials = pgTable(
+  'platform_access_token_credentials',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid().notNull(),
+    owned_by_organization_id: uuid().notNull(),
+    platform: text().notNull().$type<'bitbucket'>(),
+    integration_type: text().notNull().$type<'workspace_access_token'>(),
+    token_encrypted: text().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    provider_credential_type: text().notNull().$type<'workspace_access_token'>(),
+    provider_scopes: text().array().notNull(),
+    provider_verified_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    credential_version: integer().notNull().default(1),
+    last_validated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    last_used_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_platform_access_token_credentials_platform_integration_id').on(
+      table.platform_integration_id
+    ),
+    foreignKey({
+      columns: [table.platform_integration_id],
+      foreignColumns: [platform_integrations.id],
+      name: 'FK_platform_access_token_credentials_parent',
+    }).onDelete('cascade'),
+  ]
+);
+
+export type PlatformAccessTokenCredential = typeof platform_access_token_credentials.$inferSelect;
+export type NewPlatformAccessTokenCredential =
+  typeof platform_access_token_credentials.$inferInsert;
 
 // User Deployments
 
@@ -3413,6 +3536,33 @@ export const agent_configs = pgTable(
     ),
   ]
 );
+
+// Per-organization dismissals of adoption recommendations. The recommendation
+// rules themselves live in code; this table only records which suggestions an
+// organization has explicitly dismissed so we stop showing them.
+export const organization_recommendation_dismissals = pgTable(
+  'organization_recommendation_dismissals',
+  {
+    id: idPrimaryKeyColumn,
+    owned_by_organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    // Stable recommendation rule key (defined in code), e.g. 'org-sso-not-configured'.
+    recommendation_key: text().notNull(),
+    // Who dismissed it. Nullable + set null on user delete so the dismissal persists.
+    dismissed_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    unique('UQ_org_recommendation_dismissals_org_key').on(
+      table.owned_by_organization_id,
+      table.recommendation_key
+    ),
+  ]
+);
+
+export type OrganizationRecommendationDismissal =
+  typeof organization_recommendation_dismissals.$inferSelect;
 
 export const webhook_events = pgTable(
   'webhook_events',
@@ -5574,12 +5724,20 @@ export const security_audit_log = pgTable(
     actor_id: text(),
     actor_email: text(),
     actor_name: text(),
+    actor_type: text().$type<SecurityAuditLogActorType>(),
     action: text().$type<SecurityAuditLogAction>().notNull(),
     resource_type: text().notNull(),
     resource_id: text().notNull(),
     before_state: jsonb().$type<Record<string, unknown>>(),
     after_state: jsonb().$type<Record<string, unknown>>(),
     metadata: jsonb().$type<Record<string, unknown>>(),
+    finding_id: uuid(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }),
+    source_occurred_at: timestamp({ withTimezone: true, mode: 'string' }),
+    event_key: text(),
+    schema_version: smallint(),
+    finding_snapshot: jsonb().$type<Record<string, unknown>>(),
+    source_context: text().$type<SecurityFindingAuditSourceContext>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -5588,6 +5746,12 @@ export const security_audit_log = pgTable(
       sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
     ),
     enumCheck('security_audit_log_action_check', table.action, SecurityAuditLogAction),
+    enumCheck('security_audit_log_actor_type_check', table.actor_type, SecurityAuditLogActorType),
+    enumCheck(
+      'security_audit_log_source_context_check',
+      table.source_context,
+      SecurityFindingAuditSourceContext
+    ),
     index('IDX_security_audit_log_org_created').on(
       table.owned_by_organization_id,
       table.created_at
@@ -5596,6 +5760,20 @@ export const security_audit_log = pgTable(
     index('IDX_security_audit_log_resource').on(table.resource_type, table.resource_id),
     index('IDX_security_audit_log_actor').on(table.actor_id, table.created_at),
     index('IDX_security_audit_log_action').on(table.action, table.created_at),
+    uniqueIndex('UQ_security_audit_log_org_event_key')
+      .on(table.owned_by_organization_id, table.event_key)
+      .where(sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.event_key} IS NOT NULL`),
+    uniqueIndex('UQ_security_audit_log_user_event_key')
+      .on(table.owned_by_user_id, table.event_key)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.event_key} IS NOT NULL`),
+    index('IDX_security_audit_log_org_occurred')
+      .on(table.owned_by_organization_id, table.occurred_at, table.id)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.occurred_at} IS NOT NULL`
+      ),
+    index('IDX_security_audit_log_user_occurred')
+      .on(table.owned_by_user_id, table.occurred_at, table.id)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.occurred_at} IS NOT NULL`),
   ]
 );
 

@@ -1,6 +1,7 @@
 import {
   taxonomyRouteKey,
   DEFAULT_AUTO_ROUTING_MODE,
+  isVirtualAutoModelId,
   type AutoRoutingDecision,
   type AutoRoutingMode,
   type ClassifierOutput,
@@ -37,7 +38,9 @@ export function computeDecision(
 ): AutoRoutingDecision | null {
   if (!table) return null;
   const routeKey = taxonomyRouteKey(classification);
-  const candidates = table.routes[routeKey]?.filter(c => !deniedModelIds.has(c.model));
+  const candidates = table.routes[routeKey]?.filter(
+    c => !deniedModelIds.has(c.model) && !isVirtualAutoModelId(c.model)
+  );
   if (!candidates?.length) return null;
   const freshPick = pickFreshCandidate(candidates, mode);
 

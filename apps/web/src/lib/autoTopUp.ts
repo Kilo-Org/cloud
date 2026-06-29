@@ -429,9 +429,11 @@ async function disableAutoTopUpForEntity(entity: AutoTopUpEntity, reason: string
       .set({ auto_top_up_enabled: false })
       .where(eq(organizations.id, entity.organization.id));
 
-    // Send email notification to org owners
+    // Send email notification to org owners and billing managers
     const members = await getOrganizationMembers(entity.organization.id);
-    const ownerEmails = members.filter(m => m.role === 'owner').map(m => m.email);
+    const ownerEmails = members
+      .filter(m => (m.role === 'owner' || m.role === 'billing_manager') && m.status === 'active')
+      .map(m => m.email);
     for (const email of ownerEmails) {
       await sendAutoTopUpFailedEmail(email, {
         reason: message,

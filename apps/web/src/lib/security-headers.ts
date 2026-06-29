@@ -39,7 +39,6 @@ export function getConfiguredConnectSrcOrigins(
   env: Record<string, string | undefined> = process.env
 ): string[] {
   return compactUnique([
-    originFromUrl(env.NEXT_PUBLIC_CLOUD_AGENT_WS_URL),
     originFromUrl(env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL),
     originFromUrl(env.NEXT_PUBLIC_SESSION_INGEST_WS_URL),
     originFromUrl(env.NEXT_PUBLIC_GASTOWN_URL),

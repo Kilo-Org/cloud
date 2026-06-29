@@ -1,32 +1,23 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { redirect } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { useSecurityAgent } from '@/components/security-agent/SecurityAgentContext';
 import { SecurityDashboard } from '@/components/security-agent/SecurityDashboard';
 
 export default function OrgSecurityAgentDashboardPage() {
-  const { hasIntegration, isEnabled, isLoadingConfig, organizationId } = useSecurityAgent();
-  const router = useRouter();
+  const { hasIntegration, isEnabled, isLoadingConfig, isLoadingPermission, organizationId } =
+    useSecurityAgent();
 
-  const shouldRedirectToConfig = hasIntegration && isEnabled === false && !!organizationId;
-
-  useEffect(() => {
-    if (shouldRedirectToConfig) {
-      router.replace(`/organizations/${organizationId}/security-agent/config`);
-    }
-  }, [shouldRedirectToConfig, organizationId, router]);
+  const shouldRedirectToConfig =
+    !!organizationId &&
+    ((!isLoadingPermission && !hasIntegration) || (hasIntegration && isEnabled === false));
 
   if (shouldRedirectToConfig) {
-    return (
-      <div className="text-muted-foreground block py-16 text-center text-sm">
-        Opening settings...
-      </div>
-    );
+    redirect(`/organizations/${organizationId}/security-agent/config`);
   }
 
-  if (hasIntegration && isLoadingConfig) {
+  if (isLoadingPermission || (hasIntegration && isLoadingConfig)) {
     return (
       <div className="text-muted-foreground flex items-center justify-center gap-2 py-16 text-sm">
         <Loader2 className="size-6 animate-spin motion-reduce:animate-none" aria-hidden="true" />

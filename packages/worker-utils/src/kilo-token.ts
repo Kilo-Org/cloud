@@ -60,6 +60,7 @@ export async function signKiloToken(params: {
   pepper: string | null;
   secret: string;
   expiresInSeconds: number;
+  audience?: string;
   env?: string;
   extra?: SignKiloTokenExtra;
 }): Promise<{ token: string; expiresAt: string }> {
@@ -79,11 +80,12 @@ export async function signKiloToken(params: {
 
   const validatedPayload = signKiloTokenPayload.parse(payload);
 
-  const token = await new SignJWT(validatedPayload)
+  let signer = new SignJWT(validatedPayload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt(now)
-    .setExpirationTime(exp)
-    .sign(new TextEncoder().encode(params.secret));
+    .setExpirationTime(exp);
+  if (params.audience) signer = signer.setAudience(params.audience);
+  const token = await signer.sign(new TextEncoder().encode(params.secret));
 
   return { token, expiresAt: new Date(exp * 1000).toISOString() };
 }
@@ -96,10 +98,18 @@ export async function signKiloToken(params: {
  *
  * @throws if the token is invalid, expired, or fails schema validation.
  */
-export async function verifyKiloToken(token: string, secret: string): Promise<KiloTokenPayload> {
+export async function verifyKiloToken(
+  token: string,
+  secret: string,
+  options?: { audience?: string }
+): Promise<KiloTokenPayload> {
   const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
     algorithms: ['HS256'],
+    audience: options?.audience,
   });
+  if (options?.audience === undefined && payload.aud !== undefined) {
+    throw new Error('Unexpected token audience');
+  }
 
   return kiloTokenPayload.parse(payload);
 }

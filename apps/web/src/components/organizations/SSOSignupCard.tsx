@@ -17,9 +17,9 @@ type SSOSignupCardProps = {
 };
 
 // SSO Hooks following the same pattern as hooks.ts
-function useOrganizationSSOConfig(organizationId: string) {
+function useOrganizationSSOConfig(organizationId: string, enabled: boolean) {
   const trpc = useTRPC();
-  return useQuery(trpc.organizations.sso.getConfig.queryOptions({ organizationId }));
+  return useQuery(trpc.organizations.sso.getConfig.queryOptions({ organizationId }, { enabled }));
 }
 
 function useGenerateAdminPortalLink() {
@@ -39,7 +39,12 @@ function useGenerateAdminPortalLink() {
 
 export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
   const organizationId = organization.id;
-  const { data: ssoConfig, isLoading, error } = useOrganizationSSOConfig(organizationId);
+  const inheritedPolicy = organization.effectiveSsoPolicy.source === 'direct_parent';
+  const {
+    data: ssoConfig,
+    isLoading,
+    error,
+  } = useOrganizationSSOConfig(organizationId, !inheritedPolicy);
   const generatePortalLink = useGenerateAdminPortalLink();
   const posthog = usePostHog();
 
@@ -56,6 +61,33 @@ export function SSOSignupCard({ organization, role }: SSOSignupCardProps) {
     generatePortalLink.mutate({ organizationId, linkType: 'sso' });
     posthog?.capture('sso_setup_initiated', { organizationId });
   };
+
+  if (inheritedPolicy) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <Shield className="mr-2 inline size-4" />
+            Single Sign-On (SSO)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="border-status-success-border bg-status-success-surface flex items-center gap-2 rounded-md border p-3">
+            <CheckCircle className="text-status-success-icon size-4" />
+            <span className="type-label text-status-success">Managed by parent organization</span>
+          </div>
+          <p className="type-body text-muted-foreground">
+            Members using{' '}
+            <code className="bg-surface-inset rounded-sm px-1.5 py-0.5 font-mono">
+              @{organization.effectiveSsoPolicy.domain}
+            </code>{' '}
+            must authenticate through the parent organization's SSO provider. SSO settings are
+            managed by the parent organization.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Don't show card if loading or error
   if (isLoading || error) {

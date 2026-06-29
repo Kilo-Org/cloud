@@ -236,6 +236,37 @@ describe('handleSubscriptionEvent', () => {
     expect(membership[0].role).toBe('owner');
   });
 
+  test('does not create a new same-domain membership for an SSO organization', async () => {
+    const newUser = await insertTestUser({ google_user_email: 'buyer@example.com' });
+    const newOrganization = await createOrganization('SSO Organization');
+    await db
+      .update(organizations)
+      .set({ sso_domain: 'example.com' })
+      .where(eq(organizations.id, newOrganization.id));
+    const subscription = createMockSubscription({
+      metadata: {
+        type: 'organization_seats',
+        kiloUserId: newUser.id,
+        organizationId: newOrganization.id,
+        seats: '3',
+      },
+    });
+
+    await handleSubscriptionEvent(subscription, 'test-sso-membership-skip');
+
+    const membership = await db.query.organization_memberships.findFirst({
+      where: and(
+        eq(organization_memberships.organization_id, newOrganization.id),
+        eq(organization_memberships.kilo_user_id, newUser.id)
+      ),
+    });
+    const purchase = await db.query.organization_seats_purchases.findFirst({
+      where: eq(organization_seats_purchases.idempotency_key, 'test-sso-membership-skip'),
+    });
+    expect(membership).toBeUndefined();
+    expect(purchase).toBeDefined();
+  });
+
   test('should handle different seat counts and pricing correctly', async () => {
     const subscription = createMockSubscription({
       metadata: {

@@ -22,7 +22,7 @@ import {
 } from '@/lib/ai-gateway/gateway-config';
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
-import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { gatewayModelExists } from '@/lib/ai-gateway/providers/gateway-model-existence';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
@@ -73,10 +73,7 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  const [routingPercentage, vercelModels] = await Promise.all([
-    getVercelRoutingPercentage(),
-    getVercelModels(),
-  ]);
+  const routingPercentage = await getVercelRoutingPercentage();
 
   const passedRandomization =
     getRandomNumber('vercel_routing_' + randomSeed, 100) < routingPercentage;
@@ -86,7 +83,7 @@ export async function shouldRouteToVercel(
   }
 
   const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
-  if (!vercelModels.has(vercelModelId)) {
+  if (!(await gatewayModelExists('vercel', vercelModelId))) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
   }

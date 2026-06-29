@@ -5,7 +5,6 @@ import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage
 import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
-import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { redisClient } from '@/lib/redis';
@@ -82,7 +81,6 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedClassifyAbuse = jest.mocked(classifyAbuse);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
-const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModels);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedRedisGet = jest.mocked(redisClient.get);
@@ -184,7 +182,6 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
-    mockedGetOpenRouterModels.mockResolvedValue(new Set(['stepfun/step-3.7-flash:free']));
     mockedUpstreamRequest.mockResolvedValue(
       upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] })
     );
@@ -423,7 +420,6 @@ describe('kilo-auto/efficient classifier billing', () => {
     mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedUpstreamRequest.mockResolvedValue(
       upstreamJsonResponse({ id: 'chatcmpl-1', model: 'anthropic/claude-haiku-4', choices: [] })
     );
@@ -658,7 +654,6 @@ describe('auto-routing shadow classifier', () => {
     mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
     mockedRedisGet.mockResolvedValue(null);
     mockedRedisSet.mockResolvedValue('OK');
-    mockedGetOpenRouterModels.mockResolvedValue(new Set());
     mockedUpstreamRequest.mockResolvedValue(
       upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] })
     );

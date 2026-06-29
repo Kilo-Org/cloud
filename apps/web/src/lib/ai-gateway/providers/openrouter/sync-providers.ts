@@ -26,6 +26,7 @@ import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
 import { redisClient } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
+import { writeGatewayModelExistenceMarkers } from '@/lib/ai-gateway/providers/gateway-model-existence';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
@@ -388,6 +389,20 @@ async function mirrorToRedis(values: {
     entries.push([GATEWAY_METADATA_REDIS_KEYS.openrouterProviders, values.openrouterProviders]);
   }
   await Promise.all(entries.map(([key, value]) => redisClient.set(key, JSON.stringify(value))));
+
+  // Per-model existence markers let the routing hot path check "does this model
+  // exist at this gateway?" without re-reading and parsing the whole catalog
+  // above. Best-effort: the catalog blobs (and their DB-backed snapshot) remain
+  // authoritative, so a marker-write failure must not fail the sync run.
+  try {
+    await Promise.all([
+      writeGatewayModelExistenceMarkers('openrouter', values.openrouter),
+      writeGatewayModelExistenceMarkers('vercel', values.vercel),
+    ]);
+  } catch (err) {
+    console.error('[sync-providers] writing model existence markers failed', err);
+    captureException(err, { tags: { component: 'sync-providers-model-existence' } });
+  }
 }
 
 /**

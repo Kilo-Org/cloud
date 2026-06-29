@@ -33,19 +33,3 @@ export const getOpenRouterModelsMetadata = createStoredModelsFetcher(
   GATEWAY_METADATA_REDIS_KEYS.openrouterModels,
   'OpenRouter'
 );
-
-function toLanguageModelIdSet(models: StoredModelMap): ReadonlySet<string> {
-  return new Set(
-    Object.values(models)
-      .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length > 0)
-      .map(model => model.id)
-  );
-}
-
-export async function getVercelModels(): Promise<ReadonlySet<string>> {
-  return toLanguageModelIdSet(await getVercelModelsMetadata());
-}
-
-export async function getOpenRouterModels(): Promise<ReadonlySet<string>> {
-  return toLanguageModelIdSet(await getOpenRouterModelsMetadata());
-}

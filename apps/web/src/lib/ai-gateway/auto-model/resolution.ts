@@ -30,7 +30,7 @@ import {
   findKiloExclusiveModel,
   isKiloExclusiveFreeModel,
 } from '@/lib/ai-gateway/models';
-import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { gatewayModelExists } from '@/lib/ai-gateway/providers/gateway-model-existence';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 
@@ -56,26 +56,27 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
 /**
  * Returns the candidate models for kilo-auto/free routing.
  *
- * Non-kilo-exclusive free models are only included when they appear in the
- * supplied `openRouterModels` list (sourced from the Redis OpenRouter models
- * cache). Kilo-exclusive free models are included when their gateway supports
- * the current `apiKind`; when `apiKind` is null no API-kind filtering is applied.
+ * Non-kilo-exclusive free models are only included when they currently have an
+ * OpenRouter existence marker in Redis (written by provider sync). Kilo-exclusive
+ * free models are included when their gateway supports the current `apiKind`;
+ * when `apiKind` is null no API-kind filtering is applied.
  */
 export async function getAutoFreeCandidates(
   apiKind: GatewayRequest['kind'] | null
 ): Promise<ReadonlyArray<string>> {
-  const openRouterModels = await getOpenRouterModels();
   const candidates = new Set<string>();
-  for (const model of autoFreeModels) {
-    if (isKiloExclusiveFreeModel(model)) {
-      const kiloModel = findKiloExclusiveModel(model);
-      if (kiloModel && gatewaySupportsApiKind(kiloModel.gateway, apiKind)) {
+  await Promise.all(
+    autoFreeModels.map(async model => {
+      if (isKiloExclusiveFreeModel(model)) {
+        const kiloModel = findKiloExclusiveModel(model);
+        if (kiloModel && gatewaySupportsApiKind(kiloModel.gateway, apiKind)) {
+          candidates.add(model);
+        }
+      } else if (await gatewayModelExists('openrouter', model)) {
         candidates.add(model);
       }
-    } else if (openRouterModels.has(model)) {
-      candidates.add(model);
-    }
-  }
+    })
+  );
   return [...candidates].toSorted();
 }
 

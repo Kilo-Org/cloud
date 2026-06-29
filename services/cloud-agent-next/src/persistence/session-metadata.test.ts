@@ -366,6 +366,26 @@ describe('session metadata boundary', () => {
     expect(serializeSessionMetadata(current)).toEqual(current);
   });
 
+  it('serializes captured current branches with shell-safe Git punctuation', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'agent_current_branch',
+        userId: 'user_123',
+      },
+      auth: {},
+      repository: {
+        type: 'github' as const,
+        repo: 'acme/repo',
+        upstreamBranch: 'feature/alex+metadata@v2,fix=1#manual',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+  });
+
   it('persists Bitbucket identity and managed status without a token', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,

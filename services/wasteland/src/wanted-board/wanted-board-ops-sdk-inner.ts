@@ -203,8 +203,8 @@ const CountRow = z.object({
 function buildCountsSql(search: string | undefined): string {
   let sql = 'SELECT status, COUNT(*) AS item_count FROM wanted';
   if (search && search.length > 0) {
-    const s = escapeSqlString(search);
-    sql += ` WHERE (INSTR(title, '${s}') > 0 OR INSTR(COALESCE(description,''), '${s}') > 0 OR INSTR(COALESCE(tags,''), '${s}') > 0)`;
+    const s = escapeSqlString(search.toLowerCase());
+    sql += ` WHERE (INSTR(LOWER(title), '${s}') > 0 OR INSTR(LOWER(COALESCE(description,'')), '${s}') > 0 OR INSTR(LOWER(COALESCE(tags,'')), '${s}') > 0)`;
   }
   sql += ' GROUP BY status';
   return sql;

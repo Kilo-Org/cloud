@@ -175,7 +175,7 @@ describe('browse', () => {
     expect(sql).toContain('LIMIT 50');
   });
 
-  it('applies search filter as a literal substring match', async () => {
+  it('applies search filter as a case-insensitive literal substring match', async () => {
     const { fetch: f, calls } = makeFetch([
       {
         status: 200,
@@ -189,13 +189,15 @@ describe('browse', () => {
       upstream: { owner: 'hop', db: 'wl' },
       fork: { forkOwner: 'alice', forkDb: 'wl' },
       rigHandle: 'alice',
-      filter: { search: "100%_\\bob's" },
+      filter: { search: "100%_\\Bob's" },
       fetch: f,
     });
 
     expect(result.ok).toBe(true);
     const sql = decodeURIComponent(calls[0].url);
-    expect(sql).toContain("INSTR(title, '100%_\\\\bob''s') > 0");
+    expect(sql).toContain("INSTR(LOWER(title), '100%_\\\\bob''s') > 0");
+    expect(sql).toContain("INSTR(LOWER(COALESCE(description,'')), '100%_\\\\bob''s') > 0");
+    expect(sql).toContain("INSTR(LOWER(COALESCE(tags,'')), '100%_\\\\bob''s') > 0");
     expect(sql).not.toContain('LIKE');
   });
 

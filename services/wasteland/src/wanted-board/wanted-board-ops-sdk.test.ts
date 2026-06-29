@@ -179,12 +179,14 @@ describe('browseViaSdk', () => {
       ]),
     ]);
 
-    const result = await countWantedBoardByStatusViaSdk(baseCtx, { search: "bob's" }, fetch);
+    const result = await countWantedBoardByStatusViaSdk(baseCtx, { search: "Bob's" }, fetch);
 
     expect(result).toMatchObject({ open: 12, claimed: 3, completed: 9, in_review: 0 });
     const sql = decodeURIComponent(calls[0].url);
     expect(sql).toContain('SELECT status, COUNT(*) AS item_count FROM wanted');
-    expect(sql).toContain("INSTR(title, 'bob''s') > 0");
+    expect(sql).toContain("INSTR(LOWER(title), 'bob''s') > 0");
+    expect(sql).toContain("INSTR(LOWER(COALESCE(description,'')), 'bob''s') > 0");
+    expect(sql).toContain("INSTR(LOWER(COALESCE(tags,'')), 'bob''s') > 0");
     expect(sql).toContain('GROUP BY status');
   });
 
@@ -227,7 +229,7 @@ describe('browseViaSdk', () => {
 
     const result = await countWantedBoardByStatusViaSdk(
       baseCtx,
-      { search: 'visible', includeForkBranches: true },
+      { search: 'VISIBLE', includeForkBranches: true },
       fetch
     );
 

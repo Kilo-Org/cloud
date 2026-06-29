@@ -132,7 +132,7 @@ export async function handleWastelandBrowse(c: Context<GastownEnv>, params: { to
     userId,
     status,
     limit,
-    includeForkBranches: false,
+    includeForkBranches: true,
   });
 
   if (!result.success) {

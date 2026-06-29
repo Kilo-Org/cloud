@@ -40,6 +40,8 @@ import {
   RpcForkBranchOutput,
   RpcMyPullOutput,
   RpcPublishBranchOutput,
+  WantedBoardBrowseInput,
+  WantedBoardCountsInput,
   WantedBoardRowOutput,
 } from './schemas';
 import type { TRPCContext } from './init';
@@ -251,30 +253,6 @@ async function requireOwnerAccess(env: Env, ctx: TRPCContext, wastelandId: strin
 }
 
 // ── Router ─────────────────────────────────────────────────────────────
-
-const WantedBoardStatusInput = z.enum([
-  'open',
-  'claimed',
-  'in_review',
-  'completed',
-  'validated',
-  'withdrawn',
-]);
-
-const WantedBoardBrowseInput = z.object({
-  wastelandId: z.string().uuid(),
-  status: WantedBoardStatusInput.optional(),
-  search: z.string().trim().min(1).max(200).optional(),
-  sort: z.enum(['priority', 'activity']).optional(),
-  limit: z.number().int().min(1).max(500).optional(),
-  includeForkBranches: z.boolean().optional(),
-});
-
-const WantedBoardCountsInput = z.object({
-  wastelandId: z.string().uuid(),
-  search: z.string().trim().min(1).max(200).optional(),
-  includeForkBranches: z.boolean().optional(),
-});
 
 export const wastelandRouter = router({
   // ── Create ──────────────────────────────────────────────────────────

@@ -116,6 +116,34 @@ export const WantedBoardCountsOutput = z.object({
   withdrawn: z.number(),
 });
 
+export const WantedBoardStatusInput = z.enum([
+  'open',
+  'claimed',
+  'in_review',
+  'completed',
+  'validated',
+  'withdrawn',
+]);
+
+export const WantedBoardBrowseInput = z.object({
+  wastelandId: z.string().uuid(),
+  status: WantedBoardStatusInput.optional(),
+  search: z.string().trim().min(1).max(200).optional(),
+  sort: z.enum(['priority', 'activity']).optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+  includeForkBranches: z.boolean().optional(),
+});
+
+export const WantedBoardCountsInput = z.object({
+  wastelandId: z.string().uuid(),
+  search: z.string().trim().min(1).max(200).optional(),
+  includeForkBranches: z.boolean().optional(),
+});
+
+export const WastelandRpcBrowseWantedBoardInput = WantedBoardBrowseInput.extend({
+  userId: z.string().min(1),
+});
+
 // ── Admin: mergeUpstreamPR result ───────────────────────────────────────
 
 export const MergePullOutput = z.object({

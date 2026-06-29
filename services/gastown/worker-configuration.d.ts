@@ -30,7 +30,7 @@ type WastelandService = {
 		browseWantedBoard(params: {
 			wastelandId: string;
 			userId: string;
-			status?: string;
+			status?: 'open' | 'claimed' | 'in_review' | 'completed' | 'validated' | 'withdrawn';
 			search?: string;
 			sort?: 'priority' | 'activity';
 			limit?: number;

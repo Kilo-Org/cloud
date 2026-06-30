@@ -62,17 +62,10 @@ describe('remote MCP tools', () => {
     });
 
     expect(result.tools).toStrictEqual([]);
-    expect(result.skippedTools).toStrictEqual([
-      {
-        reason: 'invalid_name',
-        remoteToolName: 'search repos',
-        serverId: 'server-1',
-        serverName: 'GitHub',
-      },
-    ]);
+    expect(result.routes.size).toBe(0);
   });
 
-  it('skips duplicate mapped names and returns setup errors', () => {
+  it('skips duplicate mapped names', () => {
     const result = buildRemoteMcpToolDefinitions({
       mode: 'dangerous',
       servers: [
@@ -84,29 +77,9 @@ describe('remote MCP tools', () => {
     expect(result.tools).toStrictEqual([]);
     expect(result.routes.size).toBe(0);
     expect(result.warning).toBeUndefined();
-    expect(result.errors).toStrictEqual([
-      {
-        gatewayToolName: 'mcp_github_search_repos',
-        reason: 'duplicate_name',
-        remoteToolName: 'search_repos',
-        serverId: 'server-1',
-        serverName: 'GitHub',
-      },
-      {
-        gatewayToolName: 'mcp_github_search_repos',
-        reason: 'duplicate_name',
-        remoteToolName: 'search_repos',
-        serverId: 'server-2',
-        serverName: 'GitHub',
-      },
-    ]);
-    expect(result.skippedTools.map(tool => tool.reason)).toStrictEqual([
-      'duplicate_name',
-      'duplicate_name',
-    ]);
   });
 
-  it('skips non-object input schemas and records the server skipped tool', () => {
+  it('skips non-object input schemas', () => {
     const result = buildRemoteMcpToolDefinitions({
       mode: 'dangerous',
       servers: [
@@ -122,14 +95,7 @@ describe('remote MCP tools', () => {
     });
 
     expect(result.tools).toStrictEqual([]);
-    expect(result.skippedTools).toStrictEqual([
-      {
-        reason: 'non_object_schema',
-        remoteToolName: 'search_repos',
-        serverId: 'server-1',
-        serverName: 'GitHub',
-      },
-    ]);
+    expect(result.routes.size).toBe(0);
   });
 
   it('exposes only safe-mode allowed servers in safe mode', () => {

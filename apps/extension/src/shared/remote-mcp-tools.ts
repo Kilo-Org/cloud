@@ -9,25 +9,8 @@ export interface RemoteMcpToolRoute {
   readonly serverName: string;
 }
 
-export interface RemoteMcpSkippedTool {
-  readonly reason: 'duplicate_name' | 'invalid_name' | 'non_object_schema';
-  readonly remoteToolName: string;
-  readonly serverId: string;
-  readonly serverName: string;
-}
-
-export interface RemoteMcpToolBuildError {
-  readonly gatewayToolName: string;
-  readonly reason: 'duplicate_name';
-  readonly remoteToolName: string;
-  readonly serverId: string;
-  readonly serverName: string;
-}
-
 export interface RemoteMcpToolBuildResult {
-  readonly errors: readonly RemoteMcpToolBuildError[];
   readonly routes: ReadonlyMap<string, RemoteMcpToolRoute>;
-  readonly skippedTools: readonly RemoteMcpSkippedTool[];
   readonly tools: KiloGatewayToolDefinition[];
   readonly warning?: string | undefined;
 }
@@ -99,9 +82,7 @@ export const buildRemoteMcpToolDefinitions = ({
 
   if (candidates.length > MAX_REMOTE_MCP_TOOLS) {
     return {
-      errors: [],
       routes: new Map(),
-      skippedTools: [],
       tools: [],
       warning: `Remote MCP exposes ${candidates.length} tools; the limit is ${MAX_REMOTE_MCP_TOOLS}. No remote MCP tools were enabled for this turn.`,
     };
@@ -118,35 +99,15 @@ export const buildRemoteMcpToolDefinitions = ({
   }
 
   const routes = new Map<string, RemoteMcpToolRoute>();
-  const errors: RemoteMcpToolBuildError[] = [];
-  const skippedTools: RemoteMcpSkippedTool[] = [];
   const tools: KiloGatewayToolDefinition[] = [];
 
-  for (const candidate of candidates) {
-    const { mappedName, server, tool } = candidate;
-
-    if (mappedName === undefined) {
-      skippedTools.push({
-        reason: 'invalid_name',
-        remoteToolName: tool.name,
-        serverId: server.id,
-        serverName: server.displayName,
-      });
-    } else if ((mappedNameCounts.get(mappedName) ?? 0) > 1) {
-      errors.push({
-        gatewayToolName: mappedName,
-        reason: 'duplicate_name',
-        remoteToolName: tool.name,
-        serverId: server.id,
-        serverName: server.displayName,
-      });
-      skippedTools.push({
-        reason: 'duplicate_name',
-        remoteToolName: tool.name,
-        serverId: server.id,
-        serverName: server.displayName,
-      });
-    } else if (isObjectSchema(tool.inputSchema)) {
+  // Keep only tools with a unique, valid gateway name and an object input schema.
+  for (const { mappedName, server, tool } of candidates) {
+    if (
+      mappedName !== undefined &&
+      (mappedNameCounts.get(mappedName) ?? 0) === 1 &&
+      isObjectSchema(tool.inputSchema)
+    ) {
       routes.set(mappedName, {
         gatewayToolName: mappedName,
         remoteToolName: tool.name,
@@ -154,22 +115,10 @@ export const buildRemoteMcpToolDefinitions = ({
         serverName: server.displayName,
       });
       tools.push(toGatewayToolDefinition(mappedName, server, tool));
-    } else {
-      skippedTools.push({
-        reason: 'non_object_schema',
-        remoteToolName: tool.name,
-        serverId: server.id,
-        serverName: server.displayName,
-      });
     }
   }
 
-  return {
-    errors,
-    routes,
-    skippedTools,
-    tools,
-  };
+  return { routes, tools };
 };
 
 export const resolveRemoteMcpToolRoute = (

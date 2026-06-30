@@ -10,6 +10,11 @@ import type {
   RemoteMcpCachedTool,
   RemoteMcpServer,
 } from '../../src/shared/remote-mcp';
+import {
+  loadRemoteMcpStore,
+  saveRemoteMcpStore,
+  upsertRemoteMcpServer,
+} from '../../src/shared/remote-mcp-storage';
 import type { RemoteMcpStorageArea } from '../../src/shared/remote-mcp-storage';
 import type { RemoteMcpToolRoute } from '../../src/shared/remote-mcp-tools';
 import type { RemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
@@ -127,6 +132,41 @@ export const connectRemoteMcpServer = async ({
   } finally {
     await client.close();
   }
+};
+
+/*
+ * Connect a server and persist the connection results. Reloads the store before
+ * merging so OAuth tokens written by the provider mid-connect survive, then saves
+ * only the connection fields. Returns the saved servers, or undefined when the
+ * server was removed mid-connect.
+ */
+export const connectAndPersistRemoteMcpServer = async ({
+  fetch: fetchFn,
+  server,
+  storageArea,
+}: {
+  readonly fetch: FetchLike;
+  readonly server: RemoteMcpServer;
+  readonly storageArea: RemoteMcpStorageArea;
+}): Promise<readonly RemoteMcpServer[] | undefined> => {
+  const updated = await connectRemoteMcpServer({ fetch: fetchFn, server, storageArea });
+  const freshStore = await loadRemoteMcpStore(storageArea);
+  const freshServer = freshStore.servers.find(found => found.id === server.id);
+
+  if (freshServer === undefined) {
+    return undefined;
+  }
+
+  const nextStore = upsertRemoteMcpServer(freshStore, {
+    ...freshServer,
+    cachedTools: updated.cachedTools,
+    lastConnectedAt: updated.lastConnectedAt,
+    lastError: updated.lastError,
+    status: updated.status,
+  });
+  await saveRemoteMcpStore(storageArea, nextStore);
+
+  return nextStore.servers;
 };
 
 export const callRemoteMcpTool = async ({

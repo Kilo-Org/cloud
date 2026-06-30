@@ -51,13 +51,9 @@ import { MessageComposer } from './message-composer';
 import { ConversationHistoryButton } from './conversation-history-button';
 import { useGatewayModels } from './use-gateway-models';
 import type { RemoteMcpServer } from '@/src/shared/remote-mcp';
-import {
-  loadRemoteMcpStore,
-  saveRemoteMcpStore,
-  upsertRemoteMcpServer,
-} from '@/src/shared/remote-mcp-storage';
+import { loadRemoteMcpStore } from '@/src/shared/remote-mcp-storage';
 import { buildRemoteMcpToolDefinitions } from '@/src/shared/remote-mcp-tools';
-import { connectRemoteMcpServer } from './remote-mcp-client';
+import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
 import { toRemoteMcpToolCallEvents } from './agent-tool-call-events';
 import { executeRemoteMcpToolCall } from './agent-remote-mcp-tool-runtime';
 
@@ -68,38 +64,6 @@ const createDefaultConversationEvents = (): AgentConversationEvent[] => [
   createAssistantMessage('Pick a tab and ask Kilo to inspect it.'),
 ];
 
-/*
- * Connect one server with the PLAIN global fetch (third-party MCP must never see
- * the Kilo token), then reload before merging so provider-written auth.oauth
- * tokens survive; persist only the connection results. Returns the saved servers,
- * or undefined when the server vanished mid-refresh.
- */
-const refreshRemoteMcpServer = async (
-  server: RemoteMcpServer
-): Promise<readonly RemoteMcpServer[] | undefined> => {
-  const updated = await connectRemoteMcpServer({
-    fetch: globalThis.fetch,
-    server,
-    storageArea: storage,
-  });
-  const freshStore = await loadRemoteMcpStore(storage);
-  const freshServer = freshStore.servers.find(found => found.id === server.id);
-
-  if (freshServer === undefined) {
-    return undefined;
-  }
-
-  const nextStore = upsertRemoteMcpServer(freshStore, {
-    ...freshServer,
-    cachedTools: updated.cachedTools,
-    lastConnectedAt: updated.lastConnectedAt,
-    lastError: updated.lastError,
-    status: updated.status,
-  });
-  await saveRemoteMcpStore(storage, nextStore);
-
-  return nextStore.servers;
-};
 interface ConversationRunState {
   readonly abort: AbortController;
   readonly selectedTabId: number;
@@ -328,7 +292,12 @@ export const AgentChatPanel = ({
       // Refresh enabled servers with the PLAIN global fetch (never the gateway-authed fetch — that would leak the Kilo token to a third party).
       // Sequential by necessity: each connect can write OAuth tokens, so we must reload before merging the next server's results.
       for (const server of loaded.servers.filter(candidate => candidate.enabled)) {
-        const nextServers = await refreshRemoteMcpServer(server); // eslint-disable-line no-await-in-loop
+        // eslint-disable-next-line no-await-in-loop
+        const nextServers = await connectAndPersistRemoteMcpServer({
+          fetch: globalThis.fetch,
+          server,
+          storageArea: storage,
+        });
         if (cancelled) {
           return;
         }

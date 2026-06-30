@@ -31,11 +31,26 @@ export type KiloNotification = {
   showIn?: ('extension' | 'extension-native' | 'cli')[];
   // ISO 8601 timestamp after which this notification should no longer be shown
   expiresAt?: string;
+  // When specified, only show to extension clients whose numeric version (major + minor/1000 + patch/1_000_000) is strictly below this value.
+  // Use an integer major version (e.g. 7 means "below 7.x.x"). Hidden when the client version is unknown.
+  extensionVersionBelow?: number;
 };
 
 const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
+  {
+    id: 'legacy-upgrade-june-2026',
+    title: 'A New Version of Kilo Code Is Available',
+    message:
+      "You're using an older version of Kilo Code. Upgrade to the latest version to get new models, faster performance, and the best experience.",
+    action: {
+      actionText: 'Get the Latest Version',
+      actionURL: 'https://marketplace.visualstudio.com/items?itemName=kilocode.kilo-code',
+    },
+    showIn: ['extension'],
+    extensionVersionBelow: 7,
+  },
   {
     id: 'star-giveaway-june-2026',
     title: 'GitHub Star Giveaway',
@@ -111,7 +126,10 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   },
 ];
 
-export async function generateUserNotifications(user: User): Promise<KiloNotification[]> {
+export async function generateUserNotifications(
+  user: User,
+  { numericExtensionVersion }: { numericExtensionVersion?: number } = {}
+): Promise<KiloNotification[]> {
   // Pre-fetch shared data once to avoid duplicate DB queries across generators.
   // This eliminates ~5 redundant queries per request (2× userHasOrganizations,
   // 3× getUserOrganizationsWithSeats, 2× getBalanceForUser → 1+1 queries).
@@ -145,9 +163,15 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
   ).flat();
 
   const now = new Date();
-  return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications].filter(
-    n => !n.expiresAt || new Date(n.expiresAt) > now
-  );
+  return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications].filter(n => {
+    if (n.expiresAt && new Date(n.expiresAt) <= now) return false;
+    if (n.extensionVersionBelow !== undefined) {
+      // Hide when version is unknown or the client is at/above the threshold.
+      if (numericExtensionVersion === undefined) return false;
+      if (numericExtensionVersion >= n.extensionVersionBelow) return false;
+    }
+    return true;
+  });
 }
 
 async function generateLowCreditNotification(

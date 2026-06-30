@@ -72,7 +72,7 @@ describe('remote MCP tools', () => {
     ]);
   });
 
-  it('skips duplicate mapped names and returns a setup warning', () => {
+  it('skips duplicate mapped names and returns setup errors', () => {
     const result = buildRemoteMcpToolDefinitions({
       mode: 'dangerous',
       servers: [
@@ -83,7 +83,23 @@ describe('remote MCP tools', () => {
 
     expect(result.tools).toStrictEqual([]);
     expect(result.routes.size).toBe(0);
-    expect(result.warning).toBe('Duplicate remote MCP tool names were skipped.');
+    expect(result.warning).toBeUndefined();
+    expect(result.errors).toStrictEqual([
+      {
+        gatewayToolName: 'mcp_github_search_repos',
+        reason: 'duplicate_name',
+        remoteToolName: 'search_repos',
+        serverId: 'server-1',
+        serverName: 'GitHub',
+      },
+      {
+        gatewayToolName: 'mcp_github_search_repos',
+        reason: 'duplicate_name',
+        remoteToolName: 'search_repos',
+        serverId: 'server-2',
+        serverName: 'GitHub',
+      },
+    ]);
     expect(result.skippedTools.map(tool => tool.reason)).toStrictEqual([
       'duplicate_name',
       'duplicate_name',
@@ -134,6 +150,8 @@ describe('remote MCP tools', () => {
       servers: [
         createServer({ enabled: false, id: 'disabled', slug: 'disabled' }),
         createServer({ id: 'needs-auth', slug: 'needs-auth', status: 'needs_auth' }),
+        createServer({ id: 'unavailable', slug: 'unavailable', status: 'unavailable' }),
+        createServer({ id: 'untested', slug: 'untested', status: 'untested' }),
         createServer({ id: 'connected', slug: 'connected' }),
       ],
     });

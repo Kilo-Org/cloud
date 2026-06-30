@@ -16,7 +16,16 @@ export interface RemoteMcpSkippedTool {
   readonly serverName: string;
 }
 
+export interface RemoteMcpToolBuildError {
+  readonly gatewayToolName: string;
+  readonly reason: 'duplicate_name';
+  readonly remoteToolName: string;
+  readonly serverId: string;
+  readonly serverName: string;
+}
+
 export interface RemoteMcpToolBuildResult {
+  readonly errors: readonly RemoteMcpToolBuildError[];
   readonly routes: ReadonlyMap<string, RemoteMcpToolRoute>;
   readonly skippedTools: readonly RemoteMcpSkippedTool[];
   readonly tools: KiloGatewayToolDefinition[];
@@ -90,6 +99,7 @@ export const buildRemoteMcpToolDefinitions = ({
 
   if (candidates.length > MAX_REMOTE_MCP_TOOLS) {
     return {
+      errors: [],
       routes: new Map(),
       skippedTools: [],
       tools: [],
@@ -108,6 +118,7 @@ export const buildRemoteMcpToolDefinitions = ({
   }
 
   const routes = new Map<string, RemoteMcpToolRoute>();
+  const errors: RemoteMcpToolBuildError[] = [];
   const skippedTools: RemoteMcpSkippedTool[] = [];
   const tools: KiloGatewayToolDefinition[] = [];
 
@@ -122,6 +133,13 @@ export const buildRemoteMcpToolDefinitions = ({
         serverName: server.displayName,
       });
     } else if ((mappedNameCounts.get(mappedName) ?? 0) > 1) {
+      errors.push({
+        gatewayToolName: mappedName,
+        reason: 'duplicate_name',
+        remoteToolName: tool.name,
+        serverId: server.id,
+        serverName: server.displayName,
+      });
       skippedTools.push({
         reason: 'duplicate_name',
         remoteToolName: tool.name,
@@ -146,13 +164,11 @@ export const buildRemoteMcpToolDefinitions = ({
     }
   }
 
-  const hasDuplicateNames = skippedTools.some(tool => tool.reason === 'duplicate_name');
-
   return {
+    errors,
     routes,
     skippedTools,
     tools,
-    ...(hasDuplicateNames ? { warning: 'Duplicate remote MCP tool names were skipped.' } : {}),
   };
 };
 

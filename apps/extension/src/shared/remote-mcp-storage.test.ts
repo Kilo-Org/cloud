@@ -62,6 +62,12 @@ describe('remote MCP URL policy', () => {
       'Remote MCP URL must not include a fragment.'
     );
   });
+
+  it('preserves query strings while normalizing path trailing slashes', () => {
+    expect(normalizeRemoteMcpUrl('https://remote.example/mcp/?base=/')).toBe(
+      'https://remote.example/mcp?base=/'
+    );
+  });
 });
 
 describe('remote MCP storage', () => {
@@ -187,6 +193,26 @@ describe('remote MCP storage', () => {
         {
           ...savedServer,
           auth: { headerName: 'X-Token', headerValue: 'secret', type: 'header' },
+          cachedTools: [],
+          lastConnectedAt: undefined,
+          lastError: undefined,
+          status: 'untested',
+        },
+      ],
+    });
+  });
+
+  it('clears connection state when same-type auth changes', () => {
+    expect(
+      upsertRemoteMcpServer(
+        { servers: [savedServer] },
+        { ...savedServer, auth: { token: 'token-2', type: 'bearer' } }
+      )
+    ).toStrictEqual({
+      servers: [
+        {
+          ...savedServer,
+          auth: { token: 'token-2', type: 'bearer' },
           cachedTools: [],
           lastConnectedAt: undefined,
           lastError: undefined,

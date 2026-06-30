@@ -1,5 +1,3 @@
-const trimTrailingSlash = (value: string): string => value.replace(/\/+$/, '');
-
 const parseUrl = (value: string): URL | undefined => {
   try {
     return new URL(value);
@@ -32,5 +30,5 @@ export const normalizeRemoteMcpUrl = (value: string): string => {
   }
 
   url.pathname = url.pathname.replaceAll(/\/+$/g, '') || '/';
-  return trimTrailingSlash(url.toString());
+  return url.toString();
 };

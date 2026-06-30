@@ -35,7 +35,15 @@ function equalLengthStringsMatch(expected: string, actual: string): boolean {
   return mismatch === 0;
 }
 
+function hasCallbackTokenSecret(secret: string): boolean {
+  return secret.trim().length > 0;
+}
+
 export async function deriveCallbackToken(params: CallbackTokenParams): Promise<string> {
+  if (!hasCallbackTokenSecret(params.secret)) {
+    throw new Error('Callback token secret must be configured and non-empty');
+  }
+
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
@@ -57,6 +65,9 @@ export async function deriveCallbackToken(params: CallbackTokenParams): Promise<
 
 export async function verifyCallbackToken(params: VerifyCallbackTokenParams): Promise<boolean> {
   if (!params.token || !CALLBACK_TOKEN_HEX_PATTERN.test(params.token)) {
+    return false;
+  }
+  if (!hasCallbackTokenSecret(params.secret)) {
     return false;
   }
 

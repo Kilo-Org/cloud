@@ -338,8 +338,9 @@ describe('handlePullRequest', () => {
           userId: 'bot-user-1',
         },
         platform: 'github',
-        repoFullName: 'acme/widgets',
+        platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
         prNumber: 42,
+        repoFullName: 'acme/widgets',
       },
       'abc123'
     );

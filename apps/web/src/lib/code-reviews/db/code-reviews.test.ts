@@ -173,14 +173,15 @@ describe('review identity', () => {
       .where(inArray(kilocode_users.id, [firstUser.id, secondUser.id]));
   });
 
-  it('keeps the existing global repo, PR, and SHA uniqueness across users', async () => {
-    const createForUser = async (user: User, platformIntegrationId: string) => {
+  it('keeps active review uniqueness scoped to the same integration, repo, and PR', async () => {
+    const sharedRepo = `${REPO}-shared-repository`;
+    const createForIntegration = async (user: User, platformIntegrationId: string) => {
       const id = await createCodeReview({
         owner: { type: 'user', id: user.id, userId: user.id },
         platformIntegrationId,
-        repoFullName: `${REPO}-shared-repository`,
+        repoFullName: sharedRepo,
         prNumber: 17,
-        prUrl: `https://github.com/${REPO}-shared-repository/pull/17`,
+        prUrl: `https://github.com/${sharedRepo}/pull/17`,
         prTitle: 'shared review identity',
         prAuthor: 'octocat',
         baseRef: 'main',
@@ -192,25 +193,27 @@ describe('review identity', () => {
       return id;
     };
 
-    const firstReviewId = await createForUser(firstUser, firstIntegrationId);
+    const firstReviewId = await createForIntegration(firstUser, firstIntegrationId);
+    await expect(createForIntegration(firstUser, firstIntegrationId)).rejects.toThrow();
+    const secondReviewId = await createForIntegration(secondUser, secondIntegrationId);
 
-    await expect(createForUser(secondUser, secondIntegrationId)).rejects.toThrow();
     expect(firstReviewId).toEqual(expect.any(String));
+    expect(secondReviewId).toEqual(expect.any(String));
   });
 
-  it('returns the existing review when idempotent creation hits the legacy global unique key', async () => {
-    const repoFullName = `${REPO}-idempotent-global-conflict`;
+  it('returns the existing review when idempotent creation hits the same integration scope', async () => {
+    const repoFullName = `${REPO}-idempotent-integration-conflict`;
     const existingReviewId = await createCodeReview({
       owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
       platformIntegrationId: firstIntegrationId,
       repoFullName,
       prNumber: 19,
       prUrl: `https://github.com/${repoFullName}/pull/19`,
-      prTitle: 'idempotent global conflict',
+      prTitle: 'idempotent integration conflict',
       prAuthor: 'octocat',
       baseRef: 'main',
-      headRef: 'feature/idempotent-global-conflict',
-      headSha: 'idempotent-global-conflict-head-sha',
+      headRef: 'feature/idempotent-integration-conflict',
+      headSha: 'idempotent-integration-conflict-head-sha',
       platform: 'github',
     });
     createdReviewIds.push(existingReviewId);
@@ -219,22 +222,22 @@ describe('review identity', () => {
       createCodeReviewIfAbsentInTransaction(
         tx,
         {
-          owner: { type: 'user', id: secondUser.id, userId: secondUser.id },
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
           platform: 'github',
           repoFullName,
           prNumber: 19,
         },
         {
-          owner: { type: 'user', id: secondUser.id, userId: secondUser.id },
-          platformIntegrationId: secondIntegrationId,
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platformIntegrationId: firstIntegrationId,
           repoFullName,
           prNumber: 19,
           prUrl: `https://github.com/${repoFullName}/pull/19`,
-          prTitle: 'idempotent global conflict',
+          prTitle: 'idempotent integration conflict',
           prAuthor: 'octocat',
           baseRef: 'main',
-          headRef: 'feature/idempotent-global-conflict',
-          headSha: 'idempotent-global-conflict-head-sha',
+          headRef: 'feature/idempotent-integration-conflict',
+          headSha: 'idempotent-integration-conflict-head-sha',
           platform: 'github',
         }
       )
@@ -263,7 +266,7 @@ describe('review identity', () => {
     await expect(createCodeReview(params)).rejects.toThrow();
   });
 
-  it('rejects duplicate reviews in the same owner and repository scope across integrations', async () => {
+  it('rejects duplicate reviews for the same integration and allows separate reviews across integrations', async () => {
     const params = {
       owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
       platformIntegrationId: firstIntegrationId,
@@ -280,12 +283,13 @@ describe('review identity', () => {
     const reviewId = await createCodeReview(params);
     createdReviewIds.push(reviewId);
 
-    await expect(
-      createCodeReview({
-        ...params,
-        platformIntegrationId: alternateFirstUserIntegrationId,
-      })
-    ).rejects.toThrow();
+    await expect(createCodeReview(params)).rejects.toThrow();
+
+    const alternateReviewId = await createCodeReview({
+      ...params,
+      platformIntegrationId: alternateFirstUserIntegrationId,
+    });
+    createdReviewIds.push(alternateReviewId);
 
     const matchingReview = await findExistingReview(
       {
@@ -300,7 +304,7 @@ describe('review identity', () => {
     expect(matchingReview?.id).toBe(reviewId);
   });
 
-  it('keeps GitLab duplicate detection on repo name until provider-stable identity lands', async () => {
+  it('scopes GitLab active review uniqueness to the integration; separate instances are independent', async () => {
     const sharedParams = {
       owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
       repoFullName: `${REPO}-gitlab-instance-scope`,
@@ -323,10 +327,16 @@ describe('review identity', () => {
     await expect(
       createCodeReview({
         ...sharedParams,
-        platformIntegrationId: secondGitLabIntegrationId,
-        prUrl: `https://gitlab-b.example.com/${REPO}-gitlab-instance-scope/-/merge_requests/24`,
+        platformIntegrationId: firstGitLabIntegrationId,
       })
     ).rejects.toThrow();
+
+    const secondReviewId = await createCodeReview({
+      ...sharedParams,
+      platformIntegrationId: secondGitLabIntegrationId,
+      prUrl: `https://gitlab-b.example.com/${REPO}-gitlab-instance-scope/-/merge_requests/24`,
+    });
+    createdReviewIds.push(secondReviewId);
   });
 
   it('persists Bitbucket reviews without provider UUID identity columns', async () => {
@@ -451,10 +461,10 @@ describe('review identity', () => {
   });
 
   it('orders running active reviews before queued and pending fallback reviews', async () => {
-    const createActiveReview = async (headSha: string) => {
+    const createActiveReview = async (headSha: string, platformIntegrationId: string) => {
       const id = await createCodeReview({
         owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
-        platformIntegrationId: firstIntegrationId,
+        platformIntegrationId,
         repoFullName: `${REPO}-active-priority`,
         prNumber: 25,
         prUrl: `https://github.com/${REPO}-active-priority/pull/25`,
@@ -469,9 +479,18 @@ describe('review identity', () => {
       return id;
     };
 
-    const pendingReviewId = await createActiveReview('active-priority-pending-head');
-    const queuedReviewId = await createActiveReview('active-priority-queued-head');
-    const runningReviewId = await createActiveReview('active-priority-running-head');
+    const pendingReviewId = await createActiveReview(
+      'active-priority-pending-head',
+      firstIntegrationId
+    );
+    const queuedReviewId = await createActiveReview(
+      'active-priority-queued-head',
+      alternateFirstUserIntegrationId
+    );
+    const runningReviewId = await createActiveReview(
+      'active-priority-running-head',
+      secondIntegrationId
+    );
     await updateCodeReviewStatus(queuedReviewId, 'queued');
     await updateCodeReviewStatus(runningReviewId, 'running');
 
@@ -772,6 +791,8 @@ describe('review identity', () => {
 describe('cancelSupersededReviewsForPR', () => {
   let testUser: User;
   let githubIntegrationId: string;
+  let secondGithubIntegrationId: string;
+  let thirdGithubIntegrationId: string;
   let gitLabIntegrationId: string;
   const createdReviewIds: string[] = [];
   const repo = `${REPO}-superseded`;
@@ -793,6 +814,26 @@ describe('cancelSupersededReviewsForPR', () => {
         },
         {
           owned_by_user_id: testUser.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `supersession-github-2-${Date.now()}`,
+          platform_account_id: 'supersession-github-2',
+          platform_account_login: 'supersession-github-2',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+        {
+          owned_by_user_id: testUser.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `supersession-github-3-${Date.now()}`,
+          platform_account_id: 'supersession-github-3',
+          platform_account_login: 'supersession-github-3',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+        {
+          owned_by_user_id: testUser.id,
           platform: 'gitlab',
           integration_type: 'oauth',
           platform_installation_id: `supersession-gitlab-${Date.now()}`,
@@ -803,12 +844,16 @@ describe('cancelSupersededReviewsForPR', () => {
         },
       ])
       .returning({ id: platform_integrations.id, platform: platform_integrations.platform });
-    const githubIntegration = integrations.find(integration => integration.platform === 'github');
+    const githubIntegrations = integrations.filter(
+      integration => integration.platform === 'github'
+    );
     const gitLabIntegration = integrations.find(integration => integration.platform === 'gitlab');
-    if (!githubIntegration || !gitLabIntegration) {
+    if (githubIntegrations.length < 3 || !gitLabIntegration) {
       throw new Error('Expected supersession integrations');
     }
-    githubIntegrationId = githubIntegration.id;
+    githubIntegrationId = githubIntegrations[0].id;
+    secondGithubIntegrationId = githubIntegrations[1].id;
+    thirdGithubIntegrationId = githubIntegrations[2].id;
     gitLabIntegrationId = gitLabIntegration.id;
   });
 
@@ -818,7 +863,14 @@ describe('cancelSupersededReviewsForPR', () => {
     }
     await db
       .delete(platform_integrations)
-      .where(inArray(platform_integrations.id, [githubIntegrationId, gitLabIntegrationId]));
+      .where(
+        inArray(platform_integrations.id, [
+          githubIntegrationId,
+          secondGithubIntegrationId,
+          thirdGithubIntegrationId,
+          gitLabIntegrationId,
+        ])
+      );
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
@@ -828,14 +880,17 @@ describe('cancelSupersededReviewsForPR', () => {
     repoFullName = repo,
     platform = 'github' as const,
     platformProjectId,
+    platformIntegrationId: overrideIntegrationId,
   }: {
     headSha: string;
     prNumber?: number;
     repoFullName?: string;
     platform?: 'github' | 'gitlab';
     platformProjectId?: number;
+    platformIntegrationId?: string;
   }) {
-    const platformIntegrationId = platform === 'gitlab' ? gitLabIntegrationId : githubIntegrationId;
+    const platformIntegrationId =
+      overrideIntegrationId ?? (platform === 'gitlab' ? gitLabIntegrationId : githubIntegrationId);
     if (platform === 'gitlab') {
       if (platformProjectId === undefined) {
         throw new Error('GitLab review test fixtures require platformProjectId');
@@ -860,9 +915,18 @@ describe('cancelSupersededReviewsForPR', () => {
   }
 
   it('cancels pending, queued, and running rows and returns accurate prev_status values', async () => {
-    const pendingId = await createReview({ headSha: 'sha-pending' });
-    const queuedId = await createReview({ headSha: 'sha-queued' });
-    const runningId = await createReview({ headSha: 'sha-running' });
+    const pendingId = await createReview({
+      headSha: 'sha-pending',
+      platformIntegrationId: githubIntegrationId,
+    });
+    const queuedId = await createReview({
+      headSha: 'sha-queued',
+      platformIntegrationId: secondGithubIntegrationId,
+    });
+    const runningId = await createReview({
+      headSha: 'sha-running',
+      platformIntegrationId: thirdGithubIntegrationId,
+    });
     const pendingAttempt = await createCodeReviewAttempt({
       codeReviewId: pendingId,
       status: 'pending',
@@ -952,14 +1016,20 @@ describe('cancelSupersededReviewsForPR', () => {
   });
 
   it('cancels only named active review IDs', async () => {
-    const keptId = await createReview({ headSha: 'sha-id-cancel-kept', prNumber: 44 });
+    const keptId = await createReview({
+      headSha: 'sha-id-cancel-kept',
+      prNumber: 44,
+      platformIntegrationId: githubIntegrationId,
+    });
     const queuedDuplicateId = await createReview({
       headSha: 'sha-id-cancel-queued',
       prNumber: 44,
+      platformIntegrationId: secondGithubIntegrationId,
     });
     const runningDuplicateId = await createReview({
       headSha: 'sha-id-cancel-running',
       prNumber: 44,
+      platformIntegrationId: thirdGithubIntegrationId,
     });
     const unrelatedId = await createReview({ headSha: 'sha-id-cancel-unrelated', prNumber: 45 });
     const queuedAttempt = await createCodeReviewAttempt({
@@ -1040,24 +1110,35 @@ describe('cancelSupersededReviewsForPR', () => {
   });
 
   it('ignores same-sha, different repo or pr, and already-terminal rows; second call is idempotent', async () => {
-    const sameShaId = await createReview({ headSha: 'sha-keep' });
+    const sameShaId = await createReview({
+      headSha: 'sha-keep',
+      platformIntegrationId: githubIntegrationId,
+    });
     const otherPrId = await createReview({ headSha: 'sha-other-pr', prNumber: 43 });
     const otherRepoId = await createReview({
       headSha: 'sha-other-repo',
       repoFullName: `${repo}-other`,
     });
-    const terminalCompletedId = await createReview({ headSha: 'sha-completed' });
-    const terminalFailedId = await createReview({ headSha: 'sha-failed' });
+    const terminalCompletedId = await createReview({
+      headSha: 'sha-completed',
+      platformIntegrationId: secondGithubIntegrationId,
+    });
+    await updateCodeReviewStatus(terminalCompletedId, 'completed');
+    const terminalFailedId = await createReview({
+      headSha: 'sha-failed',
+      platformIntegrationId: secondGithubIntegrationId,
+    });
+    await updateCodeReviewStatus(terminalFailedId, 'failed', {
+      errorMessage: 'failed before cancel',
+    });
     const otherPlatformId = await createReview({
       headSha: 'sha-gitlab',
       platform: 'gitlab',
       platformProjectId: 999,
     });
-    const targetId = await createReview({ headSha: 'sha-target' });
-
-    await updateCodeReviewStatus(terminalCompletedId, 'completed');
-    await updateCodeReviewStatus(terminalFailedId, 'failed', {
-      errorMessage: 'failed before cancel',
+    const targetId = await createReview({
+      headSha: 'sha-target',
+      platformIntegrationId: thirdGithubIntegrationId,
     });
 
     const reviewScope = {
@@ -1074,7 +1155,7 @@ describe('cancelSupersededReviewsForPR', () => {
         prevStatus: 'pending',
         headSha: 'sha-target',
         platform: 'github',
-        platformIntegrationId: githubIntegrationId,
+        platformIntegrationId: thirdGithubIntegrationId,
       })
     );
 
@@ -1157,6 +1238,24 @@ describe('findPreviousCompletedReview', () => {
     githubIntegrationId = githubIntegration.id;
     gitLabIntegrationAId = gitLabIntegrationA.id;
     gitLabIntegrationBId = gitLabIntegrationB.id;
+  });
+
+  afterEach(async () => {
+    const activeIds = await db
+      .select({ id: cloud_agent_code_reviews.id })
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          inArray(cloud_agent_code_reviews.id, createdReviewIds),
+          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+        )
+      );
+    for (const { id } of activeIds) {
+      await updateCodeReviewStatus(id, 'cancelled', {
+        terminalReason: 'superseded',
+        errorMessage: 'Cleaned up by test',
+      });
+    }
   });
 
   afterAll(async () => {
@@ -1303,17 +1402,17 @@ describe('findPreviousCompletedReview', () => {
       gitLabIntegrationBId,
       501
     );
-    const differentProjectId = await createGitLabReview(
-      'gitlab-matching-sha',
-      gitLabIntegrationAId,
-      502
-    );
     await updateCodeReviewStatus(olderIntegrationId, 'completed', {
       sessionId: 'agent_older_integration',
     });
     await updateCodeReviewStatus(newerIntegrationId, 'completed', {
       sessionId: 'agent_newer_integration',
     });
+    const differentProjectId = await createGitLabReview(
+      'gitlab-matching-sha',
+      gitLabIntegrationAId,
+      502
+    );
     await updateCodeReviewStatus(differentProjectId, 'completed', {
       sessionId: 'agent_other_project',
     });

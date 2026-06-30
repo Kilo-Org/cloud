@@ -506,7 +506,7 @@ describe('prepareReviewPayload', () => {
     });
   });
 
-  it('uses repo-name scope for GitLab continuation when integration identity is unavailable', async () => {
+  it('throws when a provider GitLab review is missing its integration', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(
@@ -517,24 +517,14 @@ describe('prepareReviewPayload', () => {
       )
       .returning();
 
-    const payload = await prepareReviewPayload({
-      reviewId: review.id,
-      owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      agentConfig: { config: baseAgentConfig },
-      platform: 'gitlab',
-    });
-
-    expect(mockGetOrCreateProjectAccessToken).not.toHaveBeenCalled();
-    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(
-      {
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
         owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        agentConfig: { config: baseAgentConfig },
         platform: 'gitlab',
-        repoFullName: REPO,
-        prNumber: 123,
-      },
-      'headsha123'
-    );
-    expect(payload.previousCloudAgentSessionId).toBeUndefined();
+      })
+    ).rejects.toThrow('is missing its integration');
   });
 
   it('prepares a fresh tokenless Bitbucket review from exact organization integration identity', async () => {
@@ -889,7 +879,7 @@ describe('prepareReviewPayload', () => {
     const prNumber = 1234;
     const [review] = await db
       .insert(cloud_agent_code_reviews)
-      .values(defineReview(testUser.id, null, { pr_number: prNumber }))
+      .values(defineReview(testUser.id, integration.id, { pr_number: prNumber }))
       .returning({ id: cloud_agent_code_reviews.id });
 
     if (!review) {
@@ -926,7 +916,7 @@ describe('prepareReviewPayload', () => {
 
     const [review] = await db
       .insert(cloud_agent_code_reviews)
-      .values(defineReview(testUser.id, null, { pr_number: prNumber }))
+      .values(defineReview(testUser.id, integration.id, { pr_number: prNumber }))
       .returning({ id: cloud_agent_code_reviews.id });
 
     if (!review) {

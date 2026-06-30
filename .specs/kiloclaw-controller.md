@@ -736,6 +736,7 @@ running. When forwarding, it MUST authenticate to gog with
 | GET | `/_kilo/files/tree` | List immediate safe file-tree children under controller root, or under `?path=<directory>` when `files.tree.path` is advertised |
 | GET | `/_kilo/files/read` | Read a safe file path |
 | POST | `/_kilo/files/import-openclaw-workspace` | Import OpenClaw workspace files |
+| POST | `/_kilo/files/export-openclaw-workspace` | Export the OpenClaw workspace as a binary archive (`.tar.gz` or `.zip`) when `files.export-openclaw-workspace` is advertised |
 | POST | `/_kilo/files/write` | Write a safe file path |
 | POST | `/_kilo/files/write-openclaw-config` | Validate and write `openclaw.json`, with explicit invalid override support |
 
@@ -746,6 +747,16 @@ running. When forwarding, it MUST authenticate to gog with
 3. When the controller advertises `files.tree.path`, clients MAY pass `?path=<directory>` to list immediate children under that safe relative directory.
 4. Requested directory paths MUST use the same safe-path protections as file reads and writes: reject absolute paths, root escapes, symlinks, non-directory paths, and controller-owned internal validation artifacts.
 5. Directory nodes MAY omit `children`; clients MUST treat omitted `children` as not loaded yet, not as proof that the directory is empty.
+
+##### OpenClaw workspace export
+
+1. `POST /_kilo/files/export-openclaw-workspace` MUST be advertised as `files.export-openclaw-workspace`; clients MUST NOT infer this behavior from controller CalVer.
+2. The request body MUST select a `format` of `tar.gz` or `zip` and MAY include an optional `password`. A `password` combined with `format: tar.gz` MUST be rejected (`openclaw_export_encryption_unsupported`) — encryption is supported only for `zip` (AES-256).
+3. The controller MUST export only the OpenClaw workspace directory tree (paths relative to the workspace root). It MUST exclude credentials, `openclaw.json`, sessions, and other state outside the workspace, and MUST skip symlinks, `.git/`, `node_modules/`, and transient/OS-junk files.
+4. The controller MUST apply the same safe-path protections as file reads (reject root escapes and symlinked ancestors) and MUST enforce per-file, total-size, and file-count caps, returning bounded structured errors (`openclaw_export_too_large`, `openclaw_export_too_many_files`) rather than silently truncating.
+5. The produced archive MUST stay within the Durable Object RPC return limit; an archive exceeding the bound MUST fail with `openclaw_export_too_large`.
+6. On success the controller MUST return the archive bytes with the matching `Content-Type` (`application/gzip` or `application/zip`) and the `X-Openclaw-Export-File-Count`, `X-Openclaw-Export-Total-Bytes`, and `X-Openclaw-Export-Skipped` metadata headers. An empty workspace MUST return `openclaw_export_no_files`.
+7. The passphrase MUST be used transiently to encrypt and MUST NOT be stored or logged.
 
 ##### Validation-aware `openclaw.json` file writes
 

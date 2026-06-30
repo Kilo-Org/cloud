@@ -2470,9 +2470,15 @@ importers:
 
   services/kiloclaw/controller:
     dependencies:
+      '@zip.js/zip.js':
+        specifier: 2.8.26
+        version: 2.8.26
       hono:
         specifier: 4.12.18
         version: 4.12.18
+      tar-stream:
+        specifier: 3.1.9
+        version: 3.1.9
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -2480,6 +2486,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4
+      '@types/tar-stream':
+        specifier: 3.1.4
+        version: 3.1.4
 
   services/kiloclaw/plugins/kilo-chat:
     dependencies:

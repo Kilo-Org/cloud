@@ -10,7 +10,7 @@ export interface RemoteMcpToolRoute {
 }
 
 export interface RemoteMcpSkippedTool {
-  readonly reason: string;
+  readonly reason: 'duplicate_name' | 'invalid_name' | 'non_object_schema';
   readonly remoteToolName: string;
   readonly serverId: string;
   readonly serverName: string;

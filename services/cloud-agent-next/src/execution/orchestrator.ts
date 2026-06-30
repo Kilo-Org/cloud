@@ -26,10 +26,7 @@ import {
   withPreparationInfrastructureRecovery,
 } from '../sandbox-recovery.js';
 import type { AgentSandbox, WrapperInstanceLease } from '../agent-sandbox/protocol.js';
-import {
-  isCodeReviewEphemeralSandboxId,
-  resolveEphemeralSandboxPolicy,
-} from '../code-review-ephemeral-sandbox.js';
+import { isCodeReviewEphemeralSandboxId } from '../code-review-ephemeral-sandbox.js';
 
 /** Maximum time allowed for complete wrapper readiness, including Kilo startup. */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -249,7 +246,6 @@ export class ExecutionOrchestrator {
     plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest,
     error: unknown
   ): Promise<void> {
-    if (!resolveEphemeralSandboxPolicy(this.deps.env, plan.workspace.metadata).enabled) return;
     if (!isCodeReviewEphemeralSandboxId(plan.workspace.sandboxId)) return;
     if (getPreparationInfrastructureFailure(error)) return;
     try {

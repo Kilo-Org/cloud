@@ -311,7 +311,7 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
     expect(deleteSandbox).not.toHaveBeenCalled();
   });
 
-  it('keeps disabled Code Reviewer wrapper bootstrap failures warm-retryable', async () => {
+  it('destroys crv-* sandbox after wrapper bootstrap failure even if rollout policy changed', async () => {
     const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator({
       env: { CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS: 'org_other' } as Env,
     });
@@ -321,7 +321,7 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
       code: 'WRAPPER_START_FAILED',
       retryable: true,
     } satisfies Partial<ExecutionError>);
-    expect(deleteSandbox).not.toHaveBeenCalled();
+    expect(deleteSandbox).toHaveBeenCalledWith('recovery');
   });
 
   it('preserves a finalizing error from wrapper startup', async () => {

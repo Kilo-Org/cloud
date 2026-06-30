@@ -33,11 +33,22 @@ import { toast } from 'sonner';
 import { lastActivityMs, parseDoltDate } from '@/lib/wasteland/date';
 
 type WantedItem = WastelandOutputs['wasteland']['browseWantedBoard'][number];
+type WantedBoardCounts = WastelandOutputs['wasteland']['getWantedBoardCounts'];
 
 type SortField = 'priority' | 'activity';
 
 const STATUS_FILTERS = ['open', 'claimed', 'in_review', 'completed'] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
+const WANTED_BOARD_PAGE_LIMIT = 50;
+const WANTED_BOARD_MAX_LIMIT = 500;
+const EMPTY_STATUS_COUNTS: WantedBoardCounts = {
+  open: 0,
+  claimed: 0,
+  in_review: 0,
+  completed: 0,
+  validated: 0,
+  withdrawn: 0,
+};
 
 const STATUS_COLORS: Record<string, string> = {
   open: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
@@ -156,11 +167,16 @@ export function WantedBoardClient({
   const sortField = parseSortField(searchParams?.get('sort'));
 
   const [localSearch, setLocalSearch] = useState(search);
+  const [pageLimit, setPageLimit] = useState(WANTED_BOARD_PAGE_LIMIT);
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setLocalSearch(search);
   }, [search]);
+
+  useEffect(() => {
+    setPageLimit(WANTED_BOARD_PAGE_LIMIT);
+  }, [statusFilter, search, sortField]);
 
   useEffect(() => {
     return () => {
@@ -219,8 +235,35 @@ export function WantedBoardClient({
   const [closeItem, setCloseItem] = useState<WantedItem | null>(null);
   const [unclaimItem, setUnclaimItem] = useState<WantedItem | null>(null);
 
+  const wantedBoardInput = useMemo(() => {
+    const trimmedSearch = search.trim();
+    return {
+      wastelandId,
+      ...(statusFilter === 'all' ? {} : { status: statusFilter }),
+      ...(trimmedSearch ? { search: trimmedSearch } : {}),
+      sort: sortField,
+      limit: pageLimit,
+      includeForkBranches: !isUpstream,
+    };
+  }, [wastelandId, statusFilter, search, sortField, pageLimit, isUpstream]);
+
+  const countsInput = useMemo(() => {
+    const trimmedSearch = search.trim();
+    return {
+      wastelandId,
+      ...(trimmedSearch ? { search: trimmedSearch } : {}),
+      includeForkBranches: !isUpstream,
+    };
+  }, [wastelandId, search, isUpstream]);
+
   const wantedQuery = useQuery({
-    ...trpc.wasteland.browseWantedBoard.queryOptions({ wastelandId }),
+    ...trpc.wasteland.browseWantedBoard.queryOptions(wantedBoardInput),
+    refetchInterval: 30_000,
+  });
+
+  const countsQuery = useQuery({
+    ...trpc.wasteland.getWantedBoardCounts.queryOptions(countsInput),
+    placeholderData: EMPTY_STATUS_COUNTS,
     refetchInterval: 30_000,
   });
 
@@ -293,7 +336,10 @@ export function WantedBoardClient({
     prevPendingIdsRef.current = current;
     if (disappeared) {
       void queryClient.invalidateQueries({
-        queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
+        queryKey: trpc.wasteland.browseWantedBoard.pathKey(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.getWantedBoardCounts.pathKey(),
       });
     }
   }, [pendingByItemId, queryClient, trpc, wastelandId]);
@@ -302,7 +348,10 @@ export function WantedBoardClient({
     isPending: false,
     mutate: () => {
       void queryClient.invalidateQueries({
-        queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
+        queryKey: trpc.wasteland.browseWantedBoard.pathKey(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.getWantedBoardCounts.pathKey(),
       });
       void queryClient.invalidateQueries({
         queryKey: trpc.wasteland.listMyPendingClaims.queryKey({ wastelandId }),
@@ -312,7 +361,10 @@ export function WantedBoardClient({
 
   const invalidateBoard = useCallback(() => {
     void queryClient.invalidateQueries({
-      queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
+      queryKey: trpc.wasteland.browseWantedBoard.pathKey(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.wasteland.getWantedBoardCounts.pathKey(),
     });
     void queryClient.invalidateQueries({
       queryKey: trpc.wasteland.listMyPendingClaims.queryKey({ wastelandId }),
@@ -320,33 +372,23 @@ export function WantedBoardClient({
   }, [queryClient, trpc, wastelandId]);
 
   const items = wantedQuery.data ?? [];
-
-  const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = {
-      open: 0,
-      claimed: 0,
-      in_review: 0,
-      completed: 0,
-    };
-    for (const item of items) {
-      counts[item.status] = (counts[item.status] ?? 0) + 1;
-    }
-    return counts;
-  }, [items]);
+  const statusCounts = countsQuery.data ?? EMPTY_STATUS_COUNTS;
+  const totalCount = Object.values(statusCounts).reduce((sum, count) => sum + count, 0);
 
   const filteredItems = useMemo(() => {
-    let result = items;
+    const trimmedSearch = search.trim().toLowerCase();
+    const result = items.filter(item => {
+      if (statusFilter !== 'all' && item.status !== statusFilter) return false;
+      if (!trimmedSearch) return true;
 
-    if (statusFilter !== 'all') {
-      result = result.filter(item => item.status === statusFilter);
-    }
+      return [item.title, item.description, item.tags].some(value =>
+        String(value ?? '')
+          .toLowerCase()
+          .includes(trimmedSearch)
+      );
+    });
 
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(item => item.title.toLowerCase().includes(q));
-    }
-
-    result = [...result].sort((a, b) => {
+    return [...result].sort((a, b) => {
       if (sortField === 'priority') {
         return (Number(a.priority) || 3) - (Number(b.priority) || 3);
       }
@@ -354,13 +396,18 @@ export function WantedBoardClient({
         lastActivityMs(b.updated_at, b.created_at) - lastActivityMs(a.updated_at, a.created_at)
       );
     });
-
-    return result;
   }, [items, statusFilter, search, sortField]);
+
+  const activeCount = statusFilter === 'all' ? totalCount : (statusCounts[statusFilter] ?? 0);
+  const displayCount = Math.max(activeCount, filteredItems.length);
 
   const handleRefresh = useCallback(() => {
     refreshMutation.mutate();
   }, [refreshMutation, wastelandId]);
+
+  const handleLoadMore = useCallback(() => {
+    setPageLimit(limit => Math.min(limit + WANTED_BOARD_PAGE_LIMIT, WANTED_BOARD_MAX_LIMIT));
+  }, []);
 
   const toggleSort = useCallback(() => {
     updateFilterParams({ sort: sortField === 'priority' ? 'activity' : 'priority' });
@@ -402,7 +449,7 @@ export function WantedBoardClient({
   useSetWastelandPageHeader({
     title: headerTitle ?? (isUpstream ? 'Upstream' : 'Wanted Board'),
     icon: <ScrollText className="size-4 text-[color:oklch(70%_0.15_30_/_0.6)]" />,
-    count: items.length,
+    count: displayCount,
     actions: (
       <>
         <button
@@ -454,7 +501,7 @@ export function WantedBoardClient({
           <div className="flex items-center gap-1">
             <FilterChip
               label="All"
-              count={items.length}
+              count={totalCount}
               active={statusFilter === 'all'}
               onClick={() => updateFilterParams({ status: 'all' })}
             />
@@ -584,6 +631,24 @@ export function WantedBoardClient({
               );
             })}
           </AnimatePresence>
+
+          {!wantedQuery.isLoading && displayCount > filteredItems.length && (
+            <div className="flex items-center justify-between border-t border-white/[0.04] px-6 py-2 text-[10px] text-white/30">
+              <span>
+                Showing first {filteredItems.length} of {displayCount}.
+                {pageLimit >= WANTED_BOARD_MAX_LIMIT ? ' Refine search to narrow results.' : ''}
+              </span>
+              {pageLimit < WANTED_BOARD_MAX_LIMIT && (
+                <button
+                  type="button"
+                  onClick={handleLoadMore}
+                  className="rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 font-medium text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white/85"
+                >
+                  Load more
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

@@ -33,6 +33,8 @@ export type BrowseFilter = {
   search?: string;
   /** ISO8601 / SQL timestamp string; rows with `updated_at >= since`. */
   since?: string;
+  /** Sort rows before applying limit. Defaults to priority order. */
+  sort?: 'priority' | 'activity';
   /** Omit to return every matching row. */
   limit?: number;
 };
@@ -57,6 +59,8 @@ export type BrowseOptions = {
   fork: { forkOwner: string; forkDb: string };
   rigHandle: RigHandle;
   filter?: BrowseFilter;
+  /** Skip fork branch overlay reads for fast list views. Defaults to true. */
+  includeForkBranches?: boolean;
   fetch?: typeof fetch;
   hooks?: DoltFetchHooks;
 };
@@ -120,15 +124,19 @@ function buildBrowseSql(filter: BrowseFilter | undefined): string {
   if (filter?.claimedBy) conditions.push(`claimed_by = '${escapeSqlString(filter.claimedBy)}'`);
   if (filter?.since) conditions.push(`updated_at >= '${escapeSqlString(filter.since)}'`);
   if (filter?.search) {
-    const s = escapeSqlString(filter.search);
+    const s = escapeSqlString(filter.search.toLowerCase());
     conditions.push(
-      `(INSTR(title, '${s}') > 0 OR INSTR(COALESCE(description,''), '${s}') > 0 OR INSTR(COALESCE(tags,''), '${s}') > 0)`
+      `(INSTR(LOWER(title), '${s}') > 0 OR INSTR(LOWER(COALESCE(description,'')), '${s}') > 0 OR INSTR(LOWER(COALESCE(tags,'')), '${s}') > 0)`
     );
   }
 
   let sql = 'SELECT * FROM wanted';
   if (conditions.length > 0) sql += ` WHERE ${conditions.join(' AND ')}`;
-  sql += ' ORDER BY priority ASC, created_at DESC';
+  if (filter?.sort === 'activity') {
+    sql += ' ORDER BY COALESCE(updated_at, created_at) DESC, created_at DESC';
+  } else {
+    sql += ' ORDER BY priority ASC, created_at DESC';
+  }
   if (filter?.limit && filter.limit > 0) sql += ` LIMIT ${filter.limit}`;
   return sql;
 }
@@ -180,6 +188,7 @@ export async function browse(opts: BrowseOptions): Promise<WlResult<BrowseEntry[
     for (const row of mainRows) {
       byId.set(row.id, { wantedId: row.id, upstream: row, fork: null, source: 'main' });
     }
+    if (opts.includeForkBranches === false) return { ok: true, data: Array.from(byId.values()) };
 
     // 2. Caller's fork branches: list, filter to `wl/<rig>/*`, then
     //    read each branch's wanted row.

@@ -575,6 +575,17 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     return response;
   }
   if (decision === 'deny') {
+    await services.auditService.record({
+      actorUserId: identity.user.id,
+      ownerScope: preview.ownerScope,
+      ownerId: preview.ownerId,
+      configId: preview.configId,
+      connectResourceId: preview.connectResourceId,
+      instanceId: null,
+      oauthGrantId: null,
+      eventType: 'authorization_denied',
+      outcome: 'blocked',
+    });
     const response = redirectOAuthError(
       new OAuthAuthorizationRedirectError(
         'access_denied',

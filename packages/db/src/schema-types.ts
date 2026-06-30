@@ -1708,6 +1708,15 @@ export const MCPGatewayProviderGrantStatus = {
 export type MCPGatewayProviderGrantStatus =
   (typeof MCPGatewayProviderGrantStatus)[keyof typeof MCPGatewayProviderGrantStatus];
 
+export const MCPGatewayOAuthGrantStatus = {
+  Pending: 'pending',
+  Active: 'active',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayOAuthGrantStatus =
+  (typeof MCPGatewayOAuthGrantStatus)[keyof typeof MCPGatewayOAuthGrantStatus];
+
 export const MCPGatewaySecretKind = {
   StaticProviderCredentials: 'static_provider_credentials',
   DynamicRegistration: 'dynamic_registration',

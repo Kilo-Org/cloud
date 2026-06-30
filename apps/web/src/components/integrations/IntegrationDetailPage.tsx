@@ -11,12 +11,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { PageLayout } from '@/components/PageLayout';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
+import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
 export type IntegrationDetailSearchParams = Promise<{
   success?: string;
   error?: string;
   pending_approval?: string;
   org?: string;
+  returnTo?: string;
 }>;
 
 type DetailRenderProps = {
@@ -48,6 +50,9 @@ const integrationDetailRegistry = {
           error={search.error}
           pendingApproval={search.pending_approval === 'true'}
           existingPendingOrg={search.org}
+          appReturnPath={
+            search.returnTo ? (validateReturnPath(search.returnTo) ?? undefined) : undefined
+          }
         />
       );
     },
@@ -171,14 +176,14 @@ function getIntegrationDetailEntry(
   return integrationDetailRegistry[platform];
 }
 
-function BackToIntegrationsLink({ href }: { href: string }) {
+function BackLink({ href, label }: { href: string; label: string }) {
   return (
-    <Link href={href}>
-      <Button variant="ghost" size="sm" className="gap-2">
-        <ArrowLeft className="h-4 w-4" />
-        Back to Integrations
-      </Button>
-    </Link>
+    <Button asChild variant="ghost" size="sm" className="gap-2">
+      <Link href={href}>
+        <ArrowLeft className="size-4" />
+        {label}
+      </Link>
+    </Button>
   );
 }
 
@@ -230,7 +235,7 @@ export async function UserIntegrationDetailPage({
     <PageLayout
       title={entry.title}
       subtitle={entry.userSubtitle}
-      headerActions={<BackToIntegrationsLink href="/integrations" />}
+      headerActions={<BackLink href="/integrations" label="Back to Integrations" />}
     >
       <SuspendedIntegrationDetails platform={detailPlatform} search={search} />
     </PageLayout>
@@ -249,6 +254,7 @@ export async function OrganizationIntegrationDetailPage({
   const detailPlatform = getIntegrationDetailPlatform(platform);
   const entry = getIntegrationDetailEntry(detailPlatform);
   const search = await searchParams;
+  const returnTo = search.returnTo ? validateReturnPath(search.returnTo) : null;
 
   return (
     <OrganizationByPageLayout
@@ -256,7 +262,10 @@ export async function OrganizationIntegrationDetailPage({
       render={({ organization }) => (
         <>
           <div className="space-y-4">
-            <BackToIntegrationsLink href={`/organizations/${organization.id}/integrations`} />
+            <BackLink
+              href={returnTo ?? `/organizations/${organization.id}/integrations`}
+              label={returnTo ? 'Return to setup' : 'Back to Integrations'}
+            />
             <SetPageTitle title={entry.title} />
             <p className="text-muted-foreground">{entry.organizationSubtitle(organization.name)}</p>
           </div>
@@ -264,7 +273,7 @@ export async function OrganizationIntegrationDetailPage({
           <SuspendedIntegrationDetails
             platform={detailPlatform}
             organizationId={organization.id}
-            search={search}
+            search={{ ...search, returnTo: returnTo ?? undefined }}
           />
         </>
       )}

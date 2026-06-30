@@ -170,6 +170,7 @@ test('auto-compaction fires when usage exceeds 85% threshold', async () => {
 
 test('manual "Compact now" compacts the conversation', async () => {
   const fixture = await startFixtureServer();
+  const seenChatBodies: unknown[] = [];
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 
   try {
@@ -188,6 +189,7 @@ test('manual "Compact now" compacts the conversation', async () => {
       secondCompletionEvents: [
         { choices: [{ delta: { content: 'SUMMARY: manually compacted.' } }] },
       ],
+      seenChatBodies,
       toolNames: safeToolNames,
     });
 
@@ -212,6 +214,19 @@ test('manual "Compact now" compacts the conversation', async () => {
     await expect(sidePanel.getByText(/Compacted earlier context/u)).toBeVisible({
       timeout: 10_000,
     });
+
+    /*
+     * Assert the compaction actually rewrote stored events (not just rendered a prefix): the
+     * summary is persisted and the earliest seeded messages are gone, and the summarization call
+     * fired with tool_choice: 'none'.
+     */
+    await waitForStoredConversationText(sidePanel, 'SUMMARY: manually compacted.');
+    const conversationsJson = await readStoredConversationsJson(sidePanel);
+    expect(conversationsJson).not.toContain('First message');
+    expect(conversationsJson).not.toContain('Second message');
+    const [, summarizationBody] = seenChatBodies;
+    expect(summarizationBody).toMatchObject({ tool_choice: 'none' });
+
     /*
      * Compaction released the input lock: with a fresh draft, Send is enabled again. It stays
      * disabled on an empty draft, which is unrelated to compaction.

@@ -1,5 +1,5 @@
 {
-  "id": "3fc1d536-bb45-4899-8031-f09e54ee2084",
+  "id": "cbfd7a64-9b3c-4921-b49a-767118157334",
   "prevId": "06265fd6-428e-4b7d-9092-dba307d6255e",
   "version": "7",
   "dialect": "postgresql",
@@ -4661,12 +4661,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "manual_config": {
-          "name": "manual_config",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "repo_full_name": {
           "name": "repo_full_name",
           "type": "text",
@@ -4868,15 +4862,9 @@
         }
       },
       "indexes": {
-        "UQ_cloud_agent_code_reviews_webhook_integration_repo_pr_sha": {
-          "name": "UQ_cloud_agent_code_reviews_webhook_integration_repo_pr_sha",
+        "UQ_cloud_agent_code_reviews_repo_pr_sha": {
+          "name": "UQ_cloud_agent_code_reviews_repo_pr_sha",
           "columns": [
-            {
-              "expression": "platform_integration_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "repo_full_name",
               "isExpression": false,
@@ -4897,36 +4885,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"manual_config\" IS NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_cloud_agent_code_reviews_active_provider_publisher": {
-          "name": "UQ_cloud_agent_code_reviews_active_provider_publisher",
-          "columns": [
-            {
-              "expression": "platform_integration_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "repo_full_name",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "pr_number",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
-          "concurrently": true,
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },
@@ -18010,6 +17969,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "oauth_grant_id": {
+          "name": "oauth_grant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "event_type": {
           "name": "event_type",
           "type": "text",
@@ -18049,6 +18014,22 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_audit_events_grant": {
+          "name": "IDX_mcp_gateway_audit_events_grant",
+          "columns": [
+            {
+              "expression": "oauth_grant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"mcp_gateway_audit_events\".\"oauth_grant_id\" is not null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -18142,6 +18123,19 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
+        },
+        "mcp_gateway_audit_events_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk": {
+          "name": "mcp_gateway_audit_events_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk",
+          "tableFrom": "mcp_gateway_audit_events",
+          "tableTo": "mcp_gateway_oauth_grants",
+          "columnsFrom": [
+            "oauth_grant_id"
+          ],
+          "columnsTo": [
+            "oauth_grant_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -18187,6 +18181,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "oauth_grant_id": {
+          "name": "oauth_grant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "client_id": {
           "name": "client_id",
@@ -18332,6 +18332,22 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "IDX_mcp_gateway_authorization_codes_grant": {
+          "name": "IDX_mcp_gateway_authorization_codes_grant",
+          "columns": [
+            {
+              "expression": "oauth_grant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"mcp_gateway_authorization_codes\".\"oauth_grant_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -18357,6 +18373,19 @@
           ],
           "columnsTo": [
             "oauth_client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_authorization_codes_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk": {
+          "name": "mcp_gateway_authorization_codes_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk",
+          "tableFrom": "mcp_gateway_authorization_codes",
+          "tableTo": "mcp_gateway_oauth_grants",
+          "columnsFrom": [
+            "oauth_grant_id"
+          ],
+          "columnsTo": [
+            "oauth_grant_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -18434,6 +18463,12 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
+        },
+        "oauth_grant_id": {
+          "name": "oauth_grant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         },
         "client_id": {
           "name": "client_id",
@@ -18591,6 +18626,22 @@
           "method": "btree",
           "with": {}
         },
+        "IDX_mcp_gateway_authorization_requests_grant": {
+          "name": "IDX_mcp_gateway_authorization_requests_grant",
+          "columns": [
+            {
+              "expression": "oauth_grant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"mcp_gateway_authorization_requests\".\"oauth_grant_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_mcp_gateway_authorization_requests_user": {
           "name": "IDX_mcp_gateway_authorization_requests_user",
           "columns": [
@@ -18632,6 +18683,19 @@
           ],
           "columnsTo": [
             "oauth_client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_authorization_requests_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk": {
+          "name": "mcp_gateway_authorization_requests_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk",
+          "tableFrom": "mcp_gateway_authorization_requests",
+          "tableTo": "mcp_gateway_oauth_grants",
+          "columnsFrom": [
+            "oauth_grant_id"
+          ],
+          "columnsTo": [
+            "oauth_grant_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -19587,6 +19651,363 @@
       },
       "isRLSEnabled": false
     },
+    "public.mcp_gateway_oauth_grants": {
+      "name": "mcp_gateway_oauth_grants",
+      "schema": "",
+      "columns": {
+        "oauth_grant_id": {
+          "name": "oauth_grant_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "oauth_client_id": {
+          "name": "oauth_client_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_scope": {
+          "name": "owner_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config_id": {
+          "name": "config_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "connect_resource_id": {
+          "name": "connect_resource_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "instance_id": {
+          "name": "instance_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "redirect_uri": {
+          "name": "redirect_uri",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "granted_scopes": {
+          "name": "granted_scopes",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "execution_context": {
+          "name": "execution_context",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config_version": {
+          "name": "config_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "grant_status": {
+          "name": "grant_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revocation_reason": {
+          "name": "revocation_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_mcp_gateway_oauth_grants_active_binding": {
+          "name": "UQ_mcp_gateway_oauth_grants_active_binding",
+          "columns": [
+            {
+              "expression": "oauth_client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "connect_resource_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "redirect_uri",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"mcp_gateway_oauth_grants\".\"revoked_at\" is null and \"mcp_gateway_oauth_grants\".\"grant_status\" in ('pending', 'active')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_oauth_grants_client": {
+          "name": "IDX_mcp_gateway_oauth_grants_client",
+          "columns": [
+            {
+              "expression": "oauth_client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_oauth_grants_user": {
+          "name": "IDX_mcp_gateway_oauth_grants_user",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_oauth_grants_config": {
+          "name": "IDX_mcp_gateway_oauth_grants_config",
+          "columns": [
+            {
+              "expression": "config_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_oauth_grants_owner": {
+          "name": "IDX_mcp_gateway_oauth_grants_owner",
+          "columns": [
+            {
+              "expression": "owner_scope",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owner_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_oauth_grants_resource": {
+          "name": "IDX_mcp_gateway_oauth_grants_resource",
+          "columns": [
+            {
+              "expression": "connect_resource_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_oauth_grants_instance": {
+          "name": "IDX_mcp_gateway_oauth_grants_instance",
+          "columns": [
+            {
+              "expression": "instance_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_mcp_gateway_oauth_grants_revoked_at": {
+          "name": "IDX_mcp_gateway_oauth_grants_revoked_at",
+          "columns": [
+            {
+              "expression": "revoked_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "mcp_gateway_oauth_grants_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk": {
+          "name": "mcp_gateway_oauth_grants_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk",
+          "tableFrom": "mcp_gateway_oauth_grants",
+          "tableTo": "mcp_gateway_oauth_clients",
+          "columnsFrom": [
+            "oauth_client_id"
+          ],
+          "columnsTo": [
+            "oauth_client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_oauth_grants_kilo_user_id_kilocode_users_id_fk": {
+          "name": "mcp_gateway_oauth_grants_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "mcp_gateway_oauth_grants",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_oauth_grants_config_id_mcp_gateway_configs_config_id_fk": {
+          "name": "mcp_gateway_oauth_grants_config_id_mcp_gateway_configs_config_id_fk",
+          "tableFrom": "mcp_gateway_oauth_grants",
+          "tableTo": "mcp_gateway_configs",
+          "columnsFrom": [
+            "config_id"
+          ],
+          "columnsTo": [
+            "config_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_oauth_grants_connect_resource_id_mcp_gateway_connect_resources_connect_resource_id_fk": {
+          "name": "mcp_gateway_oauth_grants_connect_resource_id_mcp_gateway_connect_resources_connect_resource_id_fk",
+          "tableFrom": "mcp_gateway_oauth_grants",
+          "tableTo": "mcp_gateway_connect_resources",
+          "columnsFrom": [
+            "connect_resource_id"
+          ],
+          "columnsTo": [
+            "connect_resource_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_oauth_grants_instance_id_mcp_gateway_connection_instances_instance_id_fk": {
+          "name": "mcp_gateway_oauth_grants_instance_id_mcp_gateway_connection_instances_instance_id_fk",
+          "tableFrom": "mcp_gateway_oauth_grants",
+          "tableTo": "mcp_gateway_connection_instances",
+          "columnsFrom": [
+            "instance_id"
+          ],
+          "columnsTo": [
+            "instance_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "mcp_gateway_oauth_grants_config_version_positive": {
+          "name": "mcp_gateway_oauth_grants_config_version_positive",
+          "value": "\"mcp_gateway_oauth_grants\".\"config_version\" > 0"
+        },
+        "mcp_gateway_oauth_grants_owner_scope": {
+          "name": "mcp_gateway_oauth_grants_owner_scope",
+          "value": "\"mcp_gateway_oauth_grants\".\"owner_scope\" IN ('personal', 'organization')"
+        },
+        "mcp_gateway_oauth_grants_status": {
+          "name": "mcp_gateway_oauth_grants_status",
+          "value": "\"mcp_gateway_oauth_grants\".\"grant_status\" IN ('pending', 'active', 'revoked')"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.mcp_gateway_pending_provider_authorizations": {
       "name": "mcp_gateway_pending_provider_authorizations",
       "schema": "",
@@ -19606,6 +20027,12 @@
         },
         "authorization_request_id": {
           "name": "authorization_request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "oauth_grant_id": {
+          "name": "oauth_grant_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
@@ -19759,6 +20186,22 @@
           "method": "btree",
           "with": {}
         },
+        "IDX_mcp_gateway_pending_provider_authorizations_grant": {
+          "name": "IDX_mcp_gateway_pending_provider_authorizations_grant",
+          "columns": [
+            {
+              "expression": "oauth_grant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"mcp_gateway_pending_provider_authorizations\".\"oauth_grant_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_mcp_gateway_pending_provider_authorizations_expires_at": {
           "name": "IDX_mcp_gateway_pending_provider_authorizations_expires_at",
           "columns": [
@@ -19785,6 +20228,19 @@
           ],
           "columnsTo": [
             "authorization_request_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_pending_provider_authorizations_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk": {
+          "name": "mcp_gateway_pending_provider_authorizations_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk",
+          "tableFrom": "mcp_gateway_pending_provider_authorizations",
+          "tableTo": "mcp_gateway_oauth_grants",
+          "columnsFrom": [
+            "oauth_grant_id"
+          ],
+          "columnsTo": [
+            "oauth_grant_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -20121,6 +20577,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "oauth_grant_id": {
+          "name": "oauth_grant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "client_id": {
           "name": "client_id",
           "type": "text",
@@ -20232,6 +20694,22 @@
           "method": "btree",
           "with": {}
         },
+        "IDX_mcp_gateway_refresh_tokens_grant": {
+          "name": "IDX_mcp_gateway_refresh_tokens_grant",
+          "columns": [
+            {
+              "expression": "oauth_grant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"mcp_gateway_refresh_tokens\".\"oauth_grant_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_mcp_gateway_refresh_tokens_config": {
           "name": "IDX_mcp_gateway_refresh_tokens_config",
           "columns": [
@@ -20273,6 +20751,19 @@
           ],
           "columnsTo": [
             "oauth_client_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "mcp_gateway_refresh_tokens_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk": {
+          "name": "mcp_gateway_refresh_tokens_oauth_grant_id_mcp_gateway_oauth_grants_oauth_grant_id_fk",
+          "tableFrom": "mcp_gateway_refresh_tokens",
+          "tableTo": "mcp_gateway_oauth_grants",
+          "columnsFrom": [
+            "oauth_grant_id"
+          ],
+          "columnsTo": [
+            "oauth_grant_id"
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"

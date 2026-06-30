@@ -159,6 +159,136 @@ jobs:
       base_sha: ${{ needs.resolve-worker-base.outputs.base_sha }}
     secrets: inherit
 
+  detect-gastown-wasteland-changes:
+    needs: resolve-worker-base
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    outputs:
+      deploy_wasteland: ${{ steps.detect.outputs.deploy_wasteland }}
+      deploy_gastown: ${{ steps.detect.outputs.deploy_gastown }}
+
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          fetch-depth: 0
+
+      - name: Detect Gastown and Wasteland changes
+        id: detect
+        run: |
+          BASE_SHA="${{ needs.resolve-worker-base.outputs.base_sha }}"
+
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "null" ]; then
+            BASE_SHA="${{ github.event.before }}"
+          fi
+
+          changed_any() {
+            git diff --name-only "$BASE_SHA" HEAD -- "$@" | grep -q .
+          }
+
+          SHARED_WORKER_INPUTS=(
+            pnpm-lock.yaml
+            pnpm-workspace.yaml
+            patches
+            packages/worker-utils
+          )
+
+          WASTELAND_INPUTS=(
+            services/wasteland
+            packages/wl-sdk
+            "${SHARED_WORKER_INPUTS[@]}"
+          )
+
+          GASTOWN_INPUTS=(
+            services/gastown
+            packages/db
+            "${SHARED_WORKER_INPUTS[@]}"
+          )
+
+          deploy_wasteland=false
+          deploy_gastown=false
+
+          if changed_any "${WASTELAND_INPUTS[@]}"; then
+            deploy_wasteland=true
+          fi
+
+          if changed_any "${GASTOWN_INPUTS[@]}"; then
+            deploy_gastown=true
+          fi
+
+          echo "deploy_wasteland=$deploy_wasteland" >> "$GITHUB_OUTPUT"
+          echo "deploy_gastown=$deploy_gastown" >> "$GITHUB_OUTPUT"
+
+          echo "deploy_wasteland=$deploy_wasteland"
+          echo "deploy_gastown=$deploy_gastown"
+
+  deploy-gastown-wasteland:
+    needs:
+      [
+        check-production-db-startup,
+        run-migrations,
+        resolve-worker-base,
+        detect-gastown-wasteland-changes,
+        stage-app,
+        stage-global-app,
+        promote-app,
+        promote-global-app,
+      ]
+    if: >-
+      ${{
+        !cancelled() &&
+        needs.check-production-db-startup.result == 'success' &&
+        needs.run-migrations.result == 'success' &&
+        needs.resolve-worker-base.result == 'success' &&
+        needs.detect-gastown-wasteland-changes.result == 'success' &&
+        contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.promote-global-app.result) &&
+        (
+          needs.detect-gastown-wasteland-changes.outputs.deploy_wasteland == 'true' ||
+          needs.detect-gastown-wasteland-changes.outputs.deploy_gastown == 'true'
+        )
+      }}
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 45
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Deploy Wasteland
+        if: needs.detect-gastown-wasteland-changes.outputs.deploy_wasteland == 'true'
+        run: pnpm --filter cloudflare-wasteland deploy:prod
+
+      - name: Upload Wasteland source maps
+        if: needs.detect-gastown-wasteland-changes.outputs.deploy_wasteland == 'true'
+        run: pnpm --filter cloudflare-wasteland postdeploy:prod
+
+      - name: Deploy Gastown
+        if: needs.detect-gastown-wasteland-changes.outputs.deploy_gastown == 'true'
+        run: pnpm --filter cloudflare-gastown deploy:prod
+
+      - name: Upload Gastown source maps
+        if: needs.detect-gastown-wasteland-changes.outputs.deploy_gastown == 'true'
+        run: pnpm --filter cloudflare-gastown postdeploy:prod
+
   deploy-kiloclaw:
     needs: [check-production-db-startup, run-migrations]
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot

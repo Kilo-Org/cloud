@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Writable } from 'node:stream';
 import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
 import {
   createSafeProcessDiagnostic,
@@ -43,6 +44,8 @@ export type RestoreSessionOptions = {
 };
 
 const KILO_IMPORT_TIMEOUT_MS = 120_000;
+const JQ_SANITIZE_TOKEN_COUNTS_FILTER =
+  'walk(if type == "object" and ((.tokens? | type) == "object") then .tokens |= walk(if type == "number" and . < 0 then 0 else . end) else . end)';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -368,6 +371,55 @@ async function validateSnapshotInfoId(
   }
 }
 
+function tokenSanitizationTempPath(snapshotPath: string): string {
+  return path.join(
+    path.dirname(snapshotPath),
+    `.kilo-sanitized-${path.basename(snapshotPath)}-${process.pid}-${Date.now()}`
+  );
+}
+
+async function sanitizeSnapshotTokenCountsWithJq(
+  snapshotPath: string,
+  signal?: AbortSignal
+): Promise<boolean> {
+  const tempPath = tokenSanitizationTempPath(snapshotPath);
+  try {
+    signal?.throwIfAborted();
+    const proc = Bun.spawn(['jq', '-c', JQ_SANITIZE_TOKEN_COUNTS_FILTER, snapshotPath], {
+      stdout: 'pipe',
+      stderr: 'ignore',
+      signal,
+    });
+    const writeOutput = proc.stdout.pipeTo(Writable.toWeb(fs.createWriteStream(tempPath)));
+    const exitCode = await proc.exited;
+    await writeOutput;
+    signal?.throwIfAborted();
+    if (exitCode !== 0) {
+      log(`snapshot_token_sanitization_jq_unavailable exitCode=${exitCode}`);
+      return false;
+    }
+    fs.renameSync(tempPath, snapshotPath);
+    return true;
+  } catch {
+    signal?.throwIfAborted();
+    log('snapshot_token_sanitization_jq_unavailable');
+    return false;
+  } finally {
+    fs.rmSync(tempPath, { force: true });
+  }
+}
+
+async function sanitizeSnapshotTokenCounts(
+  snapshotPath: string,
+  signal?: AbortSignal
+): Promise<void> {
+  if (await sanitizeSnapshotTokenCountsWithJq(snapshotPath, signal)) {
+    log('snapshot token counts sanitized');
+    return;
+  }
+  log('snapshot token count sanitization skipped');
+}
+
 // jq filter that extracts diffs from the snapshot JSON using last-write-wins
 // deduplication by file path. Runs as a subprocess so the full parsed snapshot
 // is never loaded into the main process's heap — jq's C-native parser uses
@@ -585,6 +637,8 @@ export async function restoreSession(
   }
 
   try {
+    await sanitizeSnapshotTokenCounts(tmpPath, options.signal);
+
     // ---- Step 2: Run kilo import ----
     const importStartedAt = Date.now();
     log(

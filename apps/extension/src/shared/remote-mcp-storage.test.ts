@@ -165,7 +165,7 @@ describe('remote MCP storage', () => {
       servers: [
         {
           ...savedServer,
-          auth: { type: 'bearer' },
+          auth: { token: 'token-1', type: 'bearer' },
           cachedTools: [],
           lastConnectedAt: undefined,
           lastError: undefined,
@@ -186,7 +186,7 @@ describe('remote MCP storage', () => {
       servers: [
         {
           ...savedServer,
-          auth: { headerName: 'X-Token', type: 'header' },
+          auth: { headerName: 'X-Token', headerValue: 'secret', type: 'header' },
           cachedTools: [],
           lastConnectedAt: undefined,
           lastError: undefined,

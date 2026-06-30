@@ -178,23 +178,6 @@ const createSlug = (displayName: string): string => {
   return slug.length > 0 ? slug : 'remote-mcp';
 };
 
-const resetAuth = (auth: RemoteMcpAuth): RemoteMcpAuth => {
-  switch (auth.type) {
-    case 'bearer': {
-      return { type: 'bearer' };
-    }
-    case 'header': {
-      return { headerName: auth.headerName, type: 'header' };
-    }
-    case 'oauth': {
-      return { type: 'oauth' };
-    }
-    case 'none': {
-      return auth;
-    }
-  }
-};
-
 export const upsertRemoteMcpServer = (
   store: RemoteMcpStore,
   draft: RemoteMcpServerDraft
@@ -213,7 +196,7 @@ export const upsertRemoteMcpServer = (
     existing !== undefined && (existing.url !== url || existing.auth.type !== draft.auth.type);
   const server: RemoteMcpServer = {
     allowInSafeMode: draft.allowInSafeMode,
-    auth: connectionChanged ? resetAuth(draft.auth) : draft.auth,
+    auth: draft.auth,
     cachedTools: connectionChanged ? [] : (draft.cachedTools ?? existing?.cachedTools ?? []),
     displayName: draft.displayName,
     enabled: draft.enabled,

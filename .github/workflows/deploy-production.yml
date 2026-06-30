@@ -287,6 +287,7 @@ jobs:
 
       - name: Upload Gastown source maps
         if: needs.detect-gastown-wasteland-changes.outputs.deploy_gastown == 'true'
+        continue-on-error: true
         run: pnpm --filter cloudflare-gastown postdeploy:prod
 
   deploy-kiloclaw:

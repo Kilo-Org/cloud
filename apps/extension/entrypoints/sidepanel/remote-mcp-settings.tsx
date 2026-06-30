@@ -19,7 +19,6 @@ import {
   isSecretSaved,
   removeServer,
   toolsToJsonString,
-  validateDraft,
 } from './remote-mcp-settings-logic';
 
 type AuthType = 'none' | 'bearer' | 'header' | 'oauth';
@@ -129,12 +128,6 @@ const ServerForm = ({
 
   const handleSubmit = async (ev: { preventDefault: () => void }): Promise<void> => {
     ev.preventDefault();
-    const draft = buildDraftFromForm(form, existingServer?.auth);
-    const validationError = validateDraft(draft);
-    if (validationError !== null) {
-      setError(validationError);
-      return;
-    }
     setSaving(true);
     const saveError = await onSave(form);
     setSaving(false);

@@ -7,27 +7,9 @@ import type {
 } from '../../src/shared/remote-mcp';
 import type { RemoteMcpServerDraft } from '../../src/shared/remote-mcp-storage';
 import { upsertRemoteMcpServer } from '../../src/shared/remote-mcp-storage';
-import { normalizeRemoteMcpUrl } from '../../src/shared/remote-mcp-url';
 
 export const getConnectButtonLabel = (status: RemoteMcpStatus): 'Connect' | 'Refresh' =>
   status === 'untested' || status === 'needs_auth' ? 'Connect' : 'Refresh';
-
-export const validateDraftUrl = (url: string): string | null => {
-  try {
-    normalizeRemoteMcpUrl(url);
-    return null;
-  } catch (error) {
-    return error instanceof Error ? error.message : 'Invalid URL.';
-  }
-};
-
-export const validateDraftAuth = (auth: RemoteMcpAuth): string | null => {
-  const knownTypes = new Set(['none', 'bearer', 'header', 'oauth']);
-  return knownTypes.has(auth.type) ? null : 'Unsupported auth type.';
-};
-
-export const validateDraft = (draft: RemoteMcpServerDraft): string | null =>
-  validateDraftUrl(draft.url) ?? validateDraftAuth(draft.auth);
 
 const buildAuth = (
   fields: {

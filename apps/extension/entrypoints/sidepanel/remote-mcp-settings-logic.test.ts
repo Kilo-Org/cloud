@@ -9,7 +9,6 @@ import {
   isSecretSaved,
   removeServer,
   toolsToJsonString,
-  validateDraftUrl,
 } from './remote-mcp-settings-logic';
 
 const makeServer = (overrides: Partial<Parameters<typeof isSecretSaved>[0]> = {}) => ({
@@ -43,30 +42,6 @@ describe('remote-mcp-settings pure logic', () => {
 
     it('returns Refresh for unavailable', () => {
       expect(getConnectButtonLabel('unavailable')).toBe('Refresh');
-    });
-  });
-
-  describe('url validation', () => {
-    it('returns null for valid https URL', () => {
-      expect(validateDraftUrl('https://example.com/mcp')).toBeNull();
-    });
-
-    it('returns null for http localhost', () => {
-      expect(validateDraftUrl('http://localhost:3000/mcp')).toBeNull();
-    });
-
-    it('returns null for http 127.0.0.1', () => {
-      expect(validateDraftUrl('http://127.0.0.1:3000/mcp')).toBeNull();
-    });
-
-    it('returns error for http non-localhost', () => {
-      const result = validateDraftUrl('http://example.com/mcp');
-      expect(result).not.toBeNull();
-    });
-
-    it('returns error for garbage', () => {
-      const result = validateDraftUrl('not-a-url');
-      expect(result).not.toBeNull();
     });
   });
 

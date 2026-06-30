@@ -41,12 +41,12 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   //if you just want a simple straightforward global message, add it here.
   {
     id: 'legacy-upgrade-june-2026',
-    title: 'A New Version of Kilo Code Is Available',
+    title: 'Legacy Kilo Code Extension: End of Life July 31, 2026',
     message:
-      "You're using an older version of Kilo Code. Upgrade to the latest version to get new models, faster performance, and the best experience.",
+      'This extension reaches end of life on July 31, 2026 — no further updates, bug fixes, or security patches after that date. Switch to the current Kilo Code extension for continued support.',
     action: {
-      actionText: 'Get the Latest Version',
-      actionURL: 'https://marketplace.visualstudio.com/items?itemName=kilocode.kilo-code',
+      actionText: 'See End of Life Notice',
+      actionURL: 'https://github.com/Kilo-Org/kilocode-legacy#legacy-ide-extensions-end-of-life',
     },
     showIn: ['extension'],
     extensionVersionBelow: 7,

@@ -411,6 +411,8 @@ function hasKnownUnretryableFailureMessage(errorMessage?: string | null): boolea
 
   return (
     message.includes('maximum runtime') ||
+    message.includes('assistant request was not authorized') ||
+    /\b(unauthorized|authentication|authorization|forbidden|401|403)\b/i.test(message) ||
     /\b(cancelled|canceled)\b/i.test(message) ||
     message.includes('superseded') ||
     message.includes('user interrupted') ||

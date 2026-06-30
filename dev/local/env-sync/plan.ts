@@ -555,6 +555,19 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     const entries = parseExampleFile(exampleContent);
 
     for (const entry of entries) {
+      const envLocalSourceKey = getEnvLocalSourceKey(entry.key, entry.annotation);
+      if (
+        envLocalSourceKey &&
+        GENERATED_LOCAL_SECRET_KEYS.has(envLocalSourceKey) &&
+        !envLocal.get(envLocalSourceKey)
+      ) {
+        maybeAddEnvLocalAutoCreate(
+          envLocalAutoCreates,
+          createGeneratedLocalSecretAutoCreate(envLocalSourceKey)
+        );
+        continue;
+      }
+
       const { value: expectedValue, resolved } = resolveAnnotatedValue(
         entry.key,
         entry,

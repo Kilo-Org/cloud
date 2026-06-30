@@ -158,6 +158,55 @@ test('leaves an already correct generated web override unchanged', () => {
   }
 });
 
+test('reconciles stale web callback token secret from .env.local', () => {
+  const repo = createRepo({
+    '.env.local': 'CALLBACK_TOKEN_SECRET=root-callback-secret\n',
+    'apps/web/.env.development.local.example': [
+      '# @from CALLBACK_TOKEN_SECRET',
+      'CALLBACK_TOKEN_SECRET=',
+      '',
+    ].join('\n'),
+    'apps/web/.env.development.local': 'CALLBACK_TOKEN_SECRET=stale-callback-secret\n',
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+    assert.deepEqual(plan.envDevLocalChanges, [
+      {
+        key: 'CALLBACK_TOKEN_SECRET',
+        oldValue: 'stale-callback-secret',
+        newValue: 'root-callback-secret',
+      },
+    ]);
+  } finally {
+    repo.cleanup();
+  }
+});
+
+test('auto-creates blank shared callback secrets before syncing web env vars', () => {
+  const repo = createRepo({
+    '.env.local': 'CALLBACK_TOKEN_SECRET=\n',
+    'apps/web/.env.development.local.example': [
+      '# @from CALLBACK_TOKEN_SECRET',
+      'CALLBACK_TOKEN_SECRET=',
+      '',
+    ].join('\n'),
+    'apps/web/.env.development.local': 'CALLBACK_TOKEN_SECRET=stale-callback-secret\n',
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+    assert.deepEqual(plan.envLocalAutoCreates, [
+      {
+        key: 'CALLBACK_TOKEN_SECRET',
+        command: 'openssl',
+        args: ['rand', '-base64', '32'],
+      },
+    ]);
+    assert.deepEqual(plan.envDevLocalChanges, []);
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('preserves root-first resolution for unannotated web template entries', () => {
   const repo = createRepo({
     '.env.local': 'STRIPE_PRICE_ID=pulled-stripe-price\n',

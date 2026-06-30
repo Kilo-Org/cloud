@@ -253,6 +253,21 @@ describe('Device Auth', () => {
         expect(secondResult.token).toBeUndefined();
       });
 
+      test('concurrent polls mint at most one token from a single approval', async () => {
+        const { code } = await createDeviceAuthRequest({});
+        await approveDeviceAuthRequest(code, testUserId);
+
+        const results = await Promise.all([
+          pollDeviceAuthRequest(code),
+          pollDeviceAuthRequest(code),
+        ]);
+
+        const approved = results.filter(r => r.status === 'approved' && r.token);
+        const expired = results.filter(r => r.status === 'expired');
+        expect(approved).toHaveLength(1);
+        expect(expired).toHaveLength(1);
+      });
+
       test('normalizes responses - non-existent code returns expired', async () => {
         const result = await pollDeviceAuthRequest('FAKE-CODE');
         expect(result.status).toBe('expired');

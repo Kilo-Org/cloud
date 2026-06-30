@@ -176,11 +176,27 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
     return { status: request.status as 'pending' | 'denied' };
   }
 
-  // For approved requests, fetch user and generate token
+  // Atomically consume the approval before minting: a single guarded
+  // compare-and-swap flips 'approved' -> 'expired' and returns the row only to
+  // the caller that won. This prevents concurrent polls from each minting a
+  // long-lived token from one approval.
+  const consumed = await db
+    .update(device_auth_requests)
+    .set({ status: 'expired' })
+    .where(and(eq(device_auth_requests.code, code), eq(device_auth_requests.status, 'approved')))
+    .returning({ kiloUserId: device_auth_requests.kilo_user_id });
+
+  if (consumed.length === 0 || !consumed[0].kiloUserId) {
+    // Lost the race to another poller (or the status changed) — normalize to
+    // expired so the code cannot be polled into a second token.
+    return { status: 'expired' };
+  }
+  const kiloUserId = consumed[0].kiloUserId;
+
   const [user] = await db
     .select()
     .from(kilocode_users)
-    .where(eq(kilocode_users.id, request.kilo_user_id))
+    .where(eq(kilocode_users.id, kiloUserId))
     .limit(1);
 
   if (!user) {
@@ -188,14 +204,6 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
   }
 
   const token = generateApiToken(user, { deviceAuthRequestCode: code });
-
-  // Mark as consumed to enforce single-use
-  await db
-    .update(device_auth_requests)
-    .set({
-      status: 'expired',
-    })
-    .where(eq(device_auth_requests.code, code));
 
   return {
     status: 'approved',

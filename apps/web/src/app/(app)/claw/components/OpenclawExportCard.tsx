@@ -24,7 +24,7 @@ function friendlyExportError(code: string | undefined, fallback: string): string
     case 'openclaw_export_no_files':
       return 'No exportable OpenClaw workspace files were found.';
     case 'openclaw_export_too_large':
-      return 'Your workspace is too large to export. Remove large files and try again.';
+      return 'Your exported text is too large. Trim large notes and try again.';
     case 'openclaw_export_too_many_files':
       return 'Your workspace has too many files to export.';
     case 'openclaw_export_encryption_unsupported':

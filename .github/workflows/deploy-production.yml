@@ -279,6 +279,7 @@ jobs:
 
       - name: Upload Wasteland source maps
         if: needs.detect-gastown-wasteland-changes.outputs.deploy_wasteland == 'true'
+        continue-on-error: true
         run: pnpm --filter cloudflare-wasteland postdeploy:prod
 
       - name: Deploy Gastown

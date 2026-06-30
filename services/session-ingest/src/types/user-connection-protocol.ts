@@ -185,6 +185,7 @@ export type CLIOutboundMessage = z.infer<typeof CLIOutboundMessageSchema>;
 export type CLIInboundMessage = z.infer<typeof CLIInboundMessageSchema>;
 export type WebOutboundMessage = z.infer<typeof WebOutboundMessageSchema>;
 export type WebInboundMessage = z.infer<typeof WebInboundMessageSchema>;
+export type SessionStatus = z.infer<typeof SessionStatusSchema>;
 export type SessionEventV2Row = z.infer<typeof SessionEventV2RowSchema>;
 export type SessionRowEventPayload = z.infer<typeof SessionRowEventPayloadSchema>;
 export type SessionStatusUpdatedPayload = z.infer<typeof SessionStatusUpdatedPayloadSchema>;

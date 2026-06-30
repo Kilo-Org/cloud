@@ -9,8 +9,12 @@ import { getItemIdentity } from './util/compaction';
 import { MAX_INGEST_ITEM_BYTES, MAX_SINGLE_ITEM_BYTES } from './util/ingest-limits';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { withDORetry, normalizeGitUrl } from '@kilocode/worker-utils';
-import { mapSessionEventRow, notifyUserSessionEvent } from './session-events';
-import { SessionStatusSchema } from './types/user-connection-protocol';
+import {
+  mapSessionEventRow,
+  notifyUserSessionEvent,
+  type SessionEventDbRow,
+} from './session-events';
+import { SessionStatusSchema, type SessionStatus } from './types/user-connection-protocol';
 
 export interface IngestQueueMessage {
   r2Key: string;
@@ -398,27 +402,33 @@ function createIngestChunker(
 type SessionMetadataUpdates = Partial<
   Pick<
     typeof cli_sessions_v2.$inferInsert,
-    | 'title'
-    | 'created_on_platform'
-    | 'organization_id'
-    | 'git_url'
-    | 'git_branch'
-    | 'status'
-    | 'status_updated_at'
+    'title' | 'created_on_platform' | 'organization_id' | 'git_url' | 'git_branch'
   >
 >;
+
+const sessionEventReturningColumns = {
+  session_id: cli_sessions_v2.session_id,
+  created_at: cli_sessions_v2.created_at,
+  updated_at: cli_sessions_v2.updated_at,
+  title: cli_sessions_v2.title,
+  created_on_platform: cli_sessions_v2.created_on_platform,
+  organization_id: cli_sessions_v2.organization_id,
+  git_url: cli_sessions_v2.git_url,
+  git_branch: cli_sessions_v2.git_branch,
+  parent_session_id: cli_sessions_v2.parent_session_id,
+  status: cli_sessions_v2.status,
+  status_updated_at: cli_sessions_v2.status_updated_at,
+};
 
 /**
  * Build the `cli_sessions_v2` partial update from a set of metadata changes.
  *
  * `git_url` is passed through `normalizeGitUrl` on write so that the
  * `github_branch_pull_requests` cache (keyed on the canonical form) can
- * match new sessions without per-read normalization. Status bumps carry
- * `status_updated_at = now()`.
+ * match new sessions without per-read normalization.
  */
 export function computeSessionMetadataUpdates(
-  mergedChanges: Map<string, string | null>,
-  now: () => string = () => new Date().toISOString()
+  mergedChanges: Map<string, string | null>
 ): SessionMetadataUpdates {
   const updates: SessionMetadataUpdates = {};
 
@@ -439,12 +449,134 @@ export function computeSessionMetadataUpdates(
   if (mergedChanges.has('gitBranch')) {
     updates.git_branch = mergedChanges.get('gitBranch') ?? null;
   }
-  if (mergedChanges.has('status')) {
-    updates.status = mergedChanges.get('status') ?? null;
-    updates.status_updated_at = now();
-  }
 
   return updates;
+}
+
+async function updateSessionMetadata(
+  db: ReturnType<typeof getWorkerDb>,
+  kiloUserId: string,
+  sessionId: string,
+  updates: SessionMetadataUpdates
+): Promise<SessionEventDbRow | null> {
+  if (Object.keys(updates).length === 0) return null;
+
+  const [row] = await db
+    .update(cli_sessions_v2)
+    .set(updates)
+    .where(
+      and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
+    )
+    .returning(sessionEventReturningColumns);
+  return row ?? null;
+}
+
+async function updateSessionParent(
+  db: ReturnType<typeof getWorkerDb>,
+  kiloUserId: string,
+  sessionId: string,
+  parentSessionId: string | null | undefined
+): Promise<SessionEventDbRow | null> {
+  if (parentSessionId === undefined) return null;
+
+  if (parentSessionId && parentSessionId !== sessionId) {
+    const parentRows = await db
+      .select({ session_id: cli_sessions_v2.session_id })
+      .from(cli_sessions_v2)
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, parentSessionId),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+        )
+      )
+      .limit(1);
+
+    if (!parentRows[0]) return null;
+
+    const [row] = await db
+      .update(cli_sessions_v2)
+      .set({ parent_session_id: parentSessionId })
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, sessionId),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+          sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
+        )
+      )
+      .returning(sessionEventReturningColumns);
+    return row ?? null;
+  }
+
+  if (parentSessionId === null) {
+    const [row] = await db
+      .update(cli_sessions_v2)
+      .set({ parent_session_id: null })
+      .where(
+        and(
+          eq(cli_sessions_v2.session_id, sessionId),
+          eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+          sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
+        )
+      )
+      .returning(sessionEventReturningColumns);
+    return row ?? null;
+  }
+
+  return null;
+}
+
+type StatusTransitionRow = SessionEventDbRow & {
+  previous_status: string | null;
+};
+
+async function updateSessionStatus(
+  db: ReturnType<typeof getWorkerDb>,
+  kiloUserId: string,
+  sessionId: string,
+  status: string | null | undefined
+): Promise<{ session: SessionEventDbRow; previousStatus: SessionStatus | null } | null> {
+  if (status === undefined) return null;
+
+  const { rows } = await db.execute<StatusTransitionRow>(sql`
+    WITH locked AS (
+      SELECT status AS previous_status
+      FROM cli_sessions_v2
+      WHERE session_id = ${sessionId}
+        AND kilo_user_id = ${kiloUserId}
+      FOR UPDATE
+    ), updated AS (
+      UPDATE cli_sessions_v2
+      SET
+        status = ${status},
+        status_updated_at = now(),
+        updated_at = now()
+      FROM locked
+      WHERE cli_sessions_v2.session_id = ${sessionId}
+        AND cli_sessions_v2.kilo_user_id = ${kiloUserId}
+        AND locked.previous_status IS DISTINCT FROM ${status}
+      RETURNING
+        cli_sessions_v2.session_id,
+        cli_sessions_v2.created_at,
+        cli_sessions_v2.updated_at,
+        cli_sessions_v2.title,
+        cli_sessions_v2.created_on_platform,
+        cli_sessions_v2.organization_id,
+        cli_sessions_v2.git_url,
+        cli_sessions_v2.git_branch,
+        cli_sessions_v2.parent_session_id,
+        cli_sessions_v2.status,
+        cli_sessions_v2.status_updated_at,
+        (SELECT previous_status FROM locked) AS previous_status
+    )
+    SELECT * FROM updated
+  `);
+  const row = rows[0];
+  if (!row) return null;
+
+  return {
+    session: row,
+    previousStatus: SessionStatusSchema.nullable().parse(row.previous_status),
+  };
 }
 
 async function applyMetadataChanges(
@@ -462,119 +594,27 @@ async function applyMetadataChanges(
   const parentSessionId = mergedChanges.has('parentId')
     ? (mergedChanges.get('parentId') ?? null)
     : undefined;
-  const changedNonStatus =
-    mergedChanges.has('title') ||
-    mergedChanges.has('platform') ||
-    mergedChanges.has('orgId') ||
-    mergedChanges.has('gitUrl') ||
-    mergedChanges.has('gitBranch') ||
-    parentSessionId !== undefined;
+  let changedNonStatus = false;
+  let notificationRow = await updateSessionMetadata(db, kiloUserId, sessionId, updates);
+  if (notificationRow) changedNonStatus = true;
 
-  const notification = await db.transaction(async tx => {
-    const statusChange =
-      status === undefined
-        ? { changed: false, previousStatus: null }
-        : await (async () => {
-            const [statusRow] = await tx
-              .select({ status: cli_sessions_v2.status })
-              .from(cli_sessions_v2)
-              .where(
-                and(
-                  eq(cli_sessions_v2.session_id, sessionId),
-                  eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-                )
-              )
-              .limit(1)
-              .for('update');
-            if (!statusRow) return null;
-            const previousStatus = SessionStatusSchema.nullable().parse(statusRow.status);
-            return { changed: status !== previousStatus, previousStatus };
-          })();
+  const parentUpdateRow = await updateSessionParent(db, kiloUserId, sessionId, parentSessionId);
+  if (parentUpdateRow) {
+    changedNonStatus = true;
+    notificationRow = parentUpdateRow;
+  }
 
-    if (!statusChange) return null;
+  const statusChange = await updateSessionStatus(db, kiloUserId, sessionId, status);
+  if (statusChange) notificationRow = statusChange.session;
 
-    if (Object.keys(updates).length > 0) {
-      await tx
-        .update(cli_sessions_v2)
-        .set(updates)
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-          )
-        );
-    }
-
-    if (parentSessionId !== undefined) {
-      if (parentSessionId && parentSessionId !== sessionId) {
-        const parentRows = await tx
-          .select({ session_id: cli_sessions_v2.session_id })
-          .from(cli_sessions_v2)
-          .where(
-            and(
-              eq(cli_sessions_v2.session_id, parentSessionId),
-              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-            )
-          )
-          .limit(1);
-
-        if (parentRows[0]) {
-          await tx
-            .update(cli_sessions_v2)
-            .set({ parent_session_id: parentSessionId })
-            .where(
-              and(
-                eq(cli_sessions_v2.session_id, sessionId),
-                eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-                sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
-              )
-            );
-        }
-      } else if (parentSessionId === null) {
-        await tx
-          .update(cli_sessions_v2)
-          .set({ parent_session_id: null })
-          .where(
-            and(
-              eq(cli_sessions_v2.session_id, sessionId),
-              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-              sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
-            )
-          );
+  const notification = notificationRow
+    ? {
+        changedNonStatus,
+        changedStatus: !!statusChange,
+        previousStatus: statusChange?.previousStatus ?? null,
+        session: mapSessionEventRow(notificationRow),
       }
-    }
-
-    if (!changedNonStatus && !statusChange.changed) return null;
-
-    const [persistedRow] = await tx
-      .select({
-        session_id: cli_sessions_v2.session_id,
-        created_at: cli_sessions_v2.created_at,
-        updated_at: cli_sessions_v2.updated_at,
-        title: cli_sessions_v2.title,
-        created_on_platform: cli_sessions_v2.created_on_platform,
-        organization_id: cli_sessions_v2.organization_id,
-        git_url: cli_sessions_v2.git_url,
-        git_branch: cli_sessions_v2.git_branch,
-        parent_session_id: cli_sessions_v2.parent_session_id,
-        status: cli_sessions_v2.status,
-        status_updated_at: cli_sessions_v2.status_updated_at,
-      })
-      .from(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      )
-      .limit(1);
-
-    if (!persistedRow) return null;
-
-    return {
-      changedNonStatus,
-      changedStatus: statusChange.changed,
-      previousStatus: statusChange.previousStatus,
-      session: mapSessionEventRow(persistedRow),
-    };
-  });
+    : null;
   if (!notification) return;
 
   if (notification.changedNonStatus) {

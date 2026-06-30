@@ -56,7 +56,9 @@ export function transitionGastownHealthState(
         state: {
           active: true,
           consecutiveHealthyCount: 0,
-          lastNotifiedWeightedFailedChecks: metrics.weightedFailedChecks,
+          lastNotifiedWeightedFailedChecks:
+            Math.floor(metrics.weightedFailedChecks / renotifyFailedChecksStep) *
+            renotifyFailedChecksStep,
         },
         shouldNotify: false,
         stateChanged: true,

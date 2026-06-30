@@ -223,19 +223,31 @@ describe('evaluateGastownHealthAlert', () => {
     expect(sentAlerts).toHaveLength(1);
   });
 
-  it('backfills legacy active state without sending a duplicate notification', async () => {
+  it('backfills legacy active state to the last step boundary, not the current count', async () => {
     const kv = makeKv();
     const sentAlerts: AlertPayload[] = [];
     kv.store.set(STATE_KEY, JSON.stringify({ active: true, consecutiveHealthyCount: 0 }));
 
-    await evaluateAt(kv, makeMetrics(60, 4), sentAlerts);
+    // weightedFailedChecks=59 is between step boundaries 30 and 60; backfill should be 30
+    await evaluateAt(kv, makeMetrics(59, 4), sentAlerts);
 
     expect(sentAlerts).toEqual([]);
     expect(JSON.parse(kv.store.get(STATE_KEY) ?? '')).toEqual({
       active: true,
       consecutiveHealthyCount: 0,
-      lastNotifiedWeightedFailedChecks: 60,
+      lastNotifiedWeightedFailedChecks: 30,
     });
+  });
+
+  it('re-notifies correctly after backfilling legacy active state', async () => {
+    const kv = makeKv();
+    const sentAlerts: AlertPayload[] = [];
+    kv.store.set(STATE_KEY, JSON.stringify({ active: true, consecutiveHealthyCount: 0 }));
+
+    await evaluateAt(kv, makeMetrics(59, 4), sentAlerts);
+    await evaluateAt(kv, makeMetrics(60, 4), sentAlerts);
+
+    expect(sentAlerts).toMatchObject([{ weightedFailedChecks: 60, affectedTownCount: 4 }]);
   });
 
   it('does not persist active state when notification delivery fails', async () => {

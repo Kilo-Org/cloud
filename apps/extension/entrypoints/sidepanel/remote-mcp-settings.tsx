@@ -4,12 +4,8 @@ import { ChevronDown, ChevronRight, Plus, RefreshCw, Server, Trash2 } from 'luci
 import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import type { RemoteMcpServer, RemoteMcpStore } from '../../src/shared/remote-mcp';
-import {
-  loadRemoteMcpStore,
-  saveRemoteMcpStore,
-  upsertRemoteMcpServer,
-} from '../../src/shared/remote-mcp-storage';
-import { connectRemoteMcpServer } from './remote-mcp-client';
+import { loadRemoteMcpStore, saveRemoteMcpStore } from '../../src/shared/remote-mcp-storage';
+import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
 import {
   applyUpsert,
   buildDraftFromForm,
@@ -104,6 +100,43 @@ const Field = ({
   </div>
 );
 
+const SecretField = ({
+  htmlFor,
+  label,
+  onChange,
+  onReplace,
+  placeholder,
+  saved,
+  show,
+  value,
+}: {
+  htmlFor: string;
+  label: string;
+  onChange: (value: string) => void;
+  onReplace: () => void;
+  placeholder: string;
+  saved: boolean;
+  show: boolean;
+  value: string;
+}): JSX.Element => (
+  <Field htmlFor={htmlFor} label={label}>
+    {saved && !show ? (
+      <SavedSecret onReplace={onReplace} />
+    ) : (
+      <input
+        className={inputClass}
+        id={htmlFor}
+        onChange={ev => {
+          onChange(ev.target.value);
+        }}
+        placeholder={placeholder}
+        type="password"
+        value={value}
+      />
+    )}
+  </Field>
+);
+
 const ServerForm = ({
   existingServer,
   onCancel,
@@ -128,6 +161,7 @@ const ServerForm = ({
 
   const handleSubmit = async (ev: { preventDefault: () => void }): Promise<void> => {
     ev.preventDefault();
+    setError(null);
     setSaving(true);
     const saveError = await onSave(form);
     setSaving(false);
@@ -183,26 +217,20 @@ const ServerForm = ({
         </select>
       </Field>
       {form.authType === 'bearer' ? (
-        <Field htmlFor="bearerToken" label="Bearer token">
-          {secretSaved && !showBearerInput ? (
-            <SavedSecret
-              onReplace={() => {
-                setShowBearerInput(true);
-              }}
-            />
-          ) : (
-            <input
-              className={inputClass}
-              id="bearerToken"
-              onChange={ev => {
-                set('bearerToken', ev.target.value);
-              }}
-              placeholder="Token"
-              type="password"
-              value={form.bearerToken}
-            />
-          )}
-        </Field>
+        <SecretField
+          htmlFor="bearerToken"
+          label="Bearer token"
+          onChange={value => {
+            set('bearerToken', value);
+          }}
+          onReplace={() => {
+            setShowBearerInput(true);
+          }}
+          placeholder="Token"
+          saved={secretSaved}
+          show={showBearerInput}
+          value={form.bearerToken}
+        />
       ) : null}
       {form.authType === 'header' ? (
         <>
@@ -218,26 +246,20 @@ const ServerForm = ({
               value={form.headerName}
             />
           </Field>
-          <Field htmlFor="headerValue" label="Header value">
-            {secretSaved && !showHeaderValueInput ? (
-              <SavedSecret
-                onReplace={() => {
-                  setShowHeaderValueInput(true);
-                }}
-              />
-            ) : (
-              <input
-                className={inputClass}
-                id="headerValue"
-                onChange={ev => {
-                  set('headerValue', ev.target.value);
-                }}
-                placeholder="Value"
-                type="password"
-                value={form.headerValue}
-              />
-            )}
-          </Field>
+          <SecretField
+            htmlFor="headerValue"
+            label="Header value"
+            onChange={value => {
+              set('headerValue', value);
+            }}
+            onReplace={() => {
+              setShowHeaderValueInput(true);
+            }}
+            placeholder="Value"
+            saved={secretSaved}
+            show={showHeaderValueInput}
+            value={form.headerValue}
+          />
         </>
       ) : null}
       <div className="flex items-center gap-2">
@@ -394,19 +416,14 @@ export const RemoteMcpSettings = (): JSX.Element => {
   }, []);
 
   const handleConnect = async (server: RemoteMcpServer): Promise<void> => {
-    const updated = await connectRemoteMcpServer({ fetch, server, storageArea: storage });
-    const freshStore = await loadRemoteMcpStore(storage);
-    const freshServer = freshStore.servers.find(found => found.id === server.id) ?? updated;
-    const merged: RemoteMcpServer = {
-      ...freshServer,
-      cachedTools: updated.cachedTools,
-      lastConnectedAt: updated.lastConnectedAt,
-      lastError: updated.lastError,
-      status: updated.status,
-    };
-    const nextStore = upsertRemoteMcpServer(freshStore, merged);
-    await saveRemoteMcpStore(storage, nextStore);
-    setStore(nextStore);
+    const nextServers = await connectAndPersistRemoteMcpServer({
+      fetch: globalThis.fetch,
+      server,
+      storageArea: storage,
+    });
+    if (nextServers !== undefined) {
+      setStore({ servers: nextServers });
+    }
   };
 
   const handleSave = async (form: FormState): Promise<string | null> => {

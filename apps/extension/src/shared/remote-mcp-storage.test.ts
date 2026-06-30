@@ -202,6 +202,28 @@ describe('remote MCP storage', () => {
     ).toThrow('Remote MCP URL is already saved.');
   });
 
+  it('uniquifies slugs for same-named servers', () => {
+    const store = upsertRemoteMcpServer(
+      { servers: [] },
+      {
+        allowInSafeMode: false,
+        auth: { type: 'none' },
+        displayName: 'GitHub',
+        enabled: true,
+        url: 'https://a.example/mcp',
+      }
+    );
+    const next = upsertRemoteMcpServer(store, {
+      allowInSafeMode: false,
+      auth: { type: 'none' },
+      displayName: 'GitHub',
+      enabled: true,
+      url: 'https://b.example/mcp',
+    });
+
+    expect(next.servers.map(server => server.slug)).toStrictEqual(['github', 'github-2']);
+  });
+
   it('clears connection state when URL changes', () => {
     expect(
       upsertRemoteMcpServer(

@@ -205,6 +205,21 @@ const createSlug = (displayName: string): string => {
   return slug.length > 0 ? slug : 'remote-mcp';
 };
 
+// Uniquify the slug: servers sharing one map their tools to the same name and silently drop each other.
+const createUniqueSlug = (displayName: string, servers: readonly RemoteMcpServer[]): string => {
+  const base = createSlug(displayName);
+  const taken = new Set(servers.map(server => server.slug));
+  if (!taken.has(base)) {
+    return base;
+  }
+
+  let suffix = 2;
+  while (taken.has(`${base}-${suffix}`)) {
+    suffix += 1;
+  }
+  return `${base}-${suffix}`;
+};
+
 const authChanged = (existing: RemoteMcpAuth, draft: RemoteMcpAuth): boolean => {
   switch (draft.type) {
     case 'bearer': {
@@ -257,7 +272,7 @@ export const upsertRemoteMcpServer = (
       ? undefined
       : (draft.lastConnectedAt ?? existing?.lastConnectedAt),
     lastError: connectionChanged ? undefined : (draft.lastError ?? existing?.lastError),
-    slug: existing?.slug ?? draft.slug ?? createSlug(draft.displayName),
+    slug: existing?.slug ?? draft.slug ?? createUniqueSlug(draft.displayName, servers),
     status: connectionChanged ? 'untested' : (draft.status ?? existing?.status ?? 'untested'),
     url,
   };

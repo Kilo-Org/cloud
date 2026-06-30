@@ -180,4 +180,22 @@ describe('remote MCP tool executor', () => {
 
     expect(result).toStrictEqual({ error: 'boom', ok: false });
   });
+
+  it('caps an oversized isError message', async () => {
+    mocks.callRemoteMcpTool.mockClear();
+    mocks.callRemoteMcpTool.mockResolvedValueOnce({
+      content: [{ text: 'x'.repeat(70 * 1024), type: 'text' }],
+      isError: true,
+    });
+    const server = connectedServer();
+
+    const result = await executeRemoteMcpToolCall({
+      event: searchEvent(),
+      fetch: plainFetch,
+      routes: routesFor([server]),
+      servers: [server],
+    });
+
+    expect(result).toStrictEqual({ error: 'x'.repeat(64 * 1024), ok: false });
+  });
 });

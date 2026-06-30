@@ -38,7 +38,7 @@ export type RemoteMcpToolRouteResolution =
 type RemoteMcpGatewayToolName = `mcp_${string}`;
 
 const MAX_REMOTE_MCP_TOOLS = 128;
-const MAX_REMOTE_MCP_RESULT_CHARS = 64 * 1024;
+export const MAX_REMOTE_MCP_RESULT_CHARS = 64 * 1024;
 const sourceNamePattern = /^[a-zA-Z0-9_-]+$/;
 
 const isObjectSchema = (value: unknown): value is Record<string, unknown> =>

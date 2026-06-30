@@ -2,7 +2,11 @@ import type { RemoteMcpToolCallEvent } from '@/src/shared/agent-conversation';
 import type { RemoteMcpServer } from '@/src/shared/remote-mcp';
 import type { RemoteMcpStorageArea } from '@/src/shared/remote-mcp-storage';
 import type { RemoteMcpToolRoute } from '@/src/shared/remote-mcp-tools';
-import { capRemoteMcpToolResult, resolveRemoteMcpToolRoute } from '@/src/shared/remote-mcp-tools';
+import {
+  capRemoteMcpToolResult,
+  MAX_REMOTE_MCP_RESULT_CHARS,
+  resolveRemoteMcpToolRoute,
+} from '@/src/shared/remote-mcp-tools';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 import { callRemoteMcpTool } from './remote-mcp-client';
 
@@ -76,7 +80,7 @@ export const executeRemoteMcpToolCall = async ({
   });
 
   if (isMcpErrorResult(raw)) {
-    return { error: getMcpErrorText(raw), ok: false };
+    return { error: getMcpErrorText(raw).slice(0, MAX_REMOTE_MCP_RESULT_CHARS), ok: false };
   }
 
   return { ok: true, value: capRemoteMcpToolResult(raw) };

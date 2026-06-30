@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Prepares a git worktree by installing dependencies, linking the Vercel
-# project, and copying local env files from the main worktree.
+# project, copying local env files from the main worktree, and syncing the
+# web development env from the shared dev env tooling.
 
 MAIN_WORKTREE="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
 MAIN_WORKTREE_REALPATH="$(cd "$MAIN_WORKTREE" && pwd -P)"
@@ -90,5 +91,8 @@ elif [ -f "$MAIN_WORKTREE/$WEB_ENV_FILE" ]; then
   echo "==> Copying $WEB_ENV_FILE from main worktree…"
   cp "$MAIN_WORKTREE/$WEB_ENV_FILE" "./$WEB_ENV_FILE"
 fi
+
+echo "==> Syncing Next.js development env…"
+pnpm dev:env -y nextjs
 
 echo "==> Worktree ready."

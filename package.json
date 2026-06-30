@@ -22,7 +22,7 @@
     "drizzle:verify-bootstrap": "bash scripts/verify-drizzle-bootstrap.sh",
     "test:e2e": "pnpm --filter web run test:e2e",
     "dependency-cycle-check": "pnpm --filter web run dependency-cycle-check",
-    "worktree:prepare": "bash scripts/worktree-prepare.sh",
+    "dev:worktree:prepare": "bash scripts/worktree-prepare.sh",
     "test:db": "docker compose -f dev/docker-compose.yml up -d --wait postgres && pnpm drizzle migrate",
     "dev:db:reset": "pnpm --filter web db:empty-database",
     "dev:start": "tsx dev/local/cli.ts up",

@@ -50,11 +50,8 @@ const oauthTokensSchema = z
   .loose();
 const oauthStateSchema = z
   .object({
-    authorizationUrl: nonEmptyStringSchema.optional(),
     clientInformation: oauthClientInformationSchema.optional(),
     codeVerifier: nonEmptyStringSchema.optional(),
-    expiresAt: nonEmptyStringSchema.optional(),
-    tokenType: nonEmptyStringSchema.optional(),
     tokens: oauthTokensSchema.optional(),
   })
   .strip();

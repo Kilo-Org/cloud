@@ -6,9 +6,6 @@ import type {
 export type RemoteMcpStatus = 'connected' | 'needs_auth' | 'unavailable' | 'untested';
 
 export interface RemoteMcpOAuthState {
-  readonly authorizationUrl?: string | undefined;
-  readonly expiresAt?: string | undefined;
-  readonly tokenType?: string | undefined;
   /** Dynamic client registration returned by the authorization server. */
   readonly clientInformation?: OAuthClientInformationMixed | undefined;
   /** Access/refresh tokens issued for this server. */

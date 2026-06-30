@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createWrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
+import { createWrapperKiloClient, type KiloEvent } from '../../../wrapper/src/kilo-api.js';
 import type { KiloClient as SDKClient } from '@kilocode/sdk';
 
 function createSdkClient(): SDKClient {
@@ -239,6 +239,56 @@ describe('createWrapperKiloClient network endpoints', () => {
     await expect(client.resumeNetworkWait('net_req_missing')).rejects.toThrow(
       'Network reply net_req_missing failed: missing network wait'
     );
+  });
+});
+
+describe('createWrapperKiloClient event subscription', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('keeps global synthetic events that omit properties', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(
+          [
+            'data: {"payload":{"type":"server.connected"}}',
+            '',
+            'data: {"directory":"/workspace/other","payload":{"type":"session.idle","properties":{"sessionID":"other"}}}',
+            '',
+            'data: {"directory":"/workspace/project","payload":{"type":"message.updated","properties":{"id":"msg_1"}}}',
+            '',
+            'data: {"payload":{"type":"server.heartbeat"}}',
+            '',
+            '',
+          ].join('\n'),
+          { status: 200, headers: { 'content-type': 'text/event-stream' } }
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+
+    const { stream } = await client.subscribeEvents({});
+    if (!stream) throw new Error('Expected event stream');
+
+    const events: KiloEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    const request = fetchMock.mock.calls[0]?.[0];
+    expect(request).toBeInstanceOf(Request);
+    expect(new URL((request as Request).url).pathname).toBe('/global/event');
+    expect(events).toEqual([
+      { type: 'server.connected' },
+      { type: 'message.updated', properties: { id: 'msg_1' } },
+      { type: 'server.heartbeat' },
+    ]);
   });
 });
 

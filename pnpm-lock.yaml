@@ -1683,8 +1683,8 @@ importers:
   services/cloud-agent-next:
     dependencies:
       '@cloudflare/sandbox':
-        specifier: 0.11.0
-        version: 0.11.0(@xterm/xterm@6.0.0)
+        specifier: 0.12.1
+        version: 0.12.1(@xterm/xterm@6.0.0)
       '@hono/trpc-server':
         specifier: 0.4.2
         version: 0.4.2(@trpc/server@11.17.0(typescript@5.9.3))(hono@4.12.18)
@@ -1738,8 +1738,8 @@ importers:
         specifier: 'catalog:'
         version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
       '@kilocode/sdk':
-        specifier: 7.3.21
-        version: 7.3.21
+        specifier: 7.3.54
+        version: 7.3.54
       '@types/jsonwebtoken':
         specifier: 'catalog:'
         version: 9.0.10
@@ -1777,8 +1777,8 @@ importers:
   services/cloud-agent-next/wrapper:
     dependencies:
       '@kilocode/sdk':
-        specifier: 7.3.21
-        version: 7.3.21
+        specifier: 7.3.54
+        version: 7.3.54
       fuzzysort:
         specifier: 3.1.0
         version: 3.1.0
@@ -3982,8 +3982,8 @@ packages:
     resolution: {integrity: sha512-jxQYkj8dSIzc0cD6cMMNdOc1UVjqSqu8BZdor5s8cGjW2I8BjODt/kWPVdY+u9zj3ms75Q5qaZgnxUad83+eAg==}
     engines: {node: '>=22.0.0'}
 
-  '@cloudflare/sandbox@0.11.0':
-    resolution: {integrity: sha512-OdM26ucJlc5B4en8eZMI0C8/UE3gk9bi2sqmElsGyqZIk6nhAo1HqHQynmuLKIHfNo6qo4bt12tWjTgFzzzgBg==}
+  '@cloudflare/sandbox@0.12.1':
+    resolution: {integrity: sha512-P1ZmNDLYtuEY1ZUcAx0OgTol98VqS617LGd4nf1RTOjSV2yHLDAp59NI36/gg3/pxkHPgmAEyFIjH/ie8FoA7g==}
     peerDependencies:
       '@openai/agents': ^0.3.3
       '@opencode-ai/sdk': ^1.1.40
@@ -5148,8 +5148,8 @@ packages:
   '@kilocode/sdk@7.2.52':
     resolution: {integrity: sha512-j8w6ewvo7dyu/qxjJAg0bcjHGUGGvIZ4F2f5tJnpMwLzPTAu26DJoO/08aoxf1BhfuZLzNS9tA2q+ZPdzPT8Jg==}
 
-  '@kilocode/sdk@7.3.21':
-    resolution: {integrity: sha512-sdoV7l+rIzsAF/bSpKn6crmwQ3HGYo+59HbbdpVmGAfTj758N40CDGqPrgyzwOL7GHAcHgl6LlQKPvk+f69Qmw==}
+  '@kilocode/sdk@7.3.54':
+    resolution: {integrity: sha512-A+g744DVuAHXSU3pu6BLe2AoxEh4fq7NdrYvlET3+waXSS0tG41Blr3ItCKSMLJH5M6C4rK2ZXi7plzkPNbdmA==}
 
   '@lexical/clipboard@0.35.0':
     resolution: {integrity: sha512-ko7xSIIiayvDiqjNDX6fgH9RlcM6r9vrrvJYTcfGVBor5httx16lhIi0QJZ4+RNPvGtTjyFv4bwRmsixRRwImg==}
@@ -19369,7 +19369,7 @@ snapshots:
 
   '@cloudflare/kv-asset-handler@0.5.0': {}
 
-  '@cloudflare/sandbox@0.11.0(@xterm/xterm@6.0.0)':
+  '@cloudflare/sandbox@0.12.1(@xterm/xterm@6.0.0)':
     dependencies:
       '@cloudflare/containers': 0.3.7
       aws4fetch: 1.0.20
@@ -20990,7 +20990,7 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
 
-  '@kilocode/sdk@7.3.21':
+  '@kilocode/sdk@7.3.54':
     dependencies:
       cross-spawn: 7.0.6
 

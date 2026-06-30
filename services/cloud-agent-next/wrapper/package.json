@@ -8,7 +8,7 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@kilocode/sdk": "7.3.21",
+    "@kilocode/sdk": "7.3.54",
     "fuzzysort": "3.1.0"
   },
   "devDependencies": {

@@ -3,7 +3,11 @@ import {
   StreamableHTTPClientTransport,
   StreamableHTTPError,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { RemoteMcpAuth, RemoteMcpCachedTool, RemoteMcpServer } from '../../src/shared/remote-mcp';
+import type {
+  RemoteMcpAuth,
+  RemoteMcpCachedTool,
+  RemoteMcpServer,
+} from '../../src/shared/remote-mcp';
 import type { RemoteMcpToolRoute } from '../../src/shared/remote-mcp-tools';
 
 type FetchLike = typeof fetch;
@@ -62,14 +66,13 @@ export const connectRemoteMcpServer = async ({
       status: 'connected',
     };
   } catch (err) {
-    const is401 =
-      err instanceof StreamableHTTPError && err.code === 401;
-    const message =
-      is401
-        ? `401: ${err instanceof Error ? err.message : String(err)}`
-        : err instanceof Error
-          ? err.message
-          : String(err);
+    const is401 = err instanceof StreamableHTTPError && err.code === 401;
+    // is401 implies err instanceof StreamableHTTPError extends Error, so err.message is safe
+    const message = is401
+      ? `401: ${err.message}`
+      : err instanceof Error
+        ? err.message
+        : String(err);
 
     return {
       ...server,
@@ -100,11 +103,9 @@ export const callRemoteMcpTool = async ({
 
   try {
     await client.connect(transport, { signal: combined });
-    return await client.callTool(
-      { arguments: args, name: route.remoteToolName },
-      undefined,
-      { signal: combined }
-    );
+    return await client.callTool({ arguments: args, name: route.remoteToolName }, undefined, {
+      signal: combined,
+    });
   } catch (err) {
     const text = err instanceof Error ? err.message : String(err);
     return { content: [{ text, type: 'text' }], isError: true };

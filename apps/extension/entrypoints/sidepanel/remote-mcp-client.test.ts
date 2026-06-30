@@ -194,9 +194,8 @@ describe('connectRemoteMcpServer', () => {
   });
 
   it('maps StreamableHTTPError code 401 to needs_auth', async () => {
-    const { StreamableHTTPError } = await import(
-      '@modelcontextprotocol/sdk/client/streamableHttp.js'
-    );
+    const { StreamableHTTPError } =
+      await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
     mocks.connect.mockRejectedValueOnce(new StreamableHTTPError(401, 'Unauthorized'));
     mocks.close.mockResolvedValueOnce(undefined);
 
@@ -250,6 +249,24 @@ describe('connectRemoteMcpServer', () => {
       | { signal?: AbortSignal }
       | undefined;
     expect(connectOptions?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('returns unavailable with lastError when connect is aborted', async () => {
+    const abortErr = Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+    mocks.connect.mockRejectedValueOnce(abortErr);
+    mocks.close.mockResolvedValueOnce(undefined);
+
+    const controller = new AbortController();
+    controller.abort();
+    const result = await connectRemoteMcpServer({
+      fetch: noopFetch,
+      server: baseServer(),
+      signal: controller.signal,
+    });
+
+    expect(result.status).toBe('unavailable');
+    expect(result.lastError).toBeTruthy();
+    expect(result.cachedTools).toHaveLength(0);
   });
 });
 
@@ -342,5 +359,40 @@ describe('callRemoteMcpTool', () => {
     const callArgs = mocks.callTool.mock.calls[mocks.callTool.mock.calls.length - 1];
     const callToolOptions = callArgs?.[2] as { signal?: AbortSignal } | undefined;
     expect(callToolOptions?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('returns tool-error object (does not throw) when callTool rejects with AbortError', async () => {
+    const abortErr = Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+    mocks.connect.mockResolvedValueOnce(undefined);
+    mocks.callTool.mockRejectedValueOnce(abortErr);
+    mocks.close.mockResolvedValueOnce(undefined);
+
+    const controller = new AbortController();
+    controller.abort();
+    const result = await callRemoteMcpTool({
+      arguments: {},
+      fetch: noopFetch,
+      route,
+      server,
+      signal: controller.signal,
+    });
+
+    expect(result).toMatchObject({
+      content: [{ type: 'text', text: expect.any(String) }],
+      isError: true,
+    });
+  });
+
+  it('returns tool-error object (does not throw) when connect rejects with AbortError (simulating timeout)', async () => {
+    const timeoutErr = Object.assign(new Error('signal timed out'), { name: 'AbortError' });
+    mocks.connect.mockRejectedValueOnce(timeoutErr);
+    mocks.close.mockResolvedValueOnce(undefined);
+
+    const result = await callRemoteMcpTool({ arguments: {}, fetch: noopFetch, route, server });
+
+    expect(result).toMatchObject({
+      content: [{ type: 'text', text: expect.any(String) }],
+      isError: true,
+    });
   });
 });

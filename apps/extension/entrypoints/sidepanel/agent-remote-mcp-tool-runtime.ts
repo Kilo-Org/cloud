@@ -2,10 +2,7 @@ import type { RemoteMcpToolCallEvent } from '@/src/shared/agent-conversation';
 import type { RemoteMcpServer } from '@/src/shared/remote-mcp';
 import type { RemoteMcpStorageArea } from '@/src/shared/remote-mcp-storage';
 import type { RemoteMcpToolRoute } from '@/src/shared/remote-mcp-tools';
-import {
-  capRemoteMcpToolResult,
-  resolveRemoteMcpToolRoute,
-} from '@/src/shared/remote-mcp-tools';
+import { capRemoteMcpToolResult, resolveRemoteMcpToolRoute } from '@/src/shared/remote-mcp-tools';
 import type { EvalTabResult } from '@/src/shared/tab-debugger';
 import { callRemoteMcpTool } from './remote-mcp-client';
 

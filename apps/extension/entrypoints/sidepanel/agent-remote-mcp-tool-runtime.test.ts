@@ -3,7 +3,9 @@ import type { RemoteMcpServer } from '@/src/shared/remote-mcp';
 import type { RemoteMcpToolRoute } from '@/src/shared/remote-mcp-tools';
 import type { KiloGatewayToolCallRequest } from '@/src/shared/kilo-api-client';
 
-const mocks = vi.hoisted(() => ({ callRemoteMcpTool: vi.fn<(args: unknown) => Promise<unknown>>() }));
+const mocks = vi.hoisted(() => ({
+  callRemoteMcpTool: vi.fn<(args: unknown) => Promise<unknown>>(),
+}));
 
 // eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
 vi.mock('./remote-mcp-client', () => ({ callRemoteMcpTool: mocks.callRemoteMcpTool }));

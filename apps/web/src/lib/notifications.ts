@@ -337,16 +337,14 @@ async function generateByokProvidersNotification(
       'ollama-cloud': 'Ollama Cloud API Key',
     } as Record<string, string>;
 
-    // A user may have used several providers; show the first one we have a
-    // BYOK label for.
-    const matched = providers.map(provider => names[provider]).find(name => Boolean(name));
-    if (!matched) {
+    // A user may have used several providers; show the first one we have a label for.
+    const providerName = providers.map(provider => names[provider]).find(name => Boolean(name));
+    if (!providerName) {
       console.debug(
         `[generateByokProvidersNotification] no BYOK supported provider among ${providers.join(', ')}`
       );
       return [];
     }
-    const providerName = matched;
 
     console.debug(
       `[generateByokProvidersNotification] has used BYOK supported provider(s) ${providers.join(', ')}`

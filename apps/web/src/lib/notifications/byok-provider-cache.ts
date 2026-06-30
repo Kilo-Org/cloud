@@ -7,24 +7,31 @@ import { byokProvidersNotificationRedisKey } from '@/lib/redis-keys';
 /**
  * Backing store for the "Try BYOK for Kilo Gateway" notification.
  *
- * A daily cron (`/api/cron/sync-byok-provider-notifications`) runs the PostHog
- * query once and writes one small Redis entry per user — the array of BYOK
- * provider ids that user has used. When notifications are polled we read only
- * that user's entry, instead of fetching the full ~700KB dataset and scanning
- * it on every request (which degraded badly on Vercel where the in-process
- * cache rarely survives between invocations).
+ * A daily cron writes one small Redis entry per user (the BYOK provider ids
+ * that user has used) so notification polls read only that user's entry,
+ * instead of fetching the full ~700KB dataset and scanning it on every request
+ * (which degraded badly on Vercel, where the in-process cache rarely survives
+ * between invocations).
  */
 
-// 7 days, comfortably longer than the daily cron cadence so a few missed runs
-// degrade to "no notification" rather than serving nothing.
+// Longer than the daily cron cadence so a few missed runs degrade to
+// "no notification" rather than serving nothing.
 const REDIS_TTL_SECONDS = 60 * 60 * 24 * 7;
 
-// Upstash REST has no native MSET-with-TTL; batch SETs into pipelines to avoid
-// one HTTP round-trip per user when writing the full dataset.
+// Upstash REST has no MSET-with-TTL; pipeline SETs to avoid a round-trip per user.
 const REDIS_WRITE_CHUNK_SIZE = 1000;
 
-const BYOK_PROVIDER_QUERY =
-  'select id, apiProvider from notification_byok_providers_jan_19 limit 5e5';
+const BYOK_PROVIDER_QUERY = `
+select u.id, ev.properties.apiProvider
+from events ev
+join postgres.kilocode_users u on u.google_user_email = ev.distinct_id
+where ev.event = 'LLM Completion'
+  and ev.properties.apiProvider is not null
+  and ev.properties.apiProvider not like '%kilo%'
+  and ev.timestamp >= today() - toIntervalWeek(1)
+  and ev.properties.outputTokens > 0
+group by u.id, ev.properties.apiProvider
+`;
 
 const byokProviderRowsSchema = z.array(
   z.tuple([z.string(), z.string()]).transform(([userId, provider]) => ({ userId, provider }))
@@ -66,12 +73,7 @@ export type SyncByokProviderNotificationsResult = {
   userCount: number;
 };
 
-/**
- * Runs the PostHog query and writes per-user provider arrays to Redis.
- *
- * The PostHog fetcher is injectable so this can be exercised without hitting
- * the external query API.
- */
+// `fetchRows` is injectable so the sync can be tested without the PostHog API.
 export async function syncByokProviderNotificationsToRedis(
   fetchRows: ByokProviderRowsFetcher = fetchByokProviderRowsFromPosthog
 ): Promise<SyncByokProviderNotificationsResult> {
@@ -93,11 +95,8 @@ export async function syncByokProviderNotificationsToRedis(
   return { rowCount: rows.length, userCount: byUser.size };
 }
 
-/**
- * Reads the BYOK provider ids cached for a single user. Returns an empty array
- * when there is no entry (the common case) or when the cached value is
- * malformed, so callers fail open and simply skip the notification.
- */
+// Returns [] for a missing or malformed entry, so callers fail open and skip
+// the notification.
 export async function getByokProvidersForUser(userId: string): Promise<string[]> {
   const cached = await redisClient.get<string>(byokProvidersNotificationRedisKey(userId));
   if (cached === null) return [];

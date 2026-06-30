@@ -62,18 +62,15 @@ const BATCH_SIZE = 1000;
 const BATCHES_PER_REQUEST = 50;
 const BLOCKED_REASON = 'domainblocked';
 
-export async function POST(): Promise<
-  NextResponse<BlockBlacklistedDomainsBackfillResponse | { error: string }>
-> {
-  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
-  if (authFailedResponse) return authFailedResponse;
-
-  const domains = await getBlacklistedDomains();
-  if (domains.length === 0) {
-    return NextResponse.json({ processed: 0, remaining: false });
+export async function backfillBlockBlacklistedDomainsBatch(params: {
+  actorId: string;
+  domains: string[];
+}): Promise<BlockBlacklistedDomainsBackfillResponse> {
+  if (params.domains.length === 0) {
+    return { processed: 0, remaining: false };
   }
 
-  const condition = blacklistedDomainCondition(domains);
+  const condition = blacklistedDomainCondition(params.domains);
   let totalProcessed = 0;
   // Track whether we ever hit a short select, which is the only reliable
   // signal that the result set is exhausted. Basing `remaining` on
@@ -101,7 +98,10 @@ export async function POST(): Promise<
       .set({
         blocked_reason: BLOCKED_REASON,
         blocked_at: new Date().toISOString(),
-        blocked_by_kilo_user_id: user.id,
+        blocked_by_kilo_user_id: params.actorId,
+        // Rotate per-row so each blocked user's existing API tokens are revoked
+        // on every pepper-checking service.
+        api_token_pepper: sql`gen_random_uuid()::text`,
       })
       .where(
         and(
@@ -125,8 +125,17 @@ export async function POST(): Promise<
     }
   }
 
-  return NextResponse.json({
-    processed: totalProcessed,
-    remaining: !reachedEnd,
-  });
+  return { processed: totalProcessed, remaining: !reachedEnd };
+}
+
+export async function POST(): Promise<
+  NextResponse<BlockBlacklistedDomainsBackfillResponse | { error: string }>
+> {
+  const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+  if (authFailedResponse) return authFailedResponse;
+
+  const domains = await getBlacklistedDomains();
+  return NextResponse.json(
+    await backfillBlockBlacklistedDomainsBatch({ actorId: user.id, domains })
+  );
 }

@@ -428,16 +428,28 @@ describe('session metadata boundary', () => {
     });
   });
 
-  it('still rejects current repository metadata without enough repository identity', () => {
-    expect(() =>
+  it('drops a current repository with an unknown type so the reaper can still read metadata', () => {
+    expect(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_empty_local_repo', userId: 'user_123' },
+        auth: {},
+        repository: { type: 'empty-local' },
+        lifecycle: { version: 1, timestamp: 1, kiloServerLastActivity: 5 },
+      }).repository
+    ).toBeUndefined();
+  });
+
+  it('drops current repository metadata without enough repository identity', () => {
+    expect(
       parseSessionMetadata({
         metadataSchemaVersion: 2,
         identity: { sessionId: 'agent_invalid_repository', userId: 'user_123' },
         auth: {},
         repository: { upstreamBranch: 'main' },
         lifecycle: { version: 1, timestamp: 1 },
-      })
-    ).toThrow('Invalid current session metadata');
+      }).repository
+    ).toBeUndefined();
   });
 
   it('persists Bitbucket identity and managed status without a token', () => {

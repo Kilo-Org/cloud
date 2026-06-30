@@ -78,51 +78,59 @@ function normalizeRepositoryShape(value: unknown): unknown {
     return { ...repository, type: 'git' };
   }
 
-  return value;
+  // A v2 repository we cannot resolve to a known type — e.g. legacy/E2E
+  // "empty-local" placeholders or identity-less fragments — carries no usable
+  // repository for current code. Drop it so the rest of the metadata still
+  // parses, instead of throwing and crashing every alarm/reaper cycle that
+  // reads metadata. Known-type repositories still validate strictly below, so
+  // genuine corruption of a recognized repository is still surfaced.
+  return undefined;
 }
 
 const MetadataRepositorySchema = z.preprocess(
   normalizeRepositoryShape,
-  z.discriminatedUnion('type', [
-    z
-      .object({
-        type: z.literal('github'),
-        repo: z.string(),
-        platform: z.literal('github').optional(),
-        githubInstallationId: z.string().optional(),
-        githubAppType: z.enum(['standard', 'lite']).optional(),
-        ...RepositoryCommonSchema,
-      })
-      .strip(),
-    z
-      .object({
-        type: z.literal('gitlab'),
-        url: z.string(),
-        platform: z.literal('gitlab').optional(),
-        gitlabTokenManaged: z.boolean().optional(),
-        ...RepositoryCommonSchema,
-      })
-      .strip(),
-    z
-      .object({
-        type: z.literal('bitbucket'),
-        url: z.string(),
-        platform: z.literal('bitbucket').optional(),
-        workspaceUuid: z.string().uuid(),
-        repositoryUuid: z.string().uuid(),
-        bitbucketTokenManaged: z.boolean().optional(),
-        upstreamBranch: branchNameSchema.optional(),
-      })
-      .strip(),
-    z
-      .object({
-        type: z.literal('git'),
-        url: z.string(),
-        platform: z.enum(['github', 'gitlab']).optional(),
-        ...RepositoryCommonSchema,
-      })
-      .strip(),
-  ])
+  z
+    .discriminatedUnion('type', [
+      z
+        .object({
+          type: z.literal('github'),
+          repo: z.string(),
+          platform: z.literal('github').optional(),
+          githubInstallationId: z.string().optional(),
+          githubAppType: z.enum(['standard', 'lite']).optional(),
+          ...RepositoryCommonSchema,
+        })
+        .strip(),
+      z
+        .object({
+          type: z.literal('gitlab'),
+          url: z.string(),
+          platform: z.literal('gitlab').optional(),
+          gitlabTokenManaged: z.boolean().optional(),
+          ...RepositoryCommonSchema,
+        })
+        .strip(),
+      z
+        .object({
+          type: z.literal('bitbucket'),
+          url: z.string(),
+          platform: z.literal('bitbucket').optional(),
+          workspaceUuid: z.string().uuid(),
+          repositoryUuid: z.string().uuid(),
+          bitbucketTokenManaged: z.boolean().optional(),
+          upstreamBranch: branchNameSchema.optional(),
+        })
+        .strip(),
+      z
+        .object({
+          type: z.literal('git'),
+          url: z.string(),
+          platform: z.enum(['github', 'gitlab']).optional(),
+          ...RepositoryCommonSchema,
+        })
+        .strip(),
+    ])
+    .optional()
 );
 
 const CurrentMetadataInitialTurnSchema = z.discriminatedUnion('type', [

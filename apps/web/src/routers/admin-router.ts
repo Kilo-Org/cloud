@@ -522,10 +522,6 @@ export const adminRouter = createTRPCRouter({
           didTransition = isBlocking !== wasBlocked;
 
           if (input.blocked_reason) {
-            // Go through the central helper so api_token_pepper is rotated and
-            // existing API tokens are revoked on every pepper-checking service.
-            // The helper's guard preserves an existing block's original reason;
-            // the admin UI only blocks not-yet-blocked users anyway.
             await blockUser({
               kiloUserId: input.userId,
               reason: input.blocked_reason,

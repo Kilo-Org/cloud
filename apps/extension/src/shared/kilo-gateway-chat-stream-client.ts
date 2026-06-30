@@ -65,12 +65,17 @@ const variantToGatewayEffort: Record<string, string> = {
   xhigh: 'xhigh',
 };
 const toolArgumentsSchema = z.record(z.string(), z.unknown());
-const gatewayToolNameSchema = z.enum([
+const builtInToolNameSchema = z.enum([
   'eval',
   'find_in_page',
   'get_element_details',
   'get_page_snapshot',
   'get_viewport_screenshot',
+]);
+// Built-in tools plus dynamically mapped remote MCP tools (mcp_<slug>_<tool>).
+const gatewayToolNameSchema = z.union([
+  builtInToolNameSchema,
+  z.custom<`mcp_${string}`>(value => typeof value === 'string' && value.startsWith('mcp_')),
 ]);
 const streamingToolCallDeltaSchema = z.object({
   function: z

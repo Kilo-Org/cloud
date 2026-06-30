@@ -75,6 +75,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run Drizzle migrations
+        env:
+          DRIZZLE_MIGRATION_LOGGING: verbose
         run: NODE_ENV=production pnpm run drizzle:migrate
 
   stage-app:

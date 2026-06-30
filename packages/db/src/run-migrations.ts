@@ -103,6 +103,13 @@ async function readMigrations(): Promise<Migration[]> {
   });
 }
 
+// Per-statement success logging is opt-in (we enable it in CI via the workflow).
+// Failure diagnostics are always printed regardless of this flag.
+function isStatementLoggingEnabled(): boolean {
+  const value = process.env.DRIZZLE_MIGRATION_LOGGING?.trim().toLowerCase();
+  return value !== undefined && value !== '' && value !== '0' && value !== 'false';
+}
+
 function getLastMigrationMillis(row: MigrationRow | undefined): number | undefined {
   if (!row || row.created_at === null) {
     return undefined;
@@ -117,6 +124,7 @@ function getLastMigrationMillis(row: MigrationRow | undefined): number | undefin
 }
 
 async function main(): Promise<void> {
+  const logStatements = isStatementLoggingEnabled();
   const migrations = await readMigrations();
   const pool = new Pool({ ...getDatabaseClientConfig(computeDatabaseUrl()), max: 1 });
   const client = await pool.connect();
@@ -153,15 +161,20 @@ async function main(): Promise<void> {
     await client.query('BEGIN');
     try {
       for (const migration of pendingMigrations) {
-        console.log(`::group::Applying migration ${migration.tag}`);
-        try {
-          console.log(
-            `Migration timestamp ${migration.folderMillis}, sha256 ${migration.hash.slice(0, 12)}`
-          );
+        console.log(`Applying migration ${migration.tag}`);
 
+        let lastStatementIndex = 0;
+        let lastStatement = '';
+        try {
           for (const [index, statement] of migration.sql.entries()) {
-            console.log(`Executing statement ${index + 1}/${migration.sql.length}`);
-            console.log(statement.trim());
+            lastStatementIndex = index;
+            lastStatement = statement;
+
+            if (logStatements) {
+              console.log(`  statement ${index + 1}/${migration.sql.length}:`);
+              console.log(statement.trim());
+            }
+
             await client.query(statement);
           }
 
@@ -171,11 +184,14 @@ async function main(): Promise<void> {
           );
           console.log(`Applied migration ${migration.tag}`);
         } catch (error) {
-          console.error(`Failed migration ${migration.tag}`);
+          // Always surface which statement failed and the full Postgres error,
+          // even when per-statement success logging is disabled.
+          console.error(
+            `Failed migration ${migration.tag} at statement ${lastStatementIndex + 1}/${migration.sql.length}:`
+          );
+          console.error(lastStatement.trim());
           console.error(formatError(error));
           throw error;
-        } finally {
-          console.log('::endgroup::');
         }
       }
 

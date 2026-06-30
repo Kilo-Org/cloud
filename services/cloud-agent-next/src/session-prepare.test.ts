@@ -160,6 +160,7 @@ function createInternalApiContext(options: {
   requestInternalApiKey?: string | null;
   skipBalanceCheck?: boolean;
   doStub?: ReturnType<typeof createMockDOStub>;
+  getBitbucketToken?: ReturnType<typeof vi.fn>;
 }): TRPCContext {
   const doStub = options.doStub ?? createMockDOStub();
   const effectiveUserId =
@@ -213,7 +214,11 @@ function createInternalApiContext(options: {
       NEXTAUTH_SECRET: 'test-secret',
       R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
       CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
-      GIT_TOKEN_SERVICE: {} as TRPCContext['env']['GIT_TOKEN_SERVICE'],
+      GIT_TOKEN_SERVICE: {
+        getBitbucketToken:
+          options.getBitbucketToken ??
+          vi.fn().mockResolvedValue({ success: true, token: 'managed-bitbucket-token' }),
+      } as unknown as TRPCContext['env']['GIT_TOKEN_SERVICE'],
       HYPERDRIVE: {
         connectionString: 'postgres://profile-test',
       } as TRPCContext['env']['HYPERDRIVE'],
@@ -589,6 +594,64 @@ describe('prepareSession endpoint', () => {
           type: 'gitlab',
           url: 'https://gitlab.com/acme/repo.git',
           branch: 'feature/gitlab',
+        },
+      })
+    );
+    expect(doStub.registerSession.mock.calls[0]?.[0].repository).not.toHaveProperty('token');
+  });
+
+  it('persists only generic Bitbucket repository identity after access preflight', async () => {
+    const doStub = createMockDOStub();
+    const getBitbucketToken = vi
+      .fn()
+      .mockResolvedValue({ success: true, token: 'managed-bitbucket-token' });
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub, getBitbucketToken }));
+    const reviewId = '123e4567-e89b-12d3-a456-426614174023';
+    const integrationId = '123e4567-e89b-12d3-a456-426614174022';
+    const organizationId = '123e4567-e89b-12d3-a456-426614174030';
+
+    await caller.prepareSession({
+      prompt: 'Test Bitbucket review prompt',
+      mode: 'code',
+      model: 'claude-3',
+      gitUrl: 'https://bitbucket.org/acme/repo.git',
+      platform: 'bitbucket',
+      bitbucketWorkspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      bitbucketWorkspaceSlug: 'acme',
+      bitbucketRepositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      bitbucketRepositorySlug: 'repo',
+      bitbucketIntegrationId: integrationId,
+      bitbucketPullRequestId: 42,
+      bitbucketExpectedHeadSha: '0123456789abcdef0123456789abcdef01234567',
+      kilocodeOrganizationId: organizationId,
+      createdOnPlatform: 'code-review',
+      callbackTarget: {
+        url: `https://kilo.example/api/internal/code-review-status/${reviewId}?attemptId=attempt-1`,
+      },
+      upstreamBranch: 'feature/bitbucket',
+    });
+
+    expect(getBitbucketToken).toHaveBeenCalledWith({
+      userId: 'test-user-123',
+      orgId: organizationId,
+      expectedIntegrationId: integrationId,
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      repositoryUrl: 'https://bitbucket.org/acme/repo.git',
+    });
+    expect(doStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({
+          orgId: organizationId,
+          createdOnPlatform: 'code-review',
+        }),
+        repository: {
+          type: 'bitbucket',
+          url: 'https://bitbucket.org/acme/repo.git',
+          workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+          repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+          bitbucketIntegrationId: integrationId,
+          branch: 'feature/bitbucket',
         },
       })
     );

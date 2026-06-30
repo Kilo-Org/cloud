@@ -137,6 +137,7 @@ import type {
   Provider,
   CodeReviewAgentConfig,
   ManualCodeReviewConfig,
+  CodeReviewPlatform,
   ReviewMemoryEvidenceItem,
   ReviewMemoryPlatform,
   ReviewMemoryProposalStatus,
@@ -4090,7 +4091,7 @@ export const cloud_agent_code_reviews = pgTable(
     head_sha: text().notNull(), // Latest commit SHA
 
     // Platform (github, gitlab, etc.)
-    platform: text().notNull().default('github'),
+    platform: text().$type<CodeReviewPlatform>().notNull().default('github'),
 
     // Platform-specific project ID (e.g., GitLab numeric project ID)
     platform_project_id: integer(),

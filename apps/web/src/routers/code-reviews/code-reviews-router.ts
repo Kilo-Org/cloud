@@ -36,6 +36,7 @@ import {
 } from '@/lib/integrations/gitlab-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { APP_URL } from '@/lib/constants';
+import { CodeReviewPlatformSchema } from '@/lib/code-reviews/core/schemas';
 import { logExceptInTest } from '@/lib/utils.server';
 import {
   ListCodeReviewsInputSchema,
@@ -75,16 +76,16 @@ import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
  * was cleared during reset.
  */
 async function recreatePRGateCheck(review: CloudAgentCodeReview) {
+  const platform = CodeReviewPlatformSchema.parse(review.platform);
   if (!shouldPublishCodeReviewToProvider(review)) return;
-  if (!review.platform_integration_id) return;
+  if (platform === PLATFORM.BITBUCKET || !review.platform_integration_id) return;
 
   const integration = await getIntegrationById(review.platform_integration_id);
   if (!integration) return;
 
-  const platform = review.platform || 'github';
   const detailsUrl = `${APP_URL}/code-reviews/${review.id}`;
 
-  if (platform === 'github' && integration.platform_installation_id) {
+  if (platform === PLATFORM.GITHUB && integration.platform_installation_id) {
     const appType = integration.github_app_type ?? 'standard';
     if (appType === 'lite') return;
 
@@ -152,16 +153,16 @@ async function recreatePRGateCheck(review: CloudAgentCodeReview) {
  * that permanently blocks protected branches.
  */
 async function cancelPRGateCheck(review: CloudAgentCodeReview) {
+  const platform = CodeReviewPlatformSchema.parse(review.platform);
   if (!shouldPublishCodeReviewToProvider(review)) return;
-  if (!review.platform_integration_id) return;
+  if (platform === PLATFORM.BITBUCKET || !review.platform_integration_id) return;
 
   const integration = await getIntegrationById(review.platform_integration_id);
   if (!integration) return;
 
-  const platform = review.platform || 'github';
   const detailsUrl = `${APP_URL}/code-reviews/${review.id}`;
 
-  if (platform === 'github' && integration.platform_installation_id) {
+  if (platform === PLATFORM.GITHUB && integration.platform_installation_id) {
     if (!review.check_run_id) return;
 
     const appType = integration.github_app_type ?? 'standard';
@@ -544,7 +545,7 @@ export const codeReviewRouter = createTRPCRouter({
           owner = { type: 'user', id: review.owned_by_user_id as string, userId: ctx.user.id };
         }
 
-        const platform = review.platform === 'gitlab' ? 'gitlab' : 'github';
+        const platform = CodeReviewPlatformSchema.parse(review.platform);
         const manualConfig = getManualCodeReviewConfig(review);
         if (manualConfig?.outputMode === 'kilo' && !isLocalCodeReviewDevelopmentEnabled()) {
           throw new TRPCError({

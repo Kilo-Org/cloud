@@ -73,9 +73,13 @@ export function BitbucketAdditionalPermissionsWarning({ scopes }: { scopes: read
       <TriangleAlert />
       <AlertTitle>Token has additional permissions</AlertTitle>
       <AlertDescription>
-        Kilo did not request these permissions: <code>{scopes.join(', ')}</code>. Cloud Agent
-        sessions can use the token&apos;s full workspace access. Replace the token with only the
-        required permissions if this is not intentional.
+        <span>
+          Kilo did not request these permissions: <code>{scopes.join(', ')}</code>
+        </span>
+        <span>
+          Cloud Agent sessions can use the token&apos;s full workspace access. Replace the token
+          with only the required permissions if this is not intentional.
+        </span>
       </AlertDescription>
     </Alert>
   );

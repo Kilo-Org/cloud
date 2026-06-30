@@ -5,6 +5,7 @@ import {
   code_review_analytics_results,
   kilocode_users,
   organizations,
+  platform_integrations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -36,6 +37,8 @@ const capturedManifest: CodeReviewAnalyticsManifest = {
 describe('Code Reviewer analytics completion persistence', () => {
   let userId: string;
   let organizationId: string;
+  let organizationIntegrationId: string;
+  let userIntegrationId: string;
   const reviewIds: string[] = [];
 
   beforeAll(async () => {
@@ -49,6 +52,36 @@ describe('Code Reviewer analytics completion persistence', () => {
         false
       )
     ).id;
+    const [organizationIntegration, userIntegration] = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_organization_id: organizationId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `analytics-persistence-org-${crypto.randomUUID()}`,
+          platform_account_id: 'analytics-persistence-org',
+          platform_account_login: 'analytics-persistence-org',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+        {
+          owned_by_user_id: userId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `analytics-persistence-user-${crypto.randomUUID()}`,
+          platform_account_id: 'analytics-persistence-user',
+          platform_account_login: 'analytics-persistence-user',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+      ])
+      .returning({ id: platform_integrations.id });
+    if (!organizationIntegration || !userIntegration) {
+      throw new Error('Expected analytics persistence integrations');
+    }
+    organizationIntegrationId = organizationIntegration.id;
+    userIntegrationId = userIntegration.id;
   });
 
   afterAll(async () => {
@@ -63,6 +96,7 @@ describe('Code Reviewer analytics completion persistence', () => {
     const suffix = crypto.randomUUID();
     const reviewId = await createCodeReview({
       owner: { type: 'org', id: organizationId, userId },
+      platformIntegrationId: organizationIntegrationId,
       repoFullName: `analytics/repo-${suffix}`,
       prNumber: 1,
       prUrl: `https://github.com/analytics/repo-${suffix}/pull/1`,
@@ -243,6 +277,7 @@ describe('Code Reviewer analytics completion persistence', () => {
     const suffix = crypto.randomUUID();
     const reviewId = await createCodeReview({
       owner: { type: 'user', id: userId, userId },
+      platformIntegrationId: userIntegrationId,
       repoFullName: `analytics/personal-${suffix}`,
       prNumber: 1,
       prUrl: `https://github.com/analytics/personal-${suffix}/pull/1`,

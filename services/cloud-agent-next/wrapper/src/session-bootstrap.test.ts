@@ -896,6 +896,56 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(setupCalls).toEqual([['sh', '-lc', 'pnpm install']]);
   });
 
+  it('leaves a cold Bitbucket review origin credential-free before restoring Kilo', async () => {
+    const request = makeRequest(tmpDir, {
+      repo: {
+        kind: 'git',
+        url: 'https://bitbucket.org/acme/repo.git',
+        token: 'managed-token',
+        platform: 'bitbucket',
+        refreshRemote: true,
+      },
+      materialized: {
+        env: {
+          HOME: path.join(tmpDir, 'home'),
+          KILOCODE_TOKEN: 'kilo-token',
+          KILO_PLATFORM: 'code-review',
+        },
+      },
+    });
+    const events: string[] = [];
+    const gitCalls: string[][] = [];
+
+    await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        gitCalls.push(args);
+        events.push(`git:${args.join(' ')}`);
+        if (args[0] === 'clone') {
+          await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+        }
+        if (args[0] === 'rev-parse' && args[1] === '--verify') {
+          return { stdout: '', stderr: '', exitCode: 1 };
+        }
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => {
+        events.push('restore');
+        return {
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        };
+      },
+    });
+
+    expect(gitCalls[0]).toContain('https://x-token-auth:managed-token@bitbucket.org/acme/repo.git');
+    const sanitizedRemote = 'git:remote set-url origin https://bitbucket.org/acme/repo.git';
+    expect(events).toContain(sanitizedRemote);
+    expect(events.indexOf(sanitizedRemote)).toBeLessThan(events.indexOf('restore'));
+    expect(sanitizedRemote).not.toContain('managed-token');
+  });
+
   it('uses the warm path by refreshing the git remote without rerunning setup', async () => {
     const request = makeRequest(tmpDir, {
       workspace: {
@@ -978,6 +1028,41 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         'https://x-token-auth:bitbucket-token@bitbucket.org/acme/repo.git',
       ],
     ]);
+  });
+
+  it('leaves a warm Bitbucket review origin credential-free before Kilo starts', async () => {
+    const request = makeRequest(tmpDir, {
+      workspace: {
+        workspacePath: path.join(tmpDir, 'workspace'),
+        sessionHome: path.join(tmpDir, 'home'),
+        branchName: 'main',
+        preferSnapshot: true,
+      },
+      repo: {
+        kind: 'git',
+        url: 'https://bitbucket.org/acme/repo.git',
+        token: 'bitbucket-token',
+        platform: 'bitbucket',
+        refreshRemote: true,
+      },
+      materialized: {
+        env: { KILO_PLATFORM: 'code-review' },
+      },
+    });
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+    const gitCalls: string[][] = [];
+
+    await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        gitCalls.push(args);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+    });
+
+    expect(gitCalls).toEqual([
+      ['remote', 'set-url', 'origin', 'https://bitbucket.org/acme/repo.git'],
+    ]);
+    expect(gitCalls.at(-1)?.join(' ')).not.toContain('bitbucket-token');
   });
 
   it('refreshes a warm GitHub remote, author, and selected CLI credential', async () => {

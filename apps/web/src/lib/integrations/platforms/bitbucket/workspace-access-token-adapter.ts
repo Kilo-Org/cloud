@@ -1,9 +1,11 @@
 import 'server-only';
 
 import {
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_SCOPE_LABELS,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
+  getMissingBitbucketWorkspaceAccessTokenScopes,
   hasBitbucketAccessTokenFamilyPrefix,
-  hasRequiredBitbucketWorkspaceAccessTokenScopes,
+  type BitbucketWorkspaceAccessTokenRequiredScope,
   isValidBitbucketRepositoryPaginationUrl,
   normalizeBitbucketWorkspaceAccessTokenScopes,
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
@@ -122,10 +124,30 @@ const ERROR_MESSAGES: Record<BitbucketWorkspaceAccessTokenErrorCode, string> = {
   workspace_mismatch: 'The Bitbucket Workspace Access Token does not match the requested workspace',
 };
 
+function getBitbucketWorkspaceAccessTokenErrorMessage(
+  code: BitbucketWorkspaceAccessTokenErrorCode,
+  missingRequiredScopes: readonly BitbucketWorkspaceAccessTokenRequiredScope[]
+): string {
+  const message = ERROR_MESSAGES[code];
+  if (code !== 'insufficient_scopes' || missingRequiredScopes.length === 0) return message;
+
+  const missingPermissions = missingRequiredScopes
+    .map(scope => BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_SCOPE_LABELS[scope])
+    .join(', ');
+  return `${message}: ${missingPermissions}`;
+}
+
 export class BitbucketWorkspaceAccessTokenError extends Error {
-  constructor(readonly code: BitbucketWorkspaceAccessTokenErrorCode) {
-    super(ERROR_MESSAGES[code]);
+  readonly missingRequiredScopes: readonly BitbucketWorkspaceAccessTokenRequiredScope[];
+
+  constructor(
+    readonly code: BitbucketWorkspaceAccessTokenErrorCode,
+    details: { missingRequiredScopes?: readonly BitbucketWorkspaceAccessTokenRequiredScope[] } = {}
+  ) {
+    const missingRequiredScopes = details.missingRequiredScopes ?? [];
+    super(getBitbucketWorkspaceAccessTokenErrorMessage(code, missingRequiredScopes));
     this.name = 'BitbucketWorkspaceAccessTokenError';
+    this.missingRequiredScopes = missingRequiredScopes;
   }
 }
 
@@ -327,22 +349,33 @@ function readCredentialEvidence(headers: Headers): {
     throw new BitbucketWorkspaceAccessTokenError('credential_type_invalid');
   }
 
-  const scopeHeader = headers.get('X-OAuth-Scopes');
-  if (!scopeHeader || scopeHeader.length > BITBUCKET_MAX_SCOPE_HEADER_LENGTH) {
-    throw new BitbucketWorkspaceAccessTokenError('scope_evidence_missing');
-  }
-  const providerScopes = normalizeBitbucketWorkspaceAccessTokenScopes(scopeHeader);
+  const providerScopes = readProviderScopes(headers);
   if (providerScopes.length === 0) {
     throw new BitbucketWorkspaceAccessTokenError('scope_evidence_missing');
-  }
-  if (!hasRequiredBitbucketWorkspaceAccessTokenScopes(providerScopes)) {
-    throw new BitbucketWorkspaceAccessTokenError('insufficient_scopes');
   }
 
   return {
     providerCredentialType: BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
     providerScopes,
   };
+}
+
+function readProviderScopes(headers: Headers): string[] {
+  const scopeHeader = headers.get('X-OAuth-Scopes');
+  if (!scopeHeader) return [];
+  if (scopeHeader.length > BITBUCKET_MAX_SCOPE_HEADER_LENGTH) {
+    throw new BitbucketWorkspaceAccessTokenError('scope_evidence_missing');
+  }
+  return normalizeBitbucketWorkspaceAccessTokenScopes(scopeHeader);
+}
+
+function requireProviderScopes(providerScopes: readonly string[]): void {
+  const missingRequiredScopes = getMissingBitbucketWorkspaceAccessTokenScopes(providerScopes);
+  if (missingRequiredScopes.length > 0) {
+    throw new BitbucketWorkspaceAccessTokenError('insufficient_scopes', {
+      missingRequiredScopes,
+    });
+  }
 }
 
 function normalizeDiscoveredWorkspace(payload: { uuid: string; slug: string }): {
@@ -417,6 +450,7 @@ async function listWorkspaceRepositories(input: {
   workspace: { uuid: string; slug: string };
   accessToken: string;
   fetch: typeof fetch;
+  recordProviderScopes?: (headers: Headers) => void;
 }): Promise<BitbucketWorkspaceAccessTokenRepository[]> {
   const repositories: BitbucketWorkspaceAccessTokenRepository[] = [];
   const repositoryIds = new Set<string>();
@@ -433,7 +467,8 @@ async function listWorkspaceRepositories(input: {
     }
     visitedEndpoints.add(endpoint);
 
-    const { payload } = await fetchBitbucketJson(endpoint, input.accessToken, input.fetch);
+    const { payload, headers } = await fetchBitbucketJson(endpoint, input.accessToken, input.fetch);
+    input.recordProviderScopes?.(headers);
     const page = BitbucketRepositoryPageSchema.safeParse(payload);
     if (!page.success) throw new BitbucketWorkspaceAccessTokenError('invalid_response');
 
@@ -475,6 +510,12 @@ export async function validateBitbucketWorkspaceAccessToken(
     accessToken: input.accessToken,
     fetch: fetchImplementation,
   });
+  const observedProviderScopes = new Set(discovered.evidence.providerScopes);
+  const recordProviderScopes = (headers: Headers) => {
+    for (const scope of readProviderScopes(headers)) {
+      observedProviderScopes.add(scope);
+    }
+  };
   if (expectedWorkspaceUuid && discovered.workspace.uuid !== expectedWorkspaceUuid) {
     throw new BitbucketWorkspaceAccessTokenError('workspace_mismatch');
   }
@@ -484,6 +525,7 @@ export async function validateBitbucketWorkspaceAccessToken(
     input.accessToken,
     fetchImplementation
   );
+  recordProviderScopes(workspaceResult.headers);
   const workspacePayload = BitbucketWorkspacePayloadSchema.safeParse(workspaceResult.payload);
   if (!workspacePayload.success) {
     throw new BitbucketWorkspaceAccessTokenError('invalid_response');
@@ -510,6 +552,7 @@ export async function validateBitbucketWorkspaceAccessToken(
     input.accessToken,
     fetchImplementation
   );
+  recordProviderScopes(membersResult.headers);
   if (!BitbucketMembersPageSchema.safeParse(membersResult.payload).success) {
     throw new BitbucketWorkspaceAccessTokenError('invalid_response');
   }
@@ -518,11 +561,17 @@ export async function validateBitbucketWorkspaceAccessToken(
     workspace,
     accessToken: input.accessToken,
     fetch: fetchImplementation,
+    recordProviderScopes,
   });
+  const providerScopes = normalizeBitbucketWorkspaceAccessTokenScopes(
+    [...observedProviderScopes].join(' ')
+  );
+  requireProviderScopes(providerScopes);
 
   return {
     workspace,
-    ...discovered.evidence,
+    providerCredentialType: discovered.evidence.providerCredentialType,
+    providerScopes,
     repositories,
   };
 }

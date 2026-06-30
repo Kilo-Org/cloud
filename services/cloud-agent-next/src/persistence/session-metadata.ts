@@ -117,6 +117,7 @@ const MetadataRepositorySchema = z.preprocess(
           platform: z.literal('bitbucket').optional(),
           workspaceUuid: z.string().uuid(),
           repositoryUuid: z.string().uuid(),
+          bitbucketIntegrationId: z.string().uuid().optional(),
           bitbucketTokenManaged: z.boolean().optional(),
           upstreamBranch: branchNameSchema.optional(),
         })

@@ -389,6 +389,7 @@ describe('buildOverrideConfig', () => {
     expect(cfg.remoteEnv).toEqual({
       HOME: '/home/agent_xyz',
       KILO_CLOUD_AGENT: '1',
+      PATH: '${containerEnv:PATH}:/opt/kilo-cloud',
     });
   });
 
@@ -444,7 +445,7 @@ describe('mergeDevContainerConfig', () => {
         image: 'debian:bookworm',
         mounts: ['source=/user,target=/user,type=bind'],
         runArgs: ['--env', 'USER_FLAG=1'],
-        remoteEnv: { USER_ENV: '1' },
+        remoteEnv: { USER_ENV: '1', PATH: '/user/bin' },
       },
       { sessionHome: '/home/agent_xyz', wrapperPort: 5050, agentSessionId: 'agent_xyz' }
     );
@@ -470,6 +471,7 @@ describe('mergeDevContainerConfig', () => {
       USER_ENV: '1',
       HOME: '/home/agent_xyz',
       KILO_CLOUD_AGENT: '1',
+      PATH: '${containerEnv:PATH}:/opt/kilo-cloud',
     });
   });
 

@@ -21,6 +21,65 @@ export const gitUrlSchema = z
   .url()
   .refine(url => url.startsWith('https://'), 'Only HTTPS URLs are supported');
 
+export type CanonicalBitbucketRepository = {
+  workspaceSlug: string;
+  repositorySlug: string;
+};
+
+function canonicalBitbucketPathSegment(value: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+  return /^[A-Za-z0-9_.-]+$/.test(decoded) && decoded !== '.' && decoded !== '..' ? decoded : null;
+}
+
+function parseBitbucketCloudCloneUrl(
+  repositoryUrl: string,
+  allowSsh: boolean
+): CanonicalBitbucketRepository | null {
+  let url: URL;
+  try {
+    url = new URL(repositoryUrl);
+  } catch {
+    return null;
+  }
+
+  if (url.hostname !== 'bitbucket.org' || url.port || url.search || url.hash) return null;
+  if (url.protocol === 'https:') {
+    if (url.username || url.password) return null;
+  } else if (allowSsh && url.protocol === 'ssh:') {
+    if (url.username !== 'git' || url.password) return null;
+  } else {
+    return null;
+  }
+
+  const pathSegments = url.pathname.split('/');
+  if (pathSegments.length !== 3 || pathSegments[0] !== '') return null;
+  const [workspaceSegment, repositorySegmentWithSuffix] = pathSegments.slice(1);
+  if (!repositorySegmentWithSuffix?.endsWith('.git')) return null;
+
+  const workspaceSlug = canonicalBitbucketPathSegment(workspaceSegment ?? '');
+  const repositorySlug = canonicalBitbucketPathSegment(
+    repositorySegmentWithSuffix.slice(0, -'.git'.length)
+  );
+  return workspaceSlug && repositorySlug ? { workspaceSlug, repositorySlug } : null;
+}
+
+export function parseCanonicalBitbucketCloneUrl(
+  repositoryUrl: string
+): CanonicalBitbucketRepository | null {
+  return parseBitbucketCloudCloneUrl(repositoryUrl, false);
+}
+
+export function parseManagedBitbucketCloneUrl(
+  repositoryUrl: string
+): CanonicalBitbucketRepository | null {
+  return parseBitbucketCloudCloneUrl(repositoryUrl, true);
+}
+
 export const RESERVED_ENV_VARS = ['HOME', 'SESSION_ID', 'SESSION_HOME'] as const;
 
 export const envVarsSchema = z
@@ -176,6 +235,7 @@ export type BitbucketTokenFailureReason =
   | 'reconnect_required'
   | 'temporarily_unavailable'
   | 'insufficient_permissions'
+  | 'integration_mismatch'
   | 'workspace_mismatch'
   | 'repository_not_found'
   | 'repository_mismatch';
@@ -206,6 +266,7 @@ export type GitTokenService = {
   getBitbucketToken?(params: {
     userId: string;
     orgId: string;
+    expectedIntegrationId?: string;
     workspaceUuid: string;
     repositoryUuid: string;
     repositoryUrl: string;

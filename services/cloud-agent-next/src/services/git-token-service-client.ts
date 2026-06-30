@@ -185,15 +185,31 @@ export type ResolveManagedGitLabTokenResult =
   | { success: true; token: string; glabIsOAuth2: boolean }
   | { success: false; reason: string };
 
+export type ManagedBitbucketTokenFailureReason =
+  | BitbucketTokenFailureReason
+  | 'service_not_configured'
+  | 'rpc_error';
+
 export type ResolveManagedBitbucketTokenResult =
   | { success: true; token: string }
-  | { success: false; reason: BitbucketTokenFailureReason };
+  | { success: false; reason: ManagedBitbucketTokenFailureReason };
+
+export function isTemporaryManagedBitbucketTokenFailure(
+  reason: ManagedBitbucketTokenFailureReason
+): boolean {
+  return (
+    reason === 'temporarily_unavailable' ||
+    reason === 'service_not_configured' ||
+    reason === 'rpc_error'
+  );
+}
 
 export async function resolveManagedBitbucketToken(
   env: GitTokenServiceEnv,
   params: {
     userId: string;
     orgId: string;
+    expectedIntegrationId?: string;
     workspaceUuid: string;
     repositoryUuid: string;
     repositoryUrl: string;
@@ -206,7 +222,7 @@ export async function resolveManagedBitbucketToken(
   try {
     if (!env.GIT_TOKEN_SERVICE?.getBitbucketToken) {
       logger.warn('Bitbucket git-token-service binding is not configured');
-      return { success: false, reason: 'temporarily_unavailable' };
+      return { success: false, reason: 'service_not_configured' };
     }
     const result = await env.GIT_TOKEN_SERVICE.getBitbucketToken(params);
     if (result.success) {
@@ -217,7 +233,7 @@ export async function resolveManagedBitbucketToken(
     return { success: false, reason: result.reason };
   } catch {
     logger.error('Failed to call git-token-service getBitbucketToken');
-    return { success: false, reason: 'temporarily_unavailable' };
+    return { success: false, reason: 'rpc_error' };
   }
 }
 

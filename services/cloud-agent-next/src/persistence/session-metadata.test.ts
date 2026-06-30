@@ -463,6 +463,7 @@ describe('session metadata boundary', () => {
         platform: 'bitbucket',
         workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
         repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+        bitbucketIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
         bitbucketTokenManaged: true,
         token: 'must-not-persist',
       },
@@ -475,9 +476,53 @@ describe('session metadata boundary', () => {
       platform: 'bitbucket',
       workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
       repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      bitbucketIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
       bitbucketTokenManaged: true,
     });
     expect(JSON.stringify(serializeSessionMetadata(metadata))).not.toContain('must-not-persist');
+  });
+
+  it('persists Bitbucket code-review sessions with generic repository and callback metadata only', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'agent_bitbucket_review',
+        userId: 'user_123',
+        orgId: '123e4567-e89b-12d3-a456-426614174099',
+        createdOnPlatform: 'code-review',
+      },
+      auth: {},
+      repository: {
+        type: 'bitbucket' as const,
+        url: 'https://bitbucket.org/acme/repo.git',
+        platform: 'bitbucket' as const,
+        workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+        repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+        codeReview: {
+          integrationId: '123e4567-e89b-12d3-a456-426614174022',
+          pullRequestId: 42,
+          expectedHeadSha: '0123456789abcdef0123456789abcdef01234567',
+          reviewId: '123e4567-e89b-12d3-a456-426614174023',
+        },
+      },
+      callback: {
+        target: {
+          url: 'https://kilo.example/api/internal/code-review-status/123e4567-e89b-12d3-a456-426614174023',
+        },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    const metadata = parseSessionMetadata(current);
+    expect(metadata.repository).toEqual({
+      type: 'bitbucket',
+      url: 'https://bitbucket.org/acme/repo.git',
+      platform: 'bitbucket',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+    });
+    expect(metadata.callback).toEqual(current.callback);
+    expect(JSON.stringify(serializeSessionMetadata(metadata))).not.toContain('codeReview');
   });
 
   it('preserves legacy generic git tokens in grouped repository metadata', () => {

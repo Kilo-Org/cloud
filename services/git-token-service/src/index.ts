@@ -4,6 +4,11 @@ import {
   extractBearerToken,
   verifyKiloToken,
 } from '@kilocode/worker-utils';
+import {
+  BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
 import { GitLabLookupService, type GitLabLookupSuccess } from './gitlab-lookup-service.js';
@@ -50,6 +55,12 @@ import {
   type GetBitbucketTokenParams,
   type GetBitbucketTokenResult,
 } from './bitbucket-runtime-token-resolver.js';
+import {
+  BitbucketCodeReviewService,
+  BitbucketDeleteWebhookRequestSchema,
+  BitbucketEnsureWebhookRequestSchema,
+  BitbucketPullRequestRequestSchema,
+} from './bitbucket-code-review-service.js';
 
 export type GetTokenForRepoParams = {
   githubRepo: string;
@@ -199,6 +210,26 @@ export type RedeemGitLabSessionCapabilityResult =
 
 const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
 const BITBUCKET_REPOSITORIES_PATH = '/internal/bitbucket/repositories';
+const BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH = '/internal/bitbucket/code-review/pull-request';
+const BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH = '/internal/bitbucket/code-review/webhooks/ensure';
+const BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_PATH = '/internal/bitbucket/code-review/webhooks/delete';
+const INTERNAL_REQUEST_MAX_BYTES = 16_000;
+
+const BitbucketPullRequestHttpRequestSchema = BitbucketPullRequestRequestSchema.omit({
+  owner: true,
+});
+const BitbucketEnsureWebhookHttpRequestSchema = BitbucketEnsureWebhookRequestSchema.omit({
+  owner: true,
+});
+const BitbucketDeleteWebhookHttpRequestSchema = BitbucketDeleteWebhookRequestSchema.omit({
+  owner: true,
+});
+
+const bitbucketCodeReviewAudiences = new Map([
+  [BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH, BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE],
+  [BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH, BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE],
+  [BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_PATH, BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE],
+]);
 
 type ServiceHttpEnv = CloudflareEnv & {
   NEXTAUTH_SECRET: SecretsStoreSecret | string;
@@ -206,6 +237,53 @@ type ServiceHttpEnv = CloudflareEnv & {
 
 async function resolveSecret(secret: SecretsStoreSecret | string): Promise<string> {
   return typeof secret === 'string' ? secret : secret.get();
+}
+
+async function readBoundedInternalJsonRequest(request: Request): Promise<unknown> {
+  const contentType = request.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
+  if (contentType !== 'application/json' || !request.body) throw new Error('invalid_request');
+
+  const contentLength = request.headers.get('Content-Length');
+  if (contentLength) {
+    if (!/^[0-9]+$/.test(contentLength) || Number(contentLength) > INTERNAL_REQUEST_MAX_BYTES) {
+      throw new Error('invalid_request');
+    }
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      if (!(chunk.value instanceof Uint8Array)) throw new Error('invalid_request');
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > INTERNAL_REQUEST_MAX_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The request remains rejected when cancellation itself fails.
+        }
+        throw new Error('invalid_request');
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body));
+  } catch {
+    throw new Error('invalid_request');
+  }
 }
 
 function validateGitHubCapabilityUpstream(
@@ -982,7 +1060,12 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 export default {
   async fetch(request: Request, env: ServiceHttpEnv): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== DISCONNECT_PATH && url.pathname !== BITBUCKET_REPOSITORIES_PATH) {
+    const codeReviewAudience = bitbucketCodeReviewAudiences.get(url.pathname);
+    if (
+      url.pathname !== DISCONNECT_PATH &&
+      url.pathname !== BITBUCKET_REPOSITORIES_PATH &&
+      !codeReviewAudience
+    ) {
       return new Response(null, { status: 404 });
     }
     if (request.method !== 'POST') return new Response(null, { status: 405 });
@@ -1000,13 +1083,11 @@ export default {
 
     let authorization: Awaited<ReturnType<typeof verifyKiloToken>>;
     try {
-      authorization = await verifyKiloToken(
-        token,
-        secret,
+      const audience =
         url.pathname === BITBUCKET_REPOSITORIES_PATH
-          ? { audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE }
-          : undefined
-      );
+          ? BITBUCKET_REPOSITORY_LIST_AUDIENCE
+          : codeReviewAudience;
+      authorization = await verifyKiloToken(token, secret, audience ? { audience } : undefined);
     } catch {
       return Response.json({ error: 'unauthorized' }, { status: 401 });
     }
@@ -1023,6 +1104,53 @@ export default {
         return Response.json(result);
       } catch {
         return Response.json({ status: 'temporarily_unavailable' });
+      }
+    }
+
+    if (codeReviewAudience) {
+      if (!authorization.organizationId) {
+        return Response.json({ error: 'organization_required' }, { status: 403 });
+      }
+      let body: unknown;
+      try {
+        body = await readBoundedInternalJsonRequest(request);
+      } catch {
+        return Response.json({ success: false, reason: 'invalid_request' }, { status: 400 });
+      }
+      const owner = {
+        userId: authorization.kiloUserId,
+        orgId: authorization.organizationId,
+      };
+      const service = new BitbucketCodeReviewService(env);
+
+      try {
+        switch (url.pathname) {
+          case BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH: {
+            const parsed = BitbucketPullRequestHttpRequestSchema.safeParse(body);
+            if (!parsed.success) {
+              return Response.json({ success: false, reason: 'invalid_request' }, { status: 400 });
+            }
+            return Response.json(await service.getPullRequest({ owner, ...parsed.data }));
+          }
+          case BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH: {
+            const parsed = BitbucketEnsureWebhookHttpRequestSchema.safeParse(body);
+            if (!parsed.success) {
+              return Response.json({ success: false, reason: 'invalid_request' }, { status: 400 });
+            }
+            return Response.json(await service.ensureWorkspaceWebhook({ owner, ...parsed.data }));
+          }
+          case BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_PATH: {
+            const parsed = BitbucketDeleteWebhookHttpRequestSchema.safeParse(body);
+            if (!parsed.success) {
+              return Response.json({ success: false, reason: 'invalid_request' }, { status: 400 });
+            }
+            return Response.json(await service.deleteWorkspaceWebhooks({ owner, ...parsed.data }));
+          }
+          default:
+            return new Response(null, { status: 404 });
+        }
+      } catch {
+        return Response.json({ success: false, reason: 'temporarily_unavailable' });
       }
     }
 

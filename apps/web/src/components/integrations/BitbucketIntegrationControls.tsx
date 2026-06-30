@@ -78,6 +78,8 @@ function ReplaceTokenDialog({
   const statusQueryKey = trpc.organizations.bitbucket.getStatus.queryKey(statusInput);
   const repositoryQueryKey =
     trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey(statusInput);
+  const readinessQueryKey =
+    trpc.organizations.reviewAgent.getBitbucketReadiness.queryKey(statusInput);
   const mutation = useMutation(
     trpc.organizations.bitbucket.replaceToken.mutationOptions({
       gcTime: 0,
@@ -91,6 +93,7 @@ function ReplaceTokenDialog({
         void Promise.all([
           queryClient.invalidateQueries({ queryKey: statusQueryKey }),
           queryClient.invalidateQueries({ queryKey: repositoryQueryKey }),
+          queryClient.invalidateQueries({ queryKey: readinessQueryKey }),
         ]);
         toast.success('Bitbucket token replaced');
       },
@@ -242,6 +245,8 @@ function DisconnectDialog({
   const statusQueryKey = trpc.organizations.bitbucket.getStatus.queryKey(statusInput);
   const repositoryQueryKey =
     trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey(statusInput);
+  const readinessQueryKey =
+    trpc.organizations.reviewAgent.getBitbucketReadiness.queryKey(statusInput);
   const mutation = useMutation(trpc.organizations.bitbucket.disconnect.mutationOptions());
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -263,6 +268,7 @@ function DisconnectDialog({
           void Promise.all([
             queryClient.invalidateQueries({ queryKey: statusQueryKey }),
             queryClient.invalidateQueries({ queryKey: repositoryQueryKey }),
+            queryClient.invalidateQueries({ queryKey: readinessQueryKey }),
           ]);
           toast.success('Bitbucket disconnected from Kilo');
         },

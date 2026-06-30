@@ -365,6 +365,31 @@ async function prepareBranch(
   }
 }
 
+async function sanitizeBitbucketCodeReviewRemote(
+  request: WrapperSessionReadyRequest,
+  runGit: GitRunner
+): Promise<boolean> {
+  const repo = request.repo;
+  if (
+    repo?.kind !== 'git' ||
+    repo.platform !== 'bitbucket' ||
+    request.materialized.env.KILO_PLATFORM !== 'code-review'
+  ) {
+    return false;
+  }
+  const canonicalUrl = new URL(repo.url);
+  canonicalUrl.username = '';
+  canonicalUrl.password = '';
+  const result = await runGit(['remote', 'set-url', 'origin', canonicalUrl.toString()], {
+    cwd: request.workspace.workspacePath,
+    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+  });
+  if (result.exitCode !== 0) {
+    throw new Error('Failed to update git remote URL');
+  }
+  return true;
+}
+
 async function refreshGitRemoteToken(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
@@ -660,7 +685,9 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap warm workspace refreshing remote kiloSessionId=${request.kiloSessionId}`
       );
-      await refreshGitRemoteToken(request, runGit);
+      if (workspaceNeedsBootstrap || !(await sanitizeBitbucketCodeReviewRemote(request, runGit))) {
+        await refreshGitRemoteToken(request, runGit);
+      }
       logToFile(`bootstrap warm workspace remote ready kiloSessionId=${request.kiloSessionId}`);
     } else {
       progress?.('cloning', 'Cloning repository...');
@@ -680,6 +707,7 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
+      await sanitizeBitbucketCodeReviewRemote(request, runGit);
 
       await writeSessionAuthFile(request);
       await writeRuntimeSkills(request);

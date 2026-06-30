@@ -45,7 +45,7 @@ BITBUCKET_CLIENT_SECRET=
 #     --public-env BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY \
 #     --private-env BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY
 # Use the same key ID and public key in Web; keep the private key in this Worker only.
-# Provision both key values as per-Worker secrets because they exceed Secrets Store's size limit.
+# Provision these as per-Worker secrets; the key material exceeds Secrets Store's size limit.
 BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID=
 BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY=
 BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY=

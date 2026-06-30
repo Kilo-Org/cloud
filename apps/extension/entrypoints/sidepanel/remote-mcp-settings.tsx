@@ -153,7 +153,7 @@ const ServerForm = ({
   const [saving, setSaving] = useState(false);
   const [showBearerInput, setShowBearerInput] = useState(false);
   const [showHeaderValueInput, setShowHeaderValueInput] = useState(false);
-  const secretSaved = isSecretSaved(existingServer);
+  const secretSaved = isSecretSaved(existingServer) && existingServer?.auth.type === form.authType;
 
   const set = <Key extends keyof FormState>(key: Key, value: FormState[Key]): void => {
     setForm(prev => ({ ...prev, [key]: value }));

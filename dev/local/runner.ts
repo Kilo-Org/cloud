@@ -285,7 +285,16 @@ export function restartServiceInTmux(sessionName: string, serviceName: string): 
   const pane = findServicePane(sessionName, serviceName);
   if (!pane) return;
   sendInterrupt(sessionName, pane.windowIndex, pane.paneIndex);
-  setTimeout(() => sendKeys(sessionName, pane.windowIndex, cmd, pane.paneIndex), 1000);
+  setTimeout(() => {
+    const currentPane = findServicePane(sessionName, serviceName);
+    if (!currentPane) return;
+    try {
+      sendKeys(sessionName, currentPane.windowIndex, cmd, currentPane.paneIndex);
+    } catch {
+      // The dashboard may have moved or closed the pane after we resolved it.
+      // Keep the TUI alive; the next explicit restart/view action can retry.
+    }
+  }, 1000);
 }
 
 // ---------------------------------------------------------------------------

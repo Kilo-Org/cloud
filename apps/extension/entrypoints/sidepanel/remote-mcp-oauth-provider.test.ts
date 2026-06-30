@@ -1,9 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { RemoteMcpServer } from '../../src/shared/remote-mcp';
-import {
-  REMOTE_MCP_STORAGE_KEY,
-  type RemoteMcpStorageArea,
-} from '../../src/shared/remote-mcp-storage';
+import type { RemoteMcpStorageArea } from '../../src/shared/remote-mcp-storage';
+import { REMOTE_MCP_STORAGE_KEY } from '../../src/shared/remote-mcp-storage';
 
 const mocks = vi.hoisted(() => ({
   getRedirectURL: vi.fn<(path?: string) => string>(),
@@ -20,6 +18,7 @@ vi.mock('#imports', () => ({
   },
 }));
 
+// eslint-disable-next-line import/first
 import { createRemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
 
 const baseServer = (overrides: Partial<RemoteMcpServer> = {}): RemoteMcpServer => ({
@@ -49,14 +48,15 @@ const createStorage = (server: RemoteMcpServer): RemoteMcpStorageArea => {
   };
 };
 
-beforeEach(() => {
+const setupMocks = () => {
   mocks.getRedirectURL.mockReset();
   mocks.launchWebAuthFlow.mockReset();
   mocks.getRedirectURL.mockReturnValue('https://abc.chromiumapp.org/remote-mcp');
-});
+};
 
-describe('createRemoteMcpOAuthProvider', () => {
+describe('oauth provider creation', () => {
   it('reports the browser redirect URL and public client metadata', () => {
+    setupMocks();
     const provider = createRemoteMcpOAuthProvider({
       server: baseServer(),
       storageArea: createStorage(baseServer()),
@@ -71,6 +71,7 @@ describe('createRemoteMcpOAuthProvider', () => {
   });
 
   it('persists client information and reads it back', async () => {
+    setupMocks();
     const storage = createStorage(baseServer());
     const provider = createRemoteMcpOAuthProvider({ server: baseServer(), storageArea: storage });
 
@@ -80,10 +81,11 @@ describe('createRemoteMcpOAuthProvider', () => {
       server: baseServer(),
       storageArea: storage,
     });
-    expect(await reloaded.clientInformation()).toMatchObject({ client_id: 'client-abc' });
+    await expect(reloaded.clientInformation()).resolves.toMatchObject({ client_id: 'client-abc' });
   });
 
   it('persists tokens and reads them back', async () => {
+    setupMocks();
     const storage = createStorage(baseServer());
     const provider = createRemoteMcpOAuthProvider({ server: baseServer(), storageArea: storage });
 
@@ -93,10 +95,11 @@ describe('createRemoteMcpOAuthProvider', () => {
       server: baseServer(),
       storageArea: storage,
     });
-    expect(await reloaded.tokens()).toMatchObject({ access_token: 'access-123' });
+    await expect(reloaded.tokens()).resolves.toMatchObject({ access_token: 'access-123' });
   });
 
   it('persists the code verifier and reads it back', async () => {
+    setupMocks();
     const storage = createStorage(baseServer());
     const provider = createRemoteMcpOAuthProvider({ server: baseServer(), storageArea: storage });
 
@@ -106,10 +109,11 @@ describe('createRemoteMcpOAuthProvider', () => {
       server: baseServer(),
       storageArea: storage,
     });
-    expect(await reloaded.codeVerifier()).toBe('verifier-xyz');
+    await expect(reloaded.codeVerifier()).resolves.toBe('verifier-xyz');
   });
 
   it('launches the web auth flow with the authorization URL', async () => {
+    setupMocks();
     mocks.launchWebAuthFlow.mockResolvedValueOnce(
       'https://abc.chromiumapp.org/remote-mcp?code=the-code&state=the-state'
     );
@@ -128,6 +132,7 @@ describe('createRemoteMcpOAuthProvider', () => {
   });
 
   it('clears tokens and verifier when invalidating', async () => {
+    setupMocks();
     const storage = createStorage(baseServer());
     const provider = createRemoteMcpOAuthProvider({ server: baseServer(), storageArea: storage });
     await provider.saveTokens({ access_token: 'access-123', token_type: 'Bearer' });
@@ -136,7 +141,7 @@ describe('createRemoteMcpOAuthProvider', () => {
     await provider.invalidateCredentials?.('all');
 
     const reloaded = createRemoteMcpOAuthProvider({ server: baseServer(), storageArea: storage });
-    expect(await reloaded.tokens()).toBeUndefined();
-    expect(await reloaded.clientInformation()).toBeUndefined();
+    await expect(reloaded.tokens()).resolves.toBeUndefined();
+    await expect(reloaded.clientInformation()).resolves.toBeUndefined();
   });
 });

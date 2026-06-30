@@ -6,7 +6,7 @@ import {
   parseAuthorizationRedirect,
 } from './remote-mcp-oauth';
 
-describe('generateOAuthState', () => {
+describe('oauth state generation', () => {
   it('produces distinct values across calls', () => {
     const values = new Set(Array.from({ length: 16 }, () => generateOAuthState()));
     expect(values.size).toBe(16);
@@ -17,7 +17,7 @@ describe('generateOAuthState', () => {
   });
 });
 
-describe('parseAuthorizationRedirect', () => {
+describe('authorization redirect parsing', () => {
   const redirectBase = 'https://abc.chromiumapp.org/remote-mcp';
 
   it('extracts code and state from a successful redirect', () => {
@@ -31,7 +31,7 @@ describe('parseAuthorizationRedirect', () => {
   });
 
   it('throws when code is missing', () => {
-    expect(() => parseAuthorizationRedirect(`${redirectBase}?state=the-state`)).toThrow();
+    expect(() => parseAuthorizationRedirect(`${redirectBase}?state=the-state`)).toThrow(/code/);
   });
 
   it('throws when the redirect carries an OAuth error', () => {
@@ -41,11 +41,11 @@ describe('parseAuthorizationRedirect', () => {
   });
 
   it('throws on a malformed redirect URL', () => {
-    expect(() => parseAuthorizationRedirect('not a url')).toThrow();
+    expect(() => parseAuthorizationRedirect('not a url')).toThrow(Error);
   });
 });
 
-describe('isOAuthTokenExpired', () => {
+describe('oauth token expiry check', () => {
   it('treats tokens with no expiry as not expired', () => {
     expect(isOAuthTokenExpired(undefined, Date.now())).toBe(false);
   });
@@ -62,7 +62,7 @@ describe('isOAuthTokenExpired', () => {
   });
 });
 
-describe('buildPublicClientMetadata', () => {
+describe('public client metadata builder', () => {
   it('builds public-client PKCE metadata for the given redirect URL', () => {
     const metadata = buildPublicClientMetadata('https://abc.chromiumapp.org/remote-mcp');
     expect(metadata.redirect_uris).toStrictEqual(['https://abc.chromiumapp.org/remote-mcp']);

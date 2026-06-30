@@ -4,6 +4,7 @@ import {
   StreamableHTTPClientTransport,
   StreamableHTTPError,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type {
   RemoteMcpAuth,
   RemoteMcpCachedTool,
@@ -17,10 +18,10 @@ import { createRemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
 type FetchLike = typeof fetch;
 
 const buildAuthHeaders = (auth: RemoteMcpAuth): Record<string, string> => {
-  if (auth.type === 'bearer' && auth.token) {
+  if (auth.type === 'bearer' && auth.token !== undefined) {
     return { Authorization: `Bearer ${auth.token}` };
   }
-  if (auth.type === 'header' && auth.headerValue) {
+  if (auth.type === 'header' && auth.headerValue !== undefined) {
     return { [auth.headerName]: auth.headerValue };
   }
   return {};
@@ -30,6 +31,16 @@ const combineSignal = (signal?: AbortSignal): AbortSignal =>
   signal === undefined
     ? AbortSignal.timeout(20_000)
     : AbortSignal.any([signal, AbortSignal.timeout(20_000)]);
+
+/*
+ * StreamableHTTPClientTransport.sessionId is `string | undefined`, but the
+ * Transport interface declares `sessionId?: string` (meaning just `string`
+ * under exactOptionalPropertyTypes). Widen through unknown to satisfy the
+ * Transport parameter — the runtime object is identical.
+ */
+const asTransport = (transport: StreamableHTTPClientTransport): Transport =>
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  transport as unknown as Transport;
 
 const makeClient = (
   server: RemoteMcpServer,
@@ -69,17 +80,17 @@ export const connectRemoteMcpServer = async ({
    */
   const connectAndList = async () => {
     try {
-      await client.connect(transport, { signal: combined });
-    } catch (err) {
-      if (!(err instanceof UnauthorizedError) || authProvider === undefined) {
-        throw err;
+      await client.connect(asTransport(transport), { signal: combined });
+    } catch (error) {
+      if (!(error instanceof UnauthorizedError) || authProvider === undefined) {
+        throw error;
       }
       const code = authProvider.takeAuthorizationCode();
       if (code === undefined) {
-        throw err;
+        throw error;
       }
       await transport.finishAuth(code);
-      await client.connect(transport, { signal: combined });
+      await client.connect(asTransport(transport), { signal: combined });
     }
     return client.listTools(undefined, { signal: combined });
   };
@@ -87,10 +98,10 @@ export const connectRemoteMcpServer = async ({
   try {
     const { tools } = await connectAndList();
 
-    const cachedTools: RemoteMcpCachedTool[] = tools.map(t => ({
-      description: t.description,
-      inputSchema: t.inputSchema as Record<string, unknown>,
-      name: t.name,
+    const cachedTools: RemoteMcpCachedTool[] = tools.map(tool => ({
+      description: tool.description,
+      inputSchema: tool.inputSchema as Record<string, unknown>,
+      name: tool.name,
     }));
 
     return {
@@ -100,15 +111,12 @@ export const connectRemoteMcpServer = async ({
       lastError: undefined,
       status: 'connected',
     };
-  } catch (err) {
-    const is401 = err instanceof StreamableHTTPError && err.code === 401;
-    const needsAuth = is401 || err instanceof UnauthorizedError;
-    // is401 implies err instanceof StreamableHTTPError extends Error, so err.message is safe
-    const message = is401
-      ? `401: ${err.message}`
-      : err instanceof Error
-        ? err.message
-        : String(err);
+  } catch (error) {
+    const is401 = error instanceof StreamableHTTPError && error.code === 401;
+    const needsAuth = is401 || error instanceof UnauthorizedError;
+    // Is401 implies error instanceof StreamableHTTPError extends Error, so error.message is safe
+    const errorText = error instanceof Error ? error.message : String(error);
+    const message: string = is401 ? `401: ${errorText}` : errorText;
 
     return {
       ...server,
@@ -140,12 +148,12 @@ export const callRemoteMcpTool = async ({
   const { client, transport } = makeClient(server, fetchFn, storageArea);
 
   try {
-    await client.connect(transport, { signal: combined });
+    await client.connect(asTransport(transport), { signal: combined });
     return await client.callTool({ arguments: args, name: route.remoteToolName }, undefined, {
       signal: combined,
     });
-  } catch (err) {
-    const text = err instanceof Error ? err.message : String(err);
+  } catch (error) {
+    const text = error instanceof Error ? error.message : String(error);
     return { content: [{ text, type: 'text' }], isError: true };
   } finally {
     await client.close();

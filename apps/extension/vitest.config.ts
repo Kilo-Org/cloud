@@ -11,8 +11,8 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'html'],
     },
-    globals: false,
     exclude: ['entrypoints/sidepanel/agent-chat-panel.test.ts'],
+    globals: false,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'entrypoints/**/*.test.ts'],
   },
 });

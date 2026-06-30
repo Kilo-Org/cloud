@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import {
   REMOTE_MCP_STORAGE_KEY,
@@ -268,5 +269,50 @@ describe('remote MCP storage', () => {
     ).toStrictEqual({
       servers: [{ ...savedServer, enabled: false }],
     });
+  });
+
+  it('preserves cachedTools and status when only oauth tokens rotate', () => {
+    const oauthServer = {
+      ...savedServer,
+      auth: {
+        oauth: {
+          clientInformation: { client_id: 'client-abc' },
+          tokens: { access_token: 'old-token', token_type: 'Bearer' },
+        },
+        type: 'oauth',
+      } as const,
+    };
+
+    const result = upsertRemoteMcpServer(
+      { servers: [oauthServer] },
+      {
+        ...oauthServer,
+        auth: {
+          oauth: {
+            clientInformation: { client_id: 'client-abc' },
+            tokens: { access_token: 'new-token', token_type: 'Bearer' },
+          },
+          type: 'oauth',
+        },
+      }
+    );
+
+    expect(result.servers[0]?.status).toBe('connected');
+    expect(result.servers[0]?.cachedTools).toStrictEqual(oauthServer.cachedTools);
+  });
+
+  it('clears connection state when oauth auth type changes to bearer', () => {
+    const oauthServer = {
+      ...savedServer,
+      auth: { type: 'oauth' } as const,
+    };
+
+    const result = upsertRemoteMcpServer(
+      { servers: [oauthServer] },
+      { ...oauthServer, auth: { token: 'tok', type: 'bearer' } }
+    );
+
+    expect(result.servers[0]?.status).toBe('untested');
+    expect(result.servers[0]?.cachedTools).toStrictEqual([]);
   });
 });

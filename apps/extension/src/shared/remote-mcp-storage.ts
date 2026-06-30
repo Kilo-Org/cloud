@@ -225,11 +225,7 @@ const authChanged = (existing: RemoteMcpAuth, draft: RemoteMcpAuth): boolean => 
       return existing.headerName !== draft.headerName || existing.headerValue !== draft.headerValue;
     }
     case 'oauth': {
-      if (existing.type !== 'oauth') {
-        return true;
-      }
-
-      return JSON.stringify(existing.oauth) !== JSON.stringify(draft.oauth);
+      return existing.type !== 'oauth';
     }
     case 'none': {
       return existing.type !== 'none';

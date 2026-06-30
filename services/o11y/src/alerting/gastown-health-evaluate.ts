@@ -1,4 +1,8 @@
-import { queryGastownHealth, type GastownHealthMetrics } from './gastown-health-query';
+import {
+  GASTOWN_HEALTH_WINDOW_MINUTES,
+  queryGastownHealth,
+  type GastownHealthMetrics,
+} from './gastown-health-query';
 import {
   readGastownHealthState,
   transitionGastownHealthState,
@@ -7,8 +11,9 @@ import {
 import { sendAlertNotification, type AlertPayload } from './notify';
 
 export const GASTOWN_HEALTH_THRESHOLDS = {
-  weightedFailedChecks: 20,
-  affectedTowns: 3,
+  weightedFailedChecks: 30,
+  affectedTowns: 4,
+  renotifyFailedChecksStep: 30,
 } as const;
 
 type GastownHealthEnv = {
@@ -49,7 +54,8 @@ export async function evaluateGastownHealthAlert(
   const transition = transitionGastownHealthState(
     currentState,
     metrics,
-    crossedThresholds.length > 0
+    crossedThresholds.length === 2,
+    GASTOWN_HEALTH_THRESHOLDS.renotifyFailedChecksStep
   );
 
   if (transition.shouldNotify) {
@@ -59,7 +65,7 @@ export async function evaluateGastownHealthAlert(
         severity: 'ticket',
         weightedFailedChecks: metrics.weightedFailedChecks,
         affectedTownCount: metrics.affectedTownCount,
-        windowMinutes: 5,
+        windowMinutes: GASTOWN_HEALTH_WINDOW_MINUTES,
         crossedThresholds,
         failedChecksThreshold: GASTOWN_HEALTH_THRESHOLDS.weightedFailedChecks,
         affectedTownsThreshold: GASTOWN_HEALTH_THRESHOLDS.affectedTowns,

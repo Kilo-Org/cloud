@@ -18,7 +18,7 @@ export const normalizeRemoteMcpUrl = (value: string): string => {
     throw new Error('Remote MCP URL must not include credentials.');
   }
 
-  if (url.hash.length > 0) {
+  if (trimmed.includes('#')) {
     throw new Error('Remote MCP URL must not include a fragment.');
   }
 
@@ -29,6 +29,10 @@ export const normalizeRemoteMcpUrl = (value: string): string => {
     throw new Error('Remote MCP URL must use HTTPS unless it points to localhost.');
   }
 
-  url.pathname = url.pathname.replaceAll(/\/+$/g, '') || '/';
-  return url.toString();
+  const queryIndex = trimmed.indexOf('?');
+  const endpoint = queryIndex === -1 ? trimmed : trimmed.slice(0, queryIndex);
+  const query = queryIndex === -1 ? '' : trimmed.slice(queryIndex);
+  const normalizedEndpoint = url.pathname === '/' ? endpoint : endpoint.replaceAll(/\/+$/g, '');
+
+  return `${normalizedEndpoint}${query}`;
 };

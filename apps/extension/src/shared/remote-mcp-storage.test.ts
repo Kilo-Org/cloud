@@ -61,11 +61,20 @@ describe('remote MCP URL policy', () => {
     expect(() => normalizeRemoteMcpUrl('https://remote.example/mcp#tools')).toThrow(
       'Remote MCP URL must not include a fragment.'
     );
+    expect(() => normalizeRemoteMcpUrl('https://remote.example/mcp#')).toThrow(
+      'Remote MCP URL must not include a fragment.'
+    );
+    expect(() => normalizeRemoteMcpUrl('https://remote.example/mcp?base=/#')).toThrow(
+      'Remote MCP URL must not include a fragment.'
+    );
   });
 
   it('preserves query strings while normalizing path trailing slashes', () => {
     expect(normalizeRemoteMcpUrl('https://remote.example/mcp/?base=/')).toBe(
       'https://remote.example/mcp?base=/'
+    );
+    expect(normalizeRemoteMcpUrl('https://REMOTE.example:443/mcp/')).toBe(
+      'https://REMOTE.example:443/mcp'
     );
   });
 });

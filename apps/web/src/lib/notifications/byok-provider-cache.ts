@@ -31,6 +31,7 @@ where ev.event = 'LLM Completion'
   and ev.timestamp >= today() - toIntervalWeek(1)
   and ev.properties.outputTokens > 0
 group by u.id, ev.properties.apiProvider
+limit 5e5
 `;
 
 const byokProviderRowsSchema = z.array(

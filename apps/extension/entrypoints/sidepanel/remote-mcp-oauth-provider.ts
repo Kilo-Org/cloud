@@ -114,7 +114,7 @@ export const createRemoteMcpOAuthProvider = ({
       if (redirect === undefined) {
         throw new Error('Authorization flow returned no redirect URL.');
       }
-      authorizationCode = parseAuthorizationRedirect(redirect).code;
+      authorizationCode = parseAuthorizationRedirect(redirect);
     },
 
     get redirectUrl(): string {

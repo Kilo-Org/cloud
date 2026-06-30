@@ -111,6 +111,12 @@ const ToolExchangeEvent = ({
             <pre className={codeBlockClassName}>{item.toolCall.code}</pre>
           </div>
         ) : null}
+        {'arguments' in item.toolCall ? (
+          <div className="min-w-0">
+            <p className={codeLabelClassName}>Arguments</p>
+            <pre className={codeBlockClassName}>{formatToolValue(item.toolCall.arguments)}</pre>
+          </div>
+        ) : null}
         <div className="min-w-0">
           <p className="text-[11px] font-medium text-zinc-300">
             {isSuccessful ? 'Result' : 'Error'}

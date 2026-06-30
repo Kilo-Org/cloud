@@ -1,7 +1,17 @@
 import { z } from 'zod';
-import { createEvalToolCall, createSafeToolCall } from '@/src/shared/agent-conversation';
-import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-conversation';
+import {
+  createEvalToolCall,
+  createRemoteMcpToolCall,
+  createSafeToolCall,
+} from '@/src/shared/agent-conversation';
+import type {
+  AgentConversationEvent,
+  RemoteMcpAgentToolName,
+  RemoteMcpToolCallEvent,
+  SafeToolName,
+} from '@/src/shared/agent-conversation';
 import type { KiloGatewayToolCallRequest } from '@/src/shared/kilo-api-client';
+import type { RemoteMcpToolRoute } from '@/src/shared/remote-mcp-tools';
 
 type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
@@ -51,6 +61,41 @@ export const toSafeToolCallEvents = (
     const event = toSafeToolCallEvent(toolCall, selectedTabId);
 
     return event === undefined ? [] : [event];
+  });
+
+export const isRemoteMcpToolName = (name: string): name is RemoteMcpAgentToolName =>
+  name.startsWith('mcp_');
+
+export const isRemoteMcpToolCallEvent = (toolCall: {
+  readonly name: string;
+}): toolCall is RemoteMcpToolCallEvent => isRemoteMcpToolName(toolCall.name);
+
+/*
+ * Always emit an event for an mcp_ call, even when its route is gone (server
+ * removed/disabled mid-turn). The executor resolves the route again and returns
+ * a normal tool error, so the model still gets a result for the call it made.
+ */
+export const toRemoteMcpToolCallEvents = (
+  toolCalls: KiloGatewayToolCallRequest[],
+  routes: ReadonlyMap<string, RemoteMcpToolRoute>
+): RemoteMcpToolCallEvent[] =>
+  toolCalls.flatMap(toolCall => {
+    if (!isRemoteMcpToolName(toolCall.name)) {
+      return [];
+    }
+
+    const route = routes.get(toolCall.name);
+
+    return [
+      createRemoteMcpToolCall({
+        arguments: toolCall.arguments,
+        name: toolCall.name,
+        providerToolCallId: toolCall.id,
+        remoteToolName: route?.remoteToolName ?? '',
+        serverId: route?.serverId ?? '',
+        serverName: route?.serverName ?? '',
+      }),
+    ];
   });
 
 export const toDangerousToolCallEvents = (

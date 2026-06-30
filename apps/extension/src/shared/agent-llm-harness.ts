@@ -17,6 +17,7 @@ export const EXTENSION_AGENT_SYSTEM_PROMPT = [
   'When using eval, return a JSON-serializable value and do not wrap code in markdown fences.',
   'In dangerous mode, act on behalf of the user, but ask first before irreversible, financial, privacy-sensitive, authentication, external-communication, or destructive actions.',
   'Do not claim that an action succeeded until the tool result confirms it.',
+  'Remote MCP tools may be available by name. Use them according to their tool descriptions.',
 ].join('\n');
 
 export const createEvalToolDefinition = (): KiloGatewayToolDefinition => ({

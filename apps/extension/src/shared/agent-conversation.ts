@@ -62,7 +62,7 @@ export type AgentConversationEvent =
 
 type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
 type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
-type RemoteMcpToolCallEvent = Extract<
+export type RemoteMcpToolCallEvent = Extract<
   AgentConversationEvent,
   { readonly name: RemoteMcpAgentToolName }
 >;

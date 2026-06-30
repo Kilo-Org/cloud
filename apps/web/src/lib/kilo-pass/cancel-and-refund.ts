@@ -16,6 +16,7 @@ import { fromMicrodollars } from '@/lib/utils';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
+import { blockUser } from '@/lib/user/block';
 
 type Db = typeof defaultDb;
 
@@ -190,14 +191,12 @@ export async function cancelAndRefundKiloPassForUser({
       .where(eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId));
 
     if (!user.blocked_reason) {
-      await tx
-        .update(kilocode_users)
-        .set({
-          blocked_reason: reason,
-          blocked_at: new Date().toISOString(),
-          blocked_by_kilo_user_id: adminKiloUserId,
-        })
-        .where(eq(kilocode_users.id, userId));
+      await blockUser({
+        kiloUserId: userId,
+        reason,
+        blockedByKiloUserId: adminKiloUserId,
+        dbOrTx: tx,
+      });
     }
 
     const freshUserRows = await tx

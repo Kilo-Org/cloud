@@ -9,13 +9,19 @@ describe('bulkBlockUsers (integration)', () => {
   test('blocks 2 via id and 2 via email only when there is no nonsense; with nonsense none are blocked', async () => {
     // Arrange: create 4 users
     const admin = await insertTestUser({ is_admin: true });
-    const uById1 = await insertTestUser();
-    const uById2 = await insertTestUser();
+    const uById1 = await insertTestUser({ api_token_pepper: 'pepper-1' });
+    const uById2 = await insertTestUser({ api_token_pepper: 'pepper-2' });
 
     const unique1 = `bulkblock-${Date.now()}-${Math.random()}`;
     const unique2 = `bulkblock-${Date.now()}-${Math.random()}`;
-    const uByEmail1 = await insertTestUser({ google_user_email: `${unique1}@example.com` });
-    const uByEmail2 = await insertTestUser({ google_user_email: `${unique2}@example.com` });
+    const uByEmail1 = await insertTestUser({
+      google_user_email: `${unique1}@example.com`,
+      api_token_pepper: 'pepper-3',
+    });
+    const uByEmail2 = await insertTestUser({
+      google_user_email: `${unique2}@example.com`,
+      api_token_pepper: 'pepper-4',
+    });
 
     const ids = [uById1.id, uById2.id];
     const emails = [uByEmail1.google_user_email, uByEmail2.google_user_email];
@@ -68,6 +74,7 @@ describe('bulkBlockUsers (integration)', () => {
         blocked_reason: kilocode_users.blocked_reason,
         blocked_at: kilocode_users.blocked_at,
         blocked_by_kilo_user_id: kilocode_users.blocked_by_kilo_user_id,
+        api_token_pepper: kilocode_users.api_token_pepper,
       })
       .from(kilocode_users)
       .where(inArray(kilocode_users.id, [uById1.id, uById2.id, uByEmail1.id, uByEmail2.id]));
@@ -80,6 +87,18 @@ describe('bulkBlockUsers (integration)', () => {
         expect(new Date(row.blocked_at).getTime()).toBeGreaterThanOrEqual(beforeBlock);
       }
     }
+
+    // Each blocked user's pepper is rotated to a fresh, distinct value so their
+    // existing API tokens are revoked across every pepper-checking service.
+    const rotatedPeppers = rowsB.map(r => r.api_token_pepper);
+    for (const pepper of rotatedPeppers) {
+      expect(pepper).toEqual(expect.any(String));
+    }
+    expect(new Set(rotatedPeppers).size).toBe(4);
+    expect(rotatedPeppers).not.toContain('pepper-1');
+    expect(rotatedPeppers).not.toContain('pepper-2');
+    expect(rotatedPeppers).not.toContain('pepper-3');
+    expect(rotatedPeppers).not.toContain('pepper-4');
   });
 
   test('unblocks a grouped bulk block by reason, date, and admin only', async () => {

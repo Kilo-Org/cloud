@@ -57,6 +57,9 @@ export async function bulkBlockUsers(
       blocked_reason: reason,
       blocked_at: blockedAt,
       blocked_by_kilo_user_id: blockedByKiloUserId,
+      // Rotate per-row in SQL so each blocked user gets a distinct new pepper,
+      // invalidating their existing API tokens across every pepper-checking service.
+      api_token_pepper: sql`gen_random_uuid()::text`,
     })
     .where(inArray(kilocode_users.id, valid))
     .returning({ id: kilocode_users.id });

@@ -42,6 +42,7 @@ import { client } from '@/lib/stripe-client';
 import { fromMicrodollars } from '@/lib/utils';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
+import { blockUser } from '@/lib/user/block';
 
 type StripeReference = string | { id: string } | null | undefined;
 
@@ -514,15 +515,12 @@ async function blockUserForAcceptedDispute(params: {
     }
 
     if (!user.blocked_reason) {
-      didBlock = true;
-      await tx
-        .update(kilocode_users)
-        .set({
-          blocked_reason: reason,
-          blocked_at: new Date().toISOString(),
-          blocked_by_kilo_user_id: params.actor.id,
-        })
-        .where(eq(kilocode_users.id, userId));
+      didBlock = await blockUser({
+        kiloUserId: userId,
+        reason,
+        blockedByKiloUserId: params.actor.id,
+        dbOrTx: tx,
+      });
     }
 
     await tx.insert(user_admin_notes).values({

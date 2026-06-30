@@ -13,7 +13,10 @@ interface CallToolArg2 {
 
 const mocks = vi.hoisted(() => {
   const connect = vi.fn<() => Promise<void>>();
-  const callTool = vi.fn<(arg0: CallToolArg0, _compat: unknown, opts: CallToolArg2 | undefined) => Promise<unknown>>();
+  const callTool =
+    vi.fn<
+      (arg0: CallToolArg0, _compat: unknown, opts: CallToolArg2 | undefined) => Promise<unknown>
+    >();
   const close = vi.fn<() => Promise<void>>();
 
   return { callTool, close, connect };
@@ -85,7 +88,6 @@ const route: RemoteMcpToolRoute = {
 };
 
 const server = baseServer();
-
 
 describe('remote MCP tool call', () => {
   it('returns SDK result as-is on success', async () => {

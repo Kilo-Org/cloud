@@ -4898,7 +4898,7 @@
           ],
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"manual_config\" IS NULL",
-          "concurrently": true,
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },
@@ -4926,7 +4926,7 @@
           ],
           "isUnique": true,
           "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
-          "concurrently": true,
+          "concurrently": false,
           "method": "btree",
           "with": {}
         },

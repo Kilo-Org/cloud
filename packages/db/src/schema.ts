@@ -4139,11 +4139,12 @@ export const cloud_agent_code_reviews = pgTable(
   table => [
     uniqueIndex('UQ_cloud_agent_code_reviews_webhook_integration_repo_pr_sha')
       .on(table.platform_integration_id, table.repo_full_name, table.pr_number, table.head_sha)
-      .concurrently()
       .where(sql`${table.manual_config} IS NULL`),
-    uniqueIndex('UQ_cloud_agent_code_reviews_active_provider_publisher')
-      .on(table.platform_integration_id, table.repo_full_name, table.pr_number)
-      .concurrently().where(sql`${table.platform_integration_id} IS NOT NULL
+    uniqueIndex('UQ_cloud_agent_code_reviews_active_provider_publisher').on(
+      table.platform_integration_id,
+      table.repo_full_name,
+      table.pr_number
+    ).where(sql`${table.platform_integration_id} IS NOT NULL
         AND ${table.status} IN ('pending', 'queued', 'running')
         AND (${table.manual_config} IS NULL OR ${table.manual_config}->>'outputMode' = 'provider')`),
     // Indexes for ownership lookups

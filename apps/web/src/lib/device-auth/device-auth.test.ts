@@ -268,6 +268,27 @@ describe('Device Auth', () => {
         expect(expired).toHaveLength(1);
       });
 
+      test('does not mint a token when the user is blocked after approval', async () => {
+        const { code } = await createDeviceAuthRequest({});
+        await approveDeviceAuthRequest(code, testUserId);
+
+        // User becomes blocked between approval and the poll.
+        await db
+          .update(kilocode_users)
+          .set({ blocked_reason: 'blocked after approval' })
+          .where(eq(kilocode_users.id, testUserId));
+
+        const result = await pollDeviceAuthRequest(code);
+
+        expect(result.status).toBe('denied');
+        expect(result.token).toBeUndefined();
+
+        // The approval is consumed, so retrying cannot mint a token either.
+        const retry = await pollDeviceAuthRequest(code);
+        expect(retry.status).toBe('expired');
+        expect(retry.token).toBeUndefined();
+      });
+
       test('normalizes responses - non-existent code returns expired', async () => {
         const result = await pollDeviceAuthRequest('FAKE-CODE');
         expect(result.status).toBe('expired');

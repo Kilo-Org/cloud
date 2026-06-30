@@ -3,6 +3,7 @@ import { db } from '@/lib/drizzle';
 import { device_auth_requests, kilocode_users } from '@kilocode/db/schema';
 import { eq, and, lt, sql } from 'drizzle-orm';
 import { generateApiToken } from '@/lib/tokens';
+import { isUserBlacklistedByDomain } from '@/lib/user/server';
 import { randomInt } from 'node:crypto';
 
 const CODE_LENGTH = 8;
@@ -201,6 +202,14 @@ export async function pollDeviceAuthRequest(code: string): Promise<{
 
   if (!user) {
     throw new Error('User not found');
+  }
+
+  // Re-check authorization at mint time. Authorization is verified when the
+  // user approves the request, but they may have been blocked or blacklisted
+  // between approval and this poll. The approval is already consumed above, so
+  // a now-blocked user cannot retry this code into a fresh long-lived token.
+  if (user.blocked_reason || (await isUserBlacklistedByDomain(user))) {
+    return { status: 'denied' };
   }
 
   const token = generateApiToken(user, { deviceAuthRequestCode: code });

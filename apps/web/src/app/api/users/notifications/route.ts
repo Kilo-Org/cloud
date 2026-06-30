@@ -2,7 +2,7 @@ import type { KiloNotification } from '@/lib/notifications';
 import { generateUserNotifications } from '@/lib/notifications';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getKiloCodeVersionNumber, getXKiloCodeVersionNumber } from '@/lib/userAgent';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 
 export async function GET(
   request: NextRequest

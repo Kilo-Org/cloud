@@ -5,6 +5,7 @@ import type { StoredAuth } from '@/src/shared/auth';
 import type { KiloOrganizationOption } from '@/src/shared/kilo-api-client';
 import { KiloLogo } from '@/src/shared/kilo-logo';
 import { OrganizationCreditAccountSelect } from './organization-credit-account';
+import { RemoteMcpSettings } from './remote-mcp-settings';
 
 const emptyOrganizationOptions: KiloOrganizationOption[] = [];
 
@@ -86,6 +87,7 @@ const HeaderActions = ({
               organizationOptions={organizationOptions}
               selectedOrganizationId={selectedOrganizationId}
             />
+            <RemoteMcpSettings />
             <button
               className="h-9 rounded-md border border-zinc-700 px-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-[#EDFF00] focus:ring-offset-2 focus:ring-offset-zinc-950"
               onClick={() => {

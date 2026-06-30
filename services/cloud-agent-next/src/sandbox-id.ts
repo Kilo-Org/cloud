@@ -1,5 +1,6 @@
 import type { SandboxId, Env } from './types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
+import { resolveEphemeralSandboxPolicy } from './code-review-ephemeral-sandbox.js';
 
 const SHARED_SANDBOX_ID_VERSION = 'shared-v2';
 
@@ -16,6 +17,12 @@ export type SandboxRoutingTarget =
       kind: 'isolated';
       sandboxId: SandboxId;
     };
+
+export type SandboxRoutingOptions = {
+  devcontainer?: boolean;
+  createdOnPlatform?: string;
+  codeReviewEphemeralSandboxOrgIds?: string;
+};
 
 export function isGeneratedSharedSandboxId(sandboxId: string): sandboxId is SandboxId {
   return /^(org|usr|bot|ubt)-[0-9a-f]{48}$/.test(sandboxId);
@@ -46,11 +53,13 @@ function parseOrgIdList(raw: string | undefined): Set<string> {
 /**
  * Returns the correct DurableObjectNamespace for the given sandbox ID.
  * - Docker-in-Docker sandboxes (dind-* prefix) use SandboxDIND
+ * - Code Reviewer ephemeral sandboxes (crv-* prefix) use SandboxCodeReview
  * - Per-session sandboxes (ses-* prefix) use SandboxSmall
  * - All others use Sandbox
  */
 export function getSandboxNamespace(env: Env, sandboxId: string): DurableObjectNamespace<Sandbox> {
   if (sandboxId.startsWith('dind-')) return env.SandboxDIND;
+  if (sandboxId.startsWith('crv-')) return env.SandboxCodeReview;
   return sandboxId.startsWith('ses-') ? env.SandboxSmall : env.Sandbox;
 }
 
@@ -94,11 +103,28 @@ export async function generateSandboxRoutingTarget(
   userId: string,
   sessionId: string,
   botId?: string,
-  devcontainer?: boolean
+  options?: boolean | SandboxRoutingOptions
 ): Promise<SandboxRoutingTarget> {
+  const routingOptions = typeof options === 'boolean' ? { devcontainer: options } : (options ?? {});
   const perSessionOrgs = parseOrgIdList(perSessionOrgIds);
-  if (devcontainer) {
+  if (routingOptions.devcontainer) {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'dind') };
+  }
+  const ephemeralPolicy = resolveEphemeralSandboxPolicy(
+    {
+      CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS: routingOptions.codeReviewEphemeralSandboxOrgIds,
+    },
+    {
+      identity: {
+        sessionId,
+        userId,
+        orgId,
+        createdOnPlatform: routingOptions.createdOnPlatform,
+      },
+    }
+  );
+  if (ephemeralPolicy.enabled) {
+    return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'crv') };
   }
   if (perSessionOrgs.has('*') || (orgId !== undefined && perSessionOrgs.has(orgId))) {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'ses') };
@@ -123,7 +149,7 @@ export async function generateSandboxId(
   userId: string,
   sessionId: string,
   botId?: string,
-  devcontainer?: boolean
+  options?: boolean | SandboxRoutingOptions
 ): Promise<SandboxId> {
   const target = await generateSandboxRoutingTarget(
     perSessionOrgIds,
@@ -131,7 +157,7 @@ export async function generateSandboxId(
     userId,
     sessionId,
     botId,
-    devcontainer
+    options
   );
   return target.kind === 'shared' ? target.routeKey : target.sandboxId;
 }

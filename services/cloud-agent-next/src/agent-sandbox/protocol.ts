@@ -43,6 +43,8 @@ export type WrapperStopReason =
   | 'startup-failed'
   | 'unhealthy-wrapper'
   | 'terminal-failed'
+  | 'terminal-completed'
+  | 'terminal-ended'
   | 'terminal-interrupted'
   | 'idle-timeout'
   | 'keep-warm-expired'

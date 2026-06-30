@@ -148,6 +148,10 @@ import type {
   WrapperStopReason,
   WrapperStopTarget,
 } from '../agent-sandbox/protocol.js';
+import {
+  CODE_REVIEW_EPHEMERAL_SANDBOX_DESTROY_DELAY_MS,
+  isCodeReviewEphemeralSandboxId,
+} from '../code-review-ephemeral-sandbox.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -164,6 +168,8 @@ const EVENT_RETENTION_MS = Limits.SESSION_TTL_MS;
 /** Storage key for tracking last activity timestamp */
 const LAST_ACTIVITY_KEY = 'last_activity';
 const EXPLICIT_DELETION_PENDING_KEY = 'explicit_deletion_pending';
+const EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY = 'ephemeral_sandbox_destroy_after';
+const EPHEMERAL_SANDBOX_DESTROYED_AT_KEY = 'ephemeral_sandbox_destroyed_at';
 
 /** Kilo server idle timeout: 15 minutes */
 const KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT = 15 * 60 * 1000;
@@ -370,6 +376,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     reason: WrapperStopReason;
   }) => Promise<StopWrappersResult>;
   private sandboxSessionDeleter?: (reason: 'explicit' | 'retention-expired') => Promise<void>;
+  private ephemeralSandboxDestroyer?: () => Promise<void>;
   private sharedSandboxFailoverRecorder?: (routeKey: SandboxId) => Promise<void>;
   private agentRuntime?: AgentRuntime;
   private messageSettlementOutbox?: MessageSettlementOutbox;
@@ -680,7 +687,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         metadata.identity.orgId,
         metadata.identity.userId,
         metadata.identity.sessionId,
-        metadata.identity.botId
+        metadata.identity.botId,
+        {
+          createdOnPlatform: metadata.identity.createdOnPlatform,
+          codeReviewEphemeralSandboxOrgIds: this.env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
+        }
       ));
 
     return {
@@ -756,6 +767,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         updateUpstreamBranch: (branch: string) => this.updateUpstreamBranch(branch),
         setAvailableCommands: (commands: SlashCommandInfo[]) => this.setAvailableCommands(commands),
         wrapperSupervisor: this.getWrapperSupervisor(),
+        handleWrapperTerminalEvent: params => this.handleWrapperTerminalEvent(params),
         keepContainerAlive: () => {
           void this.keepContainerAlive();
         },
@@ -1694,10 +1706,51 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return (await this.ctx.storage.get<boolean>(EXPLICIT_DELETION_PENDING_KEY)) === true;
   }
 
+  async isSandboxCleanupScheduled(): Promise<boolean> {
+    const metadata = await this.getMetadata();
+    if (!metadata || !isCodeReviewEphemeralSandboxId(metadata.workspace?.sandboxId)) return false;
+    const destroyAfter = await this.ctx.storage.get<number>(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
+    if (destroyAfter !== undefined) return true;
+    return (await this.ctx.storage.get<number>(EPHEMERAL_SANDBOX_DESTROYED_AT_KEY)) !== undefined;
+  }
+
+  private async scheduleEphemeralSandboxDestroy(delayMs: number): Promise<void> {
+    const existing = await this.ctx.storage.get<number>(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
+    if (existing !== undefined) {
+      await this.scheduleAlarmAtOrBefore(existing);
+      return;
+    }
+    const destroyAfter = Date.now() + delayMs;
+    await this.ctx.storage.put(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY, destroyAfter);
+    await this.scheduleAlarmAtOrBefore(destroyAfter);
+  }
+
+  private async destroyEphemeralSandboxIfReady(now: number): Promise<void> {
+    const destroyAfter = await this.ctx.storage.get<number>(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
+    if (destroyAfter === undefined || now < destroyAfter) return;
+    const metadata = await this.getMetadata();
+    if (!metadata || !isCodeReviewEphemeralSandboxId(metadata.workspace?.sandboxId)) {
+      await this.ctx.storage.delete(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
+      return;
+    }
+
+    if (this.ephemeralSandboxDestroyer) {
+      await this.ephemeralSandboxDestroyer();
+    } else {
+      await createAgentSandbox(this.env, metadata).delete('recovery');
+    }
+    await this.ctx.storage.delete(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
+    await this.ctx.storage.put(EPHEMERAL_SANDBOX_DESTROYED_AT_KEY, Date.now());
+  }
+
   private async deletionPendingAdmissionFailure(): Promise<SessionMessageAdmissionResult | null> {
-    return (await this.isExplicitDeletionPending())
-      ? { success: false, code: 'NOT_FOUND', error: 'Session deletion is pending' }
-      : null;
+    if (await this.isExplicitDeletionPending()) {
+      return { success: false, code: 'NOT_FOUND', error: 'Session deletion is pending' };
+    }
+    if (await this.isSandboxCleanupScheduled()) {
+      return { success: false, code: 'BAD_REQUEST', error: 'Session sandbox cleanup is scheduled' };
+    }
+    return null;
   }
 
   /**
@@ -2098,6 +2151,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       }
 
       await this.getWrapperSupervisor().runMaintenance(now);
+      await this.destroyEphemeralSandboxIfReady(now);
 
       try {
         await this.getMessageSettlementOutbox().repairTerminalEffects();
@@ -2656,6 +2710,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       deadlines.push(nextCallbackDeadline);
     }
 
+    const ephemeralSandboxDestroyAfter = await this.ctx.storage.get<number>(
+      EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY
+    );
+    if (ephemeralSandboxDestroyAfter !== undefined) {
+      deadlines.push(ephemeralSandboxDestroyAfter);
+    }
+
     return deadlines;
   }
 
@@ -3098,5 +3159,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async handleWrapperTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
     await this.resolveSessionId();
     await this.getWrapperSupervisor().onTerminalEvent(params);
+    const metadata = await this.getMetadata();
+    if (!metadata) return;
+    if (!isCodeReviewEphemeralSandboxId(metadata.workspace?.sandboxId)) return;
+    await this.getWrapperSupervisor().requestPhysicalWrapperStop('terminal-ended', {
+      kind: 'session',
+    });
+    await this.scheduleEphemeralSandboxDestroy(CODE_REVIEW_EPHEMERAL_SANDBOX_DESTROY_DELAY_MS);
   }
 }

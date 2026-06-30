@@ -53,6 +53,7 @@ export type SandboxId =
   | `bot-${string}`
   | `ubt-${string}`
   | `ses-${string}`
+  | `crv-${string}`
   | `dind-${string}`
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
@@ -217,6 +218,8 @@ export type Env = {
   SandboxSmall: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for Docker-in-Docker per-session sandbox containers (standard-3) */
   SandboxDIND: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for ephemeral Code Reviewer sandbox containers (standard-3) */
+  SandboxCodeReview: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
@@ -270,6 +273,8 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** Comma-separated org IDs that use ephemeral Code Reviewer sandbox containers */
+  CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

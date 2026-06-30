@@ -55,6 +55,7 @@
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
+    "CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS": "",
   },
   "placement": { "mode": "smart" },
   /**
@@ -172,6 +173,16 @@
       "max_instances": 20,
       "rollout_active_grace_period": 1800,
     },
+    {
+      "class_name": "SandboxCodeReview",
+      "image": "./Dockerfile",
+      "instance_type": "standard-3",
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "7.3.21",
+      },
+      "max_instances": 300,
+      "rollout_active_grace_period": 1800,
+    },
   ],
   "durable_objects": {
     "bindings": [
@@ -186,6 +197,10 @@
       {
         "class_name": "SandboxDIND",
         "name": "SandboxDIND",
+      },
+      {
+        "class_name": "SandboxCodeReview",
+        "name": "SandboxCodeReview",
       },
       {
         "class_name": "CloudAgentSession",
@@ -217,6 +232,10 @@
     {
       "new_sqlite_classes": ["UserKiloFacade"],
       "tag": "v5",
+    },
+    {
+      "new_sqlite_classes": ["SandboxCodeReview"],
+      "tag": "v6",
     },
   ],
   /**
@@ -301,6 +320,7 @@
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
         "PER_SESSION_SANDBOX_ORG_IDS": "*",
+        "CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS": "",
       },
       "services": [
         {
@@ -363,6 +383,16 @@
           "max_instances": 2,
           "rollout_active_grace_period": 60,
         },
+        {
+          "class_name": "SandboxCodeReview",
+          "image": "./Dockerfile.dev",
+          "instance_type": "standard-3",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.21",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 60,
+        },
       ],
       "durable_objects": {
         "bindings": [
@@ -377,6 +407,10 @@
           {
             "class_name": "SandboxDIND",
             "name": "SandboxDIND",
+          },
+          {
+            "class_name": "SandboxCodeReview",
+            "name": "SandboxCodeReview",
           },
           {
             "class_name": "CloudAgentSession",

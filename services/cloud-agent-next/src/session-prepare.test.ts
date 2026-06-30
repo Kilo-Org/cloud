@@ -727,7 +727,11 @@ describe('prepareSession endpoint', () => {
       'test-user-123',
       'agent_12345678-1234-1234-1234-123456789abc',
       undefined,
-      true
+      {
+        codeReviewEphemeralSandboxOrgIds: undefined,
+        createdOnPlatform: undefined,
+        devcontainer: true,
+      }
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({

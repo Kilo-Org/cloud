@@ -160,7 +160,11 @@ async function allocateNewSession(
       ctx.userId,
       cloudAgentSessionId,
       ctx.botId,
-      input.runtime?.devcontainer
+      {
+        devcontainer: input.runtime?.devcontainer,
+        createdOnPlatform: input.options?.createdOnPlatform,
+        codeReviewEphemeralSandboxOrgIds: ctx.env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
+      }
     );
     if (target.kind === 'shared') {
       const assignment = await resolveSharedSandboxAssignment(

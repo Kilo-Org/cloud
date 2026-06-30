@@ -373,16 +373,97 @@ describe('generateSandboxId', () => {
       expect(id).toMatch(/^org-/);
     });
   });
+
+  describe('Code Reviewer ephemeral sandbox', () => {
+    it('routes enabled Code Reviewer organizations to dedicated crv sandboxes', async () => {
+      const target = await generateSandboxRoutingTarget(
+        undefined,
+        'org-review',
+        'user-id',
+        'agent_abc123',
+        undefined,
+        {
+          createdOnPlatform: 'code-review',
+          codeReviewEphemeralSandboxOrgIds: 'org-review',
+        }
+      );
+
+      expect(target).toEqual({
+        kind: 'isolated',
+        sandboxId: 'crv-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
+      });
+    });
+
+    it('keeps disabled Code Reviewer organizations on the existing route', async () => {
+      const target = await generateSandboxRoutingTarget(
+        undefined,
+        'org-review',
+        'user-id',
+        'agent_abc123',
+        undefined,
+        {
+          createdOnPlatform: 'code-review',
+          codeReviewEphemeralSandboxOrgIds: 'other-org',
+        }
+      );
+
+      expect(target).toEqual({
+        kind: 'shared',
+        routeKey: expect.stringMatching(/^org-/),
+      });
+    });
+
+    it('matches orgless Code Reviewer sessions only with wildcard', async () => {
+      await expect(
+        generateSandboxRoutingTarget(undefined, undefined, 'user-id', 'agent_abc123', undefined, {
+          createdOnPlatform: 'code-review',
+          codeReviewEphemeralSandboxOrgIds: 'org-review',
+        })
+      ).resolves.toEqual({
+        kind: 'shared',
+        routeKey: expect.stringMatching(/^usr-/),
+      });
+
+      await expect(
+        generateSandboxRoutingTarget(undefined, undefined, 'user-id', 'agent_abc123', undefined, {
+          createdOnPlatform: 'code-review',
+          codeReviewEphemeralSandboxOrgIds: '*',
+        })
+      ).resolves.toEqual({
+        kind: 'isolated',
+        sandboxId: 'crv-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
+      });
+    });
+
+    it('lets devcontainer routing take precedence over Code Reviewer ephemeral routing', async () => {
+      const id = await generateSandboxId(
+        undefined,
+        'org-review',
+        'user-id',
+        'agent_abc123',
+        undefined,
+        {
+          devcontainer: true,
+          createdOnPlatform: 'code-review',
+          codeReviewEphemeralSandboxOrgIds: '*',
+        }
+      );
+
+      expect(id).toBe('dind-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
+    });
+  });
 });
 
 describe('getSandboxNamespace', () => {
   const mockSandbox = {} as DurableObjectNamespace<Sandbox>;
   const mockSandboxSmall = {} as DurableObjectNamespace<Sandbox>;
   const mockSandboxDIND = {} as DurableObjectNamespace<Sandbox>;
+  const mockSandboxCodeReview = {} as DurableObjectNamespace<Sandbox>;
   const mockEnv = {
     Sandbox: mockSandbox,
     SandboxSmall: mockSandboxSmall,
     SandboxDIND: mockSandboxDIND,
+    SandboxCodeReview: mockSandboxCodeReview,
   } as unknown as Env;
 
   it('should return SandboxDIND for dind- prefixed IDs', () => {
@@ -396,6 +477,11 @@ describe('getSandboxNamespace', () => {
   it('should return SandboxSmall for ses- prefixed IDs', () => {
     const ns = getSandboxNamespace(mockEnv, 'ses-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
     expect(ns).toBe(mockSandboxSmall);
+  });
+
+  it('should return SandboxCodeReview for crv- prefixed IDs', () => {
+    const ns = getSandboxNamespace(mockEnv, 'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
+    expect(ns).toBe(mockSandboxCodeReview);
   });
 
   it('should return Sandbox for org- prefixed IDs', () => {

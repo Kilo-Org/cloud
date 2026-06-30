@@ -285,7 +285,11 @@ export function createSessionManagementHandlers() {
               sessionMetadata.identity.orgId,
               userId,
               sessionMetadata.identity.sessionId,
-              sessionMetadata.identity.botId
+              sessionMetadata.identity.botId,
+              {
+                createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
+                codeReviewEphemeralSandboxOrgIds: env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
+              }
             ));
 
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
@@ -390,7 +394,11 @@ export function createSessionManagementHandlers() {
               metadata.identity.orgId,
               userId,
               metadata.identity.sessionId,
-              metadata.identity.botId
+              metadata.identity.botId,
+              {
+                createdOnPlatform: metadata.identity.createdOnPlatform,
+                codeReviewEphemeralSandboxOrgIds: env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
+              }
             ));
 
           logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
@@ -406,14 +414,23 @@ export function createSessionManagementHandlers() {
           const activeExecutionStatus = activeMessageWork?.status;
           const executionHealth = activeMessageWork?.health ?? 'none';
 
-          let sandboxStatus: 'healthy' | 'unreachable' = 'healthy';
-          try {
-            await createAgentSandbox(env, metadata).probeHealth();
-          } catch (error) {
-            sandboxStatus = 'unreachable';
-            logger
-              .withFields({ error: error instanceof Error ? error.message : String(error) })
-              .warn('Sandbox health probe failed');
+          const cleanupScheduled = await withDORetry(
+            getStub,
+            s => s.isSandboxCleanupScheduled(),
+            'isSandboxCleanupScheduled'
+          );
+          let sandboxStatus: 'healthy' | 'destroyed' | 'unreachable' = cleanupScheduled
+            ? 'destroyed'
+            : 'healthy';
+          if (!cleanupScheduled) {
+            try {
+              await createAgentSandbox(env, metadata).probeHealth();
+            } catch (error) {
+              sandboxStatus = 'unreachable';
+              logger
+                .withFields({ error: error instanceof Error ? error.message : String(error) })
+                .warn('Sandbox health probe failed');
+            }
           }
 
           logger.info('Session health retrieved successfully', {

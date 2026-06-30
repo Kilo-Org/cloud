@@ -15,7 +15,7 @@ import {
 const SandboxIdSchema = z
   .string()
   .refine(
-    s => /^(ses|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
+    s => /^(ses|crv|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
     'Invalid sandboxId format'
   )
   .transform(s => s as SandboxId);

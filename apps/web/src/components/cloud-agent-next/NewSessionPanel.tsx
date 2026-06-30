@@ -676,17 +676,8 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
             organizationId,
             forceRefresh: false,
           });
-        switch (result.status) {
-          case 'available':
-          case 'not_connected':
-          case 'workspace_selection_required':
-          case 'reconnect_required':
-          case 'invalid_request':
-          case 'insufficient_permissions':
-            queryClient.setQueryData(repositoryQueryKey, result);
-            break;
-          case 'temporarily_unavailable':
-            break;
+        if (shouldCacheBitbucketRepositoryRefreshResult(result.status)) {
+          queryClient.setQueryData(repositoryQueryKey, result);
         }
 
         void queryClient.invalidateQueries({
@@ -718,12 +709,13 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       return;
     }
 
-    const result = await queryClient.fetchQuery(
-      trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
+    const result = await queryClient.fetchQuery({
+      ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
         organizationId,
         forceRefresh: true,
-      })
-    );
+      }),
+      staleTime: 0,
+    });
     if (shouldCacheBitbucketRepositoryRefreshResult(result.status)) {
       queryClient.setQueryData(
         trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey({

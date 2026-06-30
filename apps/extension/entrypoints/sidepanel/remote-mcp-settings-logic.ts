@@ -29,22 +29,37 @@ export const validateDraftAuth = (auth: RemoteMcpAuth): string | null => {
 export const validateDraft = (draft: RemoteMcpServerDraft): string | null =>
   validateDraftUrl(draft.url) ?? validateDraftAuth(draft.auth);
 
-const buildAuth = (fields: {
-  authType: 'none' | 'bearer' | 'header' | 'oauth';
-  bearerToken: string;
-  headerName: string;
-  headerValue: string;
-}): RemoteMcpAuth => {
+const buildAuth = (
+  fields: {
+    authType: 'none' | 'bearer' | 'header' | 'oauth';
+    bearerToken: string;
+    headerName: string;
+    headerValue: string;
+  },
+  existingAuth?: RemoteMcpAuth
+): RemoteMcpAuth => {
   switch (fields.authType) {
     case 'bearer': {
-      return fields.bearerToken.length > 0
-        ? { token: fields.bearerToken, type: 'bearer' }
-        : { type: 'bearer' };
+      if (fields.bearerToken.length > 0) {
+        return { token: fields.bearerToken, type: 'bearer' };
+      }
+      if (existingAuth?.type === 'bearer' && existingAuth.token !== undefined) {
+        return { token: existingAuth.token, type: 'bearer' };
+      }
+      return { type: 'bearer' };
     }
     case 'header': {
-      return fields.headerValue.length > 0
-        ? { headerName: fields.headerName, headerValue: fields.headerValue, type: 'header' }
-        : { headerName: fields.headerName, type: 'header' };
+      if (fields.headerValue.length > 0) {
+        return { headerName: fields.headerName, headerValue: fields.headerValue, type: 'header' };
+      }
+      if (existingAuth?.type === 'header' && existingAuth.headerValue !== undefined) {
+        return {
+          headerName: fields.headerName,
+          headerValue: existingAuth.headerValue,
+          type: 'header',
+        };
+      }
+      return { headerName: fields.headerName, type: 'header' };
     }
     case 'oauth': {
       return { type: 'oauth' };
@@ -55,19 +70,22 @@ const buildAuth = (fields: {
   }
 };
 
-export const buildDraftFromForm = (fields: {
-  displayName: string;
-  url: string;
-  authType: 'none' | 'bearer' | 'header' | 'oauth';
-  bearerToken: string;
-  headerName: string;
-  headerValue: string;
-  enabled: boolean;
-  allowInSafeMode: boolean;
-  id?: string;
-}): RemoteMcpServerDraft => ({
+export const buildDraftFromForm = (
+  fields: {
+    displayName: string;
+    url: string;
+    authType: 'none' | 'bearer' | 'header' | 'oauth';
+    bearerToken: string;
+    headerName: string;
+    headerValue: string;
+    enabled: boolean;
+    allowInSafeMode: boolean;
+    id?: string;
+  },
+  existingAuth?: RemoteMcpAuth
+): RemoteMcpServerDraft => ({
   allowInSafeMode: fields.allowInSafeMode,
-  auth: buildAuth(fields),
+  auth: buildAuth(fields, existingAuth),
   displayName: fields.displayName,
   enabled: fields.enabled,
   url: fields.url,

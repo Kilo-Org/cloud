@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { RemoteMcpStore } from '../../src/shared/remote-mcp';
 import {
   applyUpsert,
+  buildDraftFromForm,
   formatLastConnected,
   formatToolCount,
   getConnectButtonLabel,
@@ -180,6 +181,68 @@ describe('remote-mcp-settings pure logic', () => {
 
     it('returns empty array JSON for no tools', () => {
       expect(toolsToJsonString([])).toBe('[]');
+    });
+  });
+
+  describe('draft from form', () => {
+    const baseFields = {
+      allowInSafeMode: false,
+      bearerToken: '',
+      displayName: 'Test',
+      enabled: true,
+      headerName: 'X-Key',
+      headerValue: '',
+      url: 'https://example.com/mcp',
+    };
+
+    it('bearer edit — empty field + existing token preserves existing token', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'bearer' },
+        { token: 'saved-tok', type: 'bearer' }
+      );
+      expect(draft.auth).toStrictEqual({ token: 'saved-tok', type: 'bearer' });
+    });
+
+    it('bearer edit — new value typed overrides existing token', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'bearer', bearerToken: 'new-tok' },
+        { token: 'saved-tok', type: 'bearer' }
+      );
+      expect(draft.auth).toStrictEqual({ token: 'new-tok', type: 'bearer' });
+    });
+
+    it('header edit — empty field + existing headerValue preserves existing value', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'header' },
+        { headerName: 'X-Key', headerValue: 'saved-val', type: 'header' }
+      );
+      expect(draft.auth).toStrictEqual({
+        headerName: 'X-Key',
+        headerValue: 'saved-val',
+        type: 'header',
+      });
+    });
+
+    it('header edit — new value typed overrides existing value', () => {
+      const draft = buildDraftFromForm(
+        { ...baseFields, authType: 'header', headerValue: 'new-val' },
+        { headerName: 'X-Key', headerValue: 'saved-val', type: 'header' }
+      );
+      expect(draft.auth).toStrictEqual({
+        headerName: 'X-Key',
+        headerValue: 'new-val',
+        type: 'header',
+      });
+    });
+
+    it('add-new bearer with token — token present', () => {
+      const draft = buildDraftFromForm({ ...baseFields, authType: 'bearer', bearerToken: 'tok' });
+      expect(draft.auth).toStrictEqual({ token: 'tok', type: 'bearer' });
+    });
+
+    it('add-new bearer with empty token — no token field', () => {
+      const draft = buildDraftFromForm({ ...baseFields, authType: 'bearer' });
+      expect(draft.auth).toStrictEqual({ type: 'bearer' });
     });
   });
 

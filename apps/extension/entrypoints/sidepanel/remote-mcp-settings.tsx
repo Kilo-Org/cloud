@@ -129,7 +129,7 @@ const ServerForm = ({
 
   const handleSubmit = async (ev: { preventDefault: () => void }): Promise<void> => {
     ev.preventDefault();
-    const draft = buildDraftFromForm(form);
+    const draft = buildDraftFromForm(form, existingServer?.auth);
     const validationError = validateDraft(draft);
     if (validationError !== null) {
       setError(validationError);
@@ -312,8 +312,11 @@ const ServerRow = ({
 
   const handleConnect = async (): Promise<void> => {
     setConnecting(true);
-    await onConnect(server);
-    setConnecting(false);
+    try {
+      await onConnect(server);
+    } finally {
+      setConnecting(false);
+    }
   };
 
   return (
@@ -336,7 +339,8 @@ const ServerRow = ({
           </button>
           <p className="ml-5 truncate text-xs text-zinc-500">{server.url}</p>
           <p className="ml-5 text-xs text-zinc-500">
-            {formatToolCount(server.cachedTools.length)} · {formatLastConnected(server.lastConnectedAt)}
+            {formatToolCount(server.cachedTools.length)} ·{' '}
+            {formatLastConnected(server.lastConnectedAt)}
           </p>
           {server.lastError === undefined ? null : (
             <p className="ml-5 truncate text-xs text-red-400">{server.lastError}</p>
@@ -376,7 +380,9 @@ const ServerRow = ({
       </div>
       {expanded && server.cachedTools.length > 0 ? (
         <div className="mt-2 overflow-x-auto">
-          <pre className="font-mono text-xs text-zinc-400">{toolsToJsonString(server.cachedTools)}</pre>
+          <pre className="font-mono text-xs text-zinc-400">
+            {toolsToJsonString(server.cachedTools)}
+          </pre>
         </div>
       ) : null}
     </div>
@@ -411,7 +417,7 @@ export const RemoteMcpSettings = (): JSX.Element => {
   };
 
   const handleSave = async (form: FormState): Promise<string | null> => {
-    const draft = buildDraftFromForm(form);
+    const draft = buildDraftFromForm(form, editingServer?.auth);
     const { store: nextStore, error } = applyUpsert(store, draft);
     if (error !== null) {
       return error;

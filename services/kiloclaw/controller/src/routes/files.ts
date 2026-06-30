@@ -14,7 +14,6 @@ import {
 import {
   OPENCLAW_EXPORT_FORMATS,
   OPENCLAW_EXPORT_MAX_ARCHIVE_BYTES,
-  OPENCLAW_EXPORT_WORKSPACE_DIR,
   OpenclawExportError,
   buildOpenclawWorkspaceTarGz,
   buildOpenclawWorkspaceZip,
@@ -856,19 +855,9 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
       );
     }
 
-    let workspaceDir: string;
-    try {
-      workspaceDir = resolveSafePath(OPENCLAW_EXPORT_WORKSPACE_DIR, rootDir);
-    } catch (err) {
-      if (err instanceof SafePathError) {
-        return c.json({ error: err.message, code: 'openclaw_export_invalid_path' }, 400);
-      }
-      throw err;
-    }
-
     let collection;
     try {
-      collection = collectOpenclawWorkspaceFiles(workspaceDir);
+      collection = collectOpenclawWorkspaceFiles(rootDir);
     } catch (error) {
       if (error instanceof OpenclawExportError) {
         return c.json({ error: error.message, code: error.code }, error.status);

@@ -159,9 +159,9 @@ export function OpenclawExportCard({
         <div>
           <p className="text-sm font-medium">OpenClaw Export</p>
           <p className="text-muted-foreground text-xs">
-            Download your workspace — profile, instructions, memory, skills, and canvas — to move it
-            to another OpenClaw. Does not include credentials, channels, sessions, config, or
-            secrets.
+            Download your workspace text — profile, instructions, and memory — to move it to another
+            OpenClaw. Skill and canvas files aren't included, but you get a list of installed skills
+            to reinstall. Does not include credentials, channels, sessions, config, or secrets.
           </p>
         </div>
       </div>

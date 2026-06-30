@@ -8,6 +8,7 @@ import {
   Uint8ArrayWriter,
   ZipWriter,
 } from '@zip.js/zip.js';
+import { resolveSafePath, verifyCanonicalized } from './safe-path';
 
 // zip.js spins up Web Workers by default for codec parallelism. The controller
 // runs as a single-file Node bundle with no worker entrypoint, so disable them
@@ -15,24 +16,37 @@ import {
 configureZip({ useWebWorkers: false });
 
 /** Workspace directory (relative to the controller rootDir, i.e. ~/.openclaw). */
-export const OPENCLAW_EXPORT_WORKSPACE_DIR = 'workspace';
+const OPENCLAW_EXPORT_WORKSPACE_DIR = 'workspace';
 
 export const OPENCLAW_EXPORT_FORMATS = ['tar.gz', 'zip'] as const;
 export type OpenclawExportFormat = (typeof OPENCLAW_EXPORT_FORMATS)[number];
 
-export const OPENCLAW_EXPORT_MAX_FILES = 2000;
-export const OPENCLAW_EXPORT_MAX_FILE_BYTES = 10 * 1024 * 1024; // per file
-export const OPENCLAW_EXPORT_MAX_TOTAL_BYTES = 50 * 1024 * 1024; // total uncompressed
+export const OPENCLAW_EXPORT_MAX_FILES = 5000;
+export const OPENCLAW_EXPORT_MAX_FILE_BYTES = 5 * 1024 * 1024; // per file
+const OPENCLAW_EXPORT_MAX_TOTAL_BYTES = 10 * 1024 * 1024; // total uncompressed
 // The produced archive must cross the Cloudflare Durable Object RPC boundary,
 // which caps serialized return values at 32 MiB. Keep headroom under that.
+// (Text-only exports stay far below this; the guard is defense-in-depth.)
 export const OPENCLAW_EXPORT_MAX_ARCHIVE_BYTES = 28 * 1024 * 1024;
 
-/** Directory names that are never exported (VCS metadata, deps, generated). */
-const EXCLUDED_DIR_NAMES = new Set(['.git', 'node_modules']);
-/** Exact file names that are never exported (OS junk). */
-const EXCLUDED_FILE_NAMES = new Set(['.DS_Store', 'Thumbs.db']);
-/** File-name suffixes that are never exported (transient/runtime). */
-const EXCLUDED_FILE_SUFFIXES = ['.tmp', '.swp', '.sock', '.pid', '.lock'];
+/** Only text/markdown is exported. Binary skill/canvas payloads are excluded. */
+const EXPORTED_FILE_EXTENSION = '.md';
+/**
+ * Directories never traversed by the markdown walk. `skills/` and `canvas/`
+ * hold the unbounded binary payloads we intentionally do not export; the
+ * installed-skill names are captured separately as a generated manifest.
+ */
+const EXCLUDED_DIR_NAMES = new Set(['.git', 'node_modules', 'skills', 'canvas']);
+
+/** Skills live under workspace/skills/<name>/SKILL.md. */
+const SKILLS_DIR_NAME = 'skills';
+const SKILL_MANIFEST_FILE = 'SKILL.md';
+/** Generated inventory file added to the archive (not a real workspace file). */
+export const OPENCLAW_EXPORT_SKILL_INVENTORY_PATH = 'INSTALLED_SKILLS.md';
+/** Skill descriptions can be paragraph-length; keep the inventory readable. */
+const SKILL_DESCRIPTION_MAX_LENGTH = 200;
+/** Upper bound on a SKILL.md read — only its frontmatter is consumed. */
+const SKILL_MANIFEST_MAX_BYTES = 256 * 1024;
 
 export class OpenclawExportError extends Error {
   readonly code: string;
@@ -54,35 +68,47 @@ export type OpenclawExportEntry = {
 export type OpenclawExportCollection = {
   entries: OpenclawExportEntry[];
   totalBytes: number;
-  /** Count of paths skipped by the exclusion rules (dirs/files/non-regular). */
+  /** Count of paths skipped (excluded dirs, non-markdown files, symlinks). */
   skippedCount: number;
 };
 
-function isExcludedFileName(name: string): boolean {
-  if (EXCLUDED_FILE_NAMES.has(name)) return true;
-  return EXCLUDED_FILE_SUFFIXES.some(suffix => name.toLowerCase().endsWith(suffix));
-}
-
 /**
- * Recursively collect regular files under the workspace directory, reading their
- * bytes into memory. Skips symlinks, excluded dirs/files, and non-regular files.
- * Enforces per-file, total-size, and file-count caps. Archive paths are relative
- * to the workspace root (no leading `workspace/`).
+ * Collect the user's portable, host-independent OpenClaw workspace as text.
  *
- * @param workspaceDir absolute path to ~/.openclaw/workspace
+ * Includes every markdown file under `~/.openclaw/workspace` (persona,
+ * instructions, and the `memory/` tree) plus a generated `INSTALLED_SKILLS.md`
+ * inventory of installed skills. Deliberately excludes the `skills/` and
+ * `canvas/` payloads (potentially many gigabytes of binaries/deps), VCS/dep
+ * metadata, symlinks, and any non-markdown file. Enforces per-file, total-size,
+ * and file-count caps. Archive paths are relative to the workspace root.
+ *
+ * @param rootDir absolute path to the controller root (~/.openclaw)
  */
-export function collectOpenclawWorkspaceFiles(workspaceDir: string): OpenclawExportCollection {
+export function collectOpenclawWorkspaceFiles(rootDir: string): OpenclawExportCollection {
   const entries: OpenclawExportEntry[] = [];
   let totalBytes = 0;
   let skippedCount = 0;
+
+  let workspaceDir: string;
+  try {
+    workspaceDir = resolveSafePath(OPENCLAW_EXPORT_WORKSPACE_DIR, rootDir);
+  } catch {
+    return { entries, totalBytes, skippedCount };
+  }
 
   if (!fs.existsSync(workspaceDir)) {
     return { entries, totalBytes, skippedCount };
   }
 
-  // Refuse to follow a symlinked workspace root.
-  const rootStat = fs.lstatSync(workspaceDir);
-  if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+  // Refuse a symlinked/non-directory root and confirm it canonicalizes inside
+  // rootDir (mirrors the import walker's symlink-ancestor defense).
+  try {
+    const rootStat = fs.lstatSync(workspaceDir);
+    if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
+      return { entries, totalBytes, skippedCount };
+    }
+    verifyCanonicalized(fs.realpathSync(workspaceDir), rootDir);
+  } catch {
     return { entries, totalBytes, skippedCount };
   }
 
@@ -122,12 +148,19 @@ export function collectOpenclawWorkspaceFiles(workspaceDir: string): OpenclawExp
         continue;
       }
 
-      if (isExcludedFileName(dirent.name)) {
+      // Text-only export: markdown only. Everything else is intentionally dropped.
+      if (!dirent.name.toLowerCase().endsWith(EXPORTED_FILE_EXTENSION)) {
         skippedCount += 1;
         continue;
       }
 
       const archivePath = path.relative(workspaceDir, absolutePath).split(path.sep).join('/');
+
+      // The inventory path is reserved for the generated skill manifest below.
+      if (archivePath === OPENCLAW_EXPORT_SKILL_INVENTORY_PATH) {
+        skippedCount += 1;
+        continue;
+      }
 
       let stat: fs.Stats;
       try {
@@ -174,10 +207,155 @@ export function collectOpenclawWorkspaceFiles(workspaceDir: string): OpenclawExp
     }
   }
 
+  // Append a generated inventory of installed skills (names/descriptions only —
+  // the skill code itself lives in the excluded skills/ tree).
+  const skillInventory = buildInstalledSkillInventory(workspaceDir);
+  if (skillInventory) {
+    const content = Buffer.from(skillInventory, 'utf8');
+    totalBytes += content.byteLength;
+    entries.push({ path: OPENCLAW_EXPORT_SKILL_INVENTORY_PATH, content });
+  }
+
   // Stable, deterministic ordering for reproducible archives.
   entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 
   return { entries, totalBytes, skippedCount };
+}
+
+type InstalledSkill = { name: string; description: string | null };
+
+/**
+ * Build a markdown inventory of skills installed under workspace/skills/.
+ * Returns null when there are no readable skills. Reads only the top-level
+ * skill directories' SKILL.md (never descends into skill internals/node_modules)
+ * and skips symlinks.
+ */
+function buildInstalledSkillInventory(workspaceDir: string): string | null {
+  const skillsDir = path.join(workspaceDir, SKILLS_DIR_NAME);
+
+  try {
+    const skillsStat = fs.lstatSync(skillsDir);
+    if (skillsStat.isSymbolicLink() || !skillsStat.isDirectory()) {
+      return null;
+    }
+  } catch {
+    return null; // no skills directory
+  }
+
+  let dirents: fs.Dirent[];
+  try {
+    dirents = fs.readdirSync(skillsDir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  const skills: InstalledSkill[] = [];
+  for (const dirent of dirents) {
+    if (dirent.isSymbolicLink() || !dirent.isDirectory()) continue;
+
+    const skillMdPath = path.join(skillsDir, dirent.name, SKILL_MANIFEST_FILE);
+    let skillMd: string;
+    try {
+      const stat = fs.lstatSync(skillMdPath);
+      if (stat.isSymbolicLink() || !stat.isFile()) continue;
+      // Only the frontmatter is needed; cap the read so a large/pathological
+      // SKILL.md can't exhaust memory on the way to a tiny inventory line.
+      if (stat.size > SKILL_MANIFEST_MAX_BYTES) continue;
+      skillMd = fs.readFileSync(skillMdPath, 'utf8');
+    } catch {
+      continue; // a directory with no readable SKILL.md is not a valid skill
+    }
+
+    const { name, description } = parseSkillFrontmatter(skillMd);
+    skills.push({ name: name ?? dirent.name, description });
+  }
+
+  if (skills.length === 0) {
+    return null;
+  }
+
+  skills.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+  const lines = [
+    '# Installed skills',
+    '',
+    'These skills were installed in your KiloClaw workspace when it was exported.',
+    'This is a reference inventory, not a backup — the skill code itself is not',
+    'included in this export. Re-install published skills on the target host, for',
+    'example with `openclaw skills install <name>`.',
+    '',
+  ];
+  for (const skill of skills) {
+    lines.push(
+      skill.description ? `- **${skill.name}** — ${skill.description}` : `- **${skill.name}**`
+    );
+  }
+  lines.push('');
+
+  return lines.join('\n');
+}
+
+/**
+ * Extract `name` and `description` from a SKILL.md YAML frontmatter block.
+ * Intentionally minimal: only these two top-level scalars are needed, and a
+ * missing/malformed block degrades to nulls (caller falls back to the folder
+ * name).
+ */
+function parseSkillFrontmatter(source: string): {
+  name: string | null;
+  description: string | null;
+} {
+  const normalized = source.replace(/^\uFEFF/, '');
+  const lines = normalized.split('\n');
+  if (lines[0]?.trim() !== '---') {
+    return { name: null, description: null };
+  }
+
+  let fenceEnd = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === '---') {
+      fenceEnd = i;
+      break;
+    }
+  }
+  if (fenceEnd === -1) {
+    return { name: null, description: null };
+  }
+
+  let name: string | null = null;
+  let description: string | null = null;
+  for (let i = 1; i < fenceEnd; i++) {
+    const nameMatch = /^name:\s*(.+)$/.exec(lines[i]);
+    if (nameMatch && name === null) {
+      name = cleanFrontmatterScalar(nameMatch[1]);
+      continue;
+    }
+    const descriptionMatch = /^description:\s*(.+)$/.exec(lines[i]);
+    if (descriptionMatch && description === null) {
+      description = cleanFrontmatterScalar(descriptionMatch[1]);
+    }
+  }
+
+  return {
+    name,
+    description: description ? truncate(description, SKILL_DESCRIPTION_MAX_LENGTH) : null,
+  };
+}
+
+function cleanFrontmatterScalar(raw: string): string | null {
+  let value = raw.trim();
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+  return value.length > 0 ? value : null;
+}
+
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
 /** Build a gzipped tar (.tar.gz) from the collected entries. */

@@ -242,6 +242,7 @@ const ServerForm = ({
                 set('headerName', ev.target.value);
               }}
               placeholder="X-Api-Key"
+              required
               type="text"
               value={form.headerName}
             />

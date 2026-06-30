@@ -15,7 +15,7 @@ WITH ranked AS (
 UPDATE "cloud_agent_code_reviews" AS r
 SET "status" = 'cancelled',
         "terminal_reason" = 'superseded',
-        "error_message" = 'Superseded by newer review (0175 unique-index backfill)',
+        "error_message" = 'Superseded by newer review (backfill)',
         "completed_at" = now(),
         "updated_at" = now()
 FROM ranked
@@ -23,7 +23,7 @@ WHERE r."id" = ranked."id" AND ranked.rn > 1;--> statement-breakpoint
 UPDATE "cloud_agent_code_review_attempts" AS a
 SET "status" = 'cancelled',
         "terminal_reason" = 'superseded',
-        "error_message" = 'Superseded by newer review (0175 unique-index backfill)',
+        "error_message" = 'Superseded by newer review (backfill)',
         "completed_at" = now(),
         "updated_at" = now()
 FROM "cloud_agent_code_reviews" AS r

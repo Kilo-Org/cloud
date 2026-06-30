@@ -1622,6 +1622,11 @@ async function cancelReviewsForPR(
     excludeSha === undefined
       ? sql``
       : sql`AND ${cloud_agent_code_reviews.head_sha} != ${excludeSha}`;
+  const platformIntegrationCondition =
+    scope.platformIntegrationId === undefined
+      ? sql``
+      : sql`AND ${cloud_agent_code_reviews.platform_integration_id} = ${scope.platformIntegrationId}
+            AND ${cloud_agent_code_reviews.manual_config} IS NULL`;
   const result = await database.execute<CancelledReviewDatabaseRow>(sql`
     WITH targets AS (
       SELECT
@@ -1647,6 +1652,7 @@ async function cancelReviewsForPR(
         AND ${cloud_agent_code_reviews.repo_full_name} = ${scope.repoFullName}
         AND ${cloud_agent_code_reviews.pr_number} = ${scope.prNumber}
         ${excludedHeadCondition}
+        ${platformIntegrationCondition}
         AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
     ), cancelled_attempts AS (
       UPDATE ${cloud_agent_code_review_attempts} AS attempts

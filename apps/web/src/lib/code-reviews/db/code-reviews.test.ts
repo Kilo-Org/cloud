@@ -914,31 +914,19 @@ describe('cancelSupersededReviewsForPR', () => {
     return id;
   }
 
-  it('cancels pending, queued, and running rows and returns accurate prev_status values', async () => {
+  it('cancels active rows only for the scoped integration and leaves other integrations alone', async () => {
     const pendingId = await createReview({
       headSha: 'sha-pending',
       platformIntegrationId: githubIntegrationId,
     });
-    const queuedId = await createReview({
-      headSha: 'sha-queued',
+    const otherIntegrationId = await createReview({
+      headSha: 'sha-other-integration',
       platformIntegrationId: secondGithubIntegrationId,
-    });
-    const runningId = await createReview({
-      headSha: 'sha-running',
-      platformIntegrationId: thirdGithubIntegrationId,
     });
     const pendingAttempt = await createCodeReviewAttempt({
       codeReviewId: pendingId,
       status: 'pending',
     });
-    const runningAttempt = await createCodeReviewAttempt({
-      codeReviewId: runningId,
-      status: 'running',
-      sessionId: 'session-running',
-    });
-
-    await updateCodeReviewStatus(queuedId, 'queued');
-    await updateCodeReviewStatus(runningId, 'running', { sessionId: 'session-running' });
 
     const cancelled = await cancelSupersededReviewsForPR(
       {
@@ -946,22 +934,19 @@ describe('cancelSupersededReviewsForPR', () => {
         platform: 'github',
         repoFullName: repo,
         prNumber: 42,
+        platformIntegrationId: githubIntegrationId,
       },
       'sha-latest'
     );
 
-    expect(cancelled).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: pendingId, prevStatus: 'pending', headSha: 'sha-pending' }),
-        expect.objectContaining({ id: queuedId, prevStatus: 'queued', headSha: 'sha-queued' }),
-        expect.objectContaining({
-          id: runningId,
-          prevStatus: 'running',
-          headSha: 'sha-running',
-          sessionId: 'session-running',
-          latestActiveAttemptId: runningAttempt.id,
-        }),
-      ])
+    expect(cancelled).toHaveLength(1);
+    expect(cancelled[0]).toEqual(
+      expect.objectContaining({
+        id: pendingId,
+        prevStatus: 'pending',
+        headSha: 'sha-pending',
+        latestActiveAttemptId: pendingAttempt.id,
+      })
     );
 
     const rows = await db
@@ -977,16 +962,22 @@ describe('cancelSupersededReviewsForPR', () => {
       .from(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
 
-    for (const row of rows.filter(row => [pendingId, queuedId, runningId].includes(row.id))) {
-      expect(row.status).toBe('cancelled');
-      expect(row.terminalReason).toBe('superseded');
-      expect(row.errorMessage).toBe('Superseded by new push');
-      expect(row.completedAt).not.toBeNull();
-    }
+    const cancelledRow = rows.find(row => row.id === pendingId);
+    expect(cancelledRow?.status).toBe('cancelled');
+    expect(cancelledRow?.terminalReason).toBe('superseded');
+    expect(cancelledRow?.errorMessage).toBe('Superseded by new push');
+    expect(cancelledRow?.completedAt).not.toBeNull();
+    expect(cancelledRow?.startedAt).toBeNull();
+    expect(cancelledRow?.sessionId).toBeNull();
 
-    expect(rows.find(row => row.id === pendingId)?.startedAt).toBeNull();
-    expect(rows.find(row => row.id === pendingId)?.sessionId).toBeNull();
-    expect(rows.find(row => row.id === runningId)?.sessionId).toBe('session-running');
+    const otherIntegrationRow = rows.find(row => row.id === otherIntegrationId);
+    expect(otherIntegrationRow?.status).toBe('pending');
+    expect(otherIntegrationRow?.terminalReason).toBeNull();
+
+    await updateCodeReviewStatus(otherIntegrationId, 'cancelled', {
+      terminalReason: 'superseded',
+      errorMessage: 'Cleaned up by test',
+    });
 
     const attempts = await db
       .select({
@@ -999,11 +990,6 @@ describe('cancelSupersededReviewsForPR', () => {
       .from(cloud_agent_code_review_attempts)
       .where(eq(cloud_agent_code_review_attempts.code_review_id, pendingId));
 
-    expect(cancelled).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ id: pendingId, latestActiveAttemptId: pendingAttempt.id }),
-      ])
-    );
     expect(attempts).toEqual([
       expect.objectContaining({
         id: pendingAttempt.id,

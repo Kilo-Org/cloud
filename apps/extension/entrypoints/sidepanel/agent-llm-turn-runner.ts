@@ -28,6 +28,11 @@ interface RunDangerousLlmTurnOptions {
   readonly updateThinkingBlock: (eventId: string, text: string) => void;
 }
 
+type DangerousToolCallEvent = ReturnType<typeof toDangerousToolCallEvents>[number];
+
+const executeDangerousToolCall = (toolCall: DangerousToolCallEvent) =>
+  toolCall.name === 'eval' ? executeEvalToolCall(toolCall) : executeSafeToolCall(toolCall);
+
 export const runDangerousLlmTurn = ({
   selectedTabId,
   supportsImages = false,
@@ -35,8 +40,7 @@ export const runDangerousLlmTurn = ({
 }: RunDangerousLlmTurnOptions): Promise<void> =>
   runLlmTurn({
     ...options,
-    executeToolCall: toolCall =>
-      toolCall.name === 'eval' ? executeEvalToolCall(toolCall) : executeSafeToolCall(toolCall),
+    executeToolCall: executeDangerousToolCall,
     failureMessage: error =>
       `LLM request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
     maxToolRounds: maxAgentToolRounds,

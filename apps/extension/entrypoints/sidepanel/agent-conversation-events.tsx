@@ -100,7 +100,9 @@ const ToolExchangeEvent = ({
         <span className={titleClassName}>
           {item.toolCall.name} {isSuccessful ? 'completed' : 'failed'}
         </span>
-        <span className={tabClassName}>tab {item.toolCall.tabId}</span>
+        <span className={tabClassName}>
+          {'serverName' in item.toolCall ? item.toolCall.serverName : `tab ${item.toolCall.tabId}`}
+        </span>
       </summary>
       <div className="mt-2 grid min-w-0 gap-2">
         {item.toolCall.name === 'eval' ? (

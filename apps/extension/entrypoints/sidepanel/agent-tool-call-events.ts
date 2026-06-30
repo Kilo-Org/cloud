@@ -4,7 +4,8 @@ import type { AgentConversationEvent, SafeToolName } from '@/src/shared/agent-co
 import type { KiloGatewayToolCallRequest } from '@/src/shared/kilo-api-client';
 
 type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
-type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
+type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
+type DangerousToolCallEvent = EvalToolCallEvent | SafeToolCallEvent;
 
 const stringArgumentSchema = z.string();
 
@@ -55,8 +56,8 @@ export const toSafeToolCallEvents = (
 export const toDangerousToolCallEvents = (
   toolCalls: KiloGatewayToolCallRequest[],
   selectedTabId: number
-): ToolCallEvent[] => {
-  const events: ToolCallEvent[] = [];
+): DangerousToolCallEvent[] => {
+  const events: DangerousToolCallEvent[] = [];
 
   for (const toolCall of toolCalls) {
     if (toolCall.name === 'eval') {

@@ -245,6 +245,23 @@ const getGatewayMessageText = (event: MessageEvent): string =>
   event.role === 'user' && event.systemEnvironment !== undefined
     ? `${event.text}\n\n${event.systemEnvironment}`
     : event.text;
+
+const getToolCallArguments = (toolCall: ToolCallEvent): string => {
+  if (toolCall.name === 'eval') {
+    return JSON.stringify({ code: toolCall.code });
+  }
+
+  if ('arguments' in toolCall) {
+    return JSON.stringify(toolCall.arguments);
+  }
+
+  return JSON.stringify({
+    ...(toolCall.elementId === undefined ? {} : { elementId: toolCall.elementId }),
+    ...(toolCall.query === undefined ? {} : { query: toolCall.query }),
+    ...(toolCall.snapshotId === undefined ? {} : { snapshotId: toolCall.snapshotId }),
+  });
+};
+
 export const buildGatewayMessagesFromEvents = (
   events: AgentConversationEvent[],
   { supportsImages = false }: { readonly supportsImages?: boolean } = {}
@@ -282,18 +299,7 @@ export const buildGatewayMessagesFromEvents = (
             role: 'assistant',
             tool_calls: toolCalls.map(toolCall => ({
               function: {
-                arguments:
-                  toolCall.name === 'eval'
-                    ? JSON.stringify({ code: toolCall.code })
-                    : JSON.stringify({
-                        ...(toolCall.elementId === undefined
-                          ? {}
-                          : { elementId: toolCall.elementId }),
-                        ...(toolCall.query === undefined ? {} : { query: toolCall.query }),
-                        ...(toolCall.snapshotId === undefined
-                          ? {}
-                          : { snapshotId: toolCall.snapshotId }),
-                      }),
+                arguments: getToolCallArguments(toolCall),
                 name: toolCall.name,
               },
               id: getProviderToolCallId(toolCall),

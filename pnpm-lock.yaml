@@ -1322,9 +1322,18 @@ importers:
 
   packages/trpc:
     dependencies:
+      '@kilocode/kilo-chat':
+        specifier: workspace:*
+        version: link:../kilo-chat
+      '@kilocode/kiloclaw-instance-tiers':
+        specifier: workspace:*
+        version: link:../kiloclaw-instance-tiers
       '@kilocode/kiloclaw-secret-catalog':
         specifier: workspace:*
         version: link:../kiloclaw-secret-catalog
+      '@kilocode/worker-utils':
+        specifier: workspace:*
+        version: link:../worker-utils
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.17.0(typescript@5.9.3)

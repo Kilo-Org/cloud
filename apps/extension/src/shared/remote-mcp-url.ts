@@ -16,6 +16,14 @@ export const normalizeRemoteMcpUrl = (value: string): string => {
     throw new Error('Remote MCP URL must be a valid URL.');
   }
 
+  if (url.username.length > 0 || url.password.length > 0) {
+    throw new Error('Remote MCP URL must not include credentials.');
+  }
+
+  if (url.hash.length > 0) {
+    throw new Error('Remote MCP URL must not include a fragment.');
+  }
+
   if (
     url.protocol !== 'https:' &&
     !(url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'))

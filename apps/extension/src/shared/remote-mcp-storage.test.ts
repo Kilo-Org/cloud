@@ -53,6 +53,15 @@ describe('remote MCP URL policy', () => {
       'Remote MCP URL must use HTTPS unless it points to localhost.'
     );
   });
+
+  it('rejects URL credentials and fragments', () => {
+    expect(() => normalizeRemoteMcpUrl('https://token@remote.example/mcp')).toThrow(
+      'Remote MCP URL must not include credentials.'
+    );
+    expect(() => normalizeRemoteMcpUrl('https://remote.example/mcp#tools')).toThrow(
+      'Remote MCP URL must not include a fragment.'
+    );
+  });
 });
 
 describe('remote MCP storage', () => {
@@ -72,6 +81,46 @@ describe('remote MCP storage', () => {
       servers: [{ ...savedServer, id: 'normalized-url', url: 'https://remote.example/mcp' }],
     });
     expect(normalizeRemoteMcpStore({ wrong: true })).toStrictEqual({ servers: [] });
+  });
+
+  it('keeps the first server when persisted normalized URLs collide', () => {
+    expect(
+      normalizeRemoteMcpStore({
+        servers: [
+          { ...savedServer, id: 'first', url: 'https://remote.example/mcp/' },
+          { ...savedServer, id: 'second', url: 'https://remote.example/mcp' },
+          { ...savedServer, id: 'third', url: 'https://other.example/mcp' },
+        ],
+      })
+    ).toStrictEqual({
+      servers: [
+        { ...savedServer, id: 'first', url: 'https://remote.example/mcp' },
+        { ...savedServer, id: 'third', url: 'https://other.example/mcp' },
+      ],
+    });
+  });
+
+  it('strips unknown persisted fields instead of dropping otherwise valid entries', () => {
+    expect(
+      normalizeRemoteMcpStore({
+        futureStoreField: true,
+        servers: [
+          {
+            ...savedServer,
+            auth: { futureAuthField: true, token: 'token-1', type: 'bearer' },
+            cachedTools: [
+              {
+                description: 'Tool',
+                futureToolField: true,
+                inputSchema: { type: 'object' },
+                name: 'tool',
+              },
+            ],
+            futureServerField: true,
+          },
+        ],
+      })
+    ).toStrictEqual({ servers: [savedServer] });
   });
 
   it('loads and saves through the sign-out-covered local storage key', async () => {

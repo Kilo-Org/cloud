@@ -34,18 +34,18 @@ const oauthStateSchema = z
     expiresAt: nonEmptyStringSchema.optional(),
     tokenType: nonEmptyStringSchema.optional(),
   })
-  .strict();
+  .strip();
 const authSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('none') }).strict(),
-  z.object({ token: nonEmptyStringSchema.optional(), type: z.literal('bearer') }).strict(),
+  z.object({ type: z.literal('none') }).strip(),
+  z.object({ token: nonEmptyStringSchema.optional(), type: z.literal('bearer') }).strip(),
   z
     .object({
       headerName: nonEmptyStringSchema,
       headerValue: nonEmptyStringSchema.optional(),
       type: z.literal('header'),
     })
-    .strict(),
-  z.object({ oauth: oauthStateSchema.optional(), type: z.literal('oauth') }).strict(),
+    .strip(),
+  z.object({ oauth: oauthStateSchema.optional(), type: z.literal('oauth') }).strip(),
 ]);
 const cachedToolSchema = z
   .object({
@@ -53,7 +53,7 @@ const cachedToolSchema = z
     inputSchema: z.record(z.string(), z.unknown()),
     name: nonEmptyStringSchema,
   })
-  .strict();
+  .strip();
 const statusSchema = z.enum(['connected', 'needs_auth', 'unavailable', 'untested']);
 const serverSchema = z
   .object({
@@ -69,8 +69,8 @@ const serverSchema = z
     status: statusSchema,
     url: nonEmptyStringSchema,
   })
-  .strict();
-const storeSchema = z.object({ servers: z.array(z.unknown()) }).strict();
+  .strip();
+const storeSchema = z.object({ servers: z.array(z.unknown()) }).strip();
 
 const toRemoteMcpAuth = (auth: z.infer<typeof authSchema>): RemoteMcpAuth => {
   switch (auth.type) {
@@ -134,6 +134,8 @@ export const normalizeRemoteMcpStore = (value: unknown): RemoteMcpStore => {
     return { servers: [] };
   }
 
+  const urls = new Set<string>();
+
   return {
     servers: parsed.data.servers.flatMap(server => {
       const parsedServer = serverSchema.safeParse(server);
@@ -142,7 +144,12 @@ export const normalizeRemoteMcpStore = (value: unknown): RemoteMcpStore => {
       }
 
       const normalizedServer = toRemoteMcpServer(parsedServer.data);
-      return normalizedServer === undefined ? [] : [normalizedServer];
+      if (normalizedServer === undefined || urls.has(normalizedServer.url)) {
+        return [];
+      }
+
+      urls.add(normalizedServer.url);
+      return [normalizedServer];
     }),
   };
 };

@@ -34,18 +34,21 @@ export const getOpenRouterModelsMetadata = createStoredModelsFetcher(
   'OpenRouter'
 );
 
-function toLanguageModelIdSet(models: StoredModelMap): ReadonlySet<string> {
-  return new Set(
-    Object.values(models)
-      .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length > 0)
-      .map(model => model.id)
-  );
+/**
+ * The ids of language models that have at least one endpoint. This is the list
+ * mirrored to the lightweight `*-model-ids` Redis keys so existence checks can
+ * avoid loading the full model catalog.
+ */
+export function getLanguageModelIds(models: StoredModelMap): string[] {
+  return Object.values(models)
+    .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length > 0)
+    .map(model => model.id);
 }
 
 export async function getVercelModels(): Promise<ReadonlySet<string>> {
-  return toLanguageModelIdSet(await getVercelModelsMetadata());
+  return new Set(getLanguageModelIds(await getVercelModelsMetadata()));
 }
 
 export async function getOpenRouterModels(): Promise<ReadonlySet<string>> {
-  return toLanguageModelIdSet(await getOpenRouterModelsMetadata());
+  return new Set(getLanguageModelIds(await getOpenRouterModelsMetadata()));
 }

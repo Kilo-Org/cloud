@@ -7,7 +7,6 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "deploy:prod": "wrangler deploy --env=\"\" --outdir dist --var SENTRY_RELEASE:$(sentry-cli releases propose-version)",
-    "postdeploy:prod": "pnpm sentry:sourcemaps",
     "deploy:dev": "wrangler deploy --env dev",
     "sentry:sourcemaps": "_SENTRY_RELEASE=$(sentry-cli releases propose-version) && sentry-cli releases new $_SENTRY_RELEASE --org=kilo-code --project=wasteland-service && sentry-cli sourcemaps upload --org=kilo-code --project=wasteland-service --release=$_SENTRY_RELEASE --strip-prefix 'dist/..' dist",
     "dev": "wrangler dev --env dev",

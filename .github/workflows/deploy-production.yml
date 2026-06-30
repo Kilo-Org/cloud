@@ -280,7 +280,7 @@ jobs:
       - name: Upload Wasteland source maps
         if: needs.detect-gastown-wasteland-changes.outputs.deploy_wasteland == 'true'
         continue-on-error: true
-        run: pnpm --filter cloudflare-wasteland postdeploy:prod
+        run: pnpm --filter cloudflare-wasteland sentry:sourcemaps
 
       - name: Deploy Gastown
         if: needs.detect-gastown-wasteland-changes.outputs.deploy_gastown == 'true'
@@ -289,7 +289,7 @@ jobs:
       - name: Upload Gastown source maps
         if: needs.detect-gastown-wasteland-changes.outputs.deploy_gastown == 'true'
         continue-on-error: true
-        run: pnpm --filter cloudflare-gastown postdeploy:prod
+        run: pnpm --filter cloudflare-gastown sentry:sourcemaps
 
   deploy-kiloclaw:
     needs: [check-production-db-startup, run-migrations]

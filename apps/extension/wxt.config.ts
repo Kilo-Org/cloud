@@ -26,8 +26,8 @@ export default defineConfig({
     name: 'Kilo Extension',
     permissions:
       browser === 'firefox'
-        ? ['scripting', 'storage', 'tabs']
-        : ['debugger', 'scripting', 'storage'],
+        ? ['identity', 'scripting', 'storage', 'tabs']
+        : ['debugger', 'identity', 'scripting', 'storage'],
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({

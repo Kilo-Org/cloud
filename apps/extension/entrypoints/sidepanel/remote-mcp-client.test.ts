@@ -8,10 +8,11 @@ const mocks = vi.hoisted(() => {
   const listTools = vi.fn<() => Promise<{ tools: unknown[] }>>();
   const callTool = vi.fn<() => Promise<unknown>>();
   const close = vi.fn<() => Promise<void>>();
+  const finishAuth = vi.fn<(code: string) => Promise<void>>();
   // Captures args passed to new StreamableHTTPClientTransport(url, opts)
   const transportCalls: { opts: unknown; url: URL }[] = [];
 
-  return { callTool, close, connect, listTools, transportCalls };
+  return { callTool, close, connect, finishAuth, listTools, transportCalls };
 });
 
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
@@ -26,6 +27,17 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => {
   return { Client };
 });
 
+// remote-mcp-client transitively imports the OAuth provider, which imports `browser`.
+// eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
+vi.mock('#imports', () => ({
+  browser: {
+    identity: {
+      getRedirectURL: () => 'https://abc.chromiumapp.org/remote-mcp',
+      launchWebAuthFlow: () => Promise.resolve('https://abc.chromiumapp.org/remote-mcp?code=x'),
+    },
+  },
+}));
+
 vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => {
   class StreamableHTTPError extends Error {
     readonly code: number | undefined;
@@ -36,7 +48,11 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => {
   }
   class StreamableHTTPClientTransport {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    authProvider?: any;
+    finishAuth = mocks.finishAuth;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(url: URL, opts?: any) {
+      this.authProvider = opts?.authProvider;
       mocks.transportCalls.push({ opts, url });
     }
   }
@@ -267,6 +283,59 @@ describe('connectRemoteMcpServer', () => {
     expect(result.status).toBe('unavailable');
     expect(result.lastError).toBeTruthy();
     expect(result.cachedTools).toHaveLength(0);
+  });
+
+  it('runs the oauth flow and retries connect on UnauthorizedError', async () => {
+    const { UnauthorizedError } = await import('@modelcontextprotocol/sdk/client/auth.js');
+    const oauthServer = baseServer({ auth: { type: 'oauth' } });
+    const storageArea = {
+      getItem: () => ({ servers: [oauthServer] }),
+      setItem: () => {},
+    };
+
+    mocks.connect.mockClear();
+    mocks.finishAuth.mockClear();
+    // First connect simulates the SDK: redirect the user, then throw Unauthorized.
+    mocks.connect.mockImplementationOnce(async () => {
+      const provider = lastTransportCall().opts as {
+        authProvider?: { redirectToAuthorization(url: URL): Promise<void> };
+      };
+      await provider.authProvider?.redirectToAuthorization(
+        new URL('https://auth.example.com/authorize')
+      );
+      throw new UnauthorizedError('needs auth');
+    });
+    // Second connect (after finishAuth) succeeds.
+    mocks.connect.mockResolvedValueOnce(undefined);
+    mocks.finishAuth.mockResolvedValueOnce(undefined);
+    mocks.listTools.mockResolvedValueOnce({ tools: [] });
+    mocks.close.mockResolvedValueOnce(undefined);
+
+    const result = await connectRemoteMcpServer({
+      fetch: noopFetch,
+      server: oauthServer,
+      storageArea,
+    });
+
+    // launchWebAuthFlow returns ...?code=x, so finishAuth is called with that code.
+    expect(mocks.finishAuth).toHaveBeenCalledWith('x');
+    expect(mocks.connect).toHaveBeenCalledTimes(2);
+    expect(result.status).toBe('connected');
+  });
+
+  it('maps UnauthorizedError to needs_auth when no code is captured', async () => {
+    const { UnauthorizedError } = await import('@modelcontextprotocol/sdk/client/auth.js');
+    const oauthServer = baseServer({ auth: { type: 'oauth' } });
+    mocks.connect.mockRejectedValueOnce(new UnauthorizedError('nope'));
+    mocks.close.mockResolvedValueOnce(undefined);
+
+    const result = await connectRemoteMcpServer({
+      fetch: noopFetch,
+      server: oauthServer,
+      storageArea: { getItem: () => ({ servers: [oauthServer] }), setItem: () => {} },
+    });
+
+    expect(result.status).toBe('needs_auth');
   });
 });
 

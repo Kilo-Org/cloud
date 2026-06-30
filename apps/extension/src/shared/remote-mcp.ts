@@ -1,9 +1,20 @@
+import type {
+  OAuthClientInformationMixed,
+  OAuthTokens,
+} from '@modelcontextprotocol/sdk/shared/auth.js';
+
 export type RemoteMcpStatus = 'connected' | 'needs_auth' | 'unavailable' | 'untested';
 
 export interface RemoteMcpOAuthState {
   readonly authorizationUrl?: string | undefined;
   readonly expiresAt?: string | undefined;
   readonly tokenType?: string | undefined;
+  /** Dynamic client registration returned by the authorization server. */
+  readonly clientInformation?: OAuthClientInformationMixed | undefined;
+  /** Access/refresh tokens issued for this server. */
+  readonly tokens?: OAuthTokens | undefined;
+  /** PKCE code verifier kept between redirect and token exchange. */
+  readonly codeVerifier?: string | undefined;
 }
 
 export type RemoteMcpAuth =

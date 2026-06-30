@@ -28,11 +28,34 @@ export type RemoteMcpServerDraft = Pick<
   >;
 
 const nonEmptyStringSchema = z.string().min(1);
+// SDK OAuthClientInformation: client_id is required; other fields are optional.
+const oauthClientInformationSchema = z
+  .object({
+    client_id: nonEmptyStringSchema,
+    client_id_issued_at: z.number().optional(),
+    client_secret: nonEmptyStringSchema.optional(),
+    client_secret_expires_at: z.number().optional(),
+  })
+  .loose();
+// SDK OAuthTokens: access_token and token_type are required.
+const oauthTokensSchema = z
+  .object({
+    access_token: nonEmptyStringSchema,
+    expires_in: z.number().optional(),
+    id_token: nonEmptyStringSchema.optional(),
+    refresh_token: nonEmptyStringSchema.optional(),
+    scope: nonEmptyStringSchema.optional(),
+    token_type: nonEmptyStringSchema,
+  })
+  .loose();
 const oauthStateSchema = z
   .object({
     authorizationUrl: nonEmptyStringSchema.optional(),
+    clientInformation: oauthClientInformationSchema.optional(),
+    codeVerifier: nonEmptyStringSchema.optional(),
     expiresAt: nonEmptyStringSchema.optional(),
     tokenType: nonEmptyStringSchema.optional(),
+    tokens: oauthTokensSchema.optional(),
   })
   .strip();
 const authSchema = z.discriminatedUnion('type', [
@@ -45,7 +68,7 @@ const authSchema = z.discriminatedUnion('type', [
       type: z.literal('header'),
     })
     .strip(),
-  z.object({ oauth: oauthStateSchema.optional(), type: z.literal('oauth') }).strip(),
+  z.object({ oauth: z.unknown().optional(), type: z.literal('oauth') }).strip(),
 ]);
 const cachedToolSchema = z
   .object({
@@ -83,7 +106,14 @@ const toRemoteMcpAuth = (auth: z.infer<typeof authSchema>): RemoteMcpAuth => {
         : { headerName: auth.headerName, headerValue: auth.headerValue, type: 'header' };
     }
     case 'oauth': {
-      return auth.oauth === undefined ? { type: 'oauth' } : { oauth: auth.oauth, type: 'oauth' };
+      /*
+       * Malformed persisted OAuth state degrades to "no oauth state" rather than
+       * dropping the whole server, matching the normalize-drops-bad-entries behavior.
+       */
+      const parsedOauth = oauthStateSchema.safeParse(auth.oauth);
+      return parsedOauth.success && auth.oauth !== undefined
+        ? { oauth: parsedOauth.data, type: 'oauth' }
+        : { type: 'oauth' };
     }
     case 'none': {
       return auth;

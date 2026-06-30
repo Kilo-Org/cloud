@@ -138,6 +138,37 @@ describe('remote MCP storage', () => {
     ).toStrictEqual({ servers: [savedServer] });
   });
 
+  it('round-trips persisted oauth tokens, client info, and code verifier', () => {
+    const oauthServer = {
+      ...savedServer,
+      auth: {
+        oauth: {
+          clientInformation: { client_id: 'client-abc' },
+          codeVerifier: 'verifier-xyz',
+          tokens: { access_token: 'access-123', token_type: 'Bearer' },
+        },
+        type: 'oauth',
+      } as const,
+    };
+
+    expect(normalizeRemoteMcpStore({ servers: [oauthServer] })).toStrictEqual({
+      servers: [oauthServer],
+    });
+  });
+
+  it('drops malformed oauth state to no-oauth instead of throwing', () => {
+    const result = normalizeRemoteMcpStore({
+      servers: [
+        {
+          ...savedServer,
+          auth: { oauth: { tokens: { token_type: 'Bearer' } }, type: 'oauth' },
+        },
+      ],
+    });
+
+    expect(result.servers).toStrictEqual([{ ...savedServer, auth: { type: 'oauth' } }]);
+  });
+
   it('loads and saves through the sign-out-covered local storage key', async () => {
     const storage = createStorage({ servers: [savedServer] });
 

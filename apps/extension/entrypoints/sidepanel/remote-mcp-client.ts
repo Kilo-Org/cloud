@@ -1,3 +1,4 @@
+import { UnauthorizedError } from '@modelcontextprotocol/sdk/client/auth.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import {
   StreamableHTTPClientTransport,
@@ -8,7 +9,10 @@ import type {
   RemoteMcpCachedTool,
   RemoteMcpServer,
 } from '../../src/shared/remote-mcp';
+import type { RemoteMcpStorageArea } from '../../src/shared/remote-mcp-storage';
 import type { RemoteMcpToolRoute } from '../../src/shared/remote-mcp-tools';
+import type { RemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
+import { createRemoteMcpOAuthProvider } from './remote-mcp-oauth-provider';
 
 type FetchLike = typeof fetch;
 
@@ -27,30 +31,61 @@ const combineSignal = (signal?: AbortSignal): AbortSignal =>
     ? AbortSignal.timeout(20_000)
     : AbortSignal.any([signal, AbortSignal.timeout(20_000)]);
 
-const makeClient = (server: RemoteMcpServer, fetchFn: FetchLike) => {
+const makeClient = (
+  server: RemoteMcpServer,
+  fetchFn: FetchLike,
+  storageArea?: RemoteMcpStorageArea
+) => {
   const client = new Client({ name: 'kilo-extension', version: '0.0.0' });
+  const authProvider: RemoteMcpOAuthProvider | undefined =
+    server.auth.type === 'oauth' && storageArea !== undefined
+      ? createRemoteMcpOAuthProvider({ server, storageArea })
+      : undefined;
   const transport = new StreamableHTTPClientTransport(new URL(server.url), {
+    ...(authProvider === undefined ? {} : { authProvider }),
     fetch: fetchFn,
     requestInit: { headers: buildAuthHeaders(server.auth) },
   });
-  return { client, transport };
+  return { authProvider, client, transport };
 };
 
 export const connectRemoteMcpServer = async ({
   fetch: fetchFn,
   server,
   signal,
+  storageArea,
 }: {
   readonly fetch: FetchLike;
   readonly server: RemoteMcpServer;
   readonly signal?: AbortSignal;
+  readonly storageArea?: RemoteMcpStorageArea;
 }): Promise<RemoteMcpServer> => {
   const combined = combineSignal(signal);
-  const { client, transport } = makeClient(server, fetchFn);
+  const { authProvider, client, transport } = makeClient(server, fetchFn, storageArea);
+
+  /*
+   * Connect and list tools, transparently completing an interactive OAuth flow
+   * once if the SDK reports the connection is unauthorized.
+   */
+  const connectAndList = async () => {
+    try {
+      await client.connect(transport, { signal: combined });
+    } catch (err) {
+      if (!(err instanceof UnauthorizedError) || authProvider === undefined) {
+        throw err;
+      }
+      const code = authProvider.takeAuthorizationCode();
+      if (code === undefined) {
+        throw err;
+      }
+      await transport.finishAuth(code);
+      await client.connect(transport, { signal: combined });
+    }
+    return client.listTools(undefined, { signal: combined });
+  };
 
   try {
-    await client.connect(transport, { signal: combined });
-    const { tools } = await client.listTools(undefined, { signal: combined });
+    const { tools } = await connectAndList();
 
     const cachedTools: RemoteMcpCachedTool[] = tools.map(t => ({
       description: t.description,
@@ -67,6 +102,7 @@ export const connectRemoteMcpServer = async ({
     };
   } catch (err) {
     const is401 = err instanceof StreamableHTTPError && err.code === 401;
+    const needsAuth = is401 || err instanceof UnauthorizedError;
     // is401 implies err instanceof StreamableHTTPError extends Error, so err.message is safe
     const message = is401
       ? `401: ${err.message}`
@@ -78,7 +114,7 @@ export const connectRemoteMcpServer = async ({
       ...server,
       cachedTools: [],
       lastError: message,
-      status: is401 ? 'needs_auth' : 'unavailable',
+      status: needsAuth ? 'needs_auth' : 'unavailable',
     };
   } finally {
     await client.close();
@@ -91,15 +127,17 @@ export const callRemoteMcpTool = async ({
   route,
   server,
   signal,
+  storageArea,
 }: {
   readonly arguments: Record<string, unknown>;
   readonly fetch: FetchLike;
   readonly route: RemoteMcpToolRoute;
   readonly server: RemoteMcpServer;
   readonly signal?: AbortSignal;
+  readonly storageArea?: RemoteMcpStorageArea;
 }): Promise<unknown> => {
   const combined = combineSignal(signal);
-  const { client, transport } = makeClient(server, fetchFn);
+  const { client, transport } = makeClient(server, fetchFn, storageArea);
 
   try {
     await client.connect(transport, { signal: combined });

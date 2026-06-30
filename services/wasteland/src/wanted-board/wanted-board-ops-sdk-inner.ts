@@ -14,7 +14,14 @@
  */
 
 import { z } from 'zod';
-import { WlClient, WlError, doltRead, type WlClientConfig } from '@kilocode/wl-sdk';
+import {
+  WlClient,
+  WlError,
+  doltRead,
+  escapeSqlString,
+  type BrowseFilter,
+  type WlClientConfig,
+} from '@kilocode/wl-sdk';
 import { WantedBoardOpError } from './errors';
 import { listMyForkBranchesViaSdk } from '../branch-ops/branch-ops-inner';
 
@@ -25,6 +32,29 @@ export type SdkContext = {
   token: string;
   isUpstreamAdmin: boolean;
 };
+
+export type BrowseWantedBoardOptions = {
+  filter?: BrowseFilter;
+  includeForkBranches?: boolean;
+};
+
+export type WantedBoardCounts = {
+  open: number;
+  claimed: number;
+  in_review: number;
+  completed: number;
+  validated: number;
+  withdrawn: number;
+};
+
+const zeroWantedBoardCounts = (): WantedBoardCounts => ({
+  open: 0,
+  claimed: 0,
+  in_review: 0,
+  completed: 0,
+  validated: 0,
+  withdrawn: 0,
+});
 
 function makeClient(ctx: SdkContext, fetchImpl?: typeof fetch): WlClient {
   const config: WlClientConfig = {
@@ -139,12 +169,17 @@ async function readLatestCompletion(
 
 export async function browseViaSdk(
   ctx: SdkContext,
+  optionsOrFetch?: BrowseWantedBoardOptions | typeof fetch,
   fetchImpl?: typeof fetch
 ): Promise<Array<Record<string, unknown>>> {
-  const wl = makeClient(ctx, fetchImpl);
+  const options = typeof optionsOrFetch === 'function' ? undefined : optionsOrFetch;
+  const fetchToUse = typeof optionsOrFetch === 'function' ? optionsOrFetch : fetchImpl;
+  const wl = makeClient(ctx, fetchToUse);
   let entries;
   try {
-    entries = await wl.browse();
+    entries = await wl.browse(options?.filter, {
+      includeForkBranches: options?.includeForkBranches,
+    });
   } catch (err) {
     throw wrapSdkError(err, 'Browse');
   }
@@ -158,6 +193,84 @@ export async function browseViaSdk(
     if (row === null || row === undefined) return { id: entry.wantedId };
     return { ...row };
   });
+}
+
+const CountRow = z.object({
+  status: z.string(),
+  item_count: z.union([z.string(), z.number()]),
+});
+
+function buildCountsSql(search: string | undefined): string {
+  let sql = 'SELECT status, COUNT(*) AS item_count FROM wanted';
+  if (search && search.length > 0) {
+    const s = escapeSqlString(search.toLowerCase());
+    sql += ` WHERE (INSTR(LOWER(title), '${s}') > 0 OR INSTR(LOWER(COALESCE(description,'')), '${s}') > 0 OR INSTR(LOWER(COALESCE(tags,'')), '${s}') > 0)`;
+  }
+  sql += ' GROUP BY status';
+  return sql;
+}
+
+function rowMatchesSearch(row: Record<string, unknown>, search: string | undefined): boolean {
+  if (!search) return true;
+  const q = search.toLowerCase();
+  const toSearchText = (value: unknown) =>
+    typeof value === 'string' || typeof value === 'number' ? String(value) : '';
+  return [row.title, row.description, row.tags].some(value =>
+    toSearchText(value).toLowerCase().includes(q)
+  );
+}
+
+function countRowsByStatus(
+  rows: Array<Record<string, unknown>>,
+  search: string | undefined
+): WantedBoardCounts {
+  const counts = zeroWantedBoardCounts();
+  for (const row of rows) {
+    if (!rowMatchesSearch(row, search)) continue;
+    const status = typeof row.status === 'string' ? row.status : null;
+    if (status !== null && status in counts) {
+      counts[status as keyof WantedBoardCounts] += 1;
+    }
+  }
+  return counts;
+}
+
+export async function countWantedBoardByStatusViaSdk(
+  ctx: SdkContext,
+  options?: { search?: string; includeForkBranches?: boolean },
+  fetchImpl?: typeof fetch
+): Promise<WantedBoardCounts> {
+  if (options?.includeForkBranches) {
+    return countRowsByStatus(
+      await browseViaSdk(ctx, { includeForkBranches: true }, fetchImpl),
+      options.search
+    );
+  }
+
+  const slash = ctx.upstream.indexOf('/');
+  if (slash <= 0) {
+    throw new WantedBoardOpError('Counts failed: upstream is invalid', 'PRECONDITION_FAILED');
+  }
+  const owner = ctx.upstream.slice(0, slash);
+  const db = ctx.upstream.slice(slash + 1);
+  try {
+    const res = await doltRead({
+      auth: { token: ctx.token },
+      owner,
+      db,
+      query: buildCountsSql(options?.search),
+      fetch: fetchImpl,
+    });
+    const counts = zeroWantedBoardCounts();
+    for (const row of z.array(CountRow).parse(res.rows)) {
+      if (row.status in counts) {
+        counts[row.status as keyof WantedBoardCounts] = Number(row.item_count) || 0;
+      }
+    }
+    return counts;
+  } catch (err) {
+    throw wrapSdkError(err, 'Counts');
+  }
 }
 
 export async function claimViaSdk(

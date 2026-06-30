@@ -911,3 +911,59 @@ test('live local backend dangerous mode eval can update the selected page', asyn
     await rm(userDataDir, { force: true, recursive: true });
   }
 });
+
+test('live local backend manual Compact now compacts a frontier conversation', async () => {
+  const fixture = await startFixtureServer({ title: 'Kilo live compaction target' });
+  const requests: ChatRequestSummary[] = [];
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  recordChatRequests(context, requests);
+
+  try {
+    const targetPage = await context.newPage();
+    await targetPage.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await signInWithLocalDeviceAuth({ context, extensionId, sidePanel });
+    await expect(sidePanel.getByLabel('Target tab')).toContainText('Kilo live compaction target');
+    await selectFrontierModel(sidePanel);
+
+    const messageInput = sidePanel.getByLabel('Message agent');
+
+    /*
+     * A short two-exchange conversation: manual "Compact now" summarizes the whole conversation, so
+     * it still compacts. (With the auto threshold this little history would be inert.)
+     */
+    for (const text of [
+      'COMPACT_ONE: reply with one short sentence.',
+      'COMPACT_TWO: reply with one short sentence.',
+    ]) {
+      await messageInput.fill(text);
+      await messageInput.press('Enter');
+      await expect(sidePanel.getByRole('button', { name: 'Send message' })).toBeVisible({
+        timeout: 120_000,
+      });
+    }
+
+    const donut = sidePanel.getByLabel(/^Context usage:/u);
+    await expect(donut).toBeVisible();
+    await donut.click();
+    const compactButton = sidePanel.getByRole('button', { name: 'Compact now' });
+
+    await expect(compactButton).toBeEnabled();
+    await compactButton.click();
+
+    await waitForStoredConversationSnapshot(sidePanel, snapshot =>
+      snapshot.includes('Compacted earlier context')
+    );
+
+    // The summarization request goes out with no tools (tool_choice: 'none').
+    expect(
+      requests.some(request => request.model === frontierModel && request.toolNames.length === 0)
+    ).toBe(true);
+  } finally {
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});

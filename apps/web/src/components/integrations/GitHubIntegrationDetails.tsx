@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useUser } from '@/hooks/useUser';
@@ -33,6 +33,7 @@ type GitHubIntegrationDetailsProps = {
   pendingApproval?: boolean;
   existingPendingOrg?: string;
   appReturnPath?: string;
+  onInstallationDetected?: () => void;
 };
 
 export function GitHubIntegrationDetails({
@@ -43,6 +44,7 @@ export function GitHubIntegrationDetails({
   pendingApproval,
   existingPendingOrg,
   appReturnPath,
+  onInstallationDetected,
 }: GitHubIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -50,12 +52,14 @@ export function GitHubIntegrationDetails({
 
   // Fetch organization data to check GitHub app type
   const { data: organizationData } = useOrganizationWithMembers(organizationId ?? '', {
-    enabled: !!organizationId,
+    enabled: !!organizationId && !appReturnPath,
   });
 
   // Fetch models for the model selector
-  const { data: openRouterModels, isLoading: isLoadingModels } =
-    useModelSelectorList(organizationId);
+  const { data: openRouterModels, isLoading: isLoadingModels } = useModelSelectorList(
+    organizationId,
+    !appReturnPath
+  );
 
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (
@@ -71,15 +75,23 @@ export function GitHubIntegrationDetails({
 
   // Track selected model
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const installationDetectedRef = useRef(false);
+
+  const { data: onboardingAppType } = useQuery({
+    ...trpc.githubApps.getAppType.queryOptions(input),
+    enabled: Boolean(appReturnPath),
+  });
 
   // Determine which GitHub App to use based on organization settings
   const githubAppName = useMemo(() => {
-    const isLiteApp = organizationData?.settings?.github_app_type === 'lite';
+    const isLiteApp = appReturnPath
+      ? onboardingAppType === 'lite'
+      : organizationData?.settings?.github_app_type === 'lite';
     if (isLiteApp) {
       return process.env.NEXT_PUBLIC_GITHUB_LITE_APP_NAME || 'KiloConnect-Lite';
     }
     return process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
-  }, [organizationData?.settings?.github_app_type]);
+  }, [appReturnPath, onboardingAppType, organizationData?.settings?.github_app_type]);
 
   // Fetch GitHub App installation status
   const {
@@ -173,6 +185,30 @@ export function GitHubIntegrationDetails({
     }
   }, [installationData?.installation?.modelSlug]);
 
+  useEffect(() => {
+    if (!appReturnPath) return;
+
+    const refreshOnReturn = () => {
+      if (document.visibilityState === 'visible') {
+        void refetch();
+      }
+    };
+
+    window.addEventListener('focus', refreshOnReturn);
+    document.addEventListener('visibilitychange', refreshOnReturn);
+    return () => {
+      window.removeEventListener('focus', refreshOnReturn);
+      document.removeEventListener('visibilitychange', refreshOnReturn);
+    };
+  }, [appReturnPath, refetch]);
+
+  const isInstalled = installationData?.installed;
+  useEffect(() => {
+    if (!appReturnPath || !isInstalled || installationDetectedRef.current) return;
+    installationDetectedRef.current = true;
+    onInstallationDetected?.();
+  }, [appReturnPath, isInstalled, onInstallationDetected]);
+
   // Show success/error/pending toasts
   useEffect(() => {
     if (success) {
@@ -226,6 +262,10 @@ export function GitHubIntegrationDetails({
   const handleInstall = () => {
     const state = organizationId ? `org_${organizationId}` : `user_${user?.id}`;
     const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(state, appReturnPath))}`;
+    if (appReturnPath) {
+      window.open(installUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
     window.location.href = installUrl;
   };
 
@@ -296,7 +336,13 @@ export function GitHubIntegrationDetails({
   };
 
   if (isLoading) {
-    return (
+    return appReturnPath ? (
+      <div className="animate-pulse space-y-4 rounded-xl border border-border bg-surface-background p-6">
+        <div className="h-5 w-40 rounded bg-surface-hover" />
+        <div className="h-16 rounded-lg bg-surface-raised" />
+        <div className="h-10 rounded-md bg-surface-hover" />
+      </div>
+    ) : (
       <Card>
         <CardContent className="pt-6">
           <div className="animate-pulse space-y-4">
@@ -308,10 +354,86 @@ export function GitHubIntegrationDetails({
     );
   }
 
-  const isInstalled = installationData?.installed;
   const installation = installationData?.installation;
   const status = installation?.status;
   const isPendingApproval = status === 'awaiting_installation';
+
+  if (appReturnPath && !isInstalled && !isPendingApproval) {
+    return (
+      <section
+        className="flex min-h-64 flex-col justify-between rounded-xl border border-border bg-surface-background p-6"
+        aria-labelledby="github-onboarding-install-title"
+      >
+        <div className="space-y-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <h2
+                id="github-onboarding-install-title"
+                className="type-heading flex items-center gap-2"
+              >
+                <GitBranch className="size-5 text-muted-foreground" />
+                Install the Kilo GitHub App
+              </h2>
+              <p className="type-body max-w-xl text-muted-foreground">
+                Choose the GitHub organization and repositories Kilo can access. GitHub opens in a
+                new tab so this setup guide stays available.
+              </p>
+            </div>
+            <Badge variant="secondary" className="shrink-0">
+              Required
+            </Badge>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              ['1', 'Choose an account'],
+              ['2', 'Select repositories'],
+              ['3', 'Approve access'],
+            ].map(([number, label]) => (
+              <div key={number} className="flex items-center gap-3 rounded-lg bg-surface-inset p-3">
+                <span className="type-label flex size-6 shrink-0 items-center justify-center rounded-full border border-border tabular-nums text-muted-foreground">
+                  {number}
+                </span>
+                <span className="type-label text-foreground">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {pendingCheck?.hasPending && pendingCheck.pendingOrganizationId !== organizationId && (
+            <Alert variant="destructive">
+              <AlertDescription>
+                Complete or cancel your pending GitHub installation for another organization before
+                starting this one.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+
+        <div className="mt-8">
+          <Button
+            onClick={handleInstall}
+            disabled={
+              pendingCheck?.hasPending && pendingCheck.pendingOrganizationId !== organizationId
+            }
+          >
+            Open GitHub setup
+            <ExternalLink className="size-4" />
+          </Button>
+          <p className="type-label mt-3 text-muted-foreground">
+            Complete setup in the new tab, then return here. This page checks your connection when
+            you return.
+          </p>
+          <div className="mt-5">
+            <DevAddGitHubInstallationCard
+              organizationId={organizationId}
+              compact
+              onSuccess={() => void refetch()}
+            />
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -626,8 +748,8 @@ export function GitHubIntegrationDetails({
       )}
 
       {/* Dev-only card for adding existing installations - only show when no app is installed */}
-      {!isInstalled && (
-        <DevAddGitHubInstallationCard organizationId={organizationId} onSuccess={() => refetch()} />
+      {!isInstalled && !appReturnPath && (
+        <DevAddGitHubInstallationCard organizationId={organizationId} onSuccess={refetch} />
       )}
     </div>
   );

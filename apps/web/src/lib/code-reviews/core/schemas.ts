@@ -7,6 +7,7 @@
 
 import * as z from 'zod';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
+import { ManualCodeReviewConfigSchema } from '@kilocode/db/schema-types';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 
 // ============================================================================
@@ -126,6 +127,7 @@ export const CreateReviewParamsSchema = z.object({
   headSha: z.string().min(1),
   platform: CodeReviewPlatformSchema.default('github'),
   platformProjectId: z.number().int().positive().optional(),
+  manualConfig: ManualCodeReviewConfigSchema.nullable().optional(),
 });
 
 /**

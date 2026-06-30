@@ -80,6 +80,14 @@ export const IMPACT_ADVOCATE_DEBUG_LOGGING =
 export const CODING_PLANS_PURCHASE_ENABLED =
   getEnvVariable('CODING_PLANS_PURCHASE_ENABLED') === 'true';
 
+export function isLocalCodeReviewDevelopmentEnabled(): boolean {
+  return (
+    !!getEnvVariable('DEBUG_SHOW_DEV_UI') &&
+    process.env.NODE_ENV !== 'production' &&
+    !process.env.VERCEL_ENV
+  );
+}
+
 if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
 if (!TURNSTILE_SECRET_KEY) throw new Error('TURNSTILE_SECRET_KEY is required');
 if (!CALLBACK_TOKEN_SECRET) throw new Error('CALLBACK_TOKEN_SECRET is required');

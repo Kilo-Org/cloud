@@ -255,6 +255,46 @@ type CreateSessionWithInitialAdmissionInput = Omit<GroupedRegisterSessionInput, 
   };
 };
 
+function repositoryMetadataFromRegistrationInput(
+  repository: GroupedRegisterSessionInput['repository']
+): SessionMetadata['repository'] | undefined {
+  if (!repository) return undefined;
+
+  switch (repository.type) {
+    case 'github':
+      return {
+        type: 'github',
+        repo: repository.repo,
+        upstreamBranch: repository.branch,
+      };
+    case 'gitlab':
+      return {
+        type: 'gitlab',
+        url: repository.url,
+        platform: 'gitlab',
+        upstreamBranch: repository.branch,
+      };
+    case 'bitbucket':
+      return {
+        type: 'bitbucket',
+        url: repository.url,
+        platform: 'bitbucket',
+        workspaceUuid: repository.workspaceUuid,
+        repositoryUuid: repository.repositoryUuid,
+        upstreamBranch: repository.branch,
+      };
+    case 'git':
+      return {
+        type: 'git',
+        url: repository.url,
+        token: repository.token,
+        upstreamBranch: repository.branch,
+      };
+  }
+
+  throw new Error('repository.type must be github, gitlab, bitbucket, or git');
+}
+
 function isSameAcceptedInitialTurn(
   metadata: SessionMetadata,
   initialTurn: AcceptedExecutionTurn
@@ -1691,37 +1731,15 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
 
     const now = Date.now();
-    const repository: SessionMetadata['repository'] =
-      input.repository?.type === 'github'
-        ? {
-            type: 'github',
-            repo: input.repository.repo,
-            upstreamBranch: input.repository.branch,
-          }
-        : input.repository?.type === 'gitlab'
-          ? {
-              type: 'gitlab',
-              url: input.repository.url,
-              platform: 'gitlab',
-              upstreamBranch: input.repository.branch,
-            }
-          : input.repository?.type === 'bitbucket'
-            ? {
-                type: 'bitbucket',
-                url: input.repository.url,
-                platform: 'bitbucket',
-                workspaceUuid: input.repository.workspaceUuid,
-                repositoryUuid: input.repository.repositoryUuid,
-                upstreamBranch: input.repository.branch,
-              }
-            : input.repository?.type === 'git'
-              ? {
-                  type: 'git',
-                  url: input.repository.url,
-                  token: input.repository.token,
-                  upstreamBranch: input.repository.branch,
-                }
-              : undefined;
+    let repository: SessionMetadata['repository'];
+    try {
+      repository = repositoryMetadataFromRegistrationInput(input.repository);
+    } catch (error) {
+      return {
+        success: false,
+        error: `Invalid metadata: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
 
     const metadata: SessionMetadata = {
       metadataSchemaVersion: 2,

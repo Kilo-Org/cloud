@@ -100,13 +100,37 @@ export const EncryptedSecretsSchema = z
 
 export type EncryptedSecrets = z.infer<typeof EncryptedSecretsSchema>;
 
+const forbiddenGitBranchCharacters = new Set(['~', '^', ':', '?', '*', '[', '\\', "'"]);
+
+function containsForbiddenGitBranchCharacter(value: string): boolean {
+  for (const character of value) {
+    const charCode = character.charCodeAt(0);
+    if (charCode <= 32 || charCode === 127 || forbiddenGitBranchCharacters.has(character)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isShellSafeGitBranchName(value: string): boolean {
+  if (value === '@') return false;
+  if (value.startsWith('-') || value.startsWith('/') || value.endsWith('/')) return false;
+  if (value.endsWith('.') || value.includes('..') || value.includes('//')) return false;
+  if (value.includes('@{') || containsForbiddenGitBranchCharacter(value)) return false;
+
+  return value
+    .split('/')
+    .every(segment => segment.length > 0 && !segment.startsWith('.') && !segment.endsWith('.lock'));
+}
+
 export const branchNameSchema = z
   .string()
   .min(1, 'Branch name cannot be empty')
   .max(255, 'Branch name too long')
-  .regex(
-    /^[a-zA-Z0-9._\-/]+$/,
-    'Branch name can only contain alphanumeric characters, dots, dashes, underscores, and slashes'
+  .refine(
+    isShellSafeGitBranchName,
+    'Branch name must be a valid shell-safe Git branch or review ref'
   );
 
 export const modelIdSchema = z

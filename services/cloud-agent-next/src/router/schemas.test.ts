@@ -11,6 +11,7 @@ import {
   SendMessageV2Input,
   StartSessionOutput,
   StartSessionInput,
+  branchNameSchema,
 } from './schemas.js';
 
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
@@ -175,6 +176,29 @@ describe('grouped unified session input contracts', () => {
 });
 
 describe('legacy live attachment input compatibility', () => {
+  it('accepts shell-safe Git branch punctuation used by current-branch reviews', () => {
+    const branch = 'feature/alex+metadata@v2,fix=1#manual';
+
+    expect(branchNameSchema.safeParse(branch).success).toBe(true);
+    expect(
+      PrepareSessionInput.safeParse({
+        prompt: 'Review the current branch',
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+        upstreamBranch: branch,
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects Git-invalid or shell-unsafe branch names', () => {
+    const invalidBranches = ['feature/a..b', 'feature/@{bad', "feature/unsafe'quote"];
+
+    for (const branch of invalidBranches) {
+      expect(branchNameSchema.safeParse(branch).success).toBe(false);
+    }
+  });
+
   it('requires paired Bitbucket identity fields on prepareSession', () => {
     const input = {
       prompt: 'Update the repository',

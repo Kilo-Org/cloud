@@ -534,9 +534,11 @@ test('closing a conversation removes only that tab', async () => {
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(sidePanel.getByText('Close this reply.')).toBeVisible();
 
+    // Closing a tab must NOT raise a dialog — it closes immediately
+    let dialogFired = false;
     sidePanel.once('dialog', async dialog => {
-      expect(dialog.message()).toContain('Close this conversation tab?');
-      await dialog.accept();
+      dialogFired = true;
+      await dialog.dismiss();
     });
     await sidePanel.getByLabel('Close Close this').click();
 
@@ -544,6 +546,7 @@ test('closing a conversation removes only that tab', async () => {
     await expect(sidePanel.getByText('Close this reply.')).toBeHidden();
     await expect(sidePanel.getByRole('tab', { name: /Keep this/u })).toBeVisible();
     await expect(sidePanel.getByText('Keep this reply.')).toBeVisible();
+    expect(dialogFired).toBe(false);
 
     await sidePanel.getByLabel('History').click();
     await sidePanel.getByLabel('Open Close this').click();
@@ -585,9 +588,6 @@ test('history can delete closed conversations without confirmation', async () =>
     await sidePanel.getByLabel('Message agent').press('Enter');
     await expect(sidePanel.getByText('Keep open reply.')).toBeVisible();
 
-    sidePanel.once('dialog', async dialog => {
-      await dialog.accept();
-    });
     await sidePanel.getByLabel('Close Delete later').click();
     await expect(sidePanel.getByRole('tab', { name: /Delete later/u })).toBeHidden();
 
@@ -632,9 +632,6 @@ test('history reuses an empty inactive tab when opening a closed conversation', 
     await expect(sidePanel.getByText('Restore me reply.')).toBeVisible();
 
     await sidePanel.getByLabel('New conversation').click();
-    sidePanel.once('dialog', async dialog => {
-      await dialog.accept();
-    });
     await sidePanel.getByLabel('Close Restore me').click();
 
     await sidePanel.getByLabel('History').click();

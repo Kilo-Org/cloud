@@ -1158,6 +1158,16 @@ export const CodeReviewAgentConfigSchema = z.object({
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;
 
+export const ManualCodeReviewConfigSchema = z
+  .object({
+    agentConfig: CodeReviewAgentConfigSchema,
+    instructions: z.string().max(4_000).nullable(),
+    outputMode: z.enum(['provider', 'kilo']),
+  })
+  .strict();
+
+export type ManualCodeReviewConfig = z.infer<typeof ManualCodeReviewConfigSchema>;
+
 // --- Security types ---
 
 export const DependabotAlertState = {
@@ -1697,6 +1707,15 @@ export const MCPGatewayProviderGrantStatus = {
 
 export type MCPGatewayProviderGrantStatus =
   (typeof MCPGatewayProviderGrantStatus)[keyof typeof MCPGatewayProviderGrantStatus];
+
+export const MCPGatewayOAuthGrantStatus = {
+  Pending: 'pending',
+  Active: 'active',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayOAuthGrantStatus =
+  (typeof MCPGatewayOAuthGrantStatus)[keyof typeof MCPGatewayOAuthGrantStatus];
 
 export const MCPGatewaySecretKind = {
   StaticProviderCredentials: 'static_provider_credentials',

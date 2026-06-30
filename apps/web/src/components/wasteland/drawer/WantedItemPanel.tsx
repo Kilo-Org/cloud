@@ -255,7 +255,10 @@ function PendingReviewSection({ wastelandId, itemId }: { wastelandId: string; it
     const isPending = pending !== undefined;
     if (wasPendingRef.current && !isPending) {
       void queryClient.invalidateQueries({
-        queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
+        queryKey: trpc.wasteland.browseWantedBoard.pathKey(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.getWantedBoardCounts.pathKey(),
       });
       void queryClient.invalidateQueries({
         queryKey: trpc.wasteland.getWantedItem.queryKey({ wastelandId, itemId }),

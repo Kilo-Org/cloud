@@ -35,6 +35,12 @@ const FLY_TOKEN_ENV_KEY = 'FLY_API_TOKEN';
 const FLY_ORG_SLUG_ENV_KEY = 'FLY_ORG_SLUG';
 const DEFAULT_FLY_ORG_SLUG = 'kilo-dev';
 const KILOCLAW_PROVIDER_KEY = 'KILOCLAW_DEFAULT_PROVIDER';
+const GENERATED_LOCAL_SECRET_KEYS = new Set([
+  'NEXTAUTH_SECRET',
+  'INTERNAL_API_SECRET',
+  'CALLBACK_TOKEN_SECRET',
+  'BYOK_ENCRYPTION_KEY',
+]);
 
 function createFlyTokenAutoCreate(flyOrgSlug: string): EnvLocalAutoCreate {
   return {
@@ -42,6 +48,23 @@ function createFlyTokenAutoCreate(flyOrgSlug: string): EnvLocalAutoCreate {
     command: 'fly',
     args: ['tokens', 'create', 'org', flyOrgSlug],
   };
+}
+
+function createGeneratedLocalSecretAutoCreate(key: string): EnvLocalAutoCreate {
+  return {
+    key,
+    command: 'openssl',
+    args: ['rand', '-base64', '32'],
+  };
+}
+
+function maybeAddEnvLocalAutoCreate(
+  creates: EnvLocalAutoCreate[],
+  create: EnvLocalAutoCreate
+): void {
+  if (!creates.some(existing => existing.key === create.key)) {
+    creates.push(create);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -420,6 +443,19 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
         continue;
       }
 
+      const envLocalSourceKey = getEnvLocalSourceKey(entry.key, entry.annotation);
+      if (
+        envLocalSourceKey &&
+        GENERATED_LOCAL_SECRET_KEYS.has(envLocalSourceKey) &&
+        !envLocal.get(envLocalSourceKey)
+      ) {
+        maybeAddEnvLocalAutoCreate(
+          envLocalAutoCreates,
+          createGeneratedLocalSecretAutoCreate(envLocalSourceKey)
+        );
+        continue;
+      }
+
       const { value, resolved, source } = resolveAnnotatedValue(
         entry.key,
         entry,
@@ -519,6 +555,19 @@ function computePlan(repoRoot: string, serviceFilter?: Set<string>): EnvSyncPlan
     const entries = parseExampleFile(exampleContent);
 
     for (const entry of entries) {
+      const envLocalSourceKey = getEnvLocalSourceKey(entry.key, entry.annotation);
+      if (
+        envLocalSourceKey &&
+        GENERATED_LOCAL_SECRET_KEYS.has(envLocalSourceKey) &&
+        !envLocal.get(envLocalSourceKey)
+      ) {
+        maybeAddEnvLocalAutoCreate(
+          envLocalAutoCreates,
+          createGeneratedLocalSecretAutoCreate(envLocalSourceKey)
+        );
+        continue;
+      }
+
       const { value: expectedValue, resolved } = resolveAnnotatedValue(
         entry.key,
         entry,

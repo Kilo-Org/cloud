@@ -61,6 +61,12 @@ import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { v2SnapshotToLogEntries, v1BlobToLogEntries } from '@/lib/code-reviews/session-log';
 import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
+import {
+  getManualCodeReviewConfig,
+  isLocalKiloCodeReview,
+  shouldPublishCodeReviewToProvider,
+} from '@/lib/code-reviews/manual-config';
+import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
 
 /**
  * Re-creates the PR gate check (GitHub Check Run / GitLab commit status)
@@ -69,6 +75,7 @@ import { codeReviewAnalyticsRouter } from './code-review-analytics-router';
  * was cleared during reset.
  */
 async function recreatePRGateCheck(review: CloudAgentCodeReview) {
+  if (!shouldPublishCodeReviewToProvider(review)) return;
   if (!review.platform_integration_id) return;
 
   const integration = await getIntegrationById(review.platform_integration_id);
@@ -145,6 +152,7 @@ async function recreatePRGateCheck(review: CloudAgentCodeReview) {
  * that permanently blocks protected branches.
  */
 async function cancelPRGateCheck(review: CloudAgentCodeReview) {
+  if (!shouldPublishCodeReviewToProvider(review)) return;
   if (!review.platform_integration_id) return;
 
   const integration = await getIntegrationById(review.platform_integration_id);
@@ -537,21 +545,31 @@ export const codeReviewRouter = createTRPCRouter({
         }
 
         const platform = review.platform === 'gitlab' ? 'gitlab' : 'github';
-        const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
-        const actionRequiredState = getCodeReviewActionRequiredState(agentConfig);
-        if (actionRequiredState) {
+        const manualConfig = getManualCodeReviewConfig(review);
+        if (manualConfig?.outputMode === 'kilo' && !isLocalCodeReviewDevelopmentEnabled()) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message:
-              'Code Reviewer is disabled because configuration needs attention. Fix settings, enable Code Reviewer again, then retry this review.',
+            message: 'Local Code Reviewer jobs can only be retried in local development.',
           });
         }
 
-        if (!agentConfig?.is_enabled) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Enable Code Reviewer before retrying this review.',
-          });
+        if (!manualConfig) {
+          const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
+          const actionRequiredState = getCodeReviewActionRequiredState(agentConfig);
+          if (actionRequiredState) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message:
+                'Code Reviewer is disabled because configuration needs attention. Fix settings, enable Code Reviewer again, then retry this review.',
+            });
+          }
+
+          if (!agentConfig?.is_enabled) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Enable Code Reviewer before retrying this review.',
+            });
+          }
         }
 
         const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
@@ -740,7 +758,11 @@ export const codeReviewRouter = createTRPCRouter({
             return successResult({ entries: [] });
           }
 
-          return successResult({ entries: v2SnapshotToLogEntries(snapshot) });
+          return successResult({
+            entries: v2SnapshotToLogEntries(snapshot, {
+              includeFullAssistantText: isLocalKiloCodeReview(review),
+            }),
+          });
         }
 
         // V1 sessions (UUID): fetch from R2 blob storage
@@ -755,7 +777,11 @@ export const codeReviewRouter = createTRPCRouter({
         }
 
         const blobContent = await getBlobContent(session.ui_messages_blob_url);
-        return successResult({ entries: v1BlobToLogEntries(blobContent) });
+        return successResult({
+          entries: v1BlobToLogEntries(blobContent, {
+            includeFullAssistantText: isLocalKiloCodeReview(review),
+          }),
+        });
       } catch (error) {
         if (error instanceof TRPCError) {
           throw error;

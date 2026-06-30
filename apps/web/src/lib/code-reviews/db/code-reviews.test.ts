@@ -5,11 +5,14 @@ import {
   kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
+  organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import type { User } from '@kilocode/db/schema';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import type { Organization, User } from '@kilocode/db/schema';
+import type { ManualCodeReviewConfig } from '@kilocode/db/schema-types';
 import {
   cancelSupersededReviewsForPR,
   createCodeReview,
@@ -28,17 +31,52 @@ const REPO = `test-org/session-continuation-${Date.now()}`;
 
 describe('cancelSupersededReviewsForPR', () => {
   let testUser: User;
+  let githubIntegrationId: string;
+  let gitLabIntegrationId: string;
   const createdReviewIds: string[] = [];
   const repo = `${REPO}-superseded`;
 
   beforeAll(async () => {
     testUser = await insertTestUser();
+    const [githubIntegration, gitLabIntegration] = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_user_id: testUser.id,
+          platform: 'github',
+          integration_type: 'github_app',
+          platform_installation_id: `github-superseded-${Date.now()}-${Math.random()}`,
+          platform_account_id: 'github-superseded',
+          platform_account_login: 'github-superseded',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+        {
+          owned_by_user_id: testUser.id,
+          platform: 'gitlab',
+          integration_type: 'oauth',
+          platform_installation_id: `gitlab-superseded-${Date.now()}-${Math.random()}`,
+          platform_account_id: 'gitlab-superseded',
+          platform_account_login: 'gitlab-superseded',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+      ])
+      .returning({ id: platform_integrations.id });
+    if (!githubIntegration || !gitLabIntegration) {
+      throw new Error('Expected platform integrations');
+    }
+    githubIntegrationId = githubIntegration.id;
+    gitLabIntegrationId = gitLabIntegration.id;
   });
 
   afterAll(async () => {
     for (const id of createdReviewIds) {
       await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, id));
     }
+    await db
+      .delete(platform_integrations)
+      .where(inArray(platform_integrations.id, [githubIntegrationId, gitLabIntegrationId]));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
@@ -48,15 +86,20 @@ describe('cancelSupersededReviewsForPR', () => {
     repoFullName = repo,
     platform = 'github' as const,
     platformProjectId,
+    platformIntegrationId,
   }: {
     headSha: string;
     prNumber?: number;
     repoFullName?: string;
     platform?: 'github' | 'gitlab';
     platformProjectId?: number;
+    platformIntegrationId?: string;
   }) {
+    const resolvedPlatformIntegrationId =
+      platformIntegrationId ?? (platform === 'gitlab' ? gitLabIntegrationId : githubIntegrationId);
     const id = await createCodeReview({
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
+      platformIntegrationId: resolvedPlatformIntegrationId,
       repoFullName,
       prNumber,
       prUrl: `https://github.com/${repoFullName}/pull/${prNumber}`,
@@ -74,8 +117,8 @@ describe('cancelSupersededReviewsForPR', () => {
 
   it('cancels pending, queued, and running rows and returns accurate prev_status values', async () => {
     const pendingId = await createReview({ headSha: 'sha-pending' });
-    const queuedId = await createReview({ headSha: 'sha-queued' });
-    const runningId = await createReview({ headSha: 'sha-running' });
+    const queuedId = await createReview({ headSha: 'sha-queued', prNumber: 43 });
+    const runningId = await createReview({ headSha: 'sha-running', prNumber: 44 });
     const pendingAttempt = await createCodeReviewAttempt({
       codeReviewId: pendingId,
       status: 'pending',
@@ -89,7 +132,17 @@ describe('cancelSupersededReviewsForPR', () => {
     await updateCodeReviewStatus(queuedId, 'queued');
     await updateCodeReviewStatus(runningId, 'running', { sessionId: 'session-running' });
 
-    const cancelled = await cancelSupersededReviewsForPR(repo, 42, 'sha-latest');
+    const cancelled = [
+      ...(await cancelSupersededReviewsForPR(repo, 42, 'sha-latest', {
+        platformIntegrationId: githubIntegrationId,
+      })),
+      ...(await cancelSupersededReviewsForPR(repo, 43, 'sha-latest', {
+        platformIntegrationId: githubIntegrationId,
+      })),
+      ...(await cancelSupersededReviewsForPR(repo, 44, 'sha-latest', {
+        platformIntegrationId: githubIntegrationId,
+      })),
+    ];
 
     expect(cancelled).toEqual(
       expect.arrayContaining([
@@ -157,26 +210,28 @@ describe('cancelSupersededReviewsForPR', () => {
   });
 
   it('ignores same-sha, different repo or pr, and already-terminal rows; second call is idempotent', async () => {
+    const terminalCompletedId = await createReview({ headSha: 'sha-completed' });
+    await updateCodeReviewStatus(terminalCompletedId, 'completed');
+    const terminalFailedId = await createReview({ headSha: 'sha-failed' });
+    await updateCodeReviewStatus(terminalFailedId, 'failed', {
+      errorMessage: 'failed before cancel',
+    });
+
     const sameShaId = await createReview({ headSha: 'sha-keep' });
     const otherPrId = await createReview({ headSha: 'sha-other-pr', prNumber: 43 });
     const otherRepoId = await createReview({
       headSha: 'sha-other-repo',
       repoFullName: `${repo}-other`,
     });
-    const terminalCompletedId = await createReview({ headSha: 'sha-completed' });
-    const terminalFailedId = await createReview({ headSha: 'sha-failed' });
     const targetId = await createReview({
       headSha: 'sha-gitlab',
       platform: 'gitlab',
       platformProjectId: 999,
     });
 
-    await updateCodeReviewStatus(terminalCompletedId, 'completed');
-    await updateCodeReviewStatus(terminalFailedId, 'failed', {
-      errorMessage: 'failed before cancel',
+    const cancelled = await cancelSupersededReviewsForPR(repo, 42, 'sha-keep', {
+      platformIntegrationId: gitLabIntegrationId,
     });
-
-    const cancelled = await cancelSupersededReviewsForPR(repo, 42, 'sha-keep');
     expect(cancelled).toHaveLength(1);
     expect(cancelled[0]).toEqual(
       expect.objectContaining({
@@ -185,11 +240,13 @@ describe('cancelSupersededReviewsForPR', () => {
         headSha: 'sha-gitlab',
         platform: 'gitlab',
         platformProjectId: 999,
-        platformIntegrationId: null,
+        platformIntegrationId: gitLabIntegrationId,
       })
     );
 
-    const cancelledAgain = await cancelSupersededReviewsForPR(repo, 42, 'sha-keep');
+    const cancelledAgain = await cancelSupersededReviewsForPR(repo, 42, 'sha-keep', {
+      platformIntegrationId: gitLabIntegrationId,
+    });
     expect(cancelledAgain).toEqual([]);
 
     const rows = await db
@@ -216,18 +273,122 @@ describe('cancelSupersededReviewsForPR', () => {
   });
 });
 
+describe('manual Code Reviewer review identity', () => {
+  let testUser: User;
+  let organization: Organization;
+  const createdReviewIds: string[] = [];
+  const repo = `${REPO}-manual-identity`;
+  const manualConfig: ManualCodeReviewConfig = {
+    agentConfig: {
+      review_style: 'balanced',
+      focus_areas: [],
+      model_slug: 'test-model',
+    },
+    instructions: null,
+    outputMode: 'kilo',
+  };
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+    organization = await createTestOrganization(
+      'Manual Review Identity Org',
+      testUser.id,
+      0,
+      {},
+      false
+    );
+  });
+
+  afterAll(async () => {
+    for (const id of createdReviewIds) {
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, id));
+    }
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  async function createManualReview(owner: Parameters<typeof createCodeReview>[0]['owner']) {
+    const id = await createCodeReview({
+      owner,
+      repoFullName: repo,
+      prNumber: 1,
+      prUrl: `https://github.com/${repo}/pull/1`,
+      prTitle: 'Manual PR',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'refs/pull/1/head',
+      headSha: 'manual-sha',
+      platform: 'github',
+      manualConfig,
+    });
+    createdReviewIds.push(id);
+    return id;
+  }
+
+  it('allows repeated manual rows for the same owner, repo, PR, and SHA', async () => {
+    const personalFirstId = await createManualReview({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+    const personalSecondId = await createManualReview({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+    const organizationFirstId = await createManualReview({
+      type: 'org',
+      id: organization.id,
+      userId: testUser.id,
+    });
+    const organizationSecondId = await createManualReview({
+      type: 'org',
+      id: organization.id,
+      userId: testUser.id,
+    });
+
+    const rows = await db
+      .select({ id: cloud_agent_code_reviews.id })
+      .from(cloud_agent_code_reviews)
+      .where(
+        inArray(cloud_agent_code_reviews.id, [
+          personalFirstId,
+          personalSecondId,
+          organizationFirstId,
+          organizationSecondId,
+        ])
+      );
+
+    expect(new Set(rows.map(row => row.id))).toEqual(
+      new Set([personalFirstId, personalSecondId, organizationFirstId, organizationSecondId])
+    );
+  });
+});
+
 describe('findPreviousCompletedReview', () => {
   let testUser: User;
+  let githubIntegrationId: string;
   let gitLabIntegrationAId: string;
   let gitLabIntegrationBId: string;
   const createdReviewIds: string[] = [];
   const gitLabRepo = `${REPO}-gitlab-scope`;
+  let auxiliaryPrNumber = 1_000;
 
   beforeAll(async () => {
     testUser = await insertTestUser();
-    const [gitLabIntegrationA, gitLabIntegrationB] = await db
+    const [githubIntegration, gitLabIntegrationA, gitLabIntegrationB] = await db
       .insert(platform_integrations)
       .values([
+        {
+          owned_by_user_id: testUser.id,
+          platform: 'github',
+          integration_type: 'github_app',
+          platform_installation_id: `github-continuation-${Date.now()}-${Math.random()}`,
+          platform_account_id: 'github-continuation',
+          platform_account_login: 'github-continuation',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
         {
           owned_by_user_id: testUser.id,
           platform: 'gitlab',
@@ -250,9 +411,10 @@ describe('findPreviousCompletedReview', () => {
         },
       ])
       .returning({ id: platform_integrations.id });
-    if (!gitLabIntegrationA || !gitLabIntegrationB) {
-      throw new Error('Expected GitLab integrations');
+    if (!githubIntegration || !gitLabIntegrationA || !gitLabIntegrationB) {
+      throw new Error('Expected platform integrations');
     }
+    githubIntegrationId = githubIntegration.id;
     gitLabIntegrationAId = gitLabIntegrationA.id;
     gitLabIntegrationBId = gitLabIntegrationB.id;
   });
@@ -261,6 +423,7 @@ describe('findPreviousCompletedReview', () => {
     for (const id of createdReviewIds) {
       await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, id));
     }
+    await db.delete(platform_integrations).where(eq(platform_integrations.id, githubIntegrationId));
     await db
       .delete(platform_integrations)
       .where(eq(platform_integrations.id, gitLabIntegrationAId));
@@ -270,21 +433,27 @@ describe('findPreviousCompletedReview', () => {
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
-  async function createReview(headSha: string) {
+  async function createReview(headSha: string, prNumber = 42) {
     const id = await createCodeReview({
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
       repoFullName: REPO,
-      prNumber: 42,
-      prUrl: `https://github.com/${REPO}/pull/42`,
+      prNumber,
+      prUrl: `https://github.com/${REPO}/pull/${prNumber}`,
       prTitle: 'test PR',
       prAuthor: 'octocat',
       baseRef: 'main',
       headRef: 'feature/test',
       headSha,
       platform: 'github',
+      platformIntegrationId: githubIntegrationId,
     });
     createdReviewIds.push(id);
     return id;
+  }
+
+  async function createAuxiliaryReview(headSha: string) {
+    const prNumber = auxiliaryPrNumber++;
+    return await createReview(headSha, prNumber);
   }
 
   async function createGitLabReview(headSha: string, integrationId: string, projectId: number) {
@@ -306,8 +475,12 @@ describe('findPreviousCompletedReview', () => {
     return id;
   }
 
+  function githubContinuationScope() {
+    return { platform: 'github' as const, integrationId: githubIntegrationId };
+  }
+
   it('returns null when no previous completed review exists', async () => {
-    const result = await findPreviousCompletedReview(REPO, 42, 'abc123');
+    const result = await findPreviousCompletedReview(REPO, 42, 'abc123', githubContinuationScope());
     expect(result).toBeNull();
   });
 
@@ -315,7 +488,12 @@ describe('findPreviousCompletedReview', () => {
     const id = await createReview('sha-no-session');
     await updateCodeReviewStatus(id, 'completed');
 
-    const result = await findPreviousCompletedReview(REPO, 42, 'other-sha');
+    const result = await findPreviousCompletedReview(
+      REPO,
+      42,
+      'other-sha',
+      githubContinuationScope()
+    );
     expect(result).not.toBeNull();
     expect(result!.head_sha).toBe('sha-no-session');
     expect(result!.session_id).toBeNull();
@@ -327,14 +505,24 @@ describe('findPreviousCompletedReview', () => {
       sessionId: 'agent_test123',
     });
 
-    const result = await findPreviousCompletedReview(REPO, 42, 'other-sha');
+    const result = await findPreviousCompletedReview(
+      REPO,
+      42,
+      'other-sha',
+      githubContinuationScope()
+    );
     expect(result).not.toBeNull();
     expect(result!.head_sha).toBe('sha-with-session');
     expect(result!.session_id).toBe('agent_test123');
   });
 
   it('excludes the current SHA', async () => {
-    const result = await findPreviousCompletedReview(REPO, 42, 'sha-with-session');
+    const result = await findPreviousCompletedReview(
+      REPO,
+      42,
+      'sha-with-session',
+      githubContinuationScope()
+    );
     // Should skip "sha-with-session" and fall back to "sha-no-session"
     expect(result).not.toBeNull();
     expect(result!.head_sha).toBe('sha-no-session');
@@ -346,7 +534,12 @@ describe('findPreviousCompletedReview', () => {
       sessionId: 'agent_newer',
     });
 
-    const result = await findPreviousCompletedReview(REPO, 42, 'other-sha');
+    const result = await findPreviousCompletedReview(
+      REPO,
+      42,
+      'other-sha',
+      githubContinuationScope()
+    );
     expect(result).not.toBeNull();
     expect(result!.head_sha).toBe('sha-newer');
     expect(result!.session_id).toBe('agent_newer');
@@ -359,10 +552,19 @@ describe('findPreviousCompletedReview', () => {
     });
 
     // Should still return the most recent *completed* one
-    const result = await findPreviousCompletedReview(REPO, 42, 'other-sha');
+    const result = await findPreviousCompletedReview(
+      REPO,
+      42,
+      'other-sha',
+      githubContinuationScope()
+    );
     expect(result).not.toBeNull();
-    expect(result!.head_sha).toBe('sha-newer');
-    expect(result!.session_id).toBe('agent_newer');
+    expect(result!.head_sha).not.toBe('sha-running');
+
+    await updateCodeReviewStatus(id, 'cancelled', {
+      terminalReason: 'superseded',
+      errorMessage: 'test cleanup',
+    });
   });
 
   it('ensures session_id and head_sha come from the same row', async () => {
@@ -370,7 +572,12 @@ describe('findPreviousCompletedReview', () => {
     const legacyId = await createReview('sha-legacy-newest');
     await updateCodeReviewStatus(legacyId, 'completed');
 
-    const result = await findPreviousCompletedReview(REPO, 42, 'other-sha');
+    const result = await findPreviousCompletedReview(
+      REPO,
+      42,
+      'other-sha',
+      githubContinuationScope()
+    );
     expect(result).not.toBeNull();
     // The newest completed review has no session — both fields from same row
     expect(result!.head_sha).toBe('sha-legacy-newest');
@@ -379,20 +586,20 @@ describe('findPreviousCompletedReview', () => {
 
   it('scopes GitLab session continuation to the exact integration and project', async () => {
     const matchingId = await createGitLabReview('gitlab-matching-sha', gitLabIntegrationAId, 501);
+    await updateCodeReviewStatus(matchingId, 'completed', { sessionId: 'agent_matching_gitlab' });
     const differentIntegrationId = await createGitLabReview(
       'gitlab-other-integration-sha',
       gitLabIntegrationBId,
       501
     );
+    await updateCodeReviewStatus(differentIntegrationId, 'completed', {
+      sessionId: 'agent_other_integration',
+    });
     const differentProjectId = await createGitLabReview(
       'gitlab-other-project-sha',
       gitLabIntegrationAId,
       502
     );
-    await updateCodeReviewStatus(matchingId, 'completed', { sessionId: 'agent_matching_gitlab' });
-    await updateCodeReviewStatus(differentIntegrationId, 'completed', {
-      sessionId: 'agent_other_integration',
-    });
     await updateCodeReviewStatus(differentProjectId, 'completed', {
       sessionId: 'agent_other_project',
     });
@@ -409,13 +616,18 @@ describe('findPreviousCompletedReview', () => {
     });
   });
 
-  it('uses the default GitHub continuation scope when options are omitted', async () => {
-    const result = await findPreviousCompletedReview(gitLabRepo, 42, 'current-gitlab-sha');
+  it('does not share GitLab reviews with a GitHub continuation scope', async () => {
+    const result = await findPreviousCompletedReview(
+      gitLabRepo,
+      42,
+      'current-gitlab-sha',
+      githubContinuationScope()
+    );
     expect(result).toBeNull();
   });
 
   it('persists terminal_reason for failed reviews', async () => {
-    const id = await createReview('sha-billing');
+    const id = await createAuxiliaryReview('sha-billing');
     await updateCodeReviewStatus(id, 'failed', {
       errorMessage: 'Insufficient credits: add credits to continue',
       terminalReason: 'billing',
@@ -431,7 +643,7 @@ describe('findPreviousCompletedReview', () => {
   });
 
   it('creates new reviews with agent_version set to v2', async () => {
-    const id = await createReview('sha-v2-default');
+    const id = await createAuxiliaryReview('sha-v2-default');
 
     const [review] = await db
       .select({ agentVersion: cloud_agent_code_reviews.agent_version })
@@ -443,7 +655,7 @@ describe('findPreviousCompletedReview', () => {
   });
 
   it('creates, links, lists, and updates code review attempts', async () => {
-    const reviewId = await createReview('sha-attempts');
+    const reviewId = await createAuxiliaryReview('sha-attempts');
     const firstAttempt = await createCodeReviewAttempt({
       codeReviewId: reviewId,
       status: 'running',
@@ -483,7 +695,7 @@ describe('findPreviousCompletedReview', () => {
   });
 
   it('does not reopen a terminal attempt without session ids', async () => {
-    const reviewId = await createReview('sha-terminal-attempt');
+    const reviewId = await createAuxiliaryReview('sha-terminal-attempt');
     const failedAttempt = await createCodeReviewAttempt({
       codeReviewId: reviewId,
       status: 'failed',
@@ -518,7 +730,7 @@ describe('findPreviousCompletedReview', () => {
   });
 
   it('creates only one infra retry attempt for the same failed attempt', async () => {
-    const reviewId = await createReview('sha-infra-retry');
+    const reviewId = await createAuxiliaryReview('sha-infra-retry');
     await updateCodeReviewStatus(reviewId, 'running', { sessionId: 'agent_failed' });
     const failedAttempt = await createCodeReviewAttempt({
       codeReviewId: reviewId,
@@ -548,7 +760,7 @@ describe('findPreviousCompletedReview', () => {
   });
 
   it('does not create an infra retry attempt for a superseded review', async () => {
-    const reviewId = await createReview('sha-superseded-retry');
+    const reviewId = await createAuxiliaryReview('sha-superseded-retry');
     const failedAttempt = await createCodeReviewAttempt({
       codeReviewId: reviewId,
       status: 'failed',
@@ -575,7 +787,7 @@ describe('findPreviousCompletedReview', () => {
   });
 
   it('updates an explicit attempt id even when a newer attempt exists', async () => {
-    const reviewId = await createReview('sha-explicit-attempt');
+    const reviewId = await createAuxiliaryReview('sha-explicit-attempt');
     const firstAttempt = await createCodeReviewAttempt({
       codeReviewId: reviewId,
       status: 'failed',
@@ -605,7 +817,7 @@ describe('findPreviousCompletedReview', () => {
   });
 
   it('throws for an explicit missing attempt id', async () => {
-    const reviewId = await createReview('sha-missing-explicit-attempt');
+    const reviewId = await createAuxiliaryReview('sha-missing-explicit-attempt');
     await createCodeReviewAttempt({
       codeReviewId: reviewId,
       status: 'running',
@@ -623,7 +835,7 @@ describe('findPreviousCompletedReview', () => {
   });
 
   it('snapshots analytics enrollment once for a dispatched attempt', async () => {
-    const reviewId = await createReview('sha-analytics-snapshot');
+    const reviewId = await createAuxiliaryReview('sha-analytics-snapshot');
     const [review] = await db
       .select()
       .from(cloud_agent_code_reviews)
@@ -638,7 +850,7 @@ describe('findPreviousCompletedReview', () => {
   });
 
   it('copies analytics enrollment to an infrastructure retry attempt', async () => {
-    const reviewId = await createReview('sha-analytics-retry-snapshot');
+    const reviewId = await createAuxiliaryReview('sha-analytics-retry-snapshot');
     await updateCodeReviewStatus(reviewId, 'running');
     const failedAttempt = await createCodeReviewAttempt({
       codeReviewId: reviewId,

@@ -307,6 +307,11 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
     browseWantedBoard: import('@trpc/server').TRPCQueryProcedure<{
       input: {
         wastelandId: string;
+        status?: 'open' | 'claimed' | 'in_review' | 'completed' | 'validated' | 'withdrawn';
+        search?: string;
+        sort?: 'priority' | 'activity';
+        limit?: number;
+        includeForkBranches?: boolean;
       };
       output: {
         id: string;
@@ -327,6 +332,22 @@ export declare const wastelandRouter: import('@trpc/server').TRPCBuiltRouter<
         created_at: string | null;
         updated_at: string | null;
       }[];
+      meta: object;
+    }>;
+    getWantedBoardCounts: import('@trpc/server').TRPCQueryProcedure<{
+      input: {
+        wastelandId: string;
+        search?: string;
+        includeForkBranches?: boolean;
+      };
+      output: {
+        open: number;
+        claimed: number;
+        in_review: number;
+        completed: number;
+        validated: number;
+        withdrawn: number;
+      };
       meta: object;
     }>;
     listMyPendingClaims: import('@trpc/server').TRPCQueryProcedure<{
@@ -1197,6 +1218,11 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
         browseWantedBoard: import('@trpc/server').TRPCQueryProcedure<{
           input: {
             wastelandId: string;
+            status?: 'open' | 'claimed' | 'in_review' | 'completed' | 'validated' | 'withdrawn';
+            search?: string;
+            sort?: 'priority' | 'activity';
+            limit?: number;
+            includeForkBranches?: boolean;
           };
           output: {
             id: string;
@@ -1217,6 +1243,22 @@ export declare const wrappedWastelandRouter: import('@trpc/server').TRPCBuiltRou
             created_at: string | null;
             updated_at: string | null;
           }[];
+          meta: object;
+        }>;
+        getWantedBoardCounts: import('@trpc/server').TRPCQueryProcedure<{
+          input: {
+            wastelandId: string;
+            search?: string;
+            includeForkBranches?: boolean;
+          };
+          output: {
+            open: number;
+            claimed: number;
+            in_review: number;
+            completed: number;
+            validated: number;
+            withdrawn: number;
+          };
           meta: object;
         }>;
         listMyPendingClaims: import('@trpc/server').TRPCQueryProcedure<{

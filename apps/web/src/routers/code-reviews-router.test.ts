@@ -276,6 +276,108 @@ describe('codeReviewRouter.cancel', () => {
   });
 });
 
+describe('personalReviewAgent.createManualReviewJob', () => {
+  let testUser: User;
+  let fetchSpy: jest.SpiedFunction<typeof fetch> | null = null;
+  let previousDebugShowDevUi: string | undefined;
+  let previousVercelEnv: string | undefined;
+  const repo = `${REPO}-manual-job`;
+  const prUrl = `https://github.com/${repo}/pull/1`;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  beforeEach(() => {
+    previousDebugShowDevUi = process.env.DEBUG_SHOW_DEV_UI;
+    previousVercelEnv = process.env.VERCEL_ENV;
+    process.env.DEBUG_SHOW_DEV_UI = 'true';
+    delete process.env.VERCEL_ENV;
+
+    mockTryDispatchPendingReviews.mockResolvedValue(undefined);
+    fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      return new Response(
+        JSON.stringify({
+          number: 1,
+          html_url: prUrl,
+          title: 'Manual PR',
+          state: 'open',
+          draft: false,
+          user: { login: 'octocat', id: 583231 },
+          base: { ref: 'main', repo: { full_name: repo } },
+          head: { ref: 'feature/manual', sha: 'manual-sha' },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+    fetchSpy?.mockRestore();
+    fetchSpy = null;
+    mockTryDispatchPendingReviews.mockReset();
+
+    if (previousDebugShowDevUi === undefined) {
+      delete process.env.DEBUG_SHOW_DEV_UI;
+    } else {
+      process.env.DEBUG_SHOW_DEV_UI = previousDebugShowDevUi;
+    }
+    if (previousVercelEnv === undefined) {
+      delete process.env.VERCEL_ENV;
+    } else {
+      process.env.VERCEL_ENV = previousVercelEnv;
+    }
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('creates a fresh local manual review after the previous same-SHA job is cancelled', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const first = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+    });
+    await caller.codeReviews.cancel({ reviewId: first.reviewId });
+    mockTryDispatchPendingReviews.mockClear();
+
+    const second = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+    });
+
+    const rows = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        status: cloud_agent_code_reviews.status,
+        manualConfig: cloud_agent_code_reviews.manual_config,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, [first.reviewId, second.reviewId]));
+    const firstRow = rows.find(row => row.id === first.reviewId);
+    const secondRow = rows.find(row => row.id === second.reviewId);
+
+    expect(second.reviewId).not.toBe(first.reviewId);
+    expect(first).toEqual({ reviewId: first.reviewId, outputMode: 'kilo' });
+    expect(second).toEqual({ reviewId: second.reviewId, outputMode: 'kilo' });
+    expect(firstRow?.status).toBe('cancelled');
+    expect(secondRow?.status).toBe('pending');
+    expect(secondRow?.manualConfig?.outputMode).toBe('kilo');
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+  });
+});
+
 describe('review agent config REVIEW.md setting', () => {
   let testUser: User;
   let organization: Organization;

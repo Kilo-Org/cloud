@@ -124,8 +124,7 @@ export function CreateOrganizationPage({ mockSelectedOrgName }: CreateOrganizati
         })
       ).organization.id;
 
-      // Redirect with query param that will force users to invite a single user.
-      window.location.href = `/organizations/${orgId}/welcome?firstTime=1`;
+      window.location.href = `/organizations/${orgId}/welcome`;
     } catch (error) {
       console.error('Failed to create organization:', error);
       setErrors({

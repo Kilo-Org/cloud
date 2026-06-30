@@ -61,6 +61,9 @@ when they appear in all capitals.
   clients.
 - **Gateway OAuth client**: A dynamically registered OAuth client represented
   externally as `namespace:name`.
+- **Gateway OAuth grant**: A durable, revocable authorization from one Kilo user
+  to one Gateway OAuth client for one exact scoped connect resource, callback URI,
+  execution context, connection instance, and scope set.
 - **Gateway access token**: A short-lived app-issued JWT bound to one user, one
   scoped connect resource, one execution context, one instance, and one scope set.
 - **Derived connect token**: A short-lived gateway access token minted by the
@@ -280,6 +283,35 @@ when they appear in all capitals.
     `profile`.
 27. `/userinfo` MUST require `profile`; possession of `mcp:access` alone MUST NOT
     disclose profile claims.
+28. Successful interactive approval for a connection that does not require upstream
+    provider authorization MUST create or reuse an active Gateway OAuth grant.
+    Approval for a connection that still needs upstream provider authorization MUST
+    create or reuse a pending Gateway OAuth grant and MUST promote it to active only
+    after provider callback success. Denial MUST NOT create a grant.
+29. Authorization requests, pending provider authorization, authorization codes,
+    refresh tokens, and OAuth-client access JWTs MUST bind the same Gateway OAuth
+    grant ID.
+30. Reuse is allowed only when client, user, exact callback URI, scoped connect
+     resource, connection instance, execution context, config version, and granted
+     scopes are unchanged. A material binding change MUST revoke the old grant and
+     create a new grant ID; a revoked grant MUST NOT be reactivated. Adding or
+     removing `refresh_token` client grant capability is a material client metadata
+     change because it changes whether the client can extend the approved access
+     duration without another consent prompt.
+31. OAuth-client JWTs MUST contain `token_source=oauth_client`, `oauth_grant_id`,
+    and the external `client_id`. Derived connect tokens MUST contain
+    `token_source=derived_connect` and MUST NOT contain OAuth client grant identity.
+32. Code exchange, refresh, provider callback completion, `/userinfo`, and every
+    OAuth-client runtime request MUST recheck the bound grant state. Runtime,
+    `/userinfo`, code exchange, and refresh require an active grant; provider
+    callback completion may consume only the matching pending grant and must leave a
+    revoked or missing grant inactive.
+33. Revoking a Gateway OAuth grant MUST immediately invalidate pending codes,
+    refresh tokens, provider authorization attempts, and otherwise valid access
+    JWTs bound to that grant. It MUST NOT revoke the connection instance, provider
+    grant, config, route, or another client's Gateway OAuth grant.
+34. Users MUST be able to list and revoke only their own Gateway OAuth grants,
+    including grants for organization-owned connections they were authorized to use.
 
 ## Provider Authorization And Grants
 
@@ -340,43 +372,47 @@ when they appear in all capitals.
 3. After JWT verification and before fresh runtime-state resolution, credential
    loading, provider refresh, or upstream access, the Worker MUST require
    `mcp:access`.
-4. The Worker MUST reject stale route keys, disabled/deleted configs, wrong owner
+4. Before loading credentials, refreshing provider authorization, or proxying, the
+   Worker MUST fresh-check the active Gateway OAuth grant for OAuth-client tokens
+   against the JWT user, client, connection instance, exact connect resource,
+   execution context, and scopes. Derived connect tokens skip only this grant check.
+5. The Worker MUST reject stale route keys, disabled/deleted configs, wrong owner
    scope, wrong execution context, missing membership, missing assignment,
    ineligible users, removed instances, missing grants, and version conflicts.
-5. The client `Authorization` header is only for gateway authentication and MUST
+6. The client `Authorization` header is only for gateway authentication and MUST
    NOT be forwarded upstream.
-6. The Worker MUST use an explicit allowlist for transient client headers and
+7. The Worker MUST use an explicit allowlist for transient client headers and
    strip credential-like headers including `Authorization`, `Proxy-Authorization`,
    `Cookie`, `X-API-Key`, `X-Auth-*`, `X-Token-*`, and configured static
    credential names.
-7. Static headers and auxiliary headers MUST have valid header names/values and
+8. Static headers and auxiliary headers MUST have valid header names/values and
    MUST NOT be hop-by-hop or credential-confusing.
-8. At most one auth source may own upstream `Authorization`.
-9. In OAuth modes, the Worker injects the requesting user's bearer provider token.
-10. In static-header mode, the Worker injects only the config's static credential
+9. At most one auth source may own upstream `Authorization`.
+10. In OAuth modes, the Worker injects the requesting user's bearer provider token.
+11. In static-header mode, the Worker injects only the config's static credential
     headers and allowed auxiliary headers.
-11. The Worker MUST validate any incoming `Origin` header before credential
+12. The Worker MUST validate any incoming `Origin` header before credential
     injection. Origin-less non-browser clients are allowed; supplied origins MUST
     match a configured gateway/app origin or be rejected.
-12. The Worker MUST stream request and response bodies and MUST NOT buffer unknown
+13. The Worker MUST stream request and response bodies and MUST NOT buffer unknown
     proxy bodies.
-13. The Worker MUST reject non-public HTTPS upstream destinations, including
+14. The Worker MUST reject non-public HTTPS upstream destinations, including
     loopback, private, link-local, reserved, and non-public IPv4/IPv6 results.
-14. DNS validation MUST consider both A and AAAA answers and fail closed when the
+15. DNS validation MUST consider both A and AAAA answers and fail closed when the
     destination cannot be safely validated. Because Workers cannot pin arbitrary
     third-party DNS answers across zones, this is a best-effort defense rather than
     a complete DNS-rebinding guarantee for untrusted external origins.
-15. The Worker MUST NOT follow upstream redirects in v1. It may return 3xx
+16. The Worker MUST NOT follow upstream redirects in v1. It may return 3xx
     responses to clients, but it must not forward injected credentials to a
     redirect target.
-16. The Worker MUST NOT expose a provider token-exchange API.
+17. The Worker MUST NOT expose a provider token-exchange API.
 
 ## Audit, Privacy, And Cleanup
 
 1. The system MUST record sanitized audit events for config creation/update/
    disable/delete, route rotation/revocation, assignment change, authorization
-   outcome, provider authorization outcome, provider grant change, refresh
-   outcome, and runtime usage.
+   outcome, Gateway OAuth grant creation/revocation, provider authorization outcome,
+   provider grant change, refresh outcome, and runtime usage.
 2. Audit events MUST include actor when available, owner scope, owner ID, config
    ID, route/instance IDs when applicable, event type, outcome, timestamp, and
    non-secret correlation metadata.
@@ -385,12 +421,14 @@ when they appear in all capitals.
    header secrets, gateway refresh tokens, authorization codes, PKCE verifiers,
    auth headers, cookies, or raw provider payloads.
 4. Soft-delete or anonymization of a user MUST remove or anonymize user-associated
-   instances, provider grants, pending provider state, and other sensitive
-   gateway material while retaining only non-sensitive audit history where
-   required.
-5. Org removal MUST revoke/remove the user's org instances, grants, assignments,
-   and pending provider state immediately.
-6. Audit rows older than 60 days MAY be removed by the Worker cleanup job.
+   instances, Gateway OAuth grants, provider grants, pending provider state, and
+   other sensitive gateway material while retaining only non-sensitive audit
+   history where required.
+5. Org removal MUST revoke/remove the user's org instances, Gateway OAuth grants,
+   provider grants, assignments, and pending provider state immediately.
+6. Active Gateway OAuth grants MUST NOT be removed by age. Revoked grants MAY be
+   deleted under an explicit retention policy.
+7. Audit rows older than 60 days MAY be removed by the Worker cleanup job.
 
 ## Error Handling
 

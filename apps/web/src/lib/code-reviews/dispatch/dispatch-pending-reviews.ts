@@ -62,6 +62,7 @@ import {
   staleRunningCodeReviewCutoffSql,
   type PendingCodeReviewCreatedAtWindow,
 } from './dispatch-constants';
+import { getManualCodeReviewConfig, shouldPublishCodeReviewToProvider } from '../manual-config';
 
 export type DispatchResult = {
   dispatched: number;
@@ -118,6 +119,7 @@ async function finalizeActionRequiredGateCheck(
   review: CloudAgentCodeReview,
   reason: CodeReviewActionRequiredReason
 ): Promise<void> {
+  if (!shouldPublishCodeReviewToProvider(review)) return;
   const platform: CodeReviewPlatform = review.platform === 'gitlab' ? 'gitlab' : 'github';
   if (platform !== 'github' || !review.check_run_id || !review.platform_integration_id) return;
 
@@ -307,9 +309,11 @@ export async function tryDispatchPendingReviews(
         const actionRequiredReason = getActionRequiredReasonFromError(error);
         const actionRequiredStateAlreadyPresent =
           error instanceof CodeReviewActionRequiredDispatchError;
+        const manualConfig = getManualCodeReviewConfig(reservation.review);
+        const isManualReview = manualConfig !== null;
 
         if (actionRequiredReason) {
-          if (!actionRequiredStateAlreadyPresent) {
+          if (!actionRequiredStateAlreadyPresent && !isManualReview) {
             logExceptInTest(
               '[tryDispatchPendingReviews] Disabling Code Reviewer after action-required failure',
               {
@@ -384,16 +388,18 @@ export async function tryDispatchPendingReviews(
             continue;
           }
 
-          try {
-            await finalizeActionRequiredGateCheck(reservation.review, actionRequiredReason);
-          } catch (updateError) {
-            errorExceptInTest(
-              '[tryDispatchPendingReviews] Failed to finalize action-required check run',
-              {
-                reviewId: reservation.review.id,
-                updateError,
-              }
-            );
+          if (!isManualReview) {
+            try {
+              await finalizeActionRequiredGateCheck(reservation.review, actionRequiredReason);
+            } catch (updateError) {
+              errorExceptInTest(
+                '[tryDispatchPendingReviews] Failed to finalize action-required check run',
+                {
+                  reviewId: reservation.review.id,
+                  updateError,
+                }
+              );
+            }
           }
 
           continue;
@@ -447,6 +453,7 @@ export async function tryDispatchPendingReviews(
 async function dispatchReservedReview(reservation: ReservedReview, owner: Owner): Promise<boolean> {
   const { review, dispatchReservationId } = reservation;
   const platform: CodeReviewPlatform = review.platform === 'gitlab' ? 'gitlab' : 'github';
+  const manualConfig = getManualCodeReviewConfig(review);
 
   logExceptInTest('[dispatchReview] Dispatching review', {
     reviewId: review.id,
@@ -461,21 +468,30 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     return false;
   }
 
-  const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
+  let agentConfig: Parameters<typeof prepareReviewPayload>[0]['agentConfig'];
 
-  if (!agentConfig) {
-    throw new Error(
-      `Agent config not found for owner ${owner.type}:${owner.id} on platform ${platform}`
-    );
-  }
+  if (manualConfig) {
+    agentConfig = { config: manualConfig.agentConfig };
+  } else {
+    const persistedAgentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
+    if (!persistedAgentConfig) {
+      throw new Error(
+        `Agent config not found for owner ${owner.type}:${owner.id} on platform ${platform}`
+      );
+    }
 
-  const actionRequiredState = getCodeReviewActionRequiredState(agentConfig);
-  if (actionRequiredState) {
-    throw new CodeReviewActionRequiredDispatchError(actionRequiredState.reason);
-  }
+    const actionRequiredState = getCodeReviewActionRequiredState(persistedAgentConfig);
+    if (actionRequiredState) {
+      throw new CodeReviewActionRequiredDispatchError(actionRequiredState.reason);
+    }
 
-  if (!agentConfig.is_enabled) {
-    throw new Error(`Code Reviewer is disabled for owner ${owner.type}:${owner.id} on ${platform}`);
+    if (!persistedAgentConfig.is_enabled) {
+      throw new Error(
+        `Code Reviewer is disabled for owner ${owner.type}:${owner.id} on ${platform}`
+      );
+    }
+
+    agentConfig = persistedAgentConfig;
   }
 
   const payload = await prepareReviewPayload({
@@ -485,11 +501,12 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     platform,
   });
   const analyticsPrompt =
-    owner.type === 'org'
+    owner.type === 'org' && manualConfig?.outputMode !== 'kilo'
       ? appendCodeReviewAnalyticsPromptAppendix(payload.sessionInput.prompt)
       : null;
   const shouldEnrollAnalytics =
     owner.type === 'org' &&
+    manualConfig?.outputMode !== 'kilo' &&
     getReviewAnalyticsEnabledFromConfig(agentConfig.config) &&
     analyticsPrompt !== null;
 
@@ -621,7 +638,7 @@ async function handleAmbiguousDispatchFailure(
       ? workerTerminalReason
       : classifiedReason;
 
-    if (actionRequiredReason) {
+    if (actionRequiredReason && getManualCodeReviewConfig(review) === null) {
       try {
         await disableCodeReviewForActionRequiredFailure({
           owner,

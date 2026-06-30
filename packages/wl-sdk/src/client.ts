@@ -240,7 +240,10 @@ export class WlClient {
 
   // ── Reads ──────────────────────────────────────────────────────
 
-  async browse(filter?: BrowseFilter): Promise<BrowseEntry[]> {
+  async browse(
+    filter?: BrowseFilter,
+    options?: { includeForkBranches?: boolean }
+  ): Promise<BrowseEntry[]> {
     return unwrap(
       await browse({
         auth: this.#auth,
@@ -248,6 +251,7 @@ export class WlClient {
         fork: this.#fork,
         rigHandle: this.#config.rigHandle,
         filter,
+        includeForkBranches: options?.includeForkBranches,
         fetch: this.#config.fetch,
         hooks: this.#hooks,
       }),

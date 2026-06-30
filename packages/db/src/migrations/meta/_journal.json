@@ -1219,6 +1219,20 @@
       "when": 1782381719017,
       "tag": "0173_lowly_venom",
       "breakpoints": true
+    },
+    {
+      "idx": 174,
+      "version": "7",
+      "when": 1782754033598,
+      "tag": "0174_great_vector",
+      "breakpoints": true
+    },
+    {
+      "idx": 175,
+      "version": "7",
+      "when": 1782805226803,
+      "tag": "0175_spooky_unus",
+      "breakpoints": true
     }
   ]
 }

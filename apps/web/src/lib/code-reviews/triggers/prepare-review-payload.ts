@@ -60,6 +60,7 @@ import {
 import { getCurrentReviewSummaryForContext } from '../summary/history';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
+import { getManualCodeReviewConfig } from '../manual-config';
 
 export type PreparePayloadParams = {
   reviewId: string;
@@ -116,8 +117,6 @@ export async function prepareReviewPayload(
   params: PreparePayloadParams
 ): Promise<CodeReviewPayload> {
   const { reviewId, owner, agentConfig, platform = 'github' } = params;
-  const config = agentConfig.config as CodeReviewAgentConfig;
-  const shouldUseReviewMd = config.disable_review_md === false;
 
   logExceptInTest('[prepareReviewPayload] Starting payload preparation', {
     reviewId,
@@ -133,11 +132,17 @@ export async function prepareReviewPayload(
       throw new Error(`Review ${reviewId} not found`);
     }
 
+    const manualConfig = getManualCodeReviewConfig(review);
+    const outputMode = manualConfig?.outputMode ?? 'provider';
+    const config = manualConfig?.agentConfig ?? (agentConfig.config as CodeReviewAgentConfig);
+    const shouldUseReviewMd = outputMode === 'provider' && config.disable_review_md === false;
+
     logExceptInTest('[prepareReviewPayload] Found review in DB', {
       reviewId,
       repoFullName: review.repo_full_name,
       prNumber: review.pr_number,
       platformIntegrationId: review.platform_integration_id,
+      outputMode,
       baseRef: review.base_ref,
       headRef: review.head_ref,
     });
@@ -156,16 +161,23 @@ export async function prepareReviewPayload(
     // 3. Get platform token and build review state based on platform
     let githubToken: string | undefined;
     let gitlabToken: string | undefined;
-    let reviewContinuationScope: ReviewContinuationScope | null =
-      platform === PLATFORM.GITLAB ? null : { platform: 'github' };
+    let reviewContinuationScope: ReviewContinuationScope | null = null;
     let gitlabInstanceUrl: string | undefined;
     let existingReviewState: ExistingReviewState | null = null;
     let gitlabContext: GitLabDiffContext | undefined;
     let repositoryReviewInstructionsLookup = unusedRepositoryReviewInstructionsLookup();
     let repositorySize: string | null = null;
 
-    if (review.platform_integration_id) {
+    if (outputMode === 'provider') {
+      if (!review.platform_integration_id) {
+        throw new Error(`Provider Code Reviewer job ${reviewId} is missing its integration`);
+      }
+
       const integration = await getIntegrationById(review.platform_integration_id);
+
+      if (!integration) {
+        throw new Error(`Provider Code Reviewer job ${reviewId} integration is unavailable`);
+      }
 
       if (platform === 'github' && integration?.platform_installation_id) {
         const installationId = integration.platform_installation_id;
@@ -178,6 +190,7 @@ export async function prepareReviewPayload(
         const tokenData = await generateGitHubInstallationToken(installationId, appType);
         const installationToken = tokenData.token;
         githubToken = installationToken;
+        reviewContinuationScope = { platform: 'github', integrationId: integration.id };
         const [repoOwner, repoName] = review.repo_full_name.split('/');
 
         try {
@@ -260,7 +273,7 @@ export async function prepareReviewPayload(
             error: stateLookupError,
           });
         }
-      } else if (platform === 'gitlab' && integration) {
+      } else if (platform === 'gitlab') {
         // GitLab: Use Project Access Token (PrAT) for all operations
         // PrAT is required for cloning private repos and for the glab CLI.
         // Unlike GitHub, we cannot fall back to no-token for GitLab private repos,
@@ -412,6 +425,10 @@ export async function prepareReviewPayload(
             error: stateLookupError,
           });
         }
+      } else {
+        throw new Error(
+          `Provider Code Reviewer job ${reviewId} has invalid ${platform} integration`
+        );
       }
     }
 
@@ -421,14 +438,15 @@ export async function prepareReviewPayload(
     let previousHeadSha: string | null = null;
     let previousCloudAgentSessionId: string | undefined;
     try {
-      const previousReview = reviewContinuationScope
-        ? await findPreviousCompletedReview(
-            review.repo_full_name,
-            review.pr_number,
-            existingReviewState?.headCommitSha ?? review.head_sha,
-            reviewContinuationScope
-          )
-        : null;
+      const previousReview =
+        manualConfig === null && reviewContinuationScope
+          ? await findPreviousCompletedReview(
+              review.repo_full_name,
+              review.pr_number,
+              existingReviewState?.headCommitSha ?? review.head_sha,
+              reviewContinuationScope
+            )
+          : null;
       previousHeadSha = previousReview?.head_sha ?? null;
 
       if (previousReview?.session_id) {
@@ -501,6 +519,9 @@ export async function prepareReviewPayload(
         gitlabContext,
         previousHeadSha,
         repositoryReviewInstructions: repositoryReviewInstructionsLookup.content,
+        manualInstructions: manualConfig?.instructions ?? null,
+        outputMode,
+        expectedHeadSha: review.head_sha,
       }
     );
 
@@ -521,46 +542,62 @@ export async function prepareReviewPayload(
     const gateThreshold = config.gate_threshold ?? 'off';
     const githubCheckoutRef = getGitHubPullRequestCheckoutRef(review.pr_number);
     const sessionInput: SessionInput =
-      platform === 'gitlab'
+      outputMode === 'kilo'
         ? {
-            // GitLab: use full git URL for cloning
-            gitUrl: `${gitlabInstanceUrl || 'https://gitlab.com'}/${review.repo_full_name}.git`,
-            gitToken: gitlabToken,
-            platform: 'gitlab',
+            gitUrl:
+              platform === PLATFORM.GITLAB
+                ? `https://gitlab.com/${review.repo_full_name}.git`
+                : `https://github.com/${review.repo_full_name}.git`,
             kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
             prompt,
             mode: DEFAULT_CODE_REVIEW_MODE as 'code',
             model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
             variant,
             upstreamBranch: review.head_ref,
-            ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
           }
-        : {
-            // GitHub: use owner/repo format
-            githubRepo: review.repo_full_name,
-            githubToken,
-            platform: 'github',
-            kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
-            prompt,
-            mode: DEFAULT_CODE_REVIEW_MODE as 'code',
-            model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
-            variant,
-            upstreamBranch: githubCheckoutRef,
-            ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
-          };
+        : platform === 'gitlab'
+          ? {
+              // GitLab: use full git URL for cloning
+              gitUrl: `${gitlabInstanceUrl || 'https://gitlab.com'}/${review.repo_full_name}.git`,
+              gitToken: gitlabToken,
+              platform: 'gitlab',
+              kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
+              prompt,
+              mode: DEFAULT_CODE_REVIEW_MODE as 'code',
+              model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+              variant,
+              upstreamBranch: review.head_ref,
+              ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
+            }
+          : {
+              // GitHub: use owner/repo format
+              githubRepo: review.repo_full_name,
+              githubToken,
+              platform: 'github',
+              kilocodeOrganizationId: owner.type === 'org' ? owner.id : undefined,
+              prompt,
+              mode: DEFAULT_CODE_REVIEW_MODE as 'code',
+              model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+              variant,
+              upstreamBranch: githubCheckoutRef,
+              ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
+            };
 
     // Log the session input for GitLab
     if (platform === 'gitlab') {
       logExceptInTest('[prepareReviewPayload] GitLab session input prepared', {
         gitUrl: sessionInput.gitUrl,
         hasGitToken: !!sessionInput.gitToken,
+        outputMode,
         upstreamBranch: sessionInput.upstreamBranch,
         model: sessionInput.model,
       });
     } else {
       logExceptInTest('[prepareReviewPayload] GitHub session input prepared', {
         githubRepo: sessionInput.githubRepo,
+        gitUrl: sessionInput.gitUrl,
         hasGithubToken: !!sessionInput.githubToken,
+        outputMode,
         upstreamBranch: sessionInput.upstreamBranch,
         model: sessionInput.model,
       });
@@ -585,7 +622,7 @@ export async function prepareReviewPayload(
         ...sessionInput,
         githubToken: sessionInput.githubToken ? '***' : undefined, // Redact token
         gitToken: sessionInput.gitToken ? '***' : undefined, // Redact token
-        prompt: sessionInput.prompt.substring(0, 200) + '...', // Show first 200 chars
+        promptLength: sessionInput.prompt.length,
       },
     });
 

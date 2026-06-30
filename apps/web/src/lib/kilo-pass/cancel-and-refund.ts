@@ -15,6 +15,7 @@ import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled
 import { fromMicrodollars } from '@/lib/utils';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
+import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 
 type Db = typeof defaultDb;
 
@@ -261,6 +262,8 @@ export async function cancelAndRefundKiloPassForUser({
 
     return balanceReset;
   });
+
+  await revokeGatewayGrantsForBlockedUser(userId);
 
   if (!user.blocked_reason) {
     void reportEvents({

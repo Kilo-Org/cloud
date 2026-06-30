@@ -177,6 +177,14 @@ describe('kilo API client', () => {
     );
   });
 
+  it('parses context_length into contextLength', () => {
+    const options = parseKiloGatewayModelsResponse({
+      data: [{ context_length: 200_000, id: 'a/b', name: 'A: B', opencode: { variants: {} } }],
+    });
+
+    expect(options[0]?.contextLength).toBe(200_000);
+  });
+
   it('labels thinking efforts compactly', () => {
     expect(thinkingEffortLabel('medium')).toBe('Med');
     expect(thinkingEffortLabel('xhigh')).toBe('XHigh');

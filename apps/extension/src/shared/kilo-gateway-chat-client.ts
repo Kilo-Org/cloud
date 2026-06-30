@@ -54,4 +54,7 @@ export interface KiloGatewayChatCompletion {
   readonly reasoning?: string;
   readonly reasoningDetails?: readonly unknown[];
   readonly toolCalls: KiloGatewayToolCallRequest[];
+  readonly usage?: {
+    readonly promptTokens: number;
+  };
 }

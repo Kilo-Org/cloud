@@ -43,6 +43,7 @@ import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
+import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -87,6 +88,7 @@ export const rootRouter = createTRPCRouter({
   activeSessions: activeSessionsRouter,
   usageAnalytics: usageAnalyticsRouter,
   mcpGateway: mcpGatewayRouter,
+  mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

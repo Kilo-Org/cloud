@@ -366,6 +366,92 @@ describe('session metadata boundary', () => {
     expect(serializeSessionMetadata(current)).toEqual(current);
   });
 
+  it('serializes captured current branches with shell-safe Git punctuation', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'agent_current_branch',
+        userId: 'user_123',
+      },
+      auth: {},
+      repository: {
+        type: 'github' as const,
+        repo: 'acme/repo',
+        upstreamBranch: 'feature/alex+metadata@v2,fix=1#manual',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+  });
+
+  it('normalizes current GitHub repository metadata written without a type', () => {
+    expect(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_current_github_repo', userId: 'user_123' },
+        auth: {},
+        repository: {
+          repo: 'Kilo-Org/cloud',
+          platform: 'github',
+          upstreamBranch: 'refs/pull/4273/head',
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      }).repository
+    ).toEqual({
+      type: 'github',
+      repo: 'Kilo-Org/cloud',
+      platform: 'github',
+      upstreamBranch: 'refs/pull/4273/head',
+    });
+  });
+
+  it('normalizes current git URL repository metadata written without a type', () => {
+    expect(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_current_git_url', userId: 'user_123' },
+        auth: {},
+        repository: {
+          url: 'https://github.com/Kilo-Org/cloud.git',
+          platform: 'github',
+          upstreamBranch: 'chore/local-testing-code-reviews',
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      }).repository
+    ).toEqual({
+      type: 'git',
+      url: 'https://github.com/Kilo-Org/cloud.git',
+      platform: 'github',
+      upstreamBranch: 'chore/local-testing-code-reviews',
+    });
+  });
+
+  it('drops a current repository with an unknown type so the reaper can still read metadata', () => {
+    expect(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_empty_local_repo', userId: 'user_123' },
+        auth: {},
+        repository: { type: 'empty-local' },
+        lifecycle: { version: 1, timestamp: 1, kiloServerLastActivity: 5 },
+      }).repository
+    ).toBeUndefined();
+  });
+
+  it('drops current repository metadata without enough repository identity', () => {
+    expect(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_invalid_repository', userId: 'user_123' },
+        auth: {},
+        repository: { upstreamBranch: 'main' },
+        lifecycle: { version: 1, timestamp: 1 },
+      }).repository
+    ).toBeUndefined();
+  });
+
   it('persists Bitbucket identity and managed status without a token', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,

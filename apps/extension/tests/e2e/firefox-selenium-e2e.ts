@@ -470,28 +470,6 @@ const waitForTextGone = async (driver: WebDriver, text: string): Promise<void> =
   );
 };
 
-const acceptAlertWithText = async (driver: WebDriver, text: string): Promise<void> => {
-  await driver.wait(
-    async () => {
-      try {
-        const alert = await driver.switchTo().alert();
-        const alertText = await alert.getText();
-
-        if (!alertText.includes(text)) {
-          return false;
-        }
-
-        await alert.accept();
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    waitMs,
-    `Timed out waiting for alert text: ${text}`
-  );
-};
-
 const findManifestUrl = async (driver: WebDriver): Promise<string> => {
   await driver.get('about:debugging#/runtime/this-firefox');
   await waitForText(driver, 'Kilo Extension');
@@ -1067,8 +1045,8 @@ const scenarios: FirefoxScenario[] = [
           await sendMessage(session.driver, 'Close this');
           await waitForText(session.driver, 'Close this reply.');
 
+          // Close-without-confirm: no dialog fires — tab closes immediately
           await clickButtonByLabel(session.driver, 'Close Close this');
-          await acceptAlertWithText(session.driver, 'Close this conversation tab?');
           await waitForTextGone(session.driver, 'Close this reply.');
           await waitForText(session.driver, 'Keep this reply.');
 

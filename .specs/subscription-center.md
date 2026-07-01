@@ -25,6 +25,7 @@ Updated 2026-05-28 -- Credit-funded payment source label.
 Updated 2026-05-28 -- Coding Plans API key configuration summary.
 Updated 2026-05-28 -- Coding Plans billing history USD amount display.
 Updated 2026-06-05 -- KiloClaw final Commit term continuation behavior.
+Updated 2026-07-01 -- Coding Plans installed-key deletion blocked in BYOK.
 
 ## Conventions
 
@@ -297,10 +298,12 @@ historical Commit names, prices, invoices, and credit deductions.
     - Inline billing history showing credit transactions with amounts in USD
       (see Billing History rules)
 
-    Before update, disable, or delete, `/byok` MUST warn that routing changes
-    do not cancel or pause Token Plan Plus billing and cancellation is managed
-    in Subscription Center; customer surfaces MUST NOT include saved raw-key
-    view or copy controls.
+    Before update or disable, `/byok` MUST warn that routing changes do not
+    cancel or pause Token Plan Plus billing and cancellation is managed in
+    Subscription Center. `/byok` MUST block a direct delete of the Kilo-managed
+    installed key and direct the user to cancel the plan in Subscription Center,
+    which removes it at Effective Cancellation; customer surfaces MUST NOT
+    include saved raw-key view or copy controls.
 
 31. Coding Plan cancellation, installed MiniMax configuration cleanup,
     and issued-credential revocation MUST follow `.specs/coding-plans.md`.
@@ -315,9 +318,10 @@ historical Commit names, prices, invoices, and credit deductions.
     action. For MiniMax Token Plan Plus, purchase messaging MUST explain
     automatic MiniMax BYOK setup and purchase MUST be blocked when any
     personal MiniMax BYOK key exists, including a disabled key. In that
-    state, the system MUST direct the user to delete the existing key in
-    `/byok` first. An offering without assignable credential capacity MUST
-    display a sold-out state and a `Notify me when available` action. The
+    state, the system MUST direct the user to delete the existing
+    user-managed key in `/byok` first. An offering without assignable
+    credential capacity MUST display a sold-out state and a `Notify me when
+    available` action. The
     action MUST persist one notification intent per user and Plan ID without
     charging credits or reserving inventory, and the surface MUST indicate
     once that intent has been saved.
@@ -462,6 +466,11 @@ not yet enforced in the current codebase:
    the current plan and seat count without management actions.
 
 ## Changelog
+
+### 2026-07-01 -- Coding Plans installed-key deletion blocked
+
+- Blocked direct deletion of a Kilo-managed installed MiniMax key in `/byok`; the key is removed by cancelling the plan in Subscription Center, which cleans it up at Effective Cancellation.
+- Kept update and disable available with the existing billing-separation warning; a replaced, user-managed key remains deletable.
 
 ### 2026-06-05 -- KiloClaw final Commit continuation
 

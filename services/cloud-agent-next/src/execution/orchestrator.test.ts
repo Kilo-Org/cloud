@@ -274,11 +274,9 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
     } satisfies Partial<ExecutionError>);
   });
 
-  it('destroys enabled Code Reviewer sandboxes after wrapper bootstrap failure', async () => {
+  it('destroys Code Reviewer sandboxes after wrapper bootstrap failure', async () => {
     const orgId = 'org_crv_ephemeral';
-    const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator({
-      env: { CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS: orgId } as Env,
-    });
+    const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator();
     ensureWrapper.mockRejectedValueOnce(new Error('wrapper unavailable'));
 
     await expect(orchestrator.execute(codeReviewPlan(orgId))).rejects.toMatchObject({
@@ -288,11 +286,9 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
     expect(deleteSandbox).toHaveBeenCalledWith('recovery');
   });
 
-  it('does not destroy non-crv sandboxes when rollout policy changes after allocation', async () => {
+  it('does not destroy non-crv sandboxes after wrapper bootstrap failure', async () => {
     const orgId = 'org_crv_ephemeral';
-    const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator({
-      env: { CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS: orgId } as Env,
-    });
+    const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator();
     const plan = codeReviewPlan(orgId);
     ensureWrapper.mockRejectedValueOnce(new Error('wrapper unavailable'));
 
@@ -309,19 +305,6 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
       retryable: true,
     } satisfies Partial<ExecutionError>);
     expect(deleteSandbox).not.toHaveBeenCalled();
-  });
-
-  it('destroys crv-* sandbox after wrapper bootstrap failure even if rollout policy changed', async () => {
-    const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator({
-      env: { CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS: 'org_other' } as Env,
-    });
-    ensureWrapper.mockRejectedValueOnce(new Error('wrapper unavailable'));
-
-    await expect(orchestrator.execute(codeReviewPlan('org_crv_ephemeral'))).rejects.toMatchObject({
-      code: 'WRAPPER_START_FAILED',
-      retryable: true,
-    } satisfies Partial<ExecutionError>);
-    expect(deleteSandbox).toHaveBeenCalledWith('recovery');
   });
 
   it('preserves a finalizing error from wrapper startup', async () => {

@@ -375,7 +375,7 @@ describe('generateSandboxId', () => {
   });
 
   describe('Code Reviewer ephemeral sandbox', () => {
-    it('routes enabled Code Reviewer organizations to dedicated crv sandboxes', async () => {
+    it('routes Code Reviewer sessions to dedicated crv sandboxes', async () => {
       const target = await generateSandboxRoutingTarget(
         undefined,
         'org-review',
@@ -384,7 +384,6 @@ describe('generateSandboxId', () => {
         undefined,
         {
           createdOnPlatform: 'code-review',
-          codeReviewEphemeralSandboxOrgIds: 'org-review',
         }
       );
 
@@ -394,40 +393,10 @@ describe('generateSandboxId', () => {
       });
     });
 
-    it('keeps disabled Code Reviewer organizations on the existing route', async () => {
-      const target = await generateSandboxRoutingTarget(
-        undefined,
-        'org-review',
-        'user-id',
-        'agent_abc123',
-        undefined,
-        {
-          createdOnPlatform: 'code-review',
-          codeReviewEphemeralSandboxOrgIds: 'other-org',
-        }
-      );
-
-      expect(target).toEqual({
-        kind: 'shared',
-        routeKey: expect.stringMatching(/^org-/),
-      });
-    });
-
-    it('matches orgless Code Reviewer sessions only with wildcard', async () => {
+    it('routes orgless Code Reviewer sessions to dedicated crv sandboxes', async () => {
       await expect(
         generateSandboxRoutingTarget(undefined, undefined, 'user-id', 'agent_abc123', undefined, {
           createdOnPlatform: 'code-review',
-          codeReviewEphemeralSandboxOrgIds: 'org-review',
-        })
-      ).resolves.toEqual({
-        kind: 'shared',
-        routeKey: expect.stringMatching(/^usr-/),
-      });
-
-      await expect(
-        generateSandboxRoutingTarget(undefined, undefined, 'user-id', 'agent_abc123', undefined, {
-          createdOnPlatform: 'code-review',
-          codeReviewEphemeralSandboxOrgIds: '*',
         })
       ).resolves.toEqual({
         kind: 'isolated',
@@ -445,7 +414,6 @@ describe('generateSandboxId', () => {
         {
           devcontainer: true,
           createdOnPlatform: 'code-review',
-          codeReviewEphemeralSandboxOrgIds: '*',
         }
       );
 

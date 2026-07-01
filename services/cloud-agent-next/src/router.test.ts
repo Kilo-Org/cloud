@@ -1183,7 +1183,6 @@ describe('router sessionId validation', () => {
             SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
             SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
             SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
-            CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS: '',
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
@@ -1376,9 +1375,8 @@ describe('router sessionId validation', () => {
         expect(mockGetCurrentRuntimeExecution).not.toHaveBeenCalled();
       });
 
-      it('reports enabled Code Reviewer sandbox cleanup as destroyed without probing compute', async () => {
+      it('reports Code Reviewer sandbox cleanup as destroyed without probing compute', async () => {
         const sessionId: SessionId = 'agent_44444444-4444-4444-4444-444444444444';
-        mockContext.env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS = 'org-123';
         mockIsSandboxCleanupScheduled.mockResolvedValue(true);
         mockGetMetadata.mockResolvedValue(
           legacySessionMetadata({
@@ -1392,38 +1390,6 @@ describe('router sessionId validation', () => {
             auth: {},
             workspace: {
               sandboxId: 'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
-            },
-            lifecycle: { version: 1, timestamp: 123456789 },
-          })
-        );
-
-        const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
-
-        expect(result).toMatchObject({
-          cloudAgentSessionId: sessionId,
-          sandboxStatus: 'destroyed',
-          executionHealth: 'none',
-        });
-        expect(mockIsSandboxCleanupScheduled).toHaveBeenCalledOnce();
-        expect(getSandbox).not.toHaveBeenCalled();
-      });
-
-      it('reports persisted Code Reviewer sandbox cleanup after rollout removal', async () => {
-        const sessionId: SessionId = 'agent_33333333-3333-3333-3333-333333333333';
-        mockContext.env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS = 'other-org';
-        mockIsSandboxCleanupScheduled.mockResolvedValue(true);
-        mockGetMetadata.mockResolvedValue(
-          legacySessionMetadata({
-            metadataSchemaVersion: 2,
-            identity: {
-              sessionId,
-              orgId: 'org-123',
-              userId: 'test-user-123',
-              createdOnPlatform: 'code-review',
-            },
-            auth: {},
-            workspace: {
-              sandboxId: 'crv-b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4f5a6b1c2d3e4',
             },
             lifecycle: { version: 1, timestamp: 123456789 },
           })

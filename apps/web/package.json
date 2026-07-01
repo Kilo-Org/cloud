@@ -136,7 +136,7 @@
     "headroom-ai": "^0.22.4",
     "jotai": "2.18.1",
     "jotai-minidb": "0.0.8",
-    "js-cookie": "3.0.5",
+    "js-cookie": "3.0.8",
     "js-yaml": "4.1.1",
     "jsonwebtoken": "catalog:",
     "linkify-it": "5.0.0",

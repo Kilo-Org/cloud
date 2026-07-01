@@ -139,7 +139,7 @@
     "js-cookie": "3.0.5",
     "js-yaml": "4.1.1",
     "jsonwebtoken": "catalog:",
-    "linkify-it": "5.0.0",
+    "linkify-it": "5.0.1",
     "lucide-react": "0.552.0",
     "mailgun.js": "12.7.1",
     "monaco-editor": "0.55.1",

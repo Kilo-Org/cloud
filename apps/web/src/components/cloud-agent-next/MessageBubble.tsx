@@ -27,6 +27,11 @@ import LinkifyIt from 'linkify-it';
 const linkify = new LinkifyIt();
 
 function TextWithLinks({ text }: { text: string }) {
+  // Skip linkification for very large inputs to bound worst-case render time
+  // (defense-in-depth against CVE-2026-48801 / GHSA-22p9-wv53-3rq4)
+  if (text.length > 50_000) {
+    return <>{text}</>;
+  }
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   for (const match of linkify.match(text) ?? []) {

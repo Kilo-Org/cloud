@@ -1,8 +1,8 @@
-/* eslint-disable import/no-nodejs-modules, promise/avoid-new, promise/prefer-await-to-callbacks */
+/* eslint-disable import/no-nodejs-modules, max-lines, promise/avoid-new, promise/prefer-await-to-callbacks */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { expect, test } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { z } from 'zod';
@@ -29,7 +29,9 @@ type StreamableTransportOptions = ConstructorParameters<typeof StreamableHTTPSer
  * via this client path and is covered by the unit tests in
  * src/shared/remote-mcp-tools.test.ts instead.
  */
-const startMcpFixtureServer = async (): Promise<{ close: () => Promise<void>; url: string }> => {
+const startMcpFixtureServer = async (
+  options: { readonly requiredBearerToken?: string } = {}
+): Promise<{ close: () => Promise<void>; url: string }> => {
   const makeServer = (): McpServer => {
     const server = new McpServer({ name: 'kilo-mcp-fixture', version: '0.0.0' });
 
@@ -49,6 +51,19 @@ const startMcpFixtureServer = async (): Promise<{ close: () => Promise<void>; ur
 
   const httpServer = createServer((request, response) => {
     void (async (): Promise<void> => {
+      /*
+       * Reject requests without the expected bearer token so a successful turn
+       * proves the extension forwarded the header over the plain fetch.
+       */
+      if (
+        options.requiredBearerToken !== undefined &&
+        request.headers.authorization !== `Bearer ${options.requiredBearerToken}`
+      ) {
+        response.writeHead(401, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ error: 'unauthorized' }));
+        return;
+      }
+
       const chunks: string[] = [];
 
       for await (const chunk of request) {
@@ -156,114 +171,131 @@ const readStoredServersJson = (page: Page): Promise<string> =>
     REMOTE_MCP_STORAGE_KEY
   );
 
+// Display name "Fixture MCP" -> slug "fixture-mcp" -> gateway tool name below.
+const MAPPED_TOOL_NAME = 'mcp_fixture-mcp_get_weather';
+
+// A two-turn Kilo API script: call the mapped MCP tool, then answer.
+const turnMockConfig = {
+  firstCompletionEvents: [
+    {
+      choices: [
+        {
+          delta: {
+            tool_calls: [
+              {
+                function: {
+                  arguments: JSON.stringify({ city: 'Skopje' }),
+                  name: MAPPED_TOOL_NAME,
+                },
+                id: 'call_mcp_1',
+                index: 0,
+                type: 'function',
+              },
+            ],
+          },
+        },
+      ],
+    },
+  ],
+  secondCompletionEvents: [{ choices: [{ delta: { content: 'The weather in Skopje is 21C.' } }] }],
+  // Both turns offer the safe tools plus the mapped MCP tool.
+  toolNamesByCall: [
+    ['get_page_snapshot', 'get_element_details', 'find_in_page', MAPPED_TOOL_NAME],
+    ['get_page_snapshot', 'get_element_details', 'find_in_page', MAPPED_TOOL_NAME],
+  ],
+};
+
+/*
+ * Add the "Fixture MCP" server (optionally configuring auth), connect it, enable
+ * it in safe mode, then send a message and assert the mapped MCP tool ran with
+ * the fixture's JSON result. Leaves the server in place for the caller.
+ */
+const addConnectEnableAndRunTurn = async (
+  sidePanel: Page,
+  { configureAuth, url }: { configureAuth?: (page: Page) => Promise<void>; url: string }
+): Promise<void> => {
+  await sidePanel.getByRole('button', { name: 'Settings' }).click();
+  await sidePanel.getByRole('button', { name: 'Add server' }).click();
+  await sidePanel.getByLabel('Name').fill('Fixture MCP');
+  await sidePanel.getByLabel('URL').fill(url);
+  if (configureAuth !== undefined) {
+    await configureAuth(sidePanel);
+  }
+  await sidePanel.getByRole('button', { name: 'Save' }).click();
+
+  // The saved row shows the name; connect to discover tools.
+  await expect(sidePanel.getByText('Fixture MCP')).toBeVisible();
+  await sidePanel.getByRole('button', { name: 'Connect' }).click();
+
+  // Connected: the discovered tool is cached and the connect control becomes "Refresh".
+  await expect(sidePanel.getByRole('button', { name: 'Refresh' })).toBeVisible();
+  await expect(sidePanel.getByText('1 tool')).toBeVisible();
+
+  // Edit the server to allow it in safe mode (it is enabled by default).
+  await sidePanel.getByRole('button', { name: 'Edit Fixture MCP' }).click();
+  const allowInSafeMode = sidePanel.getByLabel('Allow in safe mode');
+  await expect(allowInSafeMode).not.toBeChecked();
+  await allowInSafeMode.check();
+  await expect(sidePanel.getByLabel('Enabled')).toBeChecked();
+  await sidePanel.getByRole('button', { name: 'Save' }).click();
+
+  /*
+   * Close settings. The chat panel reads remote MCP servers once on mount and
+   * refreshes the enabled ones, so reload to pick up the newly enabled server.
+   */
+  await sidePanel.getByRole('button', { name: 'Close settings' }).click();
+  await sidePanel.reload();
+
+  /*
+   * Wait for the post-reload background refresh to reconnect and re-cache the
+   * tool before sending — otherwise the turn would omit the MCP tool.
+   */
+  await sidePanel.getByRole('button', { name: 'Settings' }).click();
+  await expect(sidePanel.getByRole('button', { name: 'Refresh' })).toBeVisible();
+  await expect(sidePanel.getByText('1 tool')).toBeVisible();
+  await sidePanel.getByRole('button', { name: 'Close settings' }).click();
+
+  // Send a message that triggers the MCP tool call.
+  await sidePanel.getByLabel('Message agent').fill('What is the weather in Skopje?');
+  await sidePanel.getByLabel('Message agent').press('Enter');
+
+  // The mapped tool-call row appears; expand it and verify the plain JSON result.
+  const toolRow = sidePanel
+    .getByText(`${MAPPED_TOOL_NAME} completed`)
+    .locator('xpath=ancestor::details[1]');
+  await expect(toolRow).toBeVisible();
+  await toolRow.getByText(`${MAPPED_TOOL_NAME} completed`).click();
+  /*
+   * Arguments render as pretty JSON; the MCP result renders as the raw text
+   * envelope (the inner JSON arrives as an escaped string in the text part).
+   */
+  await expect(toolRow.getByText('"city": "Skopje"')).toBeVisible();
+  await expect(toolRow.getByText('"type": "text"')).toBeVisible();
+  await expect(toolRow.getByText(String.raw`{\"city\":\"Skopje\",\"tempC\":21}`)).toBeVisible();
+  await expect(sidePanel.getByText('The weather in Skopje is 21C.')).toBeVisible();
+};
+
+const openSidePanel = async (context: BrowserContext, extensionId: string): Promise<Page> => {
+  const sidePanel = await context.newPage();
+  await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+  await seedExtensionAuth(sidePanel);
+  await sidePanel.reload();
+  return sidePanel;
+};
+
 test('remote MCP server can be added, connected, used in a turn, and removed', async () => {
   const fixture = await startFixtureServer();
   const mcp = await startMcpFixtureServer();
   const { context, extensionId, userDataDir } = await launchExtensionContext();
 
-  // Display name "Fixture MCP" -> slug "fixture-mcp" -> gateway tool name below.
-  const mappedToolName = 'mcp_fixture-mcp_get_weather';
-
   try {
-    await mockKiloApi(context, {
-      firstCompletionEvents: [
-        {
-          choices: [
-            {
-              delta: {
-                tool_calls: [
-                  {
-                    function: {
-                      arguments: JSON.stringify({ city: 'Skopje' }),
-                      name: mappedToolName,
-                    },
-                    id: 'call_mcp_1',
-                    index: 0,
-                    type: 'function',
-                  },
-                ],
-              },
-            },
-          ],
-        },
-      ],
-      secondCompletionEvents: [
-        { choices: [{ delta: { content: 'The weather in Skopje is 21C.' } }] },
-      ],
-      // Both turns offer the safe tools plus the mapped MCP tool.
-      toolNamesByCall: [
-        ['get_page_snapshot', 'get_element_details', 'find_in_page', mappedToolName],
-        ['get_page_snapshot', 'get_element_details', 'find_in_page', mappedToolName],
-      ],
-    });
+    await mockKiloApi(context, turnMockConfig);
 
     const page = await context.newPage();
     await page.goto(fixture.url);
 
-    const sidePanel = await context.newPage();
-    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-    await seedExtensionAuth(sidePanel);
-    await sidePanel.reload();
-
-    // Open Settings and add a server.
-    await sidePanel.getByRole('button', { name: 'Settings' }).click();
-    await sidePanel.getByRole('button', { name: 'Add server' }).click();
-    await sidePanel.getByLabel('Name').fill('Fixture MCP');
-    await sidePanel.getByLabel('URL').fill(mcp.url);
-    // Auth type defaults to "None"; leave it.
-    await sidePanel.getByRole('button', { name: 'Save' }).click();
-
-    // The saved row shows the name; connect to discover tools.
-    await expect(sidePanel.getByText('Fixture MCP')).toBeVisible();
-    await sidePanel.getByRole('button', { name: 'Connect' }).click();
-
-    // Connected: the discovered tool is cached and the connect control becomes
-    // "Refresh".
-    await expect(sidePanel.getByRole('button', { name: 'Refresh' })).toBeVisible();
-    await expect(sidePanel.getByText('1 tool')).toBeVisible();
-
-    // Edit the server to enable it and allow it in safe mode.
-    await sidePanel.getByRole('button', { name: 'Edit Fixture MCP' }).click();
-    const allowInSafeMode = sidePanel.getByLabel('Allow in safe mode');
-    await expect(allowInSafeMode).not.toBeChecked();
-    await allowInSafeMode.check();
-    await expect(sidePanel.getByLabel('Enabled')).toBeChecked();
-    await sidePanel.getByRole('button', { name: 'Save' }).click();
-
-    /*
-     * Close settings. The chat panel reads remote MCP servers once on mount and
-     * refreshes the enabled ones, so reload to pick up the newly enabled server.
-     */
-    await sidePanel.getByRole('button', { name: 'Close settings' }).click();
-    await sidePanel.reload();
-
-    /*
-     * Wait for the post-reload background refresh to reconnect and re-cache the
-     * tool before sending — otherwise the turn would omit the MCP tool.
-     */
-    await sidePanel.getByRole('button', { name: 'Settings' }).click();
-    await expect(sidePanel.getByRole('button', { name: 'Refresh' })).toBeVisible();
-    await expect(sidePanel.getByText('1 tool')).toBeVisible();
-    await sidePanel.getByRole('button', { name: 'Close settings' }).click();
-
-    // Send a message that triggers the MCP tool call.
-    await sidePanel.getByLabel('Message agent').fill('What is the weather in Skopje?');
-    await sidePanel.getByLabel('Message agent').press('Enter');
-
-    // The mapped tool-call row appears; expand it and verify the plain JSON result.
-    const toolRow = sidePanel
-      .getByText(`${mappedToolName} completed`)
-      .locator('xpath=ancestor::details[1]');
-    await expect(toolRow).toBeVisible();
-    await toolRow.getByText(`${mappedToolName} completed`).click();
-    /*
-     * Arguments render as pretty JSON; the MCP result renders as the raw text
-     * envelope (the inner JSON arrives as an escaped string in the text part).
-     */
-    await expect(toolRow.getByText('"city": "Skopje"')).toBeVisible();
-    await expect(toolRow.getByText('"type": "text"')).toBeVisible();
-    await expect(toolRow.getByText(String.raw`{\"city\":\"Skopje\",\"tempC\":21}`)).toBeVisible();
-    await expect(sidePanel.getByText('The weather in Skopje is 21C.')).toBeVisible();
+    const sidePanel = await openSidePanel(context, extensionId);
+    await addConnectEnableAndRunTurn(sidePanel, { url: mcp.url });
 
     // Remove the server (no undo) and confirm it leaves storage.
     await sidePanel.getByRole('button', { name: 'Settings' }).click();
@@ -275,6 +307,35 @@ test('remote MCP server can be added, connected, used in a turn, and removed', a
         return storedJson.includes('Fixture MCP');
       })
       .toBe(false);
+  } finally {
+    await context.close();
+    await mcp.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('remote MCP server authenticates with a bearer token and runs a turn', async () => {
+  const bearerToken = 'fixture-secret-token';
+  const fixture = await startFixtureServer();
+  // The fixture 401s every request that lacks this exact bearer header.
+  const mcp = await startMcpFixtureServer({ requiredBearerToken: bearerToken });
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, turnMockConfig);
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await openSidePanel(context, extensionId);
+    await addConnectEnableAndRunTurn(sidePanel, {
+      configureAuth: async form => {
+        await form.getByLabel('Auth').selectOption('bearer');
+        await form.getByLabel('Bearer token').fill(bearerToken);
+      },
+      url: mcp.url,
+    });
   } finally {
     await context.close();
     await mcp.close();

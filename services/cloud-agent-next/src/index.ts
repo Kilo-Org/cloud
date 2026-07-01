@@ -1,10 +1,10 @@
 export { default } from './server.js';
 export {
-  ContainerProxy,
   Sandbox,
-  Sandbox as SandboxSmall,
-  Sandbox as SandboxDIND,
-  Sandbox as SandboxCodeReview,
-} from '@cloudflare/sandbox';
+  SandboxSmall,
+  SandboxDIND,
+  SandboxCodeReview,
+  ContainerProxy,
+} from './sandbox-outbound.js';
 export { CloudAgentSession } from './persistence/CloudAgentSession.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';

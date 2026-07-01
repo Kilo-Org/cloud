@@ -44,6 +44,10 @@ REAPER_INTERVAL_MS=300000
 # Comma-separated list of org IDs that use per-session sandboxes, or `*` for all orgs
 PER_SESSION_SANDBOX_ORG_IDS=
 
+# Managed SCM credential containment org IDs (optional)
+# Comma-separated list of org IDs that use managed SCM containment, or `*` for all orgs
+MANAGED_SCM_CONTAINMENT_ORG_IDS=
+
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App
 # Format for git config:

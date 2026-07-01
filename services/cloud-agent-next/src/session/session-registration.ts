@@ -27,7 +27,7 @@ import {
   recordCloudAgentSandboxIdentity,
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
-import { generateSandboxRoutingTarget } from '../sandbox-id.js';
+import { generateSandboxRoutingTarget, parseOrgIdList } from '../sandbox-id.js';
 import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { createMessageId } from './message-id.js';
@@ -112,6 +112,7 @@ type SessionEstablishmentFailure =
   | { stage: 'transport'; code: 'do_rpc_outcome_unknown' };
 
 type NewSessionAllocation = SessionRegistrationResult & {
+  managedScmContainment: boolean;
   sessionService: SessionService;
   rollbackCliSession: () => Promise<void>;
 };
@@ -151,6 +152,12 @@ async function allocateNewSession(
     ctx.env
   );
 
+  const containmentOrgs = parseOrgIdList(ctx.env.MANAGED_SCM_CONTAINMENT_ORG_IDS);
+  const orgId = input.options?.kilocodeOrganizationId;
+  const useManagedScmContainment =
+    input.repository.type === 'github' &&
+    input.runtime?.devcontainer !== true &&
+    (containmentOrgs.has('*') || (orgId !== undefined && containmentOrgs.has(orgId)));
   let sandboxId: SandboxId;
   let sandboxRoute: SharedSandboxRouteMetadata | undefined;
   try {
@@ -229,6 +236,7 @@ async function allocateNewSession(
     sandboxId,
     sandboxRoute,
     initialTurn,
+    managedScmContainment: useManagedScmContainment,
     sessionService,
     rollbackCliSession: async () => {
       try {
@@ -249,7 +257,7 @@ async function allocateNewSession(
 function buildSessionRegistrationCommand(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
-  allocation: SessionRegistrationResult
+  allocation: NewSessionAllocation
 ) {
   return {
     identity: {
@@ -279,6 +287,7 @@ function buildSessionRegistrationCommand(
       sandboxId: allocation.sandboxId,
       shallow: input.options?.shallow,
       ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
+      managedScmContainment: allocation.managedScmContainment,
       ...(input.runtime?.devcontainer ? { devcontainerRequested: true } : {}),
     },
   };

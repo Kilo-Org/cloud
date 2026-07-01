@@ -55,6 +55,7 @@
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
+    "MANAGED_SCM_CONTAINMENT_ORG_IDS": "",
   },
   "placement": { "mode": "smart" },
   /**
@@ -323,6 +324,7 @@
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
         "PER_SESSION_SANDBOX_ORG_IDS": "*",
+        "MANAGED_SCM_CONTAINMENT_ORG_IDS": "",
       },
       "services": [
         {

@@ -161,6 +161,7 @@ function createInternalApiContext(options: {
   skipBalanceCheck?: boolean;
   doStub?: ReturnType<typeof createMockDOStub>;
   getBitbucketToken?: ReturnType<typeof vi.fn>;
+  managedScmContainmentOrgIds?: string;
 }): TRPCContext {
   const doStub = options.doStub ?? createMockDOStub();
   const effectiveUserId =
@@ -222,6 +223,7 @@ function createInternalApiContext(options: {
       HYPERDRIVE: {
         connectionString: 'postgres://profile-test',
       } as TRPCContext['env']['HYPERDRIVE'],
+      MANAGED_SCM_CONTAINMENT_ORG_IDS: options.managedScmContainmentOrgIds,
     },
   } as TRPCContext;
 }
@@ -437,7 +439,10 @@ describe('prepareSession endpoint', () => {
 
   it('registers full lazy-prep metadata in one DO call', async () => {
     const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+    const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ doStub, managedScmContainmentOrgIds: orgId })
+    );
 
     const result = await caller.prepareSession({
       prompt: 'Test prompt',
@@ -525,6 +530,7 @@ describe('prepareSession endpoint', () => {
         workspace: {
           sandboxId: 'sb-test-123',
           shallow: true,
+          managedScmContainment: true,
         },
       })
     );
@@ -736,7 +742,10 @@ describe('prepareSession endpoint', () => {
       put: vi.fn(),
     };
     const doStub = createMockDOStub();
-    const context = createInternalApiContext({ doStub });
+    const context = createInternalApiContext({
+      doStub,
+      managedScmContainmentOrgIds: '*',
+    });
     Object.assign(context.env, { SHARED_SANDBOX_OVERRIDES: overrideStore });
     const caller = appRouter.createCaller(context);
 
@@ -753,6 +762,7 @@ describe('prepareSession endpoint', () => {
         workspace: {
           sandboxId: failoverSandboxId,
           shallow: undefined,
+          managedScmContainment: true,
           sandboxRoute: {
             kind: 'shared',
             routeKey,
@@ -791,8 +801,8 @@ describe('prepareSession endpoint', () => {
       'agent_12345678-1234-1234-1234-123456789abc',
       undefined,
       {
-        createdOnPlatform: undefined,
         devcontainer: true,
+        createdOnPlatform: undefined,
       }
     );
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
@@ -800,11 +810,112 @@ describe('prepareSession endpoint', () => {
         workspace: {
           sandboxId: 'dind-abcdef',
           shallow: false,
+          managedScmContainment: false,
           devcontainerRequested: true,
         },
       })
     );
     expect(doStub.registerSession).not.toHaveBeenCalled();
+  });
+
+  it('enables containment for standard GitHub sessions when the org is in the allow-list', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ doStub, managedScmContainmentOrgIds: '*' })
+    );
+
+    await caller.prepareSession({
+      prompt: 'Test containment',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'Kilo-Org/kg',
+      autoInitiate: true,
+    });
+
+    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      'test-user-123',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      undefined,
+      {
+        devcontainer: undefined,
+        createdOnPlatform: undefined,
+      }
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ managedScmContainment: true }),
+      })
+    );
+  });
+
+  it('does not enable containment for standard GitLab sessions', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Test GitLab containment',
+      mode: 'code',
+      model: 'claude-3',
+      gitUrl: 'https://gitlab.com/acme/repo.git',
+      platform: 'gitlab',
+      autoInitiate: true,
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ managedScmContainment: false }),
+      })
+    );
+  });
+
+  it('does not enable containment for standard GitHub sessions when the org is not in the allow-list', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(
+      createInternalApiContext({
+        doStub,
+        managedScmContainmentOrgIds: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      })
+    );
+
+    await caller.prepareSession({
+      prompt: 'Test containment disabled',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'Kilo-Org/kg',
+      autoInitiate: true,
+      kilocodeOrganizationId: '550e8400-e29b-41d4-a716-446655440000',
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ managedScmContainment: false }),
+      })
+    );
+  });
+
+  it('enables containment for standard GitHub sessions when the org is in the allow-list', async () => {
+    const doStub = createMockDOStub();
+    const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ doStub, managedScmContainmentOrgIds: orgId })
+    );
+
+    await caller.prepareSession({
+      prompt: 'Test containment',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'Kilo-Org/kg',
+      autoInitiate: true,
+      kilocodeOrganizationId: orgId,
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ managedScmContainment: true }),
+      })
+    );
   });
 
   it('rejects devcontainer preparation without auto-initiation', async () => {
@@ -1121,6 +1232,78 @@ describe('start endpoint', () => {
 
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
+  it('persists containment intent for standard GitHub grouped starts when the org is in the allow-list', async () => {
+    const doStub = createMockDOStub();
+    const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ doStub, managedScmContainmentOrgIds: orgId })
+    );
+
+    await caller.start({
+      message: { prompt: 'Test containment' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'Kilo-Org/kg' },
+      options: { kilocodeOrganizationId: orgId },
+    });
+
+    expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
+      undefined,
+      orgId,
+      'test-user-123',
+      'agent_12345678-1234-1234-1234-123456789abc',
+      undefined,
+      {
+        devcontainer: undefined,
+        createdOnPlatform: undefined,
+      }
+    );
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ managedScmContainment: true }),
+      })
+    );
+  });
+
+  it('does not persist containment intent for standard GitLab grouped starts', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.start({
+      message: { prompt: 'Test GitLab containment' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'gitlab', url: 'https://gitlab.com/acme/repo.git' },
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ managedScmContainment: false }),
+      })
+    );
+  });
+
+  it('does not persist containment intent for standard GitHub grouped starts when the org is not in the allow-list', async () => {
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(
+      createInternalApiContext({
+        doStub,
+        managedScmContainmentOrgIds: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      })
+    );
+
+    await caller.start({
+      message: { prompt: 'Test containment disabled' },
+      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'Kilo-Org/kg' },
+      options: { kilocodeOrganizationId: '550e8400-e29b-41d4-a716-446655440000' },
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ managedScmContainment: false }),
+      })
+    );
   });
 
   it.each(['cloud-agent-web', 'slack'])(

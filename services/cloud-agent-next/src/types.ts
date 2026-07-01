@@ -6,6 +6,7 @@ import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { CallbackJob } from './callbacks/index.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
+import type { SecretBinding } from './auth.js';
 import * as z from 'zod';
 import { Limits } from './schema.js';
 import { SESSION_ID_RE } from './shared/protocol.js';
@@ -143,6 +144,8 @@ export type SessionContext = {
   bitbucketTokenManaged?: boolean;
   bitbucketWorkspaceUuid?: string;
   bitbucketRepositoryUuid?: string;
+  /** Canonical self-managed GitLab instance URL used to configure glab. */
+  gitlabInstanceUrl?: string;
   /** GitLab CLI bearer-mode instruction returned with a server-resolved credential. */
   glabIsOAuth2?: boolean;
   /** Git platform type for correct token/env var handling */
@@ -188,6 +191,13 @@ export type GitAuthorConfig = {
   email: string;
 };
 
+type ManagedGitHubAuthParams = {
+  githubRepo: string;
+  userId: string;
+  orgId?: string;
+  allowUserAuthorization: boolean;
+};
+
 type GetCloudAgentAuthForRepoResult =
   | {
       success: true;
@@ -210,23 +220,113 @@ type GetCloudAgentAuthForRepoResult =
         | 'invalid_org_id';
     };
 
-type GetGitLabTokenResult =
-  | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
+type IssueGitHubSessionCapabilityResult =
+  | {
+      success: true;
+      capability: string;
+      installationId: string;
+      accountLogin: string;
+      appType: 'standard' | 'lite';
+      source: 'user' | 'installation';
+      gitAuthor: GitAuthorConfig;
+      commitCoAuthor?: GitAuthorConfig;
+      fallbackReason?: ManagedGitHubFallbackReason;
+    }
   | {
       success: false;
       reason:
         | 'database_not_configured'
-        | 'no_integration_found'
+        | 'invalid_repo_format'
+        | 'no_installation_found'
+        | 'repository_not_installed'
         | 'invalid_org_id'
-        | 'no_token'
-        | 'token_refresh_failed'
-        | 'token_expired_no_refresh'
-        | 'repository_url_required'
-        | 'invalid_repository_url'
-        | 'no_matching_integration'
-        | 'ambiguous_integration'
-        | 'project_lookup_failed'
-        | 'no_project_token';
+        | 'capability_configuration_error';
+    };
+
+type RedeemGitHubSessionCapabilityResult =
+  | { success: true; authorization: string }
+  | {
+      success: false;
+      reason:
+        | 'invalid_capability'
+        | 'expired_capability'
+        | 'capability_configuration_error'
+        | 'container_mismatch'
+        | 'invalid_upstream_url'
+        | 'upstream_host_not_allowed'
+        | 'repository_mismatch'
+        | 'invalid_upstream_request'
+        | 'source_unavailable'
+        | 'identity_mismatch';
+    };
+
+type GetGitLabTokenFailureReason =
+  | 'database_not_configured'
+  | 'no_integration_found'
+  | 'invalid_org_id'
+  | 'no_token'
+  | 'token_refresh_failed'
+  | 'token_expired_no_refresh'
+  | 'repository_url_required'
+  | 'invalid_repository_url'
+  | 'no_matching_integration'
+  | 'ambiguous_integration'
+  | 'project_lookup_failed'
+  | 'no_project_token'
+  | 'invalid_instance_url';
+
+type GetGitLabTokenResult =
+  | { success: true; token: string; instanceUrl: string; glabIsOAuth2: boolean }
+  | { success: false; reason: GetGitLabTokenFailureReason };
+
+type GitLabSessionIdentity = {
+  accountId: string | null;
+  accountLogin: string | null;
+};
+
+type GitLabCapabilityCredentialSource =
+  | { type: 'integration' }
+  | { type: 'project'; projectId: number; tokenDigest: string };
+
+type IssueGitLabSessionCapabilityResult =
+  | {
+      success: true;
+      capability: string;
+      instanceOrigin: string;
+      instanceHost: string;
+      projectPath: string;
+      integrationId: string;
+      authType: 'oauth' | 'pat';
+      identity: GitLabSessionIdentity;
+      source: GitLabCapabilityCredentialSource;
+      glabIsOAuth2: boolean;
+    }
+  | {
+      success: false;
+      reason:
+        | GetGitLabTokenFailureReason
+        | 'invalid_gitlab_url'
+        | 'unsupported_gitlab_instance'
+        | 'integration_identity_missing'
+        | 'capability_configuration_error';
+    };
+
+type RedeemGitLabSessionCapabilityResult =
+  | { success: true; headers: { authorization: string; 'PRIVATE-TOKEN'?: never } }
+  | { success: true; headers: { authorization?: never; 'PRIVATE-TOKEN': string } }
+  | {
+      success: false;
+      reason:
+        | 'invalid_capability'
+        | 'expired_capability'
+        | 'capability_configuration_error'
+        | 'container_mismatch'
+        | 'invalid_upstream_url'
+        | 'upstream_origin_not_allowed'
+        | 'repository_mismatch'
+        | 'invalid_upstream_request'
+        | 'source_unavailable'
+        | 'identity_mismatch';
     };
 
 export type BitbucketTokenFailureReason =
@@ -251,12 +351,18 @@ export type GitTokenService = {
     orgId?: string;
   }): Promise<GetTokenForRepoResult>;
   getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
-  getCloudAgentAuthForRepo?(params: {
-    githubRepo: string;
-    userId: string;
-    orgId?: string;
-    allowUserAuthorization: boolean;
-  }): Promise<GetCloudAgentAuthForRepoResult>;
+  getCloudAgentAuthForRepo?(
+    params: ManagedGitHubAuthParams
+  ): Promise<GetCloudAgentAuthForRepoResult>;
+  issueGitHubSessionCapability(
+    params: ManagedGitHubAuthParams & { outboundContainerId: string }
+  ): Promise<IssueGitHubSessionCapabilityResult>;
+  redeemGitHubSessionCapability(params: {
+    capability: string;
+    outboundContainerId: string;
+    requestMethod: string;
+    requestUrl: string;
+  }): Promise<RedeemGitHubSessionCapabilityResult>;
   getGitLabToken(params: {
     userId: string;
     orgId?: string;
@@ -271,6 +377,19 @@ export type GitTokenService = {
     repositoryUuid: string;
     repositoryUrl: string;
   }): Promise<GetBitbucketTokenResult>;
+  issueGitLabSessionCapability(params: {
+    gitUrl: string;
+    userId: string;
+    outboundContainerId: string;
+    orgId?: string;
+    createdOnPlatform?: string;
+  }): Promise<IssueGitLabSessionCapabilityResult>;
+  redeemGitLabSessionCapability(params: {
+    capability: string;
+    outboundContainerId: string;
+    requestMethod: string;
+    requestUrl: string;
+  }): Promise<RedeemGitLabSessionCapabilityResult>;
 };
 
 export type Env = {
@@ -306,7 +425,7 @@ export type Env = {
   /** GitHub Lite App bot user ID for git commit email */
   GITHUB_LITE_APP_BOT_USER_ID?: string;
   /** Shared secret for JWT token validation */
-  NEXTAUTH_SECRET: string;
+  NEXTAUTH_SECRET: SecretBinding;
   /** Comma-separated list of allowed Origins for /stream WebSocket connections */
   WS_ALLOWED_ORIGINS?: string;
   /** Backend base URL (used for balance checks before session spin-up) */
@@ -334,6 +453,8 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** Comma-separated org IDs that use managed SCM credential containment, or `*` for all orgs */
+  MANAGED_SCM_CONTAINMENT_ORG_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

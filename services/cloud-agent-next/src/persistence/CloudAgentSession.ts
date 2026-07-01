@@ -84,7 +84,7 @@ import type { Env as WorkerEnv, SandboxId } from '../types.js';
 import { deriveSharedSandboxId, generateSandboxId } from '../sandbox-id.js';
 import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
 
-import { validateStreamTicket } from '../auth.js';
+import { resolveSecret, validateStreamTicket } from '../auth.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
 import {
@@ -878,7 +878,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         return new Response('Missing cloudAgentSessionId', { status: 400 });
       }
 
-      const authResult = validateStreamTicket(ticket, this.env.NEXTAUTH_SECRET);
+      const nextAuthSecret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+      const authResult = validateStreamTicket(ticket, nextAuthSecret);
       if (!authResult.success) {
         return new Response(authResult.error, { status: 401 });
       }

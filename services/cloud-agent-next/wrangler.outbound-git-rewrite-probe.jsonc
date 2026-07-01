@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cloud-agent-next-outbound-git-rewrite-probe",
+  "main": "test/e2e/outbound-git-rewrite-probe.worker.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "dev": {
+    "local_protocol": "http",
+    "ip": "127.0.0.1",
+  },
+  "containers": [
+    {
+      "class_name": "OutboundGitRewriteProbeSandbox",
+      "image": "./Dockerfile.dev",
+      "instance_type": "standard-2",
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "7.2.52",
+      },
+      "max_instances": 1,
+      "rollout_active_grace_period": 60,
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "OutboundGitRewriteProbeSandbox",
+        "name": "PROBE_SANDBOX",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["OutboundGitRewriteProbeSandbox"],
+      "tag": "v1",
+    },
+  ],
+}

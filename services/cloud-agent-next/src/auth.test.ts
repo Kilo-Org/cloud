@@ -5,6 +5,13 @@ import { validateStreamTicket } from './auth.js';
 const secret = 'test-secret';
 
 describe('validateStreamTicket', () => {
+  it('returns a configuration error when NEXTAUTH_SECRET is missing', () => {
+    expect(validateStreamTicket('ticket', null)).toEqual({
+      success: false,
+      error: 'NEXTAUTH_SECRET is not configured on the worker',
+    });
+  });
+
   it('returns Ticket expired for expired stream tickets', () => {
     const ticket = jwt.sign(
       {

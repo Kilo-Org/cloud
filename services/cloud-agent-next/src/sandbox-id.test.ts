@@ -4,6 +4,7 @@ import {
   deriveSharedSandboxId,
   generateSandboxId,
   generateSandboxRoutingTarget,
+  getOutboundContainerId,
   getSandboxNamespace,
 } from './sandbox-id.js';
 import type { Env, SandboxId } from './types.js';
@@ -465,5 +466,24 @@ describe('getSandboxNamespace', () => {
   it('should return Sandbox for bot- prefixed IDs', () => {
     const ns = getSandboxNamespace(mockEnv, 'bot-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
     expect(ns).toBe(mockSandbox);
+  });
+});
+
+describe('getOutboundContainerId', () => {
+  it.each([
+    ['org-a1b2c3', 'shared-do-id'],
+    ['ses-a1b2c3', 'small-do-id'],
+    ['dind-a1b2c3', 'dind-do-id'],
+  ])('derives %s from the selected sandbox namespace', (sandboxId, expected) => {
+    const createNamespace = (containerId: string) => ({
+      idFromName: (name: string) => ({ toString: () => `${containerId}:${name}` }),
+    });
+    const env = {
+      Sandbox: createNamespace('shared-do-id'),
+      SandboxSmall: createNamespace('small-do-id'),
+      SandboxDIND: createNamespace('dind-do-id'),
+    } as unknown as Env;
+
+    expect(getOutboundContainerId(env, sandboxId)).toBe(`${expected}:${sandboxId}`);
   });
 });

@@ -6,6 +6,7 @@ import type { SessionMetadata } from './session-metadata.js';
 import type { SessionIngestBinding } from '../session-ingest-binding.js';
 import type { NotificationsBinding } from '../notifications-binding.js';
 import type { GitTokenService } from '../types.js';
+import type { SecretBinding } from '../auth.js';
 
 /**
  * Local MCP server configuration (runs a command).
@@ -111,14 +112,20 @@ export type OperationResult<T = void> = {
 };
 
 export type PersistenceEnv = {
-  /** Durable Object namespace for Sandbox instances */
+  /** Durable Object namespace for shared Sandbox instances */
   Sandbox: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for per-session Sandbox instances */
+  SandboxSmall: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for Docker-in-Docker Sandbox instances */
+  SandboxDIND: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for code-review ephemeral Sandbox instances */
+  SandboxCodeReview: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Shared secret for JWT token validation */
-  NEXTAUTH_SECRET: string;
+  NEXTAUTH_SECRET: SecretBinding;
   /** Comma-separated list of allowed Origins for /stream WebSocket connections */
   WS_ALLOWED_ORIGINS?: string;
   /** Optional override for Kilocode token injected into session environment (does not affect authentication) */
@@ -159,6 +166,8 @@ export type PersistenceEnv = {
   R2_ATTACHMENTS_BUCKET?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** Comma-separated org IDs that use managed SCM credential containment, or `*` for all orgs */
+  MANAGED_SCM_CONTAINMENT_ORG_IDS?: string;
   /** Service binding for centralized git token generation */
   GIT_TOKEN_SERVICE?: GitTokenService;
   /** Service binding for dispatching push notifications */

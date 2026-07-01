@@ -123,7 +123,6 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
 }
 
 const unavailableModels = [
-  'claude-fable', // not available anywhere
   'sakana/fugu', // not available in the EU
 ];
 

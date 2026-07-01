@@ -212,6 +212,15 @@ action_patch=$(docker run --rm "$IMAGE" sh -c \
   'OC=/usr/local/lib/node_modules/openclaw/dist; F=$(find $OC -name "channel-target-*.js" | head -1); grep -c "MESSAGE_ACTION_TARGET_MODE\[action\] ?? \"none\"" "$F"' 2>/dev/null || echo 0)
 check "actionRequiresTarget patch applied" "1" "$action_patch"
 
+# ── Externalized kilocode provider pin alignment ─────────────────────────────
+# The kilocode provider was externalized from openclaw core (openclaw #93470) and
+# is installed as a separate pin (@openclaw/kilocode-provider@<ver>). It is kept
+# in lockstep with the openclaw pin; assert the installed version matches so a
+# stale or drifted provider pin fails the build.
+kcp_version=$(docker run --rm "$IMAGE" \
+  node -p "require('/usr/local/lib/node_modules/@openclaw/kilocode-provider/package.json').version" 2>/dev/null || echo "")
+check "@openclaw/kilocode-provider matches openclaw pin" "$EXPECTED_VERSION" "$kcp_version"
+
 # ── Bundled plugins pin alignment ────────────────────────────────────────────
 kc_peer=$(docker run --rm "$IMAGE" \
   node -p "require('/usr/local/lib/node_modules/@kiloclaw/kilo-chat/package.json').peerDependencies.openclaw" 2>/dev/null || echo "")

@@ -290,10 +290,12 @@ export function generateBaseConfig(
     );
   }
 
-  // KiloCode provider entry. The bundled openclaw kilocode plugin only loads
-  // when an explicit `models.providers.kilocode` entry exists in the config —
-  // without it, the plugin's catalog hook never runs and live gateway model
-  // discovery never populates `kilo-auto/*` and the rest of the dynamic
+  // KiloCode provider entry. The kilocode provider is an external plugin
+  // (openclaw #93470) — it is installed by the Dockerfile and loaded via
+  // `plugins.load.paths` (see KILOCODE_PROVIDER_PLUGIN_PATH above). It still only
+  // activates when an explicit `models.providers.kilocode` entry exists in the
+  // config — without it, the plugin's catalog hook never runs and live gateway
+  // model discovery never populates `kilo-auto/*` and the rest of the dynamic
   // catalog. So we always include this entry (production baseUrl, empty
   // `models` so live discovery owns the catalog).
   //

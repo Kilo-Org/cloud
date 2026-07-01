@@ -8,6 +8,7 @@ import {
   contextUsageAtomFamily,
   draftAtomFamily,
   evictConversationAtoms,
+  remoteMcpStoreAtom,
   runningConversationIdsAtom,
 } from './agent-chat-atoms';
 import {
@@ -50,7 +51,6 @@ import { ConversationTabs } from './conversation-tabs';
 import { MessageComposer } from './message-composer';
 import { ConversationHistoryButton } from './conversation-history-button';
 import { useGatewayModels } from './use-gateway-models';
-import type { RemoteMcpServer } from '@/src/shared/remote-mcp';
 import { loadRemoteMcpStore } from '@/src/shared/remote-mcp-storage';
 import { buildRemoteMcpToolDefinitions } from '@/src/shared/remote-mcp-tools';
 import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
@@ -126,8 +126,6 @@ export const AgentChatPanel = ({
   const conversationStoreRef = useRef(conversationStore);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
-  // Mutable snapshot read at submit time; not React state, so a background refresh never re-renders mid-run.
-  const remoteMcpServersRef = useRef<readonly RemoteMcpServer[]>([]);
   const [remoteMcpToolWarning, setRemoteMcpToolWarning] = useState<string>();
   const { inspectableTabs, isLoadingTabs, tabDebuggerError } = useTabDebugger();
   const { modelLoadError, modelOptions, refetchModels } = useGatewayModels({
@@ -287,7 +285,7 @@ export const AgentChatPanel = ({
         return;
       }
       // Cached connected tools stay usable while the background refresh runs.
-      remoteMcpServersRef.current = loaded.servers;
+      store.set(remoteMcpStoreAtom, loaded);
 
       // Refresh enabled servers with the PLAIN global fetch (never the gateway-authed fetch — that would leak the Kilo token to a third party).
       // Sequential by necessity: each connect can write OAuth tokens, so we must reload before merging the next server's results.
@@ -302,7 +300,7 @@ export const AgentChatPanel = ({
           return;
         }
         if (nextServers !== undefined) {
-          remoteMcpServersRef.current = nextServers;
+          store.set(remoteMcpStoreAtom, { servers: nextServers });
         }
       }
     })();
@@ -310,7 +308,7 @@ export const AgentChatPanel = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [store]);
 
   useEffect(() => {
     if (isLoadingTabs) {
@@ -487,7 +485,7 @@ export const AgentChatPanel = ({
       currentIds.includes(conversationId) ? currentIds : [...currentIds, conversationId]
     );
 
-    const remoteMcpServers = remoteMcpServersRef.current;
+    const remoteMcpServers = store.get(remoteMcpStoreAtom).servers;
     const {
       routes: remoteMcpRoutes,
       tools: remoteMcpTools,

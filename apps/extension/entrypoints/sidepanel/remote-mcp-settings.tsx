@@ -1,10 +1,12 @@
 /* eslint-disable max-lines */
 import { storage } from '#imports';
+import { useAtom } from 'jotai';
 import { ChevronDown, ChevronRight, Plus, RefreshCw, Server, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
-import type { RemoteMcpServer, RemoteMcpStore } from '../../src/shared/remote-mcp';
+import type { RemoteMcpServer } from '../../src/shared/remote-mcp';
 import { loadRemoteMcpStore, saveRemoteMcpStore } from '../../src/shared/remote-mcp-storage';
+import { remoteMcpStoreAtom } from './agent-chat-atoms';
 import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
 import {
   applyUpsert,
@@ -336,8 +338,8 @@ const ServerRow = ({
   };
 
   return (
-    <div className="rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
-      <div className="flex min-w-0 items-start justify-between gap-2">
+    <div className="min-w-0 rounded-md border border-zinc-800 bg-zinc-900/40 p-3">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <button
             className="flex items-center gap-1 text-left"
@@ -406,7 +408,7 @@ const ServerRow = ({
 };
 
 export const RemoteMcpSettings = (): JSX.Element => {
-  const [store, setStore] = useState<RemoteMcpStore>({ servers: [] });
+  const [store, setStore] = useAtom(remoteMcpStoreAtom);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingServer, setEditingServer] = useState<RemoteMcpServer | null>(null);
 
@@ -414,7 +416,7 @@ export const RemoteMcpSettings = (): JSX.Element => {
     void (async () => {
       setStore(await loadRemoteMcpStore(storage));
     })();
-  }, []);
+  }, [setStore]);
 
   const handleConnect = async (server: RemoteMcpServer): Promise<void> => {
     const nextServers = await connectAndPersistRemoteMcpServer({
@@ -428,7 +430,8 @@ export const RemoteMcpSettings = (): JSX.Element => {
   };
 
   const handleSave = async (form: FormState): Promise<string | null> => {
-    const draft = buildDraftFromForm(form, editingServer?.auth);
+    const existing = editingServer;
+    const draft = buildDraftFromForm(form, existing?.auth);
     const { store: nextStore, error } = applyUpsert(store, draft);
     if (error !== null) {
       return error;
@@ -437,6 +440,22 @@ export const RemoteMcpSettings = (): JSX.Element => {
     setStore(nextStore);
     setShowAddForm(false);
     setEditingServer(null);
+
+    // Connect (test) on save so tools are cached and usable immediately; the row surfaces any failure.
+    const savedServer =
+      existing === null
+        ? nextStore.servers.find(candidate => !store.servers.some(prev => prev.id === candidate.id))
+        : nextStore.servers.find(candidate => candidate.id === existing.id);
+    if (savedServer !== undefined) {
+      const nextServers = await connectAndPersistRemoteMcpServer({
+        fetch: globalThis.fetch,
+        server: savedServer,
+        storageArea: storage,
+      });
+      if (nextServers !== undefined) {
+        setStore({ servers: nextServers });
+      }
+    }
     return null;
   };
 
@@ -457,7 +476,7 @@ export const RemoteMcpSettings = (): JSX.Element => {
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 flex-col gap-2">
       <p className={labelClass}>Remote MCP servers</p>
       {store.servers.map(server =>
         editingServer?.id === server.id ? (

@@ -1,6 +1,14 @@
 import { atom, getDefaultStore } from 'jotai';
 import { atomFamily } from 'jotai-family';
 import type { ContextUsage } from '@/src/shared/context-usage';
+import type { RemoteMcpStore } from '@/src/shared/remote-mcp';
+
+/*
+ * Shared remote MCP servers, hydrated from storage. Settings mutates it and the
+ * chat panel reads it at submit time, so newly added/connected servers are
+ * usable without a reload.
+ */
+export const remoteMcpStoreAtom = atom<RemoteMcpStore>({ servers: [] });
 
 // Per-conversation in-memory draft text (reset on reload by design).
 // Keys for closed-but-not-deleted conversations are kept so their drafts survive reopen; evicted on delete and on sign-out.

@@ -26,10 +26,15 @@ import LinkifyIt from 'linkify-it';
 
 const linkify = new LinkifyIt();
 
+// Cap input length before passing to linkify to prevent O(N²) scan-loop DoS
+// (CVE-2026-48801) in case the patched library is ever rolled back.
+const MAX_LINKIFY_LENGTH = 50_000;
+
 function TextWithLinks({ text }: { text: string }) {
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
-  for (const match of linkify.match(text) ?? []) {
+  const safeText = text.length > MAX_LINKIFY_LENGTH ? '' : text;
+  for (const match of linkify.match(safeText) ?? []) {
     if (match.index > lastIndex) {
       parts.push(text.slice(lastIndex, match.index));
     }
@@ -46,7 +51,10 @@ function TextWithLinks({ text }: { text: string }) {
     );
     lastIndex = match.lastIndex;
   }
-  if (lastIndex < text.length) {
+  // When safeText === '' (text exceeded limit), show the full original text unlinked.
+  if (safeText.length < text.length) {
+    parts.push(text);
+  } else if (lastIndex < text.length) {
     parts.push(text.slice(lastIndex));
   }
   return <>{parts}</>;

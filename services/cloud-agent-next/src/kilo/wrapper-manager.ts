@@ -10,7 +10,11 @@
 
 import { withTimeout } from '@kilocode/worker-utils';
 import type { SandboxInstance } from '../types.js';
-import type { ObservedWrapper, WrapperObservation } from '../agent-sandbox/protocol.js';
+import {
+  WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON,
+  type ObservedWrapper,
+  type WrapperObservation,
+} from '../agent-sandbox/protocol.js';
 import { logger } from '../logger.js';
 import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
 import { KILO_AGENT_SESSION_LABEL, KILO_WRAPPER_PORT_LABEL } from './devcontainer.js';
@@ -293,23 +297,27 @@ export async function discoverSessionWrappers(
   options?: { dockerEnv?: Record<string, string>; inspectContainers?: boolean }
 ): Promise<WrapperObservation> {
   let processes: Process[];
+  let listProcessesTimedOut = false;
   try {
     const timeoutMs = WRAPPER_DISCOVERY_TIMEOUT_MS;
     processes = await withTimeout(
       sandbox.listProcesses(),
       timeoutMs,
       `Wrapper process discovery timed out after ${timeoutMs}ms`,
-      () =>
+      () => {
+        listProcessesTimedOut = true;
         logSandboxOperationTimeout({
           operation: 'wrapper.discovery.listProcesses',
           timeoutMs,
           timeoutLayer: 'outer',
-        })
+        });
+      }
     );
   } catch (error) {
     return {
       status: 'inspection-failed',
       error: error instanceof Error ? error.message : String(error),
+      ...(listProcessesTimedOut ? { reason: WRAPPER_DISCOVERY_LIST_PROCESSES_TIMEOUT_REASON } : {}),
     };
   }
 

@@ -17,7 +17,7 @@ import type { Images } from '@/lib/images-schema';
 
 /**
  * Valid mode values for cloud agent sessions.
- * Matches agentModeSchema in cloud-agent-schemas.ts
+ * Shared with webhook configuration and historical session rendering.
  */
 export type AgentMode = 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
 
@@ -27,7 +27,7 @@ export type AgentMode = 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
 
 /**
  * Configuration collected when resuming a CLI session in cloud-agent.
- * Used by ResumeConfigModal and session configuration logic.
+ * Used by historical session configuration logic.
  */
 export type ResumeConfig = {
   mode: AgentMode;

@@ -1510,6 +1510,45 @@ describe('ingest WS reconnection', () => {
     expect(callbacks.onRootSessionActivity).toHaveBeenCalledTimes(2);
   });
 
+  it('rejects real-time plan follow-up questions without disconnecting', async () => {
+    state = new WrapperState();
+    state.bindSession(createSessionContext({ platform: 'cloud-agent-web' }));
+    const rejectQuestion = vi.fn().mockResolvedValue(true);
+    const kiloClient = createMockKiloClient({
+      rejectQuestion,
+      subscribeEvents: vi.fn().mockResolvedValue({
+        stream: createEventStream([
+          {
+            type: 'question.asked',
+            properties: {
+              id: 'q_plan_followup',
+              sessionID: 'kilo_sess_456',
+              questions: [
+                {
+                  question: 'Ready to implement?',
+                  questionKey: 'plan.followup.question',
+                  header: 'Implement',
+                  options: [],
+                },
+              ],
+            },
+          },
+        ]),
+      }),
+    });
+
+    const manager = createManagerWithClient(kiloClient);
+    const ws = await openConnection(manager);
+    await vi.advanceTimersByTimeAsync(0);
+
+    const questionEvents = parseSentMessages(ws).filter(
+      event => event.streamEventType === 'kilocode' && event.data.event === 'question.asked'
+    );
+    expect(questionEvents).toHaveLength(0);
+    expect(rejectQuestion).toHaveBeenCalledWith('q_plan_followup');
+    expect(callbacks.onDisconnect).not.toHaveBeenCalled();
+  });
+
   it('rejects real-time code-review questions without disconnecting', async () => {
     state = new WrapperState();
     state.bindSession(createCodeReviewSessionContext());

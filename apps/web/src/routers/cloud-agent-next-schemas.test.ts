@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import {
   basePrepareSessionNextSchema,
   baseSendMessageNextSchema,
+  personalPrepareSessionNextSchema,
   cloudAgentAttachmentsSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
 } from './cloud-agent-next-schemas';
@@ -106,6 +107,23 @@ describe('basePrepareSessionNextSchema', () => {
       basePrepareSessionNextSchema.safeParse({
         ...prompt,
         images: { path: MESSAGE_UUID, files: ['87654321-4321-4321-8321-cba987654321.png'] },
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('personalPrepareSessionNextSchema', () => {
+  it('rejects Bitbucket repository identity in personal context', () => {
+    expect(
+      personalPrepareSessionNextSchema.safeParse({
+        bitbucketRepo: {
+          fullName: 'acme/api',
+          workspaceUuid: '11111111-1111-4111-8111-111111111111',
+          repositoryUuid: '22222222-2222-4222-8222-222222222222',
+        },
+        prompt: 'Inspect the repository',
+        mode: 'code',
+        model: 'anthropic/claude-sonnet',
       }).success
     ).toBe(false);
   });

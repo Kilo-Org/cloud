@@ -23,7 +23,7 @@ import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import { isOpenCodeBasedClient, type FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import {
-  repairTools,
+  repairChatCompletionsTools,
   repairMessagesTools,
   sanitizeBinaryToolResults,
 } from '@/lib/ai-gateway/tool-calling';
@@ -110,7 +110,7 @@ export function applyGatewayModelsFallback(
   delete requestToMutate.body.models;
 }
 
-export function applyProviderSpecificLogic(
+export async function applyProviderSpecificLogic(
   provider: Provider,
   requestedModel: string,
   requestToMutate: GatewayRequest,
@@ -118,6 +118,8 @@ export function applyProviderSpecificLogic(
   userByok: BYOKResult[] | null,
   originalHeaders: FraudDetectionHeaders,
   userId: string,
+  organizationId: string | null,
+  sessionId: string | null,
   taskId: string | null
 ) {
   applyGatewayModelsFallback(provider.id, requestedModel, requestToMutate);
@@ -128,8 +130,7 @@ export function applyProviderSpecificLogic(
   if (requestToMutate.kind === 'chat_completions') {
     scrubOpenCodeSpecificProperties(requestToMutate.body);
 
-    // Mostly a workaround for bugs in the old extension.
-    repairTools(requestToMutate.body);
+    repairChatCompletionsTools(requestToMutate.body);
 
     if (isOpenCodeBasedClient(originalHeaders)) {
       // Workaround for bugs in the chat completions client.
@@ -189,12 +190,15 @@ export function applyProviderSpecificLogic(
     requestToMutate.body.thinking = { type: 'disabled' };
   }
 
-  provider.transformRequest({
+  await provider.transformRequest({
     provider,
     model: requestedModel,
     request: requestToMutate,
     originalHeaders,
     extraHeaders,
     userByok,
+    kilo_user_id: userId,
+    organization_id: organizationId,
+    session_id: sessionId,
   });
 }

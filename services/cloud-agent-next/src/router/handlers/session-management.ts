@@ -28,28 +28,34 @@ import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
 import { metadataRepositoryUpstreamBranch } from '../../persistence/session-metadata.js';
 import type { MessageResultRPCResponse } from '../../session/message-result.js';
+import { requireCurrentSessionAccess } from '../../session-access.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
   gitUrl?: string;
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
 } {
   const repository = metadata.repository;
   if (!repository) return {};
-  if (repository.type === 'github') {
-    return { githubRepo: repository.repo, platform: repository.platform ?? 'github' };
+  switch (repository.type) {
+    case 'github':
+      return { githubRepo: repository.repo, platform: repository.platform ?? 'github' };
+    case 'gitlab':
+      return { gitUrl: repository.url, platform: 'gitlab' };
+    case 'bitbucket':
+      return { gitUrl: repository.url, platform: 'bitbucket' };
+    case 'git':
+      return { gitUrl: repository.url, platform: repository.platform };
+    case 'empty-local':
+      return {};
   }
-  if (repository.type === 'empty-local') return {};
-  return {
-    gitUrl: repository.url,
-    platform: repository.platform ?? (repository.type === 'gitlab' ? 'gitlab' : undefined),
-  };
 }
 
 async function deleteSessionResources(
   sessionId: SessionId,
   userId: string,
-  env: TRPCContext['env']
+  env: TRPCContext['env'],
+  authorizeExistingSession?: () => Promise<void>
 ): Promise<{ success: true; message?: string }> {
   logger.setTags({ userId, sessionId });
   logger.info('Starting session deletion');
@@ -60,6 +66,8 @@ async function deleteSessionResources(
       logger.info('Session not found or already deleted');
       return { success: true, message: 'Session not found or already deleted' };
     }
+
+    await authorizeExistingSession?.();
 
     try {
       const doKey = `${userId}:${sessionId}`;
@@ -112,8 +120,15 @@ export function createSessionManagementHandlers() {
         })
       )
       .mutation(async ({ input, ctx }) => {
+        const sessionId = input.sessionId as SessionId;
         return withLogTags({ source: 'deleteSession' }, () =>
-          deleteSessionResources(input.sessionId as SessionId, ctx.userId, ctx.env)
+          deleteSessionResources(sessionId, ctx.userId, ctx.env, async () => {
+            await requireCurrentSessionAccess({
+              env: ctx.env,
+              kiloUserId: ctx.userId,
+              cloudAgentSessionId: sessionId,
+            });
+          })
         );
       }),
 
@@ -147,6 +162,11 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ userId, sessionId });
           logger.info('Starting session interruption');
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
 
           try {
             const metadata = await fetchSessionMetadata(env, userId, sessionId);
@@ -225,6 +245,11 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ userId, sessionId });
           logger.info('Fetching session metadata');
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
 
           // Get DO stub keyed by userId:sessionId for user isolation
           const doKey = `${userId}:${sessionId}`;
@@ -263,7 +288,10 @@ export function createSessionManagementHandlers() {
               sessionMetadata.identity.orgId,
               userId,
               sessionMetadata.identity.sessionId,
-              sessionMetadata.identity.botId
+              sessionMetadata.identity.botId,
+              {
+                createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
+              }
             ));
 
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
@@ -338,6 +366,11 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ userId, sessionId });
           logger.info('Fetching session health');
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
 
           const doKey = `${userId}:${sessionId}`;
           const getStub = () =>
@@ -363,7 +396,10 @@ export function createSessionManagementHandlers() {
               metadata.identity.orgId,
               userId,
               metadata.identity.sessionId,
-              metadata.identity.botId
+              metadata.identity.botId,
+              {
+                createdOnPlatform: metadata.identity.createdOnPlatform,
+              }
             ));
 
           logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
@@ -379,14 +415,23 @@ export function createSessionManagementHandlers() {
           const activeExecutionStatus = activeMessageWork?.status;
           const executionHealth = activeMessageWork?.health ?? 'none';
 
-          let sandboxStatus: 'healthy' | 'unreachable' = 'healthy';
-          try {
-            await createAgentSandbox(env, metadata).probeHealth();
-          } catch (error) {
-            sandboxStatus = 'unreachable';
-            logger
-              .withFields({ error: error instanceof Error ? error.message : String(error) })
-              .warn('Sandbox health probe failed');
+          const cleanupScheduled = await withDORetry(
+            getStub,
+            s => s.isSandboxCleanupScheduled(),
+            'isSandboxCleanupScheduled'
+          );
+          let sandboxStatus: 'healthy' | 'destroyed' | 'unreachable' = cleanupScheduled
+            ? 'destroyed'
+            : 'healthy';
+          if (!cleanupScheduled) {
+            try {
+              await createAgentSandbox(env, metadata).probeHealth();
+            } catch (error) {
+              sandboxStatus = 'unreachable';
+              logger
+                .withFields({ error: error instanceof Error ? error.message : String(error) })
+                .warn('Sandbox health probe failed');
+            }
           }
 
           logger.info('Session health retrieved successfully', {
@@ -414,6 +459,11 @@ export function createSessionManagementHandlers() {
         return withLogTags({ source: 'getMessageResult' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
           const { userId, env } = ctx;
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
           const doKey = `${userId}:${sessionId}`;
           const getStub = () =>
             env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(doKey));
@@ -453,6 +503,11 @@ export function createSessionManagementHandlers() {
 
           logger.setTags({ userId, sessionId });
           logger.info('Fetching latest assistant message');
+          await requireCurrentSessionAccess({
+            env,
+            kiloUserId: userId,
+            cloudAgentSessionId: sessionId,
+          });
 
           const doKey = `${userId}:${sessionId}`;
           const getStub = () =>

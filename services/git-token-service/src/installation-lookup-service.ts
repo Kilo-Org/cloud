@@ -5,7 +5,7 @@ import {
   organization_memberships,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, isNotNull, or, sql } from 'drizzle-orm';
+import { eq, and, exists, isNull, isNotNull, or, sql } from 'drizzle-orm';
 
 export type FindInstallationParams = {
   githubRepo: string;
@@ -87,6 +87,20 @@ function buildAuthorizedInstallationsQuery(
     repoOwner === undefined
       ? undefined
       : sql`lower(${platform_integrations.platform_account_login}) = lower(${repoOwner})`;
+  const requestedOrganizationMembership =
+    params.orgId === undefined
+      ? undefined
+      : exists(
+          db
+            .select({ id: organization_memberships.id })
+            .from(organization_memberships)
+            .where(
+              and(
+                eq(organization_memberships.organization_id, sql`${params.orgId}::uuid`),
+                eq(organization_memberships.kilo_user_id, params.userId)
+              )
+            )
+        );
 
   return db
     .select({
@@ -121,6 +135,7 @@ function buildAuthorizedInstallationsQuery(
         eq(platform_integrations.integration_status, 'active'),
         accountLoginFilter,
         isNotNull(platform_integrations.platform_installation_id),
+        requestedOrganizationMembership,
         or(
           and(
             isNotNull(platform_integrations.owned_by_organization_id),
@@ -293,15 +308,9 @@ export class InstallationLookupService {
 
     if (
       selected.repository_access === 'selected' &&
-      !selected.repositories?.some(repository => {
-        const [storedOwner, storedRepoName, ...unexpectedParts] = repository.full_name.split('/');
-        return (
-          storedOwner !== undefined &&
-          storedOwner.length > 0 &&
-          storedRepoName?.toLowerCase() === repoName.toLowerCase() &&
-          unexpectedParts.length === 0
-        );
-      })
+      !selected.repositories?.some(
+        repository => repository.full_name.toLowerCase() === params.githubRepo.toLowerCase()
+      )
     ) {
       return { success: false, reason: 'repository_not_installed' };
     }

@@ -1,17 +1,7 @@
+import type { PlatformIntegrationSetupStatus } from '@/lib/integrations/platform-integration-setup-status';
 import type { PlatformId } from './platforms';
 
-type SetupStatusPlatformId = Exclude<PlatformId, 'microsoft-teams' | 'google-chat'> | 'dolthub';
-
-export type PlatformInstallation = {
-  platform: SetupStatusPlatformId;
-  installed: boolean;
-  installation: {
-    accountLogin?: string | null;
-    guildName?: string | null;
-    teamName?: string | null;
-    workspaceName?: string | null;
-  } | null;
-};
+export type PlatformInstallation = PlatformIntegrationSetupStatus;
 
 export type PlatformInstallationQueryState = {
   data: readonly PlatformInstallation[] | undefined;

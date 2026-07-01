@@ -45,11 +45,8 @@ import type { Organization, User } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
-import {
-  doesOrgWithSSODomainExist,
-  getSingleUserOrganization,
-  isOrganizationMember,
-} from '@/lib/organizations/organizations';
+import { getSingleUserOrganization, isOrganizationMember } from '@/lib/organizations/organizations';
+import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { linkAccountToExistingUser } from '@/lib/user';
@@ -504,7 +501,7 @@ const logger: LoggerInstance = {
 const useSecureCookies = NEXTAUTH_URL?.startsWith('https://') ?? false;
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
 
-const authOptions: NextAuthOptions = {
+export const authOptions: NextAuthOptions = {
   secret: NEXTAUTH_SECRET,
   cookies: {
     // Apple Sign In uses response_mode=form_post, which is a cross-site POST
@@ -713,15 +710,18 @@ const authOptions: NextAuthOptions = {
         // we don't need to check gmail domains for SSO for now.
         // This is mostly an optimization so we don't hit the DB on every gmail login since they defacto aren't using SSO
         if (domainToCheck !== 'gmail.com') {
-          // if you're logging in with NOT workos but you belong to a domain with SSO you need to go back through the SSO login flow
-          // Exclude fake-login from SSO checks - it should always work regardless of domain configuration
-          const redir =
-            accountInfo.provider != 'workos' &&
-            accountInfo.provider != 'fake-login' &&
-            (await doesOrgWithSSODomainExist(domainToCheck));
-
-          if (redir) {
-            return ssoSignInRedirectUrl(domainToCheck);
+          // Fake login is intentionally exempt in supported non-production environments.
+          if (accountInfo.provider !== 'workos' && accountInfo.provider !== 'fake-login') {
+            const ssoAuthority = await resolveSsoAuthorityForDomain(domainToCheck);
+            if (ssoAuthority.status === 'misconfigured') {
+              warnInSentry('SSO authority is misconfigured', {
+                extra: { domain: domainToCheck, reason: ssoAuthority.reason },
+              });
+              return redirectUrlForCode('UNKNOWN-ERROR');
+            }
+            if (ssoAuthority.status === 'required') {
+              return ssoSignInRedirectUrl(domainToCheck);
+            }
           }
         }
 
@@ -909,6 +909,20 @@ const authOptions: NextAuthOptions = {
         token.isNewUser = (profile as ExtendedProfile)?.isNewUser || false;
         token.webSessionPepper = existingUser.web_session_pepper;
         token.isAdmin = existingUser.is_admin;
+        token.authProvider = accountInfo.provider;
+        token.authenticatedAt = token.iat;
+        delete token.ssoSourceOrganizationId;
+
+        if (accountInfo.provider === 'workos') {
+          const domain = getLowerDomainFromEmail(existingUser.google_user_email);
+          assert(domain, 'WorkOS user must have a valid primary email domain');
+          const ssoAuthority = await resolveSsoAuthorityForDomain(domain);
+          assert(
+            ssoAuthority.status === 'required',
+            `WorkOS user does not have one active SSO authority for ${domain}`
+          );
+          token.ssoSourceOrganizationId = ssoAuthority.sourceOrganizationId;
+        }
       } catch (error) {
         captureException(error, {
           tags: {
@@ -930,6 +944,9 @@ const authOptions: NextAuthOptions = {
       session.kiloUserId = castToken.kiloUserId;
       session.webSessionPepper = castToken.webSessionPepper ?? castToken.pepper ?? null;
       session.isNewUser = castToken.isNewUser || false; // Pass isNewUser to the session
+      session.authProvider = castToken.authProvider;
+      session.authenticatedAt = castToken.authenticatedAt;
+      session.ssoSourceOrganizationId = castToken.ssoSourceOrganizationId;
       return session;
     },
   },
@@ -987,7 +1004,6 @@ export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAut
     ) {
       return authError(401, 'Invalid API token', user.id);
     }
-
     const organizationId = headersList.get(ORGANIZATION_ID_HEADER) || undefined;
     const internalApiUse = authorizationValidationResult.internalApiUse;
     const botId = authorizationValidationResult.botId;
@@ -1167,14 +1183,5 @@ export async function getProfileRedirectPath(user: User) {
     return `/organizations/${singleOrg.id}`;
   }
 
-  // Fall back to SSO domain check for users not yet members
-  const domain = getLowerDomainFromEmail(user.google_user_email);
-  if (!domain || domain === 'gmail.com') {
-    return '/profile';
-  }
-  const res = await doesOrgWithSSODomainExist(domain);
-  if (res !== false) {
-    return `/organizations/${res}`;
-  }
   return '/profile';
 }

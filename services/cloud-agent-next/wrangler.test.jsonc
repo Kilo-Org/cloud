@@ -27,6 +27,7 @@
       "tag": "v5",
     },
   ],
+  "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],
   "queues": {
     "producers": [
       { "binding": "EXECUTION_QUEUE", "queue": "cloud-agent-executions" },

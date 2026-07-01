@@ -5,6 +5,7 @@ import { getGatewayAppConfig, type GatewayAppConfig } from './config';
 import { createRouteService } from './route-service';
 import { createAuditService } from './audit-service';
 import { createOAuthClientService } from './oauth-client-service';
+import { createOAuthGrantService } from './oauth-grant-service';
 import { createGrantService } from './grant-service';
 import { createProviderOAuthService } from './provider-oauth-service';
 import { createAuthorizationService } from './authorization-service';
@@ -27,13 +28,15 @@ export function createGatewayServices(
   const repository = createGatewayRepository(params.database ?? db);
   const routeService = createRouteService({ repository, gatewayBaseUrl: config.gatewayBaseUrl });
   const auditService = createAuditService(repository);
-  const clientService = createOAuthClientService({ repository, config });
+  const oauthGrantService = createOAuthGrantService(repository);
+  const clientService = createOAuthClientService({ repository, config, oauthGrantService });
   const grantService = createGrantService({ repository, config });
   const discoveryService = createDiscoveryService({ fetchImpl: params.fetchImpl });
   const providerOAuthService = createProviderOAuthService({
     repository,
     routeService,
     grantService,
+    oauthGrantService,
     config,
     fetchImpl: params.fetchImpl,
   });
@@ -41,10 +44,17 @@ export function createGatewayServices(
     repository,
     routeService,
     clientService,
+    oauthGrantService,
     providerOAuthService,
     config,
   });
-  const tokenService = createTokenService({ repository, routeService, clientService, config });
+  const tokenService = createTokenService({
+    repository,
+    routeService,
+    clientService,
+    oauthGrantService,
+    config,
+  });
   const nativeMcpAuthorizationService = createNativeMcpAuthorizationService({
     database: params.database,
     clientService,
@@ -68,6 +78,7 @@ export function createGatewayServices(
     routeService,
     auditService,
     clientService,
+    oauthGrantService,
     grantService,
     providerOAuthService,
     authorizationService,

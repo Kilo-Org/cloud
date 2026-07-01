@@ -14,7 +14,7 @@ import {
   fetchGitLabRepositoriesForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import {
-  basePrepareSessionNextSchema,
+  personalPrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
   baseInitiateFromPreparedSessionNextSchema,
   baseInitiateSessionNextOutputSchema,
@@ -47,6 +47,8 @@ import { db } from '@/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
+import { getBalanceForUser } from '@/lib/user/balance';
+import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -84,10 +86,7 @@ function createTerminalTicket(params: {
   };
 }
 
-async function assertUserOwnsTerminalSession(
-  userId: string,
-  cloudAgentSessionId: string
-): Promise<void> {
+async function assertUserOwnsSession(userId: string, cloudAgentSessionId: string): Promise<void> {
   const sessionOwnership = await verifyUserOwnsSessionV2ByCloudAgentId(
     db,
     userId,
@@ -122,7 +121,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
    * initiateFromPreparedSession.
    */
   prepareSession: baseProcedure
-    .input(basePrepareSessionNextSchema)
+    .input(personalPrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
       if (
@@ -182,6 +181,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseInitiateFromPreparedSessionNextSchema)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
@@ -208,6 +208,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseSendMessageNextSchema)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
@@ -230,7 +231,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseCreateTerminalNextSchema)
     .output(baseCreateTerminalNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
 
       try {
         const authToken = generateCloudAgentToken(ctx.user);
@@ -256,7 +257,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseRefreshTerminalTicketNextSchema)
     .output(baseRefreshTerminalTicketNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
 
       return createTerminalTicket({
         userId: ctx.user.id,
@@ -269,7 +270,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseResizeTerminalNextSchema)
     .output(baseResizeTerminalNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
 
       try {
         const authToken = generateCloudAgentToken(ctx.user);
@@ -284,7 +285,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseCloseTerminalNextSchema)
     .output(baseCloseTerminalNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertUserOwnsTerminalSession(ctx.user.id, input.cloudAgentSessionId);
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
 
       try {
         const authToken = generateCloudAgentToken(ctx.user);
@@ -339,6 +340,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
@@ -349,6 +351,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseAnswerQuestionNextSchema)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.answerQuestion(input);
@@ -358,6 +361,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseRejectQuestionNextSchema)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.rejectQuestion(input);
@@ -367,6 +371,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseAnswerPermissionNextSchema)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.sessionId);
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.answerPermission(input);
@@ -380,11 +385,17 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .input(baseGetSessionNextSchema)
     .output(baseGetSessionNextOutputSchema)
     .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);
     }),
+
+  checkEligibility: baseProcedure.query(async ({ ctx }) => {
+    const { balance } = await getBalanceForUser(ctx.user);
+    return buildCloudAgentNextEligibility(balance);
+  }),
 
   /**
    * List GitHub repositories available for cloud agent sessions.

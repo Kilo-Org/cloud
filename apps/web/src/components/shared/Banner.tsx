@@ -25,7 +25,7 @@ const colorMap: Record<BannerColor, { border: string; bg: string; text: string; 
       border: 'border-blue-500/30',
       bg: 'bg-blue-500/10',
       text: 'text-blue-400',
-      button: 'bg-blue-500 text-primary-foreground hover:bg-blue-500/90',
+      button: 'bg-primary text-primary-foreground hover:bg-primary-hover',
     },
     red: {
       border: 'border-red-500/30',

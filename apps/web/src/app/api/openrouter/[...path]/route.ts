@@ -807,7 +807,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   });
 
   const extraHeaders: Record<string, string> = {};
-  applyProviderSpecificLogic(
+  await applyProviderSpecificLogic(
     effectiveProviderContext.provider,
     effectiveModelIdLowerCased,
     requestBodyParsed,
@@ -815,6 +815,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     effectiveProviderContext.userByok,
     fraudHeaders,
     user.id,
+    organizationId ?? null,
+    usageContext.session_id,
     taskId ?? null
   );
 

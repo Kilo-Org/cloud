@@ -4,7 +4,10 @@ import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@/lib/utils.server';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 
+export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+
 export const JWT_TOKEN_VERSION = 3;
+
 const jwtSigningAlgorithm = 'HS256';
 
 export type JWTTokenExtraPayload = {
@@ -39,12 +42,21 @@ export const TOKEN_EXPIRY = {
  */
 export function generateInternalServiceToken(
   userId: string,
-  options?: { expiresIn?: number }
+  options?: { expiresIn?: number; audience?: string; organizationId?: string }
 ): string {
-  return jwt.sign({ kiloUserId: userId, version: JWT_TOKEN_VERSION }, NEXTAUTH_SECRET, {
-    algorithm: jwtSigningAlgorithm,
-    expiresIn: options?.expiresIn ?? ONE_HOUR_IN_SECONDS,
-  });
+  return jwt.sign(
+    {
+      kiloUserId: userId,
+      version: JWT_TOKEN_VERSION,
+      ...(options?.organizationId ? { organizationId: options.organizationId } : {}),
+    },
+    NEXTAUTH_SECRET,
+    {
+      algorithm: jwtSigningAlgorithm,
+      expiresIn: options?.expiresIn ?? ONE_HOUR_IN_SECONDS,
+      ...(options?.audience ? { audience: options.audience } : {}),
+    }
+  );
 }
 
 export function generateApiToken(

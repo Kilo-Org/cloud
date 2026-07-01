@@ -6,10 +6,12 @@ import { createMagicLinkToken } from '@/lib/auth/magic-link-tokens';
 import { sendMagicLinkEmail } from '@/lib/email';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import * as z from 'zod';
-import { findUserByEmail } from '@/lib/user';
+import { findUserByEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail } from '@/lib/utils';
 
 const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';
 
@@ -67,6 +69,35 @@ export async function POST(request: NextRequest) {
 
   // Check if this is an existing user (sign-in) or new user (signup)
   const existingUser = await findUserByEmail(email);
+  const primaryEmail = existingUser?.google_user_email ?? email;
+  const primaryDomain = getLowerDomainFromEmail(primaryEmail);
+  if (primaryDomain) {
+    const ssoAuthority = await resolveSsoAuthorityForDomain(primaryDomain);
+    if (ssoAuthority.status === 'misconfigured') {
+      return NextResponse.json(
+        { success: false, error: 'SSO configuration error. Contact your administrator.' },
+        { status: 503 }
+      );
+    }
+    if (ssoAuthority.status === 'required') {
+      const workosOrganization = await getWorkOSOrganization(primaryDomain);
+      if (!workosOrganization) {
+        return NextResponse.json(
+          { success: false, error: 'SSO configuration error. Contact your administrator.' },
+          { status: 503 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Sign in with your organization SSO provider.',
+          ssoOrganizationId: workosOrganization.id,
+        },
+        { status: 403 }
+      );
+    }
+  }
 
   // For new users, enforce stricter email validation and TLD blocking
   if (!existingUser) {

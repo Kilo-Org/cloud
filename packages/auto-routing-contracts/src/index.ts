@@ -18,6 +18,10 @@ export const AutoRoutingModeSchema = z.enum(['cost_per_accuracy', 'best_accuracy
 export type AutoRoutingMode = z.infer<typeof AutoRoutingModeSchema>;
 export const DEFAULT_AUTO_ROUTING_MODE: AutoRoutingMode = 'cost_per_accuracy';
 
+export function isVirtualAutoModelId(model: string): boolean {
+  return model.trim().toLowerCase().startsWith('kilo-auto/');
+}
+
 // What the gateway mirrors to the auto-routing worker per request: the
 // already-normalized classifier input plus caller identity. The gateway
 // normalizes before sending so the multi-hundred-KB request body never

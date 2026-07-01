@@ -68,7 +68,12 @@ describe('session metadata boundary', () => {
       profile,
       callback: { target: callbackTarget },
       workspace: {
-        sandboxId: 'usr-abcdef' as const,
+        sandboxId: 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df' as const,
+        sandboxRoute: {
+          kind: 'shared' as const,
+          routeKey: 'usr-000000000000000000000000000000000000000000000000' as const,
+          suffix: 'shared-slot-v1' as const,
+        },
         workspacePath: '/workspace',
         sessionHome: '/home/kilo',
         branchName: 'session/agent_123',
@@ -86,6 +91,32 @@ describe('session metadata boundary', () => {
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(serializeSessionMetadata(current)).toEqual(current);
     expect(CurrentSessionMetadataSchema.parse(current)).toEqual(current);
+  });
+
+  it('rejects shared route metadata without a compatible assigned sandbox', () => {
+    const base = {
+      metadataSchemaVersion: 2 as const,
+      identity: { sessionId: 'agent_invalid_route', userId: 'user_invalid_route' },
+      auth: {},
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+    const route = {
+      kind: 'shared' as const,
+      routeKey: 'usr-000000000000000000000000000000000000000000000000' as const,
+    };
+
+    expect(() =>
+      serializeSessionMetadata({ ...base, workspace: { sandboxRoute: route } })
+    ).toThrow();
+    expect(() =>
+      serializeSessionMetadata({
+        ...base,
+        workspace: {
+          sandboxId: 'usr-111111111111111111111111111111111111111111111111',
+          sandboxRoute: route,
+        },
+      })
+    ).toThrow();
   });
 
   it('parses and serializes current grouped DIND workspace metadata', () => {
@@ -333,6 +364,120 @@ describe('session metadata boundary', () => {
 
     expect(parseSessionMetadata(current)).toEqual(current);
     expect(serializeSessionMetadata(current)).toEqual(current);
+  });
+
+  it('serializes captured current branches with shell-safe Git punctuation', () => {
+    const current = {
+      metadataSchemaVersion: 2 as const,
+      identity: {
+        sessionId: 'agent_current_branch',
+        userId: 'user_123',
+      },
+      auth: {},
+      repository: {
+        type: 'github' as const,
+        repo: 'acme/repo',
+        upstreamBranch: 'feature/alex+metadata@v2,fix=1#manual',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    expect(parseSessionMetadata(current)).toEqual(current);
+    expect(serializeSessionMetadata(current)).toEqual(current);
+  });
+
+  it('normalizes current GitHub repository metadata written without a type', () => {
+    expect(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_current_github_repo', userId: 'user_123' },
+        auth: {},
+        repository: {
+          repo: 'Kilo-Org/cloud',
+          platform: 'github',
+          upstreamBranch: 'refs/pull/4273/head',
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      }).repository
+    ).toEqual({
+      type: 'github',
+      repo: 'Kilo-Org/cloud',
+      platform: 'github',
+      upstreamBranch: 'refs/pull/4273/head',
+    });
+  });
+
+  it('normalizes current git URL repository metadata written without a type', () => {
+    expect(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_current_git_url', userId: 'user_123' },
+        auth: {},
+        repository: {
+          url: 'https://github.com/Kilo-Org/cloud.git',
+          platform: 'github',
+          upstreamBranch: 'chore/local-testing-code-reviews',
+        },
+        lifecycle: { version: 1, timestamp: 1 },
+      }).repository
+    ).toEqual({
+      type: 'git',
+      url: 'https://github.com/Kilo-Org/cloud.git',
+      platform: 'github',
+      upstreamBranch: 'chore/local-testing-code-reviews',
+    });
+  });
+
+  it('drops a current repository with an unknown type so the reaper can still read metadata', () => {
+    expect(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_unknown_repo', userId: 'user_123' },
+        auth: {},
+        repository: { type: 'unknown-local' },
+        lifecycle: { version: 1, timestamp: 1, kiloServerLastActivity: 5 },
+      }).repository
+    ).toBeUndefined();
+  });
+
+  it('drops current repository metadata without enough repository identity', () => {
+    expect(
+      parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'agent_invalid_repository', userId: 'user_123' },
+        auth: {},
+        repository: { upstreamBranch: 'main' },
+        lifecycle: { version: 1, timestamp: 1 },
+      }).repository
+    ).toBeUndefined();
+  });
+
+  it('persists Bitbucket identity and managed status without a token', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: 'agent_bitbucket', userId: 'user_123' },
+      auth: {},
+      repository: {
+        type: 'bitbucket',
+        url: 'https://bitbucket.org/acme/repo.git',
+        platform: 'bitbucket',
+        workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+        repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+        bitbucketTokenManaged: true,
+        token: 'must-not-persist',
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(metadata.repository).toEqual({
+      type: 'bitbucket',
+      url: 'https://bitbucket.org/acme/repo.git',
+      platform: 'bitbucket',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      bitbucketTokenManaged: true,
+    });
+    expect(JSON.stringify(serializeSessionMetadata(metadata))).not.toContain('must-not-persist');
   });
 
   it('preserves legacy generic git tokens in grouped repository metadata', () => {

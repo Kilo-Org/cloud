@@ -5,8 +5,8 @@
  * Auto-dismiss is OFF by default and must be explicitly enabled per-organization.
  *
  * Unified auto-dismiss logic:
- * - After Tier 1 triage: if triage.suggestedAction === 'dismiss' (with confidence threshold)
- * - After Tier 2 sandbox: if sandboxAnalysis.isExploitable === false (no confidence threshold)
+ * - After Tier 1 triage: dismiss only when no sandbox is needed and confidence meets policy
+ * - After Tier 2 sandbox: dismiss only when analysis says not exploitable and recommends dismissal
  */
 
 import 'server-only';
@@ -22,11 +22,29 @@ import { dismissDependabotAlert } from '../github/dependabot-api';
 import type { Owner } from '@/lib/code-reviews/core';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
 import { sentryLogger } from '@/lib/utils.server';
-import { logSecurityAudit, SecurityAuditLogAction } from './audit-log-service';
+import {
+  SecurityAuditLogAction,
+  SecurityFindingAuditSourceContext,
+} from '@kilocode/db/schema-types';
+import {
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+  type SecurityFindingAuditActor,
+  type SecurityFindingAuditHumanActor,
+  type SecurityFindingAuditOwner,
+} from '@kilocode/worker-utils/security-finding-audit';
 import { parseDependabotDismissalTarget } from '@kilocode/worker-utils/dependabot-dismissal-target';
 
 const log = sentryLogger('security-agent:auto-dismiss', 'info');
 const logError = sentryLogger('security-agent:auto-dismiss', 'error');
+const TRIAGE_CONFIDENCES = ['high', 'medium', 'low'] as const;
+
+type TriageConfidence = (typeof TRIAGE_CONFIDENCES)[number];
+
+function isTriageConfidence(value: unknown): value is TriageConfidence {
+  return TRIAGE_CONFIDENCES.includes(value as TriageConfidence);
+}
 
 /**
  * Convert SecurityReviewOwner + userId to Owner format for config lookups.
@@ -38,6 +56,33 @@ function toOwner(securityOwner: SecurityReviewOwner, userId: string): Owner {
   }
   if ('userId' in securityOwner && securityOwner.userId) {
     return { type: 'user', id: securityOwner.userId, userId: securityOwner.userId };
+  }
+  throw new Error('Invalid owner: must have either organizationId or userId');
+}
+
+function toAuditOwner(owner: SecurityReviewOwner): SecurityFindingAuditOwner {
+  if ('organizationId' in owner && owner.organizationId) {
+    return { type: 'organization', organizationId: owner.organizationId };
+  }
+  if ('userId' in owner && owner.userId) {
+    return { type: 'user', userId: owner.userId };
+  }
+  throw new Error('Invalid owner: must have either organizationId or userId');
+}
+
+function ownerAuditKeyPart(owner: SecurityReviewOwner): string {
+  if ('organizationId' in owner && owner.organizationId)
+    return `organization:${owner.organizationId}`;
+  if ('userId' in owner && owner.userId) return `user:${owner.userId}`;
+  throw new Error('Invalid owner: must have either organizationId or userId');
+}
+
+function ownerFindingCondition(owner: SecurityReviewOwner) {
+  if ('organizationId' in owner && owner.organizationId) {
+    return eq(security_findings.owned_by_organization_id, owner.organizationId);
+  }
+  if ('userId' in owner && owner.userId) {
+    return eq(security_findings.owned_by_user_id, owner.userId);
   }
   throw new Error('Invalid owner: must have either organizationId or userId');
 }
@@ -56,6 +101,86 @@ export async function dismissFinding(
   await updateSecurityFindingStatus(findingId, 'ignored', {
     ignoredReason: params.reason,
     ignoredBy: params.dismissedBy || `auto-dismiss: ${params.comment}`,
+  });
+}
+
+async function dismissFindingWithAuditEvent(
+  findingId: string,
+  params: {
+    owner: SecurityReviewOwner;
+    reason: string;
+    comment: string;
+    dismissedBy: string;
+    dismissSource: AutoDismissSource | 'bulk';
+    confidence?: string | null;
+    correlationId?: string;
+    actor: SecurityFindingAuditActor;
+  }
+): Promise<boolean> {
+  const occurredAt = new Date().toISOString();
+  return db.transaction(async tx => {
+    const [finding] = await tx
+      .select()
+      .from(security_findings)
+      .where(and(eq(security_findings.id, findingId), ownerFindingCondition(params.owner)))
+      .for('update')
+      .limit(1);
+
+    if (!finding) {
+      throw new Error('Security finding not found for owner');
+    }
+
+    if (finding.status !== 'open') {
+      return false;
+    }
+
+    const ignoredBy = params.dismissedBy || `auto-dismiss: ${params.comment}`;
+    const [updatedFinding] = await tx
+      .update(security_findings)
+      .set({
+        status: 'ignored',
+        ignored_reason: params.reason,
+        ignored_by: ignoredBy,
+        updated_at: occurredAt,
+      })
+      .where(
+        and(
+          eq(security_findings.id, findingId),
+          ownerFindingCondition(params.owner),
+          eq(security_findings.status, 'open')
+        )
+      )
+      .returning();
+
+    if (!updatedFinding) {
+      throw new Error('Security finding status update failed');
+    }
+
+    await insertSecurityFindingAuditEvent(tx, {
+      owner: toAuditOwner(params.owner),
+      finding: updatedFinding,
+      actor: params.actor,
+      action: SecurityAuditLogAction.FindingAutoDismissed,
+      occurredAt,
+      eventKey: deriveSecurityFindingAuditEventKey([
+        ownerAuditKeyPart(params.owner),
+        findingId,
+        SecurityAuditLogAction.FindingAutoDismissed,
+        params.dismissSource,
+        params.correlationId || 'none',
+      ]),
+      sourceContext: SecurityFindingAuditSourceContext.Web,
+      beforeState: { status: finding.status },
+      afterState: { status: 'ignored', reason_code: params.reason },
+      metadata: {
+        trigger: 'auto_dismiss_policy',
+        dismiss_source: params.dismissSource,
+        ...(params.confidence ? { confidence: params.confidence } : {}),
+        ...(params.correlationId ? { correlation_id: params.correlationId } : {}),
+      },
+    });
+
+    return true;
   });
 }
 
@@ -130,8 +255,8 @@ type AutoDismissSource = 'triage' | 'sandbox';
  * Only runs if auto-dismiss is enabled in config.
  *
  * Priority:
- * 1. If sandboxAnalysis exists and isExploitable === false -> dismiss (no confidence threshold)
- * 2. If triage.suggestedAction === 'dismiss' -> dismiss (with confidence threshold)
+ * 1. Treat any sandbox analysis as authoritative and dismiss only a coherent not-exploitable result
+ * 2. Without sandbox analysis, dismiss a triage result only when no sandbox is needed
  *
  * @param options.findingId - The ID of the finding to potentially dismiss
  * @param options.analysis - The full analysis result (triage + optional sandbox)
@@ -156,24 +281,33 @@ export async function maybeAutoDismissAnalysis(options: {
     return { dismissed: false };
   }
 
-  // Priority 1: Check sandbox analysis (no confidence threshold - sandbox is definitive)
-  if (analysis.sandboxAnalysis?.isExploitable === false) {
-    await dismissFinding(findingId, {
+  const sandbox = analysis.sandboxAnalysis;
+  if (sandbox) {
+    if (sandbox.isExploitable !== false || sandbox.suggestedAction !== 'dismiss') {
+      return { dismissed: false };
+    }
+
+    const dismissed = await dismissFindingWithAuditEvent(findingId, {
+      owner,
       reason: 'not_used',
-      comment: analysis.sandboxAnalysis.exploitabilityReasoning,
+      comment: sandbox.exploitabilityReasoning,
       dismissedBy: 'auto-sandbox',
+      dismissSource: 'sandbox',
+      correlationId,
+      actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
     });
+    if (!dismissed) return { dismissed: false };
 
     await safeWritebackDependabotDismissal(
       findingId,
       ownerConverted,
-      analysis.sandboxAnalysis.exploitabilityReasoning
+      sandbox.exploitabilityReasoning
     );
 
     log('Auto-dismissed finding (sandbox)', {
       correlationId,
       findingId,
-      reasoning: analysis.sandboxAnalysis.exploitabilityReasoning.slice(0, 100),
+      reasoning: sandbox.exploitabilityReasoning.slice(0, 100),
     });
 
     trackSecurityAgentAutoDismiss({
@@ -184,29 +318,11 @@ export async function maybeAutoDismissAnalysis(options: {
       source: 'sandbox',
     });
 
-    logSecurityAudit({
-      owner,
-      actor_id: null,
-      actor_email: null,
-      actor_name: null,
-      action: SecurityAuditLogAction.FindingAutoDismissed,
-      resource_type: 'security_finding',
-      resource_id: findingId,
-      after_state: { status: 'ignored' },
-      metadata: {
-        source: 'system',
-        trigger: 'auto_dismiss_policy',
-        dismissSource: 'sandbox',
-        correlationId,
-      },
-    });
-
     return { dismissed: true, source: 'sandbox' };
   }
 
-  // Priority 2: Check triage (with confidence threshold)
   const triage = analysis.triage;
-  if (triage?.suggestedAction === 'dismiss') {
+  if (triage?.needsSandboxAnalysis === false && triage.suggestedAction === 'dismiss') {
     const threshold = config.auto_dismiss_confidence_threshold ?? 'high';
 
     // Check confidence threshold
@@ -216,11 +332,17 @@ export async function maybeAutoDismissAnalysis(options: {
       (threshold === 'high' && triage.confidence === 'high');
 
     if (meetsThreshold) {
-      await dismissFinding(findingId, {
+      const dismissed = await dismissFindingWithAuditEvent(findingId, {
+        owner,
         reason: 'not_used',
         comment: triage.needsSandboxReasoning,
         dismissedBy: 'auto-triage',
+        dismissSource: 'triage',
+        confidence: triage.confidence,
+        correlationId,
+        actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
       });
+      if (!dismissed) return { dismissed: false };
 
       await safeWritebackDependabotDismissal(
         findingId,
@@ -242,24 +364,6 @@ export async function maybeAutoDismissAnalysis(options: {
         findingId,
         source: 'triage',
         confidence: triage.confidence,
-      });
-
-      logSecurityAudit({
-        owner,
-        actor_id: null,
-        actor_email: null,
-        actor_name: null,
-        action: SecurityAuditLogAction.FindingAutoDismissed,
-        resource_type: 'security_finding',
-        resource_id: findingId,
-        after_state: { status: 'ignored' },
-        metadata: {
-          source: 'system',
-          trigger: 'auto_dismiss_policy',
-          dismissSource: 'triage',
-          confidence: triage.confidence,
-          correlationId,
-        },
       });
 
       return { dismissed: true, source: 'triage' };
@@ -285,13 +389,15 @@ export type AutoDismissResult = {
  * This is useful for processing findings that were triaged before auto-dismiss was enabled.
  *
  * @param owner - The security review owner (org or user)
- * @param userId - The user performing the action (for audit/permissions)
+ * @param actor - The user performing the bulk action
  */
 export async function autoDismissEligibleFindings(
   owner: SecurityReviewOwner,
-  userId: string
+  actor: SecurityFindingAuditHumanActor
 ): Promise<AutoDismissResult> {
+  const userId = actor.id;
   const ownerConverted = toOwner(owner, userId);
+  const operationId = crypto.randomUUID();
   const config = await getSecurityAgentConfig(ownerConverted);
 
   if (!config.auto_dismiss_enabled) {
@@ -331,7 +437,12 @@ export async function autoDismissEligibleFindings(
       const analysis = finding.analysis;
       const triage = analysis?.triage;
 
-      if (!triage) {
+      if (
+        !triage ||
+        analysis?.sandboxAnalysis !== undefined ||
+        triage.needsSandboxAnalysis !== false ||
+        triage.suggestedAction !== 'dismiss'
+      ) {
         skipped++;
         continue;
       }
@@ -346,11 +457,20 @@ export async function autoDismissEligibleFindings(
         continue;
       }
 
-      await dismissFinding(finding.id, {
+      const didDismiss = await dismissFindingWithAuditEvent(finding.id, {
+        owner,
         reason: 'not_used',
         comment: triage.needsSandboxReasoning,
         dismissedBy: 'auto-triage-bulk',
+        dismissSource: 'bulk',
+        confidence: triage.confidence,
+        correlationId: operationId,
+        actor,
       });
+      if (!didDismiss) {
+        skipped++;
+        continue;
+      }
       await safeWritebackDependabotDismissal(
         finding.id,
         ownerConverted,
@@ -420,17 +540,28 @@ export async function countEligibleForAutoDismiss(
     );
 
   const byConfidence = { high: 0, medium: 0, low: 0 };
+  let eligible = 0;
 
   for (const finding of findings) {
     const analysis = finding.analysis;
-    const confidence = analysis?.triage?.confidence;
-    if (confidence && confidence in byConfidence) {
-      byConfidence[confidence]++;
+    const triage = analysis?.triage;
+    if (
+      !triage ||
+      analysis?.sandboxAnalysis !== undefined ||
+      triage.needsSandboxAnalysis !== false ||
+      triage.suggestedAction !== 'dismiss'
+    ) {
+      continue;
     }
+
+    if (!isTriageConfidence(triage.confidence)) continue;
+
+    eligible++;
+    byConfidence[triage.confidence]++;
   }
 
   return {
-    eligible: findings.length,
+    eligible,
     byConfidence,
   };
 }

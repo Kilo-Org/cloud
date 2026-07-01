@@ -14,6 +14,7 @@ export {
   GatewaySupportedScopes,
   GatewayAuditOutcome,
   GatewayExecutionContextSchema,
+  executionContextsMatch,
 } from './types';
 export type { GatewaySupportedScope, GatewayExecutionContext } from './types';
 

@@ -10,6 +10,8 @@ import {
 } from '@/lib/integrations/resolve-owner';
 import { validateGitLabInstance } from '@/lib/integrations/platforms/gitlab/adapter';
 import { validatePersonalAccessToken } from '@/lib/integrations/platforms/gitlab/adapter';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 
 export const gitlabRouter = createTRPCRouter({
   /**
@@ -85,7 +87,7 @@ export const gitlabRouter = createTRPCRouter({
       auth_type?: 'oauth' | 'pat';
     } | null;
 
-    const isInstalled = integration.integration_status === 'active';
+    const isInstalled = isPlatformIntegrationHealthy(integration);
 
     return {
       installed: isInstalled,
@@ -94,7 +96,7 @@ export const gitlabRouter = createTRPCRouter({
         accountId: integration.platform_account_id,
         accountLogin: integration.platform_account_login,
         instanceUrl: metadata?.gitlab_instance_url || 'https://gitlab.com',
-        repositories: integration.repositories,
+        repositories: requireNumericPlatformRepositories(integration.repositories),
         repositoriesSyncedAt: integration.repositories_synced_at,
         installedAt: integration.installed_at,
         tokenExpiresAt: metadata?.token_expires_at ?? null,

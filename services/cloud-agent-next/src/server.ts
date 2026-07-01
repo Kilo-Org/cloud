@@ -19,6 +19,7 @@ import { balanceMiddleware } from './middleware/balance.js';
 import { resolveTerminalWrapperClient } from './terminal/access.js';
 import { requestMethodAllowsBody } from './shared/http-proxy.js';
 import { hasDuplicateQueryParameters } from './shared/http-query.js';
+import { projectSessionAccessHttpError, requireCurrentSessionAccess } from './session-access.js';
 import {
   KILO_FACADE_AUTH_TOKEN_HEADER,
   KILO_FACADE_GLOBAL_FEED_PATH,
@@ -98,6 +99,18 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
   if (ticketResult.payload.ptyId !== ptyId) {
     logger.withFields({ cloudAgentSessionId, userId, ptyId }).warn('/terminal: PTY mismatch');
     return new Response('PTY mismatch', { status: 403 });
+  }
+
+  try {
+    await requireCurrentSessionAccess({
+      env,
+      kiloUserId: userId,
+      cloudAgentSessionId,
+      expectedOrganizationId: ticketResult.payload.organizationId ?? null,
+      expectedKiloSessionId: ticketResult.payload.kiloSessionId,
+    });
+  } catch (error) {
+    return projectSessionAccessHttpError(error);
   }
 
   logger.withFields({ cloudAgentSessionId, userId, ptyId }).info('/terminal: WebSocket authorized');
@@ -234,6 +247,18 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     return c.text('Session mismatch', 403);
   }
 
+  try {
+    await requireCurrentSessionAccess({
+      env: c.env,
+      kiloUserId: userId,
+      cloudAgentSessionId,
+      expectedOrganizationId: ticketResult.payload.organizationId ?? null,
+      expectedKiloSessionId: ticketResult.payload.kiloSessionId,
+    });
+  } catch (error) {
+    return projectSessionAccessHttpError(error);
+  }
+
   logger.withFields({ cloudAgentSessionId, userId }).info('/stream: WebSocket upgrade authorized');
 
   const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
@@ -295,6 +320,17 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
     return c.text('Invalid global feed producer identity', 400);
   }
 
+  try {
+    await requireCurrentSessionAccess({
+      env: c.env,
+      kiloUserId: userId,
+      cloudAgentSessionId,
+      expectedKiloSessionId: kiloSessionId,
+    });
+  } catch (error) {
+    return projectSessionAccessHttpError(error);
+  }
+
   const sessionDoId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`);
   const sessionStub = c.env.CLOUD_AGENT_SESSION.get(sessionDoId);
   const validation = await sessionStub.validateKiloGlobalFeedProducer({
@@ -352,6 +388,16 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
     return c.text('Token does not match session user', 403);
   }
 
+  try {
+    await requireCurrentSessionAccess({
+      env: c.env,
+      kiloUserId: userId,
+      cloudAgentSessionId: sessionId,
+    });
+  } catch (error) {
+    return projectSessionAccessHttpError(error);
+  }
+
   const doId = c.env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
   const stub = c.env.CLOUD_AGENT_SESSION.get(doId);
   const doUrl = new URL(c.req.url);
@@ -392,6 +438,16 @@ app.put(
     }
     if (authResult.userId !== userId) {
       return c.text('Token does not match session user', 403);
+    }
+
+    try {
+      await requireCurrentSessionAccess({
+        env: c.env,
+        kiloUserId: userId,
+        cloudAgentSessionId: sessionId,
+      });
+    } catch (error) {
+      return projectSessionAccessHttpError(error);
     }
 
     const contentLength = parseInt(c.req.header('Content-Length') ?? '', 10);
@@ -442,6 +498,7 @@ app.use(
       userId: c.get('userId'),
       authToken: c.get('authToken'),
       botId: c.get('botId'),
+      validatedSessionAccess: c.get('validatedSessionAccess'),
       request: c.req.raw,
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {

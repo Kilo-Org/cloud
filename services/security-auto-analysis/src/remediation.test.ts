@@ -1,5 +1,45 @@
-import { describe, expect, it } from 'vitest';
-import { buildRemediationPrepareSessionBody, buildRemediationPrompt } from './remediation.js';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as QueriesModule from './db/queries.js';
+import { getSecurityFindingById } from './db/queries.js';
+import { logger } from './logger.js';
+import {
+  admitRemediationAttempt,
+  buildRemediationPrepareSessionBody,
+  buildRemediationPrompt,
+} from './remediation.js';
+
+vi.mock('./db/queries.js', async importOriginal => ({
+  ...(await importOriginal<typeof QueriesModule>()),
+  getSecurityFindingById: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe('security remediation admission', () => {
+  it('reports a missing finding without starting persistence', async () => {
+    const findingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const transaction = vi.fn();
+    const log = vi.spyOn(logger, 'info');
+    vi.mocked(getSecurityFindingById).mockResolvedValue(null as never);
+
+    await expect(
+      admitRemediationAttempt({
+        db: { transaction } as never,
+        findingId,
+        origin: 'manual',
+      })
+    ).resolves.toEqual({ admitted: false, reason: 'finding_not_found' });
+
+    expect(transaction).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('Security remediation admission rejected', {
+      finding_id: findingId,
+      origin: 'manual',
+      reason: 'finding_not_found',
+    });
+  });
+});
 
 describe('security remediation launch contract', () => {
   it('does not pass the new remediation branch as upstream checkout branch', () => {

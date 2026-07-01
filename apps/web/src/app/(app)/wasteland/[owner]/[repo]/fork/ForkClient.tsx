@@ -178,7 +178,10 @@ export function ForkClient() {
   const invalidateWorkshop = () => {
     void queryClient.invalidateQueries({ queryKey: branchesQueryKey });
     void queryClient.invalidateQueries({
-      queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId: repo.wastelandId }),
+      queryKey: trpc.wasteland.browseWantedBoard.pathKey(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.wasteland.getWantedBoardCounts.pathKey(),
     });
     void queryClient.invalidateQueries({
       queryKey: trpc.wasteland.listMyPendingClaims.queryKey({ wastelandId: repo.wastelandId }),

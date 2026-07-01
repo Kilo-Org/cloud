@@ -5,7 +5,6 @@ import {
   type OrganizationMember,
   type AcceptInviteResult,
   type OrganizationSettings,
-  OrganizationSSODomainSchema,
 } from '@/lib/organizations/organization-types';
 import {
   kilocode_users,
@@ -21,7 +20,8 @@ import { auto_deleted_at, db, sql } from '@/lib/drizzle';
 import { and, eq, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import { randomUUID } from 'crypto';
-import { fromMicrodollars, normalizeEmail } from '@/lib/utils';
+import { fromMicrodollars, getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
+import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
 import { logExceptInTest } from '@/lib/utils.server';
 import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -170,11 +170,19 @@ export async function getProfileOrganizations(userId: User['id']): Promise<Profi
       and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
     );
 
-  return results.map(result => ({
-    id: result.organization.id,
-    name: result.organization.name,
-    role: result.membership.role,
-  }));
+  const parentOrganizationIdsWithMembershipInAChild = new Set(
+    results.flatMap(result =>
+      result.organization.parent_organization_id ? [result.organization.parent_organization_id] : []
+    )
+  );
+
+  return results
+    .filter(result => !parentOrganizationIdsWithMembershipInAChild.has(result.organization.id))
+    .map(result => ({
+      id: result.organization.id,
+      name: result.organization.name,
+      role: result.membership.role,
+    }));
 }
 
 export async function createOrganization(
@@ -202,6 +210,7 @@ export async function createOrganization(
           enable_usage_limits: false,
           // all new orgs will have code indexing enabled by default
           code_indexing_enabled: true,
+          ...(plan === 'enterprise' ? { recommendations_digest_enabled: true } : {}),
         },
         ...(company_domain ? { company_domain } : {}),
         ...(plan ? { plan } : {}),
@@ -269,12 +278,45 @@ export async function addUserToOrganization(
   return added;
 }
 
+async function lockOrganizationMembershipMutation(
+  tx: DrizzleTransaction,
+  organizationId: Organization['id'],
+  userId: User['id']
+): Promise<void> {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${organizationId} || ':' || ${userId}, 0))`
+  );
+}
+
+export async function addSsoUserToOrganization(
+  organizationId: Organization['id'],
+  userId: User['id']
+): Promise<boolean> {
+  return db.transaction(async tx => {
+    await lockOrganizationMembershipMutation(tx, organizationId, userId);
+    const [removal] = await tx
+      .select({ id: organization_membership_removals.id })
+      .from(organization_membership_removals)
+      .where(
+        and(
+          eq(organization_membership_removals.organization_id, organizationId),
+          eq(organization_membership_removals.kilo_user_id, userId)
+        )
+      )
+      .limit(1);
+
+    if (removal) return false;
+    return addUserToOrganization(organizationId, userId, 'member', tx);
+  });
+}
+
 export async function removeUserFromOrganization(
   organizationId: Organization['id'],
   userId: User['id'],
   removedBy?: User['id']
 ): Promise<{ rowCount: number | null }> {
   return await db.transaction(async tx => {
+    await lockOrganizationMembershipMutation(tx, organizationId, userId);
     // Look up the user's current role before deleting
     const [membership] = await tx
       .select({ role: organization_memberships.role })
@@ -393,56 +435,86 @@ export async function inviteUserToOrganization(
   email: string,
   role: OrganizationRole
 ): Promise<OrganizationInvitation> {
-  // Check for existing pending invitation
-  const existingInvitation = await db
-    .select()
-    .from(organization_invitations)
-    .where(
-      and(
-        eq(organization_invitations.organization_id, organizationId),
-        eq(organization_invitations.email, email),
-        isNull(organization_invitations.accepted_at),
-        gt(organization_invitations.expires_at, sql`NOW()`)
+  return db.transaction(async tx => {
+    const [organization] = await tx
+      .select({ parentOrganizationId: organizations.parent_organization_id })
+      .from(organizations)
+      .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+      .for('update');
+    if (!organization) {
+      throw new Error('Organization SSO policy is misconfigured');
+    }
+    // Child organizations manage membership through their parent organization,
+    // so direct invitations into a child org are not allowed.
+    if (organization.parentOrganizationId) {
+      throw new Error('Child organizations cannot invite members');
+    }
+
+    const policy = await resolveEffectiveOrganizationSsoPolicy(organizationId, tx);
+    if (policy.status === 'misconfigured') {
+      throw new Error('Organization SSO policy is misconfigured');
+    }
+
+    let authenticationRequirement: 'default' | 'workos' = 'default';
+    let ssoSourceOrganizationId: string | null = null;
+    const emailDomain = getLowerDomainFromEmail(email);
+    if (policy.status === 'required' && emailDomain === policy.domain) {
+      if (policy.source === 'self') {
+        throw new Error('User must join this organization through SSO');
+      }
+      authenticationRequirement = 'workos';
+      ssoSourceOrganizationId = policy.sourceOrganizationId;
+    }
+
+    const existingInvitation = await tx
+      .select()
+      .from(organization_invitations)
+      .where(
+        and(
+          eq(organization_invitations.organization_id, organizationId),
+          eq(organization_invitations.email, email),
+          isNull(organization_invitations.accepted_at),
+          gt(organization_invitations.expires_at, sql`NOW()`)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (existingInvitation.length > 0) {
-    throw new Error('User already has a pending invitation');
-  }
+    if (existingInvitation.length > 0) {
+      throw new Error('User already has a pending invitation');
+    }
 
-  // Check for existing membership
-  const existingMember = await db
-    .select()
-    .from(organization_memberships)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
-    .where(
-      and(
-        eq(organization_memberships.organization_id, organizationId),
-        eq(kilocode_users.google_user_email, email)
+    const existingMember = await tx
+      .select()
+      .from(organization_memberships)
+      .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+      .where(
+        and(
+          eq(organization_memberships.organization_id, organizationId),
+          eq(kilocode_users.google_user_email, email)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (existingMember.length > 0) {
-    throw new Error('User is already a member of this organization');
-  }
+    if (existingMember.length > 0) {
+      throw new Error('User is already a member of this organization');
+    }
 
-  const token = randomUUID();
+    const [invitation] = await tx
+      .insert(organization_invitations)
+      .values({
+        organization_id: organizationId,
+        email,
+        role,
+        invited_by: invitingUserId,
+        token: randomUUID(),
+        expires_at: sql`NOW() + INTERVAL '7 days'`,
+        authentication_requirement: authenticationRequirement,
+        sso_source_organization_id: ssoSourceOrganizationId,
+      })
+      .returning();
 
-  const [invitation] = await db
-    .insert(organization_invitations)
-    .values({
-      organization_id: organizationId,
-      email,
-      role,
-      invited_by: invitingUserId,
-      token,
-      expires_at: sql`NOW() + INTERVAL '7 days'`,
-    })
-    .returning();
-
-  return invitation;
+    return invitation;
+  });
 }
 
 export async function getOrganizationMembers(
@@ -535,9 +607,15 @@ export async function getOrganizationMembers(
   return members;
 }
 
+export type InvitationAuthenticationContext = {
+  provider?: string;
+  ssoSourceOrganizationId?: string;
+};
+
 export async function acceptOrganizationInvite(
   userId: User['id'],
-  inviteToken: string
+  inviteToken: string,
+  authentication: InvitationAuthenticationContext = {}
 ): Promise<AcceptInviteResult> {
   try {
     const result = await db.transaction(async tx => {
@@ -582,11 +660,43 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation is for a different email address');
       }
 
-      // Fetch the organization to check the require_seats flag
-      const organization = await getOrganizationById(invitation.organization_id, tx);
+      const [organization] = await tx
+        .select()
+        .from(organizations)
+        .where(
+          and(eq(organizations.id, invitation.organization_id), isNull(organizations.deleted_at))
+        )
+        .for('update');
       if (!organization) {
         return failureResult('Organization not found');
       }
+      // Child organizations manage membership through their parent organization.
+      // Reject any invitation (including pre-existing ones) into a child org.
+      if (organization.parent_organization_id) {
+        return failureResult('Child organizations cannot accept invitations');
+      }
+
+      const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organization.id, tx);
+      if (ssoPolicy.status === 'misconfigured') {
+        return failureResult('Organization SSO policy is misconfigured');
+      }
+
+      const acceptingUserDomain = getLowerDomainFromEmail(acceptingUser.email);
+      if (invitation.authentication_requirement === 'workos') {
+        if (
+          ssoPolicy.status !== 'required' ||
+          acceptingUserDomain !== ssoPolicy.domain ||
+          invitation.sso_source_organization_id !== ssoPolicy.sourceOrganizationId ||
+          authentication.provider !== 'workos' ||
+          authentication.ssoSourceOrganizationId !== ssoPolicy.sourceOrganizationId
+        ) {
+          return failureResult('Invitation requires authentication through organization SSO');
+        }
+      } else if (ssoPolicy.status === 'required' && acceptingUserDomain === ssoPolicy.domain) {
+        return failureResult('Invitation requires authentication through organization SSO');
+      }
+
+      await lockOrganizationMembershipMutation(tx, invitation.organization_id, userId);
 
       // Check if user is already a member of the organization
       const existingMembership = await tx
@@ -721,22 +831,34 @@ export async function updateOrganizationSettings(
   return settings;
 }
 
+// Atomically update the recommendations-digest flag inside the settings JSONB
+// without a read-modify-write of the whole object, so a concurrent settings
+// mutation can't clobber other fields. Persist false to distinguish an explicit
+// opt-out from an organization that has never initialized this preference.
+export async function setOrganizationRecommendationsDigestEnabled(
+  organizationId: Organization['id'],
+  enabled: boolean
+): Promise<OrganizationSettings> {
+  const [row] = await db
+    .update(organizations)
+    .set({
+      settings: sql`jsonb_set(
+        COALESCE(${organizations.settings}, '{}'::jsonb),
+        '{recommendations_digest_enabled}',
+        ${JSON.stringify(enabled)}::jsonb
+      )`,
+    })
+    .where(eq(organizations.id, organizationId))
+    .returning({ settings: organizations.settings });
+
+  return row?.settings ?? {};
+}
+
 export async function markOrganizationAsDeleted(organizationId: Organization['id']): Promise<void> {
   await db
     .update(organizations)
     .set({ ...auto_deleted_at })
     .where(eq(organizations.id, organizationId));
-}
-
-export async function doesOrgWithSSODomainExist(domain: string): Promise<string | false> {
-  const d = OrganizationSSODomainSchema.safeParse(domain);
-  if (!d.success) return false;
-
-  const result = await db.query.organizations.findFirst({
-    where: and(eq(organizations.sso_domain, d.data), isNull(organizations.deleted_at)),
-    columns: { id: true },
-  });
-  return result?.id || false;
 }
 
 export async function getOrganizationMemberByEmail(

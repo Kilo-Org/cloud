@@ -1,5 +1,5 @@
 import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   organizations,
   organization_memberships,
@@ -8,6 +8,7 @@ import {
   credit_transactions,
   platform_integrations,
   kilo_pass_subscriptions,
+  user_auth_provider,
 } from '@kilocode/db/schema';
 import {
   ilike,
@@ -24,11 +25,12 @@ import {
   sql,
   type SQL,
 } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { AdminCreditTransactionSchema, OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { STRIPE_SUBSCRIPTION_STATUS_VALUES } from '@/lib/admin/stripe-subscription-statuses';
-import { isValidUUID, toMicrodollars } from '@/lib/utils';
+import { getLowerDomainFromEmail, isValidUUID, toMicrodollars } from '@/lib/utils';
 import { millisecondsInHour } from 'date-fns/constants';
 import {
   createOrganization,
@@ -42,7 +44,14 @@ import { TRPCError } from '@trpc/server';
 import { successResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
+import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
+import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getAdminCreditTransactionsForOrganization } from '@/lib/creditTransactions';
+import {
+  fetchExpiringTransactionsForOrganization,
+  computeNextExpirationAmount,
+  processOrganizationExpirations,
+} from '@/lib/creditExpiration';
 import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
   ORGANIZATION_TRIAL_DURATION_DAYS,
@@ -85,6 +94,7 @@ const OrganizationListInputSchema = z.object({
 const OrganizationSearchInputSchema = z.object({
   search: z.string().min(1),
   limit: z.number().int().min(1).max(50).default(10),
+  childOfOrganizationId: z.uuid().optional(),
 });
 
 const OrganizationSearchResultSchema = z.object({
@@ -94,6 +104,7 @@ const OrganizationSearchResultSchema = z.object({
 
 const OrganizationCreateInputSchema = z.object({
   name: z.string().min(1, 'Organization name is required').trim(),
+  parentOrganizationId: z.uuid().nullable().optional(),
 });
 
 const OrganizationIdInputSchema = z.object({
@@ -103,6 +114,11 @@ const OrganizationIdInputSchema = z.object({
 const UpdateCreatedByInputSchema = z.object({
   organizationId: z.uuid(),
   userId: z.string().uuid().nullable(),
+});
+
+const SetParentOrganizationInputSchema = z.object({
+  organizationId: z.uuid(),
+  parentOrganizationId: z.uuid().nullable(),
 });
 
 const UpdateFreeTrialEndAtInputSchema = z.object({
@@ -125,6 +141,17 @@ const AdminOrganizationDetailsSchema = z.object({
   created_by_kilo_user_id: z.string().nullable(),
   created_by_user_email: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
+});
+
+const OrganizationHierarchySummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+
+const AdminOrganizationHierarchySchema = z.object({
+  parent: OrganizationHierarchySummarySchema.nullable(),
+  ancestors: z.array(OrganizationHierarchySummarySchema),
+  children: z.array(OrganizationHierarchySummarySchema),
 });
 
 const GrantCreditInputSchema = z
@@ -173,12 +200,158 @@ const AddMemberInputSchema = z.object({
   role: z.enum(['owner', 'member', 'billing_manager']),
 });
 
+const childOrganizationSettings = {
+  suppress_trial_messaging: true,
+};
+
+async function validateParentOrganizationChange(
+  organizationId: string,
+  parentOrganizationId: string | null,
+  txn: DrizzleTransaction
+) {
+  const [organization] = await txn
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
+    .limit(1);
+
+  if (!organization) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Organization not found',
+    });
+  }
+
+  if (!parentOrganizationId) {
+    return;
+  }
+
+  if (organizationId === parentOrganizationId) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'An organization cannot be its own parent',
+    });
+  }
+
+  const [childOrganization] = await txn
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(
+      and(
+        eq(organizations.parent_organization_id, organizationId),
+        isNull(organizations.deleted_at)
+      )
+    )
+    .limit(1);
+
+  if (childOrganization) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Cannot add a parent to an organization that already has child organizations',
+    });
+  }
+
+  let currentParentId: string | null = parentOrganizationId;
+  const visitedOrganizationIds = new Set<string>();
+
+  while (currentParentId) {
+    if (currentParentId === organizationId) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Cannot create a cycle in the organization hierarchy',
+      });
+    }
+
+    if (visitedOrganizationIds.has(currentParentId)) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Existing organization hierarchy contains a cycle',
+      });
+    }
+    visitedOrganizationIds.add(currentParentId);
+
+    const [parentOrganization] = await txn
+      .select({ parent_organization_id: organizations.parent_organization_id })
+      .from(organizations)
+      .where(and(eq(organizations.id, currentParentId), isNull(organizations.deleted_at)))
+      .limit(1);
+
+    if (!parentOrganization) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Parent organization not found',
+      });
+    }
+
+    if (currentParentId === parentOrganizationId && parentOrganization.parent_organization_id) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Cannot add child organizations to an organization that is already a child',
+      });
+    }
+
+    currentParentId = parentOrganization.parent_organization_id;
+  }
+}
+
 export const organizationAdminRouter = createTRPCRouter({
   create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async opts => {
-    const organization = await createOrganization(opts.input.name);
+    const parentOrganizationId = opts.input.parentOrganizationId ?? null;
+
+    if (!parentOrganizationId) {
+      const organization = await createOrganization(opts.input.name);
+      await getOrCreateStripeCustomerIdForOrganization(organization.id);
+      return { organization };
+    }
+
+    const organization = await db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+
+      const [createdOrganization] = await tx
+        .insert(organizations)
+        .values({
+          name: opts.input.name,
+          require_seats: false,
+          free_trial_end_at: null,
+          parent_organization_id: parentOrganizationId,
+          settings: {
+            enable_usage_limits: false,
+            code_indexing_enabled: true,
+            ...childOrganizationSettings,
+          },
+        })
+        .returning();
+
+      await validateParentOrganizationChange(createdOrganization.id, parentOrganizationId, tx);
+      return createdOrganization;
+    });
+
     // create stripe customer id on org creation
     await getOrCreateStripeCustomerIdForOrganization(organization.id);
     return { organization };
+  }),
+
+  setParent: adminProcedure.input(SetParentOrganizationInputSchema).mutation(async ({ input }) => {
+    await db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(20260624, 1)`);
+      await validateParentOrganizationChange(input.organizationId, input.parentOrganizationId, tx);
+
+      await tx
+        .update(organizations)
+        .set(
+          input.parentOrganizationId
+            ? {
+                parent_organization_id: input.parentOrganizationId,
+                require_seats: false,
+                free_trial_end_at: null,
+                settings: sql`${organizations.settings} || ${JSON.stringify(childOrganizationSettings)}::jsonb`,
+              }
+            : { parent_organization_id: input.parentOrganizationId }
+        )
+        .where(eq(organizations.id, input.organizationId));
+    });
+
+    return successResult();
   }),
 
   updateCreatedBy: adminProcedure.input(UpdateCreatedByInputSchema).mutation(async ({ input }) => {
@@ -299,11 +472,142 @@ export const organizationAdminRouter = createTRPCRouter({
       return organizationDetails[0];
     }),
 
+  getHierarchy: adminProcedure
+    .input(OrganizationIdInputSchema)
+    .output(AdminOrganizationHierarchySchema)
+    .query(async ({ input }) => {
+      const { organizationId } = input;
+      const parentOrganizations = alias(organizations, 'parent_organizations');
+
+      const [organizationHierarchy] = await db
+        .select({
+          parent_id: parentOrganizations.id,
+          parent_name: parentOrganizations.name,
+        })
+        .from(organizations)
+        .leftJoin(
+          parentOrganizations,
+          eq(organizations.parent_organization_id, parentOrganizations.id)
+        )
+        .where(eq(organizations.id, organizationId))
+        .limit(1);
+
+      if (!organizationHierarchy) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      const ancestors: Array<z.infer<typeof OrganizationHierarchySummarySchema>> = [];
+      const visitedAncestorIds = new Set<string>();
+      let currentParentId = organizationHierarchy.parent_id;
+
+      while (currentParentId) {
+        if (visitedAncestorIds.has(currentParentId)) {
+          break;
+        }
+        visitedAncestorIds.add(currentParentId);
+
+        const [ancestor] = await db
+          .select({
+            id: organizations.id,
+            name: organizations.name,
+            parent_organization_id: organizations.parent_organization_id,
+          })
+          .from(organizations)
+          .where(eq(organizations.id, currentParentId))
+          .limit(1);
+
+        if (!ancestor) {
+          break;
+        }
+
+        ancestors.push({ id: ancestor.id, name: ancestor.name });
+        currentParentId = ancestor.parent_organization_id;
+      }
+
+      const children = await db
+        .select({
+          id: organizations.id,
+          name: organizations.name,
+        })
+        .from(organizations)
+        .where(eq(organizations.parent_organization_id, organizationId))
+        .orderBy(asc(organizations.name));
+
+      return {
+        parent: organizationHierarchy.parent_id
+          ? {
+              id: organizationHierarchy.parent_id,
+              name: organizationHierarchy.parent_name ?? 'Unknown organization',
+            }
+          : null,
+        ancestors,
+        children,
+      };
+    }),
+
   creditTransactions: adminProcedure
     .input(OrganizationIdInputSchema)
     .output(z.array(AdminCreditTransactionSchema))
     .query(async ({ input }) => {
       return getAdminCreditTransactionsForOrganization(input.organizationId);
+    }),
+
+  nextCreditExpiration: adminProcedure
+    .input(OrganizationIdInputSchema)
+    .output(
+      z.object({
+        next_credit_expiration_at: z.string().datetime().nullable(),
+        next_credit_expiration_amount: z.number().nullable(),
+      })
+    )
+    .query(async ({ input }) => {
+      const organizationId = input.organizationId;
+      let organization = await getOrganizationById(organizationId);
+
+      if (!organization) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      // Process pending credit expirations before returning stale balance/amount
+      if (
+        organization.next_credit_expiration_at &&
+        new Date() >= new Date(organization.next_credit_expiration_at)
+      ) {
+        await processOrganizationExpirations(
+          {
+            id: organizationId,
+            microdollars_used: organization.microdollars_used,
+            next_credit_expiration_at: organization.next_credit_expiration_at,
+            total_microdollars_acquired: organization.total_microdollars_acquired,
+          },
+          new Date()
+        );
+        organization = (await getOrganizationById(organizationId)) ?? organization;
+      }
+
+      const next_credit_expiration_at = organization.next_credit_expiration_at
+        ? new Date(organization.next_credit_expiration_at).toISOString()
+        : null;
+      const expiringTransactions = next_credit_expiration_at
+        ? await fetchExpiringTransactionsForOrganization(organizationId)
+        : [];
+
+      const next_credit_expiration_amount = computeNextExpirationAmount(
+        expiringTransactions,
+        { id: organizationId, microdollars_used: organization.microdollars_used },
+        next_credit_expiration_at
+      );
+
+      return {
+        next_credit_expiration_at,
+        next_credit_expiration_amount,
+      };
     }),
 
   grantCredit: creditManagerProcedure
@@ -496,7 +800,7 @@ export const organizationAdminRouter = createTRPCRouter({
     };
   }),
 
-  addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input }) => {
+  addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId, userId, role } = input;
 
     const organization = await getOrganizationById(organizationId);
@@ -515,7 +819,46 @@ export const organizationAdminRouter = createTRPCRouter({
       });
     }
 
-    await addUserToOrganization(organizationId, userId, role);
+    const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organizationId);
+    if (ssoPolicy.status === 'misconfigured') {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Organization SSO policy is misconfigured',
+      });
+    }
+
+    const userDomain = getLowerDomainFromEmail(existingUser.google_user_email);
+    if (
+      !existingUser.is_bot &&
+      ssoPolicy.status === 'required' &&
+      userDomain === ssoPolicy.domain
+    ) {
+      const workosProvider = await db.query.user_auth_provider.findFirst({
+        where: and(
+          eq(user_auth_provider.kilo_user_id, userId),
+          eq(user_auth_provider.provider, 'workos'),
+          eq(user_auth_provider.hosted_domain, ssoPolicy.domain)
+        ),
+      });
+      if (!workosProvider) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'User must authenticate through the organization SSO provider first',
+        });
+      }
+    }
+
+    const added = await addUserToOrganization(organizationId, userId, role);
+    if (added) {
+      await createAuditLog({
+        organization_id: organizationId,
+        action: 'organization.member.admin_add',
+        actor_name: ctx.user.google_user_name,
+        actor_email: ctx.user.google_user_email,
+        actor_id: ctx.user.id,
+        message: `Added ${existingUser.google_user_email} as ${role}`,
+      });
+    }
 
     return successResult();
   }),
@@ -724,6 +1067,7 @@ export const organizationAdminRouter = createTRPCRouter({
         created_by_kilo_user_id: organizations.created_by_kilo_user_id,
         deleted_at: organizations.deleted_at,
         sso_domain: organizations.sso_domain,
+        parent_organization_id: organizations.parent_organization_id,
         plan: organizations.plan,
         free_trial_end_at: organizations.free_trial_end_at,
         company_domain: organizations.company_domain,
@@ -968,7 +1312,7 @@ export const organizationAdminRouter = createTRPCRouter({
     .input(OrganizationSearchInputSchema)
     .output(z.array(OrganizationSearchResultSchema))
     .query(async ({ input }) => {
-      const { search, limit } = input;
+      const { search, limit, childOfOrganizationId } = input;
       const searchTerm = search.trim();
 
       if (!searchTerm) {
@@ -981,13 +1325,33 @@ export const organizationAdminRouter = createTRPCRouter({
         searchConditions.push(eq(organizations.id, searchTerm));
       }
 
+      const conditions = [or(...searchConditions), isNull(organizations.deleted_at)];
+
+      if (childOfOrganizationId) {
+        const [parentOrganization] = await db
+          .select({ parent_organization_id: organizations.parent_organization_id })
+          .from(organizations)
+          .where(and(eq(organizations.id, childOfOrganizationId), isNull(organizations.deleted_at)))
+          .limit(1);
+
+        if (!parentOrganization || parentOrganization.parent_organization_id) {
+          return [];
+        }
+
+        conditions.push(ne(organizations.id, childOfOrganizationId));
+        conditions.push(isNull(organizations.parent_organization_id));
+        conditions.push(
+          sql`NOT EXISTS (SELECT 1 FROM ${organizations} child_organizations WHERE child_organizations.parent_organization_id = ${organizations.id} AND child_organizations.deleted_at IS NULL)`
+        );
+      }
+
       const results = await db
         .select({
           id: organizations.id,
           name: organizations.name,
         })
         .from(organizations)
-        .where(and(or(...searchConditions), isNull(organizations.deleted_at)))
+        .where(and(...conditions))
         .orderBy(asc(organizations.name))
         .limit(limit);
 

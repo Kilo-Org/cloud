@@ -23,7 +23,7 @@ export type WrapperBootstrapRepoSource =
       kind: 'git';
       url: string;
       token?: string;
-      platform?: 'github' | 'gitlab';
+      platform?: 'github' | 'gitlab' | 'bitbucket';
       shallow?: boolean;
       refreshRemote?: boolean;
     }
@@ -143,6 +143,7 @@ export type WrapperWorkspaceReady = {
   githubAppType?: 'standard' | 'lite';
   gitToken?: string;
   gitlabTokenManaged?: boolean;
+  bitbucketTokenManaged?: boolean;
   devcontainer?: WrapperDevContainerMetadata;
 };
 

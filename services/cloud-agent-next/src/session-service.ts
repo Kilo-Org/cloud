@@ -12,6 +12,7 @@ import { generateSandboxId } from './sandbox-id.js';
 import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
   resolveCloudAgentGitHubAuthForRepo,
+  resolveManagedBitbucketToken,
   resolveManagedGitLabToken,
 } from './services/git-token-service-client.js';
 import { ExecutionError } from './execution/errors.js';
@@ -475,6 +476,7 @@ export type ResolvedWorkspaceTokens = {
   githubFallbackReason?: ManagedGitHubFallbackReason;
   gitToken?: string;
   gitlabTokenManaged?: boolean;
+  bitbucketTokenManaged?: boolean;
   glabIsOAuth2?: boolean;
 };
 
@@ -936,16 +938,23 @@ function githubRepository(metadata: CloudAgentSessionState) {
 
 function gitRepository(metadata: CloudAgentSessionState) {
   const repository = metadata.repository;
-  return repository?.type === 'git' || repository?.type === 'gitlab' ? repository : undefined;
+  return repository?.type === 'git' ||
+    repository?.type === 'gitlab' ||
+    repository?.type === 'bitbucket'
+    ? repository
+    : undefined;
 }
 
-function repositoryPlatform(metadata: CloudAgentSessionState): 'github' | 'gitlab' | undefined {
+function repositoryPlatform(
+  metadata: CloudAgentSessionState
+): 'github' | 'gitlab' | 'bitbucket' | undefined {
   const repository = metadata.repository;
   if (!repository) return undefined;
   if (repository.type === 'empty-local') return undefined;
   if (repository.platform) return repository.platform;
   if (repository.type === 'github') return 'github';
   if (repository.type === 'gitlab') return 'gitlab';
+  if (repository.type === 'bitbucket') return 'bitbucket';
   return undefined;
 }
 
@@ -1000,7 +1009,10 @@ export class SessionService {
         this._metadata.identity.orgId,
         userId,
         sessionId,
-        this._metadata.identity.botId
+        this._metadata.identity.botId,
+        {
+          createdOnPlatform: this._metadata.identity.createdOnPlatform,
+        }
       ));
 
     return sandboxId;
@@ -1026,12 +1038,15 @@ export class SessionService {
     gitUrl?: string;
     gitToken?: string;
     gitlabTokenManaged?: boolean;
+    bitbucketTokenManaged?: boolean;
+    bitbucketWorkspaceUuid?: string;
+    bitbucketRepositoryUuid?: string;
     glabIsOAuth2?: boolean;
     upstreamBranch?: string;
     branchName?: string;
     envVars?: Record<string, string>;
     botId?: string;
-    platform?: 'github' | 'gitlab';
+    platform?: 'github' | 'gitlab' | 'bitbucket';
   }): SessionContext {
     const sessionHome = options.sessionHome ?? getSessionHomePath(options.sessionId);
     const workspacePath =
@@ -1056,6 +1071,9 @@ export class SessionService {
       gitUrl: options.gitUrl,
       gitToken: options.gitToken,
       gitlabTokenManaged: options.gitlabTokenManaged,
+      bitbucketTokenManaged: options.bitbucketTokenManaged,
+      bitbucketWorkspaceUuid: options.bitbucketWorkspaceUuid,
+      bitbucketRepositoryUuid: options.bitbucketRepositoryUuid,
       glabIsOAuth2: options.glabIsOAuth2,
       platform: options.platform,
       envVars: options.envVars,
@@ -1446,8 +1464,10 @@ export class SessionService {
       throw ExecutionError.invalidRequest('GitHub authentication required for this repository');
     }
 
-    let gitToken = repositoryPlatform(metadata) === 'gitlab' ? undefined : git?.token;
+    const platform = repositoryPlatform(metadata);
+    let gitToken = git?.type === 'git' ? git.token : undefined;
     let gitlabTokenManaged = git?.type === 'gitlab' ? git.gitlabTokenManaged : undefined;
+    let bitbucketTokenManaged = git?.type === 'bitbucket' ? git.bitbucketTokenManaged : undefined;
     let glabIsOAuth2: boolean | undefined;
     if (git?.url && repositoryPlatform(metadata) === 'gitlab') {
       if (!env.GIT_TOKEN_SERVICE) {
@@ -1469,10 +1489,38 @@ export class SessionService {
       }
     }
 
-    if (git?.url && repositoryPlatform(metadata) === 'gitlab' && !gitToken) {
+    if (git?.url && platform === 'gitlab' && !gitToken) {
       throw ExecutionError.invalidRequest(
         'No GitLab integration found. Please connect your GitLab account first.'
       );
+    }
+
+    if (git?.type === 'bitbucket') {
+      if (!metadata.identity.orgId) {
+        throw ExecutionError.invalidRequest('Bitbucket repositories require an organization');
+      }
+
+      const result = await resolveManagedBitbucketToken(env, {
+        userId: metadata.identity.userId,
+        orgId: metadata.identity.orgId,
+        workspaceUuid: git.workspaceUuid,
+        repositoryUuid: git.repositoryUuid,
+        repositoryUrl: git.url,
+      });
+      if (!result.success) {
+        const reconnect = result.reason === 'reconnect_required' ? ' Reconnect Bitbucket.' : '';
+        const message = `Bitbucket repository authorization failed (${result.reason}).${reconnect}`;
+        if (result.reason === 'temporarily_unavailable') {
+          throw ExecutionError.workspaceSetupFailed(message);
+        }
+        throw ExecutionError.invalidRequest(message);
+      }
+      gitToken = result.token;
+      bitbucketTokenManaged = true;
+    }
+
+    if (git?.type === 'bitbucket' && !gitToken) {
+      throw ExecutionError.invalidRequest('Bitbucket authentication required for this repository');
     }
 
     return {
@@ -1485,6 +1533,7 @@ export class SessionService {
       githubFallbackReason,
       gitToken,
       gitlabTokenManaged,
+      bitbucketTokenManaged,
       glabIsOAuth2,
     };
   }
@@ -1537,6 +1586,9 @@ export class SessionService {
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
+      bitbucketWorkspaceUuid: git?.type === 'bitbucket' ? git.workspaceUuid : undefined,
+      bitbucketRepositoryUuid: git?.type === 'bitbucket' ? git.repositoryUuid : undefined,
       glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       upstreamBranch,
       branchName,
@@ -1574,6 +1626,7 @@ export class SessionService {
       githubAppType: resolvedTokens.githubAppType,
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
       ...(metadata.devcontainer ? { devcontainer: metadata.devcontainer } : {}),
     } satisfies WrapperWorkspaceReady;
 
@@ -1704,7 +1757,7 @@ export class SessionService {
         ...(repositoryShallow(metadata) !== undefined
           ? { shallow: repositoryShallow(metadata) }
           : {}),
-        refreshRemote: tokens.gitlabTokenManaged === true,
+        refreshRemote: tokens.gitlabTokenManaged === true || tokens.bitbucketTokenManaged === true,
       };
     }
 
@@ -1762,6 +1815,9 @@ export class SessionService {
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
+      bitbucketWorkspaceUuid: git?.type === 'bitbucket' ? git.workspaceUuid : undefined,
+      bitbucketRepositoryUuid: git?.type === 'bitbucket' ? git.repositoryUuid : undefined,
       glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       upstreamBranch,
       branchName,
@@ -1780,6 +1836,7 @@ export class SessionService {
       githubAppType: resolvedTokens.githubAppType,
       gitToken: resolvedTokens.gitToken,
       gitlabTokenManaged: resolvedTokens.gitlabTokenManaged,
+      bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
       devcontainer: metadata.devcontainer,
     } satisfies PreparedWorkspace['ready'];
     const runtimeEnv = this.buildRuntimeEnv({
@@ -2134,7 +2191,10 @@ export class SessionService {
 
     const git = gitRepository(metadata);
     if (git) {
-      if (tokens.gitToken !== undefined && tokens.gitlabTokenManaged === true) {
+      if (
+        tokens.gitToken !== undefined &&
+        (tokens.gitlabTokenManaged === true || tokens.bitbucketTokenManaged === true)
+      ) {
         await updateGitRemoteToken(
           session,
           context.workspacePath,
@@ -2418,7 +2478,7 @@ type GetSaferEnvVarsOptions = {
   gitUrl?: string;
   gitToken?: string;
   glabIsOAuth2?: boolean;
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
   profile?: SessionProfileBundle;
 };
 
@@ -2432,6 +2492,7 @@ export type WorkspaceReadyMetadata = {
   githubAppType?: 'standard' | 'lite';
   gitToken?: string;
   gitlabTokenManaged?: boolean;
+  bitbucketTokenManaged?: boolean;
   devcontainer?: CloudAgentSessionState['devcontainer'];
 };
 

@@ -19,7 +19,7 @@ export default function AdminPage({
 }) {
   return (
     <>
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b">
+      <header className="bg-background flex h-14 shrink-0 items-center gap-2 border-b border-border">
         <div className="flex w-full items-center justify-between gap-1 px-4 lg:gap-2 lg:px-6">
           <div className="flex items-center gap-1 lg:gap-2">
             <SidebarTrigger className="-ml-1" />

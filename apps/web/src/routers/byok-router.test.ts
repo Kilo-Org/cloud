@@ -581,18 +581,38 @@ describe('BYOK Router', () => {
       expect(updatedSubscription.installed_byok_key_id).toBeNull();
     });
 
-    test('allows deleting installed MiniMax key without canceling subscription', async () => {
+    test('blocks deleting an installed coding-plan MiniMax key', async () => {
       const { key, subscription } = await createInstalledMiniMaxKey();
       const caller = await createCallerForUser(ownerUser.id);
 
-      await expect(caller.byok.delete({ id: key.id })).resolves.toEqual({ success: true });
+      await expect(caller.byok.delete({ id: key.id })).rejects.toThrow(/coding plan/i);
+
+      const remainingKeys = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, key.id));
+      expect(remainingKeys).toHaveLength(1);
+
       const [updatedSubscription] = await db
         .select()
         .from(coding_plan_subscriptions)
         .where(eq(coding_plan_subscriptions.id, subscription.id));
 
       expect(updatedSubscription.status).toBe('active');
-      expect(updatedSubscription.installed_byok_key_id).toBeNull();
+      expect(updatedSubscription.installed_byok_key_id).toBe(key.id);
+    });
+
+    test('still deletes a user-owned key', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const created = await caller.byok.create({ provider_id: 'anthropic', api_key: 'user-key' });
+
+      await expect(caller.byok.delete({ id: created.id })).resolves.toEqual({ success: true });
+
+      const remainingKeys = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, created.id));
+      expect(remainingKeys).toHaveLength(0);
     });
   });
 

@@ -23,6 +23,11 @@ export const GATEWAY_METADATA_REDIS_KEYS = {
   allProviders: redisKey('ai-gateway.metadata:all-providers'),
   openrouterModels: redisKey('ai-gateway.metadata:openrouter-models'),
   vercelModels: redisKey('ai-gateway.metadata:vercel-models'),
+  // Lightweight lists of language model ids, mirrored alongside the full
+  // catalogs above so existence checks don't need to load every model's
+  // metadata and endpoints.
+  openrouterModelIds: redisKey('ai-gateway.metadata:openrouter-model-ids'),
+  vercelModelIds: redisKey('ai-gateway.metadata:vercel-model-ids'),
   openrouterProviders: redisKey('ai-gateway.metadata:openrouter-providers'),
 } as const;
 
@@ -30,6 +35,20 @@ export const directByokModelsRedisKey = (providerId: DirectUserByokInferenceProv
   redisKey(`ai-gateway.metadata.direct-byok-models:${providerId}`);
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
+
+/**
+ * Per-user list of BYOK provider ids a user has used, written daily by the
+ * `sync-byok-provider-notifications` cron and read when notifications are polled.
+ * Storing one entry per user keeps the read tiny instead of fetching the whole
+ * dataset on every poll.
+ */
+export const byokProvidersNotificationRedisKey = (userId: string) =>
+  redisKey(`notification:byok-providers:${userId}`);
+
+export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
+  'public-api:leaderboard-model-provider-usage'
+);
+export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 
 export const requestLogRedisKey = (hash: string) => redisKey(`ai-gateway.request-log:${hash}`);
 

@@ -53,6 +53,24 @@ describe('callback tokens', () => {
     await expect(verifyCallbackToken({ ...BASE_PARAMS, token })).resolves.toBe(true);
   });
 
+  it.each([undefined, null, '', '   '])(
+    'rejects missing or blank signing secret %j before importing HMAC key',
+    async secret => {
+      await expect(deriveCallbackToken({ ...BASE_PARAMS, secret })).rejects.toThrow(
+        'Callback token secret must be configured and non-empty'
+      );
+    }
+  );
+
+  it.each([undefined, null, '', '   '])(
+    'fails closed when verifying with missing or blank secret %j',
+    async secret => {
+      const token = await deriveCallbackToken(BASE_PARAMS);
+
+      await expect(verifyCallbackToken({ ...BASE_PARAMS, secret, token })).resolves.toBe(false);
+    }
+  );
+
   it.each([undefined, null, '', 'not-hex', 'a'.repeat(63), 'b'.repeat(64)])(
     'rejects absent, malformed, truncated, or wrong token %s',
     async token => {

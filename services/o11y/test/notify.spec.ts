@@ -4,6 +4,7 @@ import {
   type SloAlertPayload,
   type ContainerCapacityAlertPayload,
   type QueueBacklogAlertPayload,
+  type GastownHealthAlertPayload,
 } from '../src/alerting/notify';
 
 describe('buildSlackMessage — SLO error_rate alert', () => {
@@ -93,6 +94,39 @@ describe('buildSlackMessage — queue_backlog alert', () => {
     expect(allText.some(text => text.includes('50,000'))).toBe(true);
     expect(allText.some(text => text.includes('12,345,678'))).toBe(true);
     expect(allText.some(text => text.includes('2026-06-04T08:00:00.000Z'))).toBe(true);
+  });
+});
+
+describe('buildSlackMessage — gastown_container_health alert', () => {
+  const alert: GastownHealthAlertPayload = {
+    alertType: 'gastown_container_health',
+    severity: 'ticket',
+    weightedFailedChecks: 36,
+    affectedTownCount: 4,
+    windowMinutes: 15,
+    crossedThresholds: ['failed_checks', 'affected_towns'],
+    failedChecksThreshold: 30,
+    affectedTownsThreshold: 4,
+  };
+
+  it('includes counts, crossed thresholds, and investigation guidance', () => {
+    const msg = buildSlackMessage(alert) as {
+      blocks: Array<{ fields?: Array<{ text: string }>; text?: { text: string } }>;
+    };
+    const allText = msg.blocks.flatMap(block => [
+      block.text?.text ?? '',
+      ...(block.fields?.map(field => field.text) ?? []),
+    ]);
+    const text = allText.join('\n');
+
+    expect(text).toContain('Gastown container health failures');
+    expect(text).toContain('15-minute window');
+    expect(text).toContain('36');
+    expect(text).toContain('4');
+    expect(text).toContain('30 failed checks');
+    expect(text).toContain('4 affected towns');
+    expect(text).toContain('gastown-operations');
+    expect(text).toContain('gastown-container-health-failures.md');
   });
 });
 

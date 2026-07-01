@@ -6,6 +6,7 @@ export const SETUP_STATUS_PLATFORMS = [
   PLATFORM.DISCORD,
   PLATFORM.GITHUB,
   PLATFORM.GITLAB,
+  PLATFORM.BITBUCKET,
   PLATFORM.LINEAR,
   PLATFORM.DOLTHUB,
 ] as const;
@@ -42,6 +43,7 @@ function buildInstallationSummary(
   if (
     integration.platform === PLATFORM.GITHUB ||
     integration.platform === PLATFORM.GITLAB ||
+    integration.platform === PLATFORM.BITBUCKET ||
     integration.platform === PLATFORM.DOLTHUB
   ) {
     return { accountLogin: integration.platform_account_login };

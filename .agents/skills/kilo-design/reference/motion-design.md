@@ -20,8 +20,7 @@ Kilo motion is **purposeful and subtle** in product UI, with occasional
   `pulse-glow` / `animate-pulse-once`, `pulse-opacity`,
   `pulse-opacity-dim`. Reuse these instead of inventing new glow/pulse
   effects.
-- Brand accent color for glow: `rgba(237, 255, 0, ...)` mirrors
-  `--brand-primary`.
+- Brand glow uses `--brand-primary-ring` (`#F7F58659`) or alpha derived from `--brand-primary` (`#F7F586`). Never copy legacy `rgba(237, 255, 0, ...)` values.
 
 ### Kilo-specific motion rules
 

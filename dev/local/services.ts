@@ -418,7 +418,7 @@ function buildServiceDefs(): ServiceDef[] {
         dir: 'apps/storybook',
         port: 6006 + portOffset,
         dependsOn: meta.dependsOn,
-        command: ['pnpm', 'run', 'storybook', '--', '-p', String(6006 + portOffset)],
+        command: ['pnpm', 'run', 'storybook', '-p', String(6006 + portOffset)],
         group: meta.group,
       });
       continue;

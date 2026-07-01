@@ -32,6 +32,8 @@ describe('POST /api/mcp-gateway/oauth/token', () => {
     );
 
     expect(response.status).toBe(400);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('pragma')).toBe('no-cache');
     await expect(response.json()).resolves.toEqual({
       error: 'invalid_request',
       error_description: 'Request body is malformed',
@@ -58,6 +60,8 @@ describe('POST /api/mcp-gateway/oauth/token', () => {
     );
 
     expect(response.status).toBe(400);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(response.headers.get('pragma')).toBe('no-cache');
   });
 
   test('routes native refresh requests that omit resource by token ownership', async () => {

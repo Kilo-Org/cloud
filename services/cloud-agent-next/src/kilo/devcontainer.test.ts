@@ -92,7 +92,7 @@ describe('sandbox image versions', () => {
     expect(dockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(devDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
     expect(dindDockerfile).toContain(`ARG KILOCODE_CLI_VERSION="${KILO_CLI_VERSION}"`);
-    expect(wranglerConfig.split(imageVar)).toHaveLength(7);
+    expect(wranglerConfig.split(imageVar)).toHaveLength(9);
     expect(DEFAULT_SLASH_COMMANDS_SOURCE).toBe(`kilo@${KILO_CLI_VERSION}`);
   });
 });

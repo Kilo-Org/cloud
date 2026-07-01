@@ -72,7 +72,10 @@ export async function resolveLiveWrapperTarget(params: {
       metadata.identity.orgId,
       userId,
       metadata.identity.sessionId,
-      metadata.identity.botId
+      metadata.identity.botId,
+      {
+        createdOnPlatform: metadata.identity.createdOnPlatform,
+      }
     ));
 
   const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);

@@ -14,8 +14,12 @@ import {
   type OAuthTokenRequest,
   type ScopedConnectRoute,
 } from '@kilocode/mcp-gateway';
-import { mcp_gateway_authorization_codes, mcp_gateway_refresh_tokens } from '@kilocode/db/schema';
-import type { mcp_gateway_oauth_clients } from '@kilocode/db/schema';
+import {
+  mcp_gateway_authorization_codes,
+  mcp_gateway_oauth_grants,
+  mcp_gateway_refresh_tokens,
+} from '@kilocode/db/schema';
+import { MCPGatewayOAuthGrantStatus } from '@kilocode/db/schema-types';
 import { createPublicKey } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { timingSafeEqual } from '@kilocode/encryption';
@@ -24,6 +28,7 @@ import type { GatewayAppConfig, GatewayJWTKey } from './config';
 import type { GatewayRepository } from './repository';
 import type { GatewayRouteService } from './route-service';
 import type { GatewayOAuthClientService } from './oauth-client-service';
+import type { GatewayOAuthGrantService } from './oauth-grant-service';
 import { hashToken, pkceChallenge, randomToken } from './crypto';
 import { createAuditService } from './audit-service';
 
@@ -148,6 +153,7 @@ export function createTokenService(params: {
   repository: GatewayRepository;
   routeService: GatewayRouteService;
   clientService: GatewayOAuthClientService;
+  oauthGrantService: GatewayOAuthGrantService;
   config: GatewayAppConfig;
 }) {
   async function mintAccessToken(
@@ -157,7 +163,16 @@ export function createTokenService(params: {
     const now = Math.floor(Date.now() / 1000);
     const exp = now + params.config.accessTokenTtlSeconds;
     const canonicalAudience = params.routeService.canonicalUrl(input.route);
+    const sourceClaims =
+      input.token_source === 'oauth_client'
+        ? {
+            token_source: input.token_source,
+            oauth_grant_id: input.oauth_grant_id,
+            client_id: input.client_id,
+          }
+        : { token_source: input.token_source };
     const claims = GatewayTokenClaimsSchema.parse({
+      ...sourceClaims,
       iss: params.config.issuer,
       sub: input.sub,
       aud: canonicalAudience,
@@ -213,37 +228,6 @@ export function createTokenService(params: {
     });
   }
 
-  async function issueRefreshToken(paramsInput: {
-    client: typeof mcp_gateway_oauth_clients.$inferSelect;
-    route: ScopedConnectRoute;
-    resolvedConfigId: string;
-    ownerScope: 'personal' | 'organization';
-    ownerId: string;
-    scopes: string[];
-    executionContext: GatewayExecutionContext;
-    userId: string;
-    instanceId: string;
-    rotatedFromRefreshTokenId?: string | null;
-  }) {
-    const token = randomToken(32);
-    await params.repository.database.insert(mcp_gateway_refresh_tokens).values({
-      token_hash: hashToken(token),
-      rotated_from_refresh_token_id: paramsInput.rotatedFromRefreshTokenId ?? null,
-      oauth_client_id: paramsInput.client.oauth_client_id,
-      client_id: paramsInput.client.client_id,
-      owner_scope: paramsInput.ownerScope,
-      owner_id: paramsInput.ownerId,
-      config_id: paramsInput.resolvedConfigId,
-      route_key: paramsInput.route.routeKey,
-      canonical_resource_url: params.routeService.canonicalUrl(paramsInput.route),
-      granted_scopes: paramsInput.scopes,
-      execution_context: paramsInput.executionContext,
-      kilo_user_id: paramsInput.userId,
-      instance_id: paramsInput.instanceId,
-    });
-    return token;
-  }
-
   async function exchangeAuthorizationCode(paramsInput: {
     request: OAuthTokenRequest;
     headers: Headers;
@@ -279,6 +263,19 @@ export function createTokenService(params: {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Authorization code is invalid', 400);
     }
     requireMcpAccessGrant(code.granted_scopes);
+    if (!code.oauth_grant_id) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
+    }
+    const oauthGrant = await params.oauthGrantService.findActiveGrant(code.oauth_grant_id);
+    if (
+      !oauthGrant ||
+      oauthGrant.oauth_client_id !== client.oauth_client_id ||
+      oauthGrant.kilo_user_id !== code.kilo_user_id ||
+      oauthGrant.instance_id !== code.instance_id ||
+      oauthGrant.redirect_uri !== code.redirect_uri
+    ) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
+    }
     if (paramsInput.request.redirect_uri !== code.redirect_uri) {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Redirect URI mismatch', 400);
     }
@@ -328,17 +325,65 @@ export function createTokenService(params: {
         400
       );
     }
-    const [consumed] = await params.repository.database
-      .update(mcp_gateway_authorization_codes)
-      .set({ consumed_at: new Date().toISOString() })
-      .where(
-        and(
-          eq(mcp_gateway_authorization_codes.authorization_code_id, code.authorization_code_id),
-          isNull(mcp_gateway_authorization_codes.consumed_at),
-          gt(mcp_gateway_authorization_codes.expires_at, sql`NOW()`)
+    if (
+      oauthGrant.connect_resource_id !== resolved.route.connect_resource_id ||
+      oauthGrant.config_version !== resolved.config.config_version
+    ) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
+    }
+    const issueRefreshToken = client.grant_types.includes('refresh_token');
+    const refreshToken = issueRefreshToken ? randomToken(32) : null;
+    const [consumed] = await params.repository.database.transaction(async tx => {
+      const [activeGrant] = await tx
+        .select({ grantId: mcp_gateway_oauth_grants.oauth_grant_id })
+        .from(mcp_gateway_oauth_grants)
+        .where(
+          and(
+            eq(mcp_gateway_oauth_grants.oauth_grant_id, oauthGrant.oauth_grant_id),
+            eq(mcp_gateway_oauth_grants.oauth_client_id, client.oauth_client_id),
+            eq(mcp_gateway_oauth_grants.kilo_user_id, code.kilo_user_id),
+            eq(mcp_gateway_oauth_grants.instance_id, code.instance_id),
+            eq(mcp_gateway_oauth_grants.connect_resource_id, resolved.route.connect_resource_id),
+            eq(mcp_gateway_oauth_grants.grant_status, MCPGatewayOAuthGrantStatus.Active),
+            isNull(mcp_gateway_oauth_grants.revoked_at)
+          )
         )
-      )
-      .returning();
+        .limit(1)
+        .for('update');
+      if (!activeGrant) return [];
+      const consumedRows = await tx
+        .update(mcp_gateway_authorization_codes)
+        .set({ consumed_at: new Date().toISOString() })
+        .where(
+          and(
+            eq(mcp_gateway_authorization_codes.authorization_code_id, code.authorization_code_id),
+            eq(mcp_gateway_authorization_codes.oauth_grant_id, oauthGrant.oauth_grant_id),
+            isNull(mcp_gateway_authorization_codes.consumed_at),
+            gt(mcp_gateway_authorization_codes.expires_at, sql`NOW()`)
+          )
+        )
+        .returning();
+      const consumedCode = consumedRows[0];
+      if (!consumedCode) return [];
+      if (issueRefreshToken && refreshToken) {
+        await tx.insert(mcp_gateway_refresh_tokens).values({
+          token_hash: hashToken(refreshToken),
+          oauth_client_id: client.oauth_client_id,
+          oauth_grant_id: oauthGrant.oauth_grant_id,
+          client_id: client.client_id,
+          owner_scope: resolved.config.owner_scope,
+          owner_id: resolved.config.owner_id,
+          config_id: resolved.config.config_id,
+          route_key: route.routeKey,
+          canonical_resource_url: params.routeService.canonicalUrl(route),
+          granted_scopes: code.granted_scopes,
+          execution_context: GatewayExecutionContextSchema.parse(code.execution_context),
+          kilo_user_id: code.kilo_user_id,
+          instance_id: instance.instance_id,
+        });
+      }
+      return [consumedCode];
+    });
     if (!consumed) {
       throw createGatewayError(
         GatewayErrorCode.InvalidGrant,
@@ -348,6 +393,9 @@ export function createTokenService(params: {
     }
     const accessToken = await mintAccessToken({
       route,
+      token_source: 'oauth_client',
+      oauth_grant_id: oauthGrant.oauth_grant_id,
+      client_id: client.client_id,
       sub: code.kilo_user_id,
       owner_scope: resolved.config.owner_scope,
       owner_id: resolved.config.owner_id,
@@ -358,17 +406,7 @@ export function createTokenService(params: {
       config_version: resolved.config.config_version,
       scopes: code.granted_scopes,
     });
-    const refreshToken = await issueRefreshToken({
-      client,
-      route,
-      resolvedConfigId: resolved.config.config_id,
-      ownerScope: resolved.config.owner_scope,
-      ownerId: resolved.config.owner_id,
-      scopes: code.granted_scopes,
-      executionContext: GatewayExecutionContextSchema.parse(code.execution_context),
-      userId: code.kilo_user_id,
-      instanceId: instance.instance_id,
-    });
+    await params.oauthGrantService.touchGrant(oauthGrant.oauth_grant_id);
     await createAuditService(params.repository).record({
       actorUserId: code.kilo_user_id,
       ownerScope: resolved.config.owner_scope,
@@ -376,6 +414,7 @@ export function createTokenService(params: {
       configId: resolved.config.config_id,
       connectResourceId: resolved.route.connect_resource_id,
       instanceId: instance.instance_id,
+      oauthGrantId: oauthGrant.oauth_grant_id,
       eventType: 'token_issued',
       outcome: 'success',
     });
@@ -383,7 +422,7 @@ export function createTokenService(params: {
       access_token: accessToken.token,
       token_type: 'bearer',
       expires_in: params.config.accessTokenTtlSeconds,
-      refresh_token: refreshToken,
+      ...(refreshToken ? { refresh_token: refreshToken } : {}),
       scope: code.granted_scopes.join(' '),
     };
   }
@@ -419,6 +458,18 @@ export function createTokenService(params: {
       throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Refresh token is invalid', 400);
     }
     requireMcpAccessGrant(refreshToken.granted_scopes);
+    if (!refreshToken.oauth_grant_id) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
+    }
+    const oauthGrant = await params.oauthGrantService.findActiveGrant(refreshToken.oauth_grant_id);
+    if (
+      !oauthGrant ||
+      oauthGrant.oauth_client_id !== client.oauth_client_id ||
+      oauthGrant.kilo_user_id !== refreshToken.kilo_user_id ||
+      oauthGrant.instance_id !== refreshToken.instance_id
+    ) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
+    }
     const route = params.routeService.parseResource(refreshToken.canonical_resource_url);
     if (paramsInput.request.resource) {
       const requestedRoute = params.routeService.parseResource(paramsInput.request.resource);
@@ -458,8 +509,31 @@ export function createTokenService(params: {
         400
       );
     }
+    if (
+      oauthGrant.connect_resource_id !== resolved.route.connect_resource_id ||
+      oauthGrant.config_version !== resolved.config.config_version
+    ) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
+    }
     const nextRefreshToken = randomToken(32);
     const rotated = await params.repository.database.transaction(async tx => {
+      const [activeGrant] = await tx
+        .select({ grantId: mcp_gateway_oauth_grants.oauth_grant_id })
+        .from(mcp_gateway_oauth_grants)
+        .where(
+          and(
+            eq(mcp_gateway_oauth_grants.oauth_grant_id, oauthGrant.oauth_grant_id),
+            eq(mcp_gateway_oauth_grants.oauth_client_id, client.oauth_client_id),
+            eq(mcp_gateway_oauth_grants.kilo_user_id, refreshToken.kilo_user_id),
+            eq(mcp_gateway_oauth_grants.instance_id, refreshToken.instance_id),
+            eq(mcp_gateway_oauth_grants.connect_resource_id, resolved.route.connect_resource_id),
+            eq(mcp_gateway_oauth_grants.grant_status, MCPGatewayOAuthGrantStatus.Active),
+            isNull(mcp_gateway_oauth_grants.revoked_at)
+          )
+        )
+        .limit(1)
+        .for('update');
+      if (!activeGrant) return null;
       const [consumed] = await tx
         .update(mcp_gateway_refresh_tokens)
         .set({ consumed_at: new Date().toISOString() })
@@ -476,6 +550,7 @@ export function createTokenService(params: {
         token_hash: hashToken(nextRefreshToken),
         rotated_from_refresh_token_id: refreshToken.refresh_token_id,
         oauth_client_id: client.oauth_client_id,
+        oauth_grant_id: oauthGrant.oauth_grant_id,
         client_id: client.client_id,
         owner_scope: resolved.config.owner_scope,
         owner_id: resolved.config.owner_id,
@@ -496,8 +571,12 @@ export function createTokenService(params: {
         400
       );
     }
+    await params.oauthGrantService.touchGrant(oauthGrant.oauth_grant_id);
     const accessToken = await mintAccessToken({
       route,
+      token_source: 'oauth_client',
+      oauth_grant_id: oauthGrant.oauth_grant_id,
+      client_id: client.client_id,
       sub: refreshToken.kilo_user_id,
       owner_scope: resolved.config.owner_scope,
       owner_id: resolved.config.owner_id,
@@ -515,6 +594,7 @@ export function createTokenService(params: {
       configId: resolved.config.config_id,
       connectResourceId: resolved.route.connect_resource_id,
       instanceId: instance.instance_id,
+      oauthGrantId: oauthGrant.oauth_grant_id,
       eventType: 'token_refreshed',
       outcome: 'success',
     });
@@ -570,6 +650,7 @@ export function createTokenService(params: {
     }
     return await mintAccessToken({
       route: paramsInput.route,
+      token_source: 'derived_connect',
       sub: paramsInput.userId,
       owner_scope: resolved.config.owner_scope,
       owner_id: resolved.config.owner_id,
@@ -586,6 +667,20 @@ export function createTokenService(params: {
     const claims = await verifyUserInfoToken(token);
     if (!parseScopeString(claims.scope).includes('profile')) {
       throw createGatewayError(GatewayErrorCode.InvalidScope, 'profile scope is required', 401);
+    }
+    if (claims.token_source !== 'oauth_client') {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 401);
+    }
+    const expectedAudiencePrefix = new URL(
+      '/mcp-connect/',
+      params.config.gatewayBaseUrl
+    ).toString();
+    if (!claims.aud || !claims.aud.startsWith(expectedAudiencePrefix)) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'Token audience is invalid', 401);
+    }
+    const oauthGrant = await params.oauthGrantService.findActiveGrant(claims.oauth_grant_id);
+    if (!oauthGrant || !oauthGrant.granted_scopes.includes('profile')) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 401);
     }
     const user = await params.repository.findUser(claims.sub);
     if (!user) {

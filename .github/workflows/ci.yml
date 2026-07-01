@@ -24,7 +24,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       kilocode_backend: ${{ steps.filter.outputs.kilocode_backend }}
-      cloud_agent: ${{ steps.filter.outputs.cloud_agent }}
       cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
     steps:
@@ -65,14 +64,12 @@ jobs:
               - 'services/deploy-infra/builder/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
-            cloud_agent:
-              - 'services/cloud-agent/**'
             cloud_agent_next:
               - 'services/cloud-agent-next/**'
       - name: Detect changed workspaces with tests
         id: workspaces
         run: |
-          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent --exclude services/cloud-agent-next --exclude apps/web)
+          matrix=$(scripts/changed-workspaces.sh --exclude services/cloud-agent-next --exclude apps/web)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
   typecheck:
@@ -308,40 +305,6 @@ jobs:
           NODE_OPTIONS: '--max-old-space-size=8192'
         run: pnpm run build
 
-  cloud-agent:
-    needs: [changes, typecheck, lint, format-check, drizzle-check]
-    if: needs.changes.outputs.cloud_agent == 'true'
-    runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
-    timeout-minutes: 15
-    steps:
-      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
-        with:
-          lfs: true
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'pnpm'
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build wrapper bundle
-        working-directory: services/cloud-agent/wrapper
-        run: bun run build.ts
-
-      - name: Run cloud-agent tests
-        run: pnpm --filter cloud-agent test:all
-
   cloud-agent-next:
     needs: [changes, typecheck, lint, format-check, drizzle-check]
     if: needs.changes.outputs.cloud_agent_next == 'true'
@@ -410,17 +373,7 @@ jobs:
   notify-main-failure:
     if: ${{ always() && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure') }}
     needs:
-      [
-        typecheck,
-        lint,
-        format-check,
-        drizzle-check,
-        test,
-        build,
-        cloud-agent,
-        cloud-agent-next,
-        workspace-tests,
-      ]
+      [typecheck, lint, format-check, drizzle-check, test, build, cloud-agent-next, workspace-tests]
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:

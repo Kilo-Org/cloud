@@ -1,5 +1,50 @@
-import { describe, it, expect } from '@jest/globals';
-import { isInstallationGoneError } from './github-apps-service';
+import { describe, expect, it } from '@jest/globals';
+import { organizations, platform_integrations } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/drizzle';
+import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
+import { getInstallation, isInstallationGoneError } from './github-apps-service';
+
+describe('getInstallation', () => {
+  it('prefers a healthy installation when the owner has multiple GitHub rows', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub installation ${crypto.randomUUID()}` })
+      .returning();
+    const rows = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: crypto.randomUUID(),
+          integration_status: 'active',
+          repository_access: 'all',
+          suspended_at: new Date().toISOString(),
+        },
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: crypto.randomUUID(),
+          integration_status: 'active',
+          repository_access: 'all',
+        },
+      ])
+      .returning();
+
+    try {
+      const integration = await getInstallation({ type: 'org', id: organization.id });
+      const sharedIntegration = await getIntegrationForOrganization(organization.id, 'github');
+
+      expect(integration?.id).toBe(rows[1].id);
+      expect(sharedIntegration?.id).toBe(rows[1].id);
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+});
 
 describe('isInstallationGoneError', () => {
   it('should return true for 404 Not Found errors', () => {

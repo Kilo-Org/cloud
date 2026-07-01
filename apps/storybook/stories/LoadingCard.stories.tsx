@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs';
 import { LoadingCard } from '@/components/LoadingCard';
 
 const meta: Meta<typeof LoadingCard> = {
-  title: 'Components/LoadingCard',
+  title: 'Components/Feedback/LoadingCard',
   component: LoadingCard,
   parameters: {
     layout: 'centered',

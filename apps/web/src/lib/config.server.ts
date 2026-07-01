@@ -36,6 +36,14 @@ export const CONTRIBUTOR_CHAMPION_TEAM_EMAILS =
   getEnvVariable('CONTRIBUTOR_CHAMPION_TEAM_EMAILS') || '';
 export const GITLAB_CLIENT_ID = getEnvVariable('GITLAB_CLIENT_ID');
 export const GITLAB_CLIENT_SECRET = getEnvVariable('GITLAB_CLIENT_SECRET');
+export const BITBUCKET_CLIENT_ID = getEnvVariable('BITBUCKET_CLIENT_ID');
+export const BITBUCKET_CLIENT_SECRET = getEnvVariable('BITBUCKET_CLIENT_SECRET');
+export const BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID = getEnvVariable(
+  'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID'
+);
+export const BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY = getEnvVariable(
+  'BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY'
+);
 export const LINKEDIN_CLIENT_ID = getEnvVariable('LINKEDIN_CLIENT_ID');
 export const LINKEDIN_CLIENT_SECRET = getEnvVariable('LINKEDIN_CLIENT_SECRET');
 export const TURNSTILE_SECRET_KEY = getEnvVariable('TURNSTILE_SECRET_KEY');
@@ -71,6 +79,14 @@ export const IMPACT_ADVOCATE_DEBUG_LOGGING =
 // the feature can ship dark; set CODING_PLANS_PURCHASE_ENABLED=true to reveal it.
 export const CODING_PLANS_PURCHASE_ENABLED =
   getEnvVariable('CODING_PLANS_PURCHASE_ENABLED') === 'true';
+
+export function isLocalCodeReviewDevelopmentEnabled(): boolean {
+  return (
+    !!getEnvVariable('DEBUG_SHOW_DEV_UI') &&
+    process.env.NODE_ENV !== 'production' &&
+    !process.env.VERCEL_ENV
+  );
+}
 
 if (!NEXTAUTH_SECRET) throw new Error('NEXTAUTH_SECRET is required JWT signing');
 if (!TURNSTILE_SECRET_KEY) throw new Error('TURNSTILE_SECRET_KEY is required');

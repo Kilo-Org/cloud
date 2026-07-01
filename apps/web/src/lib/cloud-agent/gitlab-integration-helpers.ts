@@ -5,12 +5,12 @@ import {
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { getGitLabIntegration, getValidGitLabToken } from '@/lib/integrations/gitlab-service';
-import {
-  fetchGitLabProjects,
-  searchGitLabProjects,
-} from '@/lib/integrations/platforms/gitlab/adapter';
+import { fetchGitLabProjects } from '@/lib/integrations/platforms/gitlab/adapter';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import type { PlatformRepository } from '@/lib/integrations/core/types';
+import {
+  requireNumericPlatformRepositories,
+  type PlatformRepository,
+} from '@/lib/integrations/core/types';
 
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
 
@@ -118,8 +118,9 @@ export async function fetchGitLabRepositoriesForOrganization(
   const instanceUrl = metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
 
   try {
+    const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
     // If forceRefresh or no cached repos, fetch from GitLab and update cache
-    if (forceRefresh || !integration.repositories?.length) {
+    if (forceRefresh || !cachedRepositories?.length) {
       const accessToken = await getValidGitLabToken(integration);
       const repositories = await fetchGitLabProjects(accessToken, instanceUrl);
       await updateRepositoriesForIntegration(integration.id, repositories);
@@ -134,7 +135,7 @@ export async function fetchGitLabRepositoriesForOrganization(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(integration.repositories),
+      repositories: mapRepositories(cachedRepositories),
       syncedAt: integration.repositories_synced_at,
       instanceUrl,
     };
@@ -164,8 +165,9 @@ export async function fetchGitLabRepositoriesForUser(
   const instanceUrl = metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
 
   try {
+    const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
     // If forceRefresh or no cached repos, fetch from GitLab and update cache
-    if (forceRefresh || !integration.repositories?.length) {
+    if (forceRefresh || !cachedRepositories?.length) {
       const accessToken = await getValidGitLabToken(integration);
       const repositories = await fetchGitLabProjects(accessToken, instanceUrl);
       await updateRepositoriesForIntegration(integration.id, repositories);
@@ -180,7 +182,7 @@ export async function fetchGitLabRepositoriesForUser(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(integration.repositories),
+      repositories: mapRepositories(cachedRepositories),
       syncedAt: integration.repositories_synced_at,
       instanceUrl,
     };
@@ -293,86 +295,4 @@ export async function getGitLabInstanceUrlForOrganization(organizationId: string
 
   const metadata = integration.metadata as GitLabMetadata | null;
   return metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
-}
-
-type GitLabSearchResult = {
-  repositories: {
-    id: number;
-    name: string;
-    fullName: string;
-    private: boolean;
-  }[];
-  errorMessage?: string;
-};
-
-/**
- * Search GitLab repositories for a user by query string
- * Uses GitLab's project search API to find repositories beyond the cached list
- * @param userId - The user ID
- * @param query - Search query string (minimum 2 characters recommended)
- */
-export async function searchGitLabRepositoriesForUser(
-  userId: string,
-  query: string
-): Promise<GitLabSearchResult> {
-  const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITLAB);
-
-  if (!integration) {
-    return {
-      repositories: [],
-      errorMessage: 'No GitLab integration found for this user',
-    };
-  }
-
-  const metadata = integration.metadata as GitLabMetadata | null;
-  const instanceUrl = metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
-
-  try {
-    const accessToken = await getValidGitLabToken(integration);
-    const repositories = await searchGitLabProjects(accessToken, query, instanceUrl);
-    return {
-      repositories: mapRepositories(repositories),
-    };
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to search GitLab repositories',
-    });
-  }
-}
-
-/**
- * Search GitLab repositories for an organization by query string
- * Uses GitLab's project search API to find repositories beyond the cached list
- * @param organizationId - The organization ID
- * @param query - Search query string (minimum 2 characters recommended)
- */
-export async function searchGitLabRepositoriesForOrganization(
-  organizationId: string,
-  query: string
-): Promise<GitLabSearchResult> {
-  const integration = await getIntegrationForOrganization(organizationId, PLATFORM.GITLAB);
-
-  if (!integration) {
-    return {
-      repositories: [],
-      errorMessage: 'No GitLab integration found for this organization',
-    };
-  }
-
-  const metadata = integration.metadata as GitLabMetadata | null;
-  const instanceUrl = metadata?.gitlab_instance_url || DEFAULT_GITLAB_URL;
-
-  try {
-    const accessToken = await getValidGitLabToken(integration);
-    const repositories = await searchGitLabProjects(accessToken, query, instanceUrl);
-    return {
-      repositories: mapRepositories(repositories),
-    };
-  } catch (_error) {
-    throw new TRPCError({
-      code: 'INTERNAL_SERVER_ERROR',
-      message: 'Failed to search GitLab repositories',
-    });
-  }
 }

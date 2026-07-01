@@ -5,6 +5,17 @@ import {
   security_analysis_owner_state,
   type SecurityFinding,
 } from '@kilocode/db/schema';
+import {
+  SecurityAuditLogAction,
+  SecurityFindingAuditSourceContext,
+} from '@kilocode/db/schema-types';
+import {
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+  type SecurityFindingAuditEventFinding,
+  type SecurityFindingAuditOwner,
+} from '@kilocode/worker-utils/security-finding-audit';
 import { eq, and, sql, count, isNotNull, desc, or, isNull, not, like } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type {
@@ -26,6 +37,30 @@ function toOwner(owner: SecurityReviewOwner): Owner {
     return { type: 'user', id: owner.userId };
   }
   throw new Error('Invalid owner: must have either organizationId or userId');
+}
+
+function toAuditOwner(
+  finding: Pick<SecurityFinding, 'owned_by_user_id' | 'owned_by_organization_id'>
+): SecurityFindingAuditOwner {
+  if (finding.owned_by_organization_id) {
+    return { type: 'organization', organizationId: finding.owned_by_organization_id };
+  }
+  if (finding.owned_by_user_id) {
+    return { type: 'user', userId: finding.owned_by_user_id };
+  }
+  throw new Error('Security finding has no audit owner');
+}
+
+function ownerAuditKeyPart(
+  finding: Pick<SecurityFinding, 'owned_by_user_id' | 'owned_by_organization_id'>
+): string {
+  if (finding.owned_by_organization_id) return `organization:${finding.owned_by_organization_id}`;
+  if (finding.owned_by_user_id) return `user:${finding.owned_by_user_id}`;
+  throw new Error('Security finding has no audit owner');
+}
+
+function toAuditFinding(finding: SecurityFinding): SecurityFindingAuditEventFinding {
+  return finding;
 }
 
 export type AutoAnalysisQueueStatus = 'queued' | 'pending' | 'running' | 'failed' | 'completed';
@@ -123,18 +158,20 @@ export async function updateAnalysisStatus(
       updateData.analysis_completed_at = sql`now()`;
     }
 
+    if (status === 'completed' || status === 'failed') {
+      const rows = await updateTerminalAnalysisStatusWithAuditEvent(
+        findingId,
+        status,
+        updateData,
+        updates
+      );
+      return rows.length > 0;
+    }
+
     const rows = await db
       .update(security_findings)
       .set(updateData)
-      .where(
-        and(
-          eq(security_findings.id, findingId),
-          or(
-            isNull(security_findings.ignored_reason),
-            not(like(security_findings.ignored_reason, 'superseded:%'))
-          )
-        )
-      )
+      .where(analysisStatusUpdatePredicate(findingId))
       .returning({ id: security_findings.id });
 
     return rows.length > 0;
@@ -145,6 +182,120 @@ export async function updateAnalysisStatus(
     });
     throw error;
   }
+}
+
+function analysisStatusUpdatePredicate(findingId: string) {
+  return and(
+    eq(security_findings.id, findingId),
+    or(
+      isNull(security_findings.ignored_reason),
+      not(like(security_findings.ignored_reason, 'superseded:%'))
+    )
+  );
+}
+
+async function updateTerminalAnalysisStatusWithAuditEvent(
+  findingId: string,
+  status: 'completed' | 'failed',
+  updateData: Record<string, unknown>,
+  updates: {
+    error?: string;
+    analysis?: SecurityFindingAnalysis;
+  }
+): Promise<Array<{ id: string }>> {
+  return db.transaction(async tx => {
+    const [previousFinding] = await tx
+      .select()
+      .from(security_findings)
+      .where(analysisStatusUpdatePredicate(findingId))
+      .limit(1);
+
+    if (!previousFinding) return [];
+
+    const [updatedFinding] = await tx
+      .update(security_findings)
+      .set(updateData)
+      .where(analysisStatusUpdatePredicate(findingId))
+      .returning();
+
+    if (!updatedFinding) return [];
+
+    await insertAnalysisAuditEvent(tx, {
+      previousFinding,
+      updatedFinding,
+      status,
+      analysis: updates.analysis,
+    });
+
+    return [{ id: updatedFinding.id }];
+  });
+}
+
+async function insertAnalysisAuditEvent(
+  db: Parameters<typeof insertSecurityFindingAuditEvent>[0],
+  params: {
+    previousFinding: SecurityFinding;
+    updatedFinding: SecurityFinding;
+    status: 'completed' | 'failed';
+    analysis?: SecurityFindingAnalysis;
+  }
+): Promise<void> {
+  const { previousFinding, updatedFinding, status, analysis } = params;
+  const action =
+    status === 'completed'
+      ? SecurityAuditLogAction.FindingAnalysisCompleted
+      : SecurityAuditLogAction.FindingAnalysisFailed;
+  const occurredAt = updatedFinding.analysis_completed_at ?? new Date().toISOString();
+  const correlationId = analysis?.correlationId ?? updatedFinding.session_id ?? 'none';
+  const modelSlug = analysis?.analysisModel ?? analysis?.modelUsed ?? analysis?.triageModel ?? null;
+  const triage = analysis?.triage;
+  const sandbox = analysis?.sandboxAnalysis;
+  const suggestedAction = sandbox?.suggestedAction ?? triage?.suggestedAction;
+
+  await insertSecurityFindingAuditEvent(db, {
+    owner: toAuditOwner(updatedFinding),
+    finding: toAuditFinding(updatedFinding),
+    actor: SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+    action,
+    occurredAt,
+    eventKey: deriveSecurityFindingAuditEventKey([
+      ownerAuditKeyPart(updatedFinding),
+      updatedFinding.id,
+      action,
+      correlationId,
+    ]),
+    sourceContext: SecurityFindingAuditSourceContext.AnalysisWorker,
+    beforeState: { analysis_status: previousFinding.analysis_status ?? 'unknown' },
+    afterState:
+      status === 'completed'
+        ? {
+            analysis_status: 'completed',
+            ...(suggestedAction ? { suggested_action: suggestedAction } : {}),
+            ...(!sandbox && triage?.confidence ? { confidence: triage.confidence } : {}),
+            ...(sandbox?.extractionStatus
+              ? { structured_extraction_status: sandbox.extractionStatus }
+              : {}),
+            ...(sandbox?.isExploitable !== undefined && sandbox.extractionStatus !== 'failed'
+              ? { is_exploitable: sandbox.isExploitable }
+              : {}),
+          }
+        : { analysis_status: 'failed' },
+    metadata:
+      status === 'completed'
+        ? {
+            ...(analysis?.correlationId ? { correlation_id: analysis.correlationId } : {}),
+            ...(modelSlug ? { model_slug: modelSlug } : {}),
+            ...(analysis?.triageModel ? { triage_model_slug: analysis.triageModel } : {}),
+            ...(analysis?.analysisModel ? { analysis_model_slug: analysis.analysisModel } : {}),
+            ...(triage?.needsSandboxAnalysis !== undefined
+              ? { needs_sandbox_analysis: triage.needsSandboxAnalysis }
+              : {}),
+          }
+        : {
+            failure_code: 'analysis_failed',
+            ...(updatedFinding.session_id ? { session_id: updatedFinding.session_id } : {}),
+          },
+  });
 }
 
 /**

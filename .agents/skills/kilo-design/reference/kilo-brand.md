@@ -1,12 +1,8 @@
 # Kilo Brand
 
-The canonical overlay for every other reference in this skill. When any of
-the general design references below conflict with this document, **this
-document wins**.
+Canonical application overlay for every other reference in this skill. Root `DESIGN.md` wins for token contracts; this document wins when general references conflict on Kilo-specific application guidance.
 
-This is not a style guide rewrite. It captures what the Kilo Code codebase
-already does, so design changes stay coherent instead of drifting into
-generic AI-flavored "modern SaaS."
+Root `DESIGN.md` owns exact token values and roles. This reference explains how to apply that contract in the Kilo Code codebase so changes stay coherent instead of drifting into generic AI-flavored "modern SaaS." If implementation differs from `DESIGN.md`, treat it as drift.
 
 ## Sources of Truth
 
@@ -15,7 +11,8 @@ files directly:
 
 | Concern | File |
 |---|---|
-| Web tokens & base theme | `apps/web/src/app/globals.css` |
+| Canonical token contract | `DESIGN.md` |
+| Web token implementation | `apps/web/src/app/globals.css` |
 | Font loading & variables | `apps/web/src/app/layout.tsx` |
 | shadcn config | `apps/web/components.json` |
 | Core UI primitives | `apps/web/src/components/ui/*.tsx` |
@@ -23,8 +20,7 @@ files directly:
 | Storybook canvas | `apps/storybook/.storybook/preview.ts` and `storybook.css` |
 | Mobile tokens | `apps/mobile/src/global.css` |
 
-If a token or component already exists, **use it**. Do not reintroduce a
-parallel system.
+If a compliant token or component already exists, **use it**. Do not reintroduce a parallel system. If existing code conflicts with `DESIGN.md`, report or fix the drift rather than copying it.
 
 ## Register
 
@@ -62,15 +58,18 @@ token (e.g. `bg-background`, `text-foreground`, `border-border`) over hex.
 
 | Token | Role |
 |---|---|
-| `background` | Page/body surface. Near-black `oklch(0.145 0 0)`. |
-| `foreground` | Default text. Near-white `oklch(0.985 0 0)`. |
-| `card`, `popover` | Elevated dark surface `oklch(0.205 0 0)`. |
-| `card-foreground` | Text on card. |
-| `primary` | Brand yellow-green primary CTA token. |
-| `primary-foreground` | Near-black text on primary yellow-green. |
-| `secondary`, `muted`, `accent` | Mid-dark surfaces `oklch(0.269 0 0)` for chips, hovers. |
-| `muted-foreground` | Secondary text `oklch(0.708 0 0)`. |
-| `border`, `input`, `ring` | Hairline borders and focus rings. |
+| `background` | Alias of `surface.background` (`#151515`) for the page/body canvas. |
+| `foreground` | Alias of `foreground.default` (`#FAFAFA`). |
+| `card` | Alias of `surface.raised` (`#202020`). |
+| `popover` | Alias of `surface.overlay` (`#333333`). |
+| `card-foreground`, `popover-foreground` | Default foreground on those surfaces. |
+| `primary` | Brand yellow-green primary CTA token (`#F7F586`). |
+| `primary-foreground` | Near-black text on primary (`#1F1F1F`). |
+| `secondary` | Alias of `surface.overlay`; neutral action surface. |
+| `muted` | Alias of `surface.raised`; de-emphasized region. |
+| `accent` | Alias of `surface.hover`; interaction hover state. |
+| `muted-foreground` | Alias of `foreground.muted` (`#A3A3A3`). |
+| `border`, `input`, `ring` | Default border, strong input border, and brand focus ring. |
 | `destructive` | Red error/danger state. |
 | `sidebar-*` | Sidebar app-shell tokens. |
 | `chart-1`..`chart-5` | Data viz palette. |
@@ -79,9 +78,11 @@ token (e.g. `bg-background`, `text-foreground`, `border-border`) over hex.
 
 | Token | Value | Use |
 |---|---|---|
-| `--brand-primary` / `brand-primary` | `oklch(95% 0.15 108)` (electric yellow-green) | Alias of primary for brand roles |
-| `--color-kilo-gray` | `oklch(0.24 0.007 1)` | Kilo-branded neutral surface |
-| `--color-kilo-gray-lighter` | Derived via `oklch(from ... calc(l + 0.1) c h)` | Paired with `kilo-gray` |
+| `--brand-primary` / `brand-primary` | `#F7F586` | Alias of primary for brand roles |
+| `--brand-primary-hover` | `#E6E475` | Primary hover |
+| `--brand-primary-ring` | `#F7F58659` | Brand focus ring |
+| `--color-kilo-gray` | `surface.raised` (`#202020`) | Compatibility alias |
+| `--color-kilo-gray-lighter` | `surface.overlay` (`#333333`) | Compatibility alias |
 | `--ease-out-strong` | `cubic-bezier(0.23, 1, 0.32, 1)` | Preferred easing for transitions |
 
 ### Primary action color
@@ -91,15 +92,21 @@ semantic `primary` token and `--brand-primary` alias:
 
 | Role | Value |
 |---|---|
-| Background | `oklch(95% 0.15 108)` (`#EDFF00`-ish) |
-| Hover | Slightly darker yellow-green |
-| Text | Near-black via `primary-foreground` |
-| Focus ring | Low-alpha yellow-green / semantic `ring` |
+| Background | `#F7F586` via `primary` / `brand-primary` |
+| Hover | `#E6E475` via `primary-hover` / `brand-primary-hover` |
+| Text | `#1F1F1F` via `primary-foreground` |
+| Focus ring | `#F7F58659` via `ring` / `brand-primary-ring` |
 
 Use it for the main action on a surface, exactly once. Blue is no longer a
 primary CTA color; treat hardcoded `#2B6AD2` buttons as legacy drift and
 migrate them to semantic `primary` when the owning surface is updated. Blue
 remains acceptable for inline links and historical references only.
+
+## Surface and Domain Tokens
+
+Use the six-role surface ladder exactly: `surface.inset` for terminal and recessed regions, `surface.background` for canvas, `surface.raised` for cards and persistent chrome, `surface.overlay` for floating UI, `surface.hover` for hover, and `surface.selected` for selected neutral states.
+
+Status domain assignments are fixed: Cloud blue, VS Code purple, CLI gray, Slack teal, Agent Manager orange, success green, warning yellow, destructive red. Do not rename teal to emerald or gray to zinc. Use syntax tokens only on code-oriented surfaces and dedicated diff text/surface pairs with non-color `+`/`-` cues.
 
 ## Brand Accent Discipline
 
@@ -126,38 +133,30 @@ Font loading is in `apps/web/src/app/layout.tsx`:
 
 | Family | CSS variable | Use |
 |---|---|---|
-| Inter | `--font-sans` | Default UI text |
-| Roboto Mono | `--font-mono` | Code, identifiers, metadata |
+| Inter | `--font-sans-loaded` / Tailwind `font-sans` | Default UI text |
+| Roboto Mono | `--font-mono-loaded` / Tailwind `font-mono` | Code, identifiers, metadata |
 | JetBrains Mono | `--font-jetbrains` | Terminal-like and code-editor surfaces (`.font-jetbrains`) |
 
-Known issue to be aware of (do not fix casually): `globals.css` currently
-maps Tailwind's font tokens to `--font-geist-sans` / `--font-geist-mono`,
-while `layout.tsx` defines `--font-sans` / `--font-mono`. This means the
-Tailwind `font-sans` / `font-mono` utilities may fall back to the browser
-default unless the element consumes `--font-sans` directly through the
-`<html>` variable. If you are asked to fix this, raise it as a focused
-design-system cleanup PR rather than bundling it into an unrelated change.
+`globals.css` maps Tailwind font tokens to the variables loaded by `layout.tsx`. Do not add per-component font fallbacks.
 
 Type scale rules for product UI:
 
-- Prefer fewer sizes with stronger hierarchy. Do not stack 14/15/16/17.
-- Common sizes used in the codebase: `text-xs`, `text-sm`, `text-base`,
-  `text-lg`, `text-3xl` (logo wordmark).
-- Use `font-medium` for buttons/controls, `font-bold` for logos and
-  top-level page titles.
+- Prefer canonical utilities: `type-title`, `type-heading`, `type-body-lg`, `type-body`, `type-label`, `type-eyebrow`, and `type-code`.
+- Do not stack near-duplicate sizes or replace exact typography roles with arbitrary Tailwind combinations.
+- Use `type-label` for buttons and controls, `type-title` for top-level page titles, and existing lockup styling for logos.
 - Use `tabular-nums` for billing, usage counters, metrics, and anything
   that aligns in columns.
 
 ## Shape and Radius
 
-Base radius: `--radius: 0.625rem` in `globals.css`. Derived tokens:
+Use the exact radius contract:
 
 | Token | Value | Typical use |
 |---|---|---|
-| `--radius-sm` | `calc(var(--radius) - 4px)` | Tight inline chips |
-| `--radius-md` | `calc(var(--radius) - 2px)` | Buttons, inputs |
-| `--radius-lg` | `var(--radius)` | Popovers, medium containers |
-| `--radius-xl` | `calc(var(--radius) + 4px)` | Cards, dialogs |
+| `--radius-sm` | `4px` | Tight inline chips |
+| `--radius-md` | `8px` | Buttons, inputs |
+| `--radius-lg` | `10px` | Popovers, medium containers |
+| `--radius-xl` | `14px` | Cards, dialogs |
 | (pill) | `rounded-full` | Badges, avatars, status pills |
 
 Follow existing shadcn primitives. Buttons/inputs `rounded-md`, cards
@@ -167,8 +166,8 @@ Follow existing shadcn primitives. Buttons/inputs `rounded-md`, cards
 
 The app-shell rhythm in the current codebase:
 
-- Controls are compact: `h-8` (sm), `h-9` (default), `h-10` (lg).
-- Icons in controls are `size-4`.
+- Controls are compact: `h-8` (sm), `h-control-default` / 36px (default), `h-10` (lg). Touch surfaces use `h-control-touch` or `size-control-touch` for 44px targets.
+- Icons in controls are usually `size-4`; compact/status icons use `size-icon-sm` (14px).
 - Topbars are `h-14`.
 - Cards use `p-6` for header/content/footer, `gap-1.5` between title and
   description.

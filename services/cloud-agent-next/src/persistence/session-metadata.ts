@@ -1,5 +1,7 @@
 import * as z from 'zod';
 
+import { isGeneratedSharedSandboxId } from '../sandbox-id.js';
+import { SHARED_SANDBOX_FAILOVER_SUFFIX } from '../shared-sandbox-route.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from '../session/message-id.js';
 import type { SandboxId } from '../types.js';
 import {
@@ -13,9 +15,14 @@ import {
 const SandboxIdSchema = z
   .string()
   .refine(
-    s => /^(ses|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
+    s => /^(ses|crv|dind|org|usr|bot|ubt)-[0-9a-f]+$/.test(s) || s.includes('__'),
     'Invalid sandboxId format'
   )
+  .transform(s => s as SandboxId);
+
+const SharedSandboxIdSchema = z
+  .string()
+  .refine(isGeneratedSharedSandboxId, 'Invalid shared sandbox ID format')
   .transform(s => s as SandboxId);
 
 const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
@@ -42,40 +49,94 @@ const RepositoryCommonSchema = {
   upstreamBranch: branchNameSchema.optional(),
 };
 
-const MetadataRepositorySchema = z.discriminatedUnion('type', [
+const repositoryTypes = new Set(['github', 'gitlab', 'bitbucket', 'git', 'empty-local']);
+
+function normalizeRepositoryShape(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) return value;
+
+  const repository = value as Record<string, unknown>;
+  if (typeof repository.type === 'string' && repositoryTypes.has(repository.type)) {
+    return value;
+  }
+
+  if (typeof repository.repo === 'string') {
+    return { ...repository, type: 'github' };
+  }
+
+  if (typeof repository.url === 'string') {
+    if (repository.platform === 'gitlab') {
+      return { ...repository, type: 'gitlab' };
+    }
+    if (
+      repository.platform === 'bitbucket' &&
+      typeof repository.workspaceUuid === 'string' &&
+      typeof repository.repositoryUuid === 'string'
+    ) {
+      return { ...repository, type: 'bitbucket' };
+    }
+
+    return { ...repository, type: 'git' };
+  }
+
+  // A v2 repository we cannot resolve to a known type — e.g. legacy/E2E
+  // "empty-local" placeholders or identity-less fragments — carries no usable
+  // repository for current code. Drop it so the rest of the metadata still
+  // parses, instead of throwing and crashing every alarm/reaper cycle that
+  // reads metadata. Known-type repositories still validate strictly below, so
+  // genuine corruption of a recognized repository is still surfaced.
+  return undefined;
+}
+
+const MetadataRepositorySchema = z.preprocess(
+  normalizeRepositoryShape,
   z
-    .object({
-      type: z.literal('github'),
-      repo: z.string(),
-      platform: z.literal('github').optional(),
-      githubInstallationId: z.string().optional(),
-      githubAppType: z.enum(['standard', 'lite']).optional(),
-      ...RepositoryCommonSchema,
-    })
-    .strip(),
-  z
-    .object({
-      type: z.literal('gitlab'),
-      url: z.string(),
-      platform: z.literal('gitlab').optional(),
-      gitlabTokenManaged: z.boolean().optional(),
-      ...RepositoryCommonSchema,
-    })
-    .strip(),
-  z
-    .object({
-      type: z.literal('git'),
-      url: z.string(),
-      platform: z.enum(['github', 'gitlab']).optional(),
-      ...RepositoryCommonSchema,
-    })
-    .strip(),
-  z
-    .object({
-      type: z.literal('empty-local'),
-    })
-    .strip(),
-]);
+    .discriminatedUnion('type', [
+      z
+        .object({
+          type: z.literal('github'),
+          repo: z.string(),
+          platform: z.literal('github').optional(),
+          githubInstallationId: z.string().optional(),
+          githubAppType: z.enum(['standard', 'lite']).optional(),
+          ...RepositoryCommonSchema,
+        })
+        .strip(),
+      z
+        .object({
+          type: z.literal('gitlab'),
+          url: z.string(),
+          platform: z.literal('gitlab').optional(),
+          gitlabTokenManaged: z.boolean().optional(),
+          ...RepositoryCommonSchema,
+        })
+        .strip(),
+      z
+        .object({
+          type: z.literal('bitbucket'),
+          url: z.string(),
+          platform: z.literal('bitbucket').optional(),
+          workspaceUuid: z.string().uuid(),
+          repositoryUuid: z.string().uuid(),
+          bitbucketTokenManaged: z.boolean().optional(),
+          upstreamBranch: branchNameSchema.optional(),
+        })
+        .strip(),
+      z
+        .object({
+          type: z.literal('git'),
+          url: z.string(),
+          platform: z.enum(['github', 'gitlab']).optional(),
+          ...RepositoryCommonSchema,
+        })
+        .strip(),
+      z
+        .object({
+          type: z.literal('empty-local'),
+        })
+        .strip(),
+    ])
+    .optional()
+);
 
 const CurrentMetadataInitialTurnSchema = z.discriminatedUnion('type', [
   z
@@ -130,16 +191,55 @@ const MetadataCallbackSchema = z
   })
   .strip();
 
+const MetadataSharedSandboxRouteSchema = z
+  .object({
+    kind: z.literal('shared'),
+    routeKey: SharedSandboxIdSchema,
+    suffix: z.literal(SHARED_SANDBOX_FAILOVER_SUFFIX).optional(),
+  })
+  .strip();
+
 const MetadataWorkspaceSchema = z
   .object({
     sandboxId: SandboxIdSchema.optional(),
+    sandboxRoute: MetadataSharedSandboxRouteSchema.optional(),
     workspacePath: z.string().optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
     shallow: z.boolean().optional(),
     devcontainerRequested: z.boolean().optional(),
   })
-  .strip();
+  .strip()
+  .superRefine((workspace, context) => {
+    const route = workspace.sandboxRoute;
+    if (!route) return;
+    const sandboxId = workspace.sandboxId;
+    if (!sandboxId || !isGeneratedSharedSandboxId(sandboxId)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Shared sandbox route requires a shared sandbox ID',
+        path: ['sandboxId'],
+      });
+      return;
+    }
+    if (sandboxId.slice(0, 3) !== route.routeKey.slice(0, 3)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Shared sandbox route and assignment prefixes must match',
+        path: ['sandboxId'],
+      });
+    }
+    if (
+      (route.suffix === undefined && sandboxId !== route.routeKey) ||
+      (route.suffix !== undefined && sandboxId === route.routeKey)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Shared sandbox assignment does not match its route suffix',
+        path: ['sandboxId'],
+      });
+    }
+  });
 
 const MetadataDevContainerSchema = z
   .object({

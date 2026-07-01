@@ -26,6 +26,7 @@ import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
 import { redisClient } from '@/lib/redis';
 import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
+import { getLanguageModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
@@ -62,7 +63,6 @@ async function fetchGatewayModels(gateway: Provider) {
   await Promise.all(
     models.data.map(model =>
       limit(async () => {
-        console.debug(`[fetchGatewayModels] ${gateway.id}/${model.id}`);
         const endpointsResponse = await fetch(`${gateway.apiUrl}/models/${model.id}/endpoints`, {
           method: 'GET',
           headers,
@@ -85,6 +85,7 @@ async function fetchGatewayModels(gateway: Provider) {
   if (count < 100) {
     throw new Error(`Suspicious: total number of ${gateway.id} models is ${count} < 100`);
   }
+  console.debug(`[fetchGatewayModels] fetched ${count} models from ${gateway.id}`);
 
   return result;
 }
@@ -383,6 +384,8 @@ async function mirrorToRedis(values: {
     [GATEWAY_METADATA_REDIS_KEYS.allProviders, values.providers],
     [GATEWAY_METADATA_REDIS_KEYS.openrouterModels, values.openrouter],
     [GATEWAY_METADATA_REDIS_KEYS.vercelModels, values.vercel],
+    [GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds, getLanguageModelIds(values.openrouter)],
+    [GATEWAY_METADATA_REDIS_KEYS.vercelModelIds, getLanguageModelIds(values.vercel)],
   ];
   if (values.openrouterProviders) {
     entries.push([GATEWAY_METADATA_REDIS_KEYS.openrouterProviders, values.openrouterProviders]);

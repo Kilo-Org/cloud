@@ -203,7 +203,8 @@ export async function handleMergeRequestCodeReview(
     const cancelledReviews = await cancelSupersededReviewsForPR(
       project.path_with_namespace,
       mr.iid,
-      headSha
+      headSha,
+      { platformIntegrationId: integration.id }
     );
 
     if (cancelledReviews.length > 0) {
@@ -303,7 +304,10 @@ export async function handleMergeRequestCodeReview(
     }
 
     // 7. Check for duplicate review (same project, MR, SHA)
-    const existingReview = await findExistingReview(project.path_with_namespace, mr.iid, headSha);
+    const existingReview = await findExistingReview(project.path_with_namespace, mr.iid, headSha, {
+      type: 'webhook',
+      platformIntegrationId: integration.id,
+    });
 
     if (existingReview) {
       logExceptInTest(
@@ -476,7 +480,8 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
     const activeReviewIds = await findActiveReviewsForPR(
       args.repoFullName,
       args.mrIid,
-      args.newHeadSha
+      args.newHeadSha,
+      { platformIntegrationId: args.integrationId }
     );
     if (activeReviewIds.length === 0) return;
 

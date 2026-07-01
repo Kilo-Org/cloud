@@ -189,6 +189,7 @@ export async function handlePullRequestCodeReview(
         repoFullName: repository.full_name,
         prNumber: pull_request.number,
         newHeadSha: pull_request.head.sha,
+        integrationId: integration.id,
         installationId: integration.platform_installation_id as string,
         baseOwner,
         baseRepoName,
@@ -203,7 +204,8 @@ export async function handlePullRequestCodeReview(
     const cancelledReviews = await cancelSupersededReviewsForPR(
       repository.full_name,
       pull_request.number,
-      pull_request.head.sha
+      pull_request.head.sha,
+      { platformIntegrationId: integration.id }
     );
 
     if (cancelledReviews.length > 0) {
@@ -280,7 +282,8 @@ export async function handlePullRequestCodeReview(
     const existingReview = await findExistingReview(
       repository.full_name,
       pull_request.number,
-      pull_request.head.sha
+      pull_request.head.sha,
+      { type: 'webhook', platformIntegrationId: integration.id }
     );
 
     if (existingReview) {
@@ -477,6 +480,7 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
   repoFullName: string;
   prNumber: number;
   newHeadSha: string;
+  integrationId: string;
   installationId: string;
   // Owner/name of the *base* repo (where branch protection lives and the
   // GitHub App is installed). Fork PRs must not create check runs in the
@@ -492,7 +496,8 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
     const activeReviewIds = await findActiveReviewsForPR(
       args.repoFullName,
       args.prNumber,
-      args.newHeadSha
+      args.newHeadSha,
+      { platformIntegrationId: args.integrationId }
     );
     if (activeReviewIds.length === 0) return;
 

@@ -602,6 +602,12 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
   const executionContext = identity.executionContext;
   let preview: ConsentPreview;
   let resolvedExecutionContext = executionContext;
+  let gatewayAuditContext: {
+    ownerScope: 'personal' | 'organization';
+    ownerId: string;
+    configId: string;
+    connectResourceId: string;
+  } | null = null;
   if (nativeMcp) {
     preview = await services.nativeMcpAuthorizationService.previewAuthorization({
       query: parsed.data,
@@ -619,6 +625,12 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     });
     preview = gatewayPreview;
     resolvedExecutionContext = gatewayPreview.executionContext;
+    gatewayAuditContext = {
+      ownerScope: gatewayPreview.ownerScope,
+      ownerId: gatewayPreview.ownerId,
+      configId: gatewayPreview.configId,
+      connectResourceId: gatewayPreview.connectResourceId,
+    };
   }
   const approvalStateValue = typeof approvalState === 'string' ? approvalState : '';
   const approvalStateValid =
@@ -660,6 +672,19 @@ async function approveRequest(request: NextRequest, route?: ScopedConnectRoute) 
     return response;
   }
   if (decision === 'deny') {
+    if (gatewayAuditContext) {
+      await services.auditService.record({
+        actorUserId: identity.user.id,
+        ownerScope: gatewayAuditContext.ownerScope,
+        ownerId: gatewayAuditContext.ownerId,
+        configId: gatewayAuditContext.configId,
+        connectResourceId: gatewayAuditContext.connectResourceId,
+        instanceId: null,
+        oauthGrantId: null,
+        eventType: 'authorization_denied',
+        outcome: 'blocked',
+      });
+    }
     const response = redirectOAuthError(
       new OAuthAuthorizationRedirectError(
         'access_denied',

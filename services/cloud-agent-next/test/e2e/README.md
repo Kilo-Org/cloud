@@ -43,7 +43,7 @@ cloud-agent-next refactor.
 
 ## Running
 
-Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.3.21`):
+Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.3.54`):
 
 ```bash
 pnpm --filter cloud-agent-next exec tsx test/e2e/sdk-basic-chat.ts

@@ -44,7 +44,7 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
           organizationId,
           forceRefresh: false,
         })
-      : mainTrpc.cloudAgent.listGitHubRepositories.queryOptions({ forceRefresh: false })),
+      : mainTrpc.cloudAgentNext.listGitHubRepositories.queryOptions({ forceRefresh: false })),
     enabled: isOpen && mode === 'integration',
   });
 
@@ -54,7 +54,7 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
           organizationId,
           forceRefresh: false,
         })
-      : mainTrpc.cloudAgent.listGitLabRepositories.queryOptions({ forceRefresh: false })),
+      : mainTrpc.cloudAgentNext.listGitLabRepositories.queryOptions({ forceRefresh: false })),
     enabled: isOpen && mode === 'integration',
   });
 
@@ -106,7 +106,8 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
     setSelectedRepo(fullName);
     // Determine platform from the selection
     const repo = unifiedRepositories.find(r => r.fullName === fullName);
-    if (repo?.platform) {
+    // TODO: Add Bitbucket support to Gastown.
+    if (repo?.platform && repo.platform !== 'bitbucket') {
       setSelectedPlatform(repo.platform);
     }
     // Auto-fill name from repo name

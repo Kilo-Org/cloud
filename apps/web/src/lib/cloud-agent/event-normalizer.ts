@@ -19,7 +19,7 @@ export type V1Event = {
 
 /**
  * Error codes for WebSocket protocol errors.
- * These match the WS_* codes from cloud-agent/src/websocket/types.ts.
+ * These match the WS_* codes owned by cloud-agent-next/src/websocket/types.ts.
  */
 export type StreamErrorCode =
   | 'WS_PROTOCOL_ERROR'

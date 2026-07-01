@@ -15,6 +15,10 @@ export type SessionLogEntry = {
   content?: string;
 };
 
+export type SessionLogConversionOptions = {
+  includeFullAssistantText?: boolean;
+};
+
 // ---------------------------------------------------------------------------
 // V2 (cloud-agent-next / session-ingest) conversion
 // ---------------------------------------------------------------------------
@@ -26,7 +30,10 @@ export type SessionLogEntry = {
  * and errors into timestamped log lines. Skips reasoning, compaction, and file
  * parts — those add noise without actionable context for end users.
  */
-export function v2SnapshotToLogEntries(snapshot: SessionSnapshot): SessionLogEntry[] {
+export function v2SnapshotToLogEntries(
+  snapshot: SessionSnapshot,
+  options: SessionLogConversionOptions = {}
+): SessionLogEntry[] {
   const entries: SessionLogEntry[] = [];
 
   for (const msg of snapshot.messages) {
@@ -37,6 +44,7 @@ export function v2SnapshotToLogEntries(snapshot: SessionSnapshot): SessionLogEnt
 
     // Show the initial user prompt as a single log line (truncated)
     if (role === 'user') {
+      if (options.includeFullAssistantText) continue;
       const textContent = (msg.parts ?? [])
         .filter(p => (p as Record<string, unknown>).type === 'text')
         .map(p => ((p as Record<string, unknown>).text as string) ?? '')
@@ -98,6 +106,15 @@ export function v2SnapshotToLogEntries(snapshot: SessionSnapshot): SessionLogEnt
       if (partType === 'text') {
         const text = (p.text as string | undefined)?.trim();
         if (!text) continue;
+        if (options.includeFullAssistantText) {
+          entries.push({
+            timestamp: baseTs,
+            eventType: 'text',
+            message: 'Assistant response',
+            content: text,
+          });
+          continue;
+        }
         const truncated = text.length > 200 ? text.slice(0, 200) + '…' : text;
         entries.push({ timestamp: baseTs, eventType: 'text', message: truncated });
         continue;
@@ -128,7 +145,10 @@ export function v2SnapshotToLogEntries(snapshot: SessionSnapshot): SessionLogEnt
  * `convertToCloudMessages` utility to normalise them, then extract
  * the interesting bits (tool calls, text, errors) into log lines.
  */
-export function v1BlobToLogEntries(rawMessages: unknown): SessionLogEntry[] {
+export function v1BlobToLogEntries(
+  rawMessages: unknown,
+  options: SessionLogConversionOptions = {}
+): SessionLogEntry[] {
   if (!Array.isArray(rawMessages)) return [];
 
   const validMessages = rawMessages.filter(
@@ -141,6 +161,7 @@ export function v1BlobToLogEntries(rawMessages: unknown): SessionLogEntry[] {
     const ts = new Date(msg.ts).toISOString();
 
     if (msg.type === 'user') {
+      if (options.includeFullAssistantText) continue;
       const text = (msg.text || msg.content || '').trim();
       if (text) {
         const truncated = text.length > 300 ? text.slice(0, 300) + '…' : text;
@@ -151,14 +172,18 @@ export function v1BlobToLogEntries(rawMessages: unknown): SessionLogEntry[] {
 
     if (msg.type !== 'assistant') continue;
 
-    const logEntry = cloudMessageToLogEntry(msg, ts);
+    const logEntry = cloudMessageToLogEntry(msg, ts, options);
     if (logEntry) entries.push(logEntry);
   }
 
   return entries;
 }
 
-function cloudMessageToLogEntry(msg: CloudMessage, ts: string): SessionLogEntry | null {
+function cloudMessageToLogEntry(
+  msg: CloudMessage,
+  ts: string,
+  options: SessionLogConversionOptions
+): SessionLogEntry | null {
   // Tool calls
   if (msg.say === 'tool' || msg.ask === 'tool' || msg.ask === 'command') {
     const meta = msg.metadata;
@@ -183,6 +208,9 @@ function cloudMessageToLogEntry(msg: CloudMessage, ts: string): SessionLogEntry 
   if (msg.say === 'completion_result') {
     const text = (msg.text || msg.content || '').trim();
     if (!text) return null;
+    if (options.includeFullAssistantText) {
+      return { timestamp: ts, eventType: 'text', message: 'Assistant response', content: text };
+    }
     const truncated = text.length > 200 ? text.slice(0, 200) + '…' : text;
     return { timestamp: ts, eventType: 'text', message: truncated };
   }
@@ -191,6 +219,9 @@ function cloudMessageToLogEntry(msg: CloudMessage, ts: string): SessionLogEntry 
   if (msg.say === 'text') {
     const text = (msg.text || msg.content || '').trim();
     if (!text) return null;
+    if (options.includeFullAssistantText) {
+      return { timestamp: ts, eventType: 'text', message: 'Assistant response', content: text };
+    }
     const truncated = text.length > 200 ? text.slice(0, 200) + '…' : text;
     return { timestamp: ts, eventType: 'text', message: truncated };
   }

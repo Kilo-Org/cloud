@@ -4,6 +4,20 @@ const upstream: Schema = {
   $schema: 'https://json-schema.org/draft/2020-12/schema',
   ref: 'Config',
   type: 'object',
+  $defs: {
+    PermissionConfig: {
+      anyOf: [
+        { $ref: '#/$defs/PermissionActionConfig' },
+        {
+          type: 'object',
+          properties: {
+            read: { $ref: '#/$defs/PermissionRuleConfig' },
+          },
+          additionalProperties: { $ref: '#/$defs/PermissionRuleConfig' },
+        },
+      ],
+    },
+  },
   properties: {
     agent: {
       type: 'object',
@@ -44,7 +58,10 @@ describe('kilo config.json schema merge', () => {
   });
 
   test('terminal_command_display is an enum of expanded/collapsed', () => {
-    const tcd = props.terminal_command_display as { type: string; enum: string[] };
+    const tcd = props.terminal_command_display as {
+      type: string;
+      enum: string[];
+    };
     expect(tcd.type).toBe('string');
     expect(tcd.enum).toEqual(['expanded', 'collapsed']);
   });
@@ -75,9 +92,34 @@ describe('kilo config.json schema merge', () => {
     expect(agent.properties.build).toBeDefined(); // upstream key preserved
   });
 
+  test('adds notebook permission keys without dropping upstream', () => {
+    const defs = out.$defs as Record<string, unknown>;
+    const permissionConfig = defs.PermissionConfig as {
+      anyOf: Array<Record<string, unknown>>;
+    };
+    const permissionObject = permissionConfig.anyOf.find(variant => variant.type === 'object') as {
+      properties: Record<string, unknown>;
+    };
+
+    expect(permissionObject.properties.notebook_read).toEqual({
+      $ref: '#/$defs/PermissionRuleConfig',
+    });
+    expect(permissionObject.properties.notebook_edit).toEqual({
+      $ref: '#/$defs/PermissionRuleConfig',
+    });
+    expect(permissionObject.properties.notebook_execute).toEqual({
+      $ref: '#/$defs/PermissionRuleConfig',
+    });
+    expect(permissionObject.properties.read).toBeDefined();
+  });
+
   test('adds kilo experimental keys without dropping upstream', () => {
     const exp = props.experimental as { properties: Record<string, unknown> };
     expect(exp.properties.codebase_search).toBeDefined();
+    expect(exp.properties.agent_requirements).toEqual(expect.objectContaining({ type: 'boolean' }));
+    expect(exp.properties.native_notebook_tools).toEqual(
+      expect.objectContaining({ type: 'boolean' })
+    );
     expect(exp.properties.openTelemetry).toBeDefined();
     expect(exp.properties.batch_tool).toBeDefined(); // upstream key preserved
   });

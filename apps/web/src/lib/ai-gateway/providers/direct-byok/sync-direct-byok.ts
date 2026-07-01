@@ -27,6 +27,7 @@ const OpenAICompatibleModelsResponseSchema = z.object({
 const ModelsDevModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
+  status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
   limit: z
     .object({
       context: z.number().optional(),
@@ -100,6 +101,19 @@ function openAICompatibleFetcher(options: {
   };
 }
 
+export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
+  const provider = ModelsDevProviderSchema.parse(entry);
+  return Object.values(provider.models)
+    .filter(model => model.status !== 'deprecated')
+    .map(model => ({
+      id: model.id,
+      name: shortenDisplayName(model.name),
+      context_length: model.limit?.context,
+      max_completion_tokens: model.limit?.output,
+      input_modalities: model.modalities?.input,
+    }));
+}
+
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
   catalogKey: string
@@ -112,14 +126,7 @@ function modelsDevFetcher(
       if (!entry) {
         throw new Error(`models.dev catalog missing ${catalogKey} entry`);
       }
-      const provider = ModelsDevProviderSchema.parse(entry);
-      return Object.values(provider.models).map(model => ({
-        id: model.id,
-        name: shortenDisplayName(model.name),
-        context_length: model.limit?.context,
-        max_completion_tokens: model.limit?.output,
-        input_modalities: model.modalities?.input,
-      }));
+      return parseModelsDevProviderModels(entry);
     },
   };
 }

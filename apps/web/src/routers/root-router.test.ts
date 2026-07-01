@@ -1,6 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
+import { rootRouter } from './root-router';
 
 // Test users will be created dynamically
 let regularUser: User;
@@ -32,6 +33,17 @@ describe('trpc tests', () => {
 
   afterAll(async () => {
     // Test cleanup is handled automatically by the test framework
+  });
+
+  describe('router composition', () => {
+    it('registers Bitbucket only under organizations', () => {
+      expect(rootRouter._def.record).not.toHaveProperty('bitbucket');
+      expect(rootRouter._def.record).toHaveProperty('organizations.bitbucket');
+      expect(rootRouter._def.record).not.toHaveProperty('cloudAgentNext.listBitbucketRepositories');
+      expect(rootRouter._def.record).toHaveProperty(
+        'organizations.cloudAgentNext.listBitbucketRepositories'
+      );
+    });
   });
 
   describe('hello procedure', () => {

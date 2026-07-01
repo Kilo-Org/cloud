@@ -29,9 +29,11 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Copy, Plus, Settings, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
+import { AuthorizedClientsContent } from './AuthorizedClientsContent';
 
 type McpGatewayListContentProps = {
   organizationId?: string;
@@ -96,180 +98,195 @@ export function McpGatewayListContent({ organizationId }: McpGatewayListContentP
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1.5">
-          <h1 className="text-2xl font-semibold tracking-tight">MCP Gateway</h1>
-          <p className="text-muted-foreground text-sm">
-            Create and manage remote MCP server connections for Kilo Code.
-          </p>
-        </div>
-        <Button asChild>
-          <Link href={routes.create}>
-            <Plus />
-            Create connection
-          </Link>
-        </Button>
+      <div className="space-y-1.5">
+        <h1 className="text-2xl font-semibold tracking-tight">MCP Gateway</h1>
+        <p className="text-muted-foreground text-sm">
+          Create and manage remote MCP server connections for Kilo Code.
+        </p>
       </div>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-base">Connections</CardTitle>
-              {!listQuery.isLoading && !listQuery.isError && (
-                <span className="text-muted-foreground text-xs tabular-nums">
-                  {filteredConnections.length}
-                </span>
-              )}
-            </div>
-            <CardDescription>Remote MCP servers available to Kilo Code.</CardDescription>
-          </div>
-          <Input
-            value={filter}
-            onChange={event => setFilter(event.target.value)}
-            placeholder="Filter connections"
-            aria-label="Filter connections"
-            className="w-full sm:w-64"
-          />
-        </CardHeader>
-        <CardContent className="px-6 pb-6 pt-0">
-          {listQuery.isLoading && (
-            <div className="space-y-3 rounded-lg border p-4">
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-            </div>
-          )}
-          {listQuery.isError && (
-            <div className="space-y-3 rounded-lg border p-5">
-              <p className="text-sm">We couldn't load connections. Try again.</p>
-              <Button variant="outline" onClick={() => listQuery.refetch()}>
-                Retry loading connections
-              </Button>
-            </div>
-          )}
-          {!listQuery.isLoading && !listQuery.isError && filteredConnections.length === 0 && (
-            <div className="space-y-3 rounded-lg border p-5">
-              <p className="text-sm font-medium">
-                {listQuery.data?.length
-                  ? 'No connections match that filter.'
-                  : 'No MCP connections yet.'}
-              </p>
-              <p className="text-muted-foreground text-sm">
-                {listQuery.data?.length
-                  ? 'Clear the filter to see every connection.'
-                  : 'Create one to connect Kilo Code to a remote MCP server.'}
-              </p>
-              {listQuery.data?.length ? (
-                <Button variant="outline" onClick={() => setFilter('')}>
-                  Clear filter
-                </Button>
-              ) : (
-                <Button asChild variant="outline">
+      <Tabs defaultValue="connections">
+        <TabsList>
+          <TabsTrigger value="connections">Connections</TabsTrigger>
+          <TabsTrigger value="authorized-clients">Authorized clients</TabsTrigger>
+        </TabsList>
+        <TabsContent value="connections" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-base">Remote MCP servers</CardTitle>
+                  {!listQuery.isLoading && !listQuery.isError && (
+                    <span className="text-muted-foreground text-xs tabular-nums">
+                      {filteredConnections.length}
+                    </span>
+                  )}
+                </div>
+                <CardDescription>
+                  Connections available to Kilo Code through this gateway.
+                </CardDescription>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <Input
+                  value={filter}
+                  onChange={event => setFilter(event.target.value)}
+                  placeholder="Filter connections"
+                  aria-label="Filter connections"
+                  className="w-full sm:w-64"
+                />
+                <Button asChild>
                   <Link href={routes.create}>
                     <Plus />
                     Create connection
                   </Link>
                 </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="px-6 pb-6 pt-0">
+              {listQuery.isLoading && (
+                <div className="space-y-3 rounded-lg border p-4">
+                  <Skeleton className="h-9 w-full" />
+                  <Skeleton className="h-9 w-full" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
               )}
-            </div>
-          )}
-          {!listQuery.isLoading && !listQuery.isError && filteredConnections.length > 0 && (
-            <div className="overflow-x-auto rounded-lg border">
-              <Table className="min-w-[720px] table-fixed">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead className="w-36">Status</TableHead>
-                    {organizationId && <TableHead className="w-32">Assigned users</TableHead>}
-                    <TableHead className="w-40">Last updated</TableHead>
-                    <TableHead className="w-28 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredConnections.map(connection => (
-                    <TableRow key={connection.configId}>
-                      <TableCell className="py-3">
-                        <div className="flex flex-col gap-0.5">
-                          <Link
-                            href={routes.detail(connection.configId)}
-                            className="font-medium hover:underline"
-                          >
-                            {connection.name}
-                          </Link>
-                          <span className="text-muted-foreground font-mono text-xs">
-                            {remoteHost(connection.remoteUrl)}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <ConnectionStatusBadge connection={connection} />
-                      </TableCell>
-                      {organizationId && (
-                        <TableCell className="tabular-nums">{connection.assignmentCount}</TableCell>
-                      )}
-                      <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                        <span title={new Date(connection.updatedAt).toLocaleString()}>
-                          {formatDistanceToNow(new Date(connection.updatedAt), {
-                            addSuffix: true,
-                          })}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                asChild
-                                variant="ghost"
-                                size="icon"
-                                aria-label={`Manage ${connection.name}`}
+              {listQuery.isError && (
+                <div className="space-y-3 rounded-lg border p-5">
+                  <p className="text-sm">We couldn't load connections. Try again.</p>
+                  <Button variant="outline" onClick={() => listQuery.refetch()}>
+                    Retry loading connections
+                  </Button>
+                </div>
+              )}
+              {!listQuery.isLoading && !listQuery.isError && filteredConnections.length === 0 && (
+                <div className="space-y-3 rounded-lg border p-5">
+                  <p className="text-sm font-medium">
+                    {listQuery.data?.length
+                      ? 'No connections match that filter.'
+                      : 'No MCP connections yet.'}
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    {listQuery.data?.length
+                      ? 'Clear the filter to see every connection.'
+                      : 'Create one to connect Kilo Code to a remote MCP server.'}
+                  </p>
+                  {listQuery.data?.length ? (
+                    <Button variant="outline" onClick={() => setFilter('')}>
+                      Clear filter
+                    </Button>
+                  ) : (
+                    <Button asChild variant="outline">
+                      <Link href={routes.create}>
+                        <Plus />
+                        Create connection
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              )}
+              {!listQuery.isLoading && !listQuery.isError && filteredConnections.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border">
+                  <Table className="min-w-[720px] table-fixed">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead className="w-36">Status</TableHead>
+                        {organizationId && <TableHead className="w-32">Assigned users</TableHead>}
+                        <TableHead className="w-40">Last updated</TableHead>
+                        <TableHead className="w-28 text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredConnections.map(connection => (
+                        <TableRow key={connection.configId}>
+                          <TableCell className="py-3">
+                            <div className="flex flex-col gap-0.5">
+                              <Link
+                                href={routes.detail(connection.configId)}
+                                className="font-medium hover:underline"
                               >
-                                <Link href={routes.detail(connection.configId)}>
-                                  <Settings />
-                                </Link>
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Manage connection</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label={`Copy connect URL for ${connection.name}`}
-                                onClick={() => copyConnectUrl(connection.canonicalUrl)}
-                              >
-                                <Copy />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Copy connect URL</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label={`Delete ${connection.name}`}
-                                className="text-muted-foreground hover:text-foreground"
-                                disabled={deleteMutation.isPending}
-                                onClick={() => setDeleteConfigId(connection.configId)}
-                              >
-                                <Trash2 />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Delete connection</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                                {connection.name}
+                              </Link>
+                              <span className="text-muted-foreground font-mono text-xs">
+                                {remoteHost(connection.remoteUrl)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <ConnectionStatusBadge connection={connection} />
+                          </TableCell>
+                          {organizationId && (
+                            <TableCell className="tabular-nums">
+                              {connection.assignmentCount}
+                            </TableCell>
+                          )}
+                          <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                            <span title={new Date(connection.updatedAt).toLocaleString()}>
+                              {formatDistanceToNow(new Date(connection.updatedAt), {
+                                addSuffix: true,
+                              })}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    asChild
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Manage ${connection.name}`}
+                                  >
+                                    <Link href={routes.detail(connection.configId)}>
+                                      <Settings />
+                                    </Link>
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Manage connection</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Copy connect URL for ${connection.name}`}
+                                    onClick={() => copyConnectUrl(connection.canonicalUrl)}
+                                  >
+                                    <Copy />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Copy connect URL</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Delete ${connection.name}`}
+                                    className="text-muted-foreground hover:text-foreground"
+                                    disabled={deleteMutation.isPending}
+                                    onClick={() => setDeleteConfigId(connection.configId)}
+                                  >
+                                    <Trash2 />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Delete connection</TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="authorized-clients" className="mt-6">
+          <AuthorizedClientsContent organizationId={organizationId} />
+        </TabsContent>
+      </Tabs>
       <AlertDialog
         open={deleteConfigId !== null}
         onOpenChange={open => {

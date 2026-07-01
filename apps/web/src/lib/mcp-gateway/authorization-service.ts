@@ -3,6 +3,7 @@ import {
   GatewayAuthMode,
   GatewayAuthorizationRequestStatus,
   GatewayInstanceStatus,
+  GatewayExecutionContextSchema,
   GatewayOAuthClientAuthMethod,
   GatewayMcpAccessScope,
   createGatewayError,
@@ -17,12 +18,15 @@ import {
 import {
   mcp_gateway_authorization_codes,
   mcp_gateway_authorization_requests,
+  mcp_gateway_oauth_grants,
 } from '@kilocode/db/schema';
-import { and, eq, gt, sql } from 'drizzle-orm';
+import { MCPGatewayOAuthGrantStatus } from '@kilocode/db/schema-types';
+import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import type { GatewayRepository, ResolvedGatewayRoute } from './repository';
 import type { GatewayRouteService } from './route-service';
 import type { GatewayOAuthClientService } from './oauth-client-service';
 import type { GatewayProviderOAuthService } from './provider-oauth-service';
+import type { GatewayOAuthGrantService } from './oauth-grant-service';
 import { expiresAtIso, hashToken, randomToken } from './crypto';
 import type { GatewayAppConfig } from './config';
 import { createAuditService } from './audit-service';
@@ -61,6 +65,7 @@ export function createAuthorizationService(params: {
   repository: GatewayRepository;
   routeService: GatewayRouteService;
   clientService: GatewayOAuthClientService;
+  oauthGrantService: GatewayOAuthGrantService;
   providerOAuthService: GatewayProviderOAuthService;
   config: GatewayAppConfig;
 }) {
@@ -122,12 +127,14 @@ export function createAuthorizationService(params: {
     codeChallenge: string | null;
     executionContext: GatewayExecutionContext;
     instanceId: string;
+    oauthGrantId?: string | null;
   }) {
     const [request] = await params.repository.database
       .insert(mcp_gateway_authorization_requests)
       .values({
         request_state_hash: hashToken(randomToken(32)),
         oauth_client_id: paramsInput.client.oauth_client_id,
+        oauth_grant_id: paramsInput.oauthGrantId,
         client_id: paramsInput.client.client_id,
         owner_scope: paramsInput.resolved.config.owner_scope,
         owner_id: paramsInput.resolved.config.owner_id,
@@ -151,30 +158,95 @@ export function createAuthorizationService(params: {
   }
 
   async function finalizeAuthorizationRequest(
-    request: typeof mcp_gateway_authorization_requests.$inferSelect
+    request: typeof mcp_gateway_authorization_requests.$inferSelect,
+    options: { allowPendingGrant?: boolean } = {}
   ) {
+    if (!request.oauth_grant_id) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
+    }
+    const oauthGrantId = request.oauth_grant_id;
     const code = randomToken(32);
     const codeHash = hashToken(code);
-    const [updated] = await params.repository.database
-      .update(mcp_gateway_authorization_requests)
-      .set({
-        request_status: GatewayAuthorizationRequestStatus.Completed,
-        consumed_at: new Date().toISOString(),
-      })
-      .where(
-        and(
-          eq(
-            mcp_gateway_authorization_requests.authorization_request_id,
-            request.authorization_request_id
-          ),
-          eq(
-            mcp_gateway_authorization_requests.request_status,
-            GatewayAuthorizationRequestStatus.Pending
-          ),
-          gt(mcp_gateway_authorization_requests.expires_at, sql`NOW()`)
+    const updated = await params.repository.database.transaction(async tx => {
+      const allowedStatuses = options.allowPendingGrant
+        ? [MCPGatewayOAuthGrantStatus.Pending]
+        : [MCPGatewayOAuthGrantStatus.Active];
+      const [grant] = await tx
+        .select()
+        .from(mcp_gateway_oauth_grants)
+        .where(
+          and(
+            eq(mcp_gateway_oauth_grants.oauth_grant_id, oauthGrantId),
+            eq(mcp_gateway_oauth_grants.oauth_client_id, request.oauth_client_id),
+            eq(mcp_gateway_oauth_grants.kilo_user_id, request.kilo_user_id),
+            eq(mcp_gateway_oauth_grants.instance_id, request.instance_id),
+            inArray(mcp_gateway_oauth_grants.grant_status, allowedStatuses),
+            isNull(mcp_gateway_oauth_grants.revoked_at)
+          )
         )
-      )
-      .returning();
+        .limit(1);
+      if (!grant) return null;
+      const [completedRequest] = await tx
+        .update(mcp_gateway_authorization_requests)
+        .set({
+          request_status: GatewayAuthorizationRequestStatus.Completed,
+          consumed_at: new Date().toISOString(),
+        })
+        .where(
+          and(
+            eq(
+              mcp_gateway_authorization_requests.authorization_request_id,
+              request.authorization_request_id
+            ),
+            eq(mcp_gateway_authorization_requests.oauth_grant_id, oauthGrantId),
+            eq(
+              mcp_gateway_authorization_requests.request_status,
+              GatewayAuthorizationRequestStatus.Pending
+            ),
+            gt(mcp_gateway_authorization_requests.expires_at, sql`NOW()`)
+          )
+        )
+        .returning();
+      if (!completedRequest) return null;
+      if (grant.grant_status === MCPGatewayOAuthGrantStatus.Pending) {
+        const [activated] = await tx
+          .update(mcp_gateway_oauth_grants)
+          .set({
+            grant_status: MCPGatewayOAuthGrantStatus.Active,
+            approved_at: new Date().toISOString(),
+          })
+          .where(
+            and(
+              eq(mcp_gateway_oauth_grants.oauth_grant_id, grant.oauth_grant_id),
+              eq(mcp_gateway_oauth_grants.grant_status, MCPGatewayOAuthGrantStatus.Pending),
+              isNull(mcp_gateway_oauth_grants.revoked_at)
+            )
+          )
+          .returning();
+        if (!activated) return null;
+      }
+      await tx.insert(mcp_gateway_authorization_codes).values({
+        code_hash: codeHash,
+        authorization_request_id: completedRequest.authorization_request_id,
+        oauth_client_id: completedRequest.oauth_client_id,
+        oauth_grant_id: completedRequest.oauth_grant_id,
+        client_id: completedRequest.client_id,
+        owner_scope: completedRequest.owner_scope,
+        owner_id: completedRequest.owner_id,
+        config_id: completedRequest.config_id,
+        route_key: completedRequest.route_key,
+        canonical_resource_url: completedRequest.canonical_resource_url,
+        redirect_uri: completedRequest.redirect_uri,
+        granted_scopes: completedRequest.granted_scopes,
+        code_challenge: completedRequest.code_challenge,
+        code_challenge_method: completedRequest.code_challenge_method,
+        execution_context: completedRequest.execution_context,
+        kilo_user_id: completedRequest.kilo_user_id,
+        instance_id: completedRequest.instance_id,
+        expires_at: expiresAtIso(params.config.authorizationCodeTtlSeconds),
+      });
+      return completedRequest;
+    });
     if (!updated) {
       throw createGatewayError(
         GatewayErrorCode.InvalidGrant,
@@ -182,25 +254,6 @@ export function createAuthorizationService(params: {
         400
       );
     }
-    await params.repository.database.insert(mcp_gateway_authorization_codes).values({
-      code_hash: codeHash,
-      authorization_request_id: updated.authorization_request_id,
-      oauth_client_id: updated.oauth_client_id,
-      client_id: updated.client_id,
-      owner_scope: updated.owner_scope,
-      owner_id: updated.owner_id,
-      config_id: updated.config_id,
-      route_key: updated.route_key,
-      canonical_resource_url: updated.canonical_resource_url,
-      redirect_uri: updated.redirect_uri,
-      granted_scopes: updated.granted_scopes,
-      code_challenge: updated.code_challenge,
-      code_challenge_method: updated.code_challenge_method,
-      execution_context: updated.execution_context,
-      kilo_user_id: updated.kilo_user_id,
-      instance_id: updated.instance_id,
-      expires_at: expiresAtIso(params.config.authorizationCodeTtlSeconds),
-    });
     const redirect = new URL(updated.redirect_uri);
     redirect.searchParams.set('code', code);
     if (updated.oauth_state) {
@@ -331,9 +384,12 @@ export function createAuthorizationService(params: {
       clientName: prepared.client.client_name,
       redirectUri: input.query.redirect_uri,
       resource: prepared.resolved.route.canonical_url,
+      configId: prepared.resolved.config.config_id,
+      connectResourceId: prepared.resolved.route.connect_resource_id,
       connectionName: prepared.resolved.config.name,
       endpointHost: new URL(prepared.resolved.config.remote_url).host,
       ownerScope: prepared.resolved.config.owner_scope,
+      ownerId: prepared.resolved.config.owner_id,
       contextName:
         prepared.resolved.config.owner_scope === 'organization'
           ? (organization?.name ?? 'Organization')
@@ -361,6 +417,31 @@ export function createAuthorizationService(params: {
         configId: resolved.config.config_id,
         userId: input.userId,
       });
+      const requiresProvider =
+        resolved.config.auth_mode === GatewayAuthMode.OAuthDynamic ||
+        resolved.config.auth_mode === GatewayAuthMode.OAuthStatic;
+      const providerGrant = requiresProvider
+        ? await params.repository.findActiveGrant(instance.instance_id)
+        : null;
+      const needsProviderAuthorization =
+        requiresProvider &&
+        (!providerGrant || instance.instance_status !== GatewayInstanceStatus.Active);
+      const oauthGrant = await params.oauthGrantService.createOrReuseGrant({
+        oauthClientId: client.oauth_client_id,
+        kiloUserId: input.userId,
+        ownerScope: resolved.config.owner_scope,
+        ownerId: resolved.config.owner_id,
+        configId: resolved.config.config_id,
+        connectResourceId: resolved.route.connect_resource_id,
+        instanceId: instance.instance_id,
+        redirectUri: input.query.redirect_uri,
+        grantedScopes: scopes,
+        executionContext,
+        grantStatus: needsProviderAuthorization
+          ? MCPGatewayOAuthGrantStatus.Pending
+          : MCPGatewayOAuthGrantStatus.Active,
+        configVersion: resolved.config.config_version,
+      });
       const request = await createAuthorizationRequestWithInstance({
         client,
         route,
@@ -372,34 +453,40 @@ export function createAuthorizationService(params: {
         codeChallenge: input.query.code_challenge ?? null,
         executionContext,
         instanceId: instance.instance_id,
+        oauthGrantId: oauthGrant.oauth_grant_id,
       });
-      if (
-        resolved.config.auth_mode === GatewayAuthMode.OAuthDynamic ||
-        resolved.config.auth_mode === GatewayAuthMode.OAuthStatic
-      ) {
-        const grant = await params.repository.findActiveGrant(instance.instance_id);
-        if (!grant || instance.instance_status !== GatewayInstanceStatus.Active) {
-          const provider = await params.providerOAuthService.initiateProviderAuthorization({
-            authorizationRequest: request,
-            resolved,
-            instanceId: instance.instance_id,
-          });
-          await createAuditService(params.repository).record({
-            actorUserId: input.userId,
-            ownerScope: resolved.config.owner_scope,
-            ownerId: resolved.config.owner_id,
-            configId: resolved.config.config_id,
-            connectResourceId: resolved.route.connect_resource_id,
-            instanceId: instance.instance_id,
-            eventType: 'authorization_pending_provider',
-            outcome: 'success',
-          });
-          return {
-            kind: 'provider_redirect' as const,
-            authorizationUrl: provider.authorizationUrl,
-          };
-        }
+      if (needsProviderAuthorization) {
+        const provider = await params.providerOAuthService.initiateProviderAuthorization({
+          authorizationRequest: request,
+          resolved,
+          instanceId: instance.instance_id,
+        });
+        await createAuditService(params.repository).record({
+          actorUserId: input.userId,
+          ownerScope: resolved.config.owner_scope,
+          ownerId: resolved.config.owner_id,
+          configId: resolved.config.config_id,
+          connectResourceId: resolved.route.connect_resource_id,
+          instanceId: instance.instance_id,
+          eventType: 'authorization_pending_provider',
+          outcome: 'success',
+        });
+        return {
+          kind: 'provider_redirect' as const,
+          authorizationUrl: provider.authorizationUrl,
+        };
       }
+      await createAuditService(params.repository).record({
+        actorUserId: input.userId,
+        ownerScope: resolved.config.owner_scope,
+        ownerId: resolved.config.owner_id,
+        configId: resolved.config.config_id,
+        connectResourceId: resolved.route.connect_resource_id,
+        instanceId: instance.instance_id,
+        oauthGrantId: oauthGrant.oauth_grant_id,
+        eventType: 'oauth_grant_approved',
+        outcome: 'success',
+      });
       const finalized = await finalizeAuthorizationRequest(request);
       await createAuditService(params.repository).record({
         actorUserId: input.userId,
@@ -408,6 +495,7 @@ export function createAuthorizationService(params: {
         configId: resolved.config.config_id,
         connectResourceId: resolved.route.connect_resource_id,
         instanceId: instance.instance_id,
+        oauthGrantId: oauthGrant.oauth_grant_id,
         eventType: 'authorization_completed',
         outcome: 'success',
       });
@@ -429,7 +517,75 @@ export function createAuthorizationService(params: {
   async function completeProviderAuthorization(paramsInput: {
     authorizationRequest: typeof mcp_gateway_authorization_requests.$inferSelect;
   }) {
-    return await finalizeAuthorizationRequest(paramsInput.authorizationRequest);
+    const { resolved } = await params.routeService.resolveResource(
+      paramsInput.authorizationRequest.canonical_resource_url
+    );
+    const executionContext = GatewayExecutionContextSchema.parse(
+      paramsInput.authorizationRequest.execution_context
+    );
+    let oauthGrantId = paramsInput.authorizationRequest.oauth_grant_id;
+    let boundRequest = paramsInput.authorizationRequest;
+    if (!oauthGrantId) {
+      const oauthGrant = await params.oauthGrantService.createOrReuseGrant({
+        oauthClientId: paramsInput.authorizationRequest.oauth_client_id,
+        kiloUserId: paramsInput.authorizationRequest.kilo_user_id,
+        ownerScope: resolved.config.owner_scope,
+        ownerId: resolved.config.owner_id,
+        configId: resolved.config.config_id,
+        connectResourceId: resolved.route.connect_resource_id,
+        instanceId: paramsInput.authorizationRequest.instance_id,
+        redirectUri: paramsInput.authorizationRequest.redirect_uri,
+        grantedScopes: paramsInput.authorizationRequest.granted_scopes,
+        executionContext,
+        grantStatus: MCPGatewayOAuthGrantStatus.Pending,
+        configVersion: resolved.config.config_version,
+      });
+      oauthGrantId = oauthGrant.oauth_grant_id;
+      const [updatedRequest] = await params.repository.database
+        .update(mcp_gateway_authorization_requests)
+        .set({ oauth_grant_id: oauthGrant.oauth_grant_id })
+        .where(
+          and(
+            eq(
+              mcp_gateway_authorization_requests.authorization_request_id,
+              paramsInput.authorizationRequest.authorization_request_id
+            ),
+            eq(
+              mcp_gateway_authorization_requests.request_status,
+              GatewayAuthorizationRequestStatus.Pending
+            ),
+            gt(mcp_gateway_authorization_requests.expires_at, sql`NOW()`)
+          )
+        )
+        .returning();
+      if (!updatedRequest) {
+        await params.oauthGrantService.revokeGrantIds(
+          [oauthGrant.oauth_grant_id],
+          'authorization_request_unavailable'
+        );
+        throw createGatewayError(
+          GatewayErrorCode.InvalidGrant,
+          'Authorization request is unavailable',
+          400
+        );
+      }
+      boundRequest = updatedRequest;
+    }
+    if (!oauthGrantId) {
+      throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
+    }
+    await createAuditService(params.repository).record({
+      actorUserId: boundRequest.kilo_user_id,
+      ownerScope: boundRequest.owner_scope,
+      ownerId: boundRequest.owner_id,
+      configId: boundRequest.config_id,
+      connectResourceId: resolved.route.connect_resource_id,
+      instanceId: boundRequest.instance_id,
+      oauthGrantId,
+      eventType: 'oauth_grant_approved',
+      outcome: 'success',
+    });
+    return await finalizeAuthorizationRequest(boundRequest, { allowPendingGrant: true });
   }
 
   return {

@@ -34,18 +34,40 @@ export const getOpenRouterModelsMetadata = createStoredModelsFetcher(
   'OpenRouter'
 );
 
-function toLanguageModelIdSet(models: StoredModelMap): ReadonlySet<string> {
-  return new Set(
-    Object.values(models)
-      .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length > 0)
-      .map(model => model.id)
+/**
+ * The ids of language models that have at least one endpoint. This is the list
+ * mirrored to the lightweight `*-model-ids` Redis keys so existence checks can
+ * avoid loading the full model catalog.
+ */
+export function getLanguageModelIds(models: StoredModelMap): string[] {
+  return Object.values(models)
+    .filter(model => (model.type ?? 'language') === 'language' && model.endpoints.length > 0)
+    .map(model => model.id);
+}
+
+const ModelIdsSchema = z.array(z.string());
+
+function createModelIdsFetcher(redisKey: RedisKey, name: string) {
+  return createCachedFetch<ReadonlySet<string>>(
+    async () => {
+      const raw = JSON.parse((await redisClient.get<string>(redisKey)) ?? 'null');
+      if (!Array.isArray(raw) || raw.length === 0) {
+        console.debug(`[getGatewayModels] no ${name} model ids found in Redis`);
+        return new Set<string>();
+      }
+      return new Set(ModelIdsSchema.parse(raw));
+    },
+    600_000,
+    new Set<string>()
   );
 }
 
-export async function getVercelModels(): Promise<ReadonlySet<string>> {
-  return toLanguageModelIdSet(await getVercelModelsMetadata());
-}
+export const getVercelModels = createModelIdsFetcher(
+  GATEWAY_METADATA_REDIS_KEYS.vercelModelIds,
+  'Vercel'
+);
 
-export async function getOpenRouterModels(): Promise<ReadonlySet<string>> {
-  return toLanguageModelIdSet(await getOpenRouterModelsMetadata());
-}
+export const getOpenRouterModels = createModelIdsFetcher(
+  GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds,
+  'OpenRouter'
+);

@@ -9,6 +9,7 @@ import { OrganizationAdminDelete } from './OrganizationAdminDelete';
 import { OrganizationAdminCreditGrant } from './OrganizationAdminCreditGrant';
 import { OrganizationAdminCreditNullify } from './OrganizationAdminCreditNullify';
 import { OrganizationAdminCreatedBy } from './OrganizationAdminCreatedBy';
+import { OrganizationAdminHierarchyManagement } from './OrganizationAdminHierarchyManagement';
 import { OrganizationWorkOSCard } from './OrganizationWorkOSCard';
 import { OrganizationAdminWebhooks } from './OrganizationAdminWebhooks';
 import { OrganizationContextProvider } from '@/components/organizations/OrganizationContext';
@@ -53,12 +54,9 @@ export function OrganizationAdminDashboard({ organizationId }: { organizationId:
         <div className="flex w-full flex-col gap-y-8">
           <div className="w-full max-w-[1000px]">
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-              <div>
-                <OrganizationInfoCard
-                  organizationId={organizationId}
-                  showAdminControls
-                  className="h-full"
-                />
+              <div className="space-y-4">
+                <OrganizationInfoCard organizationId={organizationId} showAdminControls />
+                <OrganizationAdminHierarchyManagement organizationId={organizationId} />
               </div>
               <div className="space-y-7">
                 <OrganizationUsageSummaryCard organizationId={organizationId} />

@@ -599,7 +599,7 @@ describe('kiloclawRouter fileTree', () => {
       instance_id: instanceId,
       plan: 'trial',
       status: 'trialing',
-      trial_ends_at: '2026-07-01T00:00:00.000Z',
+      trial_ends_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     });
 
     const caller = createCaller({ user });

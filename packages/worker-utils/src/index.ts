@@ -51,6 +51,7 @@ export type {
 } from './cloud-agent-next-client.js';
 export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-next-client.js';
 
+export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from './internal-service-token-audiences.js';
 export {
   signKiloToken,
   verifyKiloToken,
@@ -112,3 +113,33 @@ export type {
   CloudAgentQueueReport,
   CloudAgentRunStateReport,
 } from './cloud-agent-queue-report.js';
+
+export {
+  REPORTABLE_SECURITY_FINDING_AUDIT_ACTIONS,
+  SECURITY_FINDING_AUDIT_EVENT_KEY_PREFIX,
+  SECURITY_FINDING_AUDIT_SCHEMA_VERSION,
+  SECURITY_FINDING_AUDIT_SYSTEM_ACTOR,
+  SecurityFindingAuditActorSchema,
+  SecurityFindingAuditEventSchema,
+  SecurityFindingAuditHumanActorSchema,
+  SecurityFindingAuditOwnerSchema,
+  SecurityFindingAuditSnapshotSchema,
+  buildSecurityFindingAuditHumanActor,
+  buildSecurityFindingAuditLogValues,
+  buildSecurityFindingAuditSnapshot,
+  deriveSecurityFindingAuditEventKey,
+  insertSecurityFindingAuditEvent,
+} from './security-finding-audit.js';
+export type {
+  NewSecurityFindingAuditLogValues,
+  SecurityFindingAuditActor,
+  SecurityFindingAuditEventFinding,
+  SecurityFindingAuditEventInput,
+  SecurityFindingAuditHumanActor,
+  SecurityFindingAuditLogEntry,
+  SecurityFindingAuditOwner,
+  SecurityFindingAuditSnapshot,
+  SecurityFindingAuditSnapshotExtras,
+  SecurityFindingAuditSnapshotSource,
+  SecurityFindingAuditWriterDb,
+} from './security-finding-audit.js';

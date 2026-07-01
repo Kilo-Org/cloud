@@ -12,6 +12,15 @@ import { Readable } from 'node:stream';
 
 const sampleDir = join(process.cwd(), 'src/tests/sample');
 
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(text));
+      controller.close();
+    },
+  });
+}
+
 describe('processMessagesApiUsage', () => {
   const coreProps = {
     messageId: 'test-message-id',
@@ -214,6 +223,45 @@ describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
+  });
+});
+
+describe('parseMessagesMicrodollarUsageFromStream', () => {
+  test('records stream error events as errored timeout usage', async () => {
+    const stream = streamFromText(
+      'event: error\n' +
+        'data: {"type":"error","error":{"type":"api_error","message":"Upstream idle timeout exceeded","error_type":"timeout"}}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.hasError).toBe(true);
+    expect(result.finish_reason).toBe('timeout');
+    expect(result.status_code).toBe(200);
+    expect(result.cost_mUsd).toBe(0);
+  });
+
+  test('falls back to error finish reason when stream error has no error_type', async () => {
+    const stream = streamFromText(
+      'event: error\n' + 'data: {"type":"error","error":{"message":"Upstream failed"}}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.hasError).toBe(true);
+    expect(result.finish_reason).toBe('error');
   });
 });
 

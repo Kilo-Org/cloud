@@ -130,7 +130,6 @@ describe('finalizeCompletedAnalysisCallback', () => {
   it('persists extracted sandbox analysis and terminal queue status for completed callbacks', async () => {
     const updates: unknown[] = [];
     const executes: unknown[] = [];
-    const auditRows: unknown[] = [];
     const db = {
       select: () => ({
         from: () => ({
@@ -171,11 +170,6 @@ describe('finalizeCompletedAnalysisCallback', () => {
         executes.push(statement);
         return { rows: [] };
       },
-      insert: () => ({
-        values: async (values: unknown) => {
-          auditRows.push(values);
-        },
-      }),
     };
     const autoDismissCalls: unknown[] = [];
     const analyticsCalls: unknown[] = [];
@@ -195,6 +189,7 @@ describe('finalizeCompletedAnalysisCallback', () => {
         },
         extractSandboxAnalysis: async ({ rawMarkdown }) => ({
           isExploitable: false,
+          extractionStatus: 'succeeded',
           exploitabilityReasoning: 'No reachable usage',
           usageLocations: [],
           suggestedFix: 'Upgrade package',
@@ -221,10 +216,10 @@ describe('finalizeCompletedAnalysisCallback', () => {
         type: 'completed',
         analysis: expect.objectContaining({
           rawMarkdown: '# Completed analysis',
+          sandboxAnalysis: expect.objectContaining({ extractionStatus: 'succeeded' }),
         }),
       }),
     });
-    expect(auditRows).toHaveLength(1);
     expect(autoDismissCalls).toHaveLength(1);
     expect(analyticsCalls).toHaveLength(1);
   });

@@ -5,25 +5,135 @@
 @import 'tailwindcss';
 @import '../../web/src/app/globals.css';
 
-/* Override Storybook's default styles to match our dark theme */
-.sb-show-main {
-  background-color: var(--background);
+html {
+  background-color: var(--surface-background);
+  color-scheme: dark;
+  font-family: var(--font-sans-loaded, 'Inter', ui-sans-serif, system-ui, sans-serif);
+}
+
+body,
+#storybook-root,
+#storybook-docs {
+  min-height: 100vh;
+  background-color: var(--surface-background);
   color: var(--foreground);
 }
 
+.sb-show-main,
 .sb-main-padded {
-  background-color: var(--background);
+  background-color: var(--surface-background);
   color: var(--foreground);
 }
 
-/* Ensure components render with proper dark theme */
+.docs-story,
+.sbdocs-wrapper,
+.sbdocs-content {
+  background-color: var(--surface-background);
+  color: var(--foreground);
+}
+
+#storybook-docs .sbdocs.sbdocs-wrapper,
+#storybook-docs .sbdocs.sbdocs-content {
+  background: var(--surface-background) !important;
+  color: var(--foreground) !important;
+  font-family: var(--font-sans-loaded, 'Inter', ui-sans-serif, system-ui, sans-serif) !important;
+}
+
+#storybook-docs .sbdocs.sbdocs-wrapper {
+  min-height: 100vh;
+}
+
+#storybook-docs .sbdocs.sbdocs-content {
+  max-width: 1080px;
+}
+
+#storybook-docs .sbdocs h1,
+#storybook-docs .sbdocs h2,
+#storybook-docs .sbdocs h3,
+#storybook-docs .sbdocs h4,
+#storybook-docs .sbdocs h5,
+#storybook-docs .sbdocs h6 {
+  color: var(--foreground) !important;
+  font-family: var(--font-sans-loaded, 'Inter', ui-sans-serif, system-ui, sans-serif) !important;
+}
+
+#storybook-docs .sbdocs p,
+#storybook-docs .sbdocs li,
+#storybook-docs .sbdocs td,
+#storybook-docs .sbdocs th {
+  color: var(--foreground) !important;
+}
+
+#storybook-docs .sbdocs a,
+#storybook-docs .sbdocs button:not([role='switch']),
+#storybook-docs .sbdocs label {
+  color: var(--muted-foreground) !important;
+}
+
+#storybook-docs .sbdocs code {
+  background: var(--surface-raised) !important;
+  color: var(--syntax-plain) !important;
+  border-color: var(--border) !important;
+  font-family: var(--font-mono-loaded, 'Roboto Mono', ui-monospace, monospace) !important;
+}
+
+#storybook-docs .docs-story,
+#storybook-docs .docblock-argstable,
+#storybook-docs .docblock-argstable table,
+#storybook-docs .docblock-argstable thead,
+#storybook-docs .docblock-argstable tbody,
+#storybook-docs .docblock-argstable tr,
+#storybook-docs .docblock-argstable th,
+#storybook-docs .docblock-argstable td {
+  background: var(--surface-background) !important;
+  border-color: var(--border) !important;
+}
+
+#storybook-docs .docblock-argstable th {
+  color: var(--muted-foreground) !important;
+}
+
+#storybook-docs .docblock-argstable input,
+#storybook-docs .docblock-argstable select,
+#storybook-docs .docblock-argstable textarea,
+#storybook-docs .docblock-argstable [role='combobox'] {
+  background: var(--input-background) !important;
+  color: var(--foreground) !important;
+  border-color: var(--input) !important;
+}
+
+#storybook-docs .docblock-source,
+#storybook-docs .docblock-source pre {
+  background: var(--surface-inset) !important;
+  color: var(--syntax-plain) !important;
+  border-color: var(--border) !important;
+}
+
 .storybook-component {
-  background-color: var(--background);
+  min-height: 100vh;
+  background-color: var(--surface-background);
   color: var(--foreground);
 }
 
-/* Apply dark theme to Storybook UI */
-body {
-  background-color: var(--background);
+.storybook-canvas {
+  min-height: 100vh;
+  background-color: var(--surface-background);
   color: var(--foreground);
+}
+
+.storybook-raised-surface {
+  background-color: var(--surface-raised);
+}
+
+.storybook-overlay-surface {
+  background-color: var(--surface-overlay);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .storybook-motion-sample,
+  .storybook-motion-sample * {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
 }

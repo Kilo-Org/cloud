@@ -4,6 +4,7 @@ import * as z from 'zod';
 import {
   organizationMemberProcedure,
   organizationBillingMutationProcedure,
+  organizationMemberMutationProcedure,
   OrganizationIdInputSchema,
 } from './utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -19,12 +20,11 @@ import {
 
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
-import {
-  fetchGitLabRepositoriesForOrganization,
-  searchGitLabRepositoriesForOrganization,
-} from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
@@ -36,6 +36,11 @@ import {
   getCodeReviewActionRequiredState,
 } from '@/lib/code-reviews/action-required';
 import { getReviewMemoryEnabledFromConfig } from '@/lib/code-reviews/review-memory/settings';
+import {
+  createManualCodeReviewJob,
+  ManualCodeReviewJobInputSchema,
+} from '@/lib/code-reviews/manual-code-review-jobs';
+import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -67,7 +72,28 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
   autoConfigureWebhooks: z.boolean().optional().default(true),
 });
 
+const CreateManualReviewJobInputSchema = OrganizationIdInputSchema.extend(
+  ManualCodeReviewJobInputSchema.shape
+);
+
 export const organizationReviewAgentRouter = createTRPCRouter({
+  createManualReviewJob: organizationMemberMutationProcedure
+    .input(CreateManualReviewJobInputSchema)
+    .mutation(async ({ input }) => {
+      const botUser = await ensureBotUserForOrg(input.organizationId, 'code-review');
+      const owner = { type: 'org' as const, id: input.organizationId, userId: botUser.id };
+      return await createManualCodeReviewJob({
+        owner,
+        input: {
+          platform: input.platform,
+          url: input.url,
+          modelSlug: input.modelSlug,
+          thinkingEffort: input.thinkingEffort,
+          instructions: input.instructions,
+        },
+      });
+    }),
+
   /**
    * Gets the GitHub App installation status
    * (Replaces getGitHubStatus - now checks for GitHub App instead of OAuth)
@@ -75,7 +101,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   getGitHubStatus: organizationMemberProcedure.query(async ({ input }) => {
     const integration = await getIntegrationForOrganization(input.organizationId, 'github');
 
-    if (!integration || integration.integration_status !== 'active') {
+    if (!isPlatformIntegrationHealthy(integration)) {
       return {
         connected: false,
         integration: null,
@@ -88,7 +114,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         accountLogin: integration.platform_account_login,
         repositorySelection: integration.repository_access,
         installedAt: integration.installed_at,
-        isValid: !integration.suspended_at,
+        isValid: true,
       },
     };
   }),
@@ -112,7 +138,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
   getGitLabStatus: organizationMemberProcedure.query(async ({ input }) => {
     const integration = await getIntegrationForOrganization(input.organizationId, PLATFORM.GITLAB);
 
-    if (!integration || integration.integration_status !== 'active') {
+    if (!isPlatformIntegrationHealthy(integration)) {
       return {
         connected: false,
         integration: null,
@@ -129,7 +155,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         accountLogin: integration.platform_account_login,
         repositorySelection: integration.repository_access,
         installedAt: integration.installed_at,
-        isValid: true, // GitLab OAuth doesn't have suspension concept
+        isValid: true,
         webhookSecret, // Include webhook secret for user to configure in GitLab
         instanceUrl: (metadata?.gitlab_instance_url as string) || 'https://gitlab.com',
       },
@@ -147,20 +173,6 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     )
     .query(async ({ input }) => {
       return await fetchGitLabRepositoriesForOrganization(input.organizationId, input.forceRefresh);
-    }),
-
-  /**
-   * Search GitLab repositories by query string
-   * Used when organizations have 100+ repositories and need to find specific ones
-   */
-  searchGitLabRepositories: organizationMemberProcedure
-    .input(
-      OrganizationIdInputSchema.extend({
-        query: z.string().min(2),
-      })
-    )
-    .query(async ({ input }) => {
-      return await searchGitLabRepositoriesForOrganization(input.organizationId, input.query);
     }),
 
   /**
@@ -364,18 +376,37 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           userId: ctx.user.id,
         };
 
-        await setAgentEnabled(input.organizationId, 'code_review', platform, input.isEnabled);
+        const existingConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
+        let didChange = false;
+        if (existingConfig) {
+          await setAgentEnabled(input.organizationId, 'code_review', platform, input.isEnabled);
+          // Re-toggling to the same value is a no-op and must not be audited.
+          didChange = existingConfig.is_enabled !== input.isEnabled;
+        } else if (input.isEnabled) {
+          await upsertAgentConfig({
+            organizationId: input.organizationId,
+            agentType: 'code_review',
+            platform,
+            isEnabled: true,
+            createdBy: ctx.user.id,
+            config: createDefaultCodeReviewConfig(),
+          });
+          didChange = true;
+        }
         await clearCodeReviewActionRequiredState({ owner, platform });
 
-        // Audit log
-        await createAuditLog({
-          organization_id: input.organizationId,
-          action: 'organization.settings.change',
-          actor_id: ctx.user.id,
-          actor_email: ctx.user.google_user_email,
-          actor_name: ctx.user.google_user_name,
-          message: `${input.isEnabled ? 'Enabled' : 'Disabled'} AI Code Review Agent for ${platform}`,
-        });
+        // Only audit a real state transition. Disabling a platform that never
+        // had a config row is a no-op and must not log a false "Disabled" event.
+        if (didChange) {
+          await createAuditLog({
+            organization_id: input.organizationId,
+            action: 'organization.settings.change',
+            actor_id: ctx.user.id,
+            actor_email: ctx.user.google_user_email,
+            actor_name: ctx.user.google_user_name,
+            message: `${input.isEnabled ? 'Enabled' : 'Disabled'} AI Code Review Agent for ${platform}`,
+          });
+        }
 
         return { success: true, isEnabled: input.isEnabled };
       } catch (error) {

@@ -123,17 +123,17 @@
         {
           "binding": "NEXTAUTH_SECRET",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "NEXTAUTH_SECRET",
+          "secret_name": "NEXTAUTH_SECRET_DEV",
         },
         {
           "binding": "WASTELAND_ENCRYPTION_KEY",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "WASTELAND_ENCRYPTION_KEY",
+          "secret_name": "WASTELAND_ENCRYPTION_KEY_DEV",
         },
         {
           "binding": "INTERNAL_API_SECRET",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
-          "secret_name": "INTERNAL_API_SECRET_PROD",
+          "secret_name": "INTERNAL_API_SECRET_DEV",
         },
       ],
     },

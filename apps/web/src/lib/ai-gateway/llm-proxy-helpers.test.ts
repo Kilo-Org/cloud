@@ -2,6 +2,15 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 
+let mockInceptionPromoRunning = true;
+
+jest.mock('@/lib/constants', () => ({
+  ...(jest.requireActual('@/lib/constants') as Record<string, unknown>),
+  get INCEPTION_PROMO_RUNNING() {
+    return mockInceptionPromoRunning;
+  },
+}));
+
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
 // it with an immediate invocation so the test can await the work synchronously.
@@ -27,6 +36,7 @@ jest.mock('./processUsage', () => ({
 import {
   checkOrganizationModelRestrictions,
   countAndStoreEditUsage,
+  countAndStoreFimUsage,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
@@ -413,6 +423,117 @@ describe('parseEditUsageFromResponse', () => {
   });
 });
 
+describe('countAndStoreFimUsage', () => {
+  function makeUsageContext(
+    overrides: Partial<MicrodollarUsageContext> = {}
+  ): MicrodollarUsageContext {
+    return {
+      api_kind: 'fim_completions',
+      kiloUserId: 'user-fim-test',
+      provider: 'inception',
+      requested_model: 'inception/mercury-edit-2',
+      promptInfo: {
+        system_prompt_prefix: '',
+        system_prompt_length: 0,
+        user_prompt_prefix: '',
+      },
+      max_tokens: 100,
+      has_middle_out_transform: null,
+      fraudHeaders: {},
+      isStreaming: false,
+      organizationId: undefined,
+      prior_microdollar_usage: 0,
+      posthog_distinct_id: undefined,
+      project_id: null,
+      status_code: 200,
+      editor_name: null,
+      machine_id: null,
+      user_byok: false,
+      has_tools: false,
+      feature: null,
+      session_id: null,
+      mode: null,
+      auto_model: null,
+      ttfb_ms: null,
+      ...overrides,
+    } as MicrodollarUsageContext;
+  }
+
+  function makeUpstreamResponse(): Response {
+    return new Response(
+      JSON.stringify({
+        id: 'fim-test',
+        model: 'mercury-edit-2',
+        usage: {
+          prompt_tokens: 1_000,
+          completion_tokens: 100,
+          total_tokens: 1_100,
+        },
+        choices: [{ text: 'completion' }],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+  }
+
+  beforeEach(() => {
+    mockInceptionPromoRunning = true;
+    mockedLogMicrodollarUsage.mockClear();
+    mockedLogMicrodollarUsage.mockResolvedValue(null);
+  });
+
+  it('preserves market cost but does not bill the promoted Inception model', async () => {
+    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(), undefined);
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(0);
+    expect(stats.cacheDiscount_mUsd).toBe(0);
+    expect(stats.market_cost).toBe(325);
+  });
+
+  it('bills the Inception model when the promotion is disabled', async () => {
+    mockInceptionPromoRunning = false;
+    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(), undefined);
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(325);
+    expect(stats.market_cost).toBe(325);
+  });
+
+  it('does not apply the promotion to other FIM models', async () => {
+    countAndStoreFimUsage(
+      makeUpstreamResponse(),
+      makeUsageContext({
+        provider: 'mistral',
+        requested_model: 'mistralai/codestral-2508',
+      }),
+      undefined
+    );
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(390);
+    expect(stats.market_cost).toBe(390);
+  });
+
+  it('does not bill BYOK requests when the promotion is disabled', async () => {
+    mockInceptionPromoRunning = false;
+    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext({ user_byok: true }), undefined);
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(0);
+    expect(stats.cacheDiscount_mUsd).toBe(0);
+    expect(stats.market_cost).toBe(325);
+  });
+});
+
 describe('countAndStoreEditUsage', () => {
   function makeUsageContext(
     overrides: Partial<MicrodollarUsageContext> = {}
@@ -457,6 +578,7 @@ describe('countAndStoreEditUsage', () => {
   }
 
   beforeEach(() => {
+    mockInceptionPromoRunning = true;
     mockedLogMicrodollarUsage.mockClear();
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
@@ -487,7 +609,32 @@ describe('countAndStoreEditUsage', () => {
     expect(stats.market_cost).toBe(4_750);
   });
 
-  it('preserves cost_mUsd and cacheDiscount_mUsd for non-BYOK requests', async () => {
+  it('preserves market cost but does not bill non-BYOK requests during the promotion', async () => {
+    const response = makeUpstreamResponse({
+      id: 'edit-paid',
+      model: 'mercury-edit-2',
+      usage: {
+        prompt_tokens: 100_000,
+        cached_input_tokens: 90_000,
+        completion_tokens: 0,
+        total_tokens: 100_000,
+      },
+      choices: [],
+    });
+
+    countAndStoreEditUsage(response, makeUsageContext({ user_byok: false }), undefined);
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(0);
+    expect(stats.cacheDiscount_mUsd).toBe(0);
+    expect(stats.market_cost).toBe(4_750);
+  });
+
+  it('bills non-BYOK requests when the promotion is disabled', async () => {
+    mockInceptionPromoRunning = false;
     const response = makeUpstreamResponse({
       id: 'edit-paid',
       model: 'mercury-edit-2',

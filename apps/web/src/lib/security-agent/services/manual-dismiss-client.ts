@@ -7,8 +7,6 @@ type ManualFindingDismissalOwner =
 
 type ManualFindingDismissalActor = {
   id: string;
-  email?: string | null;
-  name?: string | null;
 };
 
 type DismissReason = 'fix_started' | 'no_bandwidth' | 'tolerable_risk' | 'inaccurate' | 'not_used';

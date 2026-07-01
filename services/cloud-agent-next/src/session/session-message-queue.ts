@@ -15,7 +15,10 @@ import { logger } from '../logger.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { isSandboxWorkspaceProbeTimeoutError } from '../sandbox-recovery.js';
-import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
+import {
+  WrapperCleanupBlockedError,
+  type WrapperCleanupBlock,
+} from './wrapper-cleanup-blocked-error.js';
 import {
   MESSAGE_ID_FORMAT_DESCRIPTION,
   createMessageId,
@@ -135,7 +138,7 @@ export type SessionMessageQueueDependencies = {
   requireSessionId: () => Promise<string>;
   validateModeAgainstRuntimeAgents: (metadata: SessionMetadata, mode: string) => string | null;
   getDeliveryContext: () => Promise<ExecutionDeliveryContext | null>;
-  getDeliveryBlock: () => Promise<{ retryAt: number } | null>;
+  getDeliveryBlock: () => Promise<WrapperCleanupBlock | null>;
   deliver: (plan: MessageDeliveryRequest) => Promise<MessageDeliveryResult>;
   isDeliveryHeld?: () => Promise<boolean>;
   ensureQueuedMessageEvent: (event: PersistedQueuedMessageEvent & { entityId: string }) => void;
@@ -412,7 +415,7 @@ export async function flushNextPendingSessionMessage(params: {
     }
     return {
       type: 'skipped',
-      nextFlushAttemptAt: deliveryBlock.retryAt,
+      nextFlushAttemptAt: deliveryBlock.kind === 'retryable' ? deliveryBlock.retryAt : undefined,
       remainingCount: totalCount,
     };
   }
@@ -458,7 +461,7 @@ export async function flushNextPendingSessionMessage(params: {
       }
       return {
         type: 'skipped',
-        nextFlushAttemptAt: error.retryAt,
+        nextFlushAttemptAt: error.block.kind === 'retryable' ? error.block.retryAt : undefined,
         remainingCount: totalCount,
       };
     }

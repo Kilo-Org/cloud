@@ -1,5 +1,5 @@
 {
-  "id": "9c101f5c-3b70-421b-8e74-a10d5e5fa0d3",
+  "id": "8bbdd1ed-e6be-4ed9-8b68-60d78170cad8",
   "prevId": "f9732794-dd86-47a7-9414-d025ec7a50a0",
   "version": "7",
   "dialect": "postgresql",
@@ -20181,375 +20181,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.mcp_native_authorization_codes": {
-      "name": "mcp_native_authorization_codes",
-      "schema": "",
-      "columns": {
-        "authorization_code_id": {
-          "name": "authorization_code_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "code_hash": {
-          "name": "code_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "oauth_client_id": {
-          "name": "oauth_client_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "client_id": {
-          "name": "client_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "canonical_resource_url": {
-          "name": "canonical_resource_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "redirect_uri": {
-          "name": "redirect_uri",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "granted_scopes": {
-          "name": "granted_scopes",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "code_challenge": {
-          "name": "code_challenge",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "code_challenge_method": {
-          "name": "code_challenge_method",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'S256'"
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "consumed_at": {
-          "name": "consumed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_mcp_native_authorization_codes_code_hash": {
-          "name": "UQ_mcp_native_authorization_codes_code_hash",
-          "columns": [
-            {
-              "expression": "code_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_native_authorization_codes_user": {
-          "name": "IDX_mcp_native_authorization_codes_user",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_native_authorization_codes_client": {
-          "name": "IDX_mcp_native_authorization_codes_client",
-          "columns": [
-            {
-              "expression": "oauth_client_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "client_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_native_authorization_codes_expires_at": {
-          "name": "IDX_mcp_native_authorization_codes_expires_at",
-          "columns": [
-            {
-              "expression": "expires_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "mcp_native_authorization_codes_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk": {
-          "name": "mcp_native_authorization_codes_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk",
-          "tableFrom": "mcp_native_authorization_codes",
-          "tableTo": "mcp_gateway_oauth_clients",
-          "columnsFrom": [
-            "oauth_client_id"
-          ],
-          "columnsTo": [
-            "oauth_client_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_native_authorization_codes_kilo_user_id_kilocode_users_id_fk": {
-          "name": "mcp_native_authorization_codes_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "mcp_native_authorization_codes",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.mcp_native_refresh_tokens": {
-      "name": "mcp_native_refresh_tokens",
-      "schema": "",
-      "columns": {
-        "refresh_token_id": {
-          "name": "refresh_token_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "token_hash": {
-          "name": "token_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "rotated_from_refresh_token_id": {
-          "name": "rotated_from_refresh_token_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "oauth_client_id": {
-          "name": "oauth_client_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "client_id": {
-          "name": "client_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "canonical_resource_url": {
-          "name": "canonical_resource_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "granted_scopes": {
-          "name": "granted_scopes",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "kilo_user_id": {
-          "name": "kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "consumed_at": {
-          "name": "consumed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "revoked_at": {
-          "name": "revoked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_mcp_native_refresh_tokens_token_hash": {
-          "name": "UQ_mcp_native_refresh_tokens_token_hash",
-          "columns": [
-            {
-              "expression": "token_hash",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_native_refresh_tokens_user": {
-          "name": "IDX_mcp_native_refresh_tokens_user",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_native_refresh_tokens_client": {
-          "name": "IDX_mcp_native_refresh_tokens_client",
-          "columns": [
-            {
-              "expression": "oauth_client_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "client_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_mcp_native_refresh_tokens_consumed_revoked": {
-          "name": "IDX_mcp_native_refresh_tokens_consumed_revoked",
-          "columns": [
-            {
-              "expression": "consumed_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "revoked_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "mcp_native_refresh_tokens_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk": {
-          "name": "mcp_native_refresh_tokens_oauth_client_id_mcp_gateway_oauth_clients_oauth_client_id_fk",
-          "tableFrom": "mcp_native_refresh_tokens",
-          "tableTo": "mcp_gateway_oauth_clients",
-          "columnsFrom": [
-            "oauth_client_id"
-          ],
-          "columnsTo": [
-            "oauth_client_id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "mcp_native_refresh_tokens_kilo_user_id_kilocode_users_id_fk": {
-          "name": "mcp_native_refresh_tokens_kilo_user_id_kilocode_users_id_fk",
-          "tableFrom": "mcp_native_refresh_tokens",
-          "tableTo": "kilocode_users",
-          "columnsFrom": [
-            "kilo_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.microdollar_usage": {
       "name": "microdollar_usage",
       "schema": "",
@@ -25765,6 +25396,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "actor_type": {
+          "name": "actor_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "action": {
           "name": "action",
           "type": "text",
@@ -25798,6 +25435,48 @@
         "metadata": {
           "name": "metadata",
           "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "finding_id": {
+          "name": "finding_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_occurred_at": {
+          "name": "source_occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "event_key": {
+          "name": "event_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "schema_version": {
+          "name": "schema_version",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "finding_snapshot": {
+          "name": "finding_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_context": {
+          "name": "source_context",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
@@ -25914,6 +25593,106 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "UQ_security_audit_log_org_event_key": {
+          "name": "UQ_security_audit_log_org_event_key",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"security_audit_log\".\"owned_by_organization_id\" IS NOT NULL AND \"security_audit_log\".\"event_key\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_security_audit_log_user_event_key": {
+          "name": "UQ_security_audit_log_user_event_key",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"security_audit_log\".\"owned_by_user_id\" IS NOT NULL AND \"security_audit_log\".\"event_key\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_security_audit_log_org_occurred": {
+          "name": "IDX_security_audit_log_org_occurred",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"security_audit_log\".\"owned_by_organization_id\" IS NOT NULL AND \"security_audit_log\".\"occurred_at\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_security_audit_log_user_occurred": {
+          "name": "IDX_security_audit_log_user_occurred",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"security_audit_log\".\"owned_by_user_id\" IS NOT NULL AND \"security_audit_log\".\"occurred_at\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -25954,7 +25733,15 @@
         },
         "security_audit_log_action_check": {
           "name": "security_audit_log_action_check",
-          "value": "\"security_audit_log\".\"action\" IN ('security.finding.created', 'security.finding.status_change', 'security.finding.dismissed', 'security.finding.auto_dismissed', 'security.finding.analysis_started', 'security.finding.analysis_completed', 'security.remediation.queued', 'security.remediation.started', 'security.remediation.pr_opened', 'security.remediation.failed', 'security.remediation.blocked', 'security.remediation.no_changes_needed', 'security.remediation.cancelled', 'security.remediation.retried', 'security.finding.deleted', 'security.config.enabled', 'security.config.disabled', 'security.config.updated', 'security.sync.triggered', 'security.sync.completed', 'security.audit_log.exported')"
+          "value": "\"security_audit_log\".\"action\" IN ('security.finding.created', 'security.finding.severity_changed', 'security.finding.status_change', 'security.finding.dismissed', 'security.finding.auto_dismissed', 'security.finding.superseded', 'security.finding.analysis_started', 'security.finding.analysis_completed', 'security.finding.analysis_failed', 'security.remediation.queued', 'security.remediation.started', 'security.remediation.pr_opened', 'security.remediation.failed', 'security.remediation.blocked', 'security.remediation.no_changes_needed', 'security.remediation.cancelled', 'security.remediation.retried', 'security.finding.deleted', 'security.config.enabled', 'security.config.disabled', 'security.config.updated', 'security.sync.triggered', 'security.sync.completed', 'security.audit_log.exported', 'security.audit_report.generated')"
+        },
+        "security_audit_log_actor_type_check": {
+          "name": "security_audit_log_actor_type_check",
+          "value": "\"security_audit_log\".\"actor_type\" IN ('customer_user', 'kilo_admin', 'system')"
+        },
+        "security_audit_log_source_context_check": {
+          "name": "security_audit_log_source_context_check",
+          "value": "\"security_audit_log\".\"source_context\" IN ('security_sync', 'web', 'analysis_worker', 'remediation_callback', 'rollout_baseline')"
         }
       },
       "isRLSEnabled": false

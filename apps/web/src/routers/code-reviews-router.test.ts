@@ -2,6 +2,7 @@ const mockCancelReview = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 const mockSyncWebhooksForRepositories = jest.fn();
 const mockGetValidGitLabToken = jest.fn();
+const mockGetBlobContent = jest.fn();
 
 jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
   codeReviewWorkerClient: {
@@ -19,6 +20,10 @@ jest.mock('@/lib/integrations/platforms/gitlab/webhook-sync', () => ({
 
 jest.mock('@/lib/integrations/gitlab-service', () => ({
   getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+}));
+
+jest.mock('@/lib/r2/cli-sessions', () => ({
+  getBlobContent: (...args: unknown[]) => mockGetBlobContent(...args),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -39,6 +44,7 @@ import {
   agent_configs,
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
+  cliSessions,
   kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -112,11 +118,13 @@ describe('codeReviewRouter.cancel', () => {
     await db
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
     await db
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, testUser.id));
     mockCancelReview.mockReset();
     mockTryDispatchPendingReviews.mockReset();
+    mockGetBlobContent.mockReset();
     mockUpdateCheckRun.mockReset();
   });
 
@@ -265,6 +273,108 @@ describe('codeReviewRouter.cancel', () => {
       expect.objectContaining({ status: 'completed', conclusion: 'cancelled' }),
       'lite'
     );
+  });
+});
+
+describe('personalReviewAgent.createManualReviewJob', () => {
+  let testUser: User;
+  let fetchSpy: jest.SpiedFunction<typeof fetch> | null = null;
+  let previousDebugShowDevUi: string | undefined;
+  let previousVercelEnv: string | undefined;
+  const repo = `${REPO}-manual-job`;
+  const prUrl = `https://github.com/${repo}/pull/1`;
+
+  beforeAll(async () => {
+    testUser = await insertTestUser();
+  });
+
+  beforeEach(() => {
+    previousDebugShowDevUi = process.env.DEBUG_SHOW_DEV_UI;
+    previousVercelEnv = process.env.VERCEL_ENV;
+    process.env.DEBUG_SHOW_DEV_UI = 'true';
+    delete process.env.VERCEL_ENV;
+
+    mockTryDispatchPendingReviews.mockResolvedValue(undefined);
+    fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      return new Response(
+        JSON.stringify({
+          number: 1,
+          html_url: prUrl,
+          title: 'Manual PR',
+          state: 'open',
+          draft: false,
+          user: { login: 'octocat', id: 583231 },
+          base: { ref: 'main', repo: { full_name: repo } },
+          head: { ref: 'feature/manual', sha: 'manual-sha' },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.repo_full_name, repo));
+    fetchSpy?.mockRestore();
+    fetchSpy = null;
+    mockTryDispatchPendingReviews.mockReset();
+
+    if (previousDebugShowDevUi === undefined) {
+      delete process.env.DEBUG_SHOW_DEV_UI;
+    } else {
+      process.env.DEBUG_SHOW_DEV_UI = previousDebugShowDevUi;
+    }
+    if (previousVercelEnv === undefined) {
+      delete process.env.VERCEL_ENV;
+    } else {
+      process.env.VERCEL_ENV = previousVercelEnv;
+    }
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
+  });
+
+  it('creates a fresh local manual review after the previous same-SHA job is cancelled', async () => {
+    const caller = await createCallerForUser(testUser.id);
+
+    const first = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+    });
+    await caller.codeReviews.cancel({ reviewId: first.reviewId });
+    mockTryDispatchPendingReviews.mockClear();
+
+    const second = await caller.personalReviewAgent.createManualReviewJob({
+      platform: 'github',
+      url: prUrl,
+      modelSlug: 'test-model',
+    });
+
+    const rows = await db
+      .select({
+        id: cloud_agent_code_reviews.id,
+        status: cloud_agent_code_reviews.status,
+        manualConfig: cloud_agent_code_reviews.manual_config,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, [first.reviewId, second.reviewId]));
+    const firstRow = rows.find(row => row.id === first.reviewId);
+    const secondRow = rows.find(row => row.id === second.reviewId);
+
+    expect(second.reviewId).not.toBe(first.reviewId);
+    expect(first).toEqual({ reviewId: first.reviewId, outputMode: 'kilo' });
+    expect(second).toEqual({ reviewId: second.reviewId, outputMode: 'kilo' });
+    expect(firstRow?.status).toBe('cancelled');
+    expect(secondRow?.status).toBe('pending');
+    expect(secondRow?.manualConfig?.outputMode).toBe('kilo');
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
   });
 });
 
@@ -688,9 +798,11 @@ describe('codeReviewRouter attempts', () => {
     await db
       .delete(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
+    await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
     await db.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, testUser.id));
     mockCancelReview.mockReset();
     mockTryDispatchPendingReviews.mockReset();
+    mockGetBlobContent.mockReset();
   });
 
   afterAll(async () => {
@@ -896,5 +1008,48 @@ describe('codeReviewRouter attempts', () => {
         attemptId: otherAttempt.id,
       })
     ).rejects.toThrow('Code review attempt not found');
+  });
+
+  it('loads a historical V1 review from PostgreSQL and R2 without a worker request', async () => {
+    const cliSessionId = crypto.randomUUID();
+    await db.insert(cliSessions).values({
+      session_id: cliSessionId,
+      kilo_user_id: testUser.id,
+      title: 'Historical V1 code review',
+      created_on_platform: 'vscode',
+      ui_messages_blob_url: `sessions/${cliSessionId}/ui_messages.json`,
+    });
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'completed', {
+          agent_version: 'v1',
+          cli_session_id: cliSessionId,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    mockGetBlobContent.mockResolvedValue([
+      {
+        type: 'say',
+        say: 'completion_result',
+        text: 'Historical review result',
+        ts: Date.now(),
+      },
+    ]);
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    try {
+      const caller = await createCallerForUser(testUser.id);
+      const result = await caller.codeReviews.getSessionMessages({ reviewId: review.id });
+
+      expect(result).toMatchObject({
+        success: true,
+        entries: [{ eventType: 'text', message: 'Historical review result' }],
+      });
+      expect(mockGetBlobContent).toHaveBeenCalledWith(`sessions/${cliSessionId}/ui_messages.json`);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });

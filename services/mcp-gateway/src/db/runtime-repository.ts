@@ -4,6 +4,8 @@ import {
   GatewayOwnerScope,
   GatewayProviderGrantStatus,
   GatewayRouteStatus,
+  executionContextsMatch,
+  type GatewayExecutionContext,
   type ScopedConnectRoute,
 } from '@kilocode/mcp-gateway';
 import { getWorkerDb } from '@kilocode/db/client';
@@ -17,9 +19,12 @@ import {
   mcp_gateway_connect_resources,
   mcp_gateway_audit_events,
   mcp_gateway_connection_instances,
+  mcp_gateway_oauth_clients,
+  mcp_gateway_oauth_grants,
   mcp_gateway_provider_grants,
 } from '@kilocode/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { MCPGatewayOAuthGrantStatus } from '@kilocode/db/schema-types';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import type { MCPGatewayEnv } from '../types';
 
 export function getRuntimeDb(env: MCPGatewayEnv['Bindings']) {
@@ -69,6 +74,50 @@ export async function resolveActiveRoute(params: {
     )
     .limit(1);
   return rows[0] ?? null;
+}
+
+export async function resolveActiveOAuthGrant(params: {
+  env: MCPGatewayEnv['Bindings'];
+  grantId: string;
+  clientId: string;
+  userId: string;
+  instanceId: string;
+  connectResourceId: string;
+  configVersion: number;
+  executionContext: GatewayExecutionContext;
+  scopes: string[];
+}) {
+  const db = getRuntimeDb(params.env);
+  const rows = await db
+    .select({ grant: mcp_gateway_oauth_grants, client: mcp_gateway_oauth_clients })
+    .from(mcp_gateway_oauth_grants)
+    .innerJoin(
+      mcp_gateway_oauth_clients,
+      eq(mcp_gateway_oauth_clients.oauth_client_id, mcp_gateway_oauth_grants.oauth_client_id)
+    )
+    .where(
+      and(
+        eq(mcp_gateway_oauth_grants.oauth_grant_id, params.grantId),
+        eq(mcp_gateway_oauth_grants.kilo_user_id, params.userId),
+        eq(mcp_gateway_oauth_grants.instance_id, params.instanceId),
+        eq(mcp_gateway_oauth_grants.connect_resource_id, params.connectResourceId),
+        eq(mcp_gateway_oauth_grants.config_version, params.configVersion),
+        eq(mcp_gateway_oauth_clients.client_id, params.clientId),
+        eq(mcp_gateway_oauth_grants.grant_status, MCPGatewayOAuthGrantStatus.Active),
+        isNull(mcp_gateway_oauth_grants.revoked_at),
+        isNull(mcp_gateway_oauth_clients.deleted_at)
+      )
+    )
+    .limit(1);
+  const row = rows[0];
+  if (!row) return null;
+  if (!executionContextsMatch(row.grant.execution_context, params.executionContext)) {
+    return null;
+  }
+  if (params.scopes.some(scope => !row.grant.granted_scopes.includes(scope))) {
+    return null;
+  }
+  return row.grant;
 }
 
 export async function resolveRuntimeState(params: {
@@ -190,6 +239,29 @@ export async function resolveRuntimeState(params: {
     grant,
     staticSecret: staticSecretRows[0] ?? null,
   };
+}
+
+const OAUTH_GRANT_TOUCH_DEBOUNCE_SECONDS = 30;
+
+export async function touchOAuthGrantUsage(params: {
+  env: MCPGatewayEnv['Bindings'];
+  grantId: string;
+}) {
+  const db = getRuntimeDb(params.env);
+  await db
+    .update(mcp_gateway_oauth_grants)
+    .set({ last_used_at: sql`NOW()` })
+    .where(
+      and(
+        eq(mcp_gateway_oauth_grants.oauth_grant_id, params.grantId),
+        eq(mcp_gateway_oauth_grants.grant_status, MCPGatewayOAuthGrantStatus.Active),
+        isNull(mcp_gateway_oauth_grants.revoked_at),
+        or(
+          isNull(mcp_gateway_oauth_grants.last_used_at),
+          sql`${mcp_gateway_oauth_grants.last_used_at} < NOW() - (${OAUTH_GRANT_TOUCH_DEBOUNCE_SECONDS} || ' seconds')::interval`
+        )
+      )
+    );
 }
 
 export async function recordRuntimeAudit(params: {

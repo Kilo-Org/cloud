@@ -25,6 +25,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
+const PLAN_FOLLOWUP_QUESTION_KEY = 'plan.followup.question';
+
+function isPlanFollowupQuestion(value: unknown): boolean {
+  if (!isRecord(value) || !Array.isArray(value.questions) || value.questions.length !== 1) {
+    return false;
+  }
+  const question: unknown = value.questions[0];
+  return isRecord(question) && question.questionKey === PLAN_FOLLOWUP_QUESTION_KEY;
+}
+
 function isCodeReviewJob(state: WrapperState): boolean {
   return state.currentSession?.platform === 'code-review';
 }
@@ -95,14 +105,15 @@ function isRootSessionActivity(
 export const CODE_REVIEW_PERMISSION_REJECTION_MESSAGE =
   'Permission rejected for code-review non-interactive mode. Continue using another read-only, non-interactive method if available.';
 
-function rejectCodeReviewQuestion(
+function rejectQuestion(
   questionId: string | undefined,
+  reason: 'code-review' | 'plan-follow-up',
   kiloClient: WrapperKiloClient
 ): void {
   if (!questionId) return;
   kiloClient.rejectQuestion(questionId).catch(err => {
     logToFile(
-      `failed to reject code-review question ${questionId}: ${err instanceof Error ? err.message : String(err)}`
+      `failed to reject ${reason} question ${questionId}: ${err instanceof Error ? err.message : String(err)}`
     );
   });
 }
@@ -1074,14 +1085,21 @@ export function createConnectionManager(
             continue;
           }
 
-          if (isCodeReviewJob(state)) {
-            if (eventType === 'question.asked') {
-              const questionId = typeof properties.id === 'string' ? properties.id : undefined;
-              rejectCodeReviewQuestion(questionId, config.kiloClient);
+          if (eventType === 'question.asked') {
+            const questionId = typeof properties.id === 'string' ? properties.id : undefined;
+            if (isPlanFollowupQuestion(properties)) {
+              rejectQuestion(questionId, 'plan-follow-up', config.kiloClient);
               callbacks.onSseEvent?.();
               continue;
             }
+            if (isCodeReviewJob(state)) {
+              rejectQuestion(questionId, 'code-review', config.kiloClient);
+              callbacks.onSseEvent?.();
+              continue;
+            }
+          }
 
+          if (isCodeReviewJob(state)) {
             if (
               eventType === 'session.status' &&
               isInteractiveStatusType(statusTypeFromProperties(properties))

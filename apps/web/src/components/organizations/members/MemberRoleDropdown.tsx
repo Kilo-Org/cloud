@@ -39,9 +39,7 @@ const getAvailableRoles = (
   currentUserRole: OrganizationRole,
   isKiloAdmin: boolean
 ): OrganizationRole[] => {
-  return isKiloAdmin || currentUserRole === 'owner' || currentUserRole === 'billing_manager'
-    ? ['owner', 'member', 'billing_manager']
-    : [];
+  return isKiloAdmin || currentUserRole === 'owner' ? ['owner', 'member', 'billing_manager'] : [];
 };
 
 type MemberRoleDropdownProps = {

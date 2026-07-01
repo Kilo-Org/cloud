@@ -123,7 +123,7 @@ function ModelComboboxStory({ value, models = sampleModels, ...props }: StoryPro
 }
 
 const meta: Meta<typeof ModelComboboxStory> = {
-  title: 'Shared/ModelCombobox',
+  title: 'Components/App Controls/ModelCombobox',
   component: ModelComboboxStory,
   tags: ['autodocs'],
   argTypes: {

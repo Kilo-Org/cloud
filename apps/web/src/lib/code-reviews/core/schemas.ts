@@ -200,6 +200,7 @@ export const CancelCodeReviewInputSchema = z.object({
  */
 export const RetriggerCodeReviewInputSchema = z.object({
   reviewId: z.string().uuid(),
+  cancelActiveReview: z.boolean().optional().default(false),
 });
 
 // ============================================================================

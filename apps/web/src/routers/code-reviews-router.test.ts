@@ -800,6 +800,9 @@ describe('codeReviewRouter attempts', () => {
       .where(eq(cloud_agent_code_reviews.repo_full_name, REPO));
     await db.delete(cliSessions).where(eq(cliSessions.kilo_user_id, testUser.id));
     await db.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, testUser.id));
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, testUser.id));
     mockCancelReview.mockReset();
     mockTryDispatchPendingReviews.mockReset();
     mockGetBlobContent.mockReset();
@@ -939,6 +942,137 @@ describe('codeReviewRouter attempts', () => {
 
     expect(latestAttempt?.retry_reason).toBe('manual_retrigger');
     expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
+  });
+
+  it('blocks retrigger when a newer provider-publishing review is active', async () => {
+    await insertEnabledAgentConfig();
+    const integration = await insertGitHubIntegration(testUser.id, 'lite');
+    const [failedReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'failed', {
+          platform_integration_id: integration.id,
+          pr_number: 20,
+          pr_url: `https://github.com/${REPO}/pull/20`,
+          head_sha: 'failed-target-sha',
+          created_at: '2026-06-01T10:00:00.000Z',
+          error_message: 'Previous failure',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    const [activeReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'running', {
+          platform_integration_id: integration.id,
+          pr_number: 20,
+          pr_url: `https://github.com/${REPO}/pull/20`,
+          head_sha: 'newer-active-sha',
+          created_at: '2026-06-01T11:00:00.000Z',
+          session_id: 'agent-active-newer',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const caller = await createCallerForUser(testUser.id);
+
+    await expect(caller.codeReviews.retrigger({ reviewId: failedReview.id })).rejects.toMatchObject(
+      {
+        code: 'CONFLICT',
+        message: expect.stringContaining('A newer review is already running'),
+      }
+    );
+
+    const reviews = await db
+      .select({ id: cloud_agent_code_reviews.id, status: cloud_agent_code_reviews.status })
+      .from(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, [failedReview.id, activeReview.id]));
+
+    expect(reviews).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: failedReview.id, status: 'failed' }),
+        expect.objectContaining({ id: activeReview.id, status: 'running' }),
+      ])
+    );
+    expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+  });
+
+  it('confirms before cancelling an older active review and retriggering', async () => {
+    await insertEnabledAgentConfig();
+    const integration = await insertGitHubIntegration(testUser.id, 'lite');
+    const [activeReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'running', {
+          platform_integration_id: integration.id,
+          pr_number: 21,
+          pr_url: `https://github.com/${REPO}/pull/21`,
+          head_sha: 'older-active-sha',
+          created_at: '2026-06-01T10:00:00.000Z',
+          session_id: 'agent-active-older',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+    const [activeAttempt] = await db
+      .insert(cloud_agent_code_review_attempts)
+      .values({
+        code_review_id: activeReview.id,
+        attempt_number: 1,
+        status: 'running',
+        session_id: 'agent-active-older',
+      })
+      .returning({ id: cloud_agent_code_review_attempts.id });
+    const [failedReview] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues(testUser.id, 'failed', {
+          platform_integration_id: integration.id,
+          pr_number: 21,
+          pr_url: `https://github.com/${REPO}/pull/21`,
+          head_sha: 'failed-newer-sha',
+          created_at: '2026-06-01T11:00:00.000Z',
+          error_message: 'Previous failure',
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const caller = await createCallerForUser(testUser.id);
+    const confirmResult = await caller.codeReviews.retrigger({ reviewId: failedReview.id });
+
+    expect(confirmResult).toEqual(
+      expect.objectContaining({
+        success: true,
+        outcome: 'confirm_cancel_active',
+        activeReview: { id: activeReview.id, headSha: 'older-active-sha' },
+      })
+    );
+    expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    expect(mockCancelReview).not.toHaveBeenCalled();
+
+    const retriggerResult = await caller.codeReviews.retrigger({
+      reviewId: failedReview.id,
+      cancelActiveReview: true,
+    });
+
+    expect(retriggerResult).toEqual({ success: true, outcome: 'retriggered' });
+    expect(mockCancelReview).toHaveBeenCalledWith(
+      activeReview.id,
+      'Superseded by manual retrigger',
+      activeAttempt.id
+    );
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalled();
+
+    const reviews = await db
+      .select({ id: cloud_agent_code_reviews.id, status: cloud_agent_code_reviews.status })
+      .from(cloud_agent_code_reviews)
+      .where(inArray(cloud_agent_code_reviews.id, [failedReview.id, activeReview.id]));
+
+    expect(reviews).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: failedReview.id, status: 'pending' }),
+        expect.objectContaining({ id: activeReview.id, status: 'cancelled' }),
+      ])
+    );
   });
 
   it('blocks retrigger while Code Reviewer has action-required state', async () => {

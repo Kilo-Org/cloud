@@ -2,9 +2,20 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { CodeReviewStreamView } from '@/components/code-reviews/CodeReviewStreamView';
+import { useRetriggerReview } from '@/components/code-reviews/useRetriggerReview';
 import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
 import {
   ExternalLink,
@@ -70,21 +81,19 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
     },
   });
 
-  const retriggerMutation = useMutation(
-    trpc.codeReviews.retrigger.mutationOptions({
-      onSuccess: async () => {
-        toast.success('Code review retriggered', {
-          description: 'The code review has been queued for processing.',
-        });
-        await queryClient.invalidateQueries({
-          queryKey: trpc.codeReviews.get.queryKey({ reviewId }),
-        });
-      },
-      onError: err => {
-        toast.error('Failed to retrigger code review', { description: err.message });
-      },
-    })
-  );
+  const {
+    retriggerReview,
+    confirmOpen,
+    setConfirmOpen,
+    confirmCancelAndRetry,
+    isPending: isRetriggerPending,
+  } = useRetriggerReview(reviewId, {
+    onRetriggered: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: trpc.codeReviews.get.queryKey({ reviewId }),
+      });
+    },
+  });
 
   const cancelMutation = useMutation(
     trpc.codeReviews.cancel.mutationOptions({
@@ -303,20 +312,41 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => retriggerMutation.mutate({ reviewId })}
-                  disabled={retriggerMutation.isPending}
+                  onClick={() => retriggerReview()}
+                  disabled={isRetriggerPending}
                   className="gap-2"
                 >
-                  <RotateCcw
-                    className={`h-3 w-3 ${retriggerMutation.isPending ? 'animate-spin' : ''}`}
-                  />
-                  {retriggerMutation.isPending ? 'Retrying...' : 'Retry'}
+                  <RotateCcw className={`h-3 w-3 ${isRetriggerPending ? 'animate-spin' : ''}`} />
+                  {isRetriggerPending ? 'Retrying...' : 'Retry'}
                 </Button>
               )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel previous review and retry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A previous review is still running for this pull request. Cancel that stale review,
+              then retry this one.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRetriggerPending}>Keep running</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={confirmCancelAndRetry}
+              disabled={isRetriggerPending}
+            >
+              {isRetriggerPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Cancel and retry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Session log / live stream */}
       {showStreamView && (

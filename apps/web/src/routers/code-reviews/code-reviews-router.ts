@@ -26,6 +26,7 @@ import {
   createCodeReviewAttempt,
   getLatestCodeReviewAttempt,
   getSessionUsageFromBilling,
+  findActiveProviderPublishingReview,
 } from '@/lib/code-reviews/db/code-reviews';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCheckRun, updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
@@ -202,6 +203,33 @@ async function cancelPRGateCheck(review: CloudAgentCodeReview) {
       `[cancel] Set commit status 'canceled' on ${review.repo_full_name}!${review.pr_number}`
     );
   }
+}
+
+async function stopActiveReviewForRetrigger(review: CloudAgentCodeReview): Promise<void> {
+  if (review.status === 'running' || review.status === 'queued') {
+    try {
+      const latestAttempt = await getLatestCodeReviewAttempt(review.id);
+      await codeReviewWorkerClient.cancelReview(
+        review.id,
+        'Superseded by manual retrigger',
+        latestAttempt?.id
+      );
+    } catch (error) {
+      logExceptInTest('[retrigger] Worker interrupt of stale review failed:', error);
+    }
+  }
+
+  await cancelCodeReview(review.id);
+
+  try {
+    await cancelPRGateCheck(review);
+  } catch (error) {
+    logExceptInTest('[retrigger] Failed to finalize gate for cancelled review:', error);
+  }
+}
+
+function isPostgresUniqueViolation(error: unknown): boolean {
+  return error instanceof Error && 'code' in error && error.code === '23505';
 }
 
 export const codeReviewRouter = createTRPCRouter({
@@ -530,6 +558,36 @@ export const codeReviewRouter = createTRPCRouter({
           });
         }
 
+        if (review.platform_integration_id && shouldPublishCodeReviewToProvider(review)) {
+          const activeReview = await findActiveProviderPublishingReview({
+            platformIntegrationId: review.platform_integration_id,
+            repoFullName: review.repo_full_name,
+            prNumber: review.pr_number,
+          });
+
+          if (activeReview && activeReview.id !== review.id) {
+            const activeIsOlder =
+              new Date(activeReview.created_at).getTime() < new Date(review.created_at).getTime();
+
+            if (!activeIsOlder) {
+              throw new TRPCError({
+                code: 'CONFLICT',
+                message:
+                  'A newer review is already running for this pull request. Let it finish instead of retriggering this one.',
+              });
+            }
+
+            if (!input.cancelActiveReview) {
+              return successResult({
+                outcome: 'confirm_cancel_active' as const,
+                activeReview: { id: activeReview.id, headSha: activeReview.head_sha },
+              });
+            }
+
+            await stopActiveReviewForRetrigger(activeReview);
+          }
+        }
+
         // Build owner object for dispatch.
         // For org reviews, use the bot user ID so retrigger dispatch matches webhook-created reviews.
         let owner: Owner;
@@ -575,7 +633,19 @@ export const codeReviewRouter = createTRPCRouter({
         const currentAttempt = await ensureCurrentCodeReviewAttemptFromReview(review);
 
         // Reset the review for retry
-        await resetCodeReviewForRetry(input.reviewId);
+        try {
+          await resetCodeReviewForRetry(input.reviewId);
+        } catch (error) {
+          if (isPostgresUniqueViolation(error)) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message:
+                'Another review just started for this pull request. Please try again in a moment.',
+            });
+          }
+
+          throw error;
+        }
         await createCodeReviewAttempt({
           codeReviewId: input.reviewId,
           retryOfAttemptId: currentAttempt.id,
@@ -594,7 +664,7 @@ export const codeReviewRouter = createTRPCRouter({
         // Try to dispatch the review
         await tryDispatchPendingReviews(owner);
 
-        return successResult({ message: 'Code review retriggered successfully' });
+        return successResult({ outcome: 'retriggered' as const });
       } catch (error) {
         if (error instanceof TRPCError) {
           throw error;

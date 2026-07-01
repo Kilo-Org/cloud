@@ -11,6 +11,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -46,6 +56,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { CodeReviewStreamView } from './CodeReviewStreamView';
+import { useRetriggerReview } from './useRetriggerReview';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
@@ -565,34 +576,14 @@ export function CodeReviewJobsCard({
     </Dialog>
   );
 
-  // Retrigger mutation for failed/cancelled/interrupted reviews
-  const retriggerMutation = useMutation(
-    trpc.codeReviews.retrigger.mutationOptions({
-      onSuccess: async () => {
-        toast.success('Code review retriggered', {
-          description: 'The code review has been queued for processing.',
-        });
-        setActionInProgressId(null);
-        // Invalidate the query to refetch the list
-        await queryClient.invalidateQueries({
-          queryKey: organizationId
-            ? trpc.codeReviews.listForOrganization.queryKey({
-                organizationId,
-                limit: PAGE_SIZE,
-                offset,
-                platform,
-              })
-            : trpc.codeReviews.listForUser.queryKey({ limit: PAGE_SIZE, offset, platform }),
-        });
-      },
-      onError: error => {
-        toast.error('Failed to retrigger code review', {
-          description: error.message,
-        });
-        setActionInProgressId(null);
-      },
-    })
-  );
+  const {
+    retriggerReview,
+    confirmOpen,
+    setConfirmOpen,
+    confirmCancelAndRetry,
+    isPending: isRetriggerPending,
+    pendingReviewId: retriggerPendingReviewId,
+  } = useRetriggerReview(undefined, { onRetriggered: invalidateJobsList });
 
   // Cancel mutation for pending/queued/running reviews
   const cancelMutation = useMutation(
@@ -623,11 +614,37 @@ export function CodeReviewJobsCard({
     })
   );
 
+  const retriggerConfirmDialog = (
+    <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cancel previous review and retry?</AlertDialogTitle>
+          <AlertDialogDescription>
+            A previous review is still running for this pull request. Cancel that stale review, then
+            retry this one.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isRetriggerPending}>Keep running</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={confirmCancelAndRetry}
+            disabled={isRetriggerPending}
+          >
+            {isRetriggerPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Cancel and retry
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
   if (isLoading) {
     return (
       <>
         <Card>{renderJobsCardHeader('Loading jobs...')}</Card>
         {manualJobDialog}
+        {retriggerConfirmDialog}
       </>
     );
   }
@@ -652,6 +669,7 @@ export function CodeReviewJobsCard({
           </CardContent>
         </Card>
         {manualJobDialog}
+        {retriggerConfirmDialog}
       </>
     );
   }
@@ -854,19 +872,16 @@ export function CodeReviewJobsCard({
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {
-                                setActionInProgressId(review.id);
-                                retriggerMutation.mutate({ reviewId: review.id });
-                              }}
+                              onClick={() => retriggerReview(review.id)}
                               disabled={
-                                actionInProgressId === review.id && retriggerMutation.isPending
+                                retriggerPendingReviewId === review.id && isRetriggerPending
                               }
                               className="gap-2"
                             >
                               <RotateCcw
-                                className={`h-3 w-3 ${actionInProgressId === review.id && retriggerMutation.isPending ? 'animate-spin' : ''}`}
+                                className={`h-3 w-3 ${retriggerPendingReviewId === review.id && isRetriggerPending ? 'animate-spin' : ''}`}
                               />
-                              {actionInProgressId === review.id && retriggerMutation.isPending
+                              {retriggerPendingReviewId === review.id && isRetriggerPending
                                 ? 'Retrying...'
                                 : 'Retry'}
                             </Button>
@@ -923,6 +938,7 @@ export function CodeReviewJobsCard({
         </CardContent>
       </Card>
       {manualJobDialog}
+      {retriggerConfirmDialog}
     </>
   );
 }

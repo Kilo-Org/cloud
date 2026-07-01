@@ -71,6 +71,7 @@ export type BitbucketWorkspaceAccessTokenAuthorization = {
   integrationId: string;
   credentialId: string;
   credentialVersion: number;
+  providerScopes: string[];
   workspace: { uuid: string; slug: string };
 };
 
@@ -128,13 +129,13 @@ function authorizationFence(
   };
 }
 
-function hasVerifiedCredentialProfile(
+function getVerifiedCredentialScopes(
   candidate: BitbucketWorkspaceAccessTokenAuthorizationCandidate
-): boolean {
+): string[] | null {
   const normalizedScopes = normalizeBitbucketWorkspaceAccessTokenScopes(
     candidate.providerScopes.join(' ')
   );
-  return (
+  const hasVerifiedProfile =
     candidate.credentialPlatform === BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM &&
     candidate.credentialIntegrationType === BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE &&
     candidate.providerCredentialType ===
@@ -143,8 +144,9 @@ function hasVerifiedCredentialProfile(
     isValidTimestamp(candidate.lastValidatedAt) &&
     normalizedScopes.length === candidate.providerScopes.length &&
     normalizedScopes.every((scope, index) => scope === candidate.providerScopes[index]) &&
-    hasRequiredBitbucketWorkspaceAccessTokenScopes(normalizedScopes)
-  );
+    hasRequiredBitbucketWorkspaceAccessTokenScopes(normalizedScopes);
+
+  return hasVerifiedProfile ? normalizedScopes : null;
 }
 
 function hasActiveParent(
@@ -370,6 +372,11 @@ async function resolveSecret(secret: Secret): Promise<string | null> {
   return value || null;
 }
 
+function temporarilyUnavailable(reason: string): { status: 'temporarily_unavailable' } {
+  console.warn('[bitbucket-workspace-token] Authorization unavailable', { reason });
+  return { status: 'temporarily_unavailable' };
+}
+
 export class BitbucketWorkspaceAccessTokenAuthorizationService {
   constructor(
     private env: AuthorizationEnv,
@@ -383,7 +390,7 @@ export class BitbucketWorkspaceAccessTokenAuthorizationService {
     const organizationId = input.orgId ? normalizeOrganizationId(input.orgId) : null;
     if (!organizationId) return { status: 'invalid_request' };
     const store = this.getStore();
-    if (!store) return { status: 'temporarily_unavailable' };
+    if (!store) return temporarilyUnavailable('store_missing');
 
     let candidate: BitbucketWorkspaceAccessTokenAuthorizationCandidate | null;
     try {
@@ -392,10 +399,11 @@ export class BitbucketWorkspaceAccessTokenAuthorizationService {
         organizationId,
       });
     } catch {
-      return { status: 'temporarily_unavailable' };
+      return temporarilyUnavailable('lookup_failed');
     }
     if (!candidate) return { status: 'not_connected' };
-    if (!hasActiveParent(candidate, organizationId) || !hasVerifiedCredentialProfile(candidate)) {
+    const providerScopes = getVerifiedCredentialScopes(candidate);
+    if (!hasActiveParent(candidate, organizationId) || !providerScopes) {
       return { status: 'reconnect_required' };
     }
 
@@ -428,7 +436,7 @@ export class BitbucketWorkspaceAccessTokenAuthorizationService {
     try {
       await store.markUsed(authorizationFence(candidate), currentTime.toISOString());
     } catch {
-      return { status: 'temporarily_unavailable' };
+      return temporarilyUnavailable('mark_used_failed');
     }
     return {
       status: 'available',
@@ -437,6 +445,7 @@ export class BitbucketWorkspaceAccessTokenAuthorizationService {
       integrationId: candidate.integrationId,
       credentialId: candidate.credentialId,
       credentialVersion: candidate.credentialVersion,
+      providerScopes,
       workspace: { uuid: workspaceUuid, slug: candidate.accountLogin },
     };
   }
@@ -488,29 +497,31 @@ export class BitbucketWorkspaceAccessTokenAuthorizationService {
         resolveSecret(this.env.BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PRIVATE_KEY),
       ]);
     } catch {
-      return { status: 'temporarily_unavailable' };
+      return temporarilyUnavailable('secret_resolution_failed');
     }
     if (!keyId || !encodedPublicKey || !encodedPrivateKey) {
-      return { status: 'temporarily_unavailable' };
+      return temporarilyUnavailable('secret_missing');
     }
 
     let privateKeyPem: string;
     try {
       const publicKeyPem = Buffer.from(encodedPublicKey, 'base64').toString('utf8');
       privateKeyPem = Buffer.from(encodedPrivateKey, 'base64').toString('utf8');
-      if (publicKeyPem.includes('PRIVATE KEY')) return { status: 'temporarily_unavailable' };
+      if (publicKeyPem.includes('PRIVATE KEY')) {
+        return temporarilyUnavailable('public_key_contains_private_key');
+      }
       const publicKey = createPublicKey(publicKeyPem);
       const privateKey = createPrivateKey(privateKeyPem);
       if (publicKey.asymmetricKeyType !== 'rsa' || privateKey.asymmetricKeyType !== 'rsa') {
-        return { status: 'temporarily_unavailable' };
+        return temporarilyUnavailable('non_rsa_key_material');
       }
       const configuredPublicKey = publicKey.export({ type: 'spki', format: 'der' });
       const derivedPublicKey = createPublicKey(privateKey).export({ type: 'spki', format: 'der' });
       if (!configuredPublicKey.equals(derivedPublicKey)) {
-        return { status: 'temporarily_unavailable' };
+        return temporarilyUnavailable('key_pair_mismatch');
       }
     } catch {
-      return { status: 'temporarily_unavailable' };
+      return temporarilyUnavailable('key_material_invalid');
     }
 
     let envelope;
@@ -522,7 +533,7 @@ export class BitbucketWorkspaceAccessTokenAuthorizationService {
     } catch {
       return { status: 'unreadable' };
     }
-    if (envelope.keyId !== keyId) return { status: 'temporarily_unavailable' };
+    if (envelope.keyId !== keyId) return temporarilyUnavailable('envelope_key_mismatch');
 
     let token: string;
     try {

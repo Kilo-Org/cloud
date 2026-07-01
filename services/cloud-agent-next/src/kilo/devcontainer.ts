@@ -513,6 +513,7 @@ export function buildOverrideConfig(opts: {
     remoteEnv: {
       HOME: sessionHome,
       KILO_CLOUD_AGENT: '1',
+      PATH: '${containerEnv:PATH}:/opt/kilo-cloud',
     },
   };
 }

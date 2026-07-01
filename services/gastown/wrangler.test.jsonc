@@ -5,6 +5,7 @@
   "main": "src/gastown.worker.ts",
   "compatibility_date": "2026-02-24",
   "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
+  "logpush": true,
 
   "containers": [
     {

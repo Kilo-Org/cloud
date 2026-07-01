@@ -868,6 +868,25 @@ export async function updateGitAuthor(
   }
 }
 
+export async function updateGitRemoteUrl(
+  session: ExecutionSession,
+  workspacePath: string,
+  gitUrl: string
+): Promise<void> {
+  const canonicalUrl = new URL(gitUrl);
+  canonicalUrl.username = '';
+  canonicalUrl.password = '';
+  const result = await timedExec(
+    session,
+    `git remote set-url origin ${shellQuote(canonicalUrl.toString())}`,
+    'git.updateRemoteUrl',
+    { cwd: workspacePath }
+  );
+  if (result.exitCode !== 0) {
+    throw new Error('Failed to update git remote URL');
+  }
+}
+
 /**
  * Update the git remote origin URL to include a new token.
  * This is needed when the git token changes and we need to push/pull.

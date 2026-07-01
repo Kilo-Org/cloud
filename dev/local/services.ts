@@ -140,6 +140,10 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/db-proxy',
   },
   // code-review
+  'bitbucket-webhook-tunnel': {
+    group: 'code-review',
+    dependsOn: ['nextjs'],
+  },
   'cloudflare-code-review-infra': {
     group: 'code-review',
     dependsOn: ['cloud-agent-next', 'nextjs'],
@@ -480,6 +484,23 @@ function buildServiceDefs(): ServiceDef[] {
           String(nextjsTargetPort),
           String(kiloclawPort),
           String(kiloChatPort),
+        ],
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'bitbucket-webhook-tunnel') {
+      defs.push({
+        name,
+        type: 'process',
+        dir: '.',
+        port: 0,
+        dependsOn: meta.dependsOn,
+        command: [
+          'tsx',
+          'dev/local/scripts/start-bitbucket-webhook-tunnel.ts',
+          String(nextjsTargetPort),
         ],
         group: meta.group,
       });

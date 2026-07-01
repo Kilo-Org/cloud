@@ -239,6 +239,7 @@ type GroupedRegisterSessionInput = {
         url: string;
         workspaceUuid: string;
         repositoryUuid: string;
+        bitbucketIntegrationId?: string;
         branch?: string;
       }
     | {
@@ -291,6 +292,7 @@ function repositoryMetadataFromRegistrationInput(
         platform: 'bitbucket',
         workspaceUuid: repository.workspaceUuid,
         repositoryUuid: repository.repositoryUuid,
+        bitbucketIntegrationId: repository.bitbucketIntegrationId,
         upstreamBranch: repository.branch,
       };
     case 'git':
@@ -345,6 +347,49 @@ async function validateSharedSandboxRouteAssignment(workspace: {
   }
 }
 
+function isSameRegistrationRepository(
+  metadata: SessionMetadata,
+  input: CreateSessionWithInitialAdmissionInput
+): boolean {
+  const stored = metadata.repository;
+  const submitted = input.repository;
+  if (!stored || !submitted) return stored === undefined && submitted === undefined;
+  if (stored.type !== submitted.type) return false;
+
+  switch (submitted.type) {
+    case 'github':
+      return (
+        stored.type === 'github' &&
+        stored.repo === submitted.repo &&
+        stored.upstreamBranch === submitted.branch
+      );
+    case 'gitlab':
+      return (
+        stored.type === 'gitlab' &&
+        stored.url === submitted.url &&
+        stored.upstreamBranch === submitted.branch
+      );
+    case 'git':
+      return (
+        stored.type === 'git' &&
+        stored.url === submitted.url &&
+        stored.token === submitted.token &&
+        stored.upstreamBranch === submitted.branch
+      );
+    case 'bitbucket':
+      return (
+        stored.type === 'bitbucket' &&
+        stored.url === submitted.url &&
+        stored.workspaceUuid === submitted.workspaceUuid &&
+        stored.repositoryUuid === submitted.repositoryUuid &&
+        stored.bitbucketIntegrationId === submitted.bitbucketIntegrationId &&
+        stored.upstreamBranch === submitted.branch
+      );
+    case 'empty-local':
+      return stored.type === 'empty-local';
+  }
+}
+
 function isSameInitialAdmissionConfiguration(
   metadata: SessionMetadata,
   input: CreateSessionWithInitialAdmissionInput
@@ -353,7 +398,9 @@ function isSameInitialAdmissionConfiguration(
     metadata.identity.sessionId === input.identity.sessionId &&
     metadata.identity.userId === input.identity.userId &&
     metadata.identity.orgId === input.identity.orgId &&
-    metadata.identity.botId === input.identity.botId;
+    metadata.identity.botId === input.identity.botId &&
+    metadata.identity.createdOnPlatform === input.identity.createdOnPlatform;
+  const sameRepository = isSameRegistrationRepository(metadata, input);
   const sameWorkspace =
     metadata.workspace?.sandboxId === input.workspace?.sandboxId &&
     JSON.stringify(metadata.workspace?.sandboxRoute) ===
@@ -366,7 +413,7 @@ function isSameInitialAdmissionConfiguration(
     metadata.finalization?.autoCommit === input.finalization?.autoCommit &&
     metadata.finalization?.condenseOnComplete === input.finalization?.condenseOnComplete;
 
-  return sameIdentity && sameWorkspace && sameAgent && sameFinalization;
+  return sameIdentity && sameRepository && sameWorkspace && sameAgent && sameFinalization;
 }
 
 export class CloudAgentSession extends DurableObject<WorkerEnv> {

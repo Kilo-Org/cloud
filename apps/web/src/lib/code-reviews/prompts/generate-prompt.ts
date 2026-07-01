@@ -8,6 +8,7 @@
 
 import { z } from 'zod';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
+import DEFAULT_PROMPT_TEMPLATE_BITBUCKET from '@/lib/code-reviews/prompts/default-prompt-template-bitbucket.json';
 import DEFAULT_PROMPT_TEMPLATE_GITHUB from '@/lib/code-reviews/prompts/default-prompt-template.json';
 import DEFAULT_PROMPT_TEMPLATE_GITLAB from '@/lib/code-reviews/prompts/default-prompt-template-gitlab.json';
 import { logExceptInTest } from '@/lib/utils.server';
@@ -77,6 +78,7 @@ type PromptTemplate = z.infer<typeof PromptTemplateSchema>;
 
 const githubPromptTemplate = PromptTemplateSchema.parse(DEFAULT_PROMPT_TEMPLATE_GITHUB);
 const gitlabPromptTemplate = PromptTemplateSchema.parse(DEFAULT_PROMPT_TEMPLATE_GITLAB);
+const bitbucketPromptTemplate = PromptTemplateSchema.parse(DEFAULT_PROMPT_TEMPLATE_BITBUCKET);
 
 function getPromptTemplate(platform: CodeReviewPlatform): PromptTemplate {
   switch (platform) {
@@ -84,6 +86,8 @@ function getPromptTemplate(platform: CodeReviewPlatform): PromptTemplate {
       return githubPromptTemplate;
     case PLATFORM.GITLAB:
       return gitlabPromptTemplate;
+    case PLATFORM.BITBUCKET:
+      return bitbucketPromptTemplate;
     default: {
       const exhaustivePlatform: never = platform;
       throw new Error(`Unknown platform: ${exhaustivePlatform}`);
@@ -110,6 +114,8 @@ export type GitLabDiffContext = {
 export type GenerateReviewPromptOptions = {
   /** Code review ID for generating fix link */
   reviewId?: string;
+  /** Expected checked-out HEAD SHA. Provider reviews may pass undefined; local/Bitbucket reviews require it. */
+  expectedHeadSha?: string | null;
   /** Complete review state for intelligent decisions */
   existingReviewState?: ExistingReviewState | null;
   /** Platform type (defaults to 'github') */
@@ -124,8 +130,6 @@ export type GenerateReviewPromptOptions = {
   manualInstructions?: string | null;
   /** Persisted manual job output mode. Defaults to provider publishing. */
   outputMode?: 'provider' | 'kilo';
-  /** Expected checked-out HEAD SHA for local read-only reviews. */
-  expectedHeadSha?: string | null;
 };
 
 /**
@@ -144,6 +148,7 @@ export async function generateReviewPrompt(
 ): Promise<{ prompt: string; version: string }> {
   const {
     reviewId,
+    expectedHeadSha,
     existingReviewState,
     platform = 'github',
     gitlabContext,
@@ -151,8 +156,11 @@ export async function generateReviewPrompt(
     repositoryReviewInstructions,
     manualInstructions,
     outputMode = 'provider',
-    expectedHeadSha,
   } = options;
+  if (platform === PLATFORM.BITBUCKET && (!prNumber || !expectedHeadSha)) {
+    throw new Error('Bitbucket review prompt requires pull request number and expected head SHA');
+  }
+
   const template = getPromptTemplate(platform);
   const platformConfig = getPlatformConfig(platform);
   const pr = prNumber || `{${platformConfig.prTerm}_NUMBER}`;
@@ -184,7 +192,8 @@ export async function generateReviewPrompt(
       .replace(/{PROJECT_PATH_ENCODED}/g, encodeURIComponent(repository))
       .replace(/{PR}/g, String(pr))
       .replace(/{COMMENT_ID}/g, commentId ? String(commentId) : '{COMMENT_ID}')
-      .replace(/{NOTE_ID}/g, commentId ? String(commentId) : '{NOTE_ID}');
+      .replace(/{NOTE_ID}/g, commentId ? String(commentId) : '{NOTE_ID}')
+      .replace(/{EXPECTED_HEAD_SHA}/g, expectedHeadSha ?? '{EXPECTED_HEAD_SHA}');
 
     // GitLab-specific SHA placeholders
     if (gitlabContext) {
@@ -286,6 +295,10 @@ export async function generateReviewPrompt(
   prompt += '---\n\n# CONTEXT FOR THIS ' + platformConfig.prTerm + '\n\n';
   prompt += `**${platform === PLATFORM.GITLAB ? 'Project' : 'Repository'}:** ${repository}\n`;
   prompt += `**${platformConfig.prTerm} Number:** ${pr}\n\n`;
+
+  if (platform === PLATFORM.BITBUCKET && expectedHeadSha) {
+    prompt += `**Expected Head SHA:** \`${expectedHeadSha}\`\n\n`;
+  }
 
   // Add GitLab-specific SHA context if available
   if (platform === PLATFORM.GITLAB && gitlabContext) {

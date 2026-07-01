@@ -54,6 +54,13 @@ export function isDefaultGitLabInstanceUrl(instanceUrl?: string): boolean {
   return normalizeGitLabInstanceUrl(instanceUrl) === DEFAULT_GITLAB_INSTANCE_URL;
 }
 
+export function buildGitLabPlatformRepositoryId(input: {
+  instanceUrl?: string;
+  projectId: number;
+}): string {
+  return `${normalizeGitLabInstanceUrl(input.instanceUrl)}/-/projects/${input.projectId}`;
+}
+
 export function buildGitLabUrl(
   instanceUrl: string | undefined,
   path: string,

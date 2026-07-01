@@ -31,6 +31,59 @@ import {
   GITHUB_CLOUD_REVIEW_SKILL_NAME,
   GITHUB_CLOUD_REVIEW_SKILL_VERSION,
 } from './github-cloud-review-skill';
+import {
+  BITBUCKET_CLOUD_REVIEW_SKILL,
+  BITBUCKET_CLOUD_REVIEW_SKILL_NAME,
+  BITBUCKET_CLOUD_REVIEW_SKILL_VERSION,
+  buildBitbucketCloudReviewSkillCue,
+} from './bitbucket-cloud-review-skill';
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const BITBUCKET_SLUG_PATTERN = /^[A-Za-z0-9_.-]+$/;
+const GIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
+
+type BitbucketCloudReviewSessionInput = SessionInput &
+  Required<
+    Pick<
+      SessionInput,
+      | 'gitUrl'
+      | 'kilocodeOrganizationId'
+      | 'bitbucketWorkspaceUuid'
+      | 'bitbucketWorkspaceSlug'
+      | 'bitbucketRepositoryUuid'
+      | 'bitbucketRepositorySlug'
+      | 'bitbucketIntegrationId'
+      | 'bitbucketPullRequestId'
+      | 'bitbucketExpectedHeadSha'
+    >
+  > & { platform: 'bitbucket' };
+
+export function isBitbucketCloudReviewSessionInput(
+  sessionInput: SessionInput
+): sessionInput is BitbucketCloudReviewSessionInput {
+  return (
+    sessionInput.platform === 'bitbucket' &&
+    typeof sessionInput.gitUrl === 'string' &&
+    sessionInput.gitUrl.trim().length > 0 &&
+    typeof sessionInput.kilocodeOrganizationId === 'string' &&
+    UUID_PATTERN.test(sessionInput.kilocodeOrganizationId) &&
+    typeof sessionInput.bitbucketWorkspaceUuid === 'string' &&
+    UUID_PATTERN.test(sessionInput.bitbucketWorkspaceUuid) &&
+    typeof sessionInput.bitbucketWorkspaceSlug === 'string' &&
+    BITBUCKET_SLUG_PATTERN.test(sessionInput.bitbucketWorkspaceSlug) &&
+    typeof sessionInput.bitbucketRepositoryUuid === 'string' &&
+    UUID_PATTERN.test(sessionInput.bitbucketRepositoryUuid) &&
+    typeof sessionInput.bitbucketRepositorySlug === 'string' &&
+    BITBUCKET_SLUG_PATTERN.test(sessionInput.bitbucketRepositorySlug) &&
+    typeof sessionInput.bitbucketIntegrationId === 'string' &&
+    UUID_PATTERN.test(sessionInput.bitbucketIntegrationId) &&
+    typeof sessionInput.bitbucketPullRequestId === 'number' &&
+    Number.isSafeInteger(sessionInput.bitbucketPullRequestId) &&
+    sessionInput.bitbucketPullRequestId > 0 &&
+    typeof sessionInput.bitbucketExpectedHeadSha === 'string' &&
+    GIT_SHA_PATTERN.test(sessionInput.bitbucketExpectedHeadSha)
+  );
+}
 
 function callbackUrlForAttempt(apiUrl: string, reviewId: string, attemptId?: string): string {
   const url = new URL(`/api/internal/code-review-status/${reviewId}`, apiUrl);
@@ -862,7 +915,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       status: 'queued',
       updatedAt: new Date().toISOString(),
       skipBalanceCheck: params.skipBalanceCheck,
-      previousCloudAgentSessionId: params.previousCloudAgentSessionId,
+      previousCloudAgentSessionId:
+        params.sessionInput.platform === 'bitbucket'
+          ? undefined
+          : params.previousCloudAgentSessionId,
       repositorySize: params.repositorySize,
     };
     await this.saveState();
@@ -1059,7 +1115,10 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       return;
     }
 
-    if (this.state.previousCloudAgentSessionId) {
+    if (
+      this.state.previousCloudAgentSessionId &&
+      this.state.sessionInput.platform !== 'bitbucket'
+    ) {
       await this.runWithCloudAgentNextFollowup();
     } else {
       await this.runWithCloudAgentNext();
@@ -1111,12 +1170,25 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         sessionInput.platform === 'github' &&
         typeof sessionInput.githubRepo === 'string' &&
         sessionInput.githubRepo.trim().length > 0;
+      const bitbucketCloudReviewSkillAttached = isBitbucketCloudReviewSessionInput(sessionInput);
+      const skillCue = githubCloudReviewSkillAttached
+        ? buildGitHubCloudReviewSkillCue(this.state.reviewId)
+        : bitbucketCloudReviewSkillAttached
+          ? buildBitbucketCloudReviewSkillCue(
+              this.state.reviewId,
+              sessionInput.bitbucketPullRequestId,
+              sessionInput.bitbucketExpectedHeadSha
+            )
+          : undefined;
+      const runtimeSkills = githubCloudReviewSkillAttached
+        ? [GITHUB_CLOUD_REVIEW_SKILL]
+        : bitbucketCloudReviewSkillAttached
+          ? [BITBUCKET_CLOUD_REVIEW_SKILL]
+          : undefined;
       const prepareInput: CloudAgentPrepareSessionInput = {
         ...sessionInput,
-        prompt: githubCloudReviewSkillAttached
-          ? `${buildGitHubCloudReviewSkillCue(this.state.reviewId)}\n\n${sessionInput.prompt}`
-          : sessionInput.prompt,
-        runtimeSkills: githubCloudReviewSkillAttached ? [GITHUB_CLOUD_REVIEW_SKILL] : undefined,
+        prompt: skillCue ? `${skillCue}\n\n${sessionInput.prompt}` : sessionInput.prompt,
+        runtimeSkills,
         createdOnPlatform: 'code-review' as const,
         callbackTarget,
       };
@@ -1130,6 +1202,11 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
           attached: githubCloudReviewSkillAttached,
           name: GITHUB_CLOUD_REVIEW_SKILL_NAME,
           version: GITHUB_CLOUD_REVIEW_SKILL_VERSION,
+        },
+        bitbucketCloudReviewSkill: {
+          attached: bitbucketCloudReviewSkillAttached,
+          name: BITBUCKET_CLOUD_REVIEW_SKILL_NAME,
+          version: BITBUCKET_CLOUD_REVIEW_SKILL_VERSION,
         },
       });
 

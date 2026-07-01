@@ -45,7 +45,7 @@ describe('resolveManagedBitbucketToken', () => {
     expect(getBitbucketToken).not.toHaveBeenCalled();
   });
 
-  it('forwards exact organization and repository identity and returns the token unchanged', async () => {
+  it('forwards explicit organization and repository identity and returns the token unchanged', async () => {
     const getBitbucketToken = vi.fn().mockResolvedValue({
       success: true,
       token: 'opaque-workspace-token',
@@ -53,6 +53,23 @@ describe('resolveManagedBitbucketToken', () => {
     const params = {
       ...repositoryParams,
       orgId: '123e4567-e89b-12d3-a456-426614174030',
+    };
+
+    await expect(
+      resolveManagedBitbucketToken(createEnv({ getBitbucketToken }), params)
+    ).resolves.toEqual({ success: true, token: 'opaque-workspace-token' });
+    expect(getBitbucketToken).toHaveBeenCalledWith(params);
+  });
+
+  it('forwards an explicit expected integration id when provided', async () => {
+    const getBitbucketToken = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'opaque-workspace-token',
+    });
+    const params = {
+      ...repositoryParams,
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+      expectedIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
     };
 
     await expect(
@@ -75,7 +92,7 @@ describe('resolveManagedBitbucketToken', () => {
     }
   );
 
-  it('normalizes a missing service binding to temporary unavailability', async () => {
+  it('normalizes a missing service binding distinctly', async () => {
     await expect(
       resolveManagedBitbucketToken(
         {},
@@ -84,13 +101,13 @@ describe('resolveManagedBitbucketToken', () => {
           orgId: '123e4567-e89b-12d3-a456-426614174030',
         }
       )
-    ).resolves.toEqual({ success: false, reason: 'temporarily_unavailable' });
+    ).resolves.toEqual({ success: false, reason: 'service_not_configured' });
     expect(logger.warn).toHaveBeenCalledWith(
       'Bitbucket git-token-service binding is not configured'
     );
   });
 
-  it('normalizes an RPC exception to temporary unavailability', async () => {
+  it('normalizes an RPC exception distinctly', async () => {
     const getBitbucketToken = vi.fn().mockRejectedValue(new Error('binding unavailable'));
 
     await expect(
@@ -98,7 +115,7 @@ describe('resolveManagedBitbucketToken', () => {
         ...repositoryParams,
         orgId: '123e4567-e89b-12d3-a456-426614174030',
       })
-    ).resolves.toEqual({ success: false, reason: 'temporarily_unavailable' });
+    ).resolves.toEqual({ success: false, reason: 'rpc_error' });
     expect(logger.error).toHaveBeenCalledWith('Failed to call git-token-service getBitbucketToken');
   });
 });

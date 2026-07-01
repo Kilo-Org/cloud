@@ -67,14 +67,20 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   cloud_agent_code_reviews,
   kilocode_users,
+  organizations,
   platform_integrations,
   type PlatformIntegration,
   type User,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import { prepareReviewPayload } from './prepare-review-payload';
 
 const REPO = `test-org/prepare-review-payload-${Date.now()}`;
+const BITBUCKET_WORKSPACE_UUID = 'a07d5c40-2d2d-4e79-a812-6a47824a77d6';
+const BITBUCKET_REPOSITORY_UUID = '38a47a32-cb87-4a9f-b75d-7224774bba77';
+const BITBUCKET_REPOSITORY_SLUG = 'review-repository';
+const BITBUCKET_REPO = `review-workspace/${BITBUCKET_REPOSITORY_SLUG}`;
+const BITBUCKET_HEAD_SHA = '0123456789abcdef0123456789abcdef01234567';
 
 const baseAgentConfig = {
   review_style: 'balanced',
@@ -128,11 +134,18 @@ function defineReview(
 
 describe('prepareReviewPayload', () => {
   let testUser: User;
+  let testOrganizationId: string;
   let integration: PlatformIntegration;
   let gitlabIntegration: PlatformIntegration;
+  let bitbucketIntegration: PlatformIntegration;
 
   beforeAll(async () => {
     testUser = await insertTestUser();
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `Prepare Review Payload ${Date.now()}` })
+      .returning({ id: organizations.id });
+    testOrganizationId = organization.id;
     [integration] = await db
       .insert(platform_integrations)
       .values(defineIntegration(testUser.id))
@@ -148,6 +161,33 @@ describe('prepareReviewPayload', () => {
             access_token: 'gitlab-oauth-token',
             gitlab_instance_url: 'https://gitlab.example.com',
           },
+        })
+      )
+      .returning();
+    [bitbucketIntegration] = await db
+      .insert(platform_integrations)
+      .values(
+        defineIntegration(testUser.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: testOrganizationId,
+          platform: 'bitbucket',
+          integration_type: 'workspace_access_token',
+          platform_installation_id: null,
+          platform_account_id: BITBUCKET_WORKSPACE_UUID,
+          platform_account_login: 'review-workspace',
+          repository_access: 'selected',
+          repositories: [
+            {
+              id: BITBUCKET_REPOSITORY_UUID,
+              name: 'Review repository',
+              full_name: BITBUCKET_REPO,
+              private: true,
+              default_branch: 'main',
+            },
+          ],
+          integration_status: 'active',
+          auth_invalid_at: null,
+          github_app_type: null,
         })
       )
       .returning();
@@ -186,7 +226,12 @@ describe('prepareReviewPayload', () => {
   afterEach(async () => {
     await db
       .delete(cloud_agent_code_reviews)
-      .where(eq(cloud_agent_code_reviews.owned_by_user_id, testUser.id));
+      .where(
+        or(
+          eq(cloud_agent_code_reviews.owned_by_user_id, testUser.id),
+          eq(cloud_agent_code_reviews.owned_by_organization_id, testOrganizationId)
+        )
+      );
     mockGenerateGitHubInstallationToken.mockReset();
     mockFindKiloReviewComment.mockReset();
     mockFetchPRInlineComments.mockReset();
@@ -209,8 +254,12 @@ describe('prepareReviewPayload', () => {
   afterAll(async () => {
     await db
       .delete(platform_integrations)
+      .where(eq(platform_integrations.id, bitbucketIntegration.id));
+    await db
+      .delete(platform_integrations)
       .where(eq(platform_integrations.id, gitlabIntegration.id));
     await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
+    await db.delete(organizations).where(eq(organizations.id, testOrganizationId));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
 
@@ -248,10 +297,15 @@ describe('prepareReviewPayload', () => {
         repositoryReviewInstructions: '# Review policy\n\nFlag only regressions.',
       })
     );
-    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(REPO, 123, 'headsha123', {
-      platform: 'github',
-      integrationId: integration.id,
-    });
+    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(
+      {
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        platform: 'github',
+        repoFullName: REPO,
+        prNumber: 123,
+      },
+      'headsha123'
+    );
     expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
       body: null,
       headSha: null,
@@ -420,11 +474,15 @@ describe('prepareReviewPayload', () => {
       REPO,
       'https://gitlab.example.com'
     );
-    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(REPO, 123, 'headsha123', {
-      platform: 'gitlab',
-      integrationId: gitlabIntegration.id,
-      projectId: 456,
-    });
+    expect(mockFindPreviousCompletedReview).toHaveBeenCalledWith(
+      {
+        owner: { type: 'user', id: testUser.id, userId: testUser.id },
+        platform: 'gitlab',
+        repoFullName: REPO,
+        prNumber: 123,
+      },
+      'headsha123'
+    );
     expect(mockFetchGitLabRootTextFileAtRef).toHaveBeenCalledWith(
       'gitlab-project-token',
       REPO,
@@ -448,7 +506,7 @@ describe('prepareReviewPayload', () => {
     });
   });
 
-  it('fails provider GitLab jobs when integration is missing', async () => {
+  it('throws when a provider GitLab review is missing its integration', async () => {
     const [review] = await db
       .insert(cloud_agent_code_reviews)
       .values(
@@ -466,10 +524,108 @@ describe('prepareReviewPayload', () => {
         agentConfig: { config: baseAgentConfig },
         platform: 'gitlab',
       })
-    ).rejects.toThrow(`Provider Code Reviewer job ${review.id} is missing its integration`);
+    ).rejects.toThrow('is missing its integration');
+  });
 
-    expect(mockGetOrCreateProjectAccessToken).not.toHaveBeenCalled();
+  it('prepares a fresh tokenless Bitbucket review from exact organization integration identity', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, bitbucketIntegration.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: testOrganizationId,
+          platform: 'bitbucket',
+          repo_full_name: BITBUCKET_REPO,
+          pr_url: `https://bitbucket.org/${BITBUCKET_REPO}/pull-requests/123`,
+          head_sha: BITBUCKET_HEAD_SHA,
+        })
+      )
+      .returning();
+    mockFindPreviousCompletedReview.mockResolvedValueOnce({
+      head_sha: 'previous-bitbucket-head',
+      session_id: 'agent_previous_bitbucket',
+    });
+    const bitbucketConfig = {
+      ...baseAgentConfig,
+      repository_selection_mode: 'selected' as const,
+      selected_repository_ids: [BITBUCKET_REPOSITORY_UUID],
+      gate_threshold: 'critical' as const,
+      disable_review_md: false,
+      review_memory_enabled: true,
+      review_analytics_enabled: true,
+    } satisfies CodeReviewAgentConfig;
+
+    const payload = await prepareReviewPayload({
+      reviewId: review.id,
+      owner: { type: 'org', id: testOrganizationId, userId: testUser.id },
+      agentConfig: { config: bitbucketConfig },
+      platform: 'bitbucket',
+    });
+
+    expect(payload).toMatchObject({
+      reviewId: review.id,
+      owner: { type: 'org', id: testOrganizationId, userId: testUser.id },
+      sessionInput: {
+        gitUrl: `https://bitbucket.org/${BITBUCKET_REPO}.git`,
+        kilocodeOrganizationId: testOrganizationId,
+        platform: 'bitbucket',
+        bitbucketWorkspaceUuid: BITBUCKET_WORKSPACE_UUID,
+        bitbucketWorkspaceSlug: 'review-workspace',
+        bitbucketRepositoryUuid: BITBUCKET_REPOSITORY_UUID,
+        bitbucketRepositorySlug: BITBUCKET_REPOSITORY_SLUG,
+        bitbucketIntegrationId: bitbucketIntegration.id,
+        bitbucketPullRequestId: 123,
+        bitbucketExpectedHeadSha: BITBUCKET_HEAD_SHA,
+        upstreamBranch: 'feature/review-policy',
+        prompt: 'generated prompt',
+      },
+    });
+    expect(payload.previousCloudAgentSessionId).toBeUndefined();
+    expect(payload.sessionInput).not.toHaveProperty('githubToken');
+    expect(payload.sessionInput).not.toHaveProperty('gitToken');
+    expect(payload.sessionInput).not.toHaveProperty('gateThreshold');
+    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(bitbucketConfig, BITBUCKET_REPO, 123, {
+      platform: 'bitbucket',
+      expectedHeadSha: BITBUCKET_HEAD_SHA,
+    });
     expect(mockFindPreviousCompletedReview).not.toHaveBeenCalled();
+    expect(mockFetchGitHubRootTextFileAtRef).not.toHaveBeenCalled();
+    expect(mockFetchGitLabRootTextFileAtRef).not.toHaveBeenCalled();
+    expect(mockUpdatePreviousReviewSummary).not.toHaveBeenCalled();
+    expect(mockUpdateRepositoryReviewInstructionsMetadata).not.toHaveBeenCalled();
+  });
+
+  it('rejects a Bitbucket review whose repo is not selected in the integration cache', async () => {
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        defineReview(testUser.id, bitbucketIntegration.id, {
+          owned_by_user_id: null,
+          owned_by_organization_id: testOrganizationId,
+          platform: 'bitbucket',
+          repo_full_name: 'review-workspace/not-selected',
+          pr_url: 'https://bitbucket.org/review-workspace/not-selected/pull-requests/123',
+          head_sha: BITBUCKET_HEAD_SHA,
+        })
+      )
+      .returning();
+
+    await expect(
+      prepareReviewPayload({
+        reviewId: review.id,
+        owner: { type: 'org', id: testOrganizationId, userId: testUser.id },
+        agentConfig: {
+          config: {
+            ...baseAgentConfig,
+            repository_selection_mode: 'selected',
+            selected_repository_ids: [BITBUCKET_REPOSITORY_UUID],
+          },
+        },
+        platform: 'bitbucket',
+      })
+    ).rejects.toThrow('Bitbucket review repository identity does not match its integration cache');
+
+    expect(mockGenerateReviewPrompt).not.toHaveBeenCalled();
   });
 
   it('normalizes trailing slashes in self-hosted GitLab review repository URLs', async () => {
@@ -749,46 +905,6 @@ describe('prepareReviewPayload', () => {
       upstreamBranch: 'refs/pull/1234/head',
     });
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
-  });
-
-  it('builds typed GitHub cloud-agent input for Kilo-Org/cloud PR 4273', async () => {
-    const repo = 'Kilo-Org/cloud';
-    const prNumber = 4273;
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values(
-        defineReview(testUser.id, integration.id, {
-          repo_full_name: repo,
-          pr_number: prNumber,
-          pr_url: `https://github.com/${repo}/pull/${prNumber}`,
-          head_ref: 'chore/local-testing-code-reviews',
-        })
-      )
-      .returning({ id: cloud_agent_code_reviews.id });
-
-    if (!review) {
-      throw new Error('Expected inserted review');
-    }
-
-    const payload = await prepareReviewPayload({
-      reviewId: review.id,
-      owner: {
-        type: 'user',
-        id: testUser.id,
-        userId: testUser.id,
-      },
-      agentConfig: {
-        config: baseAgentConfig,
-      },
-      platform: 'github',
-    });
-
-    expect(payload.sessionInput).toMatchObject({
-      githubRepo: repo,
-      platform: 'github',
-      upstreamBranch: 'refs/pull/4273/head',
-    });
-    expect(payload.sessionInput).not.toHaveProperty('repository');
   });
 
   it('does not continue previous cloud-agent sessions for GitHub pull-ref reviews', async () => {

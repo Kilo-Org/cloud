@@ -110,8 +110,11 @@ RUN mkdir -p /opt/kilo-cloud \
     && bun install --production \
     && bun build src/main.ts --outfile=/opt/kilo-cloud/kilocode-wrapper.js --target=bun --minify \
     && bun build src/restore-session.ts --outfile=/opt/kilo-cloud/kilo-restore-session.js --target=bun --minify \
+    && bun build src/bitbucket-review-cli.ts --outfile=/opt/kilo-cloud/bb --target=bun --minify \
+    && chmod +x /opt/kilo-cloud/bb \
     && ln -sf /opt/kilo-cloud/kilocode-wrapper.js /usr/local/bin/kilocode-wrapper.js \
     && ln -sf /opt/kilo-cloud/kilo-restore-session.js /usr/local/bin/kilo-restore-session.js \
+    && ln -sf /opt/kilo-cloud/bb /usr/local/bin/bb \
     && rm -rf /tmp/wrapper-build
 
 # Boot script for rootless Docker-in-Docker.

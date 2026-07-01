@@ -76,9 +76,9 @@ const integrationDetailRegistry = {
   },
   [PLATFORM.BITBUCKET]: {
     title: 'Bitbucket Integration',
-    userSubtitle: 'Bitbucket is available for Kilo organizations',
+    userSubtitle: 'Bitbucket Cloud integrations are available to organizations only',
     organizationSubtitle: organizationName =>
-      `Manage the Bitbucket Cloud workspace for ${organizationName}`,
+      `Manage the Bitbucket Cloud integration for ${organizationName}`,
     render: async ({ organizationId, search }) => {
       if (!organizationId) notFound();
       const { BitbucketIntegrationDetails } =

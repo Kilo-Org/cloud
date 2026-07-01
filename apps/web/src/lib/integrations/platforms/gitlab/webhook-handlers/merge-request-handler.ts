@@ -13,11 +13,14 @@ import type { MergeRequestPayload } from '../webhook-schemas';
 import { GITLAB_ACTION, PLATFORM } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import {
+  cancelActiveCodeReviewsById,
   createCodeReview,
   cancelSupersededReviewsForPR,
   findExistingReview,
   findActiveReviewsForPR,
   updateReviewHeadShaAndCheckRun,
+  type CancelledReviewRow,
+  type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -35,6 +38,9 @@ import {
   getValidGitLabToken,
 } from '@/lib/integrations/gitlab-service';
 import { APP_URL } from '@/lib/constants';
+
+const SUPERSEDED_BY_NEW_PUSH_REASON = 'Superseded by new push';
+const DUPLICATE_MERGE_CONTINUATION_REASON = 'Superseded by duplicate merge-commit continuation';
 
 /**
  * Handles merge request events that trigger code review
@@ -157,6 +163,14 @@ export async function handleMergeRequestCodeReview(
       return NextResponse.json({ message: 'No head commit found' }, { status: 400 });
     }
 
+    const reviewScope = {
+      owner,
+      platform: 'gitlab',
+      repoFullName: project.path_with_namespace,
+      prNumber: mr.iid,
+      platformIntegrationId: integration.id,
+    } satisfies ReviewScope;
+
     // 4. Skip merge commits on update (e.g. merging base branch into feature branch).
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
     // a merge commit introduces no new feature work and should not supersede the existing review.
@@ -190,9 +204,8 @@ export async function handleMergeRequestCodeReview(
       await migrateInFlightReviewsToMergeCommitHead({
         integrationId: integration.id,
         projectId: project.id,
-        repoFullName: project.path_with_namespace,
-        mrIid: mr.iid,
         newHeadSha: headSha,
+        reviewScope,
       });
 
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
@@ -200,12 +213,7 @@ export async function handleMergeRequestCodeReview(
 
     // 5. Cancel any existing reviews for this MR (different SHA)
     // This prevents spam when user pushes multiple commits quickly
-    const cancelledReviews = await cancelSupersededReviewsForPR(
-      project.path_with_namespace,
-      mr.iid,
-      headSha,
-      { platformIntegrationId: integration.id }
-    );
+    const cancelledReviews = await cancelSupersededReviewsForPR(reviewScope, headSha);
 
     if (cancelledReviews.length > 0) {
       const cancellationCounts = {
@@ -219,35 +227,10 @@ export async function handleMergeRequestCodeReview(
         cancellationCounts
       );
 
-      await Promise.allSettled(
-        cancelledReviews
-          .filter(review => review.prevStatus !== 'pending')
-          .map(async review => {
-            try {
-              const response = await codeReviewWorkerClient.cancelReview(
-                review.id,
-                'Superseded by new push',
-                review.latestActiveAttemptId ?? undefined
-              );
-
-              if (!response.success) {
-                addBreadcrumb({
-                  category: 'code-review.cancel',
-                  level: 'info',
-                  message: 'Worker cancel returned success=false for superseded review',
-                  data: {
-                    reviewId: review.id,
-                    prevStatus: review.prevStatus,
-                    repo: project.path_with_namespace,
-                    prNumber: mr.iid,
-                  },
-                });
-              }
-            } catch (error) {
-              logExceptInTest(`Failed to interrupt review ${review.id}:`, error);
-            }
-          })
-      );
+      await interruptCancelledReviews(cancelledReviews, SUPERSEDED_BY_NEW_PUSH_REASON, {
+        repo: project.path_with_namespace,
+        prNumber: mr.iid,
+      });
     }
 
     // 6. Get integration details needed for best-effort GitLab status cleanup.
@@ -260,54 +243,16 @@ export async function handleMergeRequestCodeReview(
     const instanceUrl = normalizeGitLabInstanceUrl(metadata?.gitlab_instance_url);
 
     if (cancelledReviews.length > 0 && fullIntegration) {
-      const gitlabCancelledReviews = cancelledReviews.flatMap(review => {
-        if (
-          review.platform === 'gitlab' &&
-          review.platformProjectId != null &&
-          review.headSha.length > 0
-        ) {
-          return [{ headSha: review.headSha, platformProjectId: review.platformProjectId }];
-        }
-
-        return [];
+      await setCancelledGitLabStatuses({
+        cancelledReviews,
+        fullIntegration,
+        instanceUrl,
+        description: SUPERSEDED_BY_NEW_PUSH_REASON,
       });
-      const projectAccessTokens = new Map<number, Promise<string>>();
-      const getProjectAccessToken = (platformProjectId: number) => {
-        let token = projectAccessTokens.get(platformProjectId);
-        if (!token) {
-          token = getOrCreateProjectAccessToken(fullIntegration, platformProjectId);
-          projectAccessTokens.set(platformProjectId, token);
-        }
-        return token;
-      };
-
-      await Promise.allSettled(
-        gitlabCancelledReviews.map(async review => {
-          try {
-            const pratToken = await getProjectAccessToken(review.platformProjectId);
-            await setCommitStatus(
-              pratToken,
-              review.platformProjectId,
-              review.headSha,
-              'canceled',
-              { description: 'Superseded by new push' },
-              instanceUrl
-            );
-          } catch (error) {
-            logExceptInTest(
-              `Failed to cancel old commit status for ${review.headSha} on project ${review.platformProjectId}:`,
-              error
-            );
-          }
-        })
-      );
     }
 
     // 7. Check for duplicate review (same project, MR, SHA)
-    const existingReview = await findExistingReview(project.path_with_namespace, mr.iid, headSha, {
-      type: 'webhook',
-      platformIntegrationId: integration.id,
-    });
+    const existingReview = await findExistingReview(reviewScope, headSha);
 
     if (existingReview) {
       logExceptInTest(
@@ -461,6 +406,91 @@ export async function shouldSkipUpdateForMergeCommit(args: {
   }
 }
 
+async function interruptCancelledReviews(
+  cancelledReviews: CancelledReviewRow[],
+  reason: string,
+  context: { repo: string; prNumber: number }
+) {
+  await Promise.allSettled(
+    cancelledReviews
+      .filter(review => review.prevStatus !== 'pending')
+      .map(async review => {
+        try {
+          const response = await codeReviewWorkerClient.cancelReview(
+            review.id,
+            reason,
+            review.latestActiveAttemptId ?? undefined
+          );
+
+          if (!response.success) {
+            addBreadcrumb({
+              category: 'code-review.cancel',
+              level: 'info',
+              message: 'Worker cancel returned success=false for cancelled review',
+              data: {
+                reviewId: review.id,
+                prevStatus: review.prevStatus,
+                repo: context.repo,
+                prNumber: context.prNumber,
+              },
+            });
+          }
+        } catch (error) {
+          logExceptInTest(`Failed to interrupt review ${review.id}:`, error);
+        }
+      })
+  );
+}
+
+async function setCancelledGitLabStatuses(args: {
+  cancelledReviews: CancelledReviewRow[];
+  fullIntegration: PlatformIntegration;
+  instanceUrl: string;
+  description: string;
+}) {
+  const gitlabCancelledReviews = args.cancelledReviews.flatMap(review => {
+    if (
+      review.platform === 'gitlab' &&
+      review.platformProjectId != null &&
+      review.headSha.length > 0
+    ) {
+      return [{ headSha: review.headSha, platformProjectId: review.platformProjectId }];
+    }
+
+    return [];
+  });
+  const projectAccessTokens = new Map<number, Promise<string>>();
+  const getProjectAccessToken = (platformProjectId: number) => {
+    let token = projectAccessTokens.get(platformProjectId);
+    if (!token) {
+      token = getOrCreateProjectAccessToken(args.fullIntegration, platformProjectId);
+      projectAccessTokens.set(platformProjectId, token);
+    }
+    return token;
+  };
+
+  await Promise.allSettled(
+    gitlabCancelledReviews.map(async review => {
+      try {
+        const pratToken = await getProjectAccessToken(review.platformProjectId);
+        await setCommitStatus(
+          pratToken,
+          review.platformProjectId,
+          review.headSha,
+          'canceled',
+          { description: args.description },
+          args.instanceUrl
+        );
+      } catch (error) {
+        logExceptInTest(
+          `Failed to cancel old commit status for ${review.headSha} on project ${review.platformProjectId}:`,
+          error
+        );
+      }
+    })
+  );
+}
+
 /**
  * When a merge-commit update arrives and we bail out to preserve the
  * in-flight review, the review row still points at the previous SHA, so
@@ -472,36 +502,67 @@ export async function shouldSkipUpdateForMergeCommit(args: {
 async function migrateInFlightReviewsToMergeCommitHead(args: {
   integrationId: string;
   projectId: number;
-  repoFullName: string;
-  mrIid: number;
   newHeadSha: string;
+  reviewScope: ReviewScope;
 }) {
   try {
-    const activeReviewIds = await findActiveReviewsForPR(
-      args.repoFullName,
-      args.mrIid,
-      args.newHeadSha,
-      { platformIntegrationId: args.integrationId }
-    );
+    const activeReviewIds = await findActiveReviewsForPR(args.reviewScope, args.newHeadSha);
     if (activeReviewIds.length === 0) return;
+    const [reviewIdToContinue, ...duplicateReviewIds] = activeReviewIds;
+    if (!reviewIdToContinue) return;
 
     const fullIntegration = await getIntegrationById(args.integrationId);
     if (!fullIntegration) return;
     const metadata = fullIntegration.metadata as { gitlab_instance_url?: string } | null;
     const instanceUrl = normalizeGitLabInstanceUrl(metadata?.gitlab_instance_url);
 
-    // In practice an MR has at most one active review; migrate the first.
-    const [reviewId] = activeReviewIds;
+    try {
+      // Update the DB row first. If this fails we never touched the new SHA,
+      // so there's nothing to clean up. If it succeeds but setCommitStatus
+      // fails below, the eventual completion callback will still target the
+      // correct (new) SHA — we just miss the transient pending badge.
+      await updateReviewHeadShaAndCheckRun(reviewIdToContinue, args.newHeadSha, null);
+    } catch (reviewMigrateError) {
+      logExceptInTest('Failed to migrate in-flight review onto merge commit head:', {
+        reviewId: reviewIdToContinue,
+        error: reviewMigrateError,
+      });
+      return;
+    }
 
-    // Update the DB row first. If this fails we never touched the new SHA,
-    // so there's nothing to clean up. If it succeeds but setCommitStatus
-    // fails below, the eventual completion callback will still target the
-    // correct (new) SHA — we just miss the transient pending badge.
-    await updateReviewHeadShaAndCheckRun(reviewId, args.newHeadSha, null);
+    if (duplicateReviewIds.length > 0) {
+      try {
+        const cancelledDuplicates = await cancelActiveCodeReviewsById(
+          duplicateReviewIds,
+          DUPLICATE_MERGE_CONTINUATION_REASON
+        );
+        if (cancelledDuplicates.length > 0) {
+          await interruptCancelledReviews(
+            cancelledDuplicates,
+            DUPLICATE_MERGE_CONTINUATION_REASON,
+            {
+              repo: `gitlab-project-${args.projectId}`,
+              prNumber: args.reviewScope.prNumber,
+            }
+          );
+          await setCancelledGitLabStatuses({
+            cancelledReviews: cancelledDuplicates,
+            fullIntegration,
+            instanceUrl,
+            description: DUPLICATE_MERGE_CONTINUATION_REASON,
+          });
+        }
+      } catch (duplicateCancelError) {
+        logExceptInTest('Failed to cancel duplicate merge-continuation reviews:', {
+          reviewIds: duplicateReviewIds,
+          error: duplicateCancelError,
+        });
+      }
+    }
 
     try {
       const pratToken = await getOrCreateProjectAccessToken(fullIntegration, args.projectId);
-      const detailsUrl = `${APP_URL}/code-reviews/${reviewId}`;
+      const detailsUrl = `${APP_URL}/code-reviews/${reviewIdToContinue}`;
       await setCommitStatus(
         pratToken,
         args.projectId,
@@ -514,7 +575,7 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
         instanceUrl
       );
       logExceptInTest(
-        `Migrated review ${reviewId} to merge-commit head ${args.newHeadSha} and set pending status`
+        `Migrated review ${reviewIdToContinue} to merge-commit head ${args.newHeadSha} and set pending status`
       );
     } catch (statusError) {
       logExceptInTest('Failed to set pending status on merge-commit head:', statusError);

@@ -86,7 +86,8 @@ function createDeferred<T>() {
 describe('tryDispatchPendingReviews', () => {
   let testUser: User;
   let testOrganizationId: string;
-  let platformIntegrationId: string;
+  let userIntegrationId: string;
+  let organizationIntegrationId: string;
   let reviewSequence = 0;
 
   beforeAll(async () => {
@@ -96,23 +97,36 @@ describe('tryDispatchPendingReviews', () => {
       .values({ name: `Dispatch Pending Reviews ${Date.now()}` })
       .returning({ id: organizations.id });
     testOrganizationId = organization.id;
-    const [integration] = await db
+    const [userIntegration, organizationIntegration] = await db
       .insert(platform_integrations)
-      .values({
-        owned_by_user_id: testUser.id,
-        platform: 'github',
-        integration_type: 'github_app',
-        platform_installation_id: `dispatch-pending-${Date.now()}-${Math.random()}`,
-        platform_account_id: 'dispatch-pending',
-        platform_account_login: 'dispatch-pending',
-        repository_access: 'all',
-        integration_status: 'active',
-      })
+      .values([
+        {
+          owned_by_user_id: testUser.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `dispatch-user-${Date.now()}`,
+          platform_account_id: 'dispatch-user',
+          platform_account_login: 'dispatch-user',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+        {
+          owned_by_organization_id: testOrganizationId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `dispatch-org-${Date.now()}`,
+          platform_account_id: 'dispatch-org',
+          platform_account_login: 'dispatch-org',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+      ])
       .returning({ id: platform_integrations.id });
-    if (!integration) {
-      throw new Error('Expected platform integration');
+    if (!userIntegration || !organizationIntegration) {
+      throw new Error('Expected dispatch review integrations');
     }
-    platformIntegrationId = integration.id;
+    userIntegrationId = userIntegration.id;
+    organizationIntegrationId = organizationIntegration.id;
   });
 
   beforeEach(() => {
@@ -155,9 +169,6 @@ describe('tryDispatchPendingReviews', () => {
   });
 
   afterAll(async () => {
-    await db
-      .delete(platform_integrations)
-      .where(eq(platform_integrations.id, platformIntegrationId));
     await db.delete(organizations).where(eq(organizations.id, testOrganizationId));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
@@ -178,19 +189,22 @@ describe('tryDispatchPendingReviews', () => {
     createdAt,
     updatedAt,
     startedAt = null,
+    platform = 'github',
   }: {
     owner: ReviewOwner;
     status: ReviewStatus;
     createdAt: string;
     updatedAt: string;
     startedAt?: string | null;
+    platform?: 'github' | 'bitbucket';
   }) {
     const sequence = reviewSequence++;
 
     return {
       owned_by_user_id: owner.type === 'user' ? owner.id : null,
       owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-      platform_integration_id: platformIntegrationId,
+      platform_integration_id:
+        owner.type === 'user' ? userIntegrationId : organizationIntegrationId,
       repo_full_name: REPO,
       pr_number: sequence + 1,
       pr_url: `https://github.com/${REPO}/pull/${sequence + 1}`,
@@ -199,10 +213,20 @@ describe('tryDispatchPendingReviews', () => {
       base_ref: 'main',
       head_ref: `feature/test-${sequence}`,
       head_sha: `sha-${sequence}`,
+      platform,
       status,
       started_at: startedAt,
       created_at: createdAt,
       updated_at: updatedAt,
+    };
+  }
+
+  function userReviewScope(prNumber: number) {
+    return {
+      owner: { type: 'user' as const, id: testUser.id, userId: testUser.id },
+      platform: 'github' as const,
+      repoFullName: REPO,
+      prNumber,
     };
   }
 
@@ -237,6 +261,45 @@ describe('tryDispatchPendingReviews', () => {
 
     return review;
   }
+
+  it('dispatches pending Bitbucket work', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          platform: 'bitbucket',
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    const result = await tryDispatchPendingReviews({
+      type: 'org',
+      id: testOrganizationId,
+      userId: testUser.id,
+    });
+
+    expect(result).toEqual(expect.objectContaining({ dispatched: 1, notDispatched: 0 }));
+    expect(await getStoredReview(review.id)).toEqual(
+      expect.objectContaining({ status: 'queued', dispatchReservationId: expect.any(String) })
+    );
+    expect(mockGetAgentConfigForOwner).toHaveBeenCalledWith(
+      { type: 'org', id: testOrganizationId, userId: testUser.id },
+      'code_review',
+      'bitbucket'
+    );
+    expect(mockPrepareReviewPayload).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: review.id, platform: 'bitbucket' })
+    );
+    expect(mockDispatchReview).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewId: review.id, skipBalanceCheck: true })
+    );
+  });
 
   it('keeps organization concurrency at 20 reviews', async () => {
     const recentTimestamp = minutesAgo(1);
@@ -443,6 +506,72 @@ describe('tryDispatchPendingReviews', () => {
     );
     expect(storedConfig?.is_enabled).toBe(false);
     expect(mockSendCodeReviewDisabledEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables only the Bitbucket config after a Bitbucket action-required failure', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+    const [githubConfig, bitbucketConfig] = await db
+      .insert(agent_configs)
+      .values([
+        {
+          owned_by_organization_id: testOrganizationId,
+          agent_type: 'code_review',
+          platform: 'github',
+          config: {},
+          is_enabled: true,
+          created_by: testUser.id,
+        },
+        {
+          owned_by_organization_id: testOrganizationId,
+          agent_type: 'code_review',
+          platform: 'bitbucket',
+          config: {},
+          is_enabled: true,
+          created_by: testUser.id,
+        },
+      ])
+      .returning();
+    mockGetAgentConfigForOwner.mockResolvedValue(bitbucketConfig);
+    mockPrepareReviewPayload.mockRejectedValue(
+      new Error('Selected model is not available for this cloud agent session')
+    );
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          platform: 'bitbucket',
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await tryDispatchPendingReviews({
+      type: 'org',
+      id: testOrganizationId,
+      userId: testUser.id,
+    });
+
+    const storedGithubConfig = await db.query.agent_configs.findFirst({
+      where: eq(agent_configs.id, githubConfig.id),
+    });
+    const storedBitbucketConfig = await db.query.agent_configs.findFirst({
+      where: eq(agent_configs.id, bitbucketConfig.id),
+    });
+    expect(storedGithubConfig?.is_enabled).toBe(true);
+    expect(storedGithubConfig?.runtime_state).toEqual({});
+    expect(storedBitbucketConfig?.is_enabled).toBe(false);
+    expect(storedBitbucketConfig?.runtime_state).toEqual(
+      expect.objectContaining({
+        code_review_action_required: expect.objectContaining({
+          reason: 'selected_model_unavailable',
+          triggeringReviewId: review.id,
+        }),
+      })
+    );
   });
 
   it('refuses to prepare pending work while action-required state is present', async () => {
@@ -1019,7 +1148,7 @@ describe('tryDispatchPendingReviews', () => {
       head_sha: 'sha-old',
     });
 
-    await cancelSupersededReviewsForPR(REPO, 99, 'sha-new', { platformIntegrationId });
+    await cancelSupersededReviewsForPR(userReviewScope(99), 'sha-new');
 
     const result = await tryDispatchPendingReviews({
       type: 'user',
@@ -1072,7 +1201,7 @@ describe('tryDispatchPendingReviews', () => {
 
     mockPrepareReviewPayload.mockImplementationOnce(async (params: { reviewId: string }) => {
       queueMicrotask(() => {
-        void cancelSupersededReviewsForPR(REPO, 100, 'sha-race-new', { platformIntegrationId });
+        void cancelSupersededReviewsForPR(userReviewScope(100), 'sha-race-new');
       });
       return { reviewId: params.reviewId, sessionInput: { prompt: 'Review this change.' } };
     });
@@ -1401,6 +1530,45 @@ describe('tryDispatchPendingReviews', () => {
     expect(dispatchedPayload.sessionInput.prompt.match(/kilo-review-analytics:v1/g)).toHaveLength(
       1
     );
+  });
+
+  it('forces analytics off for Bitbucket even when its stored config enables collection', async () => {
+    const timestamp = minutesAgo(1);
+    const owner = { type: 'org', id: testOrganizationId } satisfies ReviewOwner;
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      id: 'test-bitbucket-agent-config',
+      config: { review_analytics_enabled: true },
+      is_enabled: true,
+      runtime_state: {},
+    });
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          platform: 'bitbucket',
+          status: 'pending',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await tryDispatchPendingReviews({
+      type: 'org',
+      id: testOrganizationId,
+      userId: testUser.id,
+    });
+
+    const [attempt] = await db
+      .select()
+      .from(cloud_agent_code_review_attempts)
+      .where(eq(cloud_agent_code_review_attempts.code_review_id, review.id));
+    const dispatchedPayload = mockDispatchReview.mock.calls[0]?.[0];
+
+    expect(attempt?.analytics_enabled_at_dispatch).toBe(false);
+    expect(dispatchedPayload.sessionInput.prompt).toBe('Review this change.');
   });
 
   it('ignores enabled analytics config for personal reviews', async () => {

@@ -32,7 +32,7 @@ export type BitbucketRepositoryListResult =
 export type GetBitbucketTokenParams = {
   userId: string;
   orgId?: string;
-  integrationId?: string;
+  expectedIntegrationId?: string;
   workspaceUuid: string;
   repositoryUuid: string;
   repositoryUrl: string;
@@ -48,6 +48,7 @@ export type GetBitbucketTokenResult =
         | 'reconnect_required'
         | 'temporarily_unavailable'
         | 'insufficient_permissions'
+        | 'integration_mismatch'
         | 'workspace_mismatch'
         | 'repository_not_found'
         | 'repository_mismatch';
@@ -333,8 +334,11 @@ export async function resolveBitbucketToken(
     return { success: false, reason: authorizationResult.status };
   }
   const authorization = authorizationResult.authorization;
-  if (params.integrationId && params.integrationId !== authorization.integrationId) {
-    return { success: false, reason: 'not_connected' };
+  if (
+    params.expectedIntegrationId !== undefined &&
+    params.expectedIntegrationId !== authorization.integrationId
+  ) {
+    return { success: false, reason: 'integration_mismatch' };
   }
   if (
     authorization.workspace.uuid !== workspaceUuid ||

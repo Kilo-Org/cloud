@@ -19,11 +19,17 @@ export const BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES = [
   'pullrequest',
   'webhook',
 ] as const;
-
 export type BitbucketWorkspaceAccessTokenInvalidationReason =
   (typeof BITBUCKET_WORKSPACE_ACCESS_TOKEN_INVALIDATION_REASONS)[number];
 export type BitbucketWorkspaceAccessTokenRequiredScope =
   (typeof BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES)[number];
+export const BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_SCOPE_LABELS = {
+  account: 'Account Read',
+  repository: 'Repository Read',
+  'repository:write': 'Repository Write',
+  pullrequest: 'Pull request Read',
+  webhook: 'Webhooks Read and Write',
+} satisfies Record<BitbucketWorkspaceAccessTokenRequiredScope, string>;
 
 export function buildBitbucketOrganizationCredentialLockKey(organizationId: string): string {
   return `bitbucket-oauth-owner:org:${organizationId}`;
@@ -115,25 +121,46 @@ export function getUnexpectedBitbucketWorkspaceAccessTokenScopes(
   const expectedScopes = new Set<string>(
     BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES
   );
+  expectedScopes.add('pullrequest:write');
   return normalizeBitbucketWorkspaceAccessTokenScopes(observedScopes.join(' ')).filter(
     scope => !expectedScopes.has(scope)
+  );
+}
+
+function buildBitbucketWorkspaceAccessTokenEffectiveScopeSet(
+  observedScopes: readonly string[]
+): Set<string> {
+  const effectiveScopes = new Set(
+    observedScopes.map(scope => scope.trim().toLowerCase()).filter(Boolean)
+  );
+
+  // Keep documented Bitbucket implications out of normalization so stored
+  // provider evidence stays exact.
+  if (effectiveScopes.has('pullrequest:write')) {
+    effectiveScopes.add('pullrequest');
+    effectiveScopes.add('repository:write');
+  }
+  if (effectiveScopes.has('repository:write')) {
+    effectiveScopes.add('repository');
+  }
+  if (effectiveScopes.has('project')) {
+    effectiveScopes.add('repository');
+  }
+
+  return effectiveScopes;
+}
+
+export function getMissingBitbucketWorkspaceAccessTokenScopes(
+  observedScopes: readonly string[]
+): BitbucketWorkspaceAccessTokenRequiredScope[] {
+  const effectiveScopes = buildBitbucketWorkspaceAccessTokenEffectiveScopeSet(observedScopes);
+  return BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES.filter(
+    scope => !effectiveScopes.has(scope)
   );
 }
 
 export function hasRequiredBitbucketWorkspaceAccessTokenScopes(
   observedScopes: readonly string[]
 ): boolean {
-  const effectiveScopes = new Set(
-    observedScopes.map(scope => scope.trim().toLowerCase()).filter(Boolean)
-  );
-
-  // Bitbucket documents repository write as implying repository read. Keep the
-  // implication out of normalization so stored provider evidence stays exact.
-  if (effectiveScopes.has('repository:write')) {
-    effectiveScopes.add('repository');
-  }
-
-  return BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES.every(scope =>
-    effectiveScopes.has(scope)
-  );
+  return getMissingBitbucketWorkspaceAccessTokenScopes(observedScopes).length === 0;
 }

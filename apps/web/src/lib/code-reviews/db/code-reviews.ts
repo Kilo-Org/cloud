@@ -5,8 +5,9 @@
  * Follows Drizzle ORM patterns used throughout the codebase.
  */
 
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
+  agent_configs,
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,
   kilocode_users,
@@ -15,7 +16,14 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, asc, desc, count, ne, inArray, sql, sum, gte, lte, isNull } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import type { CreateReviewParams, CodeReviewStatus, ListReviewsParams, Owner } from '../core';
+import { CreateReviewParamsSchema } from '../core';
+import type {
+  CodeReviewPlatform,
+  CreateReviewParams,
+  CodeReviewStatus,
+  ListReviewsParams,
+  Owner,
+} from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
 import { isCodeReviewActionRequiredReason } from '../action-required-shared';
@@ -32,8 +40,6 @@ import {
 } from '../dispatch/dispatch-constants';
 
 type CodeReviewAttemptStatus = CodeReviewStatus;
-
-export type CodeReviewIdentityScope = { type: 'webhook'; platformIntegrationId: string };
 
 type InfraRetryAttemptResult =
   | {
@@ -76,6 +82,35 @@ export type DispatchableCodeReviewOwnerCandidatesResult = {
   hasMore: boolean;
 };
 
+export type ReviewScope = {
+  owner: Owner;
+  platform: CodeReviewPlatform;
+  repoFullName: string;
+  prNumber: number;
+  platformIntegrationId?: string;
+};
+
+function reviewScopeConditions(scope: ReviewScope) {
+  return [
+    scope.owner.type === 'org'
+      ? eq(cloud_agent_code_reviews.owned_by_organization_id, scope.owner.id)
+      : eq(cloud_agent_code_reviews.owned_by_user_id, scope.owner.id),
+    eq(cloud_agent_code_reviews.platform, scope.platform),
+    eq(cloud_agent_code_reviews.repo_full_name, scope.repoFullName),
+    eq(cloud_agent_code_reviews.pr_number, scope.prNumber),
+    ...(scope.platformIntegrationId
+      ? [
+          eq(cloud_agent_code_reviews.platform_integration_id, scope.platformIntegrationId),
+          isNull(cloud_agent_code_reviews.manual_config),
+        ]
+      : []),
+  ];
+}
+
+function providerPublishingCondition() {
+  return sql`(${cloud_agent_code_reviews.manual_config} IS NULL OR ${cloud_agent_code_reviews.manual_config}->>'outputMode' = 'provider')`;
+}
+
 function isTerminalCodeReviewStatus(status: string): boolean {
   return status === 'completed' || status === 'failed' || status === 'cancelled';
 }
@@ -112,10 +147,12 @@ export type CancelledReviewRow = {
   latestActiveAttemptId: string | null;
   checkRunId: number | null;
   headSha: string;
-  platform: 'github' | 'gitlab';
+  platform: CodeReviewPlatform;
   platformProjectId: number | null;
   platformIntegrationId: string | null;
 };
+
+type CodeReviewDatabase = typeof db | DrizzleTransaction;
 
 const RETRYABLE_PARENT_REVIEW_STATUSES = ['queued', 'running'];
 
@@ -148,43 +185,40 @@ function createCodeReviewErrorMetadata(params: CreateReviewParams) {
   };
 }
 
-function codeReviewIdentityScopeConditions(scope: CodeReviewIdentityScope) {
-  return [
-    eq(cloud_agent_code_reviews.platform_integration_id, scope.platformIntegrationId),
-    isNull(cloud_agent_code_reviews.manual_config),
-  ];
+function codeReviewInsertValues(
+  params: CreateReviewParams
+): typeof cloud_agent_code_reviews.$inferInsert {
+  return {
+    owned_by_organization_id: params.owner.type === 'org' ? params.owner.id : null,
+    owned_by_user_id: params.owner.type === 'user' ? params.owner.id : null,
+    platform_integration_id: params.platformIntegrationId,
+    repo_full_name: params.repoFullName,
+    pr_number: params.prNumber,
+    pr_url: params.prUrl,
+    pr_title: params.prTitle,
+    pr_author: params.prAuthor,
+    pr_author_github_id: params.prAuthorGithubId || null,
+    base_ref: params.baseRef,
+    head_ref: params.headRef,
+    head_sha: params.headSha,
+    platform: params.platform ?? 'github',
+    platform_project_id: params.platformProjectId ?? null,
+    manual_config: params.manualConfig ?? null,
+    agent_version: 'v2',
+    status: 'pending',
+  };
 }
 
-function providerPublishingCondition() {
-  return sql`(${cloud_agent_code_reviews.manual_config} IS NULL OR ${cloud_agent_code_reviews.manual_config}->>'outputMode' = 'provider')`;
-}
 /**
  * Creates a new code review record
  * Returns the created review ID
  */
 export async function createCodeReview(params: CreateReviewParams): Promise<string> {
   try {
+    CreateReviewParamsSchema.parse(params);
     const [review] = await db
       .insert(cloud_agent_code_reviews)
-      .values({
-        owned_by_organization_id: params.owner.type === 'org' ? params.owner.id : null,
-        owned_by_user_id: params.owner.type === 'user' ? params.owner.id : null,
-        platform_integration_id: params.platformIntegrationId || null,
-        repo_full_name: params.repoFullName,
-        pr_number: params.prNumber,
-        pr_url: params.prUrl,
-        pr_title: params.prTitle,
-        pr_author: params.prAuthor,
-        pr_author_github_id: params.prAuthorGithubId || null,
-        base_ref: params.baseRef,
-        head_ref: params.headRef,
-        head_sha: params.headSha,
-        platform: params.platform ?? 'github',
-        platform_project_id: params.platformProjectId ?? null,
-        manual_config: params.manualConfig ?? null,
-        agent_version: 'v2',
-        status: 'pending',
-      })
+      .values(codeReviewInsertValues(params))
       .returning({ id: cloud_agent_code_reviews.id });
 
     return review.id;
@@ -223,12 +257,16 @@ export async function listDispatchableCodeReviewOwnerCandidates(
   params: {
     limit?: number;
     pendingCreatedAtWindow?: PendingCodeReviewCreatedAtWindow;
+    excludeBitbucket?: boolean;
   } = {}
 ): Promise<DispatchableCodeReviewOwnerCandidatesResult> {
   const limit = Math.max(1, Math.min(params.limit ?? 100, 1_000));
   const staleQueuedCutoff = staleQueuedCodeReviewCutoffSql();
   const staleRunningCutoff = staleRunningCodeReviewCutoffSql();
   const { pendingCreatedAtWindow } = params;
+  const bitbucketExclusion = params.excludeBitbucket
+    ? sql`AND ${cloud_agent_code_reviews.platform} != 'bitbucket'`
+    : sql``;
 
   try {
     const result = await db.execute<{ owner_type: 'user' | 'org'; owner_id: string }>(sql`
@@ -245,6 +283,7 @@ export async function listDispatchableCodeReviewOwnerCandidates(
           MIN(${cloud_agent_code_reviews.created_at}) AS oldest_reconsiderable_at
         FROM ${cloud_agent_code_reviews}
         WHERE ${reconsiderableCodeReviewWorkCondition(staleQueuedCutoff, pendingCreatedAtWindow)}
+          ${bitbucketExclusion}
         GROUP BY owner_type, owner_id
       ), active_work AS (
         SELECT
@@ -1302,7 +1341,7 @@ export async function countCodeReviews(params: {
   owner: Owner;
   status?: CodeReviewStatus;
   repoFullName?: string;
-  platform?: 'github' | 'gitlab';
+  platform?: CodeReviewPlatform;
 }): Promise<number> {
   try {
     const { owner, status, repoFullName, platform } = params;
@@ -1343,38 +1382,84 @@ export async function countCodeReviews(params: {
   }
 }
 
+async function findExistingReviewWithDatabase(
+  database: CodeReviewDatabase,
+  scope: ReviewScope,
+  headSha: string
+): Promise<CloudAgentCodeReview | null> {
+  const [review] = await database
+    .select()
+    .from(cloud_agent_code_reviews)
+    .where(and(...reviewScopeConditions(scope), eq(cloud_agent_code_reviews.head_sha, headSha)))
+    .limit(1);
+
+  return review || null;
+}
+
+async function findReviewByLegacyUniqueKeyWithDatabase(
+  database: CodeReviewDatabase,
+  params: Pick<CreateReviewParams, 'repoFullName' | 'prNumber' | 'headSha'>
+): Promise<CloudAgentCodeReview | null> {
+  const [review] = await database
+    .select()
+    .from(cloud_agent_code_reviews)
+    .where(
+      and(
+        eq(cloud_agent_code_reviews.repo_full_name, params.repoFullName),
+        eq(cloud_agent_code_reviews.pr_number, params.prNumber),
+        eq(cloud_agent_code_reviews.head_sha, params.headSha)
+      )
+    )
+    .limit(1);
+
+  return review || null;
+}
+
 /**
- * Checks if a code review already exists for a given repo, PR number, and commit SHA
- * Returns the existing review if found, null otherwise
+ * Checks if a code review already exists for an exact review scope and commit SHA.
+ * Returns the existing review if found, null otherwise.
  */
 export async function findExistingReview(
-  repoFullName: string,
-  prNumber: number,
-  headSha: string,
-  scope: CodeReviewIdentityScope
+  scope: ReviewScope,
+  headSha: string
 ): Promise<CloudAgentCodeReview | null> {
   try {
-    const [review] = await db
-      .select()
-      .from(cloud_agent_code_reviews)
-      .where(
-        and(
-          eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
-          eq(cloud_agent_code_reviews.pr_number, prNumber),
-          eq(cloud_agent_code_reviews.head_sha, headSha),
-          ...codeReviewIdentityScopeConditions(scope)
-        )
-      )
-      .limit(1);
-
-    return review || null;
+    return await findExistingReviewWithDatabase(db, scope, headSha);
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findExistingReview' },
-      extra: { repoFullName, prNumber, headSha, scope },
+      extra: { scope, headSha },
     });
     throw error;
   }
+}
+
+export function findExistingReviewInTransaction(
+  tx: DrizzleTransaction,
+  scope: ReviewScope,
+  headSha: string
+): Promise<CloudAgentCodeReview | null> {
+  return findExistingReviewWithDatabase(tx, scope, headSha);
+}
+
+export async function createCodeReviewIfAbsentInTransaction(
+  tx: DrizzleTransaction,
+  scope: ReviewScope,
+  params: CreateReviewParams
+): Promise<{ reviewId: string; created: boolean }> {
+  CreateReviewParamsSchema.parse(params);
+  const [created] = await tx
+    .insert(cloud_agent_code_reviews)
+    .values(codeReviewInsertValues(params))
+    .onConflictDoNothing()
+    .returning({ id: cloud_agent_code_reviews.id });
+  if (created) return { reviewId: created.id, created: true };
+
+  const existing =
+    (await findExistingReviewWithDatabase(tx, scope, params.headSha)) ??
+    (await findReviewByLegacyUniqueKeyWithDatabase(tx, params));
+  if (!existing) throw new Error('Code review conflict winner not found');
+  return { reviewId: existing.id, created: false };
 }
 
 /**
@@ -1430,14 +1515,12 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
 }
 
 /**
- * Finds all active (non-completed) reviews for a PR except the given SHA
- * Returns review IDs that should be cancelled when a new push comes in
+ * Finds all active reviews in an exact review scope except the given SHA.
+ * Returns review IDs that should be cancelled when a new push comes in.
  */
 export async function findActiveReviewsForPR(
-  repoFullName: string,
-  prNumber: number,
-  excludeSha: string,
-  scope: { platformIntegrationId: string }
+  scope: ReviewScope,
+  excludeSha: string
 ): Promise<string[]> {
   try {
     const reviews = await db
@@ -1445,137 +1528,43 @@ export async function findActiveReviewsForPR(
       .from(cloud_agent_code_reviews)
       .where(
         and(
-          eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
-          eq(cloud_agent_code_reviews.pr_number, prNumber),
-          eq(cloud_agent_code_reviews.platform_integration_id, scope.platformIntegrationId),
-          isNull(cloud_agent_code_reviews.manual_config),
+          ...reviewScopeConditions(scope),
           ne(cloud_agent_code_reviews.head_sha, excludeSha),
           inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
         )
+      )
+      .orderBy(
+        sql`CASE ${cloud_agent_code_reviews.status} WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END`,
+        desc(cloud_agent_code_reviews.created_at),
+        asc(cloud_agent_code_reviews.id)
       );
 
-    return reviews.map(r => r.id);
+    return reviews.map(review => review.id);
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findActiveReviewsForPR' },
-      extra: { repoFullName, prNumber, excludeSha, scope },
+      extra: { scope, excludeSha },
     });
     throw error;
   }
 }
 
-export async function cancelSupersededReviewsForPR(
-  repoFullName: string,
-  prNumber: number,
-  excludeSha: string,
-  scope: { platformIntegrationId: string }
-): Promise<CancelledReviewRow[]> {
-  try {
-    const result = await db.execute<{
-      id: string;
-      prev_status: 'pending' | 'queued' | 'running';
-      session_id: string | null;
-      latest_active_attempt_id: string | null;
-      check_run_id: number | null;
-      head_sha: string;
-      platform: 'github' | 'gitlab';
-      platform_project_id: number | null;
-      platform_integration_id: string | null;
-    }>(sql`
-      WITH targets AS (
-        SELECT
-          id,
-          status AS prev_status,
-          session_id,
-          (
-            SELECT attempts.id
-            FROM ${cloud_agent_code_review_attempts} AS attempts
-            WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
-              AND attempts.status IN ('pending', 'queued', 'running')
-            ORDER BY attempts.attempt_number DESC
-            LIMIT 1
-          ) AS latest_active_attempt_id,
-          check_run_id,
-          head_sha,
-          platform,
-          platform_project_id,
-          platform_integration_id
-        FROM ${cloud_agent_code_reviews}
-        WHERE ${cloud_agent_code_reviews.repo_full_name} = ${repoFullName}
-          AND ${cloud_agent_code_reviews.pr_number} = ${prNumber}
-          AND ${cloud_agent_code_reviews.platform_integration_id} = ${scope.platformIntegrationId}
-          AND ${cloud_agent_code_reviews.manual_config} IS NULL
-          AND ${cloud_agent_code_reviews.head_sha} != ${excludeSha}
-          AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
-      ), cancelled_attempts AS (
-        UPDATE ${cloud_agent_code_review_attempts} AS attempts
-        SET
-          status = 'cancelled',
-          terminal_reason = 'superseded',
-          error_message = 'Superseded by new push',
-          completed_at = now(),
-          updated_at = now()
-        FROM targets
-        WHERE attempts.code_review_id = targets.id
-          AND attempts.status IN ('pending', 'queued', 'running')
-      )
-      UPDATE ${cloud_agent_code_reviews} AS reviews
-      SET
-        status = 'cancelled',
-        terminal_reason = 'superseded',
-        error_message = 'Superseded by new push',
-        completed_at = now(),
-        updated_at = now()
-      FROM targets
-      WHERE reviews.id = targets.id
-      RETURNING
-        reviews.id,
-        targets.prev_status,
-        targets.session_id,
-        targets.latest_active_attempt_id,
-        targets.check_run_id,
-        targets.head_sha,
-        targets.platform,
-        targets.platform_project_id,
-        targets.platform_integration_id
-    `);
-
-    return result.rows.map(row => ({
-      id: row.id,
-      prevStatus: row.prev_status,
-      sessionId: row.session_id,
-      latestActiveAttemptId: row.latest_active_attempt_id,
-      checkRunId: row.check_run_id,
-      headSha: row.head_sha,
-      platform: row.platform,
-      platformProjectId: row.platform_project_id,
-      platformIntegrationId: row.platform_integration_id,
-    }));
-  } catch (error) {
-    captureException(error, {
-      tags: { operation: 'cancelSupersededReviewsForPR' },
-      extra: { repoFullName, prNumber, excludeSha, scope },
-    });
-    throw error;
-  }
-}
-
-export async function findActiveProviderPublishingReview(params: {
+export async function findActiveProviderPublishingReview(input: {
   platformIntegrationId: string;
   repoFullName: string;
   prNumber: number;
-}): Promise<CloudAgentCodeReview | null> {
+}): Promise<{ id: string } | null> {
   try {
     const [review] = await db
-      .select()
+      .select({ id: cloud_agent_code_reviews.id })
       .from(cloud_agent_code_reviews)
       .where(
         and(
-          eq(cloud_agent_code_reviews.platform_integration_id, params.platformIntegrationId),
-          eq(cloud_agent_code_reviews.repo_full_name, params.repoFullName),
-          eq(cloud_agent_code_reviews.pr_number, params.prNumber),
-          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running']),
-          providerPublishingCondition()
+          eq(cloud_agent_code_reviews.platform_integration_id, input.platformIntegrationId),
+          eq(cloud_agent_code_reviews.repo_full_name, input.repoFullName),
+          eq(cloud_agent_code_reviews.pr_number, input.prNumber),
+          providerPublishingCondition(),
+          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
         )
       )
       .limit(1);
@@ -1584,40 +1573,367 @@ export async function findActiveProviderPublishingReview(params: {
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findActiveProviderPublishingReview' },
-      extra: params,
+      extra: { input },
     });
     throw error;
   }
 }
 
-export type ReviewContinuationScope =
-  | { platform: 'github'; integrationId: string }
-  | { platform: 'gitlab'; integrationId: string; projectId: number };
+export function bitbucketCodeReviewerLifecycleLockKey(integrationId: string): string {
+  return `bitbucket-code-review-lifecycle:${integrationId}`;
+}
+
+type CancelledReviewDatabaseRow = {
+  id: string;
+  prev_status: 'pending' | 'queued' | 'running';
+  session_id: string | null;
+  latest_active_attempt_id: string | null;
+  check_run_id: number | null;
+  head_sha: string;
+  platform: CodeReviewPlatform;
+  platform_project_id: number | null;
+  platform_integration_id: string | null;
+};
+
+function mapCancelledReviewRow(row: CancelledReviewDatabaseRow): CancelledReviewRow {
+  return {
+    id: row.id,
+    prevStatus: row.prev_status,
+    sessionId: row.session_id,
+    latestActiveAttemptId: row.latest_active_attempt_id,
+    checkRunId: row.check_run_id,
+    headSha: row.head_sha,
+    platform: row.platform,
+    platformProjectId: row.platform_project_id,
+    platformIntegrationId: row.platform_integration_id,
+  };
+}
+
+async function cancelReviewsForPR(
+  database: CodeReviewDatabase,
+  scope: ReviewScope,
+  excludeSha?: string
+): Promise<CancelledReviewRow[]> {
+  const ownerCondition =
+    scope.owner.type === 'org'
+      ? sql`${cloud_agent_code_reviews.owned_by_organization_id} = ${scope.owner.id}`
+      : sql`${cloud_agent_code_reviews.owned_by_user_id} = ${scope.owner.id}`;
+  const excludedHeadCondition =
+    excludeSha === undefined
+      ? sql``
+      : sql`AND ${cloud_agent_code_reviews.head_sha} != ${excludeSha}`;
+  const platformIntegrationCondition =
+    scope.platformIntegrationId === undefined
+      ? sql``
+      : sql`AND ${cloud_agent_code_reviews.platform_integration_id} = ${scope.platformIntegrationId}
+            AND ${cloud_agent_code_reviews.manual_config} IS NULL`;
+  const result = await database.execute<CancelledReviewDatabaseRow>(sql`
+    WITH targets AS (
+      SELECT
+        id,
+        status AS prev_status,
+        session_id,
+        (
+          SELECT attempts.id
+          FROM ${cloud_agent_code_review_attempts} AS attempts
+          WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
+            AND attempts.status IN ('pending', 'queued', 'running')
+          ORDER BY attempts.attempt_number DESC
+          LIMIT 1
+        ) AS latest_active_attempt_id,
+        check_run_id,
+        head_sha,
+        platform,
+        platform_project_id,
+        platform_integration_id
+      FROM ${cloud_agent_code_reviews}
+      WHERE ${ownerCondition}
+        AND ${cloud_agent_code_reviews.platform} = ${scope.platform}
+        AND ${cloud_agent_code_reviews.repo_full_name} = ${scope.repoFullName}
+        AND ${cloud_agent_code_reviews.pr_number} = ${scope.prNumber}
+        ${excludedHeadCondition}
+        ${platformIntegrationCondition}
+        AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
+    ), cancelled_attempts AS (
+      UPDATE ${cloud_agent_code_review_attempts} AS attempts
+      SET
+        status = 'cancelled',
+        terminal_reason = 'superseded',
+        error_message = 'Superseded by new push',
+        completed_at = now(),
+        updated_at = now()
+      FROM targets
+      WHERE attempts.code_review_id = targets.id
+        AND attempts.status IN ('pending', 'queued', 'running')
+    )
+    UPDATE ${cloud_agent_code_reviews} AS reviews
+    SET
+      status = 'cancelled',
+      terminal_reason = 'superseded',
+      error_message = 'Superseded by new push',
+      completed_at = now(),
+      updated_at = now()
+    FROM targets
+    WHERE reviews.id = targets.id
+    RETURNING
+      reviews.id,
+      targets.prev_status,
+      targets.session_id,
+      targets.latest_active_attempt_id,
+      targets.check_run_id,
+      targets.head_sha,
+      targets.platform,
+      targets.platform_project_id,
+      targets.platform_integration_id
+  `);
+
+  return result.rows.map(mapCancelledReviewRow);
+}
+
+async function cancelActiveCodeReviewsByIdWithDatabase(
+  database: CodeReviewDatabase,
+  reviewIds: string[],
+  errorMessage: string
+): Promise<CancelledReviewRow[]> {
+  if (reviewIds.length === 0) return [];
+
+  const result = await database.execute<CancelledReviewDatabaseRow>(sql`
+    WITH targets AS (
+      SELECT
+        id,
+        status AS prev_status,
+        session_id,
+        (
+          SELECT attempts.id
+          FROM ${cloud_agent_code_review_attempts} AS attempts
+          WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
+            AND attempts.status IN ('pending', 'queued', 'running')
+          ORDER BY attempts.attempt_number DESC
+          LIMIT 1
+        ) AS latest_active_attempt_id,
+        check_run_id,
+        head_sha,
+        platform,
+        platform_project_id,
+        platform_integration_id
+      FROM ${cloud_agent_code_reviews}
+      WHERE ${inArray(cloud_agent_code_reviews.id, reviewIds)}
+        AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
+    ), cancelled_attempts AS (
+      UPDATE ${cloud_agent_code_review_attempts} AS attempts
+      SET
+        status = 'cancelled',
+        terminal_reason = 'superseded',
+        error_message = ${errorMessage},
+        completed_at = now(),
+        updated_at = now()
+      FROM targets
+      WHERE attempts.code_review_id = targets.id
+        AND attempts.status IN ('pending', 'queued', 'running')
+    )
+    UPDATE ${cloud_agent_code_reviews} AS reviews
+    SET
+      status = 'cancelled',
+      terminal_reason = 'superseded',
+      error_message = ${errorMessage},
+      completed_at = now(),
+      updated_at = now()
+    FROM targets
+    WHERE reviews.id = targets.id
+    RETURNING
+      reviews.id,
+      targets.prev_status,
+      targets.session_id,
+      targets.latest_active_attempt_id,
+      targets.check_run_id,
+      targets.head_sha,
+      targets.platform,
+      targets.platform_project_id,
+      targets.platform_integration_id
+  `);
+
+  return result.rows.map(mapCancelledReviewRow);
+}
+
+type IntegrationReviewCancellationInput = {
+  organizationId: string;
+  platform: CodeReviewPlatform;
+  integrationId: string;
+};
+
+async function cancelActiveCodeReviewsForIntegrationWithDatabase(
+  database: CodeReviewDatabase,
+  input: IntegrationReviewCancellationInput,
+  errorMessage: string
+): Promise<CancelledReviewRow[]> {
+  const result = await database.execute<CancelledReviewDatabaseRow>(sql`
+    WITH targets AS (
+      SELECT
+        id,
+        status AS prev_status,
+        session_id,
+        (
+          SELECT attempts.id
+          FROM ${cloud_agent_code_review_attempts} AS attempts
+          WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
+            AND attempts.status IN ('pending', 'queued', 'running')
+          ORDER BY attempts.attempt_number DESC
+          LIMIT 1
+        ) AS latest_active_attempt_id,
+        check_run_id,
+        head_sha,
+        platform,
+        platform_project_id,
+        platform_integration_id
+      FROM ${cloud_agent_code_reviews}
+      WHERE ${cloud_agent_code_reviews.owned_by_organization_id} = ${input.organizationId}
+        AND ${cloud_agent_code_reviews.platform} = ${input.platform}
+        AND ${cloud_agent_code_reviews.platform_integration_id} = ${input.integrationId}
+        AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
+    ), cancelled_attempts AS (
+      UPDATE ${cloud_agent_code_review_attempts} AS attempts
+      SET
+        status = 'cancelled',
+        terminal_reason = 'user_cancelled',
+        error_message = ${errorMessage},
+        completed_at = now(),
+        updated_at = now()
+      FROM targets
+      WHERE attempts.code_review_id = targets.id
+        AND attempts.status IN ('pending', 'queued', 'running')
+    )
+    UPDATE ${cloud_agent_code_reviews} AS reviews
+    SET
+      status = 'cancelled',
+      terminal_reason = 'user_cancelled',
+      error_message = ${errorMessage},
+      completed_at = now(),
+      updated_at = now()
+    FROM targets
+    WHERE reviews.id = targets.id
+    RETURNING
+      reviews.id,
+      targets.prev_status,
+      targets.session_id,
+      targets.latest_active_attempt_id,
+      targets.check_run_id,
+      targets.head_sha,
+      targets.platform,
+      targets.platform_project_id,
+      targets.platform_integration_id
+  `);
+
+  return result.rows.map(mapCancelledReviewRow);
+}
+
+export async function cancelActiveCodeReviewsForIntegration(
+  input: IntegrationReviewCancellationInput
+): Promise<CancelledReviewRow[]> {
+  try {
+    return await cancelActiveCodeReviewsForIntegrationWithDatabase(
+      db,
+      input,
+      'Platform integration disconnected'
+    );
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'cancelActiveCodeReviewsForIntegration' },
+      extra: input,
+    });
+    throw error;
+  }
+}
+
+export async function cancelActiveCodeReviewsById(
+  reviewIds: string[],
+  errorMessage: string
+): Promise<CancelledReviewRow[]> {
+  try {
+    return await cancelActiveCodeReviewsByIdWithDatabase(db, reviewIds, errorMessage);
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'cancelActiveCodeReviewsById' },
+      extra: { reviewIds, errorMessage },
+    });
+    throw error;
+  }
+}
+
+export async function disableBitbucketCodeReviewerForIntegration(input: {
+  organizationId: string;
+  integrationId: string;
+}): Promise<CancelledReviewRow[]> {
+  try {
+    return await db.transaction(async tx => {
+      const lockKey = bitbucketCodeReviewerLifecycleLockKey(input.integrationId);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+      await tx
+        .update(agent_configs)
+        .set({ is_enabled: false, updated_at: new Date().toISOString() })
+        .where(
+          and(
+            eq(agent_configs.owned_by_organization_id, input.organizationId),
+            eq(agent_configs.agent_type, 'code_review'),
+            eq(agent_configs.platform, 'bitbucket')
+          )
+        );
+      return cancelActiveCodeReviewsForIntegrationWithDatabase(
+        tx,
+        {
+          ...input,
+          platform: 'bitbucket',
+        },
+        'Bitbucket Code Reviewer disabled'
+      );
+    });
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'disableBitbucketCodeReviewerForIntegration' },
+      extra: input,
+    });
+    throw error;
+  }
+}
+
+export async function cancelSupersededReviewsForPR(
+  scope: ReviewScope,
+  excludeSha: string
+): Promise<CancelledReviewRow[]> {
+  try {
+    return await cancelReviewsForPR(db, scope, excludeSha);
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'cancelSupersededReviewsForPR' },
+      extra: { scope, excludeSha },
+    });
+    throw error;
+  }
+}
+
+export function cancelSupersededReviewsForPRInTransaction(
+  tx: DrizzleTransaction,
+  scope: ReviewScope,
+  excludeSha: string
+): Promise<CancelledReviewRow[]> {
+  return cancelReviewsForPR(tx, scope, excludeSha);
+}
+
+export function cancelActiveReviewsForPRInTransaction(
+  tx: DrizzleTransaction,
+  scope: ReviewScope
+): Promise<CancelledReviewRow[]> {
+  return cancelReviewsForPR(tx, scope);
+}
 
 /**
- * Finds the most recent completed review for the same PR with a different SHA.
- * Used for incremental reviews: returns the previous HEAD SHA so the agent
- * can diff against it instead of re-reviewing the entire PR.
- * Also returns session_id (nullable) so the caller can derive both the
- * incremental diff base and the session continuation target from a single row.
- * Continuation requires exact integration identity so equivalent repository
- * paths on separate installations or instances never share sessions.
+ * Finds the most recent completed review in an exact review scope with a different SHA.
+ * Returns the previous HEAD SHA and session ID from the same row.
  */
 export async function findPreviousCompletedReview(
-  repoFullName: string,
-  prNumber: number,
-  excludeSha: string,
-  scope: ReviewContinuationScope
+  scope: ReviewScope,
+  excludeSha: string
 ): Promise<{ head_sha: string; session_id: string | null } | null> {
   try {
-    const integrationScopeFilter = eq(
-      cloud_agent_code_reviews.platform_integration_id,
-      scope.integrationId
-    );
-    const gitLabScopeFilter =
-      scope.platform === 'gitlab'
-        ? eq(cloud_agent_code_reviews.platform_project_id, scope.projectId)
-        : undefined;
     const [review] = await db
       .select({
         head_sha: cloud_agent_code_reviews.head_sha,
@@ -1626,11 +1942,7 @@ export async function findPreviousCompletedReview(
       .from(cloud_agent_code_reviews)
       .where(
         and(
-          eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
-          eq(cloud_agent_code_reviews.pr_number, prNumber),
-          eq(cloud_agent_code_reviews.platform, scope.platform),
-          integrationScopeFilter,
-          gitLabScopeFilter,
+          ...reviewScopeConditions(scope),
           ne(cloud_agent_code_reviews.head_sha, excludeSha),
           eq(cloud_agent_code_reviews.status, 'completed')
         )
@@ -1642,7 +1954,7 @@ export async function findPreviousCompletedReview(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findPreviousCompletedReview' },
-      extra: { repoFullName, prNumber, excludeSha, scope },
+      extra: { scope, excludeSha },
     });
     throw error;
   }

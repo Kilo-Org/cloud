@@ -1,6 +1,7 @@
 const mockGetBotUserId = jest.fn();
 const mockGetAgentConfigForOwner = jest.fn();
 const mockCreateCodeReview = jest.fn();
+const mockCancelActiveCodeReviewsById = jest.fn();
 const mockCancelSupersededReviewsForPR = jest.fn();
 const mockFindExistingReview = jest.fn();
 const mockFindActiveReviewsForPR = jest.fn();
@@ -23,6 +24,7 @@ jest.mock('@/lib/agent-config/db/agent-configs', () => ({
 }));
 
 jest.mock('@/lib/code-reviews/db/code-reviews', () => ({
+  cancelActiveCodeReviewsById: (...args: unknown[]) => mockCancelActiveCodeReviewsById(...args),
   createCodeReview: (...args: unknown[]) => mockCreateCodeReview(...args),
   cancelSupersededReviewsForPR: (...args: unknown[]) => mockCancelSupersededReviewsForPR(...args),
   findExistingReview: (...args: unknown[]) => mockFindExistingReview(...args),
@@ -120,6 +122,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGetBotUserId.mockResolvedValue(null);
   mockGetAgentConfigForOwner.mockResolvedValue(null);
+  mockCancelActiveCodeReviewsById.mockResolvedValue([]);
   mockCreateCodeReview.mockResolvedValue('review-1');
   mockCancelSupersededReviewsForPR.mockResolvedValue([]);
   mockFindExistingReview.mockResolvedValue(null);
@@ -239,9 +242,20 @@ describe('handleMergeRequestCodeReview', () => {
     );
 
     expect(response.status).toBe(202);
-    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith('acme/widgets', 42, 'abc123', {
-      platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
-    });
+    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith(
+      {
+        owner: {
+          type: 'org',
+          id: 'f2aa36d7-9c1b-4db9-ae4a-a4492618796d',
+          userId: 'bot-user-1',
+        },
+        platform: 'gitlab',
+        platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
+        prNumber: 42,
+        repoFullName: 'acme/widgets',
+      },
+      'abc123'
+    );
     expect(mockCancelReview).toHaveBeenCalledTimes(2);
     expect(mockCancelReview).toHaveBeenNthCalledWith(
       1,
@@ -279,7 +293,14 @@ describe('handleMergeRequestCodeReview', () => {
       { description: 'Superseded by new push' },
       'https://gitlab.example.com'
     );
-    expect(mockCreateCodeReview).toHaveBeenCalledTimes(1);
+    expect(mockCreateCodeReview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: 'gitlab',
+        platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
+        repoFullName: 'acme/widgets',
+        platformProjectId: 123,
+      })
+    );
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
   });
 
@@ -300,6 +321,95 @@ describe('handleMergeRequestCodeReview', () => {
     expect(response.status).toBe(200);
     expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
     expect(mockCancelReview).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('migrates one active review before cancelling duplicate reviews for the merge commit', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockFindActiveReviewsForPR.mockResolvedValue(['review-1', 'review-2']);
+    mockCancelActiveCodeReviewsById.mockResolvedValue([
+      {
+        id: 'review-2',
+        prevStatus: 'queued',
+        sessionId: 'session-review-2',
+        latestActiveAttemptId: 'attempt-review-2',
+        checkRunId: null,
+        headSha: 'old-duplicate-sha',
+        platform: 'gitlab',
+        platformProjectId: 123,
+        platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
+      },
+    ]);
+    mockIsMergeCommit.mockResolvedValue(true);
+
+    const response = await handleMergeRequestCodeReview(
+      mergeRequestPayload(),
+      platformIntegration()
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCancelActiveCodeReviewsById).toHaveBeenCalledWith(
+      ['review-2'],
+      'Superseded by duplicate merge-commit continuation'
+    );
+    expect(mockCancelReview).toHaveBeenCalledWith(
+      'review-2',
+      'Superseded by duplicate merge-commit continuation',
+      'attempt-review-2'
+    );
+    expect(mockUpdateReviewHeadShaAndCheckRun).toHaveBeenCalledTimes(1);
+    expect(mockUpdateReviewHeadShaAndCheckRun).toHaveBeenCalledWith('review-1', 'abc123', null);
+    expect(mockSetCommitStatus).toHaveBeenCalledTimes(2);
+    expect(mockSetCommitStatus).toHaveBeenNthCalledWith(
+      1,
+      'prat-token',
+      123,
+      'old-duplicate-sha',
+      'canceled',
+      { description: 'Superseded by duplicate merge-commit continuation' },
+      'https://gitlab.example.com'
+    );
+    expect(mockSetCommitStatus).toHaveBeenNthCalledWith(
+      2,
+      'prat-token',
+      123,
+      'abc123',
+      'pending',
+      {
+        targetUrl: 'http://localhost:3000/code-reviews/review-1',
+        description: 'Kilo Code Review continuing from previous commit',
+      },
+      'https://gitlab.example.com'
+    );
+    expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('does not cancel duplicate merge-continuation reviews when survivor migration fails', async () => {
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
+    mockGetAgentConfigForOwner.mockResolvedValue({
+      is_enabled: true,
+      config: {},
+    });
+    mockFindActiveReviewsForPR.mockResolvedValue(['review-1', 'review-2']);
+    mockUpdateReviewHeadShaAndCheckRun.mockRejectedValue(new Error('unique conflict'));
+    mockIsMergeCommit.mockResolvedValue(true);
+
+    const response = await handleMergeRequestCodeReview(
+      mergeRequestPayload(),
+      platformIntegration()
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateReviewHeadShaAndCheckRun).toHaveBeenCalledWith('review-1', 'abc123', null);
+    expect(mockCancelActiveCodeReviewsById).not.toHaveBeenCalled();
+    expect(mockCancelReview).not.toHaveBeenCalled();
+    expect(mockSetCommitStatus).not.toHaveBeenCalled();
+    expect(mockCancelSupersededReviewsForPR).not.toHaveBeenCalled();
     expect(mockCreateCodeReview).not.toHaveBeenCalled();
   });
 });

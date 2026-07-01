@@ -1118,6 +1118,9 @@ export type CodeReviewFindingSecurityClass =
 
 // --- CodeReviewAgentConfig ---
 
+export const CODE_REVIEW_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
+export type CodeReviewPlatform = (typeof CODE_REVIEW_PLATFORMS)[number];
+
 export const ManuallyAddedRepositorySchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -1141,7 +1144,7 @@ export const CodeReviewAgentConfigSchema = z.object({
     .nullable()
     .optional(),
   repository_selection_mode: z.enum(['all', 'selected']).optional(),
-  selected_repository_ids: z.array(z.number()).optional(),
+  selected_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
   disable_review_md: z.boolean().optional(),

@@ -7,24 +7,26 @@ import { Button } from '@/components/ui/button';
 import { Lock, Unlock, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type Repository = {
-  id: number;
+export type RepositoryId = string | number;
+
+export type Repository<TId extends RepositoryId = number> = {
+  id: TId;
   name: string;
   full_name: string;
   private: boolean;
 };
 
-export type RepositoryMultiSelectProps = {
-  repositories: Repository[];
-  selectedIds: number[];
-  onSelectionChange: (selectedIds: number[]) => void;
+export type RepositoryMultiSelectProps<TId extends RepositoryId = number> = {
+  repositories: Repository<TId>[];
+  selectedIds: TId[];
+  onSelectionChange: (selectedIds: TId[]) => void;
 };
 
-export function RepositoryMultiSelect({
+export function RepositoryMultiSelect<TId extends RepositoryId = number>({
   repositories,
   selectedIds,
   onSelectionChange,
-}: RepositoryMultiSelectProps) {
+}: RepositoryMultiSelectProps<TId>) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredRepositories = useMemo(() => {
@@ -34,7 +36,7 @@ export function RepositoryMultiSelect({
     return repositories.filter(repo => repo.full_name.toLowerCase().includes(query));
   }, [repositories, searchQuery]);
 
-  const handleToggle = (repoId: number) => {
+  const handleToggle = (repoId: TId) => {
     const newSelection = selectedIds.includes(repoId)
       ? selectedIds.filter(id => id !== repoId)
       : [...selectedIds, repoId];

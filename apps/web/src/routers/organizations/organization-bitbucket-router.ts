@@ -23,6 +23,7 @@ import {
   rotateBitbucketWorkspaceAccessToken,
 } from '@/lib/integrations/platforms/bitbucket/workspace-access-token-credentials';
 import { BitbucketWorkspaceAccessTokenError } from '@/lib/integrations/platforms/bitbucket/workspace-access-token-adapter';
+import { cleanupBitbucketCodeReviewerForIntegration } from '@/lib/integrations/platforms/bitbucket/code-review-cleanup';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
@@ -52,12 +53,21 @@ const SelectWorkspaceInputSchema = OrganizationIdInputSchema.extend({
   workspaceSlug: z.string().min(1),
 }).strict();
 
-async function findOrganizationBitbucketIntegrationType(input: {
+type OrganizationBitbucketIntegration = {
+  integrationType: 'workspace_access_token' | 'oauth';
+  workspace: { uuid: string; slug: string } | null;
+};
+
+async function findOrganizationBitbucketIntegration(input: {
   organizationId: string;
   integrationId: string;
-}): Promise<'workspace_access_token' | 'oauth'> {
+}): Promise<OrganizationBitbucketIntegration> {
   const [integration] = await db
-    .select({ integrationType: platform_integrations.integration_type })
+    .select({
+      integrationType: platform_integrations.integration_type,
+      workspaceUuid: platform_integrations.platform_account_id,
+      workspaceSlug: platform_integrations.platform_account_login,
+    })
     .from(platform_integrations)
     .where(
       and(
@@ -74,7 +84,15 @@ async function findOrganizationBitbucketIntegrationType(input: {
   ) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'The Bitbucket integration was not found' });
   }
-  return integration.integrationType;
+  return {
+    integrationType: integration.integrationType,
+    workspace:
+      integration.integrationType === 'workspace_access_token' &&
+      integration.workspaceUuid &&
+      integration.workspaceSlug
+        ? { uuid: integration.workspaceUuid, slug: integration.workspaceSlug }
+        : null,
+  };
 }
 
 function rethrowBitbucketMutationError(error: unknown): never {
@@ -183,8 +201,8 @@ export const organizationBitbucketRouter = createTRPCRouter({
     .input(ExistingIntegrationInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const integrationType = await findOrganizationBitbucketIntegrationType(input);
-        if (integrationType === 'oauth') {
+        const integration = await findOrganizationBitbucketIntegration(input);
+        if (integration.integrationType === 'oauth') {
           return await refreshBitbucketOAuthRepositories({
             owner: { type: 'org', id: input.organizationId },
             kiloUserId: ctx.user.id,
@@ -206,8 +224,8 @@ export const organizationBitbucketRouter = createTRPCRouter({
     .input(ExistingIntegrationInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const integrationType = await findOrganizationBitbucketIntegrationType(input);
-        if (integrationType === 'oauth') {
+        const integration = await findOrganizationBitbucketIntegration(input);
+        if (integration.integrationType === 'oauth') {
           const disconnected = await disconnectBitbucketOAuthIntegration({
             owner: { type: 'org', id: input.organizationId },
             integrationId: input.integrationId,
@@ -215,6 +233,12 @@ export const organizationBitbucketRouter = createTRPCRouter({
           return { integrationId: disconnected.integrationId };
         }
 
+        await cleanupBitbucketCodeReviewerForIntegration({
+          organizationId: input.organizationId,
+          currentManagerId: ctx.user.id,
+          integrationId: input.integrationId,
+          workspace: integration.workspace,
+        });
         return await disconnectBitbucketWorkspaceAccessToken({
           organizationId: input.organizationId,
           actorUserId: ctx.user.id,

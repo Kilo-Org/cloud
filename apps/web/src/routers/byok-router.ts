@@ -553,6 +553,17 @@ export const byokRouter = createTRPCRouter({
         }
       }
 
+      // Coding-plan-managed keys are user-scoped and back a billed subscription.
+      // Deleting one here would orphan the subscription (FK is set-null) while it
+      // keeps billing. Require cancelling the coding plan instead.
+      if (!organizationId && existingKey.management_source === 'coding_plan') {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            "This key is managed by your coding plan and can't be deleted directly. Cancel the coding plan to remove it.",
+        });
+      }
+
       // Delete from database
       await db.delete(byok_api_keys).where(eq(byok_api_keys.id, id));
 

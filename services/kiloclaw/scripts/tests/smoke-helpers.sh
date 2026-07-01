@@ -55,7 +55,14 @@ assert_kilo_chat_plugin_loaded() {
 import json
 import sys
 
-doc = json.load(sys.stdin)
+# openclaw >=2026.6.11 may print log lines (e.g. "[state-migrations] ...") on
+# stderr, which the 2>&1 capture interleaves ahead of the JSON payload. Extract
+# the JSON object rather than assuming stdin is pure JSON.
+raw = sys.stdin.read()
+start = raw.find("{")
+if start == -1:
+    raise SystemExit("no JSON object in command output")
+doc, _ = json.JSONDecoder().raw_decode(raw[start:])
 plugin = doc.get("plugin", {})
 status = plugin.get("status")
 error = plugin.get("error")
@@ -77,7 +84,12 @@ import json
 import sys
 
 known_message = "channel plugin manifest declares kilo-chat without channelConfigs metadata; add openclaw.plugin.json#channelConfigs so config schema and setup surfaces work before runtime loads. Channels without channelConfigs still appear in channel listings, but setup UI may be limited."
-doc = json.load(sys.stdin)
+# Tolerate stderr log lines interleaved by the 2>&1 capture (see above).
+raw = sys.stdin.read()
+start = raw.find("{")
+if start == -1:
+    raise SystemExit("no JSON object in command output")
+doc, _ = json.JSONDecoder().raw_decode(raw[start:])
 diagnostics = doc.get("diagnostics", [])
 if not isinstance(diagnostics, list):
     raise SystemExit("diagnostics is not a list")

@@ -94,9 +94,10 @@ export class TownContainerDO extends Container<Env> {
    * capped by an arbitrary client-side timeout.
    */
   async warmUp(): Promise<{ coldStart: boolean; durationMs: number }> {
-    const state = await this.getState();
-    const alreadyHealthy = this.ctx.container?.running === true && state.status === 'healthy';
-    if (alreadyHealthy) {
+    if (this.ctx.container?.running === true) {
+      // Runtime-level fast path only. TownDO's /health probe is the
+      // application-level liveness source and may still recover a wedged
+      // running container.
       return { coldStart: false, durationMs: 0 };
     }
     const t0 = Date.now();

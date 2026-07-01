@@ -22,6 +22,7 @@
       "head_sampling_rate": 0.1,
     },
   },
+  "logpush": true,
   "upload_source_maps": true,
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "routes": [
@@ -121,6 +122,7 @@
 
   "env": {
     "dev": {
+      "logpush": true,
       "vars": {
         "ENVIRONMENT": "development",
         "CF_ACCESS_TEAM": "engineering-e11",

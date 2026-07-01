@@ -176,11 +176,11 @@
     {
       "class_name": "SandboxCodeReview",
       "image": "./Dockerfile",
-      "instance_type": "standard-3",
+      "instance_type": "standard-2",
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.21",
       },
-      "max_instances": 300,
+      "max_instances": 1000,
       "rollout_active_grace_period": 1800,
     },
   ],

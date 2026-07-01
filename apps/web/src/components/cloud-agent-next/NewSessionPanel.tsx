@@ -779,10 +779,14 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     !isLoadingGitHubRepos && githubRepoData?.integrationInstalled === false;
   const gitlabIntegrationMissing =
     !isLoadingGitLabRepos && gitlabRepoData?.integrationInstalled === false;
-  const bitbucketIntegrationMissing =
-    !organizationId || (!isLoadingBitbucketRepos && bitbucketRepoData?.status !== 'available');
+  const bitbucketIntegrationMissing = organizationId
+    ? !isLoadingBitbucketRepos && bitbucketRepoData?.status !== 'available'
+    : true;
   const isIntegrationMissing =
     githubIntegrationMissing && gitlabIntegrationMissing && bitbucketIntegrationMissing;
+  const bitbucketIntegrationHref = organizationId
+    ? `/organizations/${organizationId}/integrations/bitbucket`
+    : null;
 
   // ---------------------------------------------------------------------------
   // Repo popover state (must be declared before early returns to satisfy Rules of Hooks)
@@ -1442,6 +1446,26 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
               ) : unifiedRepositories.length === 0 ? (
                 <div className="text-muted-foreground space-y-2 p-4 text-center text-sm">
                   <p>No repositories found</p>
+                  {organizationId && bitbucketRepoData?.status === 'temporarily_unavailable' && (
+                    <p>The Bitbucket repository cache is temporarily unavailable.</p>
+                  )}
+                  {organizationId &&
+                    bitbucketIntegrationHref &&
+                    bitbucketRepoData?.status &&
+                    bitbucketRepoData.status !== 'available' &&
+                    bitbucketRepoData.status !== 'temporarily_unavailable' && (
+                      <Link
+                        href={bitbucketIntegrationHref}
+                        className="text-link hover:text-link-hover underline underline-offset-4"
+                      >
+                        {bitbucketRepoData.status === 'reconnect_required' ||
+                        bitbucketRepoData.status === 'insufficient_permissions'
+                          ? 'Replace the Bitbucket token'
+                          : bitbucketRepoData.status === 'invalid_request'
+                            ? 'Review the Bitbucket connection'
+                            : 'Connect Bitbucket'}
+                      </Link>
+                    )}
                   <UIButton
                     type="button"
                     variant="ghost"
@@ -1471,6 +1495,30 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                       />
                     </button>
                   </div>
+                  {organizationId &&
+                    bitbucketIntegrationHref &&
+                    bitbucketRepoData?.status &&
+                    bitbucketRepoData.status !== 'available' && (
+                      <div className="border-b px-3 py-2 text-xs">
+                        {bitbucketRepoData.status === 'temporarily_unavailable' ? (
+                          <span className="text-muted-foreground">
+                            Bitbucket is temporarily unavailable. Refresh repositories to try again.
+                          </span>
+                        ) : (
+                          <Link
+                            href={bitbucketIntegrationHref}
+                            className="text-link hover:text-link-hover underline underline-offset-4"
+                          >
+                            {bitbucketRepoData.status === 'reconnect_required' ||
+                            bitbucketRepoData.status === 'insufficient_permissions'
+                              ? 'Replace the Bitbucket token to list repositories'
+                              : bitbucketRepoData.status === 'invalid_request'
+                                ? 'Review the Bitbucket connection'
+                                : 'Connect Bitbucket to list repositories'}
+                          </Link>
+                        )}
+                      </div>
+                    )}
                   <CommandEmpty>No repositories match your search</CommandEmpty>
                   <CommandList className="max-h-64 overflow-auto">
                     {recentRepos.length > 0 && (

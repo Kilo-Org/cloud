@@ -182,7 +182,9 @@ export const personalReviewAgentRouter = createTRPCRouter({
         thinkingEffort: cfg.thinking_effort ?? null,
         gateThreshold: cfg.gate_threshold ?? 'off',
         repositorySelectionMode: cfg.repository_selection_mode || 'all',
-        selectedRepositoryIds: cfg.selected_repository_ids || [],
+        selectedRepositoryIds: (cfg.selected_repository_ids ?? []).filter(
+          (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+        ),
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
         disableReviewMd: cfg.disable_review_md ?? true,
         reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
@@ -251,11 +253,17 @@ export const personalReviewAgentRouter = createTRPCRouter({
                 // Get a valid access token (handles refresh if expired)
                 const accessToken = await getValidGitLabToken(integration);
 
+                const selectedRepositoryIds = (input.selectedRepositoryIds ?? []).filter(
+                  (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+                );
+                const previousSelectedRepositoryIds = previousRepoIds.filter(
+                  (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+                );
                 const { result, updatedWebhooks } = await syncWebhooksForRepositories(
                   accessToken,
                   webhookSecret,
-                  input.selectedRepositoryIds || [],
-                  previousRepoIds,
+                  selectedRepositoryIds,
+                  previousSelectedRepositoryIds,
                   configuredWebhooks,
                   instanceUrl
                 );

@@ -1,6 +1,7 @@
 'use client';
 
 import { useReducer, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/Button';
@@ -157,7 +158,7 @@ type BYOKKeysManagerProps = {
 type InstalledKeyWarningAction =
   | { type: 'disable'; keyId: string }
   | { type: 'update'; keyId: string }
-  | { type: 'delete'; keyId: string; providerName: string };
+  | { type: 'delete'; keyId: string };
 
 type BYOKDialogState = {
   isDialogOpen: boolean;
@@ -210,6 +211,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   // Build query options - only include organizationId if provided
   const listQueryInput = organizationId ? { organizationId } : {};
@@ -371,7 +373,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
   const handleDelete = (keyId: string, providerName: string) => {
     if (isInstalledCodingPlanKey(keyId)) {
-      setInstalledKeyWarningAction({ type: 'delete', keyId, providerName });
+      setInstalledKeyWarningAction({ type: 'delete', keyId });
       return;
     }
     if (confirm(`Are you sure you want to delete the API key for ${providerName}?`)) {
@@ -400,7 +402,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         api_key: apiKey,
       });
     } else if (installedKeyWarningAction.type === 'delete') {
-      deleteMutation.mutate({ id: installedKeyWarningAction.keyId });
+      // A coding-plan-managed key can't be deleted directly; it is removed by
+      // cancelling the plan in the Subscription Center.
+      router.push('/subscriptions');
     } else {
       setEnabledMutation.mutate({ id: installedKeyWarningAction.keyId, is_enabled: false });
     }
@@ -432,6 +436,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     title: string;
     description: string;
     actionLabel: string;
+    cancelLabel: string;
   } {
     if (action?.type === 'update') {
       return {
@@ -439,14 +444,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         description:
           'Replacing this key changes MiniMax routing and makes it user-managed. Token Plan Plus billing continues until you cancel it in Subscription Center.',
         actionLabel: 'Replace key',
+        cancelLabel: 'Keep configuration',
       };
     }
     if (action?.type === 'delete') {
       return {
-        title: `Delete ${action.providerName} key?`,
+        title: 'This key is managed by your coding plan',
         description:
-          'Deleting this key stops MiniMax routing through this configuration. Token Plan Plus billing continues until you cancel it in Subscription Center.',
-        actionLabel: 'Delete key',
+          'This MiniMax key routes your Token Plan Plus plan, so it can\u2019t be deleted here. To remove it, cancel the plan in Subscription Center. Your plan stays active and billed until you cancel.',
+        actionLabel: 'Go to Subscription Center',
+        cancelLabel: 'Close',
       };
     }
     return {
@@ -454,6 +461,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       description:
         'Disabling this key stops MiniMax routing while it is disabled. Token Plan Plus billing continues until you cancel it in Subscription Center.',
       actionLabel: 'Disable key',
+      cancelLabel: 'Keep configuration',
     };
   }
 
@@ -817,11 +825,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
               <AlertDialogDescription>{installedKeyWarning.description}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Keep configuration</AlertDialogCancel>
-              <AlertDialogAction
-                variant={installedKeyWarningAction?.type === 'delete' ? 'destructive' : 'default'}
-                onClick={confirmInstalledKeyChange}
-              >
+              <AlertDialogCancel>{installedKeyWarning.cancelLabel}</AlertDialogCancel>
+              <AlertDialogAction variant="default" onClick={confirmInstalledKeyChange}>
                 {installedKeyWarning.actionLabel}
               </AlertDialogAction>
             </AlertDialogFooter>

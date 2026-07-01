@@ -5,7 +5,10 @@ import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations
 import type { UserOrganizationWithSeats } from '@/lib/organizations/organization-types';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
-import { getByokProvidersForUser } from '@/lib/notifications/byok-provider-cache';
+import {
+  getByokProviderNotificationLabel,
+  getByokProvidersForUser,
+} from '@/lib/notifications/byok-provider-cache';
 
 import { fromMicrodollars } from '@/lib/utils';
 
@@ -268,77 +271,10 @@ async function generateByokProvidersNotification(
       return [];
     }
 
-    // Maps an extension `apiProvider` id to a user-facing label. Multiple ids can
-    // refer to the same underlying service (regional/plan/legacy variants), and we
-    // only list ids for services we actually support BYOK for via Kilo Gateway
-    // (see UserByokProviderIdSchema).
-    const names = {
-      // Anthropic / Claude
-      anthropic: 'Claude API Key',
-      claude: 'Claude API Key',
-
-      // Amazon Bedrock
-      bedrock: 'Amazon Bedrock API Key',
-      'amazon-bedrock': 'Amazon Bedrock API Key',
-
-      // Chutes
-      chutes: 'Chutes API Key',
-
-      // DeepSeek
-      deepseek: 'DeepSeek API Key',
-      deepseek1: 'DeepSeek API Key',
-      'deepseek-v4': 'DeepSeek API Key',
-      'deepseek-v4-pro': 'DeepSeek API Key',
-
-      // Fireworks
-      fireworks: 'Fireworks API Key',
-      'fireworks-ai': 'Fireworks API Key',
-
-      // Google AI (Gemini)
-      gemini: 'Google AI API Key',
-      google: 'Google AI API Key',
-
-      // Moonshot AI / Kimi
-      moonshot: 'Moonshot AI API Key',
-      moonshotai: 'Moonshot AI API Key',
-      kimi: 'Moonshot AI API Key',
-      'kimi-for-coding': 'Kimi Code Plan',
-
-      // MiniMax
-      minimax: 'MiniMax Coding Plan',
-      'minimax-coding-plan': 'MiniMax Coding Plan',
-
-      // Mistral
-      mistral: 'Mistral AI API Key',
-
-      // Novita
-      novita: 'Novita AI API Key',
-
-      // xAI
-      xai: 'xAI API Key',
-
-      // Z.ai / Zhipu (GLM)
-      zai: 'GLM Coding Plan',
-      'z-ai': 'GLM Coding Plan',
-      'zai-coding-plan': 'GLM Coding Plan',
-      glm: 'GLM Coding Plan',
-      zhipuai: 'GLM Coding Plan',
-      'zhipuai-coding-plan': 'GLM Coding Plan',
-
-      // Xiaomi MiMo
-      xiaomi: 'Xiaomi MiMo API Key',
-      'xiaomi-mimo': 'Xiaomi MiMo API Key',
-      xiaomimimo: 'Xiaomi MiMo API Key',
-      mimo: 'Xiaomi MiMo API Key',
-      'xiaomi-token-plan-sgp': 'Xiaomi Token Plan',
-      'xiaomi-token-plan-ams': 'Xiaomi Token Plan',
-
-      // Ollama Cloud
-      'ollama-cloud': 'Ollama Cloud API Key',
-    } as Record<string, string>;
-
     // A user may have used several providers; show the first one we have a label for.
-    const providerName = providers.map(provider => names[provider]).find(name => Boolean(name));
+    const providerName = providers
+      .map(provider => getByokProviderNotificationLabel(provider))
+      .find(name => Boolean(name));
     if (!providerName) {
       console.debug(
         `[generateByokProvidersNotification] no BYOK supported provider among ${providers.join(', ')}`

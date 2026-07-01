@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { CodeReviewStreamView } from '@/components/code-reviews/CodeReviewStreamView';
 import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
+import { getCodeReviewJobsHref } from '@/lib/code-reviews/code-review-links';
 import {
   ExternalLink,
   GitPullRequest,
@@ -144,6 +145,7 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
   const canRetry = ['failed', 'cancelled', 'interrupted'].includes(status);
   const canCancel = ['pending', 'queued', 'running'].includes(status);
   const prLabel = review.platform === 'gitlab' ? 'MR' : 'PR';
+  const jobsHref = getCodeReviewJobsHref(review.platform, review.owned_by_organization_id);
   const isSupersededCancellation =
     status === 'cancelled' &&
     (review.terminal_reason === 'superseded' ||
@@ -161,11 +163,11 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
     <PageContainer>
       {/* Back link */}
       <Link
-        href="/code-reviews"
-        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm transition-colors"
+        href={jobsHref}
+        className="text-muted-foreground hover:text-foreground inline-flex min-h-11 items-center gap-1 text-sm transition-colors sm:min-h-9"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to Code Reviews
+        Back to Code Review Jobs
       </Link>
 
       {/* Header */}

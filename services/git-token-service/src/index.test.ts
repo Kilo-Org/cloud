@@ -214,7 +214,7 @@ describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {
     expect(serviceMocks.resolveBitbucketToken).not.toHaveBeenCalled();
   });
 
-  it('returns only the opaque token from a successful V1 resolution', async () => {
+  it('returns only the opaque token from an integration-fenced V1 resolution', async () => {
     serviceMocks.resolveBitbucketToken.mockReset().mockResolvedValue({
       success: true,
       token: 'ATCT-runtime-token',
@@ -228,6 +228,7 @@ describe('GitTokenRPCEntrypoint Bitbucket runtime authorization', () => {
       workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
       repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
       repositoryUrl: 'https://bitbucket.org/acme/widgets.git',
+      expectedIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
     };
 
     await expect(createService().getBitbucketToken(params)).resolves.toEqual({

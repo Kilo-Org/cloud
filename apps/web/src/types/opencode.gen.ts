@@ -163,8 +163,10 @@ export type AssistantMessage = {
 export type Message = UserMessage | AssistantMessage;
 
 export type EventMessageUpdated = {
+  id: string;
   type: 'message.updated';
   properties: {
+    sessionID: string;
     info: Message;
   };
 };
@@ -415,6 +417,7 @@ export type CompactionPart = {
   type: 'compaction';
   auto: boolean;
   overflow?: boolean;
+  tail_start_id?: string;
 };
 
 export type Part =
@@ -432,13 +435,17 @@ export type Part =
   | CompactionPart;
 
 export type EventMessagePartUpdated = {
+  id: string;
   type: 'message.part.updated';
   properties: {
+    sessionID: string;
     part: Part;
+    time: number;
   };
 };
 
 export type EventMessagePartDelta = {
+  id: string;
   type: 'message.part.delta';
   properties: {
     sessionID: string;
@@ -450,6 +457,7 @@ export type EventMessagePartDelta = {
 };
 
 export type EventMessagePartRemoved = {
+  id: string;
   type: 'message.part.removed';
   properties: {
     sessionID: string;
@@ -466,13 +474,27 @@ export type SessionStatus =
       type: 'retry';
       attempt: number;
       message: string;
+      action?: {
+        reason: string;
+        provider: string;
+        title: string;
+        message: string;
+        label: string;
+        link?: string;
+      };
       next: number;
     }
   | {
       type: 'busy';
+    }
+  | {
+      type: 'offline';
+      requestID: string;
+      message: string;
     };
 
 export type EventSessionStatus = {
+  id: string;
   type: 'session.status';
   properties: {
     sessionID: string;
@@ -534,6 +556,7 @@ export type Session = {
   projectID: string;
   workspaceID?: string;
   directory: string;
+  path?: string;
   parentID?: string;
   summary?: {
     additions: number;
@@ -541,11 +564,30 @@ export type Session = {
     files: number;
     diffs?: Array<FileDiff>;
   };
+  cost?: number;
+  tokens?: {
+    input: number;
+    output: number;
+    reasoning: number;
+    cache: {
+      read: number;
+      write: number;
+    };
+  };
   share?: {
     url: string;
   };
   title: string;
+  agent?: string;
+  model?: {
+    id: string;
+    providerID: string;
+    variant?: string;
+  };
   version: string;
+  metadata?: {
+    [key: string]: unknown;
+  };
   time: {
     created: number;
     updated: number;
@@ -562,15 +604,19 @@ export type Session = {
 };
 
 export type EventSessionCreated = {
+  id: string;
   type: 'session.created';
   properties: {
+    sessionID: string;
     info: Session;
   };
 };
 
 export type EventSessionUpdated = {
+  id: string;
   type: 'session.updated';
   properties: {
+    sessionID: string;
     info: Session;
   };
 };

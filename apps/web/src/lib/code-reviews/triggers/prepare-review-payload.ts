@@ -4,10 +4,11 @@
  * Extracts all preparation logic (DB lookups, token generation, prompt generation)
  * Returns complete payload ready for cloud agent
  *
- * Supports both GitHub and GitLab platforms.
+ * Supports GitHub, GitLab, and Bitbucket platforms.
  */
 
 import { captureException } from '@sentry/nextjs';
+import { z } from 'zod';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -45,7 +46,7 @@ import {
   findPreviousCompletedReview,
   updatePreviousReviewSummary,
   updateRepositoryReviewInstructionsMetadata,
-  type ReviewContinuationScope,
+  type ReviewScope,
 } from '../db/code-reviews';
 import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/constants';
 import type { Owner } from '../core';
@@ -58,9 +59,28 @@ import {
   REVIEW_INSTRUCTIONS_FILE,
 } from '../prompts/repository-review-instructions';
 import { getCurrentReviewSummaryForContext } from '../summary/history';
-import { PLATFORM } from '@/lib/integrations/core/constants';
+import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import {
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM,
+} from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { getGitHubPullRequestCheckoutRef } from '@/lib/integrations/platforms/github/webhook-handlers/pull-request-checkout-ref';
 import { getManualCodeReviewConfig } from '../manual-config';
+
+const BitbucketWorkspaceSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9_.-]*$/);
+const BitbucketRepositorySlugSchema = z.string().regex(/^[A-Za-z0-9_.-]+$/);
+const BitbucketHeadShaSchema = z.string().regex(/^[0-9a-f]{40}$/);
+const BitbucketCachedRepositoriesSchema = z.array(
+  z
+    .object({
+      id: z.string().uuid(),
+      name: z.string().min(1),
+      full_name: z.string().min(3),
+      private: z.boolean(),
+      default_branch: z.string().min(1).optional(),
+    })
+    .passthrough()
+);
 
 export type PreparePayloadParams = {
   reviewId: string;
@@ -90,7 +110,14 @@ export type SessionInput = {
   /** Generic git token for authentication (for GitLab and other platforms) */
   gitToken?: string;
   /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
+  bitbucketWorkspaceUuid?: string;
+  bitbucketWorkspaceSlug?: string;
+  bitbucketRepositoryUuid?: string;
+  bitbucketRepositorySlug?: string;
+  bitbucketIntegrationId?: string;
+  bitbucketPullRequestId?: number;
+  bitbucketExpectedHeadSha?: string;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
 };
@@ -111,7 +138,7 @@ export type CodeReviewPayload = {
 /**
  * Prepare complete payload for code review
  * Does all the heavy lifting: DB queries, token generation, prompt generation
- * Supports both GitHub and GitLab platforms.
+ * Supports GitHub, GitLab, and Bitbucket platforms.
  */
 export async function prepareReviewPayload(
   params: PreparePayloadParams
@@ -158,10 +185,146 @@ export async function prepareReviewPayload(
       throw new Error(`User ${owner.userId} not found`);
     }
 
+    switch (platform) {
+      case PLATFORM.BITBUCKET: {
+        if (
+          owner.type !== 'org' ||
+          review.owned_by_organization_id !== owner.id ||
+          review.owned_by_user_id !== null
+        ) {
+          throw new Error('Bitbucket Code Reviewer requires exact organization ownership');
+        }
+        if (!review.platform_integration_id) {
+          throw new Error('Bitbucket review is missing its platform integration ID');
+        }
+
+        const integration = await getIntegrationById(review.platform_integration_id, owner.id);
+        if (
+          !integration ||
+          integration.platform !== BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM ||
+          integration.integration_type !== BITBUCKET_WORKSPACE_ACCESS_TOKEN_INTEGRATION_TYPE ||
+          integration.integration_status !== INTEGRATION_STATUS.ACTIVE ||
+          integration.auth_invalid_at !== null ||
+          integration.owned_by_organization_id !== owner.id ||
+          integration.owned_by_user_id !== null ||
+          integration.platform_installation_id !== null
+        ) {
+          throw new Error(
+            'Bitbucket review requires its exact active organization Workspace Access Token integration'
+          );
+        }
+
+        const workspaceUuid = z.string().uuid().safeParse(integration.platform_account_id);
+        const workspaceSlug = BitbucketWorkspaceSlugSchema.safeParse(
+          integration.platform_account_login
+        );
+        if (!workspaceUuid.success || !workspaceSlug.success) {
+          throw new Error('Bitbucket integration has invalid typed workspace identity');
+        }
+        if (
+          review.platform !== PLATFORM.BITBUCKET ||
+          review.platform_integration_id !== integration.id
+        ) {
+          throw new Error('Bitbucket review integration identity does not match its integration');
+        }
+
+        const cachedRepositories = BitbucketCachedRepositoriesSchema.safeParse(
+          integration.repositories
+        );
+        const selectedRepositoryIds = config.selected_repository_ids ?? [];
+        if (config.repository_selection_mode !== 'selected' || !cachedRepositories.success) {
+          throw new Error('Bitbucket review repository is not selected from the integration cache');
+        }
+
+        const cachedRepository = cachedRepositories.data.find(
+          repository => repository.full_name === review.repo_full_name
+        );
+        const repositoryUuid = z.string().uuid().safeParse(cachedRepository?.id);
+        const repositorySegments = cachedRepository?.full_name.split('/') ?? [];
+        const repositorySlug = BitbucketRepositorySlugSchema.safeParse(repositorySegments[1]);
+        if (
+          !cachedRepository ||
+          !repositoryUuid.success ||
+          !selectedRepositoryIds.includes(repositoryUuid.data) ||
+          repositorySegments.length !== 2 ||
+          repositorySegments[0] !== workspaceSlug.data ||
+          !repositorySlug.success ||
+          review.repo_full_name !== cachedRepository.full_name
+        ) {
+          throw new Error(
+            'Bitbucket review repository identity does not match its integration cache'
+          );
+        }
+
+        const expectedHeadSha = BitbucketHeadShaSchema.safeParse(review.head_sha);
+        if (!expectedHeadSha.success || !review.head_ref.trim()) {
+          throw new Error('Bitbucket review has invalid source branch or expected head identity');
+        }
+
+        const { prompt, version } = await generateReviewPrompt(
+          config,
+          cachedRepository.full_name,
+          review.pr_number,
+          {
+            platform: PLATFORM.BITBUCKET,
+            expectedHeadSha: expectedHeadSha.data,
+          }
+        );
+        const authToken = generateApiToken(user, { botId: 'reviewer' });
+        const sessionInput: SessionInput = {
+          gitUrl: `https://bitbucket.org/${workspaceSlug.data}/${repositorySlug.data}.git`,
+          kilocodeOrganizationId: owner.id,
+          prompt,
+          mode: DEFAULT_CODE_REVIEW_MODE as 'code',
+          model: config.model_slug || DEFAULT_CODE_REVIEW_MODEL,
+          variant: config.thinking_effort ?? undefined,
+          upstreamBranch: review.head_ref,
+          platform: PLATFORM.BITBUCKET,
+          bitbucketWorkspaceUuid: workspaceUuid.data,
+          bitbucketWorkspaceSlug: workspaceSlug.data,
+          bitbucketRepositoryUuid: repositoryUuid.data,
+          bitbucketRepositorySlug: repositorySlug.data,
+          bitbucketIntegrationId: integration.id,
+          bitbucketPullRequestId: review.pr_number,
+          bitbucketExpectedHeadSha: expectedHeadSha.data,
+        };
+
+        logExceptInTest('[prepareReviewPayload] Prepared Bitbucket payload', {
+          reviewId,
+          version,
+          organizationId: owner.id,
+          integrationId: integration.id,
+          workspaceUuid: workspaceUuid.data,
+          repositoryUuid: repositoryUuid.data,
+          pullRequestId: review.pr_number,
+        });
+
+        return {
+          reviewId,
+          authToken,
+          sessionInput,
+          owner,
+          repositorySize: null,
+        };
+      }
+      case PLATFORM.GITHUB:
+      case PLATFORM.GITLAB:
+        break;
+      default: {
+        const exhaustivePlatform: never = platform;
+        throw new Error(`Unknown Code Reviewer platform: ${exhaustivePlatform}`);
+      }
+    }
+
     // 3. Get platform token and build review state based on platform
     let githubToken: string | undefined;
     let gitlabToken: string | undefined;
-    let reviewContinuationScope: ReviewContinuationScope | null = null;
+    const reviewScope: ReviewScope = {
+      owner,
+      platform,
+      repoFullName: review.repo_full_name,
+      prNumber: review.pr_number,
+    };
     let gitlabInstanceUrl: string | undefined;
     let existingReviewState: ExistingReviewState | null = null;
     let gitlabContext: GitLabDiffContext | undefined;
@@ -190,7 +353,6 @@ export async function prepareReviewPayload(
         const tokenData = await generateGitHubInstallationToken(installationId, appType);
         const installationToken = tokenData.token;
         githubToken = installationToken;
-        reviewContinuationScope = { platform: 'github', integrationId: integration.id };
         const [repoOwner, repoName] = review.repo_full_name.split('/');
 
         try {
@@ -302,11 +464,6 @@ export async function prepareReviewPayload(
 
         try {
           gitlabToken = await getOrCreateProjectAccessToken(integration, projectId);
-          reviewContinuationScope = {
-            platform: 'gitlab',
-            integrationId: integration.id,
-            projectId,
-          };
           logExceptInTest('[prepareReviewPayload] Using PrAT for code review', {
             reviewId,
             repoFullName: review.repo_full_name,
@@ -439,28 +596,29 @@ export async function prepareReviewPayload(
     let previousCloudAgentSessionId: string | undefined;
     try {
       const previousReview =
-        manualConfig === null && reviewContinuationScope
+        manualConfig === null
           ? await findPreviousCompletedReview(
-              review.repo_full_name,
-              review.pr_number,
-              existingReviewState?.headCommitSha ?? review.head_sha,
-              reviewContinuationScope
+              reviewScope,
+              existingReviewState?.headCommitSha ?? review.head_sha
             )
           : null;
       previousHeadSha = previousReview?.head_sha ?? null;
 
       if (previousReview?.session_id) {
-        if (platform === PLATFORM.GITHUB) {
-          logExceptInTest(
-            '[prepareReviewPayload] Disabling GitHub session continuation for pull-ref checkout safety',
-            {
-              reviewId,
-              previousCloudAgentSessionId: previousReview.session_id,
-              upstreamBranch: getGitHubPullRequestCheckoutRef(review.pr_number),
-            }
-          );
-        } else {
-          previousCloudAgentSessionId = previousReview.session_id;
+        switch (platform) {
+          case PLATFORM.GITHUB:
+            logExceptInTest(
+              '[prepareReviewPayload] Disabling GitHub session continuation for pull-ref checkout safety',
+              {
+                reviewId,
+                previousCloudAgentSessionId: previousReview.session_id,
+                upstreamBranch: getGitHubPullRequestCheckoutRef(review.pr_number),
+              }
+            );
+            break;
+          case PLATFORM.GITLAB:
+            previousCloudAgentSessionId = previousReview.session_id;
+            break;
         }
       }
 

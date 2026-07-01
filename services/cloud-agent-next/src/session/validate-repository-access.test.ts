@@ -30,6 +30,29 @@ describe('Bitbucket session creation preflight', () => {
     });
   });
 
+  it('forwards an expected integration id when the repository carries one', async () => {
+    const getBitbucketToken = vi.fn().mockResolvedValue({ success: true, token: 'token' });
+    const orgId = '123e4567-e89b-12d3-a456-426614174030';
+    const integrationId = '123e4567-e89b-12d3-a456-426614174022';
+
+    await expect(
+      assertBitbucketRepositoryAccessBeforeSessionCreation({
+        env: { GIT_TOKEN_SERVICE: { getBitbucketToken } } as never,
+        userId: 'user-1',
+        orgId,
+        repository: { ...repository, bitbucketIntegrationId: integrationId },
+      })
+    ).resolves.toBeUndefined();
+    expect(getBitbucketToken).toHaveBeenCalledWith({
+      userId: 'user-1',
+      orgId,
+      expectedIntegrationId: integrationId,
+      workspaceUuid: repository.workspaceUuid,
+      repositoryUuid: repository.repositoryUuid,
+      repositoryUrl: repository.url,
+    });
+  });
+
   it('rejects personal Bitbucket sessions before invoking the service binding', async () => {
     const getBitbucketToken = vi.fn().mockResolvedValue({ success: true, token: 'token' });
 
@@ -94,7 +117,7 @@ describe('Bitbucket session creation preflight', () => {
       })
     ).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
-      message: 'Bitbucket repository authorization failed (temporarily_unavailable)',
+      message: 'Bitbucket repository authorization failed (service_not_configured)',
     });
   });
 
@@ -110,7 +133,7 @@ describe('Bitbucket session creation preflight', () => {
       })
     ).rejects.toMatchObject({
       code: 'SERVICE_UNAVAILABLE',
-      message: 'Bitbucket repository authorization failed (temporarily_unavailable)',
+      message: 'Bitbucket repository authorization failed (rpc_error)',
     });
   });
 });

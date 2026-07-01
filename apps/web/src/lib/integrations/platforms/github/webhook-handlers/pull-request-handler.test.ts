@@ -330,9 +330,20 @@ describe('handlePullRequest', () => {
     const response = await handlePullRequest(pullRequestPayload(), platformIntegration());
 
     expect(response.status).toBe(202);
-    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith('acme/widgets', 42, 'abc123', {
-      platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
-    });
+    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith(
+      {
+        owner: {
+          type: 'org',
+          id: 'f2aa36d7-9c1b-4db9-ae4a-a4492618796d',
+          userId: 'bot-user-1',
+        },
+        platform: 'github',
+        platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
+        prNumber: 42,
+        repoFullName: 'acme/widgets',
+      },
+      'abc123'
+    );
     expect(mockCancelReview).toHaveBeenCalledTimes(2);
     expect(mockCancelReview).toHaveBeenNthCalledWith(
       1,
@@ -376,7 +387,13 @@ describe('handlePullRequest', () => {
       },
       'standard'
     );
-    expect(mockCreateCodeReview).toHaveBeenCalledTimes(1);
+    expect(mockCreateCodeReview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: 'github',
+        platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
+        repoFullName: 'acme/widgets',
+      })
+    );
     expect(mockTryDispatchPendingReviews).toHaveBeenCalledTimes(1);
   });
 

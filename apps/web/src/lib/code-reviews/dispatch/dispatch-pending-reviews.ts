@@ -33,12 +33,13 @@ import {
 import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
-import type { CodeReviewPlatform } from '../core/schemas';
+import { CodeReviewPlatformSchema, type CodeReviewPlatform } from '../core/schemas';
 import { appendCodeReviewAnalyticsPromptAppendix } from '../analytics/contracts';
 import { getReviewAnalyticsEnabledFromConfig } from '../analytics/settings';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { APP_URL } from '@/lib/constants';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason,
@@ -115,13 +116,18 @@ function parseTerminalReason(reason?: string): CodeReviewTerminalReason | undefi
   return CODE_REVIEW_TERMINAL_REASONS.find(candidate => candidate === reason);
 }
 
+function parseCodeReviewPlatform(platform: string): CodeReviewPlatform {
+  return CodeReviewPlatformSchema.parse(platform);
+}
+
 async function finalizeActionRequiredGateCheck(
   review: CloudAgentCodeReview,
   reason: CodeReviewActionRequiredReason
 ): Promise<void> {
   if (!shouldPublishCodeReviewToProvider(review)) return;
-  const platform: CodeReviewPlatform = review.platform === 'gitlab' ? 'gitlab' : 'github';
-  if (platform !== 'github' || !review.check_run_id || !review.platform_integration_id) return;
+  const platform = parseCodeReviewPlatform(review.platform);
+  if (platform !== PLATFORM.GITHUB || !review.check_run_id || !review.platform_integration_id)
+    return;
 
   const integration = await getIntegrationById(review.platform_integration_id);
   if (!integration?.platform_installation_id) return;
@@ -326,7 +332,7 @@ export async function tryDispatchPendingReviews(
             try {
               await disableCodeReviewForActionRequiredFailure({
                 owner,
-                platform: reservation.review.platform === 'gitlab' ? 'gitlab' : 'github',
+                platform: parseCodeReviewPlatform(reservation.review.platform),
                 reviewId: reservation.review.id,
                 reason: actionRequiredReason,
                 errorMessage,
@@ -452,7 +458,7 @@ export async function tryDispatchPendingReviews(
 
 async function dispatchReservedReview(reservation: ReservedReview, owner: Owner): Promise<boolean> {
   const { review, dispatchReservationId } = reservation;
-  const platform: CodeReviewPlatform = review.platform === 'gitlab' ? 'gitlab' : 'github';
+  const platform = parseCodeReviewPlatform(review.platform);
   const manualConfig = getManualCodeReviewConfig(review);
 
   logExceptInTest('[dispatchReview] Dispatching review', {
@@ -501,12 +507,13 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     platform,
   });
   const analyticsPrompt =
-    owner.type === 'org' && manualConfig?.outputMode !== 'kilo'
+    owner.type === 'org' && manualConfig?.outputMode !== 'kilo' && platform !== PLATFORM.BITBUCKET
       ? appendCodeReviewAnalyticsPromptAppendix(payload.sessionInput.prompt)
       : null;
   const shouldEnrollAnalytics =
     owner.type === 'org' &&
     manualConfig?.outputMode !== 'kilo' &&
+    platform !== PLATFORM.BITBUCKET &&
     getReviewAnalyticsEnabledFromConfig(agentConfig.config) &&
     analyticsPrompt !== null;
 
@@ -519,7 +526,9 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
 
   const attempt = await ensureCurrentCodeReviewAttemptFromReview(review, shouldEnrollAnalytics);
   const analyticsEnabledAtDispatch =
-    owner.type === 'org' && attempt.analytics_enabled_at_dispatch === true;
+    owner.type === 'org' &&
+    platform !== PLATFORM.BITBUCKET &&
+    attempt.analytics_enabled_at_dispatch === true;
 
   let dispatchPayload = payload;
   if (analyticsEnabledAtDispatch) {
@@ -642,7 +651,7 @@ async function handleAmbiguousDispatchFailure(
       try {
         await disableCodeReviewForActionRequiredFailure({
           owner,
-          platform: review.platform === 'gitlab' ? 'gitlab' : 'github',
+          platform: parseCodeReviewPlatform(review.platform),
           reviewId: review.id,
           reason: actionRequiredReason,
           errorMessage: workerStatus.errorMessage ?? actionRequiredReason,

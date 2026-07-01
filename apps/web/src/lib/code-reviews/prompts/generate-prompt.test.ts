@@ -1,4 +1,5 @@
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
+import DEFAULT_PROMPT_TEMPLATE_BITBUCKET from './default-prompt-template-bitbucket.json';
 import DEFAULT_PROMPT_TEMPLATE_GITHUB from './default-prompt-template.json';
 import DEFAULT_PROMPT_TEMPLATE_GITLAB from './default-prompt-template-gitlab.json';
 import { generateReviewPrompt, PromptTemplateSchema } from './generate-prompt';
@@ -16,6 +17,10 @@ describe('checked-in prompt templates', () => {
 
   it('validates the GitLab template', () => {
     expect(PromptTemplateSchema.safeParse(DEFAULT_PROMPT_TEMPLATE_GITLAB).success).toBe(true);
+  });
+
+  it('validates the Bitbucket template', () => {
+    expect(PromptTemplateSchema.safeParse(DEFAULT_PROMPT_TEMPLATE_BITBUCKET).success).toBe(true);
   });
 });
 
@@ -48,6 +53,23 @@ describe('generateReviewPrompt', () => {
       'glab api --method POST "projects/group%2Fproject/merge_requests/10/discussions"'
     );
     expect(result.prompt).not.toContain('gh api');
+  });
+
+  it('uses Bitbucket-compatible summary markdown without HTML-only collapsible tags', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'workspace/repo', 42, {
+      platform: 'bitbucket',
+      expectedHeadSha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    });
+
+    expect(prompt).toContain('## Code Review Summary');
+    expect(prompt).toContain('### Files Reviewed');
+    expect(prompt).toContain('### Issue Details');
+    expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatIssuesFound).not.toContain('<details>');
+    expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatIssuesFound).not.toContain('<summary>');
+    expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatIssuesFound).not.toContain('<b>');
+    expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatNoIssues).not.toContain('<details>');
+    expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatNoIssues).not.toContain('<summary>');
+    expect(DEFAULT_PROMPT_TEMPLATE_BITBUCKET.summaryFormatNoIssues).not.toContain('<b>');
   });
 
   it('keeps built-in review guidance when repository instructions are absent', async () => {

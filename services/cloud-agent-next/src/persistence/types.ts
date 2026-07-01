@@ -159,8 +159,6 @@ export type PersistenceEnv = {
   R2_ATTACHMENTS_BUCKET?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-  /** Comma-separated org IDs that use ephemeral Code Reviewer sandbox containers */
-  CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS?: string;
   /** Service binding for centralized git token generation */
   GIT_TOKEN_SERVICE?: GitTokenService;
   /** Service binding for dispatching push notifications */

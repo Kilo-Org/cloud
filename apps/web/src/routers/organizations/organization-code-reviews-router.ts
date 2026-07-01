@@ -1,4 +1,4 @@
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
@@ -6,6 +6,7 @@ import {
   organizationBillingMutationProcedure,
   organizationMemberMutationProcedure,
   OrganizationIdInputSchema,
+  ensureOrganizationAccess,
 } from './utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import {
@@ -18,7 +19,10 @@ import {
   setAgentEnabled,
 } from '@/lib/agent-config/db/agent-configs';
 
-import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
+import {
+  CodeReviewAgentConfigSchema,
+  type CodeReviewAgentConfig,
+} from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
@@ -41,8 +45,18 @@ import {
   ManualCodeReviewJobInputSchema,
 } from '@/lib/code-reviews/manual-code-review-jobs';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
+import { getBitbucketCodeReviewerReadiness } from '@/lib/integrations/platforms/bitbucket/workspace-access-token-repository-cache';
+import {
+  BitbucketCodeReviewWebhookConfigurationError,
+  ensureBitbucketCodeReviewWorkspaceWebhook,
+} from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
+import { cleanupBitbucketCodeReviewerForIntegration } from '@/lib/integrations/platforms/bitbucket/code-review-cleanup';
+import {
+  ManualBitbucketCodeReviewTriggerError,
+  triggerManualBitbucketCodeReview,
+} from '@/lib/integrations/platforms/bitbucket/manual-code-review-trigger';
 
-const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
+const PlatformSchema = z.enum(['github', 'gitlab', 'bitbucket']).default('github');
 
 const ManuallyAddedRepositoryInputSchema = z.object({
   id: z.number(),
@@ -64,7 +78,7 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
     .nullable()
     .optional(),
   repositorySelectionMode: z.enum(['all', 'selected']).optional(),
-  selectedRepositoryIds: z.array(z.number()).optional(),
+  selectedRepositoryIds: z.array(z.union([z.number(), z.string()])).optional(),
   manuallyAddedRepositories: z.array(ManuallyAddedRepositoryInputSchema).optional(),
   disableReviewMd: z.boolean().optional(),
   gateThreshold: z.enum(['off', 'all', 'warning', 'critical']).optional(),
@@ -75,6 +89,169 @@ const SaveReviewConfigInputSchema = OrganizationIdInputSchema.extend({
 const CreateManualReviewJobInputSchema = OrganizationIdInputSchema.extend(
   ManualCodeReviewJobInputSchema.shape
 );
+
+const TriggerBitbucketCodeReviewInputSchema = OrganizationIdInputSchema.extend({
+  pullRequestUrl: z.string().trim().min(1).max(2048),
+});
+
+type ReviewPlatform = z.infer<typeof PlatformSchema>;
+type BitbucketCodeReviewerReadiness = Awaited<ReturnType<typeof getBitbucketCodeReviewerReadiness>>;
+
+function requireRepositoryIdsForPlatform(
+  platform: ReviewPlatform,
+  repositoryIds: Array<number | string> | undefined
+): Array<number | string> {
+  if (platform === PLATFORM.BITBUCKET) return repositoryIds ?? [];
+
+  const numericRepositoryIds = z.array(z.number()).safeParse(repositoryIds ?? []);
+  if (!numericRepositoryIds.success) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `${platform === PLATFORM.GITHUB ? 'GitHub' : 'GitLab'} repository IDs must be numbers`,
+    });
+  }
+  return numericRepositoryIds.data;
+}
+
+function requireBitbucketWorkspace(readiness: BitbucketCodeReviewerReadiness) {
+  if (!readiness.connected || !readiness.integrationId || !readiness.workspace) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message:
+        'Connect an active Bitbucket Workspace Access Token before configuring Code Reviewer',
+    });
+  }
+
+  return {
+    integrationId: readiness.integrationId,
+    workspaceUuid: readiness.workspace.uuid,
+    workspaceSlug: readiness.workspace.slug,
+  };
+}
+
+function requireBitbucketRepositorySelection(
+  input: {
+    repositorySelectionMode?: 'all' | 'selected';
+    selectedRepositoryIds?: Array<number | string>;
+  },
+  readiness: BitbucketCodeReviewerReadiness
+): string[] {
+  if (input.repositorySelectionMode !== 'selected') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Bitbucket Code Reviewer requires selected-repository mode',
+    });
+  }
+
+  const selectedRepositoryIds = z.array(z.uuid()).safeParse(input.selectedRepositoryIds);
+  if (!selectedRepositoryIds.success || selectedRepositoryIds.data.length === 0) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Select at least one cached Bitbucket repository',
+    });
+  }
+  if (new Set(selectedRepositoryIds.data).size !== selectedRepositoryIds.data.length) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Bitbucket repository selections must be unique',
+    });
+  }
+  if (readiness.repositoryCache.status !== 'available') {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Refresh the Bitbucket repository cache before configuring Code Reviewer',
+    });
+  }
+
+  const cachedRepositoryIds = new Set(
+    readiness.repositoryCache.repositories.map(repository => repository.id)
+  );
+  if (selectedRepositoryIds.data.some(repositoryId => !cachedRepositoryIds.has(repositoryId))) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message:
+        'Every selected Bitbucket repository must exactly match the current repository cache',
+    });
+  }
+
+  return selectedRepositoryIds.data;
+}
+
+function requireBitbucketCodeReviewerScopes(readiness: BitbucketCodeReviewerReadiness): void {
+  if (readiness.missingRequiredScopes.length > 0) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: `Replace the Bitbucket Workspace Access Token with one that includes: ${readiness.missingRequiredScopes.join(', ')}`,
+    });
+  }
+}
+
+function bitbucketWebhookConfigurationErrorMessage(
+  error: BitbucketCodeReviewWebhookConfigurationError
+): string {
+  if (error.code === 'callback_origin_invalid') {
+    return 'Bitbucket webhook setup requires a public HTTPS BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL with no port. Point it at an HTTPS tunnel for this Next.js app, then restart Next.js.';
+  }
+  return 'Bitbucket webhook signing keys are not configured. Set BITBUCKET_CODE_REVIEW_WEBHOOK_SIGNING_KEYS and restart Next.js.';
+}
+
+function bitbucketWebhookSetupFailureMessage(reason?: string): string {
+  switch (reason) {
+    case 'invalid_request':
+      return 'Bitbucket webhook setup requires a public HTTPS BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL with no port. Point it at an HTTPS tunnel for this Next.js app, then restart Next.js.';
+    case 'insufficient_permissions':
+      return 'Replace the Bitbucket Workspace Access Token with one that includes the webhook scope, then try again';
+    case 'not_connected':
+    case 'reconnect_required':
+      return 'Reconnect the Bitbucket Workspace Access Token and try again';
+    case 'temporarily_unavailable':
+      return 'Bitbucket webhook setup is temporarily unavailable. Check GIT_TOKEN_SERVICE_API_URL and the git-token-service, then try again';
+    default:
+      return 'Bitbucket workspace webhook setup failed. Verify the token and try again';
+  }
+}
+
+function manualBitbucketCodeReviewErrorCode(error: ManualBitbucketCodeReviewTriggerError) {
+  switch (error.code) {
+    case 'invalid_url':
+    case 'repository_not_selected':
+      return 'BAD_REQUEST' as const;
+    case 'lifecycle_changed':
+      return 'CONFLICT' as const;
+    case 'processing_failed':
+      return 'INTERNAL_SERVER_ERROR' as const;
+    default:
+      return 'PRECONDITION_FAILED' as const;
+  }
+}
+
+async function ensureBitbucketWorkspaceWebhook(input: {
+  organizationId: string;
+  currentManagerId: string;
+  workspace: ReturnType<typeof requireBitbucketWorkspace>;
+}): Promise<void> {
+  let result;
+  try {
+    result = await ensureBitbucketCodeReviewWorkspaceWebhook(input);
+  } catch (error) {
+    if (error instanceof BitbucketCodeReviewWebhookConfigurationError) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: bitbucketWebhookConfigurationErrorMessage(error),
+      });
+    }
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: bitbucketWebhookSetupFailureMessage(),
+    });
+  }
+  if (!result.success) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: bitbucketWebhookSetupFailureMessage(result.reason),
+    });
+  }
+}
 
 export const organizationReviewAgentRouter = createTRPCRouter({
   createManualReviewJob: organizationMemberMutationProcedure
@@ -92,6 +269,57 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           instructions: input.instructions,
         },
       });
+    }),
+
+  getBitbucketReadiness: baseProcedure
+    .input(OrganizationIdInputSchema)
+    .query(async ({ input, ctx }) => {
+      const role = await ensureOrganizationAccess(ctx, input.organizationId);
+      const readiness = await getBitbucketCodeReviewerReadiness(input.organizationId);
+      return {
+        ...readiness,
+        canManage: role === 'owner' || role === 'billing_manager',
+        canTriggerManualReview: ctx.user.is_admin,
+      };
+    }),
+
+  triggerBitbucketCodeReview: baseProcedure
+    .input(TriggerBitbucketCodeReviewInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.user.is_admin) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Admin access required',
+        });
+      }
+      await ensureOrganizationAccess(ctx, input.organizationId);
+
+      try {
+        const result = await triggerManualBitbucketCodeReview({
+          organizationId: input.organizationId,
+          pullRequestUrl: input.pullRequestUrl,
+        });
+        await createAuditLog({
+          organization_id: input.organizationId,
+          action: 'organization.settings.change',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          message: `Manually requested Bitbucket Code Reviewer for ${input.pullRequestUrl}`,
+        });
+        return result;
+      } catch (error) {
+        if (error instanceof ManualBitbucketCodeReviewTriggerError) {
+          throw new TRPCError({
+            code: manualBitbucketCodeReviewErrorCode(error),
+            message: error.message,
+          });
+        }
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to start Bitbucket Code Reviewer',
+        });
+      }
     }),
 
   /**
@@ -194,7 +422,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           modelSlug: PRIMARY_DEFAULT_MODEL,
           thinkingEffort: null satisfies string | null,
           gateThreshold: 'off' as const,
-          repositorySelectionMode: 'all' as const,
+          repositorySelectionMode:
+            platform === 'bitbucket' ? ('selected' as const) : ('all' as const),
           selectedRepositoryIds: [],
           manuallyAddedRepositories: [],
           disableReviewMd: true,
@@ -204,6 +433,14 @@ export const organizationReviewAgentRouter = createTRPCRouter({
       }
 
       const cfg = config.config as CodeReviewAgentConfig;
+      const isBitbucket = platform === PLATFORM.BITBUCKET;
+      const selectedRepositoryIds = isBitbucket
+        ? (cfg.selected_repository_ids ?? []).filter(
+            (repositoryId): repositoryId is string => typeof repositoryId === 'string'
+          )
+        : (cfg.selected_repository_ids ?? []).filter(
+            (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+          );
       return {
         isEnabled: config.is_enabled,
         reviewStyle: cfg.review_style || 'balanced',
@@ -211,12 +448,14 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         customInstructions: cfg.custom_instructions || null,
         modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
         thinkingEffort: cfg.thinking_effort ?? null,
-        gateThreshold: cfg.gate_threshold ?? 'off',
-        repositorySelectionMode: cfg.repository_selection_mode || 'all',
-        selectedRepositoryIds: cfg.selected_repository_ids || [],
-        manuallyAddedRepositories: cfg.manually_added_repositories || [],
-        disableReviewMd: cfg.disable_review_md ?? true,
-        reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
+        gateThreshold: isBitbucket ? ('off' as const) : (cfg.gate_threshold ?? 'off'),
+        repositorySelectionMode: isBitbucket
+          ? ('selected' as const)
+          : cfg.repository_selection_mode || 'all',
+        selectedRepositoryIds,
+        manuallyAddedRepositories: isBitbucket ? [] : cfg.manually_added_repositories || [],
+        disableReviewMd: isBitbucket ? true : (cfg.disable_review_md ?? true),
+        reviewMemoryEnabled: isBitbucket ? false : getReviewMemoryEnabledFromConfig(config.config),
         actionRequired: getCodeReviewActionRequiredState(config),
       };
     }),
@@ -230,14 +469,30 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       try {
         const platform = input.platform ?? 'github';
+        const isBitbucket = platform === PLATFORM.BITBUCKET;
 
-        // Get previous config to determine which repos were previously selected
         const previousConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
         const previousRepoIds =
           (previousConfig?.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids ||
           [];
+        let selectedRepositoryIds = requireRepositoryIdsForPlatform(
+          platform,
+          input.selectedRepositoryIds
+        );
 
-        // Save the agent config
+        if (isBitbucket) {
+          const readiness = await getBitbucketCodeReviewerReadiness(input.organizationId);
+          const workspace = requireBitbucketWorkspace(readiness);
+          selectedRepositoryIds = requireBitbucketRepositorySelection(input, readiness);
+          if (previousConfig?.is_enabled) {
+            await ensureBitbucketWorkspaceWebhook({
+              organizationId: input.organizationId,
+              currentManagerId: ctx.user.id,
+              workspace,
+            });
+          }
+        }
+
         await upsertAgentConfig({
           organizationId: input.organizationId,
           agentType: 'code_review',
@@ -248,15 +503,18 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             custom_instructions: input.customInstructions || null,
             model_slug: input.modelSlug,
             thinking_effort: input.thinkingEffort ?? null,
-            gate_threshold: input.gateThreshold ?? 'off',
-            repository_selection_mode: input.repositorySelectionMode || 'all',
-            selected_repository_ids: input.selectedRepositoryIds || [],
-            manually_added_repositories: input.manuallyAddedRepositories || [],
-            disable_review_md: input.disableReviewMd ?? true,
+            gate_threshold: isBitbucket ? 'off' : (input.gateThreshold ?? 'off'),
+            repository_selection_mode: isBitbucket
+              ? 'selected'
+              : input.repositorySelectionMode || 'all',
+            selected_repository_ids: selectedRepositoryIds,
+            manually_added_repositories: isBitbucket ? [] : input.manuallyAddedRepositories || [],
+            disable_review_md: isBitbucket ? true : (input.disableReviewMd ?? true),
             review_memory_enabled: false,
             review_analytics_enabled: false,
           },
-          preserveCodeReviewFeatureSettings: true,
+          preserveCodeReviewFeatureSettings: !isBitbucket,
+          isEnabled: isBitbucket && !previousConfig ? false : undefined,
           createdBy: ctx.user.id,
         });
 
@@ -284,11 +542,17 @@ export const organizationReviewAgentRouter = createTRPCRouter({
                 // Get a valid access token (handles refresh if expired)
                 const accessToken = await getValidGitLabToken(integration);
 
+                const selectedRepositoryIds = (input.selectedRepositoryIds ?? []).filter(
+                  (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+                );
+                const previousSelectedRepositoryIds = previousRepoIds.filter(
+                  (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+                );
                 const { result, updatedWebhooks } = await syncWebhooksForRepositories(
                   accessToken,
                   webhookSecret,
-                  input.selectedRepositoryIds || [],
-                  previousRepoIds,
+                  selectedRepositoryIds,
+                  previousSelectedRepositoryIds,
                   configuredWebhooks,
                   instanceUrl
                 );
@@ -349,6 +613,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           webhookSync: webhookSyncResult,
         };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error('Error saving review config:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -378,7 +643,92 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
         const existingConfig = await getAgentConfig(input.organizationId, 'code_review', platform);
         let didChange = false;
-        if (existingConfig) {
+
+        if (platform === PLATFORM.BITBUCKET && input.isEnabled) {
+          const config = existingConfig;
+          const parsedConfig = CodeReviewAgentConfigSchema.safeParse(config?.config);
+          if (!config || !parsedConfig.success) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Save a valid Bitbucket Code Reviewer configuration before enabling it',
+            });
+          }
+
+          const readiness = await getBitbucketCodeReviewerReadiness(input.organizationId);
+          const workspace = requireBitbucketWorkspace(readiness);
+          requireBitbucketRepositorySelection(
+            {
+              repositorySelectionMode: parsedConfig.data.repository_selection_mode,
+              selectedRepositoryIds: parsedConfig.data.selected_repository_ids,
+            },
+            readiness
+          );
+          requireBitbucketCodeReviewerScopes(readiness);
+
+          try {
+            await ensureBotUserForOrg(input.organizationId, 'code-review');
+          } catch {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Code Reviewer bot setup failed. Try enabling Code Reviewer again',
+            });
+          }
+          await ensureBitbucketWorkspaceWebhook({
+            organizationId: input.organizationId,
+            currentManagerId: ctx.user.id,
+            workspace,
+          });
+
+          const [freshConfig, freshReadiness] = await Promise.all([
+            getAgentConfig(input.organizationId, 'code_review', platform),
+            getBitbucketCodeReviewerReadiness(input.organizationId),
+          ]);
+          const freshWorkspace = requireBitbucketWorkspace(freshReadiness);
+          if (
+            freshWorkspace.integrationId !== workspace.integrationId ||
+            freshWorkspace.workspaceUuid !== workspace.workspaceUuid ||
+            freshWorkspace.workspaceSlug !== workspace.workspaceSlug
+          ) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'The Bitbucket integration changed during enablement. Try again',
+            });
+          }
+          requireBitbucketCodeReviewerScopes(freshReadiness);
+
+          const freshParsedConfig = CodeReviewAgentConfigSchema.safeParse(freshConfig?.config);
+          if (!freshConfig || !freshParsedConfig.success) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Save a valid Bitbucket Code Reviewer configuration before enabling it',
+            });
+          }
+          requireBitbucketRepositorySelection(
+            {
+              repositorySelectionMode: freshParsedConfig.data.repository_selection_mode,
+              selectedRepositoryIds: freshParsedConfig.data.selected_repository_ids,
+            },
+            freshReadiness
+          );
+
+          await setAgentEnabled(input.organizationId, 'code_review', platform, true);
+          didChange = config.is_enabled !== true;
+        } else if (platform === PLATFORM.BITBUCKET) {
+          const readiness = await getBitbucketCodeReviewerReadiness(input.organizationId);
+          didChange = existingConfig?.is_enabled === true;
+          if (readiness.integrationId) {
+            await cleanupBitbucketCodeReviewerForIntegration({
+              organizationId: input.organizationId,
+              currentManagerId: ctx.user.id,
+              integrationId: readiness.integrationId,
+              workspace: readiness.workspace,
+            });
+          } else if (existingConfig) {
+            await setAgentEnabled(input.organizationId, 'code_review', platform, false);
+          } else {
+            didChange = false;
+          }
+        } else if (existingConfig) {
           await setAgentEnabled(input.organizationId, 'code_review', platform, input.isEnabled);
           // Re-toggling to the same value is a no-op and must not be audited.
           didChange = existingConfig.is_enabled !== input.isEnabled;
@@ -392,6 +742,8 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             config: createDefaultCodeReviewConfig(),
           });
           didChange = true;
+        } else {
+          didChange = false;
         }
         await clearCodeReviewActionRequiredState({ owner, platform });
 
@@ -410,6 +762,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
 
         return { success: true, isEnabled: input.isEnabled };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error('Error toggling review agent:', error);
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

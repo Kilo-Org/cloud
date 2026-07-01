@@ -10,23 +10,31 @@ function authenticatedJson(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
   headers.set('X-Credential-Type', 'workspace_access_token');
-  headers.set('X-OAuth-Scopes', 'repository:write account pullrequest webhook');
+  if (!headers.has('X-OAuth-Scopes')) {
+    headers.set('X-OAuth-Scopes', 'repository:write account pullrequest webhook');
+  }
   return Response.json(body, { ...init, headers });
 }
 
-function workspaceDiscoveryJson(overrides: Record<string, unknown> = {}): Response {
-  return authenticatedJson({
-    pagelen: 2,
-    values: [
-      {
-        workspace: {
-          uuid: `{${WORKSPACE_UUID.toUpperCase()}}`,
-          slug: 'acme',
-          ...overrides,
+function workspaceDiscoveryJson(
+  overrides: Record<string, unknown> = {},
+  init: ResponseInit = {}
+): Response {
+  return authenticatedJson(
+    {
+      pagelen: 2,
+      values: [
+        {
+          workspace: {
+            uuid: `{${WORKSPACE_UUID.toUpperCase()}}`,
+            slug: 'acme',
+            ...overrides,
+          },
         },
-      },
-    ],
-  });
+      ],
+    },
+    init
+  );
 }
 
 function workspaceDetailsJson(): Response {
@@ -145,6 +153,40 @@ describe('Bitbucket Workspace Access Token adapter', () => {
     }
   });
 
+  it('aggregates token scope evidence across validation requests', async () => {
+    const fetchMock = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(
+        workspaceDiscoveryJson(
+          {},
+          {
+            headers: {
+              'X-OAuth-Scopes': 'account webhook',
+            },
+          }
+        )
+      )
+      .mockResolvedValueOnce(workspaceDetailsJson())
+      .mockResolvedValueOnce(authenticatedJson({ pagelen: 1, values: [] }))
+      .mockResolvedValueOnce(
+        authenticatedJson({
+          pagelen: 50,
+          values: [repository('22222222-2222-4222-8222-222222222222', 'api')],
+        })
+      );
+
+    await expect(
+      validateBitbucketWorkspaceAccessToken({
+        accessToken: ACCESS_TOKEN,
+      })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        providerScopes: ['account', 'pullrequest', 'repository:write', 'webhook'],
+      })
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
   it('rejects missing credential-type evidence before requesting members or repositories', async () => {
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValueOnce(
       Response.json(
@@ -236,22 +278,74 @@ describe('Bitbucket Workspace Access Token adapter', () => {
     const headers: Record<string, string> = {
       'X-Credential-Type': 'workspace_access_token',
     };
-    if (scopeHeader) headers['X-OAuth-Scopes'] = scopeHeader;
-    jest.spyOn(global, 'fetch').mockResolvedValueOnce(
-      Response.json(
-        {
-          pagelen: 2,
-          values: [{ workspace: { uuid: `{${WORKSPACE_UUID}}`, slug: 'acme' } }],
+    if (scopeHeader) {
+      const scopedResponse = {
+        headers: {
+          'X-OAuth-Scopes': scopeHeader,
         },
-        { headers }
-      )
-    );
+      };
+      jest
+        .spyOn(global, 'fetch')
+        .mockResolvedValueOnce(workspaceDiscoveryJson({}, scopedResponse))
+        .mockResolvedValueOnce(
+          authenticatedJson(
+            { uuid: `{${WORKSPACE_UUID}}`, slug: 'acme', name: 'Acme Workspace' },
+            scopedResponse
+          )
+        )
+        .mockResolvedValueOnce(authenticatedJson({ pagelen: 1, values: [] }, scopedResponse))
+        .mockResolvedValueOnce(authenticatedJson({ pagelen: 50, values: [] }, scopedResponse));
+    } else {
+      jest.spyOn(global, 'fetch').mockResolvedValueOnce(
+        Response.json(
+          {
+            pagelen: 2,
+            values: [{ workspace: { uuid: `{${WORKSPACE_UUID}}`, slug: 'acme' } }],
+          },
+          { headers }
+        )
+      );
+    }
 
     await expect(
       validateBitbucketWorkspaceAccessToken({
         accessToken: ACCESS_TOKEN,
       })
     ).rejects.toMatchObject({ code: expectedCode });
+  });
+
+  it('names the missing required provider scopes without exposing the token', async () => {
+    const scopedResponse = {
+      headers: {
+        'X-OAuth-Scopes': 'account repository:write',
+      },
+    };
+    jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValueOnce(workspaceDiscoveryJson({}, scopedResponse))
+      .mockResolvedValueOnce(
+        authenticatedJson(
+          {
+            uuid: `{${WORKSPACE_UUID}}`,
+            slug: 'acme',
+            name: 'Acme Workspace',
+          },
+          scopedResponse
+        )
+      )
+      .mockResolvedValueOnce(authenticatedJson({ pagelen: 1, values: [] }, scopedResponse))
+      .mockResolvedValueOnce(authenticatedJson({ pagelen: 50, values: [] }, scopedResponse));
+
+    const validation = validateBitbucketWorkspaceAccessToken({
+      accessToken: ACCESS_TOKEN,
+    });
+
+    await expect(validation).rejects.toMatchObject({
+      code: 'insufficient_scopes',
+      message:
+        'The Bitbucket Workspace Access Token is missing required permissions: Pull request Read, Webhooks Read and Write',
+    });
+    await expect(validation).rejects.not.toThrow(ACCESS_TOKEN);
   });
 
   it('rejects a credential whose workspace UUID differs from the expected binding', async () => {

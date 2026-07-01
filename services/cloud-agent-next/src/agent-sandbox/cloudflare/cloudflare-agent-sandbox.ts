@@ -112,7 +112,6 @@ export class CloudflareAgentSandbox implements AgentSandbox {
             this.metadata.identity.botId,
             {
               createdOnPlatform: this.metadata.identity.createdOnPlatform,
-              codeReviewEphemeralSandboxOrgIds: this.env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
             }
           );
     }

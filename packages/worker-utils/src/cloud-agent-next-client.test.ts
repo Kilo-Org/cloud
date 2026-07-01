@@ -6,6 +6,7 @@ import {
   CloudAgentNextError,
   isCloudAgentNextBillingErrorBody,
 } from './cloud-agent-next-client.js';
+import type { CloudAgentPrepareSessionInput } from './cloud-agent-next-client.js';
 
 const BASE_URL = 'https://cloud-agent-next.test';
 
@@ -21,6 +22,40 @@ function mockFetch(status: number, body: unknown) {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('CloudAgentNextFetchClient prepareSession', () => {
+  it('posts the complete managed Bitbucket code-review context', async () => {
+    const fetchMock = mockFetch(200, {
+      result: {
+        data: { cloudAgentSessionId: 'agent_123', kiloSessionId: 'ses_123' },
+      },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createCloudAgentNextFetchClient(BASE_URL);
+    const input: CloudAgentPrepareSessionInput = {
+      prompt: 'Review this pull request',
+      mode: 'code',
+      model: 'test-model',
+      gitUrl: 'https://bitbucket.org/acme/repo.git',
+      platform: 'bitbucket',
+      kilocodeOrganizationId: '123e4567-e89b-12d3-a456-426614174099',
+      bitbucketWorkspaceUuid: 'a07d5c40-2d2d-4e79-a812-6a47824a77d6',
+      bitbucketWorkspaceSlug: 'acme',
+      bitbucketRepositoryUuid: '38a47a32-cb87-4a9f-b75d-7224774bba77',
+      bitbucketRepositorySlug: 'repo',
+      bitbucketIntegrationId: 'ef2eb5c7-27ce-4f43-b6d3-8f282abc145c',
+      bitbucketPullRequestId: 42,
+      bitbucketExpectedHeadSha: '0123456789abcdef0123456789abcdef01234567',
+    };
+
+    await client.prepareSession({}, input);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${BASE_URL}/trpc/prepareSession`,
+      expect.objectContaining({ body: JSON.stringify(input) })
+    );
+  });
 });
 
 describe('CloudAgentNextFetchClient billing error detection', () => {

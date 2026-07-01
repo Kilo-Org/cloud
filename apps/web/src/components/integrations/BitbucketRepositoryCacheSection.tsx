@@ -112,6 +112,8 @@ export function BitbucketRepositoryCacheSection({
   const statusQueryKey = trpc.organizations.bitbucket.getStatus.queryKey(statusInput);
   const repositoryQueryKey =
     trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryKey(statusInput);
+  const readinessQueryKey =
+    trpc.organizations.reviewAgent.getBitbucketReadiness.queryKey(statusInput);
   const cache = status.repositoryCache;
 
   useEffect(() => {
@@ -141,7 +143,10 @@ export function BitbucketRepositoryCacheSection({
             setRefreshFeedback(result.status);
             break;
         }
-        void queryClient.invalidateQueries({ queryKey: statusQueryKey });
+        void Promise.all([
+          queryClient.invalidateQueries({ queryKey: statusQueryKey }),
+          queryClient.invalidateQueries({ queryKey: readinessQueryKey }),
+        ]);
       },
       onError: error => {
         toast.error("Couldn't refresh Bitbucket repositories", { description: error.message });

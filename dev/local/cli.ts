@@ -239,7 +239,12 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
   const SIDEBAR_WIDTH = 40;
 
   // --- Start capture services first (tunnel, stripe) and wait for output ---
-  const captureServiceSet = new Set(['kiloclaw-tunnel', 'stripe', 'app-builder-tunnel']);
+  const captureServiceSet = new Set([
+    'kiloclaw-tunnel',
+    'stripe',
+    'app-builder-tunnel',
+    'bitbucket-webhook-tunnel',
+  ]);
   const captureServices = serviceNames.filter(n => captureServiceSet.has(n));
   const otherServices = serviceNames.filter(n => !captureServiceSet.has(n));
   const startedServices: string[] = [];
@@ -266,6 +271,14 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
       const appBuilderEnvPath = path.join(repoRoot, 'services/app-builder/.dev.vars');
       oldValues.set('app-builder-tunnel', readEnvValue(appBuilderEnvPath, 'BUILDER_HOSTNAME'));
       oldMtimes.set('app-builder-tunnel', readEnvMtime(appBuilderEnvPath));
+    }
+    if (captureServices.includes('bitbucket-webhook-tunnel')) {
+      const appEnvPath = path.join(repoRoot, 'apps/web/.env.development.local');
+      oldValues.set(
+        'bitbucket-webhook-tunnel',
+        readEnvValue(appEnvPath, 'BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL')
+      );
+      oldMtimes.set('bitbucket-webhook-tunnel', readEnvMtime(appEnvPath));
     }
 
     for (const name of captureServices) {
@@ -359,6 +372,26 @@ async function cmdUp(args: string[], repoRoot: string): Promise<void> {
           } else {
             console.warn(
               '  App builder tunnel URL not captured after 30s - check app-builder-tunnel window'
+            );
+          }
+        })
+      );
+    }
+
+    if (captureServices.includes('bitbucket-webhook-tunnel')) {
+      waits.push(
+        waitForEnvValueChange(
+          path.join(repoRoot, 'apps/web/.env.development.local'),
+          'BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL',
+          oldValues.get('bitbucket-webhook-tunnel'),
+          CAPTURE_TIMEOUT_MS,
+          oldMtimes.get('bitbucket-webhook-tunnel')
+        ).then(ready => {
+          if (ready) {
+            console.log('  Bitbucket webhook tunnel URL captured');
+          } else {
+            console.warn(
+              '  Bitbucket webhook tunnel URL not captured after 30s - check bitbucket-webhook-tunnel window'
             );
           }
         })
@@ -581,7 +614,7 @@ async function cmdStatus(repoRoot: string, isJson = false): Promise<void> {
   }
 }
 
-async function cmdRestart(serviceName: string, repoRoot: string): Promise<void> {
+async function cmdRestart(serviceName: string): Promise<void> {
   if (!services.has(serviceName)) {
     console.error(`Unknown service: ${serviceName}`);
     process.exit(1);
@@ -674,7 +707,7 @@ Usage:
   dev:env --check         Validate env vars (CI mode)
   dev:env -y              Sync without confirmation
 
-Targets: app, app-builder, agents, security-agent, mobile, all, or any service/group name
+Targets: app, app-builder, agents, code-review, security-agent, mobile, all, or any service/group name
 Multiple targets can be specified: dev:start kiloclaw security-agent`);
 }
 
@@ -703,7 +736,7 @@ async function main() {
         console.error('Usage: dev:restart <service>');
         process.exit(1);
       }
-      await cmdRestart(serviceName, repoRoot);
+      await cmdRestart(serviceName);
       break;
     }
     case 'env':

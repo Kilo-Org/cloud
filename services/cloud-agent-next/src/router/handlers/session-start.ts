@@ -57,6 +57,7 @@ function startInputToSessionCreateRequest(
         url: repo.url,
         workspaceUuid: repo.workspaceUuid,
         repositoryUuid: repo.repositoryUuid,
+        bitbucketIntegrationId: repo.bitbucketIntegrationId,
         branch: repo.branch,
       };
       break;

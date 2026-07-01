@@ -11,18 +11,21 @@ import {
 type CodeReviewActionRequiredAlertProps = {
   actionRequired: CodeReviewActionRequiredState;
   organizationId?: string;
+  platform?: 'github' | 'gitlab' | 'bitbucket';
   compact?: boolean;
 };
 
 export function CodeReviewActionRequiredAlert({
   actionRequired,
   organizationId,
+  platform,
   compact = false,
 }: CodeReviewActionRequiredAlertProps) {
   const copy = getCodeReviewActionRequiredCopy(actionRequired.reason);
   const recoveryHref = getCodeReviewActionRequiredRecoveryHref(
     actionRequired.reason,
-    organizationId
+    organizationId,
+    platform
   );
   const isMailto = recoveryHref.startsWith('mailto:');
 

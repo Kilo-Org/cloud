@@ -202,8 +202,10 @@ version=$(docker run --rm "$IMAGE" openclaw --version 2>/dev/null \
   | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 check "openclaw version" "$EXPECTED_VERSION" "$version"
 
+# KiloCode provider was externalized to @openclaw/kilocode-provider (openclaw #93470, 2026.6.9);
+# the patched provider-models bundle is a single non-hashed file in that package.
 timeout_patch=$(docker run --rm "$IMAGE" sh -c \
-  'OC=/usr/local/lib/node_modules/openclaw/dist; F=$(grep -l KILOCODE_MODELS_URL $OC/provider-models-*.js); grep -c "DISCOVERY_TIMEOUT_MS = 60e3" "$F"' 2>/dev/null || echo 0)
+  'F=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist/provider-models.js; grep -c "DISCOVERY_TIMEOUT_MS = 60e3" "$F"' 2>/dev/null || echo 0)
 check "model-discovery timeout patch applied (60e3)" "1" "$timeout_patch"
 
 action_patch=$(docker run --rm "$IMAGE" sh -c \

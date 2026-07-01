@@ -83,6 +83,12 @@ const LEGACY_STREAM_CHAT_PLUGIN_PATH =
   '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
 const KILO_CHAT_PLUGIN_ID = 'kilo-chat';
 const KILO_CHAT_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
+// KiloCode provider was externalized from openclaw core into a standalone plugin
+// (openclaw #93470, 2026.6.9). It is installed globally by the Dockerfile and must
+// be loaded explicitly — an explicit `models.providers.kilocode` entry alone no
+// longer loads it now that it is not bundled.
+const KILOCODE_PROVIDER_PLUGIN_ID = 'kilocode';
+const KILOCODE_PROVIDER_PLUGIN_PATH = '/usr/local/lib/node_modules/@openclaw/kilocode-provider';
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
 
 type KiloExaSearchMode = 'kilo-proxy' | 'disabled';
@@ -406,6 +412,17 @@ export function generateBaseConfig(
     : [];
   if (!(config.plugins.load.paths as string[]).includes(KILOCLAW_CUSTOMIZER_PLUGIN_PATH)) {
     (config.plugins.load.paths as string[]).push(KILOCLAW_CUSTOMIZER_PLUGIN_PATH);
+  }
+  // KiloCode provider is now an external plugin (openclaw #93470); load it explicitly
+  // so model routing through the Kilo Gateway continues to work.
+  if (!(config.plugins.load.paths as string[]).includes(KILOCODE_PROVIDER_PLUGIN_PATH)) {
+    (config.plugins.load.paths as string[]).push(KILOCODE_PROVIDER_PLUGIN_PATH);
+  }
+  if (
+    Array.isArray(config.plugins.allow) &&
+    !config.plugins.allow.includes(KILOCODE_PROVIDER_PLUGIN_ID)
+  ) {
+    config.plugins.allow.push(KILOCODE_PROVIDER_PLUGIN_ID);
   }
   if (
     Array.isArray(config.plugins.allow) &&

@@ -64,12 +64,14 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Match the KiloCode chunk explicitly because OpenClaw also ships other provider
 # discovery timeout constants. Remove this patch once the timeout is configurable.
-RUN npm install -g pnpm openclaw@2026.6.11 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
+# NOTE: the KiloCode provider was externalized from openclaw core into the standalone
+# @openclaw/kilocode-provider package (openclaw #93470, 2026.6.9); it is installed
+# alongside openclaw and its provider-models bundle is a single non-hashed file.
+RUN npm install -g pnpm openclaw@2026.6.11 @openclaw/kilocode-provider@2026.6.11 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
-    && PM_FILES=$(grep -l 'KILOCODE_MODELS_URL' "$OC_DIST"/provider-models-*.js 2>/dev/null || true) \
-    && PM_FILE_COUNT=$(printf '%s\n' "$PM_FILES" | grep -c .) \
-    && if [ "$PM_FILE_COUNT" -ne 1 ]; then echo "ERROR: expected exactly 1 KiloCode provider-models chunk, found $PM_FILE_COUNT - openclaw may have changed" >&2; exit 1; fi \
-    && PM_FILE="$PM_FILES" \
+    && KP_DIST=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist \
+    && PM_FILE="$KP_DIST/provider-models.js" \
+    && if [ ! -f "$PM_FILE" ] || ! grep -q 'KILOCODE_MODELS_URL' "$PM_FILE"; then echo "ERROR: @openclaw/kilocode-provider provider-models.js missing or no KILOCODE_MODELS_URL - openclaw may have changed" >&2; exit 1; fi \
     && BEFORE=$(grep -c 'DISCOVERY_TIMEOUT_MS = 5e3' "$PM_FILE" 2>/dev/null || true) \
     && if [ "$BEFORE" -ne 1 ]; then echo "ERROR: expected exactly 1 KiloCode DISCOVERY_TIMEOUT_MS = 5e3 occurrence, found $BEFORE - openclaw may have changed" >&2; exit 1; fi \
     && sed -i 's/DISCOVERY_TIMEOUT_MS = 5e3/DISCOVERY_TIMEOUT_MS = 60e3/' "$PM_FILE" \
@@ -259,8 +261,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-07-01-v72-openclaw-2026.6.11
-RUN echo "17"
+# Build cache bust: 2026-07-01-v73-openclaw-2026.6.11-kilocode-provider
+RUN echo "18"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

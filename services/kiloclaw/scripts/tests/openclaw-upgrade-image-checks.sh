@@ -221,6 +221,19 @@ mb_peer=$(docker run --rm "$IMAGE" \
   node -p "require('/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing/package.json').peerDependencies.openclaw" 2>/dev/null || echo "")
 check "morning-briefing plugin peer matches pin" "$EXPECTED_VERSION" "$mb_peer"
 
+# ── Bundled CLI tool pins ────────────────────────────────────────────────────
+# @steipete/summarize is pinned in the Dockerfile (bumped to 0.15.1 to clear
+# GHSA-8jr4-6r33-phwm et al.). Guard both that the pin installed as expected and
+# that the CLI still launches, since the smoke does not otherwise exercise it.
+# Keep EXPECTED_SUMMARIZE_VERSION in lockstep with the Dockerfile pin.
+EXPECTED_SUMMARIZE_VERSION="0.15.1"
+summarize_version=$(docker run --rm "$IMAGE" \
+  node -p "require('/usr/local/lib/node_modules/@steipete/summarize/package.json').version" 2>/dev/null || echo "")
+check "@steipete/summarize pin installed" "$EXPECTED_SUMMARIZE_VERSION" "$summarize_version"
+
+summarize_cli=$(docker run --rm "$IMAGE" sh -c 'summarize --version >/dev/null 2>&1 && echo ok || echo fail')
+check "@steipete/summarize CLI launches" "ok" "$summarize_cli"
+
 # ── Keyless config schema validation (no gateway) ────────────────────────────
 # Representative app-written shapes must still validate against the packaged
 # OpenClaw schema; a malformed config must still be rejected (validator sanity).

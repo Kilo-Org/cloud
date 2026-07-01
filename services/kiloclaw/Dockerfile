@@ -67,7 +67,7 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 # NOTE: the KiloCode provider was externalized from openclaw core into the standalone
 # @openclaw/kilocode-provider package (openclaw #93470, 2026.6.9); it is installed
 # alongside openclaw and its provider-models bundle is a single non-hashed file.
-RUN npm install -g pnpm openclaw@2026.6.11 @openclaw/kilocode-provider@2026.6.11 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
+RUN npm install -g pnpm openclaw@2026.6.11 @openclaw/kilocode-provider@2026.6.11 clawhub mcporter@0.7.3 @steipete/summarize@0.15.1 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
     && KP_DIST=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist \
     && PM_FILE="$KP_DIST/provider-models.js" \

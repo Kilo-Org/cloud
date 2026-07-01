@@ -64,12 +64,16 @@ raw = sys.stdin.read()
 doc = None
 for _start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
     try:
-        doc, _ = json.JSONDecoder().raw_decode(raw[_start:])
-        break
+        _cand, _ = json.JSONDecoder().raw_decode(raw[_start:])
     except Exception:
         continue
+    # Accept only the real payload object, not a self-contained JSON fragment
+    # (e.g. a "[1, 2, 3]" list) embedded in an interleaved log line.
+    if isinstance(_cand, dict) and "plugin" in _cand:
+        doc = _cand
+        break
 if doc is None:
-    raise SystemExit("no JSON object in command output")
+    raise SystemExit("no plugin JSON object in command output")
 plugin = doc.get("plugin", {})
 status = plugin.get("status")
 error = plugin.get("error")
@@ -97,12 +101,16 @@ raw = sys.stdin.read()
 doc = None
 for _start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
     try:
-        doc, _ = json.JSONDecoder().raw_decode(raw[_start:])
-        break
+        _cand, _ = json.JSONDecoder().raw_decode(raw[_start:])
     except Exception:
         continue
+    # Accept only the real payload object, not a self-contained JSON fragment
+    # (e.g. a stray list) embedded in an interleaved log line.
+    if isinstance(_cand, dict) and "diagnostics" in _cand:
+        doc = _cand
+        break
 if doc is None:
-    raise SystemExit("no JSON object in command output")
+    raise SystemExit("no diagnostics JSON object in command output")
 diagnostics = doc.get("diagnostics", [])
 if not isinstance(diagnostics, list):
     raise SystemExit("diagnostics is not a list")

@@ -284,12 +284,16 @@ raw = sys.stdin.read()
 doc = None
 for _start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
     try:
-        doc, _ = json.JSONDecoder().raw_decode(raw[_start:])
-        break
+        _cand, _ = json.JSONDecoder().raw_decode(raw[_start:])
     except Exception:
         continue
+    # Accept only the real response object, not a self-contained JSON fragment
+    # (e.g. a stray list) embedded in an interleaved log line.
+    if isinstance(_cand, dict) and ("result" in _cand or "payloads" in _cand):
+        doc = _cand
+        break
 if doc is None:
-    raise SystemExit("no JSON object in command output")
+    raise SystemExit("no result JSON object in command output")
 result = doc.get("result", doc)
 payloads = result.get("payloads", []) if isinstance(result, dict) else []
 texts = [entry.get("text", "") for entry in payloads if isinstance(entry, dict)]
@@ -324,21 +328,27 @@ import json, sys
 
 raw = sys.stdin.read()
 # Tolerate any non-JSON log preamble (e.g. openclaw [state-migrations]) by trying
-# each candidate JSON start until one decodes — a bare "[state-migrations]" line
-# also begins with "[", so we cannot just take the first bracket.
-data = None
-candidates = [0] + [i for i, c in enumerate(raw) if c in "[{"]
-for start in candidates:
+# each candidate JSON start until one decodes to the model catalog shape. A bare
+# "[state-migrations]" line also begins with "[", and a self-contained fragment
+# (e.g. a stray list) in an interleaved log line could parse on its own, so accept
+# only a top-level list of model objects (or a dict with a "models" list).
+def _as_catalog(cand):
+    if isinstance(cand, dict) and isinstance(cand.get("models"), list):
+        cand = cand["models"]
+    if isinstance(cand, list) and all(isinstance(x, dict) for x in cand):
+        return cand
+    return None
+
+models = None
+for start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
     try:
-        data, _ = json.JSONDecoder().raw_decode(raw[start:])
-        break
+        cand, _ = json.JSONDecoder().raw_decode(raw[start:])
     except Exception:
         continue
-if data is None:
-    print("parse-error"); raise SystemExit(0)
-
-models = data.get("models", data) if isinstance(data, dict) else data
-if not isinstance(models, list):
+    models = _as_catalog(cand)
+    if models is not None:
+        break
+if models is None:
     print("no-catalog"); raise SystemExit(0)
 
 def is_kilocode(m):

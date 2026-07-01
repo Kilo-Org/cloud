@@ -1008,7 +1008,6 @@ export class SessionService {
         this._metadata.identity.botId,
         {
           createdOnPlatform: this._metadata.identity.createdOnPlatform,
-          codeReviewEphemeralSandboxOrgIds: env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
         }
       ));
 

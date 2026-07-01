@@ -690,7 +690,6 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         metadata.identity.botId,
         {
           createdOnPlatform: metadata.identity.createdOnPlatform,
-          codeReviewEphemeralSandboxOrgIds: this.env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
         }
       ));
 

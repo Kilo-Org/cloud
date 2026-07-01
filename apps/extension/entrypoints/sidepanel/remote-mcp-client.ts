@@ -7,6 +7,7 @@ import {
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { jsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/types.js';
 import type {
   RemoteMcpAuth,
   RemoteMcpCachedTool,
@@ -34,10 +35,24 @@ const buildAuthHeaders = (auth: RemoteMcpAuth): Record<string, string> => {
   return {};
 };
 
-const combineSignal = (signal?: AbortSignal): AbortSignal =>
+const CONNECT_TIMEOUT_MS = 20_000;
+// Interactive OAuth blocks on the user, so the auth-carrying connect gets a far longer budget.
+const AUTH_TIMEOUT_MS = 5 * 60_000;
+
+const combineSignal = (signal: AbortSignal | undefined, timeoutMs: number): AbortSignal =>
   signal === undefined
-    ? AbortSignal.timeout(20_000)
-    : AbortSignal.any([signal, AbortSignal.timeout(20_000)]);
+    ? AbortSignal.timeout(timeoutMs)
+    : AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]);
+
+/*
+ * The extension CSP forbids eval, but the SDK's default Ajv validator compiles
+ * tool output schemas with `new Function`. We forward tool results to the model
+ * without consuming output-schema validation, so inject a permissive validator.
+ */
+const permissiveJsonSchemaValidator: jsonSchemaValidator = {
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion -- generic identity: the value is never read, only `valid` is.
+  getValidator: () => input => ({ data: input as never, errorMessage: undefined, valid: true }),
+};
 
 /*
  * StreamableHTTPClientTransport.sessionId is `string | undefined`, but the
@@ -49,23 +64,34 @@ const asTransport = (transport: StreamableHTTPClientTransport): Transport =>
   // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   transport as unknown as Transport;
 
-const makeClient = (
+const makeAuthProvider = (
+  server: RemoteMcpServer,
+  storageArea?: RemoteMcpStorageArea
+): RemoteMcpOAuthProvider | undefined =>
+  server.auth.type === 'oauth' && storageArea !== undefined
+    ? createRemoteMcpOAuthProvider({ server, storageArea })
+    : undefined;
+
+const makeClient = (): Client =>
+  new Client(
+    { name: 'kilo-extension', version: '0.0.0' },
+    { jsonSchemaValidator: permissiveJsonSchemaValidator }
+  );
+
+/*
+ * A fresh transport per connect attempt: the SDK's connect() starts it, and a
+ * started transport cannot be reused for the post-auth reconnect.
+ */
+const makeTransport = (
   server: RemoteMcpServer,
   fetchFn: FetchLike,
-  storageArea?: RemoteMcpStorageArea
-) => {
-  const client = new Client({ name: 'kilo-extension', version: '0.0.0' });
-  const authProvider: RemoteMcpOAuthProvider | undefined =
-    server.auth.type === 'oauth' && storageArea !== undefined
-      ? createRemoteMcpOAuthProvider({ server, storageArea })
-      : undefined;
-  const transport = new StreamableHTTPClientTransport(new URL(server.url), {
+  authProvider?: RemoteMcpOAuthProvider
+): StreamableHTTPClientTransport =>
+  new StreamableHTTPClientTransport(new URL(server.url), {
     ...(authProvider === undefined ? {} : { authProvider }),
     fetch: fetchFn,
     requestInit: { headers: buildAuthHeaders(server.auth) },
   });
-  return { authProvider, client, transport };
-};
 
 export const connectRemoteMcpServer = async ({
   fetch: fetchFn,
@@ -78,16 +104,24 @@ export const connectRemoteMcpServer = async ({
   readonly signal?: AbortSignal;
   readonly storageArea?: RemoteMcpStorageArea;
 }): Promise<RemoteMcpServer> => {
-  const combined = combineSignal(signal);
-  const { authProvider, client, transport } = makeClient(server, fetchFn, storageArea);
+  const authProvider = makeAuthProvider(server, storageArea);
+  const client = makeClient();
 
   /*
    * Connect and list tools, transparently completing an interactive OAuth flow
-   * once if the SDK reports the connection is unauthorized.
+   * once if the SDK reports the connection is unauthorized. The auth-carrying
+   * connect gets a longer timeout because it blocks on the user, and the retry
+   * uses a fresh transport because the first one is already started.
    */
   const connectAndList = async () => {
+    const transport = makeTransport(server, fetchFn, authProvider);
     try {
-      await client.connect(asTransport(transport), { signal: combined });
+      await client.connect(asTransport(transport), {
+        signal: combineSignal(
+          signal,
+          authProvider === undefined ? CONNECT_TIMEOUT_MS : AUTH_TIMEOUT_MS
+        ),
+      });
     } catch (error) {
       if (!(error instanceof UnauthorizedError) || authProvider === undefined) {
         throw error;
@@ -97,9 +131,11 @@ export const connectRemoteMcpServer = async ({
         throw error;
       }
       await transport.finishAuth(code);
-      await client.connect(asTransport(transport), { signal: combined });
+      await client.connect(asTransport(makeTransport(server, fetchFn, authProvider)), {
+        signal: combineSignal(signal, CONNECT_TIMEOUT_MS),
+      });
     }
-    return client.listTools(undefined, { signal: combined });
+    return client.listTools(undefined, { signal: combineSignal(signal, CONNECT_TIMEOUT_MS) });
   };
 
   try {
@@ -186,8 +222,9 @@ export const callRemoteMcpTool = async ({
   readonly signal?: AbortSignal;
   readonly storageArea?: RemoteMcpStorageArea;
 }): Promise<CallToolResult> => {
-  const combined = combineSignal(signal);
-  const { client, transport } = makeClient(server, fetchFn, storageArea);
+  const combined = combineSignal(signal, CONNECT_TIMEOUT_MS);
+  const client = makeClient();
+  const transport = makeTransport(server, fetchFn, makeAuthProvider(server, storageArea));
 
   try {
     await client.connect(asTransport(transport), { signal: combined });

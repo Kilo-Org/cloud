@@ -288,7 +288,6 @@ export function createSessionManagementHandlers() {
               sessionMetadata.identity.botId,
               {
                 createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
-                codeReviewEphemeralSandboxOrgIds: env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
               }
             ));
 
@@ -397,7 +396,6 @@ export function createSessionManagementHandlers() {
               metadata.identity.botId,
               {
                 createdOnPlatform: metadata.identity.createdOnPlatform,
-                codeReviewEphemeralSandboxOrgIds: env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
               }
             ));
 

@@ -46,6 +46,8 @@ body {
 
 .agent-message-markdown {
   display: grid;
+  /* minmax(0, 1fr) lets children shrink below their content min-size; without it grid items default to min-width:auto and a long token overflows the panel. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.5rem;
 }
 
@@ -77,6 +79,7 @@ body {
   border-radius: 0.25rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   font-size: 0.75rem;
+  overflow-wrap: anywhere;
   padding: 0.125rem 0.25rem;
 }
 

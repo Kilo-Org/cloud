@@ -187,13 +187,19 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
       const previousTop = lastScrollTopRef.current;
       lastScrollTopRef.current = currentTop;
 
-      // Backstop for gestures with no input event of their own, such as dragging the scrollbar: any move above the last pinned position is the user leaving the bottom. Re-arming is left to the jump button.
+      // Backstop for gestures with no input event of their own, such as dragging the scrollbar: any move above the last pinned position is the user leaving the bottom.
       if (
         currentTop < previousTop - 1 &&
         currentTop < lastPinnedTopRef.current - 1 &&
         !isScrolledToBottom(element)
       ) {
         releaseToManualScroll();
+        return;
+      }
+
+      // Re-arm once the user scrolls back to the bottom themselves. Gated on a downward move so an upward gesture that stays within the bottom threshold, or a pin write, never re-arms and fights the user.
+      if (currentTop > previousTop && isScrolledToBottom(element)) {
+        followBottomAgain();
       }
     };
 
@@ -210,7 +216,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
       element.removeEventListener('touchmove', handleTouchMove);
       element.removeEventListener('scroll', handleScroll);
     };
-  }, [releaseToManualScroll]);
+  }, [followBottomAgain, releaseToManualScroll]);
 
   useEffect(() => cancelPin, [cancelPin]);
 

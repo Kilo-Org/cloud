@@ -48,6 +48,7 @@ export const CONTAINER_CAPACITY_THRESHOLDS = {
 export const MONITORED_CONTAINER_APPS: readonly string[] = [
   'cloud-agent-next-sandbox',
   'cloud-agent-next-sandboxsmall',
+  'cloud-agent-next-sandboxcodereview',
 ];
 
 // ── Zod schemas for the Cloudflare Containers API ───────────────────────────

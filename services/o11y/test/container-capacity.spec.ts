@@ -8,6 +8,7 @@ import {
 
 const MONITORED = MONITORED_CONTAINER_APPS[0]; // 'cloud-agent-next-sandbox'
 const MONITORED_SMALL = MONITORED_CONTAINER_APPS[1]; // 'cloud-agent-next-sandboxsmall'
+const MONITORED_CODE_REVIEW = MONITORED_CONTAINER_APPS[2]; // 'cloud-agent-next-sandboxcodereview'
 
 function makeApp(
   overrides: Partial<ContainerApplication> & Pick<ContainerApplication, 'name'>
@@ -110,5 +111,15 @@ describe('evaluateCapacityThresholds', () => {
     const smallAlert = alerts.find(a => a.applicationName === MONITORED_SMALL);
     expect(sandboxAlert?.severity).toBe('ticket');
     expect(smallAlert?.severity).toBe('page');
+  });
+
+  it('evaluates the code review sandbox app', () => {
+    const apps = [
+      makeApp({ id: 'app-id-3', name: MONITORED_CODE_REVIEW, instances: 96, maxInstances: 100 }),
+    ];
+    const alerts = evaluateCapacityThresholds(apps);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].applicationName).toBe(MONITORED_CODE_REVIEW);
+    expect(alerts[0].severity).toBe('page');
   });
 });

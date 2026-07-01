@@ -72,6 +72,19 @@ const smallDetailApp = {
   max_instances: 100,
 };
 
+const codeReviewListApp = {
+  id: 'code-review-id',
+  name: 'cloud-agent-next-sandboxcodereview',
+  instances: 10,
+};
+
+const codeReviewDetailApp = {
+  id: 'code-review-id',
+  name: 'cloud-agent-next-sandboxcodereview',
+  instances: 10,
+  max_instances: 1000,
+};
+
 const unmonitoredListApp = {
   id: 'other-id',
   name: 'some-other-app',
@@ -169,6 +182,26 @@ describe('queryContainerApplications', () => {
       'cloud-agent-next-sandbox',
       'cloud-agent-next-sandboxsmall',
     ]);
+  });
+
+  it('fetches the code review sandbox application', async () => {
+    const responses = new Map<string, object>([
+      [
+        `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/containers/dash/applications?page=1&per_page=20`,
+        makeListResponse([codeReviewListApp, unmonitoredListApp]),
+      ],
+      [
+        `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/containers/applications/code-review-id`,
+        makeDetailResponse(codeReviewDetailApp),
+      ],
+    ]);
+
+    const apps = await queryContainerApplications(makeEnv(), makeFetch(responses));
+
+    expect(apps).toHaveLength(1);
+    expect(apps[0].name).toBe('cloud-agent-next-sandboxcodereview');
+    expect(apps[0].instances).toBe(10);
+    expect(apps[0].maxInstances).toBe(1000);
   });
 
   it('returns empty array when no monitored apps are found in the list', async () => {

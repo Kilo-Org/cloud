@@ -4974,11 +4974,9 @@ export class TownDO extends DurableObject<Env> {
     try {
       const container = getTownContainerStub(this.env, townId);
 
-      // Measure Cloudflare container cold-start latency from the worker's
-      // perspective: warmUp() invokes startAndWaitForPorts() directly, so the
-      // returned durationMs is the true time-to-ready without the arbitrary
-      // 5s truncation of a plain /health ping. For already-warm containers
-      // this is a cheap RPC that returns { coldStart: false }.
+      // Measure Cloudflare container cold-start latency only when warmUp()
+      // actually starts the container. Already-running containers still rely
+      // on the /health probe below as the application-level liveness source.
       try {
         const warm = await container.warmUp();
         if (warm.coldStart) {

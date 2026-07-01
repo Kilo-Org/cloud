@@ -349,20 +349,24 @@ function isSameInitialAdmissionConfiguration(
   metadata: SessionMetadata,
   input: CreateSessionWithInitialAdmissionInput
 ): boolean {
-  return (
+  const sameIdentity =
     metadata.identity.sessionId === input.identity.sessionId &&
     metadata.identity.userId === input.identity.userId &&
     metadata.identity.orgId === input.identity.orgId &&
-    metadata.identity.botId === input.identity.botId &&
+    metadata.identity.botId === input.identity.botId;
+  const sameWorkspace =
     metadata.workspace?.sandboxId === input.workspace?.sandboxId &&
     JSON.stringify(metadata.workspace?.sandboxRoute) ===
-      JSON.stringify(input.workspace?.sandboxRoute) &&
+      JSON.stringify(input.workspace?.sandboxRoute);
+  const sameAgent =
     metadata.agent?.mode === input.agent.mode &&
     metadata.agent.model === input.agent.model &&
-    metadata.agent.variant === input.agent.variant &&
+    metadata.agent.variant === input.agent.variant;
+  const sameFinalization =
     metadata.finalization?.autoCommit === input.finalization?.autoCommit &&
-    metadata.finalization?.condenseOnComplete === input.finalization?.condenseOnComplete
-  );
+    metadata.finalization?.condenseOnComplete === input.finalization?.condenseOnComplete;
+
+  return sameIdentity && sameWorkspace && sameAgent && sameFinalization;
 }
 
 export class CloudAgentSession extends DurableObject<WorkerEnv> {

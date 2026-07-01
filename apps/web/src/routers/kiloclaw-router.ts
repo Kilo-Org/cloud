@@ -2274,6 +2274,27 @@ async function linkDestroyedSubscriptionToCreditRecoverySuccessor(params: {
   });
 }
 
+async function tryLinkDestroyedSubscriptionToCreditRecoverySuccessor(params: {
+  userId: string;
+  predecessorSubscriptionId: string;
+  successorInstanceId: string;
+  context: 'post_activation_recovery' | 'post_enrollment_success';
+}) {
+  try {
+    await linkDestroyedSubscriptionToCreditRecoverySuccessor(params);
+    return true;
+  } catch (error) {
+    logBillingWarning('KiloClaw credit reprovision successor linking failed after activation', {
+      user_id: params.userId,
+      predecessor_subscription_id: params.predecessorSubscriptionId,
+      successor_instance_id: params.successorInstanceId,
+      context: params.context,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
 async function getActivatedCreditRecoverySuccessor(params: { userId: string; instanceId: string }) {
   const [successor] = await db
     .select()
@@ -5590,18 +5611,20 @@ export const kiloclawRouter = createTRPCRouter({
           instanceId: provisioned.instanceId,
         });
         if (activatedSuccessor) {
-          await linkDestroyedSubscriptionToCreditRecoverySuccessor({
+          const linked = await tryLinkDestroyedSubscriptionToCreditRecoverySuccessor({
             userId: ctx.user.id,
             predecessorSubscriptionId: eligibility.subscription.id,
             successorInstanceId: provisioned.instanceId,
+            context: 'post_activation_recovery',
           });
           logBillingWarning(
-            'KiloClaw credit reprovision enrollment threw after activation; linked successor',
+            'KiloClaw credit reprovision enrollment threw after activation; returning activated state',
             {
               user_id: ctx.user.id,
               instance_id: provisioned.instanceId,
               subscription_id: eligibility.subscription.id,
               successor_subscription_id: activatedSuccessor.id,
+              successor_linked: linked,
               error: message,
             }
           );
@@ -5633,10 +5656,11 @@ export const kiloclawRouter = createTRPCRouter({
         };
       }
 
-      await linkDestroyedSubscriptionToCreditRecoverySuccessor({
+      await tryLinkDestroyedSubscriptionToCreditRecoverySuccessor({
         userId: ctx.user.id,
         predecessorSubscriptionId: eligibility.subscription.id,
         successorInstanceId: provisioned.instanceId,
+        context: 'post_enrollment_success',
       });
 
       return {

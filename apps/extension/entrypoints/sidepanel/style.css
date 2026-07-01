@@ -1,0 +1,90 @@
+@import 'tailwindcss';
+
+html,
+body,
+#root {
+  height: 100%;
+  min-width: 20rem;
+  overflow: hidden;
+}
+
+body {
+  background: #09090b;
+  margin: 0;
+}
+
+:where(a[href], button, select, summary, [role='button'], [role='tab']) {
+  cursor: pointer;
+}
+
+:where(button, select):disabled {
+  cursor: not-allowed;
+}
+
+.agent-conversation-scrollbar {
+  scrollbar-color: #52525b #09090b;
+  scrollbar-width: thin;
+}
+
+.agent-conversation-scrollbar::-webkit-scrollbar {
+  width: 0.625rem;
+}
+
+.agent-conversation-scrollbar::-webkit-scrollbar-track {
+  background: #09090b;
+}
+
+.agent-conversation-scrollbar::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border: 0.1875rem solid #09090b;
+  border-radius: 9999px;
+}
+
+.agent-conversation-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #52525b;
+}
+
+.agent-message-markdown {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.agent-message-markdown :where(h1, h2, h3) {
+  font-weight: 600;
+}
+
+.agent-message-markdown :where(a) {
+  text-decoration: underline;
+  text-underline-offset: 0.125rem;
+}
+
+.agent-message-markdown :where(ul, ol) {
+  display: grid;
+  gap: 0.25rem;
+  padding-left: 1rem;
+}
+
+.agent-message-markdown :where(ul) {
+  list-style: disc;
+}
+
+.agent-message-markdown :where(ol) {
+  list-style: decimal;
+}
+
+.agent-message-markdown :where(code) {
+  background: rgb(9 9 11 / 70%);
+  border-radius: 0.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.25rem;
+}
+
+.agent-message-markdown :where(pre) {
+  background: rgb(9 9 11 / 70%);
+  border-radius: 0.25rem;
+  overflow-x: hidden;
+  padding: 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

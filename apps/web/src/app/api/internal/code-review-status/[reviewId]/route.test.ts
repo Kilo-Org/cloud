@@ -249,6 +249,7 @@ function makeReview(overrides: Partial<CloudAgentCodeReview> = {}): CloudAgentCo
     repository_review_instructions_truncated: false,
     previous_summary_body: null,
     previous_summary_head_sha: null,
+    manual_config: null,
     model: null,
     total_tokens_in: null,
     total_tokens_out: null,
@@ -1365,6 +1366,39 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
       expect(mockUpdateCheckRun).not.toHaveBeenCalled();
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it('does not retry assistant authorization failures as infra failures', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        failedAttemptId: '00000000-0000-0000-0000-000000000207',
+        retryAttemptId: '00000000-0000-0000-0000-000000000208',
+        sessionId: 'agent-auth-failed-old',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          errorMessage: 'Assistant request was not authorized',
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({
+          errorMessage: 'Assistant request was not authorized',
+          terminalReason: 'upstream_error',
+        })
+      );
     });
 
     it.each([

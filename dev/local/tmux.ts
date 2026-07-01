@@ -211,7 +211,9 @@ function listWindows(sessionName: string): WindowInfo[] {
 }
 
 function renameWindow(sessionName: string, windowTarget: string | number, newName: string): void {
-  execSync(`tmux rename-window -t ${sessionName}:${windowTarget} ${newName}`, { stdio: 'ignore' });
+  execSync(`tmux rename-window -t ${sessionName}:${windowTarget} ${escapeForShell(newName)}`, {
+    stdio: 'ignore',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -328,10 +330,23 @@ function breakPane(
   newWindowName: string
 ): number {
   const output = execSync(
-    `tmux break-pane -d -s ${sessionName}:${windowTarget}.${pane} -n ${newWindowName} -P -F "#{window_index}"`,
+    `tmux break-pane -d -s ${sessionName}:${windowTarget}.${pane} -n ${escapeForShell(
+      newWindowName
+    )} -P -F "#{window_index}"`,
     { encoding: 'utf-8' }
   ).trim();
-  return parseInt(output, 10);
+  const windowIndex = parseInt(output, 10);
+
+  // tmux creates windows from break-pane with automatic-rename enabled. On
+  // tmux 3.7, the new window is immediately renamed to the shell command
+  // (for example "zsh"), even when -n is provided. The dev dashboard later
+  // finds service panes by window name, so pin the service name after moving.
+  execSync(`tmux set-window-option -t ${sessionName}:${windowIndex} automatic-rename off`, {
+    stdio: 'ignore',
+  });
+  renameWindow(sessionName, windowIndex, newWindowName);
+
+  return windowIndex;
 }
 
 /** Count panes in a window */

@@ -159,6 +159,118 @@ async function expectEphemeralConstraintViolation(
   });
 }
 
+type PlatformIntegrationInsert = typeof schema.platform_integrations.$inferInsert;
+type PlatformAccessTokenCredentialInsert =
+  typeof schema.platform_access_token_credentials.$inferInsert;
+
+async function withPlatformAccessTokenTestData(
+  testFn: (params: {
+    userId: string;
+    organizationId: string;
+    otherOrganizationId: string;
+  }) => Promise<void>
+): Promise<void> {
+  const userId = `schema-platform-token-${crypto.randomUUID()}`;
+
+  await schemaTestDb.db.insert(schema.kilocode_users).values({
+    id: userId,
+    google_user_email: `${userId}@example.com`,
+    google_user_name: 'Schema Platform Token User',
+    google_user_image_url: 'https://example.com/avatar.png',
+    stripe_customer_id: `cus_${crypto.randomUUID()}`,
+  });
+
+  const organizationRows = await schemaTestDb.db
+    .insert(schema.organizations)
+    .values([
+      { name: `Schema Platform Token Org ${crypto.randomUUID()}` },
+      { name: `Schema Platform Token Other Org ${crypto.randomUUID()}` },
+    ])
+    .returning({ id: schema.organizations.id });
+  const organization = organizationRows[0];
+  const otherOrganization = organizationRows[1];
+  if (!organization || !otherOrganization) {
+    throw new Error('Failed to insert platform access token test organizations');
+  }
+
+  try {
+    await testFn({
+      userId,
+      organizationId: organization.id,
+      otherOrganizationId: otherOrganization.id,
+    });
+  } finally {
+    await schemaTestDb.db
+      .delete(schema.organizations)
+      .where(eq(schema.organizations.id, organization.id));
+    await schemaTestDb.db
+      .delete(schema.organizations)
+      .where(eq(schema.organizations.id, otherOrganization.id));
+    await schemaTestDb.db.delete(schema.kilocode_users).where(eq(schema.kilocode_users.id, userId));
+  }
+}
+
+async function insertPlatformIntegration(
+  organizationId: string,
+  overrides: Partial<PlatformIntegrationInsert> = {}
+): Promise<typeof schema.platform_integrations.$inferSelect> {
+  const [integration] = await schemaTestDb.db
+    .insert(schema.platform_integrations)
+    .values({
+      owned_by_organization_id: organizationId,
+      platform: 'bitbucket',
+      integration_type: 'workspace_access_token',
+      integration_status: 'active',
+      ...overrides,
+    })
+    .returning();
+
+  if (!integration) {
+    throw new Error('Failed to insert platform integration');
+  }
+
+  return integration;
+}
+
+async function insertPlatformAccessTokenCredential(
+  integration: typeof schema.platform_integrations.$inferSelect,
+  overrides: Partial<PlatformAccessTokenCredentialInsert> = {}
+): Promise<typeof schema.platform_access_token_credentials.$inferSelect> {
+  const now = '2026-06-24T10:00:00.000Z';
+  const [credential] = await schemaTestDb.db
+    .insert(schema.platform_access_token_credentials)
+    .values({
+      platform_integration_id: integration.id,
+      owned_by_organization_id: integration.owned_by_organization_id ?? crypto.randomUUID(),
+      platform: 'bitbucket',
+      integration_type: 'workspace_access_token',
+      token_encrypted: 'encrypted-workspace-access-token',
+      provider_credential_type: 'workspace_access_token',
+      provider_scopes: ['account', 'repository', 'repository:write'],
+      provider_verified_at: now,
+      last_validated_at: now,
+      ...overrides,
+    })
+    .returning();
+
+  if (!credential) {
+    throw new Error('Failed to insert platform access token credential');
+  }
+
+  return credential;
+}
+
+async function expectPlatformCredentialConstraintViolation(
+  insertPromise: Promise<unknown>,
+  constraint: string
+): Promise<void> {
+  await expect(insertPromise).rejects.toMatchObject({
+    cause: {
+      constraint,
+    },
+  });
+}
+
 describe('database schema', () => {
   it("should be up to date with migrations (run 'pnpm drizzle generate' if this fails)", async () => {
     const migrationsDir = path.join(__dirname, 'migrations');
@@ -539,6 +651,75 @@ describe('database schema', () => {
   it('exposes provider-aware Kilo Pass store tables', () => {
     expect(Object.hasOwn(schema, 'kilo_pass_store_events')).toBe(true);
     expect(Object.hasOwn(schema, 'kilo_pass_store_purchases')).toBe(true);
+  });
+
+  it('exposes provider-neutral access token credentials', () => {
+    expect(Object.hasOwn(schema, 'platform_access_token_credentials')).toBe(true);
+  });
+
+  describe('platform access token credentials', () => {
+    it('stores one verified Bitbucket Workspace Access Token credential for an organization integration', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId);
+
+        const credential = await insertPlatformAccessTokenCredential(integration);
+
+        expect(credential).toEqual(
+          expect.objectContaining({
+            platform_integration_id: integration.id,
+            owned_by_organization_id: organizationId,
+            platform: 'bitbucket',
+            integration_type: 'workspace_access_token',
+            provider_credential_type: 'workspace_access_token',
+            credential_version: 1,
+          })
+        );
+        expect(credential).not.toHaveProperty('capability_profile');
+      });
+    });
+
+    it('rejects a credential without a parent integration', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId);
+
+        await expectPlatformCredentialConstraintViolation(
+          insertPlatformAccessTokenCredential(integration, {
+            platform_integration_id: crypto.randomUUID(),
+          }),
+          'FK_platform_access_token_credentials_parent'
+        );
+      });
+    });
+
+    it('rejects a second credential for the same integration', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId);
+        await insertPlatformAccessTokenCredential(integration);
+
+        await expectPlatformCredentialConstraintViolation(
+          insertPlatformAccessTokenCredential(integration),
+          'UQ_platform_access_token_credentials_platform_integration_id'
+        );
+      });
+    });
+
+    it('cascades credential deletion with its parent integration', async () => {
+      await withPlatformAccessTokenTestData(async ({ organizationId }) => {
+        const integration = await insertPlatformIntegration(organizationId);
+        const credential = await insertPlatformAccessTokenCredential(integration);
+
+        await schemaTestDb.db
+          .delete(schema.platform_integrations)
+          .where(eq(schema.platform_integrations.id, integration.id));
+
+        expect(
+          await schemaTestDb.db
+            .select()
+            .from(schema.platform_access_token_credentials)
+            .where(eq(schema.platform_access_token_credentials.id, credential.id))
+        ).toHaveLength(0);
+      });
+    });
   });
 
   describe('ephemeral deployments', () => {

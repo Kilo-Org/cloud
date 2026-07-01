@@ -76,6 +76,7 @@ export type AuditReportControlsState = {
   draftFilters: AuditReportFilters;
   submittedFilters: AuditReportFilters;
   isRangePickerOpen: boolean;
+  isSelectingRangeEnd: boolean;
 };
 
 type AuditReportControlsStateInput = {
@@ -89,9 +90,12 @@ type AuditReportControlsAction =
       open: boolean;
     }
   | {
-      type: 'select-draft-range';
-      range: DayPickerDateRange | undefined;
-      closePicker: boolean;
+      type: 'select-range-start';
+      date: Date;
+    }
+  | {
+      type: 'select-range-end';
+      range: DayPickerDateRange;
     }
   | {
       type: 'set-draft-filter';
@@ -207,6 +211,7 @@ export function createAuditReportControlsState({
     draftFilters: initialFilters,
     submittedFilters: initialFilters,
     isRangePickerOpen: false,
+    isSelectingRangeEnd: false,
   };
 }
 
@@ -216,12 +221,22 @@ export function auditReportControlsReducer(
 ): AuditReportControlsState {
   switch (action.type) {
     case 'set-range-picker-open':
-      return { ...state, isRangePickerOpen: action.open };
-    case 'select-draft-range':
+      return {
+        ...state,
+        isRangePickerOpen: action.open,
+        isSelectingRangeEnd: action.open ? state.isSelectingRangeEnd : false,
+      };
+    case 'select-range-start':
+      return {
+        ...state,
+        draftRange: { from: action.date },
+        isSelectingRangeEnd: true,
+      };
+    case 'select-range-end':
       return {
         ...state,
         draftRange: action.range,
-        isRangePickerOpen: action.closePicker ? false : state.isRangePickerOpen,
+        isSelectingRangeEnd: false,
       };
     case 'set-draft-filter':
       return {
@@ -235,6 +250,7 @@ export function auditReportControlsReducer(
         draftFilters: action.filters,
         submittedFilters: action.filters,
         isRangePickerOpen: false,
+        isSelectingRangeEnd: false,
       };
     case 'submit-report':
       return {
@@ -277,8 +293,14 @@ export function SecurityAuditReportPage() {
     { initialRange, initialFilters },
     createAuditReportControlsState
   );
-  const { draftRange, submittedRange, draftFilters, submittedFilters, isRangePickerOpen } =
-    controlsState;
+  const {
+    draftRange,
+    submittedRange,
+    draftFilters,
+    submittedFilters,
+    isRangePickerOpen,
+    isSelectingRangeEnd,
+  } = controlsState;
 
   useEffect(() => {
     dispatchControlsState({
@@ -347,13 +369,18 @@ export function SecurityAuditReportPage() {
     if (isSameRange) void refetchReport();
   }
 
-  function handleDateRangeSelect(nextRange: DayPickerDateRange | undefined) {
-    if (nextRange?.from && nextRange.to && !isWithinAuditReportRangeLimit(nextRange)) return;
-    dispatchControlsState({
-      type: 'select-draft-range',
-      range: nextRange,
-      closePicker: Boolean(nextRange?.from && nextRange.to),
-    });
+  function handleDateRangeSelect(_nextRange: DayPickerDateRange | undefined, selectedDate: Date) {
+    if (!isSelectingRangeEnd || !draftRange?.from) {
+      dispatchControlsState({ type: 'select-range-start', date: selectedDate });
+      return;
+    }
+
+    const range =
+      selectedDate < draftRange.from
+        ? { from: selectedDate, to: draftRange.from }
+        : { from: draftRange.from, to: selectedDate };
+    if (!isWithinAuditReportRangeLimit(range)) return;
+    dispatchControlsState({ type: 'select-range-end', range });
   }
 
   function handleClearFilters() {
@@ -405,6 +432,7 @@ export function SecurityAuditReportPage() {
                     >
                       <Calendar
                         mode="range"
+                        showOutsideDays={false}
                         selected={draftRange}
                         onSelect={handleDateRangeSelect}
                         defaultMonth={draftRange?.from}
@@ -414,9 +442,24 @@ export function SecurityAuditReportPage() {
                         excludeDisabled
                         autoFocus
                       />
-                      <p className="border-border text-muted-foreground type-label border-t px-3 py-2">
-                        Report periods can include up to {MAX_AUDIT_REPORT_DAYS} calendar days.
-                      </p>
+                      <div className="border-border flex items-center justify-between gap-3 border-t px-3 py-2">
+                        <p className="text-muted-foreground type-label">
+                          {isSelectingRangeEnd
+                            ? `Now select an end date, up to ${MAX_AUDIT_REPORT_DAYS} calendar days.`
+                            : 'Select a start date for a new report period.'}
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={!completeDraftRange}
+                          onClick={() =>
+                            dispatchControlsState({ type: 'set-range-picker-open', open: false })
+                          }
+                        >
+                          Use period
+                        </Button>
+                      </div>
                     </PopoverContent>
                   </Popover>
                 </SecurityAgentActionBarField>
@@ -548,7 +591,6 @@ export function SecurityAuditReportPage() {
       {hasOwnerContext && report && unfilteredReport && (
         <AuditReportView
           report={report}
-          provenanceReport={unfilteredReport}
           totalFindingCount={unfilteredReport.summary.findingCount}
           hasActiveFilters={hasActiveAuditReportFilters(effectiveSubmittedFilters)}
           onClearFilters={handleClearFilters}
@@ -560,20 +602,17 @@ export function SecurityAuditReportPage() {
 
 function AuditReportView({
   report,
-  provenanceReport,
   totalFindingCount,
   hasActiveFilters,
   onClearFilters,
 }: {
   report: SecurityAgentAuditReport;
-  provenanceReport: SecurityAgentAuditReport;
   totalFindingCount: number;
   hasActiveFilters: boolean;
   onClearFilters: () => void;
 }) {
   return (
     <div className="space-y-6">
-      <AuditReportProvenance report={provenanceReport} />
       <ReportSummary report={report} />
 
       {report.findings.length === 0 ? (
@@ -587,73 +626,6 @@ function AuditReportView({
         <FindingTimelineList findings={report.findings} totalFindingCount={totalFindingCount} />
       )}
     </div>
-  );
-}
-
-export function getAuditReportProvenance(report: SecurityAgentAuditReport) {
-  const startsBeforeReliableCoverage =
-    Date.parse(report.period.start) < Date.parse(report.reliableCoverageStart);
-  let warning: string | null = null;
-
-  if (startsBeforeReliableCoverage && report.hasLegacySupplementalActivity) {
-    warning =
-      'This period starts before reliable event coverage, and supplemental legacy activity may be incomplete.';
-  } else if (startsBeforeReliableCoverage) {
-    warning = 'Activity before reliable event coverage may be incomplete.';
-  } else if (report.hasLegacySupplementalActivity) {
-    warning = 'Supplemental legacy activity may be incomplete.';
-  }
-
-  return {
-    evidence: {
-      recorded_by_kilo: 'Security Finding activity recorded by Kilo.',
-    }[report.evidenceBasis],
-    dataThrough: formatReportDateTime(report.dataThrough),
-    reliableCoverageStart: formatReportDateTime(report.reliableCoverageStart),
-    warning,
-  };
-}
-
-export function AuditReportProvenance({ report }: { report: SecurityAgentAuditReport }) {
-  const provenance = getAuditReportProvenance(report);
-
-  return (
-    <section
-      className="border-border bg-surface-inset rounded-lg border px-4 py-3"
-      aria-labelledby="report-provenance-title"
-    >
-      <div className="flex items-start gap-3">
-        <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <h2 id="report-provenance-title" className="type-label text-foreground">
-            Report provenance
-          </h2>
-          <p className="text-muted-foreground type-body mt-0.5">{provenance.evidence}</p>
-          <dl className="text-muted-foreground type-label mt-2 flex flex-wrap gap-x-5 gap-y-1">
-            <div className="flex flex-wrap gap-x-1.5">
-              <dt>Data cutoff</dt>
-              <dd className="text-foreground tabular-nums">
-                <time dateTime={report.dataThrough}>{provenance.dataThrough}</time>
-              </dd>
-            </div>
-            <div className="flex flex-wrap gap-x-1.5">
-              <dt>Reliable coverage starts</dt>
-              <dd className="text-foreground tabular-nums">
-                <time dateTime={report.reliableCoverageStart}>
-                  {provenance.reliableCoverageStart}
-                </time>
-              </dd>
-            </div>
-          </dl>
-          {provenance.warning && (
-            <p className="text-status-warning type-label mt-2 flex items-start gap-1.5">
-              <TriangleAlert className="mt-px size-3.5 shrink-0" aria-hidden="true" />
-              <span>{provenance.warning}</span>
-            </p>
-          )}
-        </div>
-      </div>
-    </section>
   );
 }
 

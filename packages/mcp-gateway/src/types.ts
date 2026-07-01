@@ -102,6 +102,15 @@ export const GatewayExecutionContextSchema = z.discriminatedUnion('type', [
 
 export type GatewayExecutionContext = z.infer<typeof GatewayExecutionContextSchema>;
 
+export function executionContextsMatch(left: unknown, right: GatewayExecutionContext): boolean {
+  const parsedLeft = GatewayExecutionContextSchema.safeParse(left);
+  if (!parsedLeft.success) return false;
+  if (parsedLeft.data.type !== right.type) return false;
+  if (parsedLeft.data.type === 'personal') return true;
+  if (right.type !== 'organization') return false;
+  return parsedLeft.data.organizationId === right.organizationId;
+}
+
 export const GatewayAuditOutcome = {
   Success: 'success',
   Failure: 'failure',

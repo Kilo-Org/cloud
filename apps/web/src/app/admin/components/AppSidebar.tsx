@@ -30,6 +30,7 @@ import {
   Route,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { usePathname } from 'next/navigation';
 import type { Session } from 'next-auth';
 import KiloCrabIcon from '@/components/KiloCrabIcon';
 
@@ -49,6 +50,7 @@ import {
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { useTRPC } from '@/lib/trpc/utils';
+import { cn } from '@/lib/utils';
 
 type MenuItem = {
   title: (session: Session | null) => string;
@@ -269,25 +271,45 @@ const menuSections: MenuSection[] = [
   },
 ];
 
-export function AppSidebar({
-  children,
-  ...props
-}: { children: React.ReactNode } & React.ComponentProps<typeof Sidebar>) {
-  const session = useSession();
-  const trpc = useTRPC();
-  const disputesSummaryQuery = useQuery({
-    ...trpc.admin.disputes.summary.queryOptions(),
-    staleTime: DISPUTES_SUMMARY_STALE_TIME_MS,
-  });
-  const pendingDisputesCount = disputesSummaryQuery.data?.pendingCount ?? 0;
+const adminMenuUrls = menuSections.flatMap(section => section.items.map(item => item.url));
 
+function isAdminMenuItemActive(pathname: string, itemUrl: string) {
+  const matchesPrefix = pathname === itemUrl || pathname.startsWith(itemUrl + '/');
+  if (!matchesPrefix) return false;
+
+  return !adminMenuUrls.some(
+    url =>
+      url !== itemUrl &&
+      url.length > itemUrl.length &&
+      (pathname === url || pathname.startsWith(url + '/'))
+  );
+}
+
+type AppSidebarViewProps = {
+  children: React.ReactNode;
+  pathname: string;
+  session: Session | null;
+  pendingDisputesCount?: number;
+} & React.ComponentProps<typeof Sidebar>;
+
+export function AppSidebarView({
+  children,
+  pathname,
+  session,
+  pendingDisputesCount = 0,
+  ...props
+}: AppSidebarViewProps) {
   return (
     <Sidebar {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link href="/admin" prefetch={false}>
+            <SidebarMenuButton size="lg" asChild isActive={pathname === '/admin'}>
+              <Link
+                href="/admin"
+                prefetch={false}
+                aria-current={pathname === '/admin' ? 'page' : undefined}
+              >
                 <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                   <span className="text-lg font-bold">K</span>
                 </div>
@@ -307,28 +329,35 @@ export function AppSidebar({
             <SidebarGroupLabel>{section.label}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {section.items.map(item => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton
-                      asChild
-                      className={
-                        item.url === '/admin/disputes' && pendingDisputesCount > 0
-                          ? 'pr-10'
-                          : undefined
-                      }
-                    >
-                      <a href={item.url}>
-                        {item.icon(session.data)}
-                        <span>{item.title(session.data)}</span>
-                      </a>
-                    </SidebarMenuButton>
-                    {item.url === '/admin/disputes' && pendingDisputesCount > 0 ? (
-                      <SidebarMenuBadge className="bg-destructive/15 text-destructive ring-1 ring-destructive/30">
-                        {pendingDisputesCount}
-                      </SidebarMenuBadge>
-                    ) : null}
-                  </SidebarMenuItem>
-                ))}
+                {section.items.map(item => {
+                  const isActive = isAdminMenuItemActive(pathname, item.url);
+
+                  return (
+                    <SidebarMenuItem key={item.url}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive}
+                        className={cn(
+                          item.url === '/admin/disputes' && pendingDisputesCount > 0 && 'pr-10'
+                        )}
+                      >
+                        <Link
+                          href={item.url}
+                          prefetch={false}
+                          aria-current={isActive ? 'page' : undefined}
+                        >
+                          {item.icon(session)}
+                          <span>{item.title(session)}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      {item.url === '/admin/disputes' && pendingDisputesCount > 0 ? (
+                        <SidebarMenuBadge className="bg-destructive/15 text-destructive ring-1 ring-destructive/30">
+                          {pendingDisputesCount}
+                        </SidebarMenuBadge>
+                      ) : null}
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -339,5 +368,30 @@ export function AppSidebar({
 
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+export function AppSidebar({
+  children,
+  ...props
+}: { children: React.ReactNode } & React.ComponentProps<typeof Sidebar>) {
+  const session = useSession();
+  const pathname = usePathname();
+  const trpc = useTRPC();
+  const disputesSummaryQuery = useQuery({
+    ...trpc.admin.disputes.summary.queryOptions(),
+    staleTime: DISPUTES_SUMMARY_STALE_TIME_MS,
+  });
+  const pendingDisputesCount = disputesSummaryQuery.data?.pendingCount ?? 0;
+
+  return (
+    <AppSidebarView
+      {...props}
+      pathname={pathname}
+      session={session.data}
+      pendingDisputesCount={pendingDisputesCount}
+    >
+      {children}
+    </AppSidebarView>
   );
 }

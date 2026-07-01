@@ -4,7 +4,7 @@ import { sentryLogger } from '@/lib/utils.server';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
 import { getLowerDomainFromEmail } from '@/lib/utils';
 import { getAllUserProviders, getWorkOSOrganization } from '@/lib/user';
-import { doesOrgWithSSODomainExist } from '@/lib/organizations/organizations';
+import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import type { SSOOrganizationsResponse } from '@/lib/schemas/sso-organizations';
 
 const warnInSentry = sentryLogger('sso-organizations', 'warning');
@@ -47,17 +47,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       // User already has WorkOS linked → enforce SSO via their linked domain
       if (userProviderInfo.workosHostedDomain) {
-        const organization = await getWorkOSOrganization(userProviderInfo.workosHostedDomain);
-        if (organization) {
-          const response: SSOOrganizationsResponse = {
-            providers: ['workos'],
-            organizationId: organization.id,
-            newUser: false,
-          };
-          return NextResponse.json(response);
-        }
+        const ssoResponse = await tryGetSSOResponse(userProviderInfo.workosHostedDomain, {
+          email,
+          workosHostedDomain: userProviderInfo.workosHostedDomain,
+        });
+        if (ssoResponse) return ssoResponse;
 
-        warnInSentry('User has workos provider but could not find organization', {
+        warnInSentry('User has workos provider but no active SSO authority', {
           extra: { email, workosHostedDomain: userProviderInfo.workosHostedDomain },
         });
       }
@@ -107,13 +103,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       tags: { source: 'sso/organizations' },
       extra: { userProviders },
     });
-    // Return newUser: true for graceful degradation to "new user" flow
-    // Errors are logged to Sentry above for debugging
     const response: SSOOrganizationsResponse = {
       providers: [],
-      newUser: true,
+      newUser: false,
     };
-    return NextResponse.json(response);
+    return NextResponse.json(response, { status: 503 });
   }
 }
 
@@ -125,9 +119,15 @@ async function tryGetSSOResponse(
   domain: string,
   warningContext: Record<string, unknown>
 ): Promise<NextResponse | null> {
-  const localOrgId = await doesOrgWithSSODomainExist(domain);
-  if (!localOrgId) {
+  const authority = await resolveSsoAuthorityForDomain(domain);
+  if (authority.status === 'not_required') {
     return null;
+  }
+  if (authority.status === 'misconfigured') {
+    warnInSentry('Local SSO authority is misconfigured', {
+      extra: { ...warningContext, domain, reason: authority.reason },
+    });
+    return NextResponse.json({ providers: [], newUser: false }, { status: 503 });
   }
 
   const organization = await getWorkOSOrganization(domain);
@@ -142,7 +142,7 @@ async function tryGetSSOResponse(
 
   // DB says SSO exists but WorkOS doesn't have it - this is a config error
   warnInSentry('Local organization has SSO but WorkOS organization not found', {
-    extra: { ...warningContext, domain, localOrgId },
+    extra: { ...warningContext, domain, localOrgId: authority.sourceOrganizationId },
   });
-  return null;
+  return NextResponse.json({ providers: [], newUser: false }, { status: 503 });
 }

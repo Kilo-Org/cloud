@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HonoContext } from '../hono-context.js';
 import type { Env } from '../types.js';
 
+const { requireCurrentSessionAccessMock } = vi.hoisted(() => ({
+  requireCurrentSessionAccessMock: vi.fn(),
+}));
+
 vi.mock('../balance-validation.js', () => ({
   BALANCE_REQUIRED_MUTATIONS: new Set([
     'initiateFromKilocodeSessionV2',
@@ -24,6 +28,11 @@ vi.mock('../logger.js', () => ({
   },
 }));
 
+vi.mock('../session-access.js', () => ({
+  requireCurrentSessionAccess: requireCurrentSessionAccessMock,
+  projectSessionAccessHttpError: () => new Response('Session access denied', { status: 403 }),
+}));
+
 const { balanceMiddleware } = await import('./balance.js');
 const { fetchOrgIdForSession, validateBalanceOnly } = await import('../balance-validation.js');
 
@@ -33,6 +42,10 @@ describe('balanceMiddleware', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(validateBalanceOnly).mockResolvedValue({ success: true });
+    requireCurrentSessionAccessMock.mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+      organizationId: 'org-current',
+    });
   });
 
   function createApp() {
@@ -43,7 +56,9 @@ describe('balanceMiddleware', () => {
       await next();
     });
     app.use('/trpc/*', balanceMiddleware);
-    app.post('/trpc/:procedure', c => c.json({ ok: true }));
+    app.post('/trpc/:procedure', c =>
+      c.json({ ok: true, validatedSessionAccess: c.get('validatedSessionAccess') })
+    );
     return app;
   }
 
@@ -105,5 +120,29 @@ describe('balanceMiddleware', () => {
     expect(response.status).toBe(200);
     expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', orgId, env);
     expect(fetchOrgIdForSession).not.toHaveBeenCalled();
+  });
+
+  it('validates caller-supplied organization context against the stored session scope', async () => {
+    const response = await postTrpc('send', {
+      cloudAgentSessionId: 'agent-existing',
+      kilocodeOrganizationId: 'org-requested',
+    });
+
+    expect(response.status).toBe(200);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+      env,
+      kiloUserId: 'user-123',
+      cloudAgentSessionId: 'agent-existing',
+      expectedOrganizationId: 'org-requested',
+    });
+    expect(validateBalanceOnly).toHaveBeenCalledWith('token-123', 'org-current', env);
+    await expect(response.json()).resolves.toMatchObject({
+      validatedSessionAccess: {
+        kiloUserId: 'user-123',
+        cloudAgentSessionId: 'agent-existing',
+        kiloSessionId: 'ses_12345678901234567890123456',
+        organizationId: 'org-current',
+      },
+    });
   });
 });

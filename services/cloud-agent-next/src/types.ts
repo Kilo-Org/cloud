@@ -1,6 +1,7 @@
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { CallbackJob } from './callbacks/index.js';
 import type { NotificationsBinding } from './notifications-binding.js';
@@ -52,6 +53,7 @@ export type SandboxId =
   | `bot-${string}`
   | `ubt-${string}`
   | `ses-${string}`
+  | `crv-${string}`
   | `dind-${string}`
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
@@ -78,10 +80,14 @@ export type SessionContext = {
   gitToken?: string;
   /** Whether the GitLab token was resolved server-side and its remote should be refreshed. */
   gitlabTokenManaged?: boolean;
+  /** Whether the Bitbucket token was resolved server-side and its remote should be refreshed. */
+  bitbucketTokenManaged?: boolean;
+  bitbucketWorkspaceUuid?: string;
+  bitbucketRepositoryUuid?: string;
   /** GitLab CLI bearer-mode instruction returned with a server-resolved credential. */
   glabIsOAuth2?: boolean;
   /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
   envVars?: Record<string, string>;
 };
 /** Result of interrupting a session's running processes */
@@ -164,6 +170,20 @@ type GetGitLabTokenResult =
         | 'no_project_token';
     };
 
+export type BitbucketTokenFailureReason =
+  | 'invalid_request'
+  | 'not_connected'
+  | 'reconnect_required'
+  | 'temporarily_unavailable'
+  | 'insufficient_permissions'
+  | 'workspace_mismatch'
+  | 'repository_not_found'
+  | 'repository_mismatch';
+
+type GetBitbucketTokenResult =
+  | { success: true; token: string }
+  | { success: false; reason: BitbucketTokenFailureReason };
+
 export type GitTokenService = {
   getTokenForRepo(params: {
     githubRepo: string;
@@ -183,6 +203,13 @@ export type GitTokenService = {
     repositoryUrl?: string;
     createdOnPlatform?: string;
   }): Promise<GetGitLabTokenResult>;
+  getBitbucketToken?(params: {
+    userId: string;
+    orgId: string;
+    workspaceUuid: string;
+    repositoryUuid: string;
+    repositoryUrl: string;
+  }): Promise<GetBitbucketTokenResult>;
 };
 
 export type Env = {
@@ -191,10 +218,14 @@ export type Env = {
   SandboxSmall: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for Docker-in-Docker per-session sandbox containers (standard-3) */
   SandboxDIND: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for ephemeral Code Reviewer sandbox containers (standard-3) */
+  SandboxCodeReview: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
+  /** One-way shared sandbox failover overrides keyed by shared identity */
+  SHARED_SANDBOX_OVERRIDES: KVNamespace;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Shared secret for internal service-to-service authentication */
@@ -242,6 +273,8 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
+  /** Comma-separated org IDs that use ephemeral Code Reviewer sandbox containers */
+  CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */
@@ -258,6 +291,11 @@ export type Env = {
   HYPERDRIVE: Hyperdrive;
 };
 
+export type ValidatedSessionAccess = AccessibleCloudAgentSession & {
+  kiloUserId: string;
+  cloudAgentSessionId: string;
+};
+
 /** tRPC context passed to all procedures */
 export type TRPCContext = {
   env: Env;
@@ -265,6 +303,7 @@ export type TRPCContext = {
   request: Request;
   authToken: string;
   botId?: string;
+  validatedSessionAccess?: ValidatedSessionAccess;
 };
 
 export type SystemSandboxUsageEvent = {

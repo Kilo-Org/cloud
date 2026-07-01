@@ -1,4 +1,4 @@
-import type { Env } from './types.js';
+import type { Env, ValidatedSessionAccess } from './types.js';
 
 export type HonoContext = {
   Bindings: Env;
@@ -6,5 +6,6 @@ export type HonoContext = {
     userId?: string;
     authToken?: string;
     botId?: string;
+    validatedSessionAccess?: ValidatedSessionAccess;
   };
 };

@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest';
+import type { SandboxId } from '../types.js';
 import {
   allocateWrapperRuntimeState,
   clearCurrentWrapperRuntimeLivenessState,
   emptyWrapperLease,
+  emptyWrapperRuntimeState,
   getWrapperLease,
   getWrapperRuntimeState,
   hasCompleteWrapperRunMessageIndex,
   isWrapperDeliveryHeld,
   markWrapperFinalizing,
+  nextSandboxRecoveryDeadline,
   nextWrapperCleanupDeadline,
   nextWrapperLeaseDeadline,
   putWrapperLease,
   recordMeaningfulWrapperOutput,
   recordWrapperAcceptedMessage,
+  reduceSandboxRecoveryState,
   reduceWrapperLease,
 } from './wrapper-runtime-state.js';
 
@@ -205,6 +209,88 @@ describe('WrapperLease', () => {
     expect(nextWrapperLeaseDeadline(retrying)).toBe(5_200);
   });
 
+  it('keeps an exhausted cleanup quarantined without another deadline', () => {
+    const requested = reduceWrapperLease(emptyWrapperLease(), {
+      type: 'request_stop',
+      target: { kind: 'session' },
+      reason: 'observation-failed',
+      now: 100,
+    });
+    if (requested.state !== 'stop_needed') throw new Error('Expected cleanup request');
+    const stopping = reduceWrapperLease(
+      { ...requested, attempts: 4 },
+      {
+        type: 'begin_stop_attempt',
+        attemptId: 'attempt_fifth',
+        now: 200,
+        attemptDeadlineAt: 45_200,
+      }
+    );
+    const exhausted = reduceWrapperLease(stopping, {
+      type: 'cleanup_exhausted',
+      attemptId: 'attempt_fifth',
+      now: 300,
+      error: 'inspection failed',
+    });
+
+    expect(exhausted).toMatchObject({
+      state: 'stop_needed',
+      attempts: 5,
+      exhaustedAt: 300,
+      lastError: 'inspection failed',
+    });
+    expect(nextWrapperCleanupDeadline(exhausted)).toBeUndefined();
+    expect(nextWrapperLeaseDeadline(exhausted)).toBeUndefined();
+    expect(isWrapperDeliveryHeld(emptyWrapperRuntimeState(), exhausted)).toBe(true);
+    expect(
+      reduceWrapperLease(exhausted, {
+        type: 'request_stop',
+        target: { kind: 'session' },
+        reason: 'user-interrupt',
+        now: 400,
+      })
+    ).toEqual(exhausted);
+  });
+
+  it('counts only fresh list-processes timeouts and persists publication deadlines', () => {
+    const routeKey = `usr-${'d'.repeat(48)}` as SandboxId;
+    expect(
+      reduceSandboxRecoveryState(undefined, {
+        type: 'inspection_failed',
+      })
+    ).toBeUndefined();
+
+    const firstTimeout = reduceSandboxRecoveryState(undefined, {
+      type: 'inspection_failed',
+      reason: 'wrapper_discovery_list_processes_timeout',
+    });
+    const secondTimeout = reduceSandboxRecoveryState(firstTimeout, {
+      type: 'inspection_failed',
+      reason: 'wrapper_discovery_list_processes_timeout',
+    });
+    const publication = reduceSandboxRecoveryState(secondTimeout, {
+      type: 'prepare_failover',
+      routeKey,
+      now: 1_000,
+    });
+    const retrying = reduceSandboxRecoveryState(publication, {
+      type: 'record_failover_retry',
+      routeKey,
+      expectedFailedAttempts: 0,
+      nextAttemptAt: 3_000,
+    });
+
+    expect(retrying).toMatchObject({
+      listProcessesTimeouts: 2,
+      failoverPublication: {
+        status: 'pending',
+        failedAttempts: 1,
+        nextAttemptAt: 3_000,
+      },
+    });
+    expect(nextSandboxRecoveryDeadline(retrying)).toBe(3_000);
+  });
+
   it('marks a newly allocated wrapper run as maintaining its message index', async () => {
     const storage = createMemoryStorage();
 
@@ -356,5 +442,28 @@ describe('WrapperLease', () => {
     });
     await putWrapperLease(storage, owned);
     await expect(getWrapperLease(storage)).resolves.toEqual(owned);
+  });
+
+  it('repairs an invalid persisted lease into a durable cleanup quarantine', async () => {
+    const storage = createMemoryStorage();
+    await storage.put('wrapper_lease', {
+      state: 'owns_wrapper',
+      nextInstanceGeneration: 2,
+    });
+
+    const repaired = await getWrapperLease(storage);
+
+    expect(repaired).toMatchObject({
+      state: 'stop_needed',
+      nextInstanceGeneration: 2,
+      target: { kind: 'session' },
+      reason: 'observation-failed',
+      attempts: 5,
+      lastError: 'Invalid persisted wrapper lease',
+      exhaustedAt: expect.any(Number),
+    });
+    expect(isWrapperDeliveryHeld(emptyWrapperRuntimeState(), repaired)).toBe(true);
+    expect(nextWrapperCleanupDeadline(repaired)).toBeUndefined();
+    await expect(getWrapperLease(storage)).resolves.toEqual(repaired);
   });
 });

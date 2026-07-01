@@ -38,6 +38,12 @@ test('keeps auto routing package dev script compatible with local launcher flags
   assert.equal(launcherFlags.filter(part => part === '--ip').length, 1);
 });
 
+test('starts Storybook with Storybook v10 port flags', () => {
+  const service = getService('storybook');
+
+  assert.deepEqual(service.command, ['pnpm', 'run', 'storybook', '-p', '6006']);
+});
+
 test('preserves auto routing backend auth secret name', () => {
   const service = getService('auto-routing');
   const wranglerConfig = fs.readFileSync(`${service.dir}/wrangler.jsonc`, 'utf-8');

@@ -8,7 +8,11 @@ import type {
 } from '../execution/types.js';
 import { WrapperFinalizingError } from '../kilo/wrapper-client.js';
 import { createAgentRuntime, WRAPPER_NO_OUTPUT_TIMEOUT_MS } from './agent-runtime.js';
-import { getWrapperLease, getWrapperRuntimeState } from './wrapper-runtime-state.js';
+import {
+  getSandboxRecoveryState,
+  getWrapperLease,
+  getWrapperRuntimeState,
+} from './wrapper-runtime-state.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 
 vi.mock('@cloudflare/sandbox', () => ({
@@ -726,6 +730,33 @@ describe('AgentRuntime', () => {
     await expect(getWrapperRuntimeState(storage)).resolves.not.toHaveProperty('wrapperRunId');
   });
 
+  it('records a list-processes timeout in durable sandbox recovery state', async () => {
+    const storage = createMemoryStorage();
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({ execute: vi.fn() }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      discoverSessionWrappers: vi.fn().mockResolvedValue({
+        status: 'inspection-failed',
+        error: 'Wrapper process discovery timed out',
+        reason: 'wrapper_discovery_list_processes_timeout',
+      }),
+    });
+
+    await expect(runtime.send(createPlan())).rejects.toMatchObject({
+      name: 'ExecutionError',
+      code: 'SANDBOX_CONNECT_FAILED',
+      retryable: true,
+    });
+    await expect(getWrapperLease(storage)).resolves.toMatchObject({ state: 'stop_needed' });
+    await expect(getSandboxRecoveryState(storage)).resolves.toMatchObject({
+      listProcessesTimeouts: 1,
+    });
+  });
+
   it('blocks cold launch when an unexpected physical wrapper is present', async () => {
     const storage = createMemoryStorage();
     const execute = vi.fn();
@@ -758,6 +789,40 @@ describe('AgentRuntime', () => {
       target: { kind: 'session' },
       reason: 'unexpected-wrapper',
     });
+  });
+
+  it('keeps delivery quarantined after cleanup attempts are exhausted', async () => {
+    const storage = createMemoryStorage([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'observation-failed',
+          requestedAt: 1_000,
+          nextAttemptAt: 3_153_600_036_000,
+          exhaustedAt: 36_000,
+          attempts: 5,
+          lastError: 'inspection failed',
+        },
+      ],
+    ]);
+    const execute = vi.fn();
+    const discoverSessionWrappers = vi.fn();
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({ execute }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      discoverSessionWrappers,
+    });
+
+    await expect(runtime.send(createPlan())).rejects.toThrow(/cleanup is required/i);
+    expect(discoverSessionWrappers).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('does not overwrite cleanup requested while physical wrapper observation is in flight', async () => {

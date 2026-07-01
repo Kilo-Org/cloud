@@ -277,7 +277,10 @@ function MarkDoneInlineForm({ wastelandId, item }: { wastelandId: string; item: 
       );
       setEvidence('');
       void queryClient.invalidateQueries({
-        queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
+        queryKey: trpc.wasteland.browseWantedBoard.pathKey(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.getWantedBoardCounts.pathKey(),
       });
       void queryClient.invalidateQueries({
         queryKey: trpc.wasteland.getWantedItem.queryKey({ wastelandId, itemId: item.id }),
@@ -546,7 +549,10 @@ export function ClaimAction({ wastelandId, item }: { wastelandId: string; item: 
         toast.success('Item claimed');
       }
       void queryClient.invalidateQueries({
-        queryKey: trpc.wasteland.browseWantedBoard.queryKey({ wastelandId }),
+        queryKey: trpc.wasteland.browseWantedBoard.pathKey(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: trpc.wasteland.getWantedBoardCounts.pathKey(),
       });
       void queryClient.invalidateQueries({
         queryKey: trpc.wasteland.getWantedItem.queryKey({ wastelandId, itemId: item.id }),

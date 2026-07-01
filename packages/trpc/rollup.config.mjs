@@ -16,11 +16,20 @@ function resolveDts(base) {
 }
 
 export default {
-  // @kilocode/encryption is type-only and never exposed in router I/O, so we
-  // externalize it to avoid relying on tsgo emitting its transitive d.ts files
-  // (which has been flaky in CI). Any unused imports get pruned by rollup's
-  // tree-shaking, so the final bundle is unchanged.
-  external: ['pg', '@tanstack/react-query', '@trpc/client', 'next/server', '@kilocode/encryption'],
+  // These packages are declaration-boundary imports in the generated router
+  // types. Leave them external instead of asking rollup-plugin-dts to inline
+  // implementation package declarations into @kilocode/trpc's single d.ts.
+  external: [
+    'pg',
+    '@tanstack/react-query',
+    '@trpc/client',
+    'next/server',
+    '@kilocode/encryption',
+    '@kilocode/kiloclaw-instance-tiers',
+    '@kilocode/worker-utils',
+    '@kilocode/worker-utils/security-remediation-policy',
+    '@kilocode/kilo-chat',
+  ],
   input: './dist/tsc/packages/trpc/src/index.d.ts',
   output: {
     file: './dist/index.d.ts',

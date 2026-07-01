@@ -944,6 +944,42 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     );
   });
 
+  it('refreshes a warm Bitbucket remote with x-token-auth', async () => {
+    const request = makeRequest(tmpDir, {
+      workspace: {
+        workspacePath: path.join(tmpDir, 'workspace'),
+        sessionHome: path.join(tmpDir, 'home'),
+        branchName: 'main',
+        preferSnapshot: true,
+      },
+      repo: {
+        kind: 'git',
+        url: 'https://bitbucket.org/acme/repo.git',
+        token: 'bitbucket-token',
+        platform: 'bitbucket',
+        refreshRemote: true,
+      },
+    });
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+    const gitCalls: string[][] = [];
+
+    await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        gitCalls.push(args);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+    });
+
+    expect(gitCalls).toEqual([
+      [
+        'remote',
+        'set-url',
+        'origin',
+        'https://x-token-auth:bitbucket-token@bitbucket.org/acme/repo.git',
+      ],
+    ]);
+  });
+
   it('refreshes a warm GitHub remote, author, and selected CLI credential', async () => {
     const request = makeRequest(tmpDir, {
       workspace: {

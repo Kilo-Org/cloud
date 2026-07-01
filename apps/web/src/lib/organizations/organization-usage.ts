@@ -211,56 +211,8 @@ export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Pro
 
   if (!organization_id) return;
   return await db.transaction(async tx => {
-    // Get current balance and settings before the update
-    const [orgData] = await tx
-      .select({
-        total_microdollars_acquired: organizations.total_microdollars_acquired,
-        microdollars_used: organizations.microdollars_used,
-        settings: organizations.settings,
-      })
-      .from(organizations)
-      .where(eq(organizations.id, organization_id))
-      .limit(1);
-
-    const currentBalance =
-      (orgData?.total_microdollars_acquired ?? 0) - (orgData?.microdollars_used ?? 0);
-
-    const minimumBalance = orgData?.settings?.minimum_balance
-      ? toMicrodollars(orgData?.settings?.minimum_balance)
-      : null;
-
-    const newBalance = currentBalance - cost;
-
-    // Check if balance is crossing the minimum_balance threshold
-    if (minimumBalance != null && currentBalance >= minimumBalance && newBalance < minimumBalance) {
-      const alertEmails = orgData?.settings?.minimum_balance_alert_email ?? [];
-      logExceptInTest(
-        `[ingestOrganizationTokenUsage] Balance alert triggered for org ${organization_id}: currentBalance=${fromMicrodollars(currentBalance)} newBalance=${fromMicrodollars(newBalance)} threshold=${fromMicrodollars(minimumBalance)} recipients=${alertEmails.length}`
-      );
-      // Send email notification about low balance (don't block the transaction, but do make Vercel wait on the Promise before shutting down)
-      after(
-        sendBalanceAlertEmail({
-          organizationId: organization_id,
-          minimum_balance: fromMicrodollars(minimumBalance),
-          to: alertEmails,
-        }).catch(err => {
-          console.error('[ingestOrganizationTokenUsage] Failed to send balance alert email:', err);
-        })
-      );
-    }
-
-    // Update organization usage (always happens regardless of membership)
-    await tx
-      .update(organizations)
-      .set({
-        microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
-        microdollars_balance: sql`${organizations.microdollars_balance} - ${cost}`,
-      })
-      .where(eq(organizations.id, organization_id));
-
     const limitType: OrganizationUserLimitType = 'daily';
-    // Track user usage only if they are a member of the organization
-    // Use INSERT with a subquery that only inserts if the user is a member
+    // Do this before updating the hot organization aggregate row so that row lock is held briefly.
     await tx.execute(sql`
       INSERT INTO ${organization_user_usage} (
         organization_id,
@@ -284,6 +236,43 @@ export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Pro
         microdollar_usage = ${organization_user_usage.microdollar_usage} + ${cost},
         updated_at = NOW()
     `);
+
+    const [orgData] = await tx
+      .update(organizations)
+      .set({
+        microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
+        microdollars_balance: sql`${organizations.microdollars_balance} - ${cost}`,
+      })
+      .where(eq(organizations.id, organization_id))
+      .returning({
+        total_microdollars_acquired: organizations.total_microdollars_acquired,
+        microdollars_used: organizations.microdollars_used,
+        settings: organizations.settings,
+      });
+
+    if (!orgData) return;
+
+    const currentBalance = orgData.total_microdollars_acquired - (orgData.microdollars_used - cost);
+    const newBalance = orgData.total_microdollars_acquired - orgData.microdollars_used;
+    const minimumBalance = orgData.settings?.minimum_balance
+      ? toMicrodollars(orgData.settings.minimum_balance)
+      : null;
+
+    if (minimumBalance != null && currentBalance >= minimumBalance && newBalance < minimumBalance) {
+      const alertEmails = orgData.settings?.minimum_balance_alert_email ?? [];
+      logExceptInTest(
+        `[ingestOrganizationTokenUsage] Balance alert triggered for org ${organization_id}: currentBalance=${fromMicrodollars(currentBalance)} newBalance=${fromMicrodollars(newBalance)} threshold=${fromMicrodollars(minimumBalance)} recipients=${alertEmails.length}`
+      );
+      after(
+        sendBalanceAlertEmail({
+          organizationId: organization_id,
+          minimum_balance: fromMicrodollars(minimumBalance),
+          to: alertEmails,
+        }).catch(err => {
+          console.error('[ingestOrganizationTokenUsage] Failed to send balance alert email:', err);
+        })
+      );
+    }
   });
 }
 

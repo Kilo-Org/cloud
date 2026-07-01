@@ -21,7 +21,7 @@ import {
   kiloclaw_subscriptions,
   user_push_tokens,
 } from '@kilocode/db/schema';
-import { eq, and, isNull, inArray, sql, gte } from 'drizzle-orm';
+import { eq, and, isNull, inArray, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
@@ -35,11 +35,14 @@ import {
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
 } from '@/lib/autoTopUpConstants';
 import { getCreditBlocks } from '@/lib/getCreditBlocks';
+import { resolveStripeReceiptUrl } from '@/lib/credits';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
+const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
+const PERSONAL_TOP_UP_DESCRIPTIONS = ['Top-up via stripe', 'Auto top-up via stripe'];
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
 
@@ -90,11 +93,14 @@ const CreditBlockSchema = z.object({
 
 const GetCreditBlocksInputSchema = z.object({});
 
+const CreditDeductionKindSchema = z.enum(['deduction', 'adjustment', 'balance_neutral']);
+
 const CreditDeductionSchema = z.object({
   id: z.string(),
   date: z.string(),
   description: z.string(),
   amount_mUsd: z.number(),
+  kind: CreditDeductionKindSchema,
 });
 
 const GetCreditBlocksOutputSchema = z.object({
@@ -103,6 +109,37 @@ const GetCreditBlocksOutputSchema = z.object({
   totalBalance_mUsd: z.number(),
   isFirstPurchase: z.boolean(),
   autoTopUpEnabled: z.boolean(),
+});
+
+const CreditPurchaseHistoryInputSchema = z.object({
+  cursor: z.number().int().min(0).default(0),
+});
+
+const CreditPurchaseHistoryOutputSchema = z.object({
+  entries: z.array(
+    z.object({
+      id: z.uuid(),
+      date: z.iso.datetime(),
+      description: z.string(),
+      amount_mUsd: z.number().positive(),
+    })
+  ),
+  nextCursor: z.number().int().positive().nullable(),
+  previousCursor: z.number().int().min(0).nullable(),
+});
+
+const CreditPurchaseTransactionInputSchema = z.object({
+  transactionId: z.uuid(),
+});
+
+const CreditPurchaseConfirmationOutputSchema = z.object({
+  transactionId: z.uuid(),
+  amount_mUsd: z.number().positive(),
+  purchasedAt: z.iso.datetime(),
+});
+
+const CreditPurchaseReceiptOutputSchema = z.object({
+  url: z.url().nullable(),
 });
 
 type RawDeduction = {
@@ -160,6 +197,31 @@ function capitalizeFirst(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function getDeductionKind(
+  creditCategory: string | null
+): z.infer<typeof CreditDeductionKindSchema> {
+  if (creditCategory?.startsWith('kiloclaw-settlement:')) return 'balance_neutral';
+  if (
+    creditCategory === 'credits_expired' ||
+    creditCategory === 'orb_credit_expired' ||
+    creditCategory === 'orb_credit_voided'
+  ) {
+    return 'adjustment';
+  }
+  return 'deduction';
+}
+
+function getPersonalTopUpConditions(userId: string) {
+  return and(
+    eq(credit_transactions.kilo_user_id, userId),
+    isNull(credit_transactions.organization_id),
+    eq(credit_transactions.is_free, false),
+    gt(credit_transactions.amount_microdollars, 0),
+    isNotNull(credit_transactions.stripe_payment_id),
+    inArray(credit_transactions.description, PERSONAL_TOP_UP_DESCRIPTIONS)
+  );
+}
+
 /**
  * Enrich KiloClaw deduction descriptions with instance names so users
  * can distinguish charges across multiple instances.
@@ -167,7 +229,15 @@ function capitalizeFirst(s: string): string {
 async function enrichDeductionsWithInstanceNames(
   userId: string,
   deductions: RawDeduction[]
-): Promise<{ id: string; date: string; description: string; amount_mUsd: number }[]> {
+): Promise<
+  {
+    id: string;
+    date: string;
+    description: string;
+    amount_mUsd: number;
+    kind: z.infer<typeof CreditDeductionKindSchema>;
+  }[]
+> {
   // Collect unique instance IDs from pure-credit deduction categories.
   const instanceIds = new Set<string>();
   // Collect Stripe subscription IDs from settlement categories for lookup.
@@ -250,7 +320,13 @@ async function enrichDeductionsWithInstanceNames(
       }
       description = formatKiloClawDeductionDescription(description, instanceName);
     }
-    return { id: d.id, date: d.date, description, amount_mUsd: d.amount_mUsd };
+    return {
+      id: d.id,
+      date: d.date,
+      description,
+      amount_mUsd: d.amount_mUsd,
+      kind: getDeductionKind(d.credit_category),
+    };
   });
 }
 
@@ -338,6 +414,91 @@ export const userRouter = createTRPCRouter({
         deductions: enrichedDeductions,
         autoTopUpEnabled: ctx.user.auto_top_up_enabled,
       };
+    }),
+
+  getCreditPurchaseHistory: baseProcedure
+    .input(CreditPurchaseHistoryInputSchema)
+    .output(CreditPurchaseHistoryOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const transactions = await db
+        .select({
+          id: credit_transactions.id,
+          date: credit_transactions.created_at,
+          description: credit_transactions.description,
+          amount_mUsd: credit_transactions.amount_microdollars,
+        })
+        .from(credit_transactions)
+        .where(getPersonalTopUpConditions(ctx.user.id))
+        .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))
+        .limit(CREDIT_PURCHASE_HISTORY_PAGE_SIZE + 1)
+        .offset(input.cursor);
+
+      const hasMore = transactions.length > CREDIT_PURCHASE_HISTORY_PAGE_SIZE;
+      const entries = transactions.slice(0, CREDIT_PURCHASE_HISTORY_PAGE_SIZE).map(transaction => ({
+        id: transaction.id,
+        date: new Date(transaction.date).toISOString(),
+        description:
+          transaction.description === 'Auto top-up via stripe'
+            ? 'Automatic top-up'
+            : 'Credit purchase',
+        amount_mUsd: transaction.amount_mUsd,
+      }));
+
+      return {
+        entries,
+        nextCursor: hasMore ? input.cursor + CREDIT_PURCHASE_HISTORY_PAGE_SIZE : null,
+        previousCursor:
+          input.cursor > 0 ? Math.max(0, input.cursor - CREDIT_PURCHASE_HISTORY_PAGE_SIZE) : null,
+      };
+    }),
+
+  getCreditPurchaseConfirmation: baseProcedure
+    .input(CreditPurchaseTransactionInputSchema)
+    .output(CreditPurchaseConfirmationOutputSchema)
+    .query(async ({ ctx, input }) => {
+      const transaction = await db.query.credit_transactions.findFirst({
+        where: and(
+          getPersonalTopUpConditions(ctx.user.id),
+          eq(credit_transactions.id, input.transactionId)
+        ),
+        columns: {
+          id: true,
+          amount_microdollars: true,
+          created_at: true,
+        },
+      });
+
+      if (!transaction) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Credit purchase not found' });
+      }
+
+      return {
+        transactionId: transaction.id,
+        amount_mUsd: transaction.amount_microdollars,
+        purchasedAt: new Date(transaction.created_at).toISOString(),
+      };
+    }),
+
+  getCreditPurchaseReceipt: baseProcedure
+    .input(CreditPurchaseTransactionInputSchema)
+    .output(CreditPurchaseReceiptOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const transaction = await db.query.credit_transactions.findFirst({
+        where: and(
+          getPersonalTopUpConditions(ctx.user.id),
+          eq(credit_transactions.id, input.transactionId)
+        ),
+        columns: { stripe_payment_id: true },
+      });
+
+      if (!transaction?.stripe_payment_id) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Credit purchase not found' });
+      }
+
+      const url = await resolveStripeReceiptUrl(transaction.stripe_payment_id, {
+        skipInAutomatedTest: true,
+      });
+      return { url };
     }),
 
   getBalance: baseProcedure

@@ -105,7 +105,9 @@ export type PrepareSessionInput = {
   gitUrl?: string;
   gitToken?: string;
   /** Explicit platform type for correct env var setup (avoids URL-based detection) */
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
+  bitbucketWorkspaceUuid?: string;
+  bitbucketRepositoryUuid?: string;
   // Common params
   kilocodeOrganizationId?: string;
   /** Profile ID forwarded to cloud-agent-next for server-side merge. */
@@ -260,7 +262,7 @@ export type GetSessionOutput = {
   // Repository info (no tokens)
   githubRepo?: string;
   gitUrl?: string;
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
 
   // Execution params
   prompt?: string;

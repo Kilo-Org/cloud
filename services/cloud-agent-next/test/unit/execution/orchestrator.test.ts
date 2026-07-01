@@ -31,15 +31,24 @@ import { FAST_SANDBOX_COMMAND_TIMEOUT_MS } from '../../../src/sandbox-timeout-lo
 const createWorkspaceDeliveryPlan = (): WorkspaceDeliveryPlan => ({
   sandboxId: 'sandbox_123',
   metadata: {
-    version: 1,
-    sessionId: 'agent_123',
-    userId: 'user_123',
-    timestamp: 1,
-    kiloSessionId: 'kilo_sess_456',
-    kilocodeToken: 'kilo_token',
-    workspacePath: '/workspace/project',
-    sessionHome: '/home/agent_123',
-    branchName: 'feature-branch',
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: 'agent_123',
+      userId: 'user_123',
+    },
+    auth: {
+      kiloSessionId: 'kilo_sess_456',
+      kilocodeToken: 'kilo_token',
+    },
+    lifecycle: {
+      version: 1,
+      timestamp: 1,
+    },
+    workspace: {
+      workspacePath: '/workspace/project',
+      sessionHome: '/home/agent_123',
+      branchName: 'feature-branch',
+    },
   },
 });
 
@@ -310,8 +319,8 @@ describe('WorkspaceDeliveryPlan types', () => {
     const plan = createWorkspaceDeliveryPlan();
 
     expect(plan.sandboxId).toBe('sandbox_123');
-    expect(plan.metadata.kiloSessionId).toBe('kilo_sess_456');
-    expect(plan.metadata.kilocodeToken).toBe('kilo_token');
+    expect(plan.metadata.auth.kiloSessionId).toBe('kilo_sess_456');
+    expect(plan.metadata.auth.kilocodeToken).toBe('kilo_token');
   });
 });
 
@@ -383,7 +392,7 @@ describe('ExecutionPlan types', () => {
       },
     };
 
-    expect(plan.workspace.metadata.sessionId).toBe('agent_123');
+    expect(plan.workspace.metadata.identity.sessionId).toBe('agent_123');
     expect(plan.agent.model).toBe('claude-sonnet-4-20250514');
     expect(plan.turn.messageId).toBe('msg_018f1e2d3c4bPlanTypeAbCdE');
   });

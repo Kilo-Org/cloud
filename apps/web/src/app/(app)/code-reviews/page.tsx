@@ -1,4 +1,5 @@
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
 import { ReviewAgentPageClient } from './ReviewAgentPageClient';
 
 type ReviewAgentPageProps = {
@@ -9,6 +10,7 @@ export default async function PersonalReviewAgentPage({ searchParams }: ReviewAg
   const search = await searchParams;
   const user = await getUserFromAuthOrRedirect('/users/sign_in?callbackPath=/code-reviews');
   const platform = search.platform === 'gitlab' ? 'gitlab' : 'github';
+  const localCodeReviewDevelopmentEnabled = isLocalCodeReviewDevelopmentEnabled();
 
   return (
     <ReviewAgentPageClient
@@ -17,6 +19,7 @@ export default async function PersonalReviewAgentPage({ searchParams }: ReviewAg
       successMessage={search.success}
       errorMessage={search.error}
       initialPlatform={platform}
+      localCodeReviewDevelopmentEnabled={localCodeReviewDevelopmentEnabled}
     />
   );
 }

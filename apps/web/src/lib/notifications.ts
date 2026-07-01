@@ -5,8 +5,7 @@ import { getUserOrganizationsWithSeats } from '@/lib/organizations/organizations
 import type { UserOrganizationWithSeats } from '@/lib/organizations/organization-types';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
-import { cachedPosthogQuery } from '@/lib/posthog-query';
-import * as z from 'zod';
+import { getByokProvidersForUser } from '@/lib/notifications/byok-provider-cache';
 
 import { fromMicrodollars } from '@/lib/utils';
 
@@ -256,24 +255,15 @@ async function generateTeamsTrialNotification(
   ];
 }
 
-const getByokProviderUsers = cachedPosthogQuery(
-  z.array(
-    z.tuple([z.string(), z.string()]).transform(([userId, provider]) => ({ userId, provider }))
-  )
-);
-
 async function generateByokProvidersNotification(
   user: User,
   _ctx: NotificationContext
 ): Promise<KiloNotification[]> {
   try {
-    const byokProviderUsers = await getByokProviderUsers(
-      'byok-provider-usage-users',
-      'select id, apiProvider from notification_byok_providers_jan_19 limit 5e5'
-    );
-
-    const provider = byokProviderUsers.find(p => p.userId === user.id)?.provider;
-    if (!provider) {
+    // Per-user provider ids are written daily to Redis by the
+    // `sync-byok-provider-notifications` cron, so this read is tiny.
+    const providers = await getByokProvidersForUser(user.id);
+    if (providers.length === 0) {
       console.debug('[generateByokProvidersNotification] not using a BYOK supported provider');
       return [];
     }
@@ -307,11 +297,6 @@ async function generateByokProvidersNotification(
       // Google AI (Gemini)
       gemini: 'Google AI API Key',
       google: 'Google AI API Key',
-
-      // OpenAI
-      'openai-native': 'OpenAI API Key',
-      openai: 'OpenAI API Key',
-      'openai-responses': 'OpenAI API Key',
 
       // Moonshot AI / Kimi
       moonshot: 'Moonshot AI API Key',
@@ -352,16 +337,17 @@ async function generateByokProvidersNotification(
       'ollama-cloud': 'Ollama Cloud API Key',
     } as Record<string, string>;
 
-    const providerName = names[provider];
+    // A user may have used several providers; show the first one we have a label for.
+    const providerName = providers.map(provider => names[provider]).find(name => Boolean(name));
     if (!providerName) {
       console.debug(
-        `[generateByokProvidersNotification] unknown BYOK supported provider ${provider}`
+        `[generateByokProvidersNotification] no BYOK supported provider among ${providers.join(', ')}`
       );
       return [];
     }
 
     console.debug(
-      `[generateByokProvidersNotification] has used BYOK supported provider ${provider}`
+      `[generateByokProvidersNotification] has used BYOK supported provider(s) ${providers.join(', ')}`
     );
     return [
       {

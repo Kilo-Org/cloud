@@ -8,6 +8,8 @@ import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list
 import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { GET } from './route';
+import { getBenchmarkRoutingTable } from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
+import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
@@ -27,6 +29,12 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
 jest.mock('@/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
+jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
+  getBenchmarkRoutingTable: jest.fn(),
+}));
+jest.mock('@/lib/ai-gateway/auto-model/resolution', () => ({
+  getAutoFreeCandidates: jest.fn(),
+}));
 jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
@@ -36,6 +44,8 @@ const mockedListAvailableExperimentModels = jest.mocked(listAvailableExperimentM
 const mockedAddUserByokAvailability = jest.mocked(addUserByokAvailability);
 const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
+const mockedGetBenchmarkRoutingTable = jest.mocked(getBenchmarkRoutingTable);
+const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -71,6 +81,11 @@ describe('GET /api/openrouter/models', () => {
     mockedListAvailableExperimentModels.mockResolvedValue([]);
     mockedGetUserByokProviderIds.mockResolvedValue([]);
     mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
+    mockedGetBenchmarkRoutingTable.mockResolvedValue({
+      status: 200,
+      body: { table: null, publishedAt: null },
+    });
+    mockedGetAutoFreeCandidates.mockResolvedValue([]);
   });
 
   test('leaves BYOK availability undefined for unauthenticated requests', async () => {
@@ -103,6 +118,63 @@ describe('GET /api/openrouter/models', () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       data: [{ ...publicModel, hasUserByokAvailable: true }, directModel, experimentModel],
+    });
+  });
+
+  test('adds auto-routing models from routing sources', async () => {
+    const efficientModel = makeModel('kilo-auto/efficient');
+    const freeModel = makeModel('kilo-auto/free');
+    const balancedModel = makeModel('kilo-auto/balanced');
+    const geminiModel = makeModel('google/gemini-2.5-flash');
+    const gptMiniModel = makeModel('openai/gpt-5.4-mini');
+    const poolsideModel = makeModel('poolside/laguna-m.1:free');
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+      data: [efficientModel, freeModel, balancedModel, geminiModel, gptMiniModel, poolsideModel],
+    });
+    mockedGetAutoFreeCandidates.mockResolvedValue([
+      'poolside/laguna-m.1:free',
+      'missing/free-model',
+    ]);
+    mockedGetBenchmarkRoutingTable.mockResolvedValue({
+      status: 200,
+      body: {
+        table: {
+          routes: {
+            'implementation/code_generation': [
+              { model: 'google/gemini-2.5-flash' },
+              { model: 'openai/gpt-5.4-mini' },
+            ],
+            'analysis/debugging': [
+              { model: 'kilo-auto/balanced' },
+              { model: 'google/gemini-2.5-flash' },
+            ],
+          },
+        },
+      },
+    } as never);
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: [
+        {
+          ...efficientModel,
+          autoRouting: {
+            models: ['google/gemini-2.5-flash', 'openai/gpt-5.4-mini'],
+          },
+        },
+        {
+          ...freeModel,
+          autoRouting: {
+            models: ['poolside/laguna-m.1:free'],
+          },
+        },
+        balancedModel,
+        geminiModel,
+        gptMiniModel,
+        poolsideModel,
+      ],
     });
   });
 });

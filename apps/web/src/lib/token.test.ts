@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import type { User } from '@kilocode/db/schema';
 import {
   generateApiToken,
+  generateInternalServiceToken,
   generateOrganizationApiToken,
   validateAuthorizationHeader,
   JWT_TOKEN_VERSION,
@@ -44,6 +45,7 @@ const mockUser: User = {
   github_url: null,
   discord_server_membership_verified_at: null,
   openrouter_upstream_safety_identifier: null,
+  openrouter_downstream_safety_identifier: null,
   vercel_downstream_safety_identifier: null,
   customer_source: null,
   signup_ip: null,
@@ -53,6 +55,16 @@ const mockUser: User = {
 };
 
 describe('Token Functions', () => {
+  describe('generateInternalServiceToken', () => {
+    it('generates a generic service token without an audience', () => {
+      const token = generateInternalServiceToken(mockUser.id);
+      const decoded = jwt.decode(token) as jwt.JwtPayload;
+
+      expect(decoded.kiloUserId).toBe(mockUser.id);
+      expect(decoded.aud).toBeUndefined();
+    });
+  });
+
   describe('generateApiToken', () => {
     it('should generate a valid JWT token for a user', () => {
       const token = generateApiToken(mockUser);

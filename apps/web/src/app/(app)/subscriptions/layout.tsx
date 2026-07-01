@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 
-export default function SubscriptionsLayout({ children }: { children: ReactNode }) {
+export default async function SubscriptionsLayout({ children }: { children: ReactNode }) {
+  await getUserFromAuthOrRedirect();
   return children;
 }

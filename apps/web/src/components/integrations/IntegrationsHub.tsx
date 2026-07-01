@@ -5,7 +5,10 @@ import {
   PlatformCard,
   type GitHubIdentityStatus,
 } from '@/app/(app)/organizations/[id]/integrations/components/PlatformCard';
-import { buildPlatforms, PLATFORM_DEFINITIONS } from '@/lib/integrations/platform-definitions';
+import {
+  buildPlatforms,
+  getPlatformDefinitionCountForOwner,
+} from '@/lib/integrations/platform-definitions';
 import { Card, CardContent } from '@/components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -32,8 +35,8 @@ export function IntegrationsHub({ organizationId }: IntegrationsHubProps) {
   if (isLoading) {
     return (
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {PLATFORM_DEFINITIONS.map((_, i) => (
-          <Card key={i}>
+        {Array.from({ length: getPlatformDefinitionCountForOwner(organizationId) }, (_, index) => (
+          <Card key={index}>
             <CardContent className="pt-6">
               <div className="animate-pulse space-y-4">
                 <div className="bg-muted h-20 rounded" />

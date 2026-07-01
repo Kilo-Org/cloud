@@ -1,13 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import type {
   SecurityAgentAuditReport,
   SecurityAgentAuditReportEvent,
   SecurityFindingAuditSection,
 } from '@/lib/security-agent/db/security-audit-report';
 import {
-  AuditReportProvenance,
   auditReportControlsReducer,
   buildAuditReportSearchParams,
   createAuditReportControlsState,
@@ -16,7 +13,6 @@ import {
   formatDateTime24Hour,
   getAuditEventDetails,
   getDefaultAuditReportDateRange,
-  getAuditReportProvenance,
   getAuditReportRepositoryHref,
   getAuditReportRepositoryOptions,
   hasSecurityAgentAuditReportOwnerContext,
@@ -136,6 +132,37 @@ describe('audit report control state', () => {
     expect(nextState.submittedFilters).toBe(submittedFilters);
     expect(nextState.draftRange).toBe(state.draftRange);
     expect(nextState.isRangePickerOpen).toBe(false);
+  });
+
+  it('keeps the date picker open while selecting a complete range', () => {
+    const initialState = createAuditReportControlsState({
+      initialRange: { startDate: '2026-03-19', endDate: '2026-06-16' },
+      initialFilters: { severity: 'all', state: 'all', repository: null },
+    });
+    const openState = auditReportControlsReducer(initialState, {
+      type: 'set-range-picker-open',
+      open: true,
+    });
+    const startSelectedState = auditReportControlsReducer(openState, {
+      type: 'select-range-start',
+      date: new Date(2026, 4, 1),
+    });
+    const completeRangeState = auditReportControlsReducer(startSelectedState, {
+      type: 'select-range-end',
+      range: { from: new Date(2026, 4, 1), to: new Date(2026, 4, 31) },
+    });
+
+    expect(startSelectedState).toMatchObject({
+      isRangePickerOpen: true,
+      isSelectingRangeEnd: true,
+      draftRange: { from: new Date(2026, 4, 1) },
+    });
+    expect(completeRangeState.isRangePickerOpen).toBe(true);
+    expect(completeRangeState.isSelectingRangeEnd).toBe(false);
+    expect(completeRangeState.draftRange).toEqual({
+      from: new Date(2026, 4, 1),
+      to: new Date(2026, 4, 31),
+    });
   });
 
   it('synchronizes submitted controls when browser navigation changes the URL', () => {
@@ -373,45 +400,6 @@ describe('audit report filters', () => {
     expect(normalizeAuditReportRepositoryFilter(validFilters, ['kilo/api', 'kilo/web'])).toBe(
       validFilters
     );
-  });
-});
-
-describe('audit report provenance', () => {
-  it('renders provenance and coverage warning for a successful empty report', () => {
-    const html = renderToStaticMarkup(createElement(AuditReportProvenance, { report: report([]) }));
-
-    expect(html).toContain('Security Finding activity recorded by Kilo.');
-    expect(html).toContain('Data cutoff');
-    expect(html).toContain('Jun 16, 2026 at 00:00 UTC');
-    expect(html).toContain('Reliable coverage starts');
-    expect(html).toContain('Jun 12, 2026 at 00:00 UTC');
-    expect(html).toContain(
-      'This period starts before reliable event coverage, and supplemental legacy activity may be incomplete.'
-    );
-  });
-
-  it('warns independently for pre-coverage periods and supplemental legacy activity', () => {
-    const baseReport = report([]);
-    const preCoverage = {
-      ...baseReport,
-      hasLegacySupplementalActivity: false,
-    };
-    const legacySupplemental = {
-      ...baseReport,
-      period: { ...baseReport.period, start: baseReport.reliableCoverageStart },
-    };
-    const completeCoverage = {
-      ...legacySupplemental,
-      hasLegacySupplementalActivity: false,
-    };
-
-    expect(getAuditReportProvenance(preCoverage).warning).toBe(
-      'Activity before reliable event coverage may be incomplete.'
-    );
-    expect(getAuditReportProvenance(legacySupplemental).warning).toBe(
-      'Supplemental legacy activity may be incomplete.'
-    );
-    expect(getAuditReportProvenance(completeCoverage).warning).toBeNull();
   });
 });
 

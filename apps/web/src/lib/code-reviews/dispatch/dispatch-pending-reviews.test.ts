@@ -49,6 +49,7 @@ import {
   cloud_agent_code_reviews,
   kilocode_users,
   organizations,
+  platform_integrations,
   type User,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -85,6 +86,7 @@ function createDeferred<T>() {
 describe('tryDispatchPendingReviews', () => {
   let testUser: User;
   let testOrganizationId: string;
+  let platformIntegrationId: string;
   let reviewSequence = 0;
 
   beforeAll(async () => {
@@ -94,6 +96,23 @@ describe('tryDispatchPendingReviews', () => {
       .values({ name: `Dispatch Pending Reviews ${Date.now()}` })
       .returning({ id: organizations.id });
     testOrganizationId = organization.id;
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: testUser.id,
+        platform: 'github',
+        integration_type: 'github_app',
+        platform_installation_id: `dispatch-pending-${Date.now()}-${Math.random()}`,
+        platform_account_id: 'dispatch-pending',
+        platform_account_login: 'dispatch-pending',
+        repository_access: 'all',
+        integration_status: 'active',
+      })
+      .returning({ id: platform_integrations.id });
+    if (!integration) {
+      throw new Error('Expected platform integration');
+    }
+    platformIntegrationId = integration.id;
   });
 
   beforeEach(() => {
@@ -136,6 +155,9 @@ describe('tryDispatchPendingReviews', () => {
   });
 
   afterAll(async () => {
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, platformIntegrationId));
     await db.delete(organizations).where(eq(organizations.id, testOrganizationId));
     await db.delete(kilocode_users).where(eq(kilocode_users.id, testUser.id));
   });
@@ -168,6 +190,7 @@ describe('tryDispatchPendingReviews', () => {
     return {
       owned_by_user_id: owner.type === 'user' ? owner.id : null,
       owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+      platform_integration_id: platformIntegrationId,
       repo_full_name: REPO,
       pr_number: sequence + 1,
       pr_url: `https://github.com/${REPO}/pull/${sequence + 1}`,
@@ -996,7 +1019,7 @@ describe('tryDispatchPendingReviews', () => {
       head_sha: 'sha-old',
     });
 
-    await cancelSupersededReviewsForPR(REPO, 99, 'sha-new');
+    await cancelSupersededReviewsForPR(REPO, 99, 'sha-new', { platformIntegrationId });
 
     const result = await tryDispatchPendingReviews({
       type: 'user',
@@ -1049,7 +1072,7 @@ describe('tryDispatchPendingReviews', () => {
 
     mockPrepareReviewPayload.mockImplementationOnce(async (params: { reviewId: string }) => {
       queueMicrotask(() => {
-        void cancelSupersededReviewsForPR(REPO, 100, 'sha-race-new');
+        void cancelSupersededReviewsForPR(REPO, 100, 'sha-race-new', { platformIntegrationId });
       });
       return { reviewId: params.reviewId, sessionInput: { prompt: 'Review this change.' } };
     });

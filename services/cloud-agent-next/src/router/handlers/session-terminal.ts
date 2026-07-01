@@ -6,6 +6,7 @@ import type { WrapperPty } from '../../kilo/wrapper-client.js';
 import type { SessionId } from '../../types/ids.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { protectedProcedure } from '../auth.js';
+import { requireCurrentSessionAccess } from '../../session-access.js';
 import {
   CloseTerminalInput,
   CloseTerminalOutput,
@@ -49,6 +50,11 @@ export function createSessionTerminalHandlers() {
           const sessionId = input.cloudAgentSessionId as SessionId;
           logger.setTags({ userId: ctx.userId, sessionId });
           logger.withFields({ cols: input.cols, rows: input.rows }).info('Creating terminal');
+          await requireCurrentSessionAccess({
+            env: ctx.env,
+            kiloUserId: ctx.userId,
+            cloudAgentSessionId: sessionId,
+          });
 
           const result = await withDORetry<
             DurableObjectStub<CloudAgentSession>,
@@ -79,6 +85,11 @@ export function createSessionTerminalHandlers() {
         return withLogTags({ source: 'resizeTerminal' }, async () => {
           const sessionId = input.cloudAgentSessionId as SessionId;
           logger.setTags({ userId: ctx.userId, sessionId, ptyId: input.ptyId });
+          await requireCurrentSessionAccess({
+            env: ctx.env,
+            kiloUserId: ctx.userId,
+            cloudAgentSessionId: sessionId,
+          });
           const result = await withDORetry<
             DurableObjectStub<CloudAgentSession>,
             OperationResult<{ pty: WrapperPty }>
@@ -109,6 +120,11 @@ export function createSessionTerminalHandlers() {
           const sessionId = input.cloudAgentSessionId as SessionId;
           logger.setTags({ userId: ctx.userId, sessionId, ptyId: input.ptyId });
           logger.info('Closing terminal');
+          await requireCurrentSessionAccess({
+            env: ctx.env,
+            kiloUserId: ctx.userId,
+            cloudAgentSessionId: sessionId,
+          });
 
           const result = await withDORetry<
             DurableObjectStub<CloudAgentSession>,

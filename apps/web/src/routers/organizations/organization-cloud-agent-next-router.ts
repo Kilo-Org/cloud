@@ -13,6 +13,10 @@ import {
 } from '@/routers/organizations/utils';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import {
+  BitbucketOrganizationRepositoryListResultSchema,
+  fetchBitbucketRepositoriesForOrganization,
+} from '@/lib/cloud-agent/bitbucket-integration-helpers';
+import {
   getGitLabInstanceUrlForOrganization,
   buildGitLabCloneUrl,
   fetchGitLabRepositoriesForOrganization,
@@ -51,6 +55,8 @@ import { db } from '@/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@/lib/cloud-agent-sdk/message-id';
+import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
+import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -90,7 +96,7 @@ function createTerminalTicket(params: {
   };
 }
 
-async function assertOrganizationOwnsTerminalSession(params: {
+async function assertOrganizationOwnsSession(params: {
   organizationId: string;
   userId: string;
   cloudAgentSessionId: string;
@@ -179,6 +185,11 @@ const ListGitLabRepositoriesInput = z.object({
   forceRefresh: z.boolean().optional().default(false),
 });
 
+const ListBitbucketRepositoriesInput = z.object({
+  organizationId: z.uuid(),
+  forceRefresh: z.boolean().optional().default(false),
+});
+
 /**
  * Cloud Agent Next Router (Organization Context)
  *
@@ -215,8 +226,15 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
-      const { gitlabProject, githubRepo, organizationId, attachments, images, ...restInput } =
-        input;
+      const {
+        gitlabProject,
+        githubRepo,
+        bitbucketRepo,
+        organizationId,
+        attachments,
+        images,
+        ...restInput
+      } = input;
 
       // Profile resolution happens inside cloud-agent-next. Tokens are resolved
       // there as well via GIT_TOKEN_SERVICE. We forward profileId + inline
@@ -224,13 +242,22 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       let gitParams: {
         githubRepo?: string;
         gitUrl?: string;
-        platform?: 'github' | 'gitlab';
+        platform?: 'github' | 'gitlab' | 'bitbucket';
+        bitbucketWorkspaceUuid?: string;
+        bitbucketRepositoryUuid?: string;
       };
 
       if (gitlabProject) {
         const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
+      } else if (bitbucketRepo) {
+        gitParams = {
+          gitUrl: `https://bitbucket.org/${bitbucketRepo.fullName}.git`,
+          platform: PLATFORM.BITBUCKET,
+          bitbucketWorkspaceUuid: bitbucketRepo.workspaceUuid,
+          bitbucketRepositoryUuid: bitbucketRepo.repositoryUuid,
+        };
       } else {
         gitParams = { githubRepo, platform: PLATFORM.GITHUB };
       }
@@ -259,6 +286,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(InitiateFromPreparedSessionInput)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
@@ -285,6 +317,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(SendMessageInput)
     .output(baseInitiateSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
@@ -309,7 +346,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(CreateTerminalInput)
     .output(baseCreateTerminalNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertOrganizationOwnsTerminalSession({
+      await assertOrganizationOwnsSession({
         organizationId: input.organizationId,
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
@@ -344,7 +381,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(RefreshTerminalTicketInput)
     .output(baseRefreshTerminalTicketNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertOrganizationOwnsTerminalSession({
+      await assertOrganizationOwnsSession({
         organizationId: input.organizationId,
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
@@ -362,7 +399,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(ResizeTerminalInput)
     .output(baseResizeTerminalNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertOrganizationOwnsTerminalSession({
+      await assertOrganizationOwnsSession({
         organizationId: input.organizationId,
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
@@ -386,7 +423,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(CloseTerminalInput)
     .output(baseCloseTerminalNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      await assertOrganizationOwnsTerminalSession({
+      await assertOrganizationOwnsSession({
         organizationId: input.organizationId,
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
@@ -448,6 +485,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
@@ -458,6 +500,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(AnswerQuestionInput)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.answerQuestion({
@@ -471,6 +518,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(RejectQuestionInput)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.rejectQuestion({
@@ -483,6 +535,11 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(AnswerPermissionInput)
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.sessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
       return await client.answerPermission({
@@ -500,10 +557,22 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(GetSessionInput)
     .output(baseGetSessionNextOutputSchema)
     .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
       const authToken = generateCloudAgentToken(ctx.user);
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);
+    }),
+
+  checkEligibility: organizationMemberProcedure
+    .input(z.object({ organizationId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const { balance } = await getBalanceForOrganizationUser(input.organizationId, ctx.user.id);
+      return buildCloudAgentNextEligibility(balance);
     }),
 
   /**
@@ -527,7 +596,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         errorMessage: z.string().optional(),
       })
     )
-    .query(async ({ ctx: _ctx, input }) => {
+    .query(async ({ input }) => {
       const result = await fetchGitHubRepositoriesForOrganization(
         input.organizationId,
         input.forceRefresh
@@ -560,7 +629,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         errorMessage: z.string().optional(),
       })
     )
-    .query(async ({ ctx: _ctx, input }) => {
+    .query(async ({ input }) => {
       const result = await fetchGitLabRepositoriesForOrganization(
         input.organizationId,
         input.forceRefresh
@@ -571,5 +640,16 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,
       };
+    }),
+
+  listBitbucketRepositories: organizationMemberProcedure
+    .input(ListBitbucketRepositoriesInput)
+    .output(BitbucketOrganizationRepositoryListResultSchema)
+    .query(async ({ ctx, input }) => {
+      return fetchBitbucketRepositoriesForOrganization(
+        input.organizationId,
+        ctx.user.id,
+        input.forceRefresh
+      );
     }),
 });

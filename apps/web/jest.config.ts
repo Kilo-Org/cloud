@@ -37,7 +37,6 @@ const config: Config = {
   testMatch: ['**/src/**/*.test.ts', '<rootDir>/../../packages/db/src/**/*.test.ts'],
   testPathIgnorePatterns: [
     '<rootDir>/../../.kilocode/',
-    '<rootDir>/../../services/cloud-agent/',
     '<rootDir>/../../services/cloud-agent-next/',
     '<rootDir>/../../services/app-builder/',
     '<rootDir>/../../services/webhook-agent-ingest/',

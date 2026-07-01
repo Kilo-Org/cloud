@@ -83,7 +83,7 @@ function buildPreparedRequests() {
   };
 }
 
-function createOrchestrator(options?: { sessionReady?: boolean }) {
+function createOrchestrator(options?: { sessionReady?: boolean; env?: Env }) {
   const ensureSessionReady = vi.fn().mockResolvedValue({ kiloSessionId: 'kilo_ready' });
   const prompt = vi.fn().mockResolvedValue({ messageId: basePlan.turn.messageId });
   const command = vi.fn().mockResolvedValue({});
@@ -107,7 +107,7 @@ function createOrchestrator(options?: { sessionReady?: boolean }) {
   const orchestrator = new ExecutionOrchestrator({
     getAgentSandbox: vi.fn().mockReturnValue(agentSandbox),
     getSessionStub: vi.fn().mockReturnValue({ recordKiloServerActivity }),
-    env: {} as Env,
+    env: options?.env ?? ({} as Env),
   });
   return {
     orchestrator,
@@ -116,6 +116,25 @@ function createOrchestrator(options?: { sessionReady?: boolean }) {
     ensureSessionReady,
     prompt,
     command,
+  };
+}
+
+function codeReviewPlan(orgId: string): FencedWrapperDispatchRequest {
+  return {
+    ...basePlan,
+    scope: { ...basePlan.scope, orgId },
+    workspace: {
+      ...basePlan.workspace,
+      sandboxId: 'crv-test',
+      metadata: {
+        ...baseMetadata,
+        identity: {
+          ...baseMetadata.identity,
+          orgId,
+          createdOnPlatform: 'code-review',
+        },
+      },
+    },
   };
 }
 
@@ -253,6 +272,56 @@ describe('ExecutionOrchestrator AgentSandbox delivery', () => {
       code: 'WRAPPER_START_FAILED',
       retryable: true,
     } satisfies Partial<ExecutionError>);
+  });
+
+  it('destroys enabled Code Reviewer sandboxes after wrapper bootstrap failure', async () => {
+    const orgId = 'org_crv_ephemeral';
+    const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator({
+      env: { CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS: orgId } as Env,
+    });
+    ensureWrapper.mockRejectedValueOnce(new Error('wrapper unavailable'));
+
+    await expect(orchestrator.execute(codeReviewPlan(orgId))).rejects.toMatchObject({
+      code: 'WRAPPER_START_FAILED',
+      retryable: true,
+    } satisfies Partial<ExecutionError>);
+    expect(deleteSandbox).toHaveBeenCalledWith('recovery');
+  });
+
+  it('does not destroy non-crv sandboxes when rollout policy changes after allocation', async () => {
+    const orgId = 'org_crv_ephemeral';
+    const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator({
+      env: { CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS: orgId } as Env,
+    });
+    const plan = codeReviewPlan(orgId);
+    ensureWrapper.mockRejectedValueOnce(new Error('wrapper unavailable'));
+
+    await expect(
+      orchestrator.execute({
+        ...plan,
+        workspace: {
+          ...plan.workspace,
+          sandboxId: 'org-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'WRAPPER_START_FAILED',
+      retryable: true,
+    } satisfies Partial<ExecutionError>);
+    expect(deleteSandbox).not.toHaveBeenCalled();
+  });
+
+  it('destroys crv-* sandbox after wrapper bootstrap failure even if rollout policy changed', async () => {
+    const { orchestrator, ensureWrapper, deleteSandbox } = createOrchestrator({
+      env: { CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS: 'org_other' } as Env,
+    });
+    ensureWrapper.mockRejectedValueOnce(new Error('wrapper unavailable'));
+
+    await expect(orchestrator.execute(codeReviewPlan('org_crv_ephemeral'))).rejects.toMatchObject({
+      code: 'WRAPPER_START_FAILED',
+      retryable: true,
+    } satisfies Partial<ExecutionError>);
+    expect(deleteSandbox).toHaveBeenCalledWith('recovery');
   });
 
   it('preserves a finalizing error from wrapper startup', async () => {

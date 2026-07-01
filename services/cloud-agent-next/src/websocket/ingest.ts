@@ -234,8 +234,8 @@ export type IngestDOContext = {
     | 'observePong'
     | 'observeMeaningfulOutput'
     | 'observeFinalizing'
-    | 'onTerminalEvent'
   >;
+  handleWrapperTerminalEvent: (params: WrapperTerminalEvent) => Promise<void>;
   keepContainerAlive?: () => void;
   observeCorrelatedAgentActivity?: (messageId: string) => Promise<void>;
   terminalizeSessionMessageOnce: (
@@ -274,7 +274,7 @@ export function createIngestHandler(
   doContext: IngestDOContext
 ) {
   async function forwardIngestTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
-    await doContext.wrapperSupervisor.onTerminalEvent(params);
+    await doContext.handleWrapperTerminalEvent(params);
   }
 
   function readCurrentAttachment(ws: WebSocket): IngestAttachment | null {

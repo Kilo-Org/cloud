@@ -239,7 +239,9 @@ describe('handleMergeRequestCodeReview', () => {
     );
 
     expect(response.status).toBe(202);
-    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith('acme/widgets', 42, 'abc123');
+    expect(mockCancelSupersededReviewsForPR).toHaveBeenCalledWith('acme/widgets', 42, 'abc123', {
+      platformIntegrationId: '8b2ff443-8396-4b07-99ae-7015789da7dd',
+    });
     expect(mockCancelReview).toHaveBeenCalledTimes(2);
     expect(mockCancelReview).toHaveBeenNthCalledWith(
       1,

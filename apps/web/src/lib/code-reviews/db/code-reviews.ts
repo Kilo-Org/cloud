@@ -33,6 +33,8 @@ import {
 
 type CodeReviewAttemptStatus = CodeReviewStatus;
 
+export type CodeReviewIdentityScope = { type: 'webhook'; platformIntegrationId: string };
+
 type InfraRetryAttemptResult =
   | {
       outcome: 'created';
@@ -124,6 +126,38 @@ function canCreateInfraRetryAttempt(review: { status: string; terminal_reason: s
     RETRYABLE_PARENT_REVIEW_STATUSES.includes(review.status)
   );
 }
+
+function createCodeReviewErrorMetadata(params: CreateReviewParams) {
+  return {
+    owner: params.owner,
+    platformIntegrationId: params.platformIntegrationId,
+    repoFullName: params.repoFullName,
+    prNumber: params.prNumber,
+    prUrl: params.prUrl,
+    headSha: params.headSha,
+    platform: params.platform,
+    platformProjectId: params.platformProjectId,
+    manualConfig: params.manualConfig
+      ? {
+          outputMode: params.manualConfig.outputMode,
+          hasInstructions: params.manualConfig.instructions !== null,
+          modelSlug: params.manualConfig.agentConfig.model_slug,
+          thinkingEffort: params.manualConfig.agentConfig.thinking_effort ?? null,
+        }
+      : null,
+  };
+}
+
+function codeReviewIdentityScopeConditions(scope: CodeReviewIdentityScope) {
+  return [
+    eq(cloud_agent_code_reviews.platform_integration_id, scope.platformIntegrationId),
+    isNull(cloud_agent_code_reviews.manual_config),
+  ];
+}
+
+function providerPublishingCondition() {
+  return sql`(${cloud_agent_code_reviews.manual_config} IS NULL OR ${cloud_agent_code_reviews.manual_config}->>'outputMode' = 'provider')`;
+}
 /**
  * Creates a new code review record
  * Returns the created review ID
@@ -147,6 +181,7 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
         head_sha: params.headSha,
         platform: params.platform ?? 'github',
         platform_project_id: params.platformProjectId ?? null,
+        manual_config: params.manualConfig ?? null,
         agent_version: 'v2',
         status: 'pending',
       })
@@ -156,7 +191,7 @@ export async function createCodeReview(params: CreateReviewParams): Promise<stri
   } catch (error) {
     captureException(error, {
       tags: { operation: 'createCodeReview' },
-      extra: { params },
+      extra: { params: createCodeReviewErrorMetadata(params) },
     });
     throw error;
   }
@@ -1315,7 +1350,8 @@ export async function countCodeReviews(params: {
 export async function findExistingReview(
   repoFullName: string,
   prNumber: number,
-  headSha: string
+  headSha: string,
+  scope: CodeReviewIdentityScope
 ): Promise<CloudAgentCodeReview | null> {
   try {
     const [review] = await db
@@ -1325,7 +1361,8 @@ export async function findExistingReview(
         and(
           eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
           eq(cloud_agent_code_reviews.pr_number, prNumber),
-          eq(cloud_agent_code_reviews.head_sha, headSha)
+          eq(cloud_agent_code_reviews.head_sha, headSha),
+          ...codeReviewIdentityScopeConditions(scope)
         )
       )
       .limit(1);
@@ -1334,7 +1371,7 @@ export async function findExistingReview(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findExistingReview' },
-      extra: { repoFullName, prNumber, headSha },
+      extra: { repoFullName, prNumber, headSha, scope },
     });
     throw error;
   }
@@ -1399,7 +1436,8 @@ export async function resetCodeReviewForRetry(reviewId: string): Promise<void> {
 export async function findActiveReviewsForPR(
   repoFullName: string,
   prNumber: number,
-  excludeSha: string
+  excludeSha: string,
+  scope: { platformIntegrationId: string }
 ): Promise<string[]> {
   try {
     const reviews = await db
@@ -1409,6 +1447,8 @@ export async function findActiveReviewsForPR(
         and(
           eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
           eq(cloud_agent_code_reviews.pr_number, prNumber),
+          eq(cloud_agent_code_reviews.platform_integration_id, scope.platformIntegrationId),
+          isNull(cloud_agent_code_reviews.manual_config),
           ne(cloud_agent_code_reviews.head_sha, excludeSha),
           inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
         )
@@ -1418,7 +1458,7 @@ export async function findActiveReviewsForPR(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'findActiveReviewsForPR' },
-      extra: { repoFullName, prNumber, excludeSha },
+      extra: { repoFullName, prNumber, excludeSha, scope },
     });
     throw error;
   }
@@ -1427,7 +1467,8 @@ export async function findActiveReviewsForPR(
 export async function cancelSupersededReviewsForPR(
   repoFullName: string,
   prNumber: number,
-  excludeSha: string
+  excludeSha: string,
+  scope: { platformIntegrationId: string }
 ): Promise<CancelledReviewRow[]> {
   try {
     const result = await db.execute<{
@@ -1462,6 +1503,8 @@ export async function cancelSupersededReviewsForPR(
         FROM ${cloud_agent_code_reviews}
         WHERE ${cloud_agent_code_reviews.repo_full_name} = ${repoFullName}
           AND ${cloud_agent_code_reviews.pr_number} = ${prNumber}
+          AND ${cloud_agent_code_reviews.platform_integration_id} = ${scope.platformIntegrationId}
+          AND ${cloud_agent_code_reviews.manual_config} IS NULL
           AND ${cloud_agent_code_reviews.head_sha} != ${excludeSha}
           AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
       ), cancelled_attempts AS (
@@ -1511,14 +1554,44 @@ export async function cancelSupersededReviewsForPR(
   } catch (error) {
     captureException(error, {
       tags: { operation: 'cancelSupersededReviewsForPR' },
-      extra: { repoFullName, prNumber, excludeSha },
+      extra: { repoFullName, prNumber, excludeSha, scope },
+    });
+    throw error;
+  }
+}
+
+export async function findActiveProviderPublishingReview(params: {
+  platformIntegrationId: string;
+  repoFullName: string;
+  prNumber: number;
+}): Promise<CloudAgentCodeReview | null> {
+  try {
+    const [review] = await db
+      .select()
+      .from(cloud_agent_code_reviews)
+      .where(
+        and(
+          eq(cloud_agent_code_reviews.platform_integration_id, params.platformIntegrationId),
+          eq(cloud_agent_code_reviews.repo_full_name, params.repoFullName),
+          eq(cloud_agent_code_reviews.pr_number, params.prNumber),
+          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running']),
+          providerPublishingCondition()
+        )
+      )
+      .limit(1);
+
+    return review ?? null;
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'findActiveProviderPublishingReview' },
+      extra: params,
     });
     throw error;
   }
 }
 
 export type ReviewContinuationScope =
-  | { platform: 'github' }
+  | { platform: 'github'; integrationId: string }
   | { platform: 'gitlab'; integrationId: string; projectId: number };
 
 /**
@@ -1527,22 +1600,23 @@ export type ReviewContinuationScope =
  * can diff against it instead of re-reviewing the entire PR.
  * Also returns session_id (nullable) so the caller can derive both the
  * incremental diff base and the session continuation target from a single row.
- * GitLab continuation requires the exact integration and project identity so
- * equivalent project paths on separate GitLab instances never share sessions.
+ * Continuation requires exact integration identity so equivalent repository
+ * paths on separate installations or instances never share sessions.
  */
 export async function findPreviousCompletedReview(
   repoFullName: string,
   prNumber: number,
   excludeSha: string,
-  scope: ReviewContinuationScope = { platform: 'github' }
+  scope: ReviewContinuationScope
 ): Promise<{ head_sha: string; session_id: string | null } | null> {
   try {
+    const integrationScopeFilter = eq(
+      cloud_agent_code_reviews.platform_integration_id,
+      scope.integrationId
+    );
     const gitLabScopeFilter =
       scope.platform === 'gitlab'
-        ? and(
-            eq(cloud_agent_code_reviews.platform_integration_id, scope.integrationId),
-            eq(cloud_agent_code_reviews.platform_project_id, scope.projectId)
-          )
+        ? eq(cloud_agent_code_reviews.platform_project_id, scope.projectId)
         : undefined;
     const [review] = await db
       .select({
@@ -1555,6 +1629,7 @@ export async function findPreviousCompletedReview(
           eq(cloud_agent_code_reviews.repo_full_name, repoFullName),
           eq(cloud_agent_code_reviews.pr_number, prNumber),
           eq(cloud_agent_code_reviews.platform, scope.platform),
+          integrationScopeFilter,
           gitLabScopeFilter,
           ne(cloud_agent_code_reviews.head_sha, excludeSha),
           eq(cloud_agent_code_reviews.status, 'completed')

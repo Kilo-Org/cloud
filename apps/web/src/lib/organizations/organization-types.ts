@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import type { Organization, organization_invitations } from '@kilocode/db/schema';
 import type { Result } from '@/lib/maybe-result';
-import { CompanyDomainSchema } from './company-domain';
+import { CompanyDomainSchema, isValidDomain } from './company-domain';
 
 // Re-export base types that don't depend on schema.ts
 export type {
@@ -113,12 +113,31 @@ type ActiveMember = {
   inviteDate: string | null;
   dailyUsageLimitUsd: number | null;
   currentDailyUsageUsd: number | null;
+  childOrganizationMemberships?: ChildOrganizationMembership[];
 };
 
 export type OrganizationMember = InvitedMember | ActiveMember;
 
+export type ChildOrganizationSummary = {
+  id: string;
+  name: string;
+};
+
+export type ChildOrganizationMembership = ChildOrganizationSummary & {
+  role: OrganizationRole;
+};
+
+export type OrganizationSsoPolicyView = {
+  required: boolean;
+  source: 'self' | 'direct_parent' | null;
+  domain: string | null;
+  configurationError: boolean;
+};
+
 export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
   members: OrganizationMember[];
+  childOrganizations: ChildOrganizationSummary[];
+  effectiveSsoPolicy: OrganizationSsoPolicyView;
 };
 
 export type AcceptInviteResult = Result<
@@ -204,6 +223,11 @@ const OpenRouterModelSchema = z.object({
   isFree: z.boolean().optional(),
   mayTrainOnYourPrompts: z.boolean().optional(),
   hasUserByokAvailable: z.boolean().optional(),
+  autoRouting: z
+    .object({
+      models: z.array(z.string()),
+    })
+    .optional(),
   terminalBench: z
     .object({
       overallScore: z.number(),
@@ -254,9 +278,9 @@ export type OpenRouterModelsResponse = z.infer<typeof OpenRouterModelsResponseSc
 
 export const OrganizationSSODomainSchema = z
   .string()
-  .min(1, 'Domain cannot be empty')
-  .lowercase()
-  .trim();
+  .trim()
+  .toLowerCase()
+  .refine(isValidDomain, { message: 'Please enter a valid domain (e.g. acme.com)' });
 
 export type OrgTrialStatus =
   | 'subscribed' // Has active paid subscription

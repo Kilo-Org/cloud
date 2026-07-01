@@ -48,6 +48,21 @@
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_PROD",
     },
+    {
+      "binding": "BITBUCKET_CLIENT_ID",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "BITBUCKET_CLIENT_ID_PROD",
+    },
+    {
+      "binding": "BITBUCKET_CLIENT_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "BITBUCKET_CLIENT_SECRET_PROD",
+    },
+    {
+      "binding": "BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID_PROD",
+    },
   ],
   "dev": {
     "port": 8802,
@@ -84,6 +99,21 @@
           "binding": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY",
           "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
           "secret_name": "SCM_SESSION_CAPABILITY_ENCRYPTION_KEY_DEV",
+        },
+        {
+          "binding": "BITBUCKET_CLIENT_ID",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "BITBUCKET_CLIENT_ID_DEV",
+        },
+        {
+          "binding": "BITBUCKET_CLIENT_SECRET",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "BITBUCKET_CLIENT_SECRET_DEV",
+        },
+        {
+          "binding": "BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID",
+          "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+          "secret_name": "BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID_DEV",
         },
       ],
     },

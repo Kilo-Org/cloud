@@ -94,6 +94,104 @@ describe('session deletion physical cleanup', () => {
     });
   });
 
+  it('deletes quarantined session state without probing its sandbox again', async () => {
+    const userId = 'user_delete_quarantined';
+    const sessionId = 'agent_delete_quarantined';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        prompt: 'delete quarantined',
+        mode: 'code',
+        model: 'test-model',
+      });
+      let stopAttempts = 0;
+      let sandboxDeleteAttempts = 0;
+      instance['physicalWrapperStopper'] = async () => {
+        stopAttempts += 1;
+        return { status: 'inspection-failed', error: 'must not inspect quarantined sandbox' };
+      };
+      instance['sandboxSessionDeleter'] = async () => {
+        sandboxDeleteAttempts += 1;
+      };
+      await instance.ctx.storage.put('wrapper_lease', {
+        state: 'stop_needed',
+        nextInstanceGeneration: 2,
+        target: { kind: 'session' },
+        reason: 'observation-failed',
+        requestedAt: 1_000,
+        nextAttemptAt: 3_153_600_036_000,
+        attempts: 5,
+        lastError: 'inspection failed',
+        exhaustedAt: 36_000,
+      });
+
+      await instance.deleteSession();
+      return {
+        stopAttempts,
+        sandboxDeleteAttempts,
+        metadata: await instance.getMetadata(),
+        alarm: await instance.ctx.storage.getAlarm(),
+        lease: await getWrapperLease(instance.ctx.storage),
+      };
+    });
+
+    expect(result).toEqual({
+      stopAttempts: 0,
+      sandboxDeleteAttempts: 1,
+      metadata: null,
+      alarm: null,
+      lease: { state: 'none', nextInstanceGeneration: 1 },
+    });
+  });
+
+  it('defers deletion while failover publication remains pending', async () => {
+    const userId = 'user_delete_pending_failover';
+    const sessionId = 'agent_delete_pending_failover';
+    const routeKey = 'usr-000000000000000000000000000000000000000000000000';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        prompt: 'delete after failover publication',
+        mode: 'code',
+        model: 'test-model',
+      });
+      const nextAttemptAt = Date.now() + 10_000;
+      await instance.ctx.storage.put('sandbox_recovery_state', {
+        listProcessesTimeouts: 2,
+        failoverPublication: {
+          status: 'pending',
+          routeKey,
+          failedAttempts: 1,
+          nextAttemptAt,
+        },
+      });
+
+      await expect(instance.deleteSession()).rejects.toThrow(
+        'Session deletion pending physical wrapper cleanup'
+      );
+      const result = {
+        metadata: await instance.getMetadata(),
+        alarm: await instance.ctx.storage.getAlarm(),
+        nextAttemptAt,
+      };
+      await instance.ctx.storage.deleteAll();
+      return result;
+    });
+
+    expect(result.metadata?.identity.sessionId).toBe(sessionId);
+    expect(result.alarm).toBe(result.nextAttemptAt);
+  });
+
   it('retains physical cleanup backoff while explicit deletion is pending', async () => {
     const userId = 'user_delete_backoff';
     const sessionId = 'agent_delete_backoff';

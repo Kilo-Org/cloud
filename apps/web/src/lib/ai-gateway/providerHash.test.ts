@@ -1,5 +1,9 @@
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
-import { generateProviderSpecificHash } from './providerHash';
+import {
+  generateOpenRouterDownstreamSafetyIdentifier,
+  generateProviderSpecificHash,
+  generateVercelDownstreamSafetyIdentifier,
+} from './providerHash';
 
 describe('generateProviderSpecificHash', () => {
   const testUserId = 'test-user-123';
@@ -30,5 +34,21 @@ describe('generateProviderSpecificHash', () => {
 
     // Base64 pattern check
     expect(hash).toMatch(/^[A-Za-z0-9+/]+=*$/);
+  });
+});
+
+describe('downstream safety identifiers', () => {
+  const testUserId = 'test-user-123';
+
+  it('uses the OpenRouter-specific user hash for OpenRouter', () => {
+    expect(generateOpenRouterDownstreamSafetyIdentifier(testUserId)).toBe(
+      generateProviderSpecificHash(testUserId, PROVIDERS.OPENROUTER)
+    );
+  });
+
+  it('keeps OpenRouter and Vercel identifiers distinct', () => {
+    expect(generateOpenRouterDownstreamSafetyIdentifier(testUserId)).not.toBe(
+      generateVercelDownstreamSafetyIdentifier(testUserId)
+    );
   });
 });

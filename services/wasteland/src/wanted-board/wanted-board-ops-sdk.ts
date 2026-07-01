@@ -32,12 +32,15 @@ import {
   acceptViaSdk,
   browseViaSdk,
   claimViaSdk,
+  countWantedBoardByStatusViaSdk,
   closeViaSdk,
   doneViaSdk,
   editViaSdk,
   postViaSdk,
   rejectViaSdk,
   unclaimViaSdk,
+  type BrowseWantedBoardOptions,
+  type WantedBoardCounts,
   type SdkContext,
 } from './wanted-board-ops-sdk-inner';
 
@@ -122,10 +125,21 @@ export async function loadSdkContext(
 export async function browseWantedBoard(
   env: Env,
   wastelandId: string,
-  userId: string
+  userId: string,
+  options?: BrowseWantedBoardOptions
 ): Promise<Array<Record<string, unknown>>> {
   const ctx = await loadSdkContext(env, wastelandId, userId);
-  return browseViaSdk(ctx);
+  return browseViaSdk(ctx, options);
+}
+
+export async function getWantedBoardCounts(
+  env: Env,
+  wastelandId: string,
+  userId: string,
+  options?: { search?: string; includeForkBranches?: boolean }
+): Promise<WantedBoardCounts> {
+  const ctx = await loadSdkContext(env, wastelandId, userId);
+  return countWantedBoardByStatusViaSdk(ctx, options);
 }
 
 export async function claimWantedItem(

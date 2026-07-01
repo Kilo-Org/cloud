@@ -167,7 +167,7 @@ function setRightPanes(
   sessionName: string,
   serviceNames: string[],
   currentPaneNames: string
-): void {
+): string[] {
   // Break all current right-side panes (>= 1) back to their own named windows
   const total = countPanes(sessionName, 0);
   const current = currentPaneNames ? currentPaneNames.split(',') : [];
@@ -196,12 +196,13 @@ function setRightPanes(
     }
   }
 
-  if (serviceNames.length === 0) return;
+  if (serviceNames.length === 0) return [];
 
   // Join first service horizontally (right of sidebar pane 0)
   const firstWin = listWindows(sessionName).find(w => w.name === serviceNames[0]);
-  if (!firstWin) return;
+  if (!firstWin) return [];
   joinPane(sessionName, firstWin.index, 0, 0, 0, 'h');
+  const joinedServiceNames = [serviceNames[0]];
 
   // Join subsequent services vertically below pane 1 (stacked in the right column)
   for (let i = 1; i < serviceNames.length; i++) {
@@ -209,6 +210,7 @@ function setRightPanes(
     if (!win) continue;
     try {
       joinPane(sessionName, win.index, 0, 0, i, 'v');
+      joinedServiceNames.push(serviceNames[i]);
     } catch {
       // skip service if join fails
     }
@@ -223,15 +225,16 @@ function setRightPanes(
   }
 
   // Label each right-side pane so pane border titles show the service name
-  for (let i = 0; i < serviceNames.length; i++) {
+  for (let i = 0; i < joinedServiceNames.length; i++) {
     try {
-      setPaneTitle(sessionName, 0, i + 1, serviceNames[i]);
+      setPaneTitle(sessionName, 0, i + 1, joinedServiceNames[i]);
     } catch {
       /* best-effort */
     }
   }
 
   selectPane(sessionName, 0, 0);
+  return joinedServiceNames;
 }
 
 /**
@@ -247,8 +250,10 @@ export function showServiceInTmux(
 ): string {
   if (serviceName === currentPaneNames && !currentViewedIsGroup) return currentPaneNames;
   try {
-    setRightPanes(sessionName, [serviceName], currentPaneNames);
-    return serviceName;
+    const joinedServiceNames = setRightPanes(sessionName, [serviceName], currentPaneNames);
+    return joinedServiceNames.length === 1 && joinedServiceNames[0] === serviceName
+      ? serviceName
+      : '';
   } catch {
     return currentPaneNames;
   }
@@ -265,8 +270,8 @@ export function showGroupInTmux(
 ): string {
   if (serviceNames.length === 0) return currentPaneNames;
   try {
-    setRightPanes(sessionName, serviceNames, currentPaneNames);
-    return serviceNames.join(',');
+    const joinedServiceNames = setRightPanes(sessionName, serviceNames, currentPaneNames);
+    return joinedServiceNames.length > 0 ? joinedServiceNames.join(',') : '';
   } catch {
     return currentPaneNames;
   }

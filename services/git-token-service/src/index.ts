@@ -1,5 +1,9 @@
 import { timingSafeEqual } from '@kilocode/encryption';
-import { extractBearerToken, verifyKiloToken } from '@kilocode/worker-utils';
+import {
+  BITBUCKET_REPOSITORY_LIST_AUDIENCE,
+  extractBearerToken,
+  verifyKiloToken,
+} from '@kilocode/worker-utils';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
 import { GitLabLookupService, type GitLabLookupSuccess } from './gitlab-lookup-service.js';
@@ -39,6 +43,13 @@ import {
   type GitAuthorConfig,
   type ManagedGitHubFallbackReason as UserAuthorizationFallbackReason,
 } from './github-user-authorization-service.js';
+import {
+  listBitbucketRepositories,
+  resolveBitbucketToken,
+  type BitbucketRepositoryListResult,
+  type GetBitbucketTokenParams,
+  type GetBitbucketTokenResult,
+} from './bitbucket-runtime-token-resolver.js';
 
 export type GetTokenForRepoParams = {
   githubRepo: string;
@@ -71,6 +82,11 @@ export type {
   GetGitLabTokenFailure,
   GetGitLabTokenResult,
 } from './gitlab-runtime-token-resolver.js';
+export type {
+  BitbucketRepositoryListResult,
+  GetBitbucketTokenParams,
+  GetBitbucketTokenResult,
+} from './bitbucket-runtime-token-resolver.js';
 
 export type ManagedGitHubFallbackReason = UserAuthorizationFallbackReason | 'lite_installation';
 
@@ -150,7 +166,13 @@ export type IssueGitLabSessionCapabilitySuccess = {
 export type IssueGitLabSessionCapabilityResult =
   | IssueGitLabSessionCapabilitySuccess
   | GetGitLabTokenFailure
-  | { success: false; reason: GitLabCloneUrlFailureReason | 'capability_configuration_error' };
+  | {
+      success: false;
+      reason:
+        | GitLabCloneUrlFailureReason
+        | 'integration_identity_missing'
+        | 'capability_configuration_error';
+    };
 export type RedeemGitLabSessionCapabilityParams = {
   capability: string;
   outboundContainerId?: string;
@@ -176,8 +198,9 @@ export type RedeemGitLabSessionCapabilityResult =
   | { success: false; reason: RedeemGitLabSessionCapabilityFailureReason };
 
 const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
+const BITBUCKET_REPOSITORIES_PATH = '/internal/bitbucket/repositories';
 
-type DisconnectEnv = CloudflareEnv & {
+type ServiceHttpEnv = CloudflareEnv & {
   NEXTAUTH_SECRET: SecretsStoreSecret | string;
 };
 
@@ -186,6 +209,24 @@ async function resolveSecret(secret: SecretsStoreSecret | string): Promise<strin
 }
 
 function validateGitHubCapabilityUpstream(
+  requestUrl: string
+): RedeemGitHubSessionCapabilityFailureReason | null {
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return 'invalid_upstream_url';
+  }
+  if (url.protocol !== 'https:') return 'invalid_upstream_url';
+  if (url.username || url.password || url.hash) return 'invalid_upstream_url';
+  if (url.port !== '') return 'upstream_host_not_allowed';
+  if (!['api.github.com', 'uploads.github.com', 'github.com'].includes(url.hostname)) {
+    return 'upstream_host_not_allowed';
+  }
+  return null;
+}
+
+function validateLegacyGitHubCapabilityUpstream(
   requestMethod: string,
   requestUrl: string,
   repository: { owner: string; repo: string }
@@ -251,7 +292,75 @@ function validateGitHubCapabilityUpstream(
   return 'invalid_upstream_request';
 }
 
+function isGitLabGitAuthPath(pathname: string): boolean {
+  return /\.git\/(?:info\/refs|git-upload-pack|git-receive-pack|info\/lfs\/(?:objects\/batch|locks(?:\/verify|\/[^/]+\/unlock)?))$/.test(
+    pathname
+  );
+}
+
+function decodeGitLabPathname(pathname: string): string | null {
+  let decoded = pathname;
+  for (let depth = 0; depth < 4; depth++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      return null;
+    }
+    if (next === decoded) return decoded;
+    decoded = next;
+  }
+  return null;
+}
+
 function validateGitLabCapabilityUpstream(
+  requestUrl: string,
+  instanceOrigin: string
+): { failure: RedeemGitLabSessionCapabilityFailureReason | null; authSurface: 'git' | 'api' } {
+  if (/%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  }
+  const base = parseGitLabBaseUrl(instanceOrigin);
+  if (!base) return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.hash) {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  }
+  if (url.origin !== base.origin) {
+    return { failure: 'upstream_origin_not_allowed', authSurface: 'git' };
+  }
+  const decodedPathname = decodeGitLabPathname(url.pathname);
+  if (
+    decodedPathname === null ||
+    decodedPathname.includes('\\') ||
+    /(?:^|\/)\.{1,2}(?:\/|$)/.test(decodedPathname)
+  ) {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  }
+  if (
+    base.basePath !== '' &&
+    url.pathname !== base.basePath &&
+    !url.pathname.startsWith(`${base.basePath}/`)
+  ) {
+    return { failure: 'upstream_origin_not_allowed', authSurface: 'git' };
+  }
+  const apiV4Prefix = `${base.basePath}/api/v4`;
+  const authSurface =
+    !isGitLabGitAuthPath(url.pathname) &&
+    (url.pathname === apiV4Prefix ||
+      url.pathname.startsWith(`${apiV4Prefix}/`) ||
+      url.pathname === `${base.basePath}/api/graphql`)
+      ? 'api'
+      : 'git';
+  return { failure: null, authSurface };
+}
+
+function validateLegacyGitLabCapabilityUpstream(
   requestMethod: string,
   requestUrl: string,
   session: {
@@ -587,11 +696,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'container_mismatch' };
     }
 
-    const upstreamFailure = validateGitHubCapabilityUpstream(
-      params.requestMethod,
-      params.requestUrl,
-      claims
-    );
+    const upstreamFailure =
+      claims.version === 2
+        ? validateGitHubCapabilityUpstream(params.requestUrl)
+        : validateLegacyGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
     if (upstreamFailure) return { success: false, reason: upstreamFailure };
 
     const authParams = {
@@ -714,6 +822,12 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     });
   }
 
+  async getBitbucketToken(params: GetBitbucketTokenParams): Promise<GetBitbucketTokenResult> {
+    if (!params.orgId) return { success: false, reason: 'invalid_request' };
+    const result = await resolveBitbucketToken(this.env, params);
+    return result.success ? { success: true, token: result.token } : result;
+  }
+
   async issueGitLabSessionCapability(
     params: IssueGitLabSessionCapabilityParams
   ): Promise<IssueGitLabSessionCapabilityResult> {
@@ -738,7 +852,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     const repository = parseGitLabCloneUrl(params.gitUrl, instanceOrigin);
     if (!repository.success) return repository;
     const identity = this.getGitLabSessionIdentity(integration);
-    if (!identity) return { success: false, reason: 'no_token' };
+    if (!identity) return { success: false, reason: 'integration_identity_missing' };
 
     let capability: string;
     try {
@@ -791,11 +905,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'container_mismatch' };
     }
 
-    const upstream = validateGitLabCapabilityUpstream(
-      params.requestMethod,
-      params.requestUrl,
-      claims
-    );
+    const upstream =
+      claims.version === 2
+        ? validateGitLabCapabilityUpstream(params.requestUrl, claims.instanceOrigin)
+        : validateLegacyGitLabCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
     if (upstream.failure) return { success: false, reason: upstream.failure };
     const context = {
       userId: claims.userId,
@@ -867,9 +980,11 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 }
 
 export default {
-  async fetch(request: Request, env: DisconnectEnv): Promise<Response> {
+  async fetch(request: Request, env: ServiceHttpEnv): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== DISCONNECT_PATH) return new Response(null, { status: 404 });
+    if (url.pathname !== DISCONNECT_PATH && url.pathname !== BITBUCKET_REPOSITORIES_PATH) {
+      return new Response(null, { status: 404 });
+    }
     if (request.method !== 'POST') return new Response(null, { status: 405 });
 
     const token = extractBearerToken(request.headers.get('Authorization'));
@@ -883,20 +998,40 @@ export default {
     }
     if (!secret) return Response.json({ error: 'authentication_unavailable' }, { status: 503 });
 
-    let kiloUserId: string;
+    let authorization: Awaited<ReturnType<typeof verifyKiloToken>>;
     try {
-      const authorization = await verifyKiloToken(token, secret);
-      kiloUserId = authorization.kiloUserId;
+      authorization = await verifyKiloToken(
+        token,
+        secret,
+        url.pathname === BITBUCKET_REPOSITORIES_PATH
+          ? { audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE }
+          : undefined
+      );
     } catch {
       return Response.json({ error: 'unauthorized' }, { status: 401 });
     }
 
+    if (url.pathname === BITBUCKET_REPOSITORIES_PATH) {
+      if (!authorization.organizationId) {
+        return Response.json({ error: 'organization_required' }, { status: 403 });
+      }
+      try {
+        const result: BitbucketRepositoryListResult = await listBitbucketRepositories(env, {
+          userId: authorization.kiloUserId,
+          orgId: authorization.organizationId,
+        });
+        return Response.json(result);
+      } catch {
+        return Response.json({ status: 'temporarily_unavailable' });
+      }
+    }
+
     try {
       const service = new GitHubUserAuthorizationService(env);
-      await service.disconnectUserAuthorization(kiloUserId);
+      await service.disconnectUserAuthorization(authorization.kiloUserId);
       return Response.json({ disconnected: true });
     } catch {
       return Response.json({ error: 'disconnect_failed' }, { status: 502 });
     }
   },
-} satisfies ExportedHandler<DisconnectEnv>;
+} satisfies ExportedHandler<ServiceHttpEnv>;

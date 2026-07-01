@@ -21,6 +21,7 @@ import {
   organization_user_usage,
   organization_audit_logs,
   organization_invitations,
+  organization_recommendation_dismissals,
   security_audit_log,
   free_model_usage,
   organizations,
@@ -75,6 +76,9 @@ import {
   code_review_feedback_events,
   code_review_memory_proposals,
   user_github_app_tokens,
+  platform_oauth_credentials,
+  platform_access_token_credentials,
+  platform_integrations,
   model_eval_ingestions,
   microdollar_usage,
   model_experiment,
@@ -98,6 +102,7 @@ import {
   mcp_gateway_provider_grants,
   mcp_gateway_pending_provider_authorizations,
   mcp_gateway_oauth_clients,
+  mcp_gateway_oauth_grants,
   deployments_ephemeral,
 } from '@kilocode/db/schema';
 
@@ -110,6 +115,7 @@ import {
   createOrUpdateUser,
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
+import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
 import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -179,6 +185,7 @@ describe('User', () => {
     await db.delete(referral_code_usages);
     await db.delete(referral_codes);
     await db.delete(organization_audit_logs);
+    await db.delete(organization_recommendation_dismissals);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
     await db.delete(model_eval_ingestions);
@@ -231,6 +238,7 @@ describe('User', () => {
     await db.delete(mcp_gateway_pending_provider_authorizations);
     await db.delete(mcp_gateway_authorization_codes);
     await db.delete(mcp_gateway_authorization_requests);
+    await db.delete(mcp_gateway_oauth_grants);
     await db.delete(mcp_gateway_oauth_clients);
     await db.delete(mcp_gateway_provider_grants);
     await db.delete(mcp_gateway_connection_instances);
@@ -240,6 +248,9 @@ describe('User', () => {
     await db.delete(code_review_memory_proposals);
     await db.delete(code_review_feedback_events);
     await db.delete(user_github_app_tokens);
+    await db.delete(platform_oauth_credentials);
+    await db.delete(platform_access_token_credentials);
+    await db.delete(platform_integrations);
     await db.delete(organizations);
     await db.delete(kilocode_users);
   });
@@ -269,6 +280,9 @@ describe('User', () => {
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.user.signup_ip).toBe('203.0.113.25');
+      expect(result.user.openrouter_downstream_safety_identifier).toBe(
+        generateOpenRouterDownstreamSafetyIdentifier(result.user.id)
+      );
     });
 
     it('rejects new signups after the per-IP burst threshold (100/24h)', async () => {
@@ -460,9 +474,258 @@ describe('User', () => {
       );
       consoleError.mockRestore();
     });
+
+    it('preserves API token pepper when upgrading an existing user to WorkOS', async () => {
+      const existingUser = await insertTestUser({
+        google_user_email: 'workos-upgrade@example.com',
+        api_token_pepper: 'api-pepper-before-workos',
+        web_session_pepper: 'web-pepper-before-workos',
+      });
+
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'workos-upgrade@example.com',
+          google_user_name: 'WorkOS Upgrade',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'example.com',
+          provider: 'workos',
+          provider_account_id: 'workos-upgrade-provider-id',
+        },
+        undefined,
+        true
+      );
+
+      expect(result.success).toBe(true);
+      const updatedUser = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, existingUser.id),
+      });
+      expect(updatedUser?.api_token_pepper).toBe('api-pepper-before-workos');
+      expect(updatedUser?.web_session_pepper).toEqual(expect.any(String));
+      expect(updatedUser?.web_session_pepper).not.toBe('web-pepper-before-workos');
+    });
   });
 
   describe('softDeleteUser', () => {
+    it('anonymizes recommendation dismissal actor references', async () => {
+      const organizationOwner = await insertTestUser();
+      const dismissingUser = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Recommendation Dismissal Cleanup Org',
+        organizationOwner.id,
+        0
+      );
+      const [dismissal] = await db
+        .insert(organization_recommendation_dismissals)
+        .values({
+          owned_by_organization_id: organization.id,
+          recommendation_key: 'org-sso-not-configured',
+          dismissed_by_user_id: dismissingUser.id,
+        })
+        .returning();
+
+      await softDeleteUser(dismissingUser.id);
+
+      const [retainedDismissal] = await db
+        .select()
+        .from(organization_recommendation_dismissals)
+        .where(eq(organization_recommendation_dismissals.id, dismissal.id));
+      expect(retainedDismissal?.dismissed_by_user_id).toBeNull();
+    });
+
+    it('deletes personal integrations and every OAuth credential authorized by the user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization(
+        'OAuth Credential Cleanup Org',
+        otherUser.id,
+        0
+      );
+      const [integration, otherIntegration, organizationIntegration] = await db
+        .insert(platform_integrations)
+        .values([
+          {
+            owned_by_user_id: user.id,
+            created_by_user_id: user.id,
+            platform: 'bitbucket',
+            integration_type: 'oauth',
+            platform_installation_id: '{workspace-user}',
+            platform_account_id: '{workspace-user}',
+            platform_account_login: 'user-workspace',
+            integration_status: 'active',
+          },
+          {
+            owned_by_user_id: otherUser.id,
+            created_by_user_id: otherUser.id,
+            platform: 'bitbucket',
+            integration_type: 'oauth',
+            platform_installation_id: '{workspace-other}',
+            platform_account_id: '{workspace-other}',
+            platform_account_login: 'other-workspace',
+            integration_status: 'active',
+          },
+          {
+            owned_by_organization_id: organization.id,
+            created_by_user_id: user.id,
+            platform: 'bitbucket',
+            integration_type: 'oauth',
+            platform_installation_id: '{workspace-organization}',
+            platform_account_id: '{workspace-organization}',
+            platform_account_login: 'organization-workspace',
+            integration_status: 'active',
+          },
+        ])
+        .returning();
+      if (!integration || !otherIntegration || !organizationIntegration) {
+        throw new Error('Failed to create Bitbucket integrations');
+      }
+
+      const [credential, otherCredential, organizationCredential] = await db
+        .insert(platform_oauth_credentials)
+        .values([
+          {
+            platform_integration_id: integration.id,
+            platform: 'bitbucket',
+            authorized_by_user_id: user.id,
+            provider_subject_id: '{bitbucket-user}',
+            provider_subject_login: 'bitbucket-user',
+            access_token_encrypted: 'encrypted-access-token',
+            access_token_expires_at: '2026-06-22T14:00:00.000Z',
+            refresh_token_encrypted: 'encrypted-refresh-token',
+          },
+          {
+            platform_integration_id: otherIntegration.id,
+            platform: 'bitbucket',
+            authorized_by_user_id: otherUser.id,
+            provider_subject_id: '{bitbucket-other-user}',
+            provider_subject_login: 'bitbucket-other-user',
+            access_token_encrypted: 'other-encrypted-access-token',
+            access_token_expires_at: '2026-06-22T14:00:00.000Z',
+            refresh_token_encrypted: 'other-encrypted-refresh-token',
+          },
+          {
+            platform_integration_id: organizationIntegration.id,
+            platform: 'bitbucket',
+            authorized_by_user_id: user.id,
+            provider_subject_id: '{bitbucket-organization-authorizer}',
+            provider_subject_login: 'bitbucket-organization-authorizer',
+            access_token_encrypted: 'organization-encrypted-access-token',
+            access_token_expires_at: '2026-06-22T14:00:00.000Z',
+            refresh_token_encrypted: 'organization-encrypted-refresh-token',
+          },
+        ])
+        .returning();
+      if (!credential || !otherCredential || !organizationCredential) {
+        throw new Error('Failed to create Bitbucket OAuth credentials');
+      }
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(platform_oauth_credentials)
+          .where(eq(platform_oauth_credentials.id, credential.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, integration.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(platform_oauth_credentials)
+          .where(eq(platform_oauth_credentials.id, organizationCredential.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, organizationIntegration.id))
+      ).toEqual([
+        expect.objectContaining({
+          integration_status: 'suspended',
+          auth_invalid_reason: 'authorizing_user_deleted',
+        }),
+      ]);
+      expect(
+        await db
+          .select()
+          .from(platform_oauth_credentials)
+          .where(eq(platform_oauth_credentials.id, otherCredential.id))
+      ).toHaveLength(1);
+      expect(
+        await db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, otherIntegration.id))
+      ).toHaveLength(1);
+    });
+
+    it('preserves an organization Workspace Access Token when its setup actor is deleted', async () => {
+      const setupActor = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Workspace Access Token Setup Actor Org',
+        setupActor.id,
+        0
+      );
+      const [integration] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_organization_id: organization.id,
+          created_by_user_id: setupActor.id,
+          platform: 'bitbucket',
+          integration_type: 'workspace_access_token',
+          platform_account_id: '{workspace-organization}',
+          platform_account_login: 'organization-workspace',
+          repository_access: 'all',
+          integration_status: 'active',
+        })
+        .returning();
+      if (!integration) {
+        throw new Error('Failed to create Bitbucket Workspace Access Token integration');
+      }
+      const [credential] = await db
+        .insert(platform_access_token_credentials)
+        .values({
+          platform_integration_id: integration.id,
+          owned_by_organization_id: organization.id,
+          platform: 'bitbucket',
+          integration_type: 'workspace_access_token',
+          token_encrypted: 'encrypted-workspace-access-token',
+          provider_credential_type: 'workspace_access_token',
+          provider_scopes: ['account', 'repository', 'repository:write'],
+          provider_verified_at: '2026-06-24T10:00:00.000Z',
+          last_validated_at: '2026-06-24T10:00:00.000Z',
+        })
+        .returning();
+      if (!credential) {
+        throw new Error('Failed to create Bitbucket Workspace Access Token credential');
+      }
+
+      await softDeleteUser(setupActor.id);
+
+      expect(
+        await db
+          .select()
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, integration.id))
+      ).toEqual([
+        expect.objectContaining({
+          integration_status: 'active',
+          auth_invalid_at: null,
+          auth_invalid_reason: null,
+        }),
+      ]);
+      expect(
+        await db
+          .select()
+          .from(platform_access_token_credentials)
+          .where(eq(platform_access_token_credentials.id, credential.id))
+      ).toHaveLength(1);
+    });
+
     it('deletes personal Security Agent notifications through finding cleanup', async () => {
       const user = await insertTestUser();
       const [finding] = await db
@@ -606,11 +869,28 @@ describe('User', () => {
           declared_scopes: ['mcp:access'],
         })
         .returning();
+      const [oauthGrant] = await db
+        .insert(mcp_gateway_oauth_grants)
+        .values({
+          oauth_client_id: oauthClient.oauth_client_id,
+          kilo_user_id: user.id,
+          owner_scope: 'personal',
+          owner_id: user.id,
+          config_id: config.config_id,
+          connect_resource_id: route.connect_resource_id,
+          instance_id: instance.instance_id,
+          redirect_uri: 'https://client.example/callback',
+          granted_scopes: ['mcp:access'],
+          execution_context: { type: 'personal' },
+          config_version: 1,
+        })
+        .returning();
       const [authorizationRequest] = await db
         .insert(mcp_gateway_authorization_requests)
         .values({
           request_state_hash: 'request-state-hash',
           oauth_client_id: oauthClient.oauth_client_id,
+          oauth_grant_id: oauthGrant.oauth_grant_id,
           client_id: 'mcp:test-client',
           owner_scope: 'personal',
           owner_id: user.id,
@@ -633,6 +913,7 @@ describe('User', () => {
         code_hash: 'authorization-code-hash',
         authorization_request_id: authorizationRequest.authorization_request_id,
         oauth_client_id: authorizationRequest.oauth_client_id,
+        oauth_grant_id: oauthGrant.oauth_grant_id,
         client_id: authorizationRequest.client_id,
         owner_scope: 'personal',
         owner_id: user.id,
@@ -650,6 +931,7 @@ describe('User', () => {
       });
       await db.insert(mcp_gateway_pending_provider_authorizations).values({
         state_hash: 'pending-state-hash',
+        oauth_grant_id: oauthGrant.oauth_grant_id,
         config_id: config.config_id,
         instance_id: instance.instance_id,
         owner_scope: 'personal',
@@ -690,11 +972,16 @@ describe('User', () => {
         .select()
         .from(mcp_gateway_authorization_requests)
         .where(eq(mcp_gateway_authorization_requests.kilo_user_id, user.id));
+      const oauthGrants = await db
+        .select()
+        .from(mcp_gateway_oauth_grants)
+        .where(eq(mcp_gateway_oauth_grants.kilo_user_id, user.id));
       expect(grants).toHaveLength(0);
       expect(configSecrets).toHaveLength(0);
       expect(pending).toHaveLength(0);
       expect(authorizationCodes).toHaveLength(0);
       expect(authorizationRequests).toHaveLength(0);
+      expect(oauthGrants).toHaveLength(0);
     });
 
     it('should anonymize the user row and preserve it', async () => {
@@ -707,6 +994,7 @@ describe('User', () => {
         linkedin_url: 'https://linkedin.com/in/testuser',
         github_url: 'https://github.com/testuser',
         openrouter_upstream_safety_identifier: 'openrouter_upstream_safety_identifier',
+        openrouter_downstream_safety_identifier: 'openrouter_downstream_safety_identifier',
         vercel_downstream_safety_identifier: 'vercel_downstream_safety_identifier',
         customer_source: 'A YouTube video',
         signup_ip: '203.0.113.10',
@@ -733,6 +1021,9 @@ describe('User', () => {
       expect(softDeleted!.discord_server_membership_verified_at).toBeNull();
       expect(softDeleted!.openrouter_upstream_safety_identifier).toBe(
         'openrouter_upstream_safety_identifier'
+      );
+      expect(softDeleted!.openrouter_downstream_safety_identifier).toBe(
+        'openrouter_downstream_safety_identifier'
       );
       expect(softDeleted!.vercel_downstream_safety_identifier).toBe(
         'vercel_downstream_safety_identifier'

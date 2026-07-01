@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./bitbucket-workspace-access-token": "./src/bitbucket-workspace-access-token.ts",
+    "./internal-service-token-audiences": "./src/internal-service-token-audiences.ts",
     "./instance-id": "./src/instance-id.ts",
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
@@ -17,6 +19,7 @@
     "./git-url": "./src/git-url.ts",
     "./callback-token": "./src/callback-token.ts",
     "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
+    "./cloud-agent-session-access": "./src/cloud-agent-session-access.ts",
     "./kilo-model-id": "./src/kilo-model-id.ts",
     "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts",
     "./cloud-agent-failure": "./src/cloud-agent-failure.ts",

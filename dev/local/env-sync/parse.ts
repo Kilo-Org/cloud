@@ -217,7 +217,8 @@ function resolveAnnotatedValue(
 
     case 'from': {
       const val = envLocal.get(entry.annotation.envLocalKey);
-      if (val !== undefined) return { value: val, resolved: true, source: 'env-local' };
+      if (val) return { value: val, resolved: true, source: 'env-local' };
+      if (val === '') return { value: '', resolved: false, source: 'missing' };
       if (entry.defaultValue) {
         return { value: entry.defaultValue, resolved: true, source: 'default' };
       }

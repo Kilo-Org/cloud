@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Sandbox } from '@cloudflare/sandbox';
-import { generateSandboxId, getSandboxNamespace } from './sandbox-id.js';
-import type { Env } from './types.js';
+import {
+  deriveSharedSandboxId,
+  generateSandboxId,
+  generateSandboxRoutingTarget,
+  getSandboxNamespace,
+} from './sandbox-id.js';
+import type { Env, SandboxId } from './types.js';
 
 describe('generateSandboxId', () => {
   describe('shared sandbox (default)', () => {
@@ -53,6 +58,59 @@ describe('generateSandboxId', () => {
       const id2 = await generateSandboxId(undefined, 'org-id', 'user-id', 'session-b');
       expect(id1).toBe(id2);
     });
+
+    it.each([
+      [
+        'org',
+        'org-id',
+        undefined,
+        'org-7d891a9e4905bb0d5ff8dffcb99ba76973039c70340665b0',
+        'org-1e1a41e3aaa921e0283d132325aeccbea85665f0eb8696df',
+      ],
+      [
+        'usr',
+        undefined,
+        undefined,
+        'usr-e4da69a737a38f1fc3283e8159b965e9d88f13d84c23cab1',
+        'usr-821f081306e3b48a67a9c1286d3f82d4ced0ae42b56e1c4f',
+      ],
+      [
+        'bot',
+        'org-id',
+        'reviewer',
+        'bot-b7b5ae452e738ff4c3e88238a0bd903edb1039b22314e3dc',
+        'bot-84b4021610af9dafd01ba496ffabe13401b5c47fc857ed4e',
+      ],
+      [
+        'ubt',
+        undefined,
+        'reviewer',
+        'ubt-5714320d8e828e8d428046c7f8601c126755f3e04d55b0d6',
+        'ubt-4dd1985461fbef377d4d37f103e2b27140d57d1f52b1be6f',
+      ],
+    ])(
+      'provides stable base and suffixed IDs for %s shared sandboxes',
+      async (_prefix, orgId, botId, routeKey, failoverSandboxId) => {
+        const target = await generateSandboxRoutingTarget(
+          undefined,
+          orgId,
+          'user-id',
+          'session-a',
+          botId
+        );
+
+        expect(target).toEqual({
+          kind: 'shared',
+          routeKey,
+        });
+        await expect(deriveSharedSandboxId(routeKey as SandboxId, 'shared-slot-v1')).resolves.toBe(
+          failoverSandboxId
+        );
+        expect(target).toEqual(
+          await generateSandboxRoutingTarget(undefined, orgId, 'user-id', 'session-b', botId)
+        );
+      }
+    );
 
     it.each([
       [
@@ -173,6 +231,15 @@ describe('generateSandboxId', () => {
   });
 
   describe('per-session sandbox', () => {
+    it('bypasses shared slot routing', async () => {
+      await expect(
+        generateSandboxRoutingTarget('my-org', 'my-org', 'user-id', 'agent_abc123')
+      ).resolves.toEqual({
+        kind: 'isolated',
+        sandboxId: 'ses-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
+      });
+    });
+
     it('should preserve the existing per-session ID generation', async () => {
       const id = await generateSandboxId('my-org', 'my-org', 'user-id', 'agent_abc123');
       expect(id).toBe('ses-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
@@ -238,6 +305,22 @@ describe('generateSandboxId', () => {
   });
 
   describe('devcontainer sandbox', () => {
+    it('bypasses shared slot routing', async () => {
+      await expect(
+        generateSandboxRoutingTarget(
+          undefined,
+          'org-id',
+          'user-id',
+          'agent_abc123',
+          undefined,
+          true
+        )
+      ).resolves.toEqual({
+        kind: 'isolated',
+        sandboxId: 'dind-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
+      });
+    });
+
     it('should preserve the existing devcontainer ID generation', async () => {
       const id = await generateSandboxId(
         undefined,
@@ -290,16 +373,97 @@ describe('generateSandboxId', () => {
       expect(id).toMatch(/^org-/);
     });
   });
+
+  describe('Code Reviewer ephemeral sandbox', () => {
+    it('routes enabled Code Reviewer organizations to dedicated crv sandboxes', async () => {
+      const target = await generateSandboxRoutingTarget(
+        undefined,
+        'org-review',
+        'user-id',
+        'agent_abc123',
+        undefined,
+        {
+          createdOnPlatform: 'code-review',
+          codeReviewEphemeralSandboxOrgIds: 'org-review',
+        }
+      );
+
+      expect(target).toEqual({
+        kind: 'isolated',
+        sandboxId: 'crv-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
+      });
+    });
+
+    it('keeps disabled Code Reviewer organizations on the existing route', async () => {
+      const target = await generateSandboxRoutingTarget(
+        undefined,
+        'org-review',
+        'user-id',
+        'agent_abc123',
+        undefined,
+        {
+          createdOnPlatform: 'code-review',
+          codeReviewEphemeralSandboxOrgIds: 'other-org',
+        }
+      );
+
+      expect(target).toEqual({
+        kind: 'shared',
+        routeKey: expect.stringMatching(/^org-/),
+      });
+    });
+
+    it('matches orgless Code Reviewer sessions only with wildcard', async () => {
+      await expect(
+        generateSandboxRoutingTarget(undefined, undefined, 'user-id', 'agent_abc123', undefined, {
+          createdOnPlatform: 'code-review',
+          codeReviewEphemeralSandboxOrgIds: 'org-review',
+        })
+      ).resolves.toEqual({
+        kind: 'shared',
+        routeKey: expect.stringMatching(/^usr-/),
+      });
+
+      await expect(
+        generateSandboxRoutingTarget(undefined, undefined, 'user-id', 'agent_abc123', undefined, {
+          createdOnPlatform: 'code-review',
+          codeReviewEphemeralSandboxOrgIds: '*',
+        })
+      ).resolves.toEqual({
+        kind: 'isolated',
+        sandboxId: 'crv-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370',
+      });
+    });
+
+    it('lets devcontainer routing take precedence over Code Reviewer ephemeral routing', async () => {
+      const id = await generateSandboxId(
+        undefined,
+        'org-review',
+        'user-id',
+        'agent_abc123',
+        undefined,
+        {
+          devcontainer: true,
+          createdOnPlatform: 'code-review',
+          codeReviewEphemeralSandboxOrgIds: '*',
+        }
+      );
+
+      expect(id).toBe('dind-51256c9fcd04ef0144d0afcdfb9ffb2abc280ff2e0bae370');
+    });
+  });
 });
 
 describe('getSandboxNamespace', () => {
   const mockSandbox = {} as DurableObjectNamespace<Sandbox>;
   const mockSandboxSmall = {} as DurableObjectNamespace<Sandbox>;
   const mockSandboxDIND = {} as DurableObjectNamespace<Sandbox>;
+  const mockSandboxCodeReview = {} as DurableObjectNamespace<Sandbox>;
   const mockEnv = {
     Sandbox: mockSandbox,
     SandboxSmall: mockSandboxSmall,
     SandboxDIND: mockSandboxDIND,
+    SandboxCodeReview: mockSandboxCodeReview,
   } as unknown as Env;
 
   it('should return SandboxDIND for dind- prefixed IDs', () => {
@@ -313,6 +477,11 @@ describe('getSandboxNamespace', () => {
   it('should return SandboxSmall for ses- prefixed IDs', () => {
     const ns = getSandboxNamespace(mockEnv, 'ses-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
     expect(ns).toBe(mockSandboxSmall);
+  });
+
+  it('should return SandboxCodeReview for crv- prefixed IDs', () => {
+    const ns = getSandboxNamespace(mockEnv, 'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
+    expect(ns).toBe(mockSandboxCodeReview);
   });
 
   it('should return Sandbox for org- prefixed IDs', () => {

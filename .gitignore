@@ -81,6 +81,7 @@ docs/superpowers/
 .kilocode/
 
 # generated assets
+/apps/web/public/api-docs/
 /apps/storybook/stories/generated/
 /apps/storybook/public/screenshots/
 

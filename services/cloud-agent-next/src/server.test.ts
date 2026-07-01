@@ -6,10 +6,12 @@ const {
   getRunningTerminalClientMock,
   consumeCloudAgentReportBatchMock,
   removeExpiredCloudAgentReportDataMock,
+  requireCurrentSessionAccessMock,
 } = vi.hoisted(() => ({
   getRunningTerminalClientMock: vi.fn(),
   consumeCloudAgentReportBatchMock: vi.fn().mockResolvedValue(undefined),
   removeExpiredCloudAgentReportDataMock: vi.fn().mockResolvedValue(undefined),
+  requireCurrentSessionAccessMock: vi.fn(),
 }));
 
 vi.mock('./logger.js', () => {
@@ -73,6 +75,19 @@ vi.mock('./middleware/balance.js', () => ({
   balanceMiddleware: vi.fn(),
 }));
 
+vi.mock('./session-access.js', () => ({
+  requireCurrentSessionAccess: requireCurrentSessionAccessMock,
+  projectSessionAccessHttpError: (error: unknown) =>
+    new Response(
+      error instanceof Error && 'code' in error && error.code === 'FORBIDDEN'
+        ? 'Session access denied'
+        : 'Session access is temporarily unavailable',
+      {
+        status: error instanceof Error && 'code' in error && error.code === 'FORBIDDEN' ? 403 : 503,
+      }
+    ),
+}));
+
 vi.mock('./persistence/CloudAgentSession.js', () => ({
   CloudAgentSession: class CloudAgentSession {},
 }));
@@ -131,6 +146,10 @@ beforeEach(() => {
   getRunningTerminalClientMock.mockReset();
   consumeCloudAgentReportBatchMock.mockClear();
   removeExpiredCloudAgentReportDataMock.mockClear();
+  requireCurrentSessionAccessMock.mockReset().mockResolvedValue({
+    kiloSessionId: 'ses_12345678901234567890123456',
+    organizationId: null,
+  });
 });
 
 describe('server /stream', () => {
@@ -156,6 +175,34 @@ describe('server /stream', () => {
 
     expect(response.status).toBe(401);
     await expect(response.text()).resolves.toBe('Ticket expired');
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
+  });
+
+  it('rejects a valid ticket when current session access has been removed', async () => {
+    const ticket = jwt.sign(
+      {
+        type: 'stream_ticket',
+        userId: 'user-1',
+        kiloSessionId: 'ses_12345678901234567890123456',
+        cloudAgentSessionId: 'session-1',
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 60 }
+    );
+    const env = createEnv();
+    requireCurrentSessionAccessMock.mockRejectedValue(
+      Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
+    );
+    const request = new Request(
+      `http://worker.test/stream?cloudAgentSessionId=session-1&ticket=${encodeURIComponent(ticket)}`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+
+    const response = await fetchWorker(request, env);
+
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Session access denied');
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
   });
@@ -266,6 +313,35 @@ describe('server /terminal', () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(getRunningTerminalClientMock).toHaveBeenCalledOnce();
     expect(connectTerminal).toHaveBeenCalledWith('pty_123', request);
+  });
+
+  it('rejects removed session access before Durable Object lookup', async () => {
+    const ticket = jwt.sign(
+      {
+        type: 'stream_ticket',
+        purpose: 'terminal',
+        userId: 'user-1',
+        cloudAgentSessionId: 'session-1',
+        ptyId: 'pty_123',
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 60 }
+    );
+    requireCurrentSessionAccessMock.mockRejectedValue(
+      Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
+    );
+    const env = createEnv();
+    const request = new Request(
+      `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+
+    const response = await fetchWorker(request, env);
+
+    expect(response.status).toBe(403);
+    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
+    expect(getRunningTerminalClientMock).not.toHaveBeenCalled();
   });
 
   it('rejects stream-purpose tickets', async () => {

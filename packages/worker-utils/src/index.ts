@@ -51,6 +51,7 @@ export type {
 } from './cloud-agent-next-client.js';
 export { CloudAgentNextBillingError, CloudAgentNextError } from './cloud-agent-next-client.js';
 
+export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from './internal-service-token-audiences.js';
 export {
   signKiloToken,
   verifyKiloToken,

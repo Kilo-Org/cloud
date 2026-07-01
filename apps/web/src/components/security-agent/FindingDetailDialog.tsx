@@ -334,7 +334,7 @@ function getAnalysisStatus(analysis: FindingAnalysis, analysisStatus: string | n
     case 'exploitable':
       return { value: 'Exploitable', tone: 'destructive' };
     case 'not-exploitable':
-      return { value: 'No reachable path', tone: 'success' };
+      return { value: 'Unreachable', tone: 'success' };
     case 'safe-to-dismiss':
       return { value: 'Safe to dismiss', tone: 'success' };
     case 'analysis-required':
@@ -795,7 +795,11 @@ function FindingDetailActions({
         </Button>
       )}
       {action.kind === 'remediation' && (
-        <Button className="h-control-touch" onClick={() => onSelectTab('remediation')}>
+        <Button
+          variant="outline"
+          className="h-control-touch"
+          onClick={() => onSelectTab('remediation')}
+        >
           <GitPullRequest aria-hidden="true" />
           {action.label}
         </Button>
@@ -812,14 +816,6 @@ function FindingDetailActions({
         <Button className="h-control-touch" onClick={() => onOpenFinding(supersedingFindingId)}>
           <GitMerge aria-hidden="true" />
           {action.label}
-        </Button>
-      )}
-      {finding.status === 'open' && finding.dependabot_html_url && (
-        <Button variant="ghost" className="h-control-touch" asChild>
-          <a href={finding.dependabot_html_url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink aria-hidden="true" />
-            View on GitHub
-          </a>
         </Button>
       )}
       {canDismiss && finding.status === 'open' && (
@@ -901,6 +897,17 @@ function FindingDetails({
               <DetailFactCell key={fact.label} fact={fact} />
             ))}
           </dl>
+          {finding.dependabot_html_url && (
+            <a
+              href={finding.dependabot_html_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-link hover:text-link-hover focus-visible:ring-ring type-label mt-3 inline-flex items-center gap-1 rounded-sm underline decoration-current/40 underline-offset-4 outline-none hover:underline focus-visible:ring-[3px]"
+            >
+              View on GitHub
+              <ExternalLink className="size-icon-sm" aria-hidden="true" />
+            </a>
+          )}
         </section>
 
         <section className="max-w-[70ch] space-y-3">
@@ -1133,7 +1140,7 @@ function getAnalysisPresentation({
         title: 'Review the generated report',
         description:
           'Read the technical evidence or ask Cloud Agent to explain it. Keep the finding open until the result is clear.',
-        buttonLabel: 'Ask Cloud Agent',
+        buttonLabel: 'Inspect analysis',
         buttonIcon: CircleHelp,
         kind: 'cloud-agent',
       },
@@ -1228,12 +1235,13 @@ function getAnalysisPresentation({
       action: {
         label: 'Next step',
         title: 'Update during routine maintenance',
-        description:
-          sandbox.suggestedFix ||
-          'Review the source advisory and update the dependency during routine maintenance.',
-        buttonLabel: 'View source record',
-        buttonIcon: ExternalLink,
-        kind: 'source',
+        description: canStartRemediation
+          ? 'A patched version or suggested fix is available for a user-reviewed manual remediation.'
+          : sandbox.suggestedFix ||
+            'Review the source advisory and update the dependency during routine maintenance.',
+        buttonLabel: canStartRemediation ? 'View remediation' : 'View source record',
+        buttonIcon: canStartRemediation ? GitPullRequest : ExternalLink,
+        kind: canStartRemediation ? 'view-remediation' : 'source',
       },
       disclosureTitle: 'How Security Agent reached this decision',
     };
@@ -1279,7 +1287,7 @@ function getAnalysisPresentation({
         description: canStartRemediation
           ? 'A concrete fix path is available for a user-reviewed manual remediation.'
           : 'Inspect the recorded usage locations and ask Cloud Agent for more context.',
-        buttonLabel: canStartRemediation ? 'View remediation' : 'Ask Cloud Agent',
+        buttonLabel: canStartRemediation ? 'View remediation' : 'Inspect analysis',
         buttonIcon: canStartRemediation ? GitPullRequest : CircleHelp,
         kind: canStartRemediation ? 'view-remediation' : 'cloud-agent',
         primary: true,
@@ -1693,7 +1701,7 @@ function FindingAnalysisPanel({
             <Button variant="ghost" className="h-control-touch" asChild>
               <Link href={sessionHref}>
                 <CircleHelp aria-hidden="true" />
-                Ask Cloud Agent
+                Inspect analysis
               </Link>
             </Button>
           )}

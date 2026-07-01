@@ -17,8 +17,13 @@ import {
   type WrapperReconnectDecision,
   type WrapperSupervisorStorage,
 } from './wrapper-supervisor.js';
-import { getWrapperLease, getWrapperRuntimeState } from './wrapper-runtime-state.js';
+import {
+  getSandboxRecoveryState,
+  getWrapperLease,
+  getWrapperRuntimeState,
+} from './wrapper-runtime-state.js';
 import type { LatestAssistantMessage } from './types.js';
+import type { SandboxId } from '../types.js';
 
 vi.mock('@cloudflare/sandbox', () => ({
   getSandbox: vi.fn(),
@@ -116,6 +121,7 @@ function createHarness(
       messageId: string,
       wrapperRunId: string
     ) => Promise<void>;
+    recordSharedSandboxFailover?: (routeKey: SandboxId) => Promise<void>;
   }
 ) {
   const getAssistantMessageForUserMessage =
@@ -149,6 +155,9 @@ function createHarness(
     getSessionIdForLogs: () => currentMetadata.identity.sessionId,
   });
   const requestPendingDrainIfNeeded = vi.fn().mockResolvedValue(false);
+  const recordSharedSandboxFailover = vi.fn(
+    options?.recordSharedSandboxFailover ?? (async () => {})
+  );
   const supervisor = createWrapperSupervisor({
     storage,
     agentRuntime: {
@@ -165,6 +174,7 @@ function createHarness(
     ensureAcceptedMessageBeforeTerminal:
       options?.ensureAcceptedMessageBeforeTerminal ?? (async () => {}),
     stopWrappers,
+    recordSharedSandboxFailover: routeKey => recordSharedSandboxFailover(routeKey),
     requestAlarmAtOrBefore: async deadline => {
       requestedAlarms.push(deadline);
     },
@@ -180,6 +190,7 @@ function createHarness(
     stopWrappers,
     requestedAlarms,
     requestPendingDrainIfNeeded,
+    recordSharedSandboxFailover,
     settlementOutbox,
     supervisor,
   };
@@ -1238,6 +1249,7 @@ describe('WrapperSupervisor', () => {
       hasActiveIngestConnection: async () => false,
       clearInterruptRequest: async () => {},
       ensureAcceptedMessageBeforeTerminal: ensureAccepted,
+      recordSharedSandboxFailover: async () => {},
       requestAlarmAtOrBefore: async () => {},
       getSessionIdForLogs: () => 'agent_supervisor',
     });
@@ -1846,7 +1858,266 @@ describe('WrapperSupervisor', () => {
     });
   });
 
-  it('backs off unconfirmed physical cleanup retries through the saturated delay tail', async () => {
+  it('records shared sandbox failover after fresh delivery and cleanup inspection timeouts', async () => {
+    const routeKey = `usr-${'a'.repeat(48)}` as SandboxId;
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: routeKey,
+        sandboxRoute: { kind: 'shared', routeKey },
+      },
+    } satisfies SessionMetadata;
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 2,
+            target: { kind: 'session' },
+            reason: 'observation-failed',
+            requestedAt: 1_000,
+            nextAttemptAt: 1_000,
+            attempts: 0,
+          },
+        ],
+        ['sandbox_recovery_state', { listProcessesTimeouts: 1 }],
+      ],
+      { metadata }
+    );
+    harness.stopWrappers.mockResolvedValue({
+      status: 'inspection-failed',
+      error: 'Wrapper process discovery timed out',
+      reason: 'wrapper_discovery_list_processes_timeout',
+    });
+
+    await harness.supervisor.runMaintenance(1_000);
+
+    expect(harness.recordSharedSandboxFailover).toHaveBeenCalledOnce();
+    expect(harness.recordSharedSandboxFailover).toHaveBeenCalledWith(routeKey);
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+    });
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toMatchObject({
+      listProcessesTimeouts: 2,
+      failoverPublication: { status: 'recorded', routeKey },
+    });
+  });
+
+  it('records failover when the fifth cleanup attempt supplies the second fresh timeout', async () => {
+    const routeKey = `usr-${'c'.repeat(48)}` as SandboxId;
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: routeKey,
+        sandboxRoute: { kind: 'shared', routeKey },
+      },
+    } satisfies SessionMetadata;
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 2,
+            target: { kind: 'session' },
+            reason: 'observation-failed',
+            requestedAt: 1_000,
+            nextAttemptAt: 10_000,
+            attempts: 4,
+          },
+        ],
+        ['sandbox_recovery_state', { listProcessesTimeouts: 1 }],
+      ],
+      { metadata }
+    );
+    harness.stopWrappers.mockResolvedValue({
+      status: 'inspection-failed',
+      error: 'Wrapper process discovery timed out',
+      reason: 'wrapper_discovery_list_processes_timeout',
+    });
+
+    await harness.supervisor.runMaintenance(10_000);
+
+    expect(harness.recordSharedSandboxFailover).toHaveBeenCalledWith(routeKey);
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      attempts: 5,
+      exhaustedAt: expect.any(Number),
+    });
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toMatchObject({
+      listProcessesTimeouts: 2,
+      failoverPublication: { status: 'recorded', routeKey },
+    });
+  });
+
+  it('clears timeout evidence after cleanup confirms wrapper absence', async () => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'observation-failed',
+          requestedAt: 1_000,
+          nextAttemptAt: 1_000,
+          attempts: 0,
+        },
+      ],
+      ['sandbox_recovery_state', { listProcessesTimeouts: 1 }],
+    ]);
+
+    await harness.supervisor.runMaintenance(1_000);
+
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({ state: 'none' });
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toBeUndefined();
+  });
+
+  it('does not count a generic cleanup inspection failure as failover evidence', async () => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stop_needed',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'observation-failed',
+          requestedAt: 1_000,
+          nextAttemptAt: 1_000,
+          attempts: 0,
+        },
+      ],
+      ['sandbox_recovery_state', { listProcessesTimeouts: 1 }],
+    ]);
+    harness.stopWrappers.mockResolvedValue({
+      status: 'inspection-failed',
+      error: 'Generic provider error',
+    });
+
+    await harness.supervisor.runMaintenance(1_000);
+
+    expect(harness.recordSharedSandboxFailover).not.toHaveBeenCalled();
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toMatchObject({
+      listProcessesTimeouts: 1,
+    });
+  });
+
+  it('honors the persisted failover publication retry deadline', async () => {
+    const routeKey = `usr-${'b'.repeat(48)}` as SandboxId;
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: routeKey,
+        sandboxRoute: { kind: 'shared', routeKey },
+      },
+    } satisfies SessionMetadata;
+    const publish = vi
+      .fn<(routeKey: SandboxId) => Promise<void>>()
+      .mockRejectedValueOnce(new Error('KV unavailable'))
+      .mockResolvedValueOnce(undefined);
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 2,
+            target: { kind: 'session' },
+            reason: 'observation-failed',
+            requestedAt: 1_000,
+            nextAttemptAt: 100_000,
+            attempts: 1,
+          },
+        ],
+        ['sandbox_recovery_state', { listProcessesTimeouts: 2 }],
+      ],
+      { metadata, recordSharedSandboxFailover: publish }
+    );
+    const now = 10_000;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    await harness.supervisor.runMaintenance(now);
+    expect(publish).toHaveBeenCalledOnce();
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toMatchObject({
+      failoverPublication: {
+        status: 'pending',
+        failedAttempts: 1,
+        nextAttemptAt: now + 2_000,
+      },
+    });
+
+    clock.mockReturnValue(now + 1_000);
+    await harness.supervisor.runMaintenance(now + 1_000);
+    expect(publish).toHaveBeenCalledOnce();
+
+    clock.mockReturnValue(now + 2_000);
+    await harness.supervisor.runMaintenance(now + 2_000);
+    clock.mockRestore();
+    expect(publish).toHaveBeenCalledTimes(2);
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toMatchObject({
+      failoverPublication: { status: 'recorded', routeKey },
+    });
+  });
+
+  it('exhausts failover publication after persisted 2, 4, and 8 second retries', async () => {
+    const routeKey = `usr-${'e'.repeat(48)}` as SandboxId;
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: routeKey,
+        sandboxRoute: { kind: 'shared', routeKey },
+      },
+    } satisfies SessionMetadata;
+    const publish = vi
+      .fn<(routeKey: SandboxId) => Promise<void>>()
+      .mockRejectedValue(new Error('KV unavailable'));
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 2,
+            target: { kind: 'session' },
+            reason: 'observation-failed',
+            requestedAt: 1,
+            nextAttemptAt: 3_153_600_000_001,
+            attempts: 5,
+            lastError: 'inspection failed',
+            exhaustedAt: 1,
+          },
+        ],
+        ['sandbox_recovery_state', { listProcessesTimeouts: 2 }],
+      ],
+      { metadata, recordSharedSandboxFailover: publish }
+    );
+    const attemptTimes = [10_000, 12_000, 16_000, 24_000];
+    const clock = vi.spyOn(Date, 'now');
+
+    try {
+      for (const now of attemptTimes) {
+        clock.mockReturnValue(now);
+        await harness.supervisor.runMaintenance(now);
+      }
+    } finally {
+      clock.mockRestore();
+    }
+
+    expect(publish).toHaveBeenCalledTimes(4);
+    await expect(getSandboxRecoveryState(harness.storage)).resolves.toMatchObject({
+      failoverPublication: {
+        status: 'exhausted',
+        failedAttempts: 4,
+        routeKey,
+      },
+    });
+    await harness.supervisor.runMaintenance(25_000);
+    expect(publish).toHaveBeenCalledTimes(4);
+    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([]);
+  });
+
+  it('quarantines cleanup after five failed attempts', async () => {
     const harness = createHarness([
       [
         'wrapper_lease',
@@ -1862,25 +2133,71 @@ describe('WrapperSupervisor', () => {
       ],
     ]);
     harness.stopWrappers.mockResolvedValue({ status: 'still-present', observed: [] });
-    const expectedDelays = [5_000, 30_000, 120_000, 300_000, 300_000];
+    const retryDelays = [5_000, 10_000, 10_000, 10_000];
     let now = 1_001;
     const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
 
     try {
-      for (const [index, expectedDelay] of expectedDelays.entries()) {
+      for (const [index, retryDelay] of retryDelays.entries()) {
         clock.mockReturnValue(now);
         await harness.supervisor.runMaintenance(now);
         const lease = await getWrapperLease(harness.storage);
         if (lease.state !== 'stop_needed') {
-          throw new Error(`Expected a retryable cleanup lease after attempt ${index + 1}`);
+          throw new Error(`Expected retryable cleanup after attempt ${index + 1}`);
         }
         expect(lease.attempts).toBe(index + 1);
-        expect(lease.nextAttemptAt - now).toBe(expectedDelay);
+        expect(lease.nextAttemptAt - now).toBe(retryDelay);
         now = lease.nextAttemptAt;
       }
+
+      clock.mockReturnValue(now);
+      await harness.supervisor.runMaintenance(now);
     } finally {
       clock.mockRestore();
     }
+
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      attempts: 5,
+      exhaustedAt: expect.any(Number),
+      lastError: 'Wrapper remains present',
+    });
+    expect(harness.stopWrappers).toHaveBeenCalledTimes(5);
+    await harness.supervisor.runMaintenance(now + 60_000);
+    expect(harness.stopWrappers).toHaveBeenCalledTimes(5);
+    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.not.toContainEqual(
+      expect.any(Number)
+    );
+  });
+
+  it('quarantines the fifth cleanup attempt when its watchdog expires', async () => {
+    const harness = createHarness([
+      [
+        'wrapper_lease',
+        {
+          state: 'stopping',
+          nextInstanceGeneration: 2,
+          target: { kind: 'session' },
+          reason: 'observation-failed',
+          requestedAt: 1_000,
+          attemptId: 'attempt_fifth',
+          attemptStartedAt: 2_000,
+          attemptDeadlineAt: 47_000,
+          attempts: 5,
+        },
+      ],
+    ]);
+
+    await harness.supervisor.runMaintenance(47_000);
+
+    expect(harness.stopWrappers).not.toHaveBeenCalled();
+    await expect(getWrapperLease(harness.storage)).resolves.toMatchObject({
+      state: 'stop_needed',
+      attempts: 5,
+      exhaustedAt: 47_000,
+      lastError: 'Stop attempt deadline expired',
+    });
+    await expect(harness.supervisor.nextMaintenanceDeadlines()).resolves.toEqual([]);
   });
 
   it('retries thrown cleanup and does not issue a parallel stop during a valid watchdog', async () => {

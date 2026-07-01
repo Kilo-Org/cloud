@@ -34,6 +34,11 @@ export type CloudAgentPrepareSessionInput = {
   callbackTarget?: CallbackTarget;
   createdOnPlatform?: string;
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
+  runtimeSkills?: Array<{
+    name: string;
+    rawMarkdown: string;
+    files?: Record<string, string>;
+  }>;
 };
 
 export type CloudAgentPrepareSessionOutput = {

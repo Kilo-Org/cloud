@@ -1,4 +1,11 @@
-import { beforeAll, describe, test, expect } from '@jest/globals';
+const mockHeaders = jest.fn<Promise<Headers>, []>();
+
+jest.mock('next/headers', () => ({
+  headers: () => mockHeaders(),
+  cookies: jest.fn(),
+}));
+
+import { beforeAll, beforeEach, describe, test, expect } from '@jest/globals';
 import {
   isEmailBlacklistedByDomain,
   isBlockedTLD,
@@ -7,17 +14,23 @@ import {
   uuidSchema,
   parseSignInRedirectContext,
   getProfileRedirectPath,
+  getUserFromAuth,
 } from './server';
 import { db } from '@/lib/drizzle';
 import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { generateApiToken } from '@/lib/tokens';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 
 // Same namespace UUID used in user.server.ts
 const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+beforeEach(() => {
+  mockHeaders.mockReset();
+});
 
 describe('isEmailBlacklistedByDomain', () => {
   test('should return false when blacklisted_domains is undefined', () => {
@@ -409,6 +422,29 @@ describe('uuidSchema (organization ID validation)', () => {
   test('should reject numbers', () => {
     expect(uuidSchema.safeParse(12345).success).toBe(false);
     expect(uuidSchema.safeParse(0).success).toBe(false);
+  });
+});
+
+describe('getUserFromAuth', () => {
+  test('allows API-token authentication for users from SSO-protected domains', async () => {
+    const ssoDomain = `${crypto.randomUUID()}.example.com`;
+    const user = await insertTestUser({
+      google_user_email: `api-token-user@${ssoDomain}`,
+      api_token_pepper: 'api-token-pepper',
+    });
+    const organization = await createTestOrganization('API Token SSO Domain Org', user.id, 0);
+    await db
+      .update(organizations)
+      .set({ sso_domain: ssoDomain })
+      .where(eq(organizations.id, organization.id));
+
+    const token = generateApiToken(user);
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
   });
 });
 

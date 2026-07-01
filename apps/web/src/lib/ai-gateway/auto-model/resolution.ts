@@ -13,7 +13,7 @@ import type {
   OrganizationPlan,
   OrganizationSettings,
 } from '@/lib/organizations/organization-types';
-import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
+import { isVirtualAutoModelId, type AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import {
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_SMALL_MODEL,
@@ -270,7 +270,7 @@ export async function resolveAutoModel(
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id) {
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
-    if (decision) {
+    if (decision && !isVirtualAutoModelId(decision.model)) {
       // Apply the candidate's pinned reasoning effort so the model runs under
       // the same conditions the benchmark measured it at.
       return {

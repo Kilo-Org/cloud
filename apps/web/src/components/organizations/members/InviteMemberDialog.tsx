@@ -20,7 +20,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { OrganizationPlan, OrganizationRole } from '@/lib/organizations/organization-types';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
@@ -63,7 +62,6 @@ type InviteMemberDialogProps = {
   onOpenChange: (open: boolean) => void;
   organizationId: string;
   onMemberInvited: () => void;
-  blockClose?: boolean; // If true, prevents closing the dialog (hides close button and disables cancel)
 };
 
 type InviteSeatCapacity = {
@@ -87,7 +85,6 @@ export function InviteMemberDialog({
   onOpenChange,
   organizationId,
   onMemberInvited,
-  blockClose = false,
 }: InviteMemberDialogProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<OrganizationRole>('member');
@@ -109,13 +106,16 @@ export function InviteMemberDialog({
     return emailSchema.safeParse(email.trim()).success;
   }, [email]);
 
-  const emailDomainMatchesSSODomain = useMemo(() => {
-    if (!email.trim() || !organizationData?.sso_domain) return false;
+  const emailDomainMatchesDirectSSODomain = useMemo(() => {
+    const policy = organizationData?.effectiveSsoPolicy;
+    if (!email.trim() || !policy?.required || policy.source !== 'self' || !policy.domain) {
+      return false;
+    }
     const emailDomain = getLowerDomainFromEmail(email.trim());
-    return emailDomain === organizationData.sso_domain.toLowerCase();
-  }, [email, organizationData?.sso_domain]);
+    return emailDomain === policy.domain;
+  }, [email, organizationData?.effectiveSsoPolicy]);
 
-  const ssoErrorText = `Members of your enterprise domain (@${organizationData?.sso_domain}) should sign in to Kilo Code via your SSO IdP to be automatically added to this organization.`;
+  const ssoErrorText = `Members of your enterprise domain (@${organizationData?.effectiveSsoPolicy.domain}) should sign in through your SSO provider to join this organization.`;
 
   const shouldShowEmailError = useMemo(() => {
     return email.trim() && !isEmailFocused && !isEmailValid;
@@ -153,7 +153,7 @@ export function InviteMemberDialog({
       return;
     }
 
-    if (emailDomainMatchesSSODomain) {
+    if (emailDomainMatchesDirectSSODomain) {
       toast.error(ssoErrorText);
       return;
     }
@@ -189,10 +189,6 @@ export function InviteMemberDialog({
   };
 
   const handleClose = () => {
-    // Prevent closing if blockClose is true
-    if (blockClose) {
-      return;
-    }
     onOpenChange(false);
     handleReset();
   };
@@ -200,7 +196,7 @@ export function InviteMemberDialog({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <LockableContainer>
-        <DialogContent className="sm:max-w-[600px]" showCloseButton={!blockClose}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Invite Member</DialogTitle>
             <DialogDescription className="text-pretty">
@@ -228,7 +224,7 @@ export function InviteMemberDialog({
                       }
                     }}
                     className={
-                      shouldShowEmailError || emailDomainMatchesSSODomain
+                      shouldShowEmailError || emailDomainMatchesDirectSSODomain
                         ? 'border-red-500 focus:border-red-500'
                         : ''
                     }
@@ -278,7 +274,7 @@ export function InviteMemberDialog({
               </div>
             </div>
 
-            {(shouldShowEmailError || emailDomainMatchesSSODomain) && (
+            {(shouldShowEmailError || emailDomainMatchesDirectSSODomain) && (
               <div className="rounded-md border border-red-800 bg-red-950/30 p-3">
                 <div className="flex items-center gap-2">
                   <svg
@@ -294,7 +290,7 @@ export function InviteMemberDialog({
                   </svg>
                   <p className="text-sm text-red-300" role="alert">
                     {shouldShowEmailError && 'Please enter a valid email address'}
-                    {emailDomainMatchesSSODomain && ssoErrorText}
+                    {emailDomainMatchesDirectSSODomain && ssoErrorText}
                   </p>
                 </div>
               </div>
@@ -312,37 +308,18 @@ export function InviteMemberDialog({
           </div>
 
           <DialogFooter>
-            {blockClose ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="inline-block">
-                    <Button
-                      variant="outline"
-                      onClick={handleClose}
-                      disabled={inviteMemberMutation.isPending || blockClose}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Invite someone to continue</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Button
-                variant="outline"
-                onClick={handleClose}
-                disabled={inviteMemberMutation.isPending || blockClose}
-              >
-                Cancel
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              onClick={handleClose}
+              disabled={inviteMemberMutation.isPending}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={handleInviteMember}
               disabled={
                 !isEmailValid ||
-                emailDomainMatchesSSODomain ||
+                emailDomainMatchesDirectSSODomain ||
                 inviteMemberMutation.isPending ||
                 !canInviteMembers ||
                 !hasSeatsAvailable

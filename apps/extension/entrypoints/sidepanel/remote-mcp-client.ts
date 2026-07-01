@@ -5,6 +5,8 @@ import {
   StreamableHTTPError,
 } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type {
   RemoteMcpAuth,
   RemoteMcpCachedTool,
@@ -105,7 +107,7 @@ export const connectRemoteMcpServer = async ({
 
     const cachedTools: RemoteMcpCachedTool[] = tools.map(tool => ({
       description: tool.description,
-      inputSchema: tool.inputSchema as Record<string, unknown>,
+      inputSchema: tool.inputSchema,
       name: tool.name,
     }));
 
@@ -183,15 +185,23 @@ export const callRemoteMcpTool = async ({
   readonly server: RemoteMcpServer;
   readonly signal?: AbortSignal;
   readonly storageArea?: RemoteMcpStorageArea;
-}): Promise<unknown> => {
+}): Promise<CallToolResult> => {
   const combined = combineSignal(signal);
   const { client, transport } = makeClient(server, fetchFn, storageArea);
 
   try {
     await client.connect(asTransport(transport), { signal: combined });
-    return await client.callTool({ arguments: args, name: route.remoteToolName }, undefined, {
-      signal: combined,
-    });
+    const result = await client.callTool(
+      { arguments: args, name: route.remoteToolName },
+      CallToolResultSchema,
+      { signal: combined }
+    );
+    /*
+     * The callTool overload statically returns the modern result unioned with the
+     * legacy { toolResult } shape. Re-parse with the schema to collapse that to a
+     * typed CallToolResult so callers never hand-inspect an unknown.
+     */
+    return CallToolResultSchema.parse(result);
   } catch (error) {
     const text = error instanceof Error ? error.message : String(error);
     return { content: [{ text, type: 'text' }], isError: true };

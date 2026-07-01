@@ -1,3 +1,4 @@
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { RemoteMcpToolCallEvent } from '@/src/shared/agent-conversation';
 import type { RemoteMcpServer } from '@/src/shared/remote-mcp';
 import type { RemoteMcpStorageArea } from '@/src/shared/remote-mcp-storage';
@@ -12,29 +13,12 @@ import { callRemoteMcpTool } from './remote-mcp-client';
 
 type FetchLike = typeof fetch;
 
-const isMcpErrorResult = (value: unknown): value is { content: unknown } =>
-  typeof value === 'object' && value !== null && 'isError' in value && value.isError === true;
+const getMcpErrorText = (result: CallToolResult): string => {
+  const text = result.content
+    .flatMap(part => (part.type === 'text' && part.text.length > 0 ? [part.text] : []))
+    .join('\n');
 
-const getContentPartText = (part: unknown): string =>
-  typeof part === 'object' && part !== null && 'text' in part && typeof part.text === 'string'
-    ? part.text
-    : '';
-
-const getMcpErrorText = (value: { content: unknown }): string => {
-  const { content } = value;
-
-  if (Array.isArray(content)) {
-    const text = content
-      .map(part => getContentPartText(part))
-      .filter(part => part.length > 0)
-      .join('\n');
-
-    if (text.length > 0) {
-      return text;
-    }
-  }
-
-  return 'Remote MCP tool call failed.';
+  return text.length > 0 ? text : 'Remote MCP tool call failed.';
 };
 
 /*
@@ -79,7 +63,7 @@ export const executeRemoteMcpToolCall = async ({
     ...(storageArea === undefined ? {} : { storageArea }),
   });
 
-  if (isMcpErrorResult(raw)) {
+  if (raw.isError === true) {
     return { error: getMcpErrorText(raw).slice(0, MAX_REMOTE_MCP_RESULT_CHARS), ok: false };
   }
 

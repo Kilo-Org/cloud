@@ -1,13 +1,7 @@
 # Repo Conventions — Worker/DO Services in This Monorepo
 
-These conventions apply to Cloudflare Worker services in `services/` that use
-Durable Objects. The file naming/sub-module/IO-boundary/SQL/HTTP-route sections
-below are specific to the Hono + Zod service family (currently `services/gastown`,
-`services/wasteland`, `services/mcp-gateway`); the DO call retry section applies
-to every service in the repo that calls a DO stub. They are repo-specific patterns
-layered on top of the general Durable Objects rules in `references/rules.md`; each
-service's own `AGENTS.md` documents only its scope and genuine deltas from this
-shared contract.
+Always bias towards following established patterns in existing services. These
+are merely guidelines.
 
 ## DO call retries
 
@@ -31,17 +25,7 @@ bound in, e.g. `services/cloud-agent-next/src/utils/do-retry.ts` and
 logger-binding adapters over the shared `withDORetry`, not reimplementations.
 Prefer this pattern (a local `withDORetry` re-export bound to the service logger)
 over calling the base helper directly with no logger, and over copying the retry
-loop itself. Used today by `cloud-agent-next`, `webhook-agent-ingest`,
-`session-ingest`, `kilo-chat`, `kiloclaw`, and `code-review-infra`.
-
-## File naming
-
-- Add a suffix matching the module type, e.g. `agents.table.ts`, `gastown.worker.ts`,
-  `connect.handler.ts`, `routes.schema.ts`, `instances.table.ts`.
-- Modules that predominantly export a class should be named after that class, e.g.
-  `AgentIdentity.do.ts` for `AgentIdentityDO`, `MCPGatewayInstance.do.ts` for
-  `MCPGatewayInstance`.
-- Keep pure helpers in `lib/` and route handlers in `handlers/`.
+loop itself.
 
 ## DO stub helper
 
@@ -61,13 +45,6 @@ dos/
   town/
     agents.ts           # Agent CRUD, hook management
     beads.ts            # Bead CRUD, convoy progress
-    scheduling.ts        # Agent dispatch, pending work scheduling
-    review-queue.ts      # Review lifecycle, recovery
-    patrol.ts            # Zombie detection, stale hook recovery
-    config.ts            # Town configuration
-    rigs.ts               # Rig registry
-    mail.ts               # Inter-agent mail
-    container-dispatch.ts # Container start/stop/status
 ```
 
 Each sub-module exports plain functions (not classes) that accept `SqlStorage` and
@@ -91,94 +68,12 @@ you can always tell which domain a function belongs to.
 
 ## IO boundaries
 
-- Always validate data at IO boundaries (HTTP responses, JSON.parse results, SSE
+- Validate data at IO boundaries (HTTP responses, JSON.parse results, SSE
   event payloads, subprocess output, upstream responses, persisted session
   records) with Zod schemas. Return `unknown` from raw fetch/parse helpers and
   `.parse()` in the caller.
 - Never use `as` to cast IO data. If the shape is known, define a Zod schema; if
   not, use `.passthrough()` or a catch-all schema.
-- Some services are stricter than others at these boundaries (e.g. `mcp-gateway`
-  validates MCP protocol messages, headers, and query params in addition to the
-  baseline above) — check the service's own `AGENTS.md` for boundary-specific
-  additions.
-
-## Column naming
-
-Never name a primary key column just `id`. Encode the entity in the column name,
-e.g. `bead_id`, `bead_event_id`, `rig_id`. This avoids ambiguity in joins and makes
-grep-based navigation reliable.
-
-## SQL queries
-
-- Use the type-safe `query()` helper from `util/query.util.ts` for all SQL queries.
-- Prefix SQL template strings with `/* sql */` for syntax highlighting and to
-  signal intent, e.g. `query(this.sql, /* sql */ \`SELECT ...\`, [...])`.
-- Format queries for human readability: multi-line strings, one clause per line
-  (`SELECT`, `FROM`, `WHERE`, `SET`, etc.).
-- Reference tables and columns via the table interpolator objects exported from
-  `db/tables/*.table.ts` (created with `getTableFromZodSchema` from
-  `util/table.ts`). Never use raw table/column name strings in queries. Three
-  access patterns — use the right one for context:
-  - `${beads}` → bare table name. Use for `FROM`, `INSERT INTO`, `DELETE FROM`.
-  - `${beads.columns.status}` → bare column name. Use for `SET` clauses and
-    `INSERT` column lists where the table is already implied.
-  - `${beads.status}` → qualified `table.column`. Use for `SELECT`, `WHERE`,
-    `JOIN ON`, `ORDER BY`, and anywhere a column could be ambiguous.
-- **Do not alias tables in SQL queries.** Always use the full table name with the
-  qualified `${table.column}` interpolator. Aliases like `FROM beads b` combined
-  with the qualified interpolator produce double-qualified names
-  (`b.beads.bead_id`) that SQLite rejects. If a self-join requires
-  disambiguation, use a raw string alias only for the second copy and reference
-  its columns with `${table.columns.col}` (bare) prefixed manually.
-- Prefer static queries over dynamically constructed ones. Move conditional logic
-  into the query itself using SQL constructs like `COALESCE`, `CASE`, `NULLIF`, or
-  `WHERE (? IS NULL OR col = ?)` patterns so the full query is always visible as a
-  single readable string.
-- Always parse query results with the Zod `Record` schemas from
-  `db/tables/*.table.ts`. Never use ad-hoc `as Record<string, unknown>` casts or
-  `String(row.col)` to extract fields — use `.pick()` for partial selects and
-  `.array()` for lists, e.g. `BeadRecord.pick({ bead_id: true }).array().parse(rows)`.
-- When a column has a SQL `CHECK` constraint restricting it to a set of values
-  (i.e. an enum), mirror that in the Record schema using `z.enum()` rather than
-  `z.string()`, e.g. `role: z.enum(['polecat', 'refinery', 'mayor', 'witness'])`.
-
-## HTTP routes
-
-- **Do not use Hono sub-app mounting** (e.g. `app.route('/prefix', subApp)`).
-  Define all routes in the main worker entry point (e.g. `gastown.worker.ts`,
-  `mcp-gateway.worker.ts`) so a human can scan one file and see every exposed
-  route.
-- Move handler logic into `handlers/*.handler.ts` modules. Each module owns
-  routes for a logical domain. Name the file after the domain, e.g.
-  `handlers/rig-agents.handler.ts` for `/api/rigs/:rigId/agents/*` routes.
-- Each handler function takes two arguments:
-  1. The Hono `Context` object (typed as the app's env type).
-  2. A plain object containing the route params parsed from the path, e.g.
-     `{ rigId: string }` or `{ rigId: string; beadId: string }`.
-
-  This keeps the handler's contract explicit and testable, while the route
-  definition in the entry point is the single source of truth for
-  path → param shape.
-
-```ts
-// gastown.worker.ts — route definition
-app.post('/api/rigs/:rigId/agents', c => handleRegisterAgent(c, c.req.param()));
-
-// handlers/rig-agents.handler.ts — handler implementation
-export async function handleRegisterAgent(c: Context<GastownEnv>, params: { rigId: string }) {
-  // Zod validation lives in the handler, not as route middleware
-  const parsed = RegisterAgentBody.safeParse(await c.req.json());
-  if (!parsed.success) {
-    return c.json(
-      { success: false, error: 'Invalid request body', issues: parsed.error.issues },
-      400
-    );
-  }
-  const rig = getRigDOStub(c.env, params.rigId);
-  const agent = await rig.registerAgent(parsed.data);
-  return c.json(resSuccess(agent), 201);
-}
-```
 
 ## DB clients
 

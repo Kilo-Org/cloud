@@ -20,7 +20,7 @@ Gateway v1 spec — protocol surface, ownership, OAuth lifecycle, provider grant
 runtime auth). Read it (and load the `specs` skill) before changing gateway
 behavior.
 
-## HTTP routes (deltas)
+## HTTP routes
 
 - Runtime routes are scoped connect resources only:
   - `/mcp-connect/user/{user_id}/{config_id}/{route_key}`

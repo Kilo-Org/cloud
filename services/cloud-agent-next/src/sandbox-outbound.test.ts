@@ -863,6 +863,23 @@ describe('handleManagedScmOutbound GitLab authorization', () => {
     expect(forward).not.toHaveBeenCalled();
   });
 
+  it('returns a clean 502 when GitLab upstream forwarding rejects', async () => {
+    const redeemGitLabSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      headers: { authorization: 'Bearer upstream-token' },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network unavailable')));
+
+    const response = await handleOutbound(
+      new Request('https://gitlab.com/api/v4/user', {
+        headers: { Authorization: `Bearer ${GITLAB_CAPABILITY}` },
+      }),
+      createEnv(vi.fn(), redeemGitLabSessionCapability)
+    );
+
+    expect(response.status).toBe(502);
+  });
+
   it.each([
     { headers: [['PRIVATE-TOKEN', 'explicit-profile-token']] },
     { headers: [['Authorization', 'Bearer explicit-profile-token']] },

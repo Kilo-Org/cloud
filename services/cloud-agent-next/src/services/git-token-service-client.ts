@@ -101,6 +101,18 @@ export type ResolvedCloudAgentGitHubCapability = {
   fallbackReason?: ManagedGitHubFallbackReason;
 };
 
+type IssueCloudAgentGitHubSessionCapabilityParams = {
+  githubRepo: string;
+  userId: string;
+  outboundContainerId: string;
+  orgId?: string;
+  allowUserAuthorization: boolean;
+};
+
+type IssueCloudAgentGitHubSessionCapabilityResult =
+  | { success: true; value: ResolvedCloudAgentGitHubCapability | ResolvedCloudAgentGitHubAuth }
+  | { success: false; error: ResolveGitHubTokenError };
+
 type CloudAgentGitHubAuthResult =
   | { success: true; value: ResolvedCloudAgentGitHubAuth }
   | { success: false; error: ResolveGitHubTokenError };
@@ -192,19 +204,22 @@ export async function resolveCloudAgentGitHubAuthForRepo(
   }
 }
 
+function resolveGitHubAuthFallbackForCapability(
+  env: GitTokenServiceEnv,
+  params: IssueCloudAgentGitHubSessionCapabilityParams
+): Promise<IssueCloudAgentGitHubSessionCapabilityResult> {
+  return resolveCloudAgentGitHubAuthForRepo(env, {
+    githubRepo: params.githubRepo,
+    userId: params.userId,
+    ...(params.orgId !== undefined ? { orgId: params.orgId } : {}),
+    allowUserAuthorization: params.allowUserAuthorization,
+  });
+}
+
 export async function issueCloudAgentGitHubSessionCapability(
   env: GitTokenServiceEnv,
-  params: {
-    githubRepo: string;
-    userId: string;
-    outboundContainerId: string;
-    orgId?: string;
-    allowUserAuthorization: boolean;
-  }
-): Promise<
-  | { success: true; value: ResolvedCloudAgentGitHubCapability }
-  | { success: false; error: ResolveGitHubTokenError }
-> {
+  params: IssueCloudAgentGitHubSessionCapabilityParams
+): Promise<IssueCloudAgentGitHubSessionCapabilityResult> {
   if (!env.GIT_TOKEN_SERVICE) {
     return {
       success: false,
@@ -213,6 +228,10 @@ export async function issueCloudAgentGitHubSessionCapability(
         message: 'git-token-service capability issuance is not configured',
       },
     };
+  }
+  if (typeof env.GIT_TOKEN_SERVICE.issueGitHubSessionCapability !== 'function') {
+    logger.warn('Managed GitHub capability RPC unavailable; using direct authentication fallback');
+    return resolveGitHubAuthFallbackForCapability(env, params);
   }
 
   try {
@@ -250,11 +269,10 @@ export async function issueCloudAgentGitHubSessionCapability(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error('Failed to issue managed GitHub session capability');
-    return {
-      success: false,
-      error: { reason: 'rpc_error', message: `git-token-service RPC failed: ${message}` },
-    };
+    logger
+      .withFields({ error: message })
+      .warn('Managed GitHub capability RPC unavailable; using direct authentication fallback');
+    return resolveGitHubAuthFallbackForCapability(env, params);
   }
 }
 

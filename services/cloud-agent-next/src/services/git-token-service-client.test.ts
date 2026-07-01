@@ -190,6 +190,35 @@ describe('resolveManagedGitLabToken', () => {
 });
 
 describe('issueCloudAgentGitHubSessionCapability', () => {
+  it('falls back to installation authentication when the capability RPC is not deployed yet', async () => {
+    const getTokenForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      token: 'installation-token',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+    });
+
+    const result = await issueCloudAgentGitHubSessionCapability(createEnv({ getTokenForRepo }), {
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId: 'container-test',
+      allowUserAuthorization: true,
+    });
+
+    expect(getTokenForRepo).toHaveBeenCalledWith({ githubRepo: 'acme/repo', userId: 'user_1' });
+    expect(result).toEqual({
+      success: true,
+      value: {
+        githubToken: 'installation-token',
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
+        source: 'installation',
+      },
+    });
+  });
+
   it('returns an opaque capability and preserves managed identity metadata', async () => {
     const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: true,
@@ -261,11 +290,19 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     expect(getTokenForRepo).not.toHaveBeenCalled();
   });
 
-  it('fails closed when capability RPC throws without a raw token fallback', async () => {
+  it('falls back to direct authentication when the capability RPC rejects during rollout', async () => {
     const issueGitHubSessionCapability = vi
       .fn()
       .mockRejectedValue(new Error('service unavailable'));
-    const getCloudAgentAuthForRepo = vi.fn();
+    const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
+      success: true,
+      githubToken: 'user-token',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+      source: 'user',
+      gitAuthor: { name: 'octocat', email: '101+octocat@users.noreply.github.com' },
+    });
     const getTokenForRepo = vi.fn();
 
     const result = await issueCloudAgentGitHubSessionCapability(
@@ -278,8 +315,22 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
       }
     );
 
-    expect(result).toMatchObject({ success: false, error: { reason: 'rpc_error' } });
-    expect(getCloudAgentAuthForRepo).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      success: true,
+      value: {
+        githubToken: 'user-token',
+        installationId: '123',
+        accountLogin: 'acme',
+        appType: 'standard',
+        source: 'user',
+        gitAuthor: { name: 'octocat', email: '101+octocat@users.noreply.github.com' },
+      },
+    });
+    expect(getCloudAgentAuthForRepo).toHaveBeenCalledWith({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      allowUserAuthorization: true,
+    });
     expect(getTokenForRepo).not.toHaveBeenCalled();
   });
 });

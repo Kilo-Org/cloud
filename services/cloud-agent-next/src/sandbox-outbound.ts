@@ -333,7 +333,7 @@ async function handleManagedGitLabOutbound(
     if (!result.success) {
       return new Response('GitLab authorization unavailable', { status: 502 });
     }
-    return forwardRedeemedRequest(request, result.headers, true);
+    return await forwardRedeemedRequest(request, result.headers, true);
   } catch {
     return new Response('GitLab authorization unavailable', { status: 502 });
   }

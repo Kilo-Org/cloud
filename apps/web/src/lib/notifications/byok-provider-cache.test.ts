@@ -46,6 +46,20 @@ describe('groupProvidersByUser', () => {
     expect(grouped.get('user_b')).toEqual(['deepseek']);
     expect(grouped.size).toBe(2);
   });
+
+  it('omits providers that are not relevant for the notification', () => {
+    const rows: ByokProviderRow[] = [
+      { userId: 'user_a', provider: 'anthropic' },
+      { userId: 'user_a', provider: 'unsupported-provider' },
+      { userId: 'user_b', provider: 'openrouter' },
+    ];
+
+    const grouped = groupProvidersByUser(rows);
+
+    expect(grouped.get('user_a')).toEqual(['anthropic']);
+    expect(grouped.has('user_b')).toBe(false);
+    expect(grouped.size).toBe(1);
+  });
 });
 
 describe('syncByokProviderNotificationsToRedis', () => {
@@ -77,6 +91,18 @@ describe('syncByokProviderNotificationsToRedis', () => {
     const result = await syncByokProviderNotificationsToRedis(async () => []);
 
     expect(result).toEqual({ rowCount: 0, userCount: 0 });
+    expect(mockPipelineSets).toHaveLength(0);
+  });
+
+  it('does not store empty provider lists after irrelevant providers are filtered', async () => {
+    const rows: ByokProviderRow[] = [
+      { userId: 'user_a', provider: 'unsupported-provider' },
+      { userId: 'user_b', provider: 'openrouter' },
+    ];
+
+    const result = await syncByokProviderNotificationsToRedis(async () => rows);
+
+    expect(result).toEqual({ rowCount: 2, userCount: 0 });
     expect(mockPipelineSets).toHaveLength(0);
   });
 });

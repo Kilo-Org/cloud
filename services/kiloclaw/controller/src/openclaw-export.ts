@@ -276,8 +276,18 @@ function buildInstalledSkillInventory(workspaceDir: string): string | null {
 
   const skills: InstalledSkill[] = [];
   let omittedCount = 0;
+  let examinedCount = 0;
   for (const dirent of dirents) {
     if (dirent.isSymbolicLink() || !dirent.isDirectory()) continue;
+
+    // Bound the synchronous I/O *before* any lstat/read: cap how many skill
+    // directories we examine, not how many yield a skill. Remaining candidates
+    // are reported in the footer rather than statted/read.
+    if (examinedCount >= SKILL_INVENTORY_MAX_ENTRIES) {
+      omittedCount += 1;
+      continue;
+    }
+    examinedCount += 1;
 
     const skillMdPath = path.join(skillsDir, dirent.name, SKILL_MANIFEST_FILE);
     let skillMd: string;
@@ -290,12 +300,6 @@ function buildInstalledSkillInventory(workspaceDir: string): string | null {
       skillMd = fs.readFileSync(skillMdPath, 'utf8');
     } catch {
       continue; // a directory with no readable SKILL.md is not a valid skill
-    }
-
-    // Bound the synchronous work and inventory size; report extras below.
-    if (skills.length >= SKILL_INVENTORY_MAX_ENTRIES) {
-      omittedCount += 1;
-      continue;
     }
 
     const { name, description } = parseSkillFrontmatter(skillMd);

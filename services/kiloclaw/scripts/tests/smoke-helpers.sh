@@ -56,13 +56,20 @@ import json
 import sys
 
 # openclaw >=2026.6.11 may print log lines (e.g. "[state-migrations] ...") on
-# stderr, which the 2>&1 capture interleaves ahead of the JSON payload. Extract
-# the JSON object rather than assuming stdin is pure JSON.
+# stderr, which the 2>&1 capture interleaves ahead of the JSON payload. A bare
+# "[state-migrations]" line also begins with "[", and a log line may contain a
+# stray "{", so we cannot just take the first bracket — try every "["/"{"
+# candidate offset until one decodes.
 raw = sys.stdin.read()
-start = raw.find("{")
-if start == -1:
+doc = None
+for _start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
+    try:
+        doc, _ = json.JSONDecoder().raw_decode(raw[_start:])
+        break
+    except Exception:
+        continue
+if doc is None:
     raise SystemExit("no JSON object in command output")
-doc, _ = json.JSONDecoder().raw_decode(raw[start:])
 plugin = doc.get("plugin", {})
 status = plugin.get("status")
 error = plugin.get("error")
@@ -84,12 +91,18 @@ import json
 import sys
 
 known_message = "channel plugin manifest declares kilo-chat without channelConfigs metadata; add openclaw.plugin.json#channelConfigs so config schema and setup surfaces work before runtime loads. Channels without channelConfigs still appear in channel listings, but setup UI may be limited."
-# Tolerate stderr log lines interleaved by the 2>&1 capture (see above).
+# Tolerate stderr log lines interleaved by the 2>&1 capture (see above): try
+# every "["/"{" candidate offset until one decodes.
 raw = sys.stdin.read()
-start = raw.find("{")
-if start == -1:
+doc = None
+for _start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
+    try:
+        doc, _ = json.JSONDecoder().raw_decode(raw[_start:])
+        break
+    except Exception:
+        continue
+if doc is None:
     raise SystemExit("no JSON object in command output")
-doc, _ = json.JSONDecoder().raw_decode(raw[start:])
 diagnostics = doc.get("diagnostics", [])
 if not isinstance(diagnostics, list):
     raise SystemExit("diagnostics is not a list")

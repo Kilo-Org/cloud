@@ -276,13 +276,20 @@ import sys
 
 nonce = sys.argv[1]
 # openclaw >=2026.6.11 may print log lines (e.g. "[state-migrations] ...") on
-# stderr, which the 2>&1 capture interleaves ahead of the JSON payload. Extract
-# the JSON object rather than assuming stdin is pure JSON.
+# stderr, which the 2>&1 capture interleaves ahead of the JSON payload. A bare
+# "[state-migrations]" line also begins with "[", and a log line may contain a
+# stray "{", so we cannot just take the first bracket — try every "["/"{"
+# candidate offset until one decodes.
 raw = sys.stdin.read()
-start = raw.find("{")
-if start == -1:
+doc = None
+for _start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
+    try:
+        doc, _ = json.JSONDecoder().raw_decode(raw[_start:])
+        break
+    except Exception:
+        continue
+if doc is None:
     raise SystemExit("no JSON object in command output")
-doc, _ = json.JSONDecoder().raw_decode(raw[start:])
 result = doc.get("result", doc)
 payloads = result.get("payloads", []) if isinstance(result, dict) else []
 texts = [entry.get("text", "") for entry in payloads if isinstance(entry, dict)]

@@ -8,6 +8,7 @@ import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader } from '@zip.js/zip.js';
 import {
   OPENCLAW_EXPORT_MAX_FILES,
   OPENCLAW_EXPORT_MAX_FILE_BYTES,
+  OPENCLAW_EXPORT_MAX_TOTAL_BYTES,
   OPENCLAW_EXPORT_SKILL_INVENTORY_PATH,
   OpenclawExportError,
   buildOpenclawWorkspaceTarGz,
@@ -221,6 +222,38 @@ describe('installed skill inventory', () => {
     expect(text).toContain('…');
     const line = text.split('\n').find(l => l.includes('**wordy**'))!;
     expect(line.length).toBeLessThan(250);
+  });
+
+  it('truncates an over-long skill name', () => {
+    const longName = 'n'.repeat(500);
+    write('skills/big/SKILL.md', `---\nname: ${longName}\ndescription: ok\n---\n`);
+    const text = inventoryText(collectOpenclawWorkspaceFiles(rootDir).entries);
+    const line = text.split('\n').find(l => l.startsWith('- **'))!;
+    expect(line).toContain('…');
+    expect(line.length).toBeLessThan(200);
+  });
+
+  it('counts the generated inventory against the total-size cap', () => {
+    // Fill the workspace to exactly the total cap with markdown, then a skill
+    // whose inventory would push it over -> must fail, not silently exceed.
+    const chunk = OPENCLAW_EXPORT_MAX_FILE_BYTES;
+    const fullChunks = Math.floor(OPENCLAW_EXPORT_MAX_TOTAL_BYTES / chunk);
+    for (let i = 0; i < fullChunks; i++) {
+      write(`memory/fill-${i}.md`, 'x'.repeat(chunk));
+    }
+    const remainder = OPENCLAW_EXPORT_MAX_TOTAL_BYTES % chunk;
+    if (remainder > 0) {
+      write('memory/fill-rem.md', 'x'.repeat(remainder));
+    }
+    write('skills/s/SKILL.md', '---\nname: s\ndescription: d\n---\n');
+
+    try {
+      collectOpenclawWorkspaceFiles(rootDir);
+      throw new Error('expected to throw');
+    } catch (error) {
+      expect(error).toBeInstanceOf(OpenclawExportError);
+      expect((error as OpenclawExportError).code).toBe('openclaw_export_too_large');
+    }
   });
 
   it('skips an oversized SKILL.md rather than reading it into memory', () => {

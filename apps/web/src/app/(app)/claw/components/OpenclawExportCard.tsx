@@ -170,7 +170,11 @@ export function OpenclawExportCard({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="openclaw-export-format">Format</Label>
-            <Select value={format} onValueChange={handleFormatChange} disabled={!isRunning}>
+            <Select
+              value={format}
+              onValueChange={handleFormatChange}
+              disabled={!isRunning || isExporting}
+            >
               <SelectTrigger id="openclaw-export-format" className="w-32">
                 <SelectValue />
               </SelectTrigger>
@@ -190,7 +194,7 @@ export function OpenclawExportCard({
               placeholder={encryptionAvailable ? 'Encrypt the zip' : 'Switch to .zip to encrypt'}
               value={password}
               onChange={event => setPassword(event.currentTarget.value)}
-              disabled={!isRunning || !encryptionAvailable}
+              disabled={!isRunning || !encryptionAvailable || isExporting}
               aria-describedby="openclaw-export-password-help"
               maxLength={256}
             />

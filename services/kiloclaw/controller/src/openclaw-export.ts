@@ -23,7 +23,7 @@ export type OpenclawExportFormat = (typeof OPENCLAW_EXPORT_FORMATS)[number];
 
 export const OPENCLAW_EXPORT_MAX_FILES = 5000;
 export const OPENCLAW_EXPORT_MAX_FILE_BYTES = 5 * 1024 * 1024; // per file
-const OPENCLAW_EXPORT_MAX_TOTAL_BYTES = 10 * 1024 * 1024; // total uncompressed
+export const OPENCLAW_EXPORT_MAX_TOTAL_BYTES = 10 * 1024 * 1024; // total uncompressed
 // The produced archive must cross the Cloudflare Durable Object RPC boundary,
 // which caps serialized return values at 32 MiB. Keep headroom under that.
 // (Text-only exports stay far below this; the guard is defense-in-depth.)
@@ -45,8 +45,16 @@ const SKILL_MANIFEST_FILE = 'SKILL.md';
 export const OPENCLAW_EXPORT_SKILL_INVENTORY_PATH = 'INSTALLED_SKILLS.md';
 /** Skill descriptions can be paragraph-length; keep the inventory readable. */
 const SKILL_DESCRIPTION_MAX_LENGTH = 200;
+/** Frontmatter `name` is untrusted single-line text; bound it in the inventory. */
+const SKILL_NAME_MAX_LENGTH = 100;
 /** Upper bound on a SKILL.md read — only its frontmatter is consumed. */
-const SKILL_MANIFEST_MAX_BYTES = 256 * 1024;
+const SKILL_MANIFEST_MAX_BYTES = 64 * 1024;
+/**
+ * Cap on skill directories read while building the inventory. Bounds the
+ * synchronous I/O and inventory size independent of the archive caps; extra
+ * skills are reported in a footer rather than silently dropped.
+ */
+const SKILL_INVENTORY_MAX_ENTRIES = 1000;
 
 export class OpenclawExportError extends Error {
   readonly code: string;
@@ -208,10 +216,27 @@ export function collectOpenclawWorkspaceFiles(rootDir: string): OpenclawExportCo
   }
 
   // Append a generated inventory of installed skills (names/descriptions only —
-  // the skill code itself lives in the excluded skills/ tree).
+  // the skill code itself lives in the excluded skills/ tree). The inventory is
+  // subject to the same caps as any exported file.
   const skillInventory = buildInstalledSkillInventory(workspaceDir);
   if (skillInventory) {
     const content = Buffer.from(skillInventory, 'utf8');
+
+    if (entries.length >= OPENCLAW_EXPORT_MAX_FILES) {
+      throw new OpenclawExportError(
+        `Workspace exceeds the ${OPENCLAW_EXPORT_MAX_FILES}-file export limit`,
+        'openclaw_export_too_many_files'
+      );
+    }
+
+    if (totalBytes + content.byteLength > OPENCLAW_EXPORT_MAX_TOTAL_BYTES) {
+      throw new OpenclawExportError(
+        `Workspace exceeds the ${OPENCLAW_EXPORT_MAX_TOTAL_BYTES}-byte export limit`,
+        'openclaw_export_too_large',
+        413
+      );
+    }
+
     totalBytes += content.byteLength;
     entries.push({ path: OPENCLAW_EXPORT_SKILL_INVENTORY_PATH, content });
   }
@@ -250,6 +275,7 @@ function buildInstalledSkillInventory(workspaceDir: string): string | null {
   }
 
   const skills: InstalledSkill[] = [];
+  let omittedCount = 0;
   for (const dirent of dirents) {
     if (dirent.isSymbolicLink() || !dirent.isDirectory()) continue;
 
@@ -266,8 +292,14 @@ function buildInstalledSkillInventory(workspaceDir: string): string | null {
       continue; // a directory with no readable SKILL.md is not a valid skill
     }
 
+    // Bound the synchronous work and inventory size; report extras below.
+    if (skills.length >= SKILL_INVENTORY_MAX_ENTRIES) {
+      omittedCount += 1;
+      continue;
+    }
+
     const { name, description } = parseSkillFrontmatter(skillMd);
-    skills.push({ name: name ?? dirent.name, description });
+    skills.push({ name: truncate(name ?? dirent.name, SKILL_NAME_MAX_LENGTH), description });
   }
 
   if (skills.length === 0) {
@@ -280,7 +312,7 @@ function buildInstalledSkillInventory(workspaceDir: string): string | null {
     '# Installed skills',
     '',
     'These skills were installed in your KiloClaw workspace when it was exported.',
-    'This is a reference inventory, not a backup — the skill code itself is not',
+    'This is a reference inventory, not a backup. The skill code itself is not',
     'included in this export. Re-install published skills on the target host, for',
     'example with `openclaw skills install <name>`.',
     '',
@@ -289,6 +321,10 @@ function buildInstalledSkillInventory(workspaceDir: string): string | null {
     lines.push(
       skill.description ? `- **${skill.name}** — ${skill.description}` : `- **${skill.name}**`
     );
+  }
+  if (omittedCount > 0) {
+    lines.push('');
+    lines.push(`_${omittedCount} additional skill(s) not listed._`);
   }
   lines.push('');
 

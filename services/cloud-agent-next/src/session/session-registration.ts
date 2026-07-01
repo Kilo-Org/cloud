@@ -163,7 +163,6 @@ async function allocateNewSession(
       {
         devcontainer: input.runtime?.devcontainer,
         createdOnPlatform: input.options?.createdOnPlatform,
-        codeReviewEphemeralSandboxOrgIds: ctx.env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
       }
     );
     if (target.kind === 'shared') {

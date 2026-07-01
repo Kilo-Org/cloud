@@ -273,8 +273,6 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-  /** Comma-separated org IDs that use ephemeral Code Reviewer sandbox containers */
-  CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

@@ -12,7 +12,7 @@ export type ChangelogEntry = {
 export const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: '2026-07-01',
-    description: 'Updated OpenClaw to 2026.6.11.',
+    description: 'OpenClaw 2026.6.11 is available now as an Early Access upgrade.',
     category: 'feature',
     deployHint: 'upgrade_required',
   },

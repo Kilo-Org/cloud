@@ -16,6 +16,7 @@ const GastownHealthStateSchema = z.discriminatedUnion('active', [
       .int()
       .min(0)
       .max(CONSECUTIVE_HEALTHY_TO_RESOLVE - 1),
+    lastNotifiedWeightedFailedChecks: z.number().finite().nonnegative().optional(),
   }),
 ]);
 
@@ -34,12 +35,46 @@ function inactiveState(): GastownHealthState {
 export function transitionGastownHealthState(
   state: GastownHealthState,
   metrics: GastownHealthMetrics,
-  thresholdCrossed: boolean
+  thresholdCrossed: boolean,
+  renotifyFailedChecksStep: number
 ): GastownHealthTransition {
   if (thresholdCrossed) {
     if (!state.active) {
       return {
-        state: { active: true, consecutiveHealthyCount: 0 },
+        state: {
+          active: true,
+          consecutiveHealthyCount: 0,
+          lastNotifiedWeightedFailedChecks: metrics.weightedFailedChecks,
+        },
+        shouldNotify: true,
+        stateChanged: true,
+      };
+    }
+
+    if (state.lastNotifiedWeightedFailedChecks === undefined) {
+      return {
+        state: {
+          active: true,
+          consecutiveHealthyCount: 0,
+          lastNotifiedWeightedFailedChecks:
+            Math.floor(metrics.weightedFailedChecks / renotifyFailedChecksStep) *
+            renotifyFailedChecksStep,
+        },
+        shouldNotify: false,
+        stateChanged: true,
+      };
+    }
+
+    if (
+      metrics.weightedFailedChecks >=
+      state.lastNotifiedWeightedFailedChecks + renotifyFailedChecksStep
+    ) {
+      return {
+        state: {
+          active: true,
+          consecutiveHealthyCount: 0,
+          lastNotifiedWeightedFailedChecks: metrics.weightedFailedChecks,
+        },
         shouldNotify: true,
         stateChanged: true,
       };
@@ -47,7 +82,11 @@ export function transitionGastownHealthState(
 
     if (state.consecutiveHealthyCount > 0) {
       return {
-        state: { active: true, consecutiveHealthyCount: 0 },
+        state: {
+          active: true,
+          consecutiveHealthyCount: 0,
+          lastNotifiedWeightedFailedChecks: state.lastNotifiedWeightedFailedChecks,
+        },
         shouldNotify: false,
         stateChanged: true,
       };
@@ -66,7 +105,11 @@ export function transitionGastownHealthState(
   }
 
   return {
-    state: { active: true, consecutiveHealthyCount },
+    state: {
+      active: true,
+      consecutiveHealthyCount,
+      lastNotifiedWeightedFailedChecks: state.lastNotifiedWeightedFailedChecks,
+    },
     shouldNotify: false,
     stateChanged: true,
   };

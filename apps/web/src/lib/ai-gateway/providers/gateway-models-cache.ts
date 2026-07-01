@@ -45,10 +45,29 @@ export function getLanguageModelIds(models: StoredModelMap): string[] {
     .map(model => model.id);
 }
 
-export async function getVercelModels(): Promise<ReadonlySet<string>> {
-  return new Set(getLanguageModelIds(await getVercelModelsMetadata()));
+const ModelIdsSchema = z.array(z.string());
+
+function createModelIdsFetcher(redisKey: RedisKey, name: string) {
+  return createCachedFetch<ReadonlySet<string>>(
+    async () => {
+      const raw = JSON.parse((await redisClient.get<string>(redisKey)) ?? 'null');
+      if (!Array.isArray(raw) || raw.length === 0) {
+        console.debug(`[getGatewayModels] no ${name} model ids found in Redis`);
+        return new Set<string>();
+      }
+      return new Set(ModelIdsSchema.parse(raw));
+    },
+    600_000,
+    new Set<string>()
+  );
 }
 
-export async function getOpenRouterModels(): Promise<ReadonlySet<string>> {
-  return new Set(getLanguageModelIds(await getOpenRouterModelsMetadata()));
-}
+export const getVercelModels = createModelIdsFetcher(
+  GATEWAY_METADATA_REDIS_KEYS.vercelModelIds,
+  'Vercel'
+);
+
+export const getOpenRouterModels = createModelIdsFetcher(
+  GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds,
+  'OpenRouter'
+);

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const GASTOWN_HEALTH_WINDOW_MINUTES = 5;
+export const GASTOWN_HEALTH_WINDOW_MINUTES = 15;
 
 export type GastownHealthMetrics = {
   weightedFailedChecks: number;

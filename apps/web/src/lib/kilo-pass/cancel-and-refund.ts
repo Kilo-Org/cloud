@@ -16,6 +16,7 @@ import { fromMicrodollars } from '@/lib/utils';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
+import { blockUser } from '@/lib/user/block';
 
 type Db = typeof defaultDb;
 
@@ -86,7 +87,6 @@ export async function cancelAndRefundKiloPassForUser({
     columns: {
       id: true,
       stripe_customer_id: true,
-      blocked_reason: true,
     },
     where: eq(kilocode_users.id, userId),
   });
@@ -178,6 +178,11 @@ export async function cancelAndRefundKiloPassForUser({
     }
   }
 
+  // Whether THIS call transitioned the user from unblocked to blocked. Driven
+  // by blockUser's guarded result rather than the pre-transaction snapshot, so
+  // a concurrent block landing between the read above and the update here does
+  // not get misreported as our own block.
+  let didBlock = false;
   const balanceResetAmountUsd = await db.transaction(async tx => {
     await tx
       .update(kilo_pass_subscriptions)
@@ -189,16 +194,12 @@ export async function cancelAndRefundKiloPassForUser({
       })
       .where(eq(kilo_pass_subscriptions.stripe_subscription_id, stripeSubscriptionId));
 
-    if (!user.blocked_reason) {
-      await tx
-        .update(kilocode_users)
-        .set({
-          blocked_reason: reason,
-          blocked_at: new Date().toISOString(),
-          blocked_by_kilo_user_id: adminKiloUserId,
-        })
-        .where(eq(kilocode_users.id, userId));
-    }
+    didBlock = await blockUser({
+      kiloUserId: userId,
+      reason,
+      blockedByKiloUserId: adminKiloUserId,
+      dbOrTx: tx,
+    });
 
     const freshUserRows = await tx
       .select({
@@ -249,7 +250,7 @@ export async function cancelAndRefundKiloPassForUser({
       balanceReset != null
         ? `Balance reset: $${balanceReset.toFixed(2)} zeroed.`
         : 'Balance was already $0.',
-      !user.blocked_reason ? 'Account blocked.' : 'Account was already blocked.',
+      didBlock ? 'Account blocked.' : 'Account was already blocked.',
     ];
     if (noteSuffix) {
       noteParts.push(noteSuffix);
@@ -265,7 +266,7 @@ export async function cancelAndRefundKiloPassForUser({
 
   await revokeGatewayGrantsForBlockedUser(userId);
 
-  if (!user.blocked_reason) {
+  if (didBlock) {
     void reportEvents({
       events: [
         {
@@ -284,6 +285,6 @@ export async function cancelAndRefundKiloPassForUser({
     status: refundLatestPayment ? 'cancelled_and_refunded' : 'cancelled',
     refundedAmountCents,
     balanceResetAmountUsd,
-    alreadyBlocked: !!user.blocked_reason,
+    alreadyBlocked: !didBlock,
   };
 }

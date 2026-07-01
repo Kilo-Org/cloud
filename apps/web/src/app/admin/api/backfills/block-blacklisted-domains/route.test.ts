@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
-import { and, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { blacklistedDomainCondition } from './route';
+import { backfillBlockBlacklistedDomainsBatch, blacklistedDomainCondition } from './route';
 
 beforeEach(async () => {
   await cleanupDbForTest();
@@ -139,5 +139,75 @@ describe('blacklistedDomainCondition', () => {
     const matches = await unblockedMatches(['  MAILINATOR.COM  ']);
 
     expect(matches).toContain(user.id);
+  });
+});
+
+describe('backfillBlockBlacklistedDomainsBatch', () => {
+  it('blocks matching users and rotates their api_token_pepper', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const target = await insertTestUser({
+      google_user_email: 'a@mailinator.com',
+      email_domain: 'mailinator.com',
+      api_token_pepper: 'initial-pepper',
+    });
+    const safe = await insertTestUser({
+      google_user_email: 'b@legit.com',
+      email_domain: 'legit.com',
+      api_token_pepper: 'safe-pepper',
+    });
+
+    const result = await backfillBlockBlacklistedDomainsBatch({
+      actorId: admin.id,
+      domains: ['mailinator.com'],
+    });
+    expect(result.processed).toBe(1);
+
+    const rows = await db
+      .select({
+        id: kilocode_users.id,
+        blocked_reason: kilocode_users.blocked_reason,
+        blocked_by_kilo_user_id: kilocode_users.blocked_by_kilo_user_id,
+        api_token_pepper: kilocode_users.api_token_pepper,
+      })
+      .from(kilocode_users)
+      .where(inArray(kilocode_users.id, [target.id, safe.id]));
+    const byId = new Map(rows.map(r => [r.id, r]));
+
+    const blocked = byId.get(target.id);
+    expect(blocked?.blocked_reason).toBe('domainblocked');
+    expect(blocked?.blocked_by_kilo_user_id).toBe(admin.id);
+    expect(blocked?.api_token_pepper).toEqual(expect.any(String));
+    expect(blocked?.api_token_pepper).not.toBe('initial-pepper');
+
+    // Non-matching users are untouched.
+    const untouched = byId.get(safe.id);
+    expect(untouched?.blocked_reason).toBeNull();
+    expect(untouched?.api_token_pepper).toBe('safe-pepper');
+  });
+
+  it('does not overwrite or re-rotate an already-blocked user', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const already = await insertTestUser({
+      google_user_email: 'c@mailinator.com',
+      email_domain: 'mailinator.com',
+      blocked_reason: 'prior reason',
+      api_token_pepper: 'prior-pepper',
+    });
+
+    const result = await backfillBlockBlacklistedDomainsBatch({
+      actorId: admin.id,
+      domains: ['mailinator.com'],
+    });
+    expect(result.processed).toBe(0);
+
+    const [row] = await db
+      .select({
+        blocked_reason: kilocode_users.blocked_reason,
+        api_token_pepper: kilocode_users.api_token_pepper,
+      })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, already.id));
+    expect(row.blocked_reason).toBe('prior reason');
+    expect(row.api_token_pepper).toBe('prior-pepper');
   });
 });

@@ -101,12 +101,12 @@ describe('buildSlackMessage — gastown_container_health alert', () => {
   const alert: GastownHealthAlertPayload = {
     alertType: 'gastown_container_health',
     severity: 'ticket',
-    weightedFailedChecks: 24,
+    weightedFailedChecks: 36,
     affectedTownCount: 4,
-    windowMinutes: 5,
+    windowMinutes: 15,
     crossedThresholds: ['failed_checks', 'affected_towns'],
-    failedChecksThreshold: 20,
-    affectedTownsThreshold: 3,
+    failedChecksThreshold: 30,
+    affectedTownsThreshold: 4,
   };
 
   it('includes counts, crossed thresholds, and investigation guidance', () => {
@@ -120,11 +120,11 @@ describe('buildSlackMessage — gastown_container_health alert', () => {
     const text = allText.join('\n');
 
     expect(text).toContain('Gastown container health failures');
-    expect(text).toContain('5-minute window');
-    expect(text).toContain('24');
+    expect(text).toContain('15-minute window');
+    expect(text).toContain('36');
     expect(text).toContain('4');
-    expect(text).toContain('20 failed checks');
-    expect(text).toContain('3 affected towns');
+    expect(text).toContain('30 failed checks');
+    expect(text).toContain('4 affected towns');
     expect(text).toContain('gastown-operations');
     expect(text).toContain('gastown-container-health-failures.md');
   });

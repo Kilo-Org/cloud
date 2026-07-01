@@ -57,8 +57,16 @@ export async function bulkBlockUsers(
       blocked_reason: reason,
       blocked_at: blockedAt,
       blocked_by_kilo_user_id: blockedByKiloUserId,
+      // Rotate per-row in SQL so each blocked user gets a distinct new pepper,
+      // invalidating their existing API tokens across every pepper-checking service.
+      api_token_pepper: sql`gen_random_uuid()::text`,
     })
-    .where(inArray(kilocode_users.id, valid))
+    // Re-check `blocked_reason IS NULL` in the update itself: the "already
+    // blocked" filter above runs in a separate read, so without this guard a
+    // concurrent block landing between the read and the update would let us
+    // overwrite the original reason/actor/time (and re-rotate the pepper),
+    // which `unblockBulkBlockedUsers` could later clear as the wrong group.
+    .where(and(inArray(kilocode_users.id, valid), isNull(kilocode_users.blocked_reason)))
     .returning({ id: kilocode_users.id });
 
   if (updated.length > 0) {
@@ -69,6 +77,19 @@ export async function bulkBlockUsers(
         data: { kilo_user_id: u.id, reason, actor_email: null },
       })),
     });
+  }
+
+  // A short update count means some of the selected users were concurrently
+  // blocked between the read and the guarded update. Surface that as a
+  // retryable conflict so the caller can re-run and confirm their final state.
+  const updatedIds = new Set(updated.map(u => u.id));
+  const skipped = valid.filter(id => !updatedIds.has(id));
+  if (skipped.length > 0) {
+    return {
+      success: false,
+      error: `${skipped.length} users were concurrently blocked during the operation and were skipped: ${skipped.slice(0, 50).join(' ')}${skipped.length > 50 ? ` …(+${skipped.length - 50} more)` : ''}`,
+      foundIds: skipped,
+    };
   }
 
   return successResult({ updatedCount: updated.length });

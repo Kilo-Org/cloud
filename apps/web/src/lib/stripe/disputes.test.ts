@@ -105,6 +105,7 @@ describe('acceptStripeDisputeCase', () => {
       auto_top_up_enabled: true,
       total_microdollars_acquired: 1_500_000,
       microdollars_used: 500_000,
+      api_token_pepper: 'initial-pepper',
     });
     await db.insert(auto_top_up_configs).values({
       owned_by_user_id: user.id,
@@ -168,6 +169,9 @@ describe('acceptStripeDisputeCase', () => {
       .from(kilocode_users)
       .where(eq(kilocode_users.id, user.id));
     expect(updatedUser.blocked_reason).toBe('stripe_dispute_accepted:dp_accept_personal');
+    // Blocking rotates the pepper so existing API tokens are revoked everywhere.
+    expect(updatedUser.api_token_pepper).toEqual(expect.any(String));
+    expect(updatedUser.api_token_pepper).not.toBe('initial-pepper');
     expect(updatedUser.auto_top_up_enabled).toBe(false);
     expect(updatedUser.total_microdollars_acquired).toBe(updatedUser.microdollars_used);
 

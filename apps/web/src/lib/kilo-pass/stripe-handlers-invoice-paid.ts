@@ -14,6 +14,7 @@ import { db } from '@/lib/drizzle';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
+import { blockUser } from '@/lib/user/block';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import {
   appendKiloPassAuditLog,
@@ -623,13 +624,11 @@ export async function handleKiloPassInvoicePaid(params: {
           .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
 
-        await tx
-          .update(kilocode_users)
-          .set({
-            blocked_reason: 'kilo_pass_duplicate_card',
-            blocked_at: new Date().toISOString(),
-          })
-          .where(and(eq(kilocode_users.id, kiloUserId), isNull(kilocode_users.blocked_reason)));
+        await blockUser({
+          kiloUserId,
+          reason: 'kilo_pass_duplicate_card',
+          dbOrTx: tx,
+        });
 
         affiliateSaleState.context = null;
         kiloUserIdForCache = null;

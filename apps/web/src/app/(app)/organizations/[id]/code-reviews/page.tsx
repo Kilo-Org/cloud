@@ -10,14 +10,17 @@ type ReviewAgentPageProps = {
     error?: string;
     platform?: string;
     returnTo?: string;
+    view?: string;
   }>;
 };
 
 export default async function ReviewAgentPage({ params, searchParams }: ReviewAgentPageProps) {
   const search = await searchParams;
-  const platform = search.platform === 'gitlab' ? 'gitlab' : 'github';
   const localCodeReviewDevelopmentEnabled = isLocalCodeReviewDevelopmentEnabled();
   const returnTo = search.returnTo ? validateReturnPath(search.returnTo) : null;
+  const platform =
+    search.platform === 'gitlab' || search.platform === 'bitbucket' ? search.platform : 'github';
+  const bitbucketView = search.view === 'jobs' ? 'jobs' : 'config';
 
   return (
     <OrganizationByPageLayout
@@ -31,6 +34,7 @@ export default async function ReviewAgentPage({ params, searchParams }: ReviewAg
           initialPlatform={platform}
           localCodeReviewDevelopmentEnabled={localCodeReviewDevelopmentEnabled}
           returnTo={returnTo ?? undefined}
+          initialBitbucketView={bitbucketView}
         />
       )}
     />

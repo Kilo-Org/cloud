@@ -58,8 +58,12 @@ import {
   getCodeReviewActionRequiredRecoveryHref,
   isCodeReviewActionRequiredReason,
 } from '@/lib/code-reviews/action-required-shared';
+import {
+  getCodeReviewRepositoryUrl,
+  type CodeReviewUiPlatform,
+} from '@/lib/code-reviews/code-review-links';
 
-type Platform = 'github' | 'gitlab';
+type Platform = CodeReviewUiPlatform;
 
 type CodeReviewJobsCardProps = {
   organizationId?: string;
@@ -383,6 +387,11 @@ export function CodeReviewJobsCard({
       return;
     }
 
+    if (platform === 'bitbucket') {
+      setManualJobSubmitError('Manual Code Reviewer jobs are not supported for Bitbucket.');
+      return;
+    }
+
     const input = {
       platform,
       url: manualJobUrl.trim(),
@@ -687,7 +696,11 @@ export function CodeReviewJobsCard({
                 ? getCodeReviewActionRequiredCopy(actionRequiredReason)
                 : null;
               const actionRequiredRecoveryHref = actionRequiredReason
-                ? getCodeReviewActionRequiredRecoveryHref(actionRequiredReason, organizationId)
+                ? getCodeReviewActionRequiredRecoveryHref(
+                    actionRequiredReason,
+                    organizationId,
+                    platform
+                  )
                 : null;
 
               return (
@@ -718,11 +731,7 @@ export function CodeReviewJobsCard({
                           </Link>
                           <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
                             <a
-                              href={
-                                review.platform === 'gitlab'
-                                  ? review.pr_url.replace(/\/-\/merge_requests\/\d+$/, '')
-                                  : review.pr_url.replace(/\/pull\/\d+$/, '')
-                              }
+                              href={getCodeReviewRepositoryUrl(platform, review.pr_url)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="hover:text-primary transition-colors hover:underline"

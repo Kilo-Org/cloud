@@ -26,7 +26,10 @@ import {
 import { doNameForAttempt } from './do-name';
 
 // Import base Durable Object
-import { CodeReviewOrchestrator as CodeReviewOrchestratorBase } from './code-review-orchestrator';
+import {
+  CodeReviewOrchestrator as CodeReviewOrchestratorBase,
+  isBitbucketCloudReviewSessionInput,
+} from './code-review-orchestrator';
 
 // Export Durable Object (with Sentry instrumentation in production)
 export const CodeReviewOrchestrator = CodeReviewOrchestratorBase;
@@ -59,6 +62,16 @@ app.post('/review', async (c: Context<HonoEnv>) => {
       },
       400
     );
+  }
+
+  if (
+    body.sessionInput.platform === 'bitbucket' &&
+    (!isBitbucketCloudReviewSessionInput(body.sessionInput) ||
+      body.owner.type !== 'org' ||
+      body.owner.id !== body.sessionInput.kilocodeOrganizationId ||
+      body.sessionInput.gitToken !== undefined)
+  ) {
+    return c.json({ error: 'Invalid Bitbucket review request' }, 400);
   }
 
   console.log('[POST /review] Received review request', {

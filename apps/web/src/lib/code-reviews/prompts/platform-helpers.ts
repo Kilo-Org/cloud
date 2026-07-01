@@ -1,7 +1,7 @@
 /**
  * Platform Helpers for Code Review Prompt Generation
  *
- * Abstracts platform-specific differences between GitHub and GitLab
+ * Abstracts platform-specific differences between GitHub, GitLab, and Bitbucket
  * for CLI commands, API calls, and terminology.
  */
 
@@ -14,7 +14,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 export type PlatformConfig = {
   /** Platform name for display */
   name: string;
-  /** CLI tool name (gh, glab) */
+  /** CLI tool name (gh, glab, bb) */
   cli: string;
   /** Term for pull request (PR, MR) */
   prTerm: string;
@@ -77,6 +77,26 @@ const gitlabConfig: PlatformConfig = {
 };
 
 /**
+ * Bitbucket platform configuration
+ */
+const bitbucketConfig: PlatformConfig = {
+  name: 'Bitbucket',
+  cli: 'bb',
+  prTerm: 'PR',
+  prNumberPlaceholder: '{PR_NUMBER}',
+  issuesPath: 'pullrequests',
+  pullsPath: 'pullrequests',
+  diffCommand: prNumber => `bb pr diff ${prNumber}`,
+  createCommentCommand: (_repo, prNumber) =>
+    `bb comments create ${prNumber} --input - < <SCRATCH_JSON_PATH>`,
+  updateCommentCommand: (_repo, commentId) =>
+    `bb comments update {PR_NUMBER} ${commentId} --input - < <SCRATCH_JSON_PATH>`,
+  inlineCommentsCommand: (_repo, prNumber) =>
+    `bb comments create-batch ${prNumber} --input - < <SCRATCH_JSON_PATH>`,
+  suggestionSyntax: '```text\n{CORRECTED_LINE}\n```',
+};
+
+/**
  * Get platform configuration by platform type
  */
 export function getPlatformConfig(platform: CodeReviewPlatform): PlatformConfig {
@@ -85,6 +105,8 @@ export function getPlatformConfig(platform: CodeReviewPlatform): PlatformConfig 
       return githubConfig;
     case PLATFORM.GITLAB:
       return gitlabConfig;
+    case PLATFORM.BITBUCKET:
+      return bitbucketConfig;
     default: {
       // Exhaustive check
       const _exhaustive: never = platform;
@@ -183,5 +205,14 @@ export const PLATFORM_TERMINOLOGY = {
     comment: 'note',
     reviewComment: 'discussion',
     cli: 'glab',
+  },
+  bitbucket: {
+    pullRequest: 'Pull Request',
+    pullRequestShort: 'PR',
+    mergeRequest: 'Pull Request',
+    repository: 'repository',
+    comment: 'comment',
+    reviewComment: 'inline comment',
+    cli: 'bb',
   },
 } as const;

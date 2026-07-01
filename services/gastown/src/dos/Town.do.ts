@@ -30,6 +30,11 @@ import * as patrol from './town/patrol';
 import * as scheduling from './town/scheduling';
 import * as events from './town/events';
 import { stopContainerIfIdle as _stopContainerIfIdle } from './town/container-idle-stop';
+import {
+  CONTAINER_HEALTH_STORAGE_KEYS,
+  recoverContainerIfWedged as _recoverContainerIfWedged,
+  type ContainerHealthPingOutcome,
+} from './town/container-health-watchdog';
 import * as scm from './town/town-scm';
 import * as reconciler from './town/reconciler';
 import * as wasteland from './town/wasteland';
@@ -4551,6 +4556,49 @@ export class TownDO extends DurableObject<Env> {
     });
   }
 
+  private async recordContainerHealthOutcome(
+    townId: string,
+    outcome: ContainerHealthPingOutcome
+  ): Promise<void> {
+    await _recoverContainerIfWedged({
+      townId,
+      outcome,
+      isDraining: () => this._draining,
+      getConsecutiveHealthFailures: () =>
+        this.ctx.storage.get<number>(CONTAINER_HEALTH_STORAGE_KEYS.consecutiveHealthFailures),
+      setConsecutiveHealthFailures: value =>
+        this.ctx.storage.put(CONTAINER_HEALTH_STORAGE_KEYS.consecutiveHealthFailures, value),
+      getFirstHealthFailureAt: () =>
+        this.ctx.storage.get<number>(CONTAINER_HEALTH_STORAGE_KEYS.firstHealthFailureAt),
+      setFirstHealthFailureAt: value =>
+        this.ctx.storage.put(CONTAINER_HEALTH_STORAGE_KEYS.firstHealthFailureAt, value),
+      deleteFirstHealthFailureAt: () =>
+        this.ctx.storage.delete(CONTAINER_HEALTH_STORAGE_KEYS.firstHealthFailureAt),
+      getLastAutoRestartAt: () =>
+        this.ctx.storage.get<number>(CONTAINER_HEALTH_STORAGE_KEYS.lastAutoRestartAt),
+      setLastAutoRestartAt: value =>
+        this.ctx.storage.put(CONTAINER_HEALTH_STORAGE_KEYS.lastAutoRestartAt, value),
+      getAutoRestartWindowStart: () =>
+        this.ctx.storage.get<number>(CONTAINER_HEALTH_STORAGE_KEYS.autoRestartWindowStart),
+      setAutoRestartWindowStart: value =>
+        this.ctx.storage.put(CONTAINER_HEALTH_STORAGE_KEYS.autoRestartWindowStart, value),
+      getAutoRestartsInWindow: () =>
+        this.ctx.storage.get<number>(CONTAINER_HEALTH_STORAGE_KEYS.autoRestartsInWindow),
+      setAutoRestartsInWindow: value =>
+        this.ctx.storage.put(CONTAINER_HEALTH_STORAGE_KEYS.autoRestartsInWindow, value),
+      getAutoRestartExhaustedWindowStart: () =>
+        this.ctx.storage.get<number>(CONTAINER_HEALTH_STORAGE_KEYS.autoRestartExhaustedWindowStart),
+      setAutoRestartExhaustedWindowStart: value =>
+        this.ctx.storage.put(CONTAINER_HEALTH_STORAGE_KEYS.autoRestartExhaustedWindowStart, value),
+      deleteAutoRestartExhaustedWindowStart: () =>
+        this.ctx.storage.delete(CONTAINER_HEALTH_STORAGE_KEYS.autoRestartExhaustedWindowStart),
+      getContainerStub: id => getTownContainerStub(this.env, id),
+      writeEventFn: data => writeEvent(this.env, data),
+      logWarnFn: data => logger.warn('container health watchdog', data),
+      now: () => Date.now(),
+    });
+  }
+
   /**
    * Proactively remint KILOCODE_TOKEN when it's approaching expiry.
    * Throttled to once per day — the 30-day token is refreshed when
@@ -4926,11 +4974,9 @@ export class TownDO extends DurableObject<Env> {
     try {
       const container = getTownContainerStub(this.env, townId);
 
-      // Measure Cloudflare container cold-start latency from the worker's
-      // perspective: warmUp() invokes startAndWaitForPorts() directly, so the
-      // returned durationMs is the true time-to-ready without the arbitrary
-      // 5s truncation of a plain /health ping. For already-warm containers
-      // this is a cheap RPC that returns { coldStart: false }.
+      // Measure Cloudflare container cold-start latency only when warmUp()
+      // actually starts the container. Already-running containers still rely
+      // on the /health probe below as the application-level liveness source.
       try {
         const warm = await container.warmUp();
         if (warm.coldStart) {
@@ -4994,10 +5040,22 @@ export class TownDO extends DurableObject<Env> {
             statusCode: healthResp.status,
             error: `non-ok status ${healthResp.status}`,
           });
+          await this.recordContainerHealthOutcome(townId, {
+            ok: false,
+            reason: 'non_ok',
+            durationMs,
+            statusCode: healthResp.status,
+            error: `non-ok status ${healthResp.status}`,
+          });
         } else {
           writeEvent(this.env, {
             event: 'container.health_ping',
             townId,
+            durationMs,
+            statusCode: healthResp.status,
+          });
+          await this.recordContainerHealthOutcome(townId, {
+            ok: true,
             durationMs,
             statusCode: healthResp.status,
           });
@@ -5046,6 +5104,12 @@ export class TownDO extends DurableObject<Env> {
         writeEvent(this.env, {
           event: 'container.health_ping',
           townId,
+          durationMs,
+          error: 'timeout',
+        });
+        await this.recordContainerHealthOutcome(townId, {
+          ok: false,
+          reason: 'timeout',
           durationMs,
           error: 'timeout',
         });

@@ -9,6 +9,7 @@ import {
   findExistingReview,
   findActiveReviewsForPR,
   updateReviewHeadShaAndCheckRun,
+  type ReviewScope,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
@@ -153,6 +154,13 @@ export async function handlePullRequestCodeReview(
     }
 
     const appType = integration.github_app_type ?? 'standard';
+    const reviewScope = {
+      owner,
+      platform: 'github',
+      repoFullName: repository.full_name,
+      prNumber: pull_request.number,
+      platformIntegrationId: integration.id,
+    } satisfies ReviewScope;
     const headFullName = checkoutRef.headRepoFullName ?? repository.full_name;
     const [headOwner, headRepoName] = headFullName.split('/');
 
@@ -186,14 +194,13 @@ export async function handlePullRequestCodeReview(
       // lives and where the app is installed), not the head/fork repo.
       const [baseOwner, baseRepoName] = repository.full_name.split('/');
       await migrateInFlightReviewsToMergeCommitHead({
-        repoFullName: repository.full_name,
-        prNumber: pull_request.number,
         newHeadSha: pull_request.head.sha,
         integrationId: integration.id,
         installationId: integration.platform_installation_id as string,
         baseOwner,
         baseRepoName,
         appType,
+        reviewScope,
       });
 
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
@@ -201,12 +208,7 @@ export async function handlePullRequestCodeReview(
 
     // 5. Cancel any existing reviews for this PR (different SHA)
     // This prevents spam when user pushes multiple commits quickly
-    const cancelledReviews = await cancelSupersededReviewsForPR(
-      repository.full_name,
-      pull_request.number,
-      pull_request.head.sha,
-      { platformIntegrationId: integration.id }
-    );
+    const cancelledReviews = await cancelSupersededReviewsForPR(reviewScope, pull_request.head.sha);
 
     if (cancelledReviews.length > 0) {
       const cancellationCounts = {
@@ -279,12 +281,7 @@ export async function handlePullRequestCodeReview(
     }
 
     // 6. Check for duplicate review (same repo, PR, SHA)
-    const existingReview = await findExistingReview(
-      repository.full_name,
-      pull_request.number,
-      pull_request.head.sha,
-      { type: 'webhook', platformIntegrationId: integration.id }
-    );
+    const existingReview = await findExistingReview(reviewScope, pull_request.head.sha);
 
     if (existingReview) {
       logExceptInTest(
@@ -477,8 +474,6 @@ export async function shouldSkipSynchronizeForMergeCommit(args: {
  * any failure is logged but does not fail the webhook.
  */
 async function migrateInFlightReviewsToMergeCommitHead(args: {
-  repoFullName: string;
-  prNumber: number;
   newHeadSha: string;
   integrationId: string;
   installationId: string;
@@ -489,16 +484,12 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
   baseOwner: string;
   baseRepoName: string;
   appType: GitHubAppType;
+  reviewScope: ReviewScope;
 }) {
   if (args.appType === 'lite') return;
 
   try {
-    const activeReviewIds = await findActiveReviewsForPR(
-      args.repoFullName,
-      args.prNumber,
-      args.newHeadSha,
-      { platformIntegrationId: args.integrationId }
-    );
+    const activeReviewIds = await findActiveReviewsForPR(args.reviewScope, args.newHeadSha);
     if (activeReviewIds.length === 0) return;
 
     // In practice a PR has at most one active review at a time; migrate the

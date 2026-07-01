@@ -121,7 +121,8 @@ export function getCodeReviewActionRequiredCopy(
 
 export function getCodeReviewActionRequiredRecoveryHref(
   reason: CodeReviewActionRequiredReason,
-  organizationId?: string
+  organizationId?: string,
+  platform?: 'github' | 'gitlab' | 'bitbucket'
 ): string {
   if (reason === 'github_installation_required') {
     return organizationId
@@ -144,7 +145,10 @@ export function getCodeReviewActionRequiredRecoveryHref(
   }
 
   if (reason === 'selected_model_unavailable') {
-    return organizationId ? `/organizations/${organizationId}/code-reviews` : '/code-reviews';
+    const basePath = organizationId
+      ? `/organizations/${organizationId}/code-reviews`
+      : '/code-reviews';
+    return platform ? `${basePath}?platform=${platform}` : basePath;
   }
 
   return organizationId ? `/organizations/${organizationId}/byok` : '/byok';

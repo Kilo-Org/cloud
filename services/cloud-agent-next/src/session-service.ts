@@ -1,16 +1,18 @@
-import { dirname } from 'node:path';
-import type {
-  ExecutionSession,
-  SandboxInstance,
-  SandboxId,
-  SessionContext,
-  SessionId,
-  GitAuthorConfig,
-  ManagedGitHubFallbackReason,
+import { dirname, relative } from 'node:path';
+import {
+  parseManagedBitbucketCloneUrl,
+  type ExecutionSession,
+  type SandboxInstance,
+  type SandboxId,
+  type SessionContext,
+  type SessionId,
+  type GitAuthorConfig,
+  type ManagedGitHubFallbackReason,
 } from './types.js';
 import { generateSandboxId } from './sandbox-id.js';
 import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
+  isTemporaryManagedBitbucketTokenFailure,
   resolveCloudAgentGitHubAuthForRepo,
   resolveManagedBitbucketToken,
   resolveManagedGitLabToken,
@@ -28,6 +30,7 @@ import {
   setupWorkspace,
   updateGitAuthor,
   updateGitRemoteToken,
+  updateGitRemoteUrl,
 } from './workspace.js';
 import { logger, WithLogTags } from './logger.js';
 import { timedExec } from './sandbox-timeout-logging.js';
@@ -41,7 +44,7 @@ import type {
 import { parseSessionMetadata } from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
 import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
-import type { MCPSecretValue } from './router/schemas.js';
+import { codeReviewIdFromCallbackTarget, type MCPSecretValue } from './router/schemas.js';
 import type { SessionProfileBundle } from './session-profile.js';
 import { readProfileBundle } from './session-profile.js';
 import {
@@ -80,6 +83,18 @@ import {
 
 const SETUP_COMMAND_TIMEOUT_SECONDS = 300; // 5 minutes
 const DEFAULT_DENIED_COMMAND_PATTERNS = ['rm -rf', 'sudo rm', 'mkfs', 'dd if='];
+const BITBUCKET_REVIEW_ENV_KEYS = [
+  'BITBUCKET_TOKEN',
+  'KILO_BITBUCKET_INTEGRATION_ID',
+  'KILO_BITBUCKET_WORKSPACE_SLUG',
+  'KILO_BITBUCKET_WORKSPACE_UUID',
+  'KILO_BITBUCKET_REPOSITORY_SLUG',
+  'KILO_BITBUCKET_REPOSITORY_UUID',
+] as const;
+
+export function bitbucketReviewInputPath(reviewId: string): string {
+  return `/tmp/bb-${reviewId}/input.json`;
+}
 
 function gitLabTokenLookupFailureMessage(reason: string): string {
   switch (reason) {
@@ -154,6 +169,61 @@ const CODE_REVIEW_ALLOWED_COMMANDS = [
   'cd',
   'mkdir',
   'touch',
+];
+
+const BITBUCKET_CODE_REVIEW_SHELL_SYNTAX_DENIES = [
+  '*$*',
+  '*`*',
+  '*;*',
+  '*|*',
+  '*&&*',
+  '*||*',
+  '*>*',
+  '*\n*',
+];
+
+function bitbucketCodeReviewAllowedCommands(reviewId: string): string[] {
+  const inputPath = bitbucketReviewInputPath(reviewId);
+  return [
+    'bb',
+    'bb help',
+    'bb --help',
+    'bb -h',
+    'bb pr current',
+    'bb pr create --title *',
+    'bb pr view *',
+    'bb pr diff *',
+    'bb comments list *',
+    'bb comments create * --input -',
+    'bb comments create-batch * --input -',
+    'bb comments update * * --input -',
+    `bb comments create * --input - < ${inputPath}`,
+    `bb comments create-batch * --input - < ${inputPath}`,
+    `bb comments update * * --input - < ${inputPath}`,
+  ];
+}
+
+function bitbucketCodeReviewDeniedCommands(reviewId: string): string[] {
+  const inputPath = bitbucketReviewInputPath(reviewId);
+  return [
+    'bb pr create --title * < *',
+    'bb pr view * ?*',
+    'bb pr diff * ?*',
+    'bb comments list * ?*',
+    'bb comments create * * --input -',
+    'bb comments create-batch * * --input -',
+    'bb comments update * * * --input -',
+    `bb comments create * * --input - < ${inputPath}`,
+    `bb comments create-batch * * --input - < ${inputPath}`,
+    `bb comments update * * * --input - < ${inputPath}`,
+  ];
+}
+
+const BITBUCKET_CODE_REVIEW_DIFF_NAME_ONLY_ALLOWED_COMMANDS = ['bb pr diff * --name-only'];
+
+const BITBUCKET_CODE_REVIEW_DIFF_NAME_ONLY_DENIED_COMMANDS = [
+  'bb pr diff * ?* --name-only',
+  'bb pr diff * --name-only ?*',
 ];
 
 const CODE_REVIEW_DENIED_COMMAND_PATTERNS = [
@@ -373,10 +443,19 @@ const SECURITY_REMEDIATION_DENIED_COMMAND_PATTERNS = [
 export type CommandGuardPolicy = {
   policyName: string;
   allowed: string[];
+  exactAllowed?: string[];
   denied: string[];
+  allowedAfterDenied?: string[];
+  deniedAfterAllowedOverrides?: string[];
+  terminalDenied?: string[];
+  defaultDeny?: boolean;
 };
 
-export function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardPolicy | null {
+export function getCommandGuardPolicy(
+  createdOnPlatform?: string,
+  platform?: 'github' | 'gitlab' | 'bitbucket',
+  bitbucketReviewId?: string
+): CommandGuardPolicy | null {
   if (createdOnPlatform === 'security-remediation') {
     return {
       policyName: 'security-remediation-pr',
@@ -386,6 +465,25 @@ export function getCommandGuardPolicy(createdOnPlatform?: string): CommandGuardP
   }
 
   if (createdOnPlatform === 'code-review') {
+    if (platform === 'bitbucket') {
+      const exactAllowed = bitbucketReviewId
+        ? bitbucketCodeReviewAllowedCommands(bitbucketReviewId)
+        : [];
+      return {
+        policyName: 'bitbucket-code-review-read-only',
+        allowed: [],
+        exactAllowed,
+        denied: bitbucketReviewId ? bitbucketCodeReviewDeniedCommands(bitbucketReviewId) : [],
+        allowedAfterDenied: bitbucketReviewId
+          ? BITBUCKET_CODE_REVIEW_DIFF_NAME_ONLY_ALLOWED_COMMANDS
+          : [],
+        deniedAfterAllowedOverrides: bitbucketReviewId
+          ? BITBUCKET_CODE_REVIEW_DIFF_NAME_ONLY_DENIED_COMMANDS
+          : [],
+        terminalDenied: BITBUCKET_CODE_REVIEW_SHELL_SYNTAX_DENIES,
+        defaultDeny: true,
+      };
+    }
     return {
       policyName: 'code-review-read-only',
       allowed: CODE_REVIEW_ALLOWED_COMMANDS,
@@ -402,15 +500,55 @@ export function buildCommandGuardBashPermissions(
   // Denies are inserted after allows so exact duplicates still fail closed;
   // more-specific denied sub-commands also override broader allowed commands in the CLI matcher.
   const bashPermissions: Record<string, string> = {};
+  if (commandGuardPolicy.defaultDeny) {
+    bashPermissions['*'] = 'deny';
+  }
   for (const cmd of commandGuardPolicy.allowed) {
     bashPermissions[cmd] = 'allow';
     bashPermissions[`${cmd} *`] = 'allow';
+  }
+  for (const cmd of commandGuardPolicy.exactAllowed ?? []) {
+    bashPermissions[cmd] = 'allow';
   }
   for (const cmd of commandGuardPolicy.denied) {
     bashPermissions[cmd] = 'deny';
     bashPermissions[`${cmd} *`] = 'deny';
   }
+  for (const cmd of commandGuardPolicy.allowedAfterDenied ?? []) {
+    bashPermissions[cmd] = 'allow';
+  }
+  for (const cmd of commandGuardPolicy.deniedAfterAllowedOverrides ?? []) {
+    bashPermissions[cmd] = 'deny';
+    bashPermissions[`${cmd} *`] = 'deny';
+  }
+  for (const cmd of commandGuardPolicy.terminalDenied ?? []) {
+    bashPermissions[cmd] = 'deny';
+    bashPermissions[`${cmd} *`] = 'deny';
+  }
   return bashPermissions;
+}
+
+function matchesKiloPermissionPattern(input: string, pattern: string): boolean {
+  let escaped = pattern
+    .replaceAll('\\', '/')
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*')
+    .replace(/\?/g, '.');
+  if (escaped.endsWith(' .*')) {
+    escaped = `${escaped.slice(0, -3)}( .*)?`;
+  }
+  return new RegExp(`^${escaped}$`, 's').test(input.replaceAll('\\', '/'));
+}
+
+export function resolveCommandGuardBashPermission(
+  permissions: Record<string, string>,
+  command: string
+): string | undefined {
+  let result: string | undefined;
+  for (const [pattern, action] of Object.entries(permissions)) {
+    if (matchesKiloPermissionPattern(command, pattern)) result = action;
+  }
+  return result;
 }
 
 class SessionSnapshotRestoreError extends Error {
@@ -954,6 +1092,24 @@ function repositoryPlatform(
   return undefined;
 }
 
+function inferGitPlatformFromCloneUrl(
+  gitUrl: string | undefined
+): 'gitlab' | 'bitbucket' | undefined {
+  if (!gitUrl) return undefined;
+
+  try {
+    const url = new URL(gitUrl);
+    if (url.protocol !== 'https:' && url.protocol !== 'ssh:') return undefined;
+    if (url.hostname === 'gitlab.com') return 'gitlab';
+    if (url.hostname === 'bitbucket.org') return 'bitbucket';
+    return undefined;
+  } catch {
+    if (/^git@gitlab\.com:[^/]+\/[^/]+(?:\.git)?$/.test(gitUrl)) return 'gitlab';
+    if (/^git@bitbucket\.org:[^/]+\/[^/]+(?:\.git)?$/.test(gitUrl)) return 'bitbucket';
+    return undefined;
+  }
+}
+
 function repositoryShallow(metadata: CloudAgentSessionState): boolean | undefined {
   return metadata.workspace?.shallow;
 }
@@ -1008,7 +1164,6 @@ export class SessionService {
         this._metadata.identity.botId,
         {
           createdOnPlatform: this._metadata.identity.createdOnPlatform,
-          codeReviewEphemeralSandboxOrgIds: env.CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS,
         }
       ));
 
@@ -1097,11 +1252,15 @@ export class SessionService {
       githubToken: context.githubToken,
       githubRepo: context.githubRepo,
       createdOnPlatform: opts.createdOnPlatform,
+      callbackTarget: opts.callbackTarget,
       appendSystemPrompt: opts.appendSystemPrompt,
       gitUrl: context.gitUrl,
       gitToken: context.gitToken,
       glabIsOAuth2: context.glabIsOAuth2,
       platform: context.platform,
+      bitbucketTokenManaged: context.bitbucketTokenManaged,
+      bitbucketWorkspaceUuid: context.bitbucketWorkspaceUuid,
+      bitbucketRepositoryUuid: context.bitbucketRepositoryUuid,
       profile: effectiveProfile,
     });
   }
@@ -1118,15 +1277,24 @@ export class SessionService {
       githubToken,
       githubRepo,
       createdOnPlatform,
+      callbackTarget,
       appendSystemPrompt,
       gitUrl,
       gitToken,
       glabIsOAuth2,
       platform,
+      bitbucketTokenManaged,
+      bitbucketWorkspaceUuid,
+      bitbucketRepositoryUuid,
       profile,
     } = opts;
     const userEnvVars = profile?.envVars;
     const encryptedSecrets = profile?.encryptedSecrets;
+    const bitbucketReviewId =
+      createdOnPlatform === 'code-review' && platform === 'bitbucket'
+        ? codeReviewIdFromCallbackTarget(callbackTarget)
+        : null;
+    const isBitbucketCodeReview = bitbucketReviewId !== null;
     const mcpServers = profile?.mcpServers;
     const runtimeAgents = profile?.runtimeAgents;
     const kiloCommands = profile?.kiloCommands;
@@ -1135,11 +1303,11 @@ export class SessionService {
     const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
     const kilocodeOrganizationId = env.KILOCODE_ORG_ID_OVERRIDE ?? originalOrgId;
 
-    // Start with user env vars
-    let baseEnvVars = userEnvVars || {};
+    // Bitbucket Code Reviewer sessions use only trusted worker-owned environment values.
+    let baseEnvVars = isBitbucketCodeReview ? {} : { ...userEnvVars };
 
     // Decrypt and merge encrypted secrets if present
-    if (encryptedSecrets && Object.keys(encryptedSecrets).length > 0) {
+    if (!isBitbucketCodeReview && encryptedSecrets && Object.keys(encryptedSecrets).length > 0) {
       const privateKey = env.AGENT_ENV_VARS_PRIVATE_KEY;
       if (!privateKey) {
         throw new Error(
@@ -1150,6 +1318,10 @@ export class SessionService {
       logger
         .withTags({ secretCount: Object.keys(encryptedSecrets).length })
         .info('Decrypted and merged encrypted secrets');
+    }
+
+    for (const key of BITBUCKET_REVIEW_ENV_KEYS) {
+      delete baseEnvVars[key];
     }
 
     const envVars: Record<string, string> = {
@@ -1180,7 +1352,15 @@ export class SessionService {
       providerOptions.baseURL = backendUrlForSandbox(env.KILO_OPENROUTER_BASE);
     }
     const isInteractive = createdOnPlatform == 'cloud-agent-web';
-    const commandGuardPolicy = getCommandGuardPolicy(createdOnPlatform);
+    const commandGuardPolicy = getCommandGuardPolicy(
+      createdOnPlatform,
+      platform,
+      bitbucketReviewId ?? undefined
+    );
+    const bitbucketInputPath =
+      commandGuardPolicy?.policyName === 'bitbucket-code-review-read-only' && bitbucketReviewId
+        ? bitbucketReviewInputPath(bitbucketReviewId)
+        : undefined;
 
     if (commandGuardPolicy) {
       Object.assign(envVars, {
@@ -1200,6 +1380,7 @@ export class SessionService {
         [`/tmp/attachments/${sessionId}/**`]: 'allow',
         [`${workspacePath}/**`]: 'allow',
         [`${sessionHome}/.kilocode/skills/**`]: 'allow',
+        ...(bitbucketInputPath ? { [`${dirname(bitbucketInputPath)}/*`]: 'allow' } : {}),
       },
       ...(!isInteractive && { question: 'deny' }),
       read: 'allow',
@@ -1228,10 +1409,22 @@ export class SessionService {
       //   webfetch/websearch/codesearch: deny  (was browser.enabled: false)
       //   MCP: allowed by default (was mcp.enabled: true)
       //   question: handled above (line 564) for non-interactive sessions
+      const bitbucketReviewPolicy =
+        commandGuardPolicy.policyName === 'bitbucket-code-review-read-only';
       Object.assign(permission, {
         read: 'allow',
-        edit: commandGuardPolicy.policyName === 'security-remediation-pr' ? 'allow' : 'deny',
+        edit:
+          commandGuardPolicy.policyName === 'security-remediation-pr'
+            ? 'allow'
+            : bitbucketReviewPolicy && bitbucketInputPath
+              ? {
+                  '*': 'deny',
+                  [relative(workspacePath, bitbucketInputPath)]: 'allow',
+                }
+              : 'deny',
         bash: bashPermissions,
+        task: bitbucketReviewPolicy ? 'deny' : permission.task,
+        lsp: bitbucketReviewPolicy ? 'deny' : permission.lsp,
         webfetch: 'deny',
         websearch: 'deny',
         codesearch: 'deny',
@@ -1258,7 +1451,7 @@ export class SessionService {
       autoupdate: false,
       snapshot: createdOnPlatform === 'cloud-agent-web',
     };
-    if (mcpServers && Object.keys(mcpServers).length > 0) {
+    if (!bitbucketInputPath && mcpServers && Object.keys(mcpServers).length > 0) {
       const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);
       configContent.mcp = materialized;
       logger.info('MCP config merged into KILO_CONFIG_CONTENT', {
@@ -1273,7 +1466,7 @@ export class SessionService {
     if (appendSystemPrompt && appendSystemPrompt.trim()) {
       agentConfig.custom = { prompt: appendSystemPrompt };
     }
-    if (runtimeAgents && runtimeAgents.length > 0) {
+    if (!bitbucketInputPath && runtimeAgents && runtimeAgents.length > 0) {
       for (const agent of runtimeAgents) {
         agentConfig[agent.slug] = buildAgentEntryFromRuntimeAgent(agent);
       }
@@ -1285,7 +1478,7 @@ export class SessionService {
     if (Object.keys(agentConfig).length > 0) {
       configContent.agent = agentConfig;
     }
-    if (kiloCommands && kiloCommands.length > 0) {
+    if (!bitbucketInputPath && kiloCommands && kiloCommands.length > 0) {
       configContent.command = Object.fromEntries(
         kiloCommands.map(cmd => [
           cmd.name,
@@ -1312,7 +1505,31 @@ export class SessionService {
     }
 
     // Determine effective platform: use explicit platform param, or infer from gitUrl as fallback
-    const effectivePlatform = platform ?? (gitUrl?.includes('gitlab') ? 'gitlab' : undefined);
+    const effectivePlatform = platform ?? inferGitPlatformFromCloneUrl(gitUrl);
+
+    if (effectivePlatform === 'bitbucket' && bitbucketTokenManaged === true) {
+      const managedRepository = gitUrl ? parseManagedBitbucketCloneUrl(gitUrl) : null;
+      if (!gitToken || !bitbucketWorkspaceUuid || !bitbucketRepositoryUuid || !managedRepository) {
+        throw ExecutionError.invalidRequest(
+          'Validated Bitbucket context and managed token are required'
+        );
+      }
+      Object.assign(envVars, {
+        BITBUCKET_TOKEN: gitToken,
+        KILO_BITBUCKET_WORKSPACE_SLUG: managedRepository.workspaceSlug,
+        KILO_BITBUCKET_WORKSPACE_UUID: `{${bitbucketWorkspaceUuid.toLowerCase()}}`,
+        KILO_BITBUCKET_REPOSITORY_SLUG: managedRepository.repositorySlug,
+        KILO_BITBUCKET_REPOSITORY_UUID: `{${bitbucketRepositoryUuid.toLowerCase()}}`,
+      });
+    }
+
+    if (createdOnPlatform === 'code-review' && effectivePlatform === 'bitbucket') {
+      if (!bitbucketReviewId) {
+        throw ExecutionError.invalidRequest(
+          'Validated Bitbucket code-review context and managed token are required'
+        );
+      }
+    }
 
     const requiresResolvedGitLabTokenMode = glabIsOAuth2 === false;
     // A token-mode credential must be materialized consistently with its resolver instruction.
@@ -1383,6 +1600,7 @@ export class SessionService {
       kilocodeModel,
       originalOrgId,
       createdOnPlatform,
+      callbackTarget,
       appendSystemPrompt,
       profile,
     } = opts;
@@ -1400,6 +1618,7 @@ export class SessionService {
       kilocodeModel,
       originalOrgId,
       createdOnPlatform,
+      callbackTarget,
       appendSystemPrompt,
       profile: effectiveProfile,
     });
@@ -1500,6 +1719,9 @@ export class SessionService {
       const result = await resolveManagedBitbucketToken(env, {
         userId: metadata.identity.userId,
         orgId: metadata.identity.orgId,
+        ...(git.bitbucketIntegrationId
+          ? { expectedIntegrationId: git.bitbucketIntegrationId }
+          : {}),
         workspaceUuid: git.workspaceUuid,
         repositoryUuid: git.repositoryUuid,
         repositoryUrl: git.url,
@@ -1507,7 +1729,7 @@ export class SessionService {
       if (!result.success) {
         const reconnect = result.reason === 'reconnect_required' ? ' Reconnect Bitbucket.' : '';
         const message = `Bitbucket repository authorization failed (${result.reason}).${reconnect}`;
-        if (result.reason === 'temporarily_unavailable') {
+        if (isTemporaryManagedBitbucketTokenFailure(result.reason)) {
           throw ExecutionError.workspaceSetupFailed(message);
         }
         throw ExecutionError.invalidRequest(message);
@@ -1605,11 +1827,15 @@ export class SessionService {
       githubToken: resolvedTokens.githubToken,
       githubRepo: github?.repo,
       createdOnPlatform: metadata.identity.createdOnPlatform,
+      callbackTarget: metadata.callback?.target,
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
       gitUrl: git?.url,
       gitToken: resolvedTokens.gitToken,
       glabIsOAuth2: resolvedTokens.glabIsOAuth2,
       platform,
+      bitbucketTokenManaged: resolvedTokens.bitbucketTokenManaged,
+      bitbucketWorkspaceUuid: git?.type === 'bitbucket' ? git.workspaceUuid : undefined,
+      bitbucketRepositoryUuid: git?.type === 'bitbucket' ? git.repositoryUuid : undefined,
       profile,
     });
 
@@ -1843,6 +2069,7 @@ export class SessionService {
       kilocodeModel: options.kilocodeModel,
       originalOrgId: orgId,
       createdOnPlatform: metadata.identity.createdOnPlatform,
+      callbackTarget: metadata.callback?.target,
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
       profile: readProfileBundle(metadata),
     });
@@ -1863,7 +2090,11 @@ export class SessionService {
         options.kilocodeModel,
         orgId
       );
-      await this.refreshGitRemoteToken(session, context, metadata, resolvedTokens);
+      if (
+        !(await this.sanitizeBitbucketCodeReviewRemote(session, context.workspacePath, metadata))
+      ) {
+        await this.refreshGitRemoteToken(session, context, metadata, resolvedTokens);
+      }
 
       const detectedDevcontainer =
         metadata.workspace?.devcontainerRequested && !metadata.devcontainer
@@ -1937,6 +2168,7 @@ export class SessionService {
 
       onProgress?.('branch', 'Setting up branch…');
       await this.prepareBranch(session, workspacePath, branchName, metadata);
+      await this.sanitizeBitbucketCodeReviewRemote(session, workspacePath, metadata);
 
       await writeAuthFile(sandbox, sessionHome, metadata.auth.kilocodeToken);
       await writeGlobalRules(sandbox, sessionHome, sessionId);
@@ -2049,6 +2281,7 @@ export class SessionService {
       kilocodeModel,
       originalOrgId: orgId,
       createdOnPlatform: metadata.identity.createdOnPlatform,
+      callbackTarget: metadata.callback?.target,
       appendSystemPrompt: metadata.agent?.appendSystemPrompt,
       profile: readProfileBundle(metadata),
     });
@@ -2148,6 +2381,19 @@ export class SessionService {
         `Failed to create session branch ${branchName}: ${result.stderr || result.stdout}`
       );
     }
+  }
+
+  private async sanitizeBitbucketCodeReviewRemote(
+    session: ExecutionSession,
+    workspacePath: string,
+    metadata: CloudAgentSessionState
+  ): Promise<boolean> {
+    const git = gitRepository(metadata);
+    if (metadata.identity.createdOnPlatform !== 'code-review' || git?.type !== 'bitbucket') {
+      return false;
+    }
+    await updateGitRemoteUrl(session, workspacePath, git.url);
+    return true;
   }
 
   /**
@@ -2441,6 +2687,7 @@ export type GetOrCreateSessionOptions = {
   kilocodeModel?: string;
   originalOrgId?: string;
   createdOnPlatform?: string;
+  callbackTarget?: NonNullable<CloudAgentSessionState['callback']>['target'];
   appendSystemPrompt?: string;
   profile?: SessionProfileBundle;
 };
@@ -2467,11 +2714,15 @@ type GetSaferEnvVarsOptions = {
   githubToken?: string;
   githubRepo?: string;
   createdOnPlatform?: string;
+  callbackTarget?: NonNullable<CloudAgentSessionState['callback']>['target'];
   appendSystemPrompt?: string;
   gitUrl?: string;
   gitToken?: string;
   glabIsOAuth2?: boolean;
   platform?: 'github' | 'gitlab' | 'bitbucket';
+  bitbucketTokenManaged?: boolean;
+  bitbucketWorkspaceUuid?: string;
+  bitbucketRepositoryUuid?: string;
   profile?: SessionProfileBundle;
 };
 

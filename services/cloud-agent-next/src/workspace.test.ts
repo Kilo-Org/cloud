@@ -34,6 +34,7 @@ import {
   cloneGitRepo,
   updateGitAuthor,
   updateGitRemoteToken,
+  updateGitRemoteUrl,
   checkDiskSpace,
   checkDiskAndCleanBeforeSetup,
   cleanupStaleWorkspaces,
@@ -751,6 +752,23 @@ describe('disk space checking', () => {
         `git config user.email 'user'\\''$(touch /tmp/email)'\\''@example.com'`,
         expect.objectContaining({ cwd: workspacePath })
       );
+    });
+  });
+
+  describe('updateGitRemoteUrl', () => {
+    it('replaces a tokenized origin with the credential-free canonical URL', async () => {
+      mockExec.mockResolvedValueOnce({ exitCode: 0, stdout: '', stderr: '' });
+
+      await updateGitRemoteUrl(
+        fakeSession,
+        '/workspace',
+        'https://x-token-auth:managed-token@bitbucket.org/acme/repo.git'
+      );
+
+      const command = String(mockExec.mock.calls[0]?.[0]);
+      expect(command).toContain("git remote set-url origin 'https://bitbucket.org/acme/repo.git'");
+      expect(command).not.toContain('managed-token');
+      expect(command).not.toContain('@bitbucket.org');
     });
   });
 

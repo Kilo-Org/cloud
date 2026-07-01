@@ -1,6 +1,5 @@
 import type { SandboxId, Env } from './types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
-import { resolveEphemeralSandboxPolicy } from './code-review-ephemeral-sandbox.js';
 
 const SHARED_SANDBOX_ID_VERSION = 'shared-v2';
 
@@ -21,7 +20,6 @@ export type SandboxRoutingTarget =
 export type SandboxRoutingOptions = {
   devcontainer?: boolean;
   createdOnPlatform?: string;
-  codeReviewEphemeralSandboxOrgIds?: string;
 };
 
 export function isGeneratedSharedSandboxId(sandboxId: string): sandboxId is SandboxId {
@@ -85,7 +83,9 @@ export async function deriveSharedSandboxId(
 /**
  * Generate a deterministic, Cloudflare-compatible sandboxId (≤63 chars).
  *
- * When the org is in PER_SESSION_SANDBOX_ORG_IDS the sandbox is isolated
+ * Code Reviewer sessions (createdOnPlatform === 'code-review') always get an
+ * ephemeral, isolated sandbox (crv-{hash}, using SandboxCodeReview). Otherwise,
+ * when the org is in PER_SESSION_SANDBOX_ORG_IDS the sandbox is isolated
  * per session (ses-{hash}, using SandboxSmall) or when devcontainer mode
  * is requested (dind-{hash}, using SandboxDIND). Otherwise it is shared
  * per org/user/bot (org-|usr-|bot-|ubt-{hash}, using Sandbox).
@@ -110,20 +110,7 @@ export async function generateSandboxRoutingTarget(
   if (routingOptions.devcontainer) {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'dind') };
   }
-  const ephemeralPolicy = resolveEphemeralSandboxPolicy(
-    {
-      CODE_REVIEW_EPHEMERAL_SANDBOX_ORG_IDS: routingOptions.codeReviewEphemeralSandboxOrgIds,
-    },
-    {
-      identity: {
-        sessionId,
-        userId,
-        orgId,
-        createdOnPlatform: routingOptions.createdOnPlatform,
-      },
-    }
-  );
-  if (ephemeralPolicy.enabled) {
+  if (routingOptions.createdOnPlatform === 'code-review') {
     return { kind: 'isolated', sandboxId: await hashToSandboxId(sessionId, 'crv') };
   }
   if (perSessionOrgs.has('*') || (orgId !== undefined && perSessionOrgs.has(orgId))) {

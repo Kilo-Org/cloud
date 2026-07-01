@@ -11,6 +11,16 @@ import {
   isOpenclawMarkdownContent,
   normalizeOpenclawImportPath,
 } from '../openclaw-import';
+import {
+  OPENCLAW_EXPORT_FORMATS,
+  OPENCLAW_EXPORT_MAX_ARCHIVE_BYTES,
+  OpenclawExportError,
+  buildOpenclawWorkspaceTarGz,
+  buildOpenclawWorkspaceZip,
+  collectOpenclawWorkspaceFiles,
+  openclawExportContentType,
+  openclawExportFileName,
+} from '../openclaw-export';
 import { getBearerToken } from './gateway';
 import { timingSafeTokenEqual } from '../auth';
 import { resolveSafePath, verifyCanonicalized, SafePathError } from '../safe-path';
@@ -38,6 +48,11 @@ const OpenclawWorkspaceImportFileSchema = z.object({
 
 const OpenclawWorkspaceImportBodySchema = z.object({
   files: z.array(OpenclawWorkspaceImportFileSchema).min(1).max(OPENCLAW_IMPORT_MAX_FILES),
+});
+
+const OpenclawWorkspaceExportBodySchema = z.object({
+  format: z.enum(OPENCLAW_EXPORT_FORMATS),
+  password: z.string().min(1).max(256).optional(),
 });
 
 const OpenclawWorkspaceImportFailureSchema = z.object({
@@ -167,7 +182,11 @@ function validateOpenclawWorkspaceImport(
       };
     }
 
-    preparedFiles.push({ path: normalizedPath, content: file.content, utf8Bytes });
+    preparedFiles.push({
+      path: normalizedPath,
+      content: file.content,
+      utf8Bytes,
+    });
 
     if (normalizedPath.startsWith(OPENCLAW_IMPORT_MEMORY_PREFIX)) {
       importedMemoryPaths.add(normalizedPath);
@@ -271,7 +290,11 @@ function resolveAndValidateImportTarget(
     resolvedPath = resolveSafePath(relativePath, rootDir);
   } catch (error) {
     if (error instanceof SafePathError) {
-      return { ok: false, error: error.message, code: 'openclaw_import_invalid_path' };
+      return {
+        ok: false,
+        error: error.message,
+        code: 'openclaw_import_invalid_path',
+      };
     }
     throw error;
   }
@@ -381,11 +404,19 @@ function resolveAndValidateDirectory(
   }
 
   if (isOpenclawValidationArtifactPath(path.relative(rootDir, resolved))) {
-    return { code: 'file_not_found', error: 'Directory does not exist', status: 404 };
+    return {
+      code: 'file_not_found',
+      error: 'Directory does not exist',
+      status: 404,
+    };
   }
 
   if (!fs.existsSync(resolved)) {
-    return { code: 'file_not_found', error: 'Directory does not exist', status: 404 };
+    return {
+      code: 'file_not_found',
+      error: 'Directory does not exist',
+      status: 404,
+    };
   }
 
   let canonicalPath: string;
@@ -399,7 +430,11 @@ function resolveAndValidateDirectory(
     throw e;
   }
   if (isOpenclawValidationArtifactPath(path.relative(rootDir, canonicalPath))) {
-    return { code: 'file_not_found', error: 'Directory does not exist', status: 404 };
+    return {
+      code: 'file_not_found',
+      error: 'Directory does not exist',
+      status: 404,
+    };
   }
 
   const stat = fs.lstatSync(resolved);
@@ -433,11 +468,19 @@ function resolveAndValidateFile(
   }
 
   if (isOpenclawValidationArtifactPath(path.relative(rootDir, resolved))) {
-    return { code: 'file_not_found', error: 'File does not exist', status: 404 };
+    return {
+      code: 'file_not_found',
+      error: 'File does not exist',
+      status: 404,
+    };
   }
 
   if (!fs.existsSync(resolved)) {
-    return { code: 'file_not_found', error: 'File does not exist', status: 404 };
+    return {
+      code: 'file_not_found',
+      error: 'File does not exist',
+      status: 404,
+    };
   }
 
   // Canonicalize to catch symlinked ancestors escaping the root or aliasing internal artifacts.
@@ -452,7 +495,11 @@ function resolveAndValidateFile(
     throw e;
   }
   if (isOpenclawValidationArtifactPath(path.relative(rootDir, canonicalPath))) {
-    return { code: 'file_not_found', error: 'File does not exist', status: 404 };
+    return {
+      code: 'file_not_found',
+      error: 'File does not exist',
+      status: 404,
+    };
   }
 
   const stat = fs.lstatSync(resolved);
@@ -775,6 +822,102 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
     return c.json(validatedResponse);
   });
 
+  app.post('/_kilo/files/export-openclaw-workspace', async c => {
+    let rawBody: unknown;
+    try {
+      rawBody = await c.req.json();
+    } catch {
+      return c.json({ error: 'Invalid JSON body', code: 'invalid_json_body' }, 400);
+    }
+
+    const parsed = OpenclawWorkspaceExportBodySchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: 'Missing or invalid export request',
+          code: 'invalid_request_body',
+          details: parsed.error.flatten().fieldErrors,
+        },
+        400
+      );
+    }
+
+    const { format, password } = parsed.data;
+
+    // Encryption is zip-only; .tar.gz has no user-friendly password mechanism.
+    if (password && format !== 'zip') {
+      return c.json(
+        {
+          error: 'Encryption is only supported for zip exports',
+          code: 'openclaw_export_encryption_unsupported',
+        },
+        400
+      );
+    }
+
+    let collection;
+    try {
+      collection = collectOpenclawWorkspaceFiles(rootDir);
+    } catch (error) {
+      if (error instanceof OpenclawExportError) {
+        return c.json({ error: error.message, code: error.code }, error.status);
+      }
+      console.error('[files] Failed to collect workspace for export:', error);
+      return c.json({ error: 'Failed to read workspace', code: 'openclaw_export_failed' }, 500);
+    }
+
+    if (collection.entries.length === 0) {
+      return c.json(
+        {
+          error: 'No exportable OpenClaw workspace files were found',
+          code: 'openclaw_export_no_files',
+        },
+        400
+      );
+    }
+
+    let archive: Uint8Array;
+    try {
+      archive =
+        format === 'zip'
+          ? await buildOpenclawWorkspaceZip(collection.entries, password)
+          : await buildOpenclawWorkspaceTarGz(collection.entries);
+    } catch (error) {
+      console.error('[files] Failed to build export archive:', error);
+      return c.json(
+        {
+          error: 'Failed to build export archive',
+          code: 'openclaw_export_failed',
+        },
+        500
+      );
+    }
+
+    if (archive.byteLength > OPENCLAW_EXPORT_MAX_ARCHIVE_BYTES) {
+      return c.json(
+        {
+          error: `Export archive exceeds the ${OPENCLAW_EXPORT_MAX_ARCHIVE_BYTES}-byte transfer limit`,
+          code: 'openclaw_export_too_large',
+        },
+        413
+      );
+    }
+
+    // Hand back a clean ArrayBuffer slice so Hono types accept the binary body.
+    const body = archive.buffer.slice(
+      archive.byteOffset,
+      archive.byteOffset + archive.byteLength
+    ) as ArrayBuffer;
+
+    return c.body(body, 200, {
+      'Content-Type': openclawExportContentType(format),
+      'Content-Disposition': `attachment; filename="${openclawExportFileName(format)}"`,
+      'X-Openclaw-Export-File-Count': String(collection.entries.length),
+      'X-Openclaw-Export-Total-Bytes': String(collection.totalBytes),
+      'X-Openclaw-Export-Skipped': String(collection.skippedCount),
+    });
+  });
+
   const WriteBodySchema = z.object({
     path: z.string().min(1),
     content: z.string(),
@@ -808,12 +951,21 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
           const currentContent = fs.readFileSync(result, 'utf-8');
           if (body.etag !== computeEtag(currentContent)) {
             return c.json(
-              { code: 'file_etag_conflict', error: 'File was modified externally' },
+              {
+                code: 'file_etag_conflict',
+                error: 'File was modified externally',
+              },
               409
             );
           }
         } catch {
-          return c.json({ code: 'file_etag_conflict', error: 'File was modified externally' }, 409);
+          return c.json(
+            {
+              code: 'file_etag_conflict',
+              error: 'File was modified externally',
+            },
+            409
+          );
         }
       }
 
@@ -878,16 +1030,28 @@ export function registerFileRoutes(app: Hono, expectedToken: string, rootDir: st
     return serializeAgentConfigMutation(
       async () => {
         if (hasEtagConflict()) {
-          return c.json({ code: 'file_etag_conflict', error: 'File was modified externally' }, 409);
+          return c.json(
+            {
+              code: 'file_etag_conflict',
+              error: 'File was modified externally',
+            },
+            409
+          );
         }
         if (body.mode === 'warn-before-write') {
           const validation = await validateOpenclawConfigCandidate(body.content, result);
           if (!validation.valid) {
-            return c.json({ outcome: 'openclaw-validation-warning', ...validation });
+            return c.json({
+              outcome: 'openclaw-validation-warning',
+              ...validation,
+            });
           }
           if (hasEtagConflict()) {
             return c.json(
-              { code: 'file_etag_conflict', error: 'File was modified externally' },
+              {
+                code: 'file_etag_conflict',
+                error: 'File was modified externally',
+              },
               409
             );
           }

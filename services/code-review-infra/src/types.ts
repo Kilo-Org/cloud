@@ -27,7 +27,21 @@ export interface SessionInput {
   /** Generic git token for authentication (for GitLab and other platforms) */
   gitToken?: string;
   /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
+  /** Managed Bitbucket workspace UUID. */
+  bitbucketWorkspaceUuid?: string;
+  /** Managed Bitbucket workspace slug. */
+  bitbucketWorkspaceSlug?: string;
+  /** Managed Bitbucket repository UUID. */
+  bitbucketRepositoryUuid?: string;
+  /** Managed Bitbucket repository slug. */
+  bitbucketRepositorySlug?: string;
+  /** Kilo Bitbucket platform integration ID. */
+  bitbucketIntegrationId?: string;
+  /** Bitbucket pull request ID. */
+  bitbucketPullRequestId?: number;
+  /** Head commit SHA that publication must remain fenced to. */
+  bitbucketExpectedHeadSha?: string;
   envVars?: Record<string, string>;
   mcpServers?: Record<string, MCPServerConfig>;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */

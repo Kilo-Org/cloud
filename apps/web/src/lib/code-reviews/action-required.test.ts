@@ -160,6 +160,9 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
     expect(getCodeReviewActionRequiredRecoveryHref('selected_model_unavailable', 'org-1')).toBe(
       '/organizations/org-1/code-reviews'
     );
+    expect(
+      getCodeReviewActionRequiredRecoveryHref('selected_model_unavailable', 'org-1', 'bitbucket')
+    ).toBe('/organizations/org-1/code-reviews?platform=bitbucket');
   });
 
   it('routes repeated repository clone timeout recovery to support email', () => {

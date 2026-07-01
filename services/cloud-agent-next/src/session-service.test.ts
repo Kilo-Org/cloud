@@ -1,3 +1,4 @@
+import { dirname, relative } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DevContainerModule from './kilo/devcontainer.js';
 import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
@@ -28,6 +29,7 @@ const workspaceMocks = vi.hoisted(() => ({
   }),
   updateGitAuthor: vi.fn().mockResolvedValue(undefined),
   updateGitRemoteToken: vi.fn().mockResolvedValue(undefined),
+  updateGitRemoteUrl: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./workspace.js', () => ({
@@ -70,9 +72,11 @@ vi.mock('./execution/attachment-prompt-parts.js', () => attachmentMocks);
 
 import {
   SessionService,
+  bitbucketReviewInputPath,
   buildCommandGuardBashPermissions,
   fetchSessionMetadata,
   getCommandGuardPolicy,
+  resolveCommandGuardBashPermission,
   writeGlobalRules,
 } from './session-service.js';
 import type { CloudAgentSessionState, PersistenceEnv } from './persistence/types.js';
@@ -159,6 +163,80 @@ describe('code-review command guard policy', () => {
     expect(bashPermissions['glab mr merge *']).toBe('deny');
     expect(bashPermissions['glab auth']).toBe('deny');
     expect(bashPermissions['glab auth *']).toBe('deny');
+  });
+
+  it('matches only purpose-built Bitbucket review commands and exact scratch redirection', () => {
+    const reviewId = '123e4567-e89b-12d3-a456-426614174023';
+    const inputPath = bitbucketReviewInputPath(reviewId);
+    const policy = getCommandGuardPolicy('code-review', 'bitbucket', reviewId);
+    if (!policy) throw new Error('Expected Bitbucket code-review command guard policy');
+
+    const permissions = buildCommandGuardBashPermissions(policy);
+    for (const command of [
+      'bb',
+      'bb help',
+      'bb --help',
+      'bb -h',
+      'bb pr current',
+      'bb pr create --title "Add safer widgets"',
+      'bb pr create --title "Add safer widgets" --description "Ready for review"',
+      'bb pr create --title "Add safer widgets" --destination main',
+      'bb pr view 42',
+      'bb pr diff 42',
+      'bb pr diff 42 --name-only',
+      'bb comments list 42',
+      'bb comments create 42 --input -',
+      'bb comments create-batch 42 --input -',
+      'bb comments update 42 31 --input -',
+      `bb comments create 42 --input - < ${inputPath}`,
+      `bb comments create-batch 42 --input - < ${inputPath}`,
+      `bb comments update 42 31 --input - < ${inputPath}`,
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('allow');
+    }
+
+    for (const command of [
+      'env',
+      'printenv BITBUCKET_TOKEN',
+      'echo $BITBUCKET_TOKEN',
+      'cat /proc/self/environ',
+      'python -c "print(1)"',
+      'node -e "console.log(1)"',
+      'pnpm exec tsx script.ts',
+      'curl https://api.bitbucket.org/2.0/user',
+      './repository-script',
+      'git status --short',
+      'git rev-parse HEAD',
+      'git diff --no-ext-diff --no-textconv',
+      'git show --no-ext-diff --no-textconv --format=fuller --stat HEAD',
+      'git config --get-regexp alias',
+      'git fetch origin',
+      'git diff',
+      'bb help extra',
+      'bb --debug pr view 42',
+      'bb pr current extra',
+      'bb pr create',
+      'bb pr create --description "Ready for review"',
+      'bb pr create --title "Add safer widgets" < /tmp/other.json',
+      'bb comments create 42 --input - --workspace other',
+      'bb comments create-batch 42 --input - --workspace other',
+      'bb comments update 42 31 --input - extra',
+      'bb comments create 42 --input - < /tmp/other.json',
+      'bb comments create-batch 42 --input - < /tmp/other.json',
+      `bb comments update 42 $COMMENT_ID --input - < ${inputPath}`,
+      `bb comments update 42 31 --input - < ${inputPath}; env`,
+      `bb pr diff 42 | bb comments create 42 --input - < ${inputPath}`,
+      'bb pr diff 42 --workspace other',
+      'bb pr diff 42 extra --name-only',
+      'bb pr diff 42 --name-only extra',
+      'bb pr diff $BITBUCKET_TOKEN --name-only',
+      'bb pr view 42 && printenv',
+      'bb pr view 42 extra',
+      'bb comments create 42 43 --input -',
+      'bb comments create-batch 42 43 --input -',
+    ]) {
+      expect(resolveCommandGuardBashPermission(permissions, command), command).toBe('deny');
+    }
   });
 });
 
@@ -286,22 +364,51 @@ function createGitLabCodeReviewMetadata(): CloudAgentSessionState {
   });
 }
 
-function createBitbucketMetadata(orgId?: string): CloudAgentSessionState {
+function createBitbucketMetadata(
+  isCodeReview: boolean,
+  orgId: string | null = '123e4567-e89b-12d3-a456-426614174030'
+): CloudAgentSessionState {
   return parseSessionMetadata({
     metadataSchemaVersion: 2,
     identity: {
-      sessionId: 'agent_bitbucket',
+      sessionId: 'agent_test',
       userId: 'user_test',
       ...(orgId ? { orgId } : {}),
+      createdOnPlatform: isCodeReview ? 'code-review' : 'cloud-agent-web',
     },
-    auth: {},
+    auth: {
+      kilocodeToken: 'kilo-token',
+      kiloSessionId: 'kilo-session',
+    },
     repository: {
       type: 'bitbucket',
-      url: 'https://bitbucket.org/acme/repo.git',
+      url: 'https://bitbucket.org/acme-team/widgets.git',
       platform: 'bitbucket',
       workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
       repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      ...(isCodeReview ? { bitbucketIntegrationId: '123e4567-e89b-12d3-a456-426614174022' } : {}),
     },
+    ...(isCodeReview
+      ? {
+          callback: {
+            target: {
+              url: 'https://kilo.example/api/internal/code-review-status/123e4567-e89b-12d3-a456-426614174023?attemptId=attempt-1',
+            },
+          },
+        }
+      : {}),
+    profile: {
+      envVars: {
+        BITBUCKET_TOKEN: 'user-token',
+        KILO_BITBUCKET_INTEGRATION_ID: 'user-integration',
+        KILO_BITBUCKET_WORKSPACE_SLUG: 'user-workspace',
+        KILO_BITBUCKET_WORKSPACE_UUID: '{00000000-0000-4000-8000-000000000000}',
+        KILO_BITBUCKET_REPOSITORY_SLUG: 'user-repository',
+        KILO_BITBUCKET_REPOSITORY_UUID: '{00000000-0000-4000-8000-000000000001}',
+        PATH: '/user/bin',
+      },
+    },
+    agent: { mode: 'code', model: 'kilo/test-model' },
     lifecycle: { version: 1, timestamp: 1 },
   });
 }
@@ -317,7 +424,7 @@ describe('SessionService.resolveWorkspaceTokens', () => {
 
   it('fails closed for replayed Bitbucket metadata without an organization', async () => {
     await expect(
-      new SessionService().resolveWorkspaceTokens(createEnv(), createBitbucketMetadata())
+      new SessionService().resolveWorkspaceTokens(createEnv(), createBitbucketMetadata(false, null))
     ).rejects.toMatchObject({
       code: 'INVALID_REQUEST',
       retryable: false,
@@ -330,7 +437,10 @@ describe('SessionService.resolveWorkspaceTokens', () => {
     const orgId = '123e4567-e89b-12d3-a456-426614174030';
 
     await expect(
-      new SessionService().resolveWorkspaceTokens(createEnv(), createBitbucketMetadata(orgId))
+      new SessionService().resolveWorkspaceTokens(
+        createEnv(),
+        createBitbucketMetadata(false, orgId)
+      )
     ).resolves.toMatchObject({
       gitToken: 'opaque-workspace-token',
       bitbucketTokenManaged: true,
@@ -340,7 +450,7 @@ describe('SessionService.resolveWorkspaceTokens', () => {
       orgId,
       workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
       repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
-      repositoryUrl: 'https://bitbucket.org/acme/repo.git',
+      repositoryUrl: 'https://bitbucket.org/acme-team/widgets.git',
     });
   });
 
@@ -351,14 +461,26 @@ describe('SessionService.resolveWorkspaceTokens', () => {
     });
 
     await expect(
-      new SessionService().resolveWorkspaceTokens(
-        createEnv(),
-        createBitbucketMetadata('123e4567-e89b-12d3-a456-426614174030')
-      )
+      new SessionService().resolveWorkspaceTokens(createEnv(), createBitbucketMetadata(false))
     ).rejects.toMatchObject({
       code: 'WORKSPACE_SETUP_FAILED',
       retryable: true,
       message: 'Bitbucket repository authorization failed (temporarily_unavailable).',
+    });
+  });
+
+  it('keeps an unavailable token-service binding retryable during replay', async () => {
+    tokenMocks.resolveManagedBitbucketToken.mockResolvedValue({
+      success: false,
+      reason: 'service_not_configured',
+    });
+
+    await expect(
+      new SessionService().resolveWorkspaceTokens(createEnv(), createBitbucketMetadata(false))
+    ).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      retryable: true,
+      message: 'Bitbucket repository authorization failed (service_not_configured).',
     });
   });
 });
@@ -391,6 +513,7 @@ describe('SessionService.prepareWorkspace', () => {
     });
     workspaceMocks.updateGitAuthor.mockResolvedValue(undefined);
     workspaceMocks.updateGitRemoteToken.mockResolvedValue(undefined);
+    workspaceMocks.updateGitRemoteUrl.mockResolvedValue(undefined);
     tokenMocks.resolveCloudAgentGitHubAuthForRepo.mockResolvedValue({
       success: true,
       value: {
@@ -406,6 +529,10 @@ describe('SessionService.prepareWorkspace', () => {
       success: true,
       token: 'resolved-gitlab-token',
       glabIsOAuth2: true,
+    });
+    tokenMocks.resolveManagedBitbucketToken.mockResolvedValue({
+      success: true,
+      token: 'fresh-bitbucket-token',
     });
     devcontainerMocks.detectDevContainer.mockResolvedValue(null);
     devcontainerMocks.bringUpDevContainer.mockReset();
@@ -461,6 +588,45 @@ describe('SessionService.prepareWorkspace', () => {
       gitToken: 'resolved-gitlab-token',
       gitlabTokenManaged: true,
     });
+  });
+
+  it('removes the managed Bitbucket token from origin after cold review branch setup', async () => {
+    const session = createSession(false);
+    const sandbox = createSandbox(session);
+    const metadata = createBitbucketMetadata(true);
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    const workspacePath = '/workspace/user/sessions/agent_test';
+    expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
+      session,
+      workspacePath,
+      'https://bitbucket.org/acme-team/widgets.git'
+    );
+    expect(workspaceMocks.updateGitRemoteToken).not.toHaveBeenCalled();
+    const branchCallIndex = session.exec.mock.calls.findIndex(
+      ([command]) => typeof command === 'string' && command.includes('git checkout -b')
+    );
+    expect(branchCallIndex).toBeGreaterThanOrEqual(0);
+    expect(session.exec.mock.invocationCallOrder[branchCallIndex]).toBeLessThan(
+      workspaceMocks.updateGitRemoteUrl.mock.invocationCallOrder[0] ?? 0
+    );
+    const restoreCallIndex = session.exec.mock.calls.findIndex(
+      ([command]) => typeof command === 'string' && command.includes('kilo-restore-session.js')
+    );
+    expect(restoreCallIndex).toBeGreaterThanOrEqual(0);
+    expect(workspaceMocks.updateGitRemoteUrl.mock.invocationCallOrder[0]).toBeLessThan(
+      session.exec.mock.invocationCallOrder[restoreCallIndex] ?? 0
+    );
   });
 
   it('types ENOSPC during the cold devcontainer probe before provisioning', async () => {
@@ -722,6 +888,31 @@ describe('SessionService.prepareWorkspace', () => {
     expect(restoreCommand).toContain('XDG_CACHE_HOME=');
     expect(restoreCommand).toContain('/home/agent_test/.cache');
     expect(restoreCommand).not.toContain('KILOCODE_TOKEN=');
+  });
+
+  it('replaces a warm Bitbucket review origin with the credential-free canonical URL', async () => {
+    const session = createSession(true);
+    const sandbox = createSandbox(session, true);
+    const metadata = createBitbucketMetadata(true);
+
+    await new SessionService().prepareWorkspace({
+      sandbox,
+      sandboxId: 'usr-abcdef',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+      userId: 'user_test',
+      sessionId: 'agent_test' as SessionId,
+      env: createEnv(),
+      metadata,
+      kilocodeModel: 'test-model',
+    });
+
+    expect(workspaceMocks.cloneGitRepo).not.toHaveBeenCalled();
+    expect(workspaceMocks.updateGitRemoteToken).not.toHaveBeenCalled();
+    expect(workspaceMocks.updateGitRemoteUrl).toHaveBeenCalledWith(
+      session,
+      '/workspace/user/sessions/agent_test',
+      'https://bitbucket.org/acme-team/widgets.git'
+    );
   });
 
   it('refreshes the warm fast path GitHub remote with repo lookup token when legacy metadata stored a token', async () => {
@@ -1098,6 +1289,10 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       success: true,
       token: 'resolved-gitlab-token',
       glabIsOAuth2: true,
+    });
+    tokenMocks.resolveManagedBitbucketToken.mockResolvedValue({
+      success: true,
+      token: 'fresh-bitbucket-token',
     });
     devcontainerMocks.detectDevContainer.mockResolvedValue(null);
     devcontainerMocks.bringUpDevContainer.mockReset();
@@ -1685,6 +1880,165 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(tokenMocks.resolveManagedGitLabToken).toHaveBeenCalledOnce();
   });
 
+  it('materializes only fixed repository identity from the fresh managed token', async () => {
+    const result = await buildPromptWrapperRequests(createBitbucketMetadata(true));
+
+    expect(tokenMocks.resolveManagedBitbucketToken).toHaveBeenCalledWith(expect.any(Object), {
+      userId: 'user_test',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+      expectedIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      repositoryUrl: 'https://bitbucket.org/acme-team/widgets.git',
+    });
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      token: 'fresh-bitbucket-token',
+      platform: 'bitbucket',
+      refreshRemote: true,
+    });
+    expect(result.readyRequest.materialized.env).toMatchObject({
+      BITBUCKET_TOKEN: 'fresh-bitbucket-token',
+      KILO_BITBUCKET_WORKSPACE_SLUG: 'acme-team',
+      KILO_BITBUCKET_WORKSPACE_UUID: '{123e4567-e89b-12d3-a456-426614174020}',
+      KILO_BITBUCKET_REPOSITORY_SLUG: 'widgets',
+      KILO_BITBUCKET_REPOSITORY_UUID: '{123e4567-e89b-12d3-a456-426614174021}',
+    });
+    expect(result.readyRequest.materialized.env.KILO_BITBUCKET_INTEGRATION_ID).toBeUndefined();
+    expect(result.readyRequest.materialized.env.PATH).toBeUndefined();
+    expect(
+      Object.keys(result.readyRequest.materialized.env)
+        .filter(key => key.startsWith('KILO_BITBUCKET_'))
+        .sort()
+    ).toEqual(
+      [
+        'KILO_BITBUCKET_REPOSITORY_SLUG',
+        'KILO_BITBUCKET_REPOSITORY_UUID',
+        'KILO_BITBUCKET_WORKSPACE_SLUG',
+        'KILO_BITBUCKET_WORKSPACE_UUID',
+      ].sort()
+    );
+
+    const inputPath = bitbucketReviewInputPath('123e4567-e89b-12d3-a456-426614174023');
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      permission: {
+        bash: Record<string, 'allow' | 'deny'>;
+        edit: Record<string, 'allow' | 'deny'>;
+        external_directory: Record<string, 'allow' | 'deny'>;
+        task: string;
+        lsp: string;
+      };
+    };
+    const relativeInputPath = relative('/workspace/user/sessions/agent_test', inputPath);
+    expect(
+      resolveCommandGuardBashPermission(
+        config.permission.external_directory,
+        `${dirname(inputPath)}/*`
+      )
+    ).toBe('allow');
+    expect(resolveCommandGuardBashPermission(config.permission.external_directory, '/tmp/*')).toBe(
+      'deny'
+    );
+    expect(resolveCommandGuardBashPermission(config.permission.edit, relativeInputPath)).toBe(
+      'allow'
+    );
+    expect(resolveCommandGuardBashPermission(config.permission.edit, '../another.json')).toBe(
+      'deny'
+    );
+    expect(config.permission.task).toBe('deny');
+    expect(config.permission.lsp).toBe('deny');
+    expect(
+      resolveCommandGuardBashPermission(
+        config.permission.bash,
+        `bb comments create 42 --input - < ${inputPath}`
+      )
+    ).toBe('allow');
+    for (const key of [
+      'GIT_CONFIG_NOSYSTEM',
+      'GIT_CONFIG_GLOBAL',
+      'GIT_CONFIG_COUNT',
+      'GIT_CONFIG_KEY_0',
+      'GIT_CONFIG_VALUE_0',
+      'GIT_CONFIG_KEY_1',
+      'GIT_CONFIG_VALUE_1',
+      'GIT_CONFIG_KEY_2',
+      'GIT_CONFIG_VALUE_2',
+      'GIT_OPTIONAL_LOCKS',
+    ]) {
+      expect(result.readyRequest.materialized.env[key], key).toBeUndefined();
+    }
+  });
+
+  it('does not materialize profile env vars or encrypted secrets for Bitbucket reviews', async () => {
+    const baseMetadata = createBitbucketMetadata(true);
+    const metadata = {
+      ...baseMetadata,
+      profile: {
+        ...baseMetadata.profile,
+        envVars: {
+          BASH_ENV: '/workspace/repository-controlled.sh',
+          LD_PRELOAD: '/workspace/repository-controlled.so',
+        },
+        encryptedSecrets: {
+          PROFILE_SECRET: {
+            encryptedData: 'not-decrypted',
+            encryptedDEK: 'not-decrypted',
+            algorithm: 'rsa-aes-256-gcm' as const,
+            version: 1 as const,
+          },
+        },
+      },
+    } satisfies CloudAgentSessionState;
+
+    const result = await buildPromptWrapperRequests(metadata, env => {
+      env.AGENT_ENV_VARS_PRIVATE_KEY = undefined;
+    });
+    const materialized = result.readyRequest.materialized.env;
+
+    expect(materialized.BASH_ENV).toBeUndefined();
+    expect(materialized.LD_PRELOAD).toBeUndefined();
+    expect(materialized.PROFILE_SECRET).toBeUndefined();
+  });
+
+  it('materializes fixed Bitbucket CLI environment for ordinary Bitbucket sessions', async () => {
+    const result = await buildPromptWrapperRequests(createBitbucketMetadata(false));
+    const materialized = result.readyRequest.materialized.env;
+
+    expect(tokenMocks.resolveManagedBitbucketToken).toHaveBeenCalledWith(expect.any(Object), {
+      userId: 'user_test',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      repositoryUrl: 'https://bitbucket.org/acme-team/widgets.git',
+    });
+    expect(result.readyRequest.repo).toMatchObject({
+      token: 'fresh-bitbucket-token',
+      platform: 'bitbucket',
+      refreshRemote: true,
+    });
+    expect(materialized).toMatchObject({
+      BITBUCKET_TOKEN: 'fresh-bitbucket-token',
+      KILO_BITBUCKET_WORKSPACE_SLUG: 'acme-team',
+      KILO_BITBUCKET_WORKSPACE_UUID: '{123e4567-e89b-12d3-a456-426614174020}',
+      KILO_BITBUCKET_REPOSITORY_SLUG: 'widgets',
+      KILO_BITBUCKET_REPOSITORY_UUID: '{123e4567-e89b-12d3-a456-426614174021}',
+    });
+    expect(materialized.KILO_BITBUCKET_INTEGRATION_ID).toBeUndefined();
+    expect(
+      Object.keys(materialized)
+        .filter(key => key.startsWith('KILO_BITBUCKET_'))
+        .sort()
+    ).toEqual(
+      [
+        'KILO_BITBUCKET_REPOSITORY_SLUG',
+        'KILO_BITBUCKET_REPOSITORY_UUID',
+        'KILO_BITBUCKET_WORKSPACE_SLUG',
+        'KILO_BITBUCKET_WORKSPACE_UUID',
+      ].sort()
+    );
+    expect(materialized.PATH).toBe('/user/bin');
+  });
+
   it('does not use OAuth bearer mode for inferred legacy GitLab tokens', async () => {
     const result = await buildPromptWrapperRequests(
       createMetadata({
@@ -1708,6 +2062,108 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('generic-git-token');
     expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
     expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBeUndefined();
+  });
+
+  it('preserves legacy GitLab env setup for SSH clone URLs', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        gitUrl: 'git@gitlab.com:acme/repo.git',
+        gitToken: 'generic-git-token',
+        platform: undefined,
+        gitlabTokenManaged: undefined,
+      })
+    );
+
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'git@gitlab.com:acme/repo.git',
+      token: 'generic-git-token',
+    });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('generic-git-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBeUndefined();
+  });
+
+  it('preserves legacy GitLab env setup for ssh URL clone URLs', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        gitUrl: 'ssh://git@gitlab.com/acme/repo.git',
+        gitToken: 'generic-git-token',
+        platform: undefined,
+        gitlabTokenManaged: undefined,
+      })
+    );
+
+    expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'ssh://git@gitlab.com/acme/repo.git',
+      token: 'generic-git-token',
+    });
+    expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('generic-git-token');
+    expect(result.readyRequest.materialized.env.GITLAB_HOST).toBe('gitlab.com');
+    expect(result.readyRequest.materialized.env.GLAB_IS_OAUTH2).toBeUndefined();
+  });
+
+  it('preserves legacy Bitbucket env setup for ssh URL clone URLs', async () => {
+    const baseMetadata = createBitbucketMetadata(false);
+    const bitbucketRepository = baseMetadata.repository;
+    if (bitbucketRepository?.type !== 'bitbucket') {
+      throw new Error('Expected Bitbucket metadata fixture');
+    }
+    const { platform: explicitPlatform, ...repositoryWithoutPlatform } = bitbucketRepository;
+    expect(explicitPlatform).toBe('bitbucket');
+    const metadata = {
+      ...baseMetadata,
+      repository: {
+        ...repositoryWithoutPlatform,
+        url: 'ssh://git@bitbucket.org/acme-team/widgets.git',
+      },
+    } satisfies CloudAgentSessionState;
+
+    const result = await buildPromptWrapperRequests(metadata);
+
+    expect(tokenMocks.resolveManagedBitbucketToken).toHaveBeenCalledWith(expect.any(Object), {
+      userId: 'user_test',
+      orgId: '123e4567-e89b-12d3-a456-426614174030',
+      workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+      repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      repositoryUrl: 'ssh://git@bitbucket.org/acme-team/widgets.git',
+    });
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'ssh://git@bitbucket.org/acme-team/widgets.git',
+      token: 'fresh-bitbucket-token',
+      refreshRemote: true,
+    });
+    expect(result.readyRequest.materialized.env).toMatchObject({
+      BITBUCKET_TOKEN: 'fresh-bitbucket-token',
+      KILO_BITBUCKET_WORKSPACE_SLUG: 'acme-team',
+      KILO_BITBUCKET_WORKSPACE_UUID: '{123e4567-e89b-12d3-a456-426614174020}',
+      KILO_BITBUCKET_REPOSITORY_SLUG: 'widgets',
+      KILO_BITBUCKET_REPOSITORY_UUID: '{123e4567-e89b-12d3-a456-426614174021}',
+    });
+  });
+
+  it('does not infer Bitbucket from clone URL path substrings', async () => {
+    const result = await buildPromptWrapperRequests(
+      createMetadata({
+        gitUrl: 'https://example.com/bitbucket.org/acme/repo.git',
+        gitToken: 'generic-git-token',
+        platform: undefined,
+        bitbucketTokenManaged: true,
+        gitlabTokenManaged: undefined,
+      })
+    );
+
+    expect(result.readyRequest.repo).toMatchObject({
+      kind: 'git',
+      url: 'https://example.com/bitbucket.org/acme/repo.git',
+      token: 'generic-git-token',
+    });
+    expect(result.readyRequest.materialized.env.BITBUCKET_TOKEN).toBeUndefined();
+    expect(result.readyRequest.materialized.env.KILO_BITBUCKET_WORKSPACE_SLUG).toBeUndefined();
   });
 });
 

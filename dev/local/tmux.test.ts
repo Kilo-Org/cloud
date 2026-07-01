@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 
 import { breakPane, buildInteractiveShellCommand, listWindows } from './tmux';
+import { restartServiceInTmux } from './runner';
 
 test('buildInteractiveShellCommand wraps quoted startup commands in parseable shell syntax', () => {
   const startupCommand =
@@ -24,6 +25,10 @@ const hasTmux = (() => {
     return false;
   }
 })();
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 test(
   'breakPane keeps the requested service window name after tmux automatic rename',
@@ -73,6 +78,46 @@ test(
         ),
         '0'
       );
+    } finally {
+      try {
+        tmux('kill-session', '-t', sessionName);
+      } catch {
+        // Session may already be gone if tmux fails during setup.
+      }
+    }
+  }
+);
+
+test(
+  'restartServiceInTmux re-resolves the service pane after dashboard pane moves',
+  { skip: !hasTmux },
+  async () => {
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const serviceName = 'stripe';
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+
+    try {
+      tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep 120');
+      tmux('new-window', '-d', '-t', sessionName, '-n', serviceName, '/bin/sh');
+
+      const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
+      assert.ok(serviceWindow);
+
+      tmux(
+        'join-pane',
+        '-h',
+        '-s',
+        `${sessionName}:${serviceWindow.index}.0`,
+        '-t',
+        `${sessionName}:0.0`
+      );
+      tmux('select-pane', '-t', `${sessionName}:0.1`, '-T', serviceName);
+
+      restartServiceInTmux(sessionName, serviceName);
+      breakPane(sessionName, 0, 1, serviceName);
+
+      await sleep(1200);
+      assert.ok(listWindows(sessionName).some(window => window.name === serviceName));
     } finally {
       try {
         tmux('kill-session', '-t', sessionName);

@@ -21,7 +21,7 @@ function makeEnv(token: string | null = API_TOKEN) {
 }
 
 describe('queryGastownHealth', () => {
-  it('queries weighted five-minute container health metrics', async () => {
+  it('queries weighted fifteen-minute container health metrics', async () => {
     let calledUrl = '';
     let calledInit: RequestInit | undefined;
     const fetchFn: FetchFn = async (url, init) => {

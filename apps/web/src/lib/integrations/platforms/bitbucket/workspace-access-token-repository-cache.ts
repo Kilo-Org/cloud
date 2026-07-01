@@ -5,6 +5,8 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_INVALIDATION_REASONS,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PLATFORM,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES,
+  getMissingBitbucketWorkspaceAccessTokenScopes,
   getUnexpectedBitbucketWorkspaceAccessTokenScopes,
   hasRequiredBitbucketWorkspaceAccessTokenScopes,
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
@@ -78,6 +80,13 @@ type RefreshRepositoriesInput = {
 type RefreshRepositoriesForMemberInput = {
   organizationId: string;
   kiloUserId: string;
+};
+
+type ListRepositoriesInput = {
+  organizationId: string;
+  kiloUserId: string;
+  expectedIntegrationId?: string;
+  syncPolicy?: 'cache_only' | 'refresh_if_uninitialized';
 };
 
 type WorkspaceIdentity = {
@@ -360,6 +369,77 @@ export async function readCachedBitbucketWorkspaceAccessTokenRepositories({
     return { status: 'reconnect_required' };
   }
   return integration.cache ?? { status: 'temporarily_unavailable' };
+}
+
+export async function getBitbucketCodeReviewerReadiness(organizationId: string) {
+  const canonicalOrganizationId = canonicalizeUuid(organizationId);
+  const repositoryCache = {
+    status: 'uninitialized' as const,
+    repositories: [],
+    syncedAt: null,
+  };
+  if (!canonicalOrganizationId) {
+    return {
+      connected: false,
+      ready: false,
+      integrationId: null,
+      workspace: null,
+      missingRequiredScopes: [...BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES],
+      repositoryCache,
+    };
+  }
+
+  const integration = await loadParsedIntegration(canonicalOrganizationId);
+  if (!integration) {
+    return {
+      connected: false,
+      ready: false,
+      integrationId: null,
+      workspace: null,
+      missingRequiredScopes: [...BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES],
+      repositoryCache,
+    };
+  }
+
+  const missingRequiredScopes = getMissingBitbucketWorkspaceAccessTokenScopes(
+    integration.row.providerScopes ?? []
+  );
+  const connected = integration.state === 'usable' && integration.workspace !== null;
+  const cache = integration.cache ?? repositoryCache;
+  return {
+    connected,
+    ready:
+      connected &&
+      hasRequiredBitbucketWorkspaceAccessTokenScopes(integration.row.providerScopes ?? []) &&
+      cache.status === 'available',
+    integrationId: integration.row.integrationId,
+    workspace: integration.workspace,
+    missingRequiredScopes,
+    repositoryCache: cache,
+  };
+}
+
+export async function listBitbucketWorkspaceAccessTokenRepositories({
+  organizationId,
+  kiloUserId,
+  expectedIntegrationId,
+  syncPolicy = 'cache_only',
+}: ListRepositoriesInput): Promise<BitbucketWorkspaceAccessTokenRepositoryListResult> {
+  const cached = await readCachedBitbucketWorkspaceAccessTokenRepositories({
+    organizationId,
+    expectedIntegrationId,
+  });
+  if (syncPolicy !== 'refresh_if_uninitialized' || cached.status !== 'temporarily_unavailable') {
+    return cached;
+  }
+
+  const status = await getBitbucketWorkspaceAccessTokenStatus(organizationId);
+  if (!status.integrationId) return cached;
+  return refreshBitbucketWorkspaceAccessTokenRepositories({
+    organizationId,
+    kiloUserId,
+    expectedIntegrationId: status.integrationId,
+  });
 }
 
 async function isObservedCredentialGenerationCurrent(

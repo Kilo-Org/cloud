@@ -84,19 +84,18 @@ export class TownContainerDO extends Container<Env> {
   }
 
   /**
-   * Ensure the container is running and its default port is ready to accept
-   * traffic. Returns how long the underlying Container class took to satisfy
-   * that (i.e. `startAndWaitForPorts`), along with whether this call actually
-   * triggered a cold start.
+   * Ensure the container runtime has been started. For an already-running
+   * container this intentionally does not trust or refresh the SDK health
+   * state; TownDO's /health probe is the application-level liveness source.
    *
-   * Intended to be called from the Town DO alarm in place of a manual
-   * /health ping — gives an accurate cold-start measurement without being
-   * capped by an arbitrary client-side timeout.
+   * Returns how long startAndWaitForPorts took when this call actually
+   * triggered a cold start.
    */
   async warmUp(): Promise<{ coldStart: boolean; durationMs: number }> {
-    const state = await this.getState();
-    const alreadyHealthy = this.ctx.container?.running === true && state.status === 'healthy';
-    if (alreadyHealthy) {
+    if (this.ctx.container?.running === true) {
+      // Runtime-level fast path only. TownDO's /health probe is the
+      // application-level liveness source and may still recover a wedged
+      // running container.
       return { coldStart: false, durationMs: 0 };
     }
     const t0 = Date.now();

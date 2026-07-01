@@ -21,12 +21,89 @@ const REDIS_TTL_SECONDS = 60 * 60 * 24 * 7;
 // Upstash REST has no MSET-with-TTL; pipeline SETs to avoid a round-trip per user.
 const REDIS_WRITE_CHUNK_SIZE = 1000;
 
+// Maps an extension `apiProvider` id to a user-facing label. Multiple ids can
+// refer to the same underlying service (regional/plan/legacy variants), and we
+// only list ids for services we actually support BYOK for via Kilo Gateway
+// (see UserByokProviderIdSchema).
+export const BYOK_PROVIDER_NOTIFICATION_LABELS: Record<string, string> = {
+  // Anthropic / Claude
+  anthropic: 'Claude API Key',
+  claude: 'Claude API Key',
+
+  // Amazon Bedrock
+  bedrock: 'Amazon Bedrock API Key',
+  'amazon-bedrock': 'Amazon Bedrock API Key',
+
+  // Chutes
+  chutes: 'Chutes API Key',
+
+  // DeepSeek
+  deepseek: 'DeepSeek API Key',
+  deepseek1: 'DeepSeek API Key',
+  'deepseek-v4': 'DeepSeek API Key',
+  'deepseek-v4-pro': 'DeepSeek API Key',
+
+  // Fireworks
+  fireworks: 'Fireworks API Key',
+  'fireworks-ai': 'Fireworks API Key',
+
+  // Google AI (Gemini)
+  gemini: 'Google AI API Key',
+  google: 'Google AI API Key',
+
+  // Moonshot AI / Kimi
+  moonshot: 'Moonshot AI API Key',
+  moonshotai: 'Moonshot AI API Key',
+  kimi: 'Moonshot AI API Key',
+  'kimi-for-coding': 'Kimi Code Plan',
+
+  // MiniMax
+  minimax: 'MiniMax Coding Plan',
+  'minimax-coding-plan': 'MiniMax Coding Plan',
+
+  // Mistral
+  mistral: 'Mistral AI API Key',
+
+  // Novita
+  novita: 'Novita AI API Key',
+
+  // xAI
+  xai: 'xAI API Key',
+
+  // Z.ai / Zhipu (GLM)
+  zai: 'GLM Coding Plan',
+  'z-ai': 'GLM Coding Plan',
+  'zai-coding-plan': 'GLM Coding Plan',
+  glm: 'GLM Coding Plan',
+  zhipuai: 'GLM Coding Plan',
+  'zhipuai-coding-plan': 'GLM Coding Plan',
+
+  // Xiaomi MiMo
+  xiaomi: 'Xiaomi MiMo API Key',
+  'xiaomi-mimo': 'Xiaomi MiMo API Key',
+  xiaomimimo: 'Xiaomi MiMo API Key',
+  mimo: 'Xiaomi MiMo API Key',
+  'xiaomi-token-plan-sgp': 'Xiaomi Token Plan',
+  'xiaomi-token-plan-ams': 'Xiaomi Token Plan',
+
+  // Ollama Cloud
+  'ollama-cloud': 'Ollama Cloud API Key',
+};
+
+const BYOK_PROVIDER_NOTIFICATION_IDS = Object.keys(BYOK_PROVIDER_NOTIFICATION_LABELS);
+const BYOK_PROVIDER_NOTIFICATION_ID_SET = new Set(BYOK_PROVIDER_NOTIFICATION_IDS);
+
+const byokProviderNotificationSqlList = BYOK_PROVIDER_NOTIFICATION_IDS.map(
+  provider => `'${provider.replaceAll("'", "''")}'`
+).join(', ');
+
 const BYOK_PROVIDER_QUERY = `
 select u.id, ev.properties.apiProvider
 from events ev
 join postgres.kilocode_users u on u.google_user_email = ev.distinct_id
 where ev.event = 'LLM Completion'
   and ev.properties.apiProvider is not null
+  and ev.properties.apiProvider in (${byokProviderNotificationSqlList})
   and ev.properties.apiProvider not like '%kilo%'
   and ev.timestamp >= today() - toIntervalWeek(1)
   and ev.properties.outputTokens > 0
@@ -42,6 +119,10 @@ const cachedProvidersSchema = z.array(z.string());
 
 export type ByokProviderRow = { userId: string; provider: string };
 export type ByokProviderRowsFetcher = () => Promise<ByokProviderRow[]>;
+
+export function getByokProviderNotificationLabel(provider: string): string | undefined {
+  return BYOK_PROVIDER_NOTIFICATION_LABELS[provider];
+}
 
 const fetchByokProviderRowsFromPosthog: ByokProviderRowsFetcher = async () => {
   const response = await posthogQuery('sync-byok-provider-notifications', BYOK_PROVIDER_QUERY);
@@ -59,6 +140,8 @@ const fetchByokProviderRowsFromPosthog: ByokProviderRowsFetcher = async () => {
 export function groupProvidersByUser(rows: ByokProviderRow[]): Map<string, string[]> {
   const byUser = new Map<string, string[]>();
   for (const { userId, provider } of rows) {
+    if (!BYOK_PROVIDER_NOTIFICATION_ID_SET.has(provider)) continue;
+
     const existing = byUser.get(userId);
     if (existing) {
       if (!existing.includes(provider)) existing.push(provider);

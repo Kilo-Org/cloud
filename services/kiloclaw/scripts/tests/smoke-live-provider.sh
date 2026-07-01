@@ -335,7 +335,15 @@ raw = sys.stdin.read()
 def _as_catalog(cand):
     if isinstance(cand, dict) and isinstance(cand.get("models"), list):
         cand = cand["models"]
-    if isinstance(cand, list) and all(isinstance(x, dict) for x in cand):
+    # Require a non-empty list whose entries look like model objects (have a
+    # "key" or "provider"), so an empty list or a stray list of unrelated dicts
+    # from interleaved log noise is not mistaken for the real catalog.
+    if (
+        isinstance(cand, list)
+        and cand
+        and all(isinstance(x, dict) for x in cand)
+        and any(("key" in x or "provider" in x) for x in cand)
+    ):
         return cand
     return None
 

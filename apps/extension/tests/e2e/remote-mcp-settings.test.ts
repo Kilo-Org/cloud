@@ -30,7 +30,10 @@ type StreamableTransportOptions = ConstructorParameters<typeof StreamableHTTPSer
  * src/shared/remote-mcp-tools.test.ts instead.
  */
 const startMcpFixtureServer = async (
-  options: { readonly requiredBearerToken?: string } = {}
+  options: {
+    readonly requiredBearerToken?: string;
+    readonly requiredHeader?: { readonly name: string; readonly value: string };
+  } = {}
 ): Promise<{ close: () => Promise<void>; url: string }> => {
   const makeServer = (): McpServer => {
     const server = new McpServer({ name: 'kilo-mcp-fixture', version: '0.0.0' });
@@ -52,13 +55,18 @@ const startMcpFixtureServer = async (
   const httpServer = createServer((request, response) => {
     void (async (): Promise<void> => {
       /*
-       * Reject requests without the expected bearer token so a successful turn
-       * proves the extension forwarded the header over the plain fetch.
+       * Reject requests missing the expected auth header so a successful turn
+       * proves the extension forwarded the credential over the plain fetch. Node
+       * lowercases header names, so match the custom header case-insensitively.
        */
-      if (
+      const bearerMismatch =
         options.requiredBearerToken !== undefined &&
-        request.headers.authorization !== `Bearer ${options.requiredBearerToken}`
-      ) {
+        request.headers.authorization !== `Bearer ${options.requiredBearerToken}`;
+      const headerMismatch =
+        options.requiredHeader !== undefined &&
+        request.headers[options.requiredHeader.name.toLowerCase()] !== options.requiredHeader.value;
+
+      if (bearerMismatch || headerMismatch) {
         response.writeHead(401, { 'content-type': 'application/json' });
         response.end(JSON.stringify({ error: 'unauthorized' }));
         return;
@@ -328,6 +336,39 @@ test('remote MCP server authenticates with a bearer token and runs a turn', asyn
       configureAuth: async form => {
         await form.getByLabel('Auth').selectOption('bearer');
         await form.getByLabel('Bearer token').fill(bearerToken);
+      },
+      url: mcp.url,
+    });
+  } finally {
+    await context.close();
+    await mcp.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('remote MCP server authenticates with a custom header and runs a turn', async () => {
+  const headerName = 'X-Fixture-Key';
+  const headerValue = 'fixture-secret-header';
+  const fixture = await startFixtureServer();
+  // The fixture 401s every request that lacks this exact custom header.
+  const mcp = await startMcpFixtureServer({
+    requiredHeader: { name: headerName, value: headerValue },
+  });
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, turnMockConfig);
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await openSidePanel(context, extensionId);
+    await addConnectEnableAndRunTurn(sidePanel, {
+      configureAuth: async form => {
+        await form.getByLabel('Auth').selectOption('header');
+        await form.getByLabel('Header name').fill(headerName);
+        await form.getByLabel('Header value').fill(headerValue);
       },
       url: mcp.url,
     });

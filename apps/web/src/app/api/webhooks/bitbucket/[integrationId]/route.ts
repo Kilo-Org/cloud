@@ -429,6 +429,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     platform: 'bitbucket',
     repoFullName: selectedRepository.fullName,
     prNumber: pullRequest.id,
+    platformIntegrationId: integration.id,
   } satisfies ReviewScope;
   const observation: BitbucketAuthoritativeObservation = {
     ...identity,

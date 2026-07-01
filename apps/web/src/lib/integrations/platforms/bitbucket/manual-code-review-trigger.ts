@@ -399,6 +399,7 @@ export async function triggerManualBitbucketCodeReview(input: {
     platform: 'bitbucket',
     repoFullName: selectedRepository.fullName,
     prNumber: pullRequest.id,
+    platformIntegrationId: integration.id,
   } satisfies ReviewScope;
 
   let transactionResult: TransactionResult;

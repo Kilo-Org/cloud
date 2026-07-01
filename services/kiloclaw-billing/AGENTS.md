@@ -4,6 +4,10 @@
 
 `services/kiloclaw-billing` owns the KiloClaw billing lifecycle worker.
 
+## Specs
+
+This service is governed by `.specs/kiloclaw-billing.md` and `.specs/kiloclaw-billing-lifecycle.md`. Read them (and load the `specs` skill) before changing billing behavior here.
+
 ## Allowed Writes
 
 - This worker is allowed to write KiloClaw billing state in Postgres via Hyperdrive.

@@ -34,6 +34,9 @@ Fetch the relevant doc page when implementing features.
 - `./references/rules.md` - Core rules, storage, concurrency, RPC, alarms
 - `./references/testing.md` - Vitest setup, unit/integration tests, alarm testing
 - `./references/workers.md` - Workers handlers, types, wrangler config, observability
+- `./references/repo-conventions.md` - This repo's file naming, DO stub helpers,
+  sub-module splitting, IO boundary/SQL/HTTP route conventions shared by
+  `services/gastown`, `services/wasteland`, and `services/mcp-gateway`
 
 Search: `blockConcurrencyWhile`, `idFromName`, `getByName`, `setAlarm`, `sql.exec`
 

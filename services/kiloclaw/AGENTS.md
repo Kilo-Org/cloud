@@ -4,6 +4,10 @@
 
 KiloClaw is a Cloudflare Worker that runs per-user OpenClaw AI assistant instances on Fly.io Machines. The CF Worker handles auth, config management, and proxies HTTP/WebSocket traffic to each user's Fly Machine via Fly Proxy.
 
+## Specs
+
+This service is governed by `.specs/kiloclaw-controller.md`, `.specs/kiloclaw-datamodel.md`, and `.specs/kiloclaw-composio.md`. Read the relevant spec (and load the `specs` skill) before changing controller/machine lifecycle, the instance/subscription data model, or Composio credential handling.
+
 ## Hard Invariants
 
 These are non-negotiable. Do not reintroduce shared/fallback paths.
@@ -259,13 +263,6 @@ KiloClaw is transitioning from one-instance-per-user to N-instances-per-owner (p
 
 - **KiloClawRegistry DO** — SQLite-backed DO that indexes instances per owner (`user:{userId}` or `org:{orgId}`) for routing. Fresh-provision admission reservations are being added as a separate non-routable state surface; never expose pending reservations from normal route-resolution methods.
 - **Org instances** — `organization_id` links instances to org contexts. Registry entries for an organization may contain several assigned users; any current one-active-instance admission rule must be qualified by assigned user rather than treating the whole organization as one slot.
-
-## Code Style
-
-- See `/.kilocode/rules/coding-style.md` for project-wide rules
-- Prefer `type` over `interface`
-- Avoid `as` and `!` -- use `satisfies` or flow-sensitive typing
-- No mocks where avoidable -- assert on results
 
 ## Gateway Configuration
 

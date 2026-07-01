@@ -206,9 +206,9 @@ const turnMockConfig = {
 };
 
 /*
- * Add the "Fixture MCP" server (optionally configuring auth), connect it, enable
- * it in safe mode, then send a message and assert the mapped MCP tool ran with
- * the fixture's JSON result. Leaves the server in place for the caller.
+ * Add the "Fixture MCP" server (optionally configuring auth), enable it in safe
+ * mode, then send a message and assert the mapped MCP tool ran with the
+ * fixture's JSON result. Leaves the server in place for the caller.
  */
 const addConnectEnableAndRunTurn = async (
   sidePanel: Page,
@@ -223,11 +223,11 @@ const addConnectEnableAndRunTurn = async (
   }
   await sidePanel.getByRole('button', { name: 'Save' }).click();
 
-  // The saved row shows the name; connect to discover tools.
+  /*
+   * Save connects (tests) the server automatically: the tool is cached and the
+   * connect control becomes "Refresh" with no manual Connect click.
+   */
   await expect(sidePanel.getByText('Fixture MCP')).toBeVisible();
-  await sidePanel.getByRole('button', { name: 'Connect' }).click();
-
-  // Connected: the discovered tool is cached and the connect control becomes "Refresh".
   await expect(sidePanel.getByRole('button', { name: 'Refresh' })).toBeVisible();
   await expect(sidePanel.getByText('1 tool')).toBeVisible();
 
@@ -239,20 +239,15 @@ const addConnectEnableAndRunTurn = async (
   await expect(sidePanel.getByLabel('Enabled')).toBeChecked();
   await sidePanel.getByRole('button', { name: 'Save' }).click();
 
-  /*
-   * Close settings. The chat panel reads remote MCP servers once on mount and
-   * refreshes the enabled ones, so reload to pick up the newly enabled server.
-   */
-  await sidePanel.getByRole('button', { name: 'Close settings' }).click();
-  await sidePanel.reload();
-
-  /*
-   * Wait for the post-reload background refresh to reconnect and re-cache the
-   * tool before sending — otherwise the turn would omit the MCP tool.
-   */
-  await sidePanel.getByRole('button', { name: 'Settings' }).click();
+  // The saved server re-connects; wait for it before closing settings.
   await expect(sidePanel.getByRole('button', { name: 'Refresh' })).toBeVisible();
   await expect(sidePanel.getByText('1 tool')).toBeVisible();
+
+  /*
+   * Close settings and send immediately — no reload. Settings and the chat panel
+   * share the jotai remote-MCP atom, so the newly enabled server is visible to
+   * the turn without a reload.
+   */
   await sidePanel.getByRole('button', { name: 'Close settings' }).click();
 
   // Send a message that triggers the MCP tool call.

@@ -7534,6 +7534,123 @@ describe('enrollWithCredits', () => {
     expect(deductions.map(row => row.amountMicrodollars)).toContain(-55_000_000);
   });
 
+  it('rolls back a duplicate fresh provision when another recovery activates first', async () => {
+    setTestSystemTime('2026-07-01T12:00:00.000Z');
+    const destroyedInstance = await createInstance(user.id);
+    await db
+      .update(kiloclaw_instances)
+      .set({ destroyed_at: '2026-06-30T00:00:00.000Z' })
+      .where(eq(kiloclaw_instances.id, destroyedInstance.id));
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: 120_000_000,
+        microdollars_used: 0,
+        kilo_pass_threshold: null,
+      })
+      .where(eq(kilocode_users.id, user.id));
+    const [oldSubscription] = await db
+      .insert(kiloclaw_subscriptions)
+      .values({
+        user_id: user.id,
+        instance_id: destroyedInstance.id,
+        payment_source: 'credits',
+        plan: 'standard',
+        status: 'canceled',
+        kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+        current_period_start: '2026-05-30T00:00:00.000Z',
+        current_period_end: '2026-06-30T00:00:00.000Z',
+        credit_renewal_at: '2026-06-30T00:00:00.000Z',
+      })
+      .returning();
+    const oldSubscriptionId = oldSubscription?.id;
+    if (!oldSubscriptionId) throw new Error('Expected old subscription fixture');
+    const winningInstance = {
+      id: crypto.randomUUID(),
+      sandboxId: `ki_${crypto.randomUUID()}`,
+    };
+    const freshInstance = {
+      id: crypto.randomUUID(),
+      sandboxId: `ki_${crypto.randomUUID()}`,
+    };
+    kiloclawInternalClientMock.__provisionMock.mockImplementationOnce(async () => {
+      await db.insert(kiloclaw_instances).values({
+        id: winningInstance.id,
+        user_id: user.id,
+        sandbox_id: winningInstance.sandboxId,
+      });
+      const [winningSubscription] = await db
+        .insert(kiloclaw_subscriptions)
+        .values({
+          user_id: user.id,
+          instance_id: winningInstance.id,
+          payment_source: 'credits',
+          plan: 'standard',
+          status: 'active',
+          kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+          current_period_start: '2026-07-01T12:00:00.000Z',
+          current_period_end: '2026-08-01T12:00:00.000Z',
+          credit_renewal_at: '2026-08-01T12:00:00.000Z',
+        })
+        .returning();
+      const winningSubscriptionId = winningSubscription?.id;
+      if (!winningSubscriptionId) throw new Error('Expected winning subscription fixture');
+      await db
+        .update(kiloclaw_subscriptions)
+        .set({ transferred_to_subscription_id: winningSubscriptionId })
+        .where(eq(kiloclaw_subscriptions.id, oldSubscriptionId));
+      await db.insert(kiloclaw_instances).values({
+        id: freshInstance.id,
+        user_id: user.id,
+        sandbox_id: freshInstance.sandboxId,
+      });
+      return {
+        instanceId: freshInstance.id,
+        sandboxId: freshInstance.sandboxId,
+      };
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(
+      caller.kiloclaw.reprovisionAndEnrollWithCredits({ plan: 'standard' })
+    ).resolves.toEqual({
+      success: true,
+      status: 'activated',
+      instanceId: winningInstance.id,
+    });
+
+    expect(kiloclawInternalClientMock.__provisionMock).toHaveBeenCalledTimes(1);
+
+    const [freshRow] = await db
+      .select({ destroyedAt: kiloclaw_instances.destroyed_at })
+      .from(kiloclaw_instances)
+      .where(eq(kiloclaw_instances.id, freshInstance.id))
+      .limit(1);
+    expect(freshRow?.destroyedAt).toEqual(expect.any(String));
+
+    const freshSubscriptions = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.instance_id, freshInstance.id));
+    expect(freshSubscriptions).toEqual([]);
+    expect(kiloclawInternalClientMock.__destroyMock).toHaveBeenCalledWith(
+      user.id,
+      freshInstance.id,
+      { reason: 'stale_provision_cleanup' }
+    );
+
+    const [predecessor] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.id, oldSubscriptionId))
+      .limit(1);
+    expect(predecessor).toEqual(
+      expect.objectContaining({
+        transferred_to_subscription_id: expect.any(String),
+      })
+    );
+  });
+
   it('rolls back the fresh instance when destroyed-subscription credit recovery enrollment fails', async () => {
     setTestSystemTime('2026-07-01T12:00:00.000Z');
     const destroyedInstance = await createInstance(user.id);

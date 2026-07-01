@@ -2194,6 +2194,24 @@ async function getCreditReprovisionRecoveryEligibility(params: {
   };
 }
 
+function getCreditReprovisionRecoveryUnavailableMessage(
+  eligibility: Exclude<CreditReprovisionRecoveryEligibility, { eligible: true }>
+) {
+  return eligibility.reason === 'insufficient_credits'
+    ? 'Effective credit balance is insufficient to activate Standard hosting.'
+    : 'Credit-funded reprovision recovery is not available for this KiloClaw state.';
+}
+
+function throwCreditReprovisionRecoveryUnavailable(
+  eligibility: Exclude<CreditReprovisionRecoveryEligibility, { eligible: true }>
+): never {
+  const message = getCreditReprovisionRecoveryUnavailableMessage(eligibility);
+  throw new TRPCError({
+    code: eligibility.reason === 'insufficient_credits' ? 'BAD_REQUEST' : 'CONFLICT',
+    message,
+  });
+}
+
 async function linkDestroyedSubscriptionToCreditRecoverySuccessor(params: {
   userId: string;
   predecessorSubscriptionId: string;
@@ -2311,6 +2329,49 @@ async function getActivatedCreditRecoverySuccessor(params: { userId: string; ins
     .limit(1);
 
   return successor ?? null;
+}
+
+async function getCompetingCreditRecoveryActivation(params: {
+  userId: string;
+  instanceId: string;
+}): Promise<
+  { status: 'activated'; instanceId: string } | { status: 'in_progress'; instanceId: string } | null
+> {
+  const [activeSuccessor] = await db
+    .select({ instanceId: kiloclaw_subscriptions.instance_id })
+    .from(kiloclaw_subscriptions)
+    .leftJoin(kiloclaw_instances, eq(kiloclaw_instances.id, kiloclaw_subscriptions.instance_id))
+    .where(
+      and(
+        eq(kiloclaw_subscriptions.user_id, params.userId),
+        ne(kiloclaw_subscriptions.instance_id, params.instanceId),
+        eq(kiloclaw_subscriptions.status, 'active'),
+        eq(kiloclaw_subscriptions.payment_source, 'credits'),
+        isNull(kiloclaw_subscriptions.transferred_to_subscription_id),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+
+  if (activeSuccessor?.instanceId) {
+    return { status: 'activated', instanceId: activeSuccessor.instanceId };
+  }
+
+  const [activeInstance] = await db
+    .select({ id: kiloclaw_instances.id })
+    .from(kiloclaw_instances)
+    .where(
+      and(
+        eq(kiloclaw_instances.user_id, params.userId),
+        ne(kiloclaw_instances.id, params.instanceId),
+        isNull(kiloclaw_instances.organization_id),
+        isNull(kiloclaw_instances.destroyed_at)
+      )
+    )
+    .limit(1);
+
+  return activeInstance ? { status: 'in_progress', instanceId: activeInstance.id } : null;
 }
 
 async function cleanupFailedCreditRecoveryProvision(params: {
@@ -5570,14 +5631,7 @@ export const kiloclawRouter = createTRPCRouter({
       });
 
       if (!eligibility.eligible) {
-        const message =
-          eligibility.reason === 'insufficient_credits'
-            ? 'Effective credit balance is insufficient to activate Standard hosting.'
-            : 'Credit-funded reprovision recovery is not available for this KiloClaw state.';
-        throw new TRPCError({
-          code: eligibility.reason === 'insufficient_credits' ? 'BAD_REQUEST' : 'CONFLICT',
-          message,
-        });
+        throwCreditReprovisionRecoveryUnavailable(eligibility);
       }
 
       const provisioned = await provisionInstance(
@@ -5588,6 +5642,36 @@ export const kiloclawRouter = createTRPCRouter({
           bootstrapSubscription: false,
         }
       );
+
+      const competingRecovery = await getCompetingCreditRecoveryActivation({
+        userId: ctx.user.id,
+        instanceId: provisioned.instanceId,
+      });
+      if (competingRecovery) {
+        const cleanedUp = await cleanupFailedCreditRecoveryProvision({
+          userId: ctx.user.id,
+          instanceId: provisioned.instanceId,
+          sandboxId: provisioned.sandboxId,
+        });
+        logBillingWarning('KiloClaw credit reprovision skipped duplicate concurrent provision', {
+          user_id: ctx.user.id,
+          instance_id: provisioned.instanceId,
+          competing_instance_id: competingRecovery.instanceId,
+          competing_status: competingRecovery.status,
+          cleanup: cleanedUp ? 'destroyed' : 'not_needed_or_already_destroyed',
+        });
+        if (competingRecovery.status === 'activated') {
+          return {
+            success: true,
+            status: 'activated',
+            instanceId: competingRecovery.instanceId,
+          };
+        }
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'KiloClaw credit-funded reprovision recovery is already in progress.',
+        });
+      }
 
       try {
         await enrollWithCreditsImpl({

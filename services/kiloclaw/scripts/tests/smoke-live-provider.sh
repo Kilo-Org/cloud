@@ -299,15 +299,20 @@ assert_kilocode_provider_loaded() {
   # wired in via plugins.load.paths by config-writer. The keyless image-check only
   # proves the package is installed; this proves it is actually present in the
   # RUNNING config and loaded by the gateway — i.e. model routing won't silently die.
+  # Guard the read: if openclaw.json is missing/unreadable/invalid (the very
+  # regression this guards), the embedded python exits non-zero. Testing it in an
+  # `if` keeps `set -e` from aborting the whole run so it fails cleanly here.
   local path_present
-  path_present=$(docker exec -i "$CID" python3 - <<'PY'
+  if ! path_present=$(docker exec -i "$CID" python3 - <<'PY'
 import json
 from pathlib import Path
 doc = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
 paths = (((doc.get('plugins') or {}).get('load') or {}).get('paths') or [])
 print('yes' if '/usr/local/lib/node_modules/@openclaw/kilocode-provider' in paths else 'no')
 PY
-  )
+  ); then
+    path_present="config unreadable"
+  fi
   check "kilocode provider on plugins.load.paths" "yes" "$path_present"
 
   # And confirm the gateway actually loaded it (openclaw writes JSON to stdout,

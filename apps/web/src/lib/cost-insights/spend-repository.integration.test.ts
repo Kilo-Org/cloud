@@ -14,6 +14,7 @@ import {
 
 import {
   getOwnerHourlySpend,
+  getOwnerHourDriverEvidence,
   getOwnerRolling24HourDriverEvidenceExact,
   getOwnerRolling24HourSpendExact,
   getOwnerTopSpendDrivers,
@@ -256,6 +257,215 @@ describe('Cost Insights spend repository integration', () => {
           spendRecordCount: 1,
         }),
       ],
+    });
+  });
+
+  test('uses canonical current-hour driver evidence for partial-hour windows', async () => {
+    const userId = await createUser();
+    await initializeCoverage();
+    const owner = { type: 'user', id: userId } as const;
+    const driver = await aiGatewayDriver('rollup-model', userId);
+    await db.insert(cost_insight_owner_hour_totals).values({
+      owned_by_user_id: userId,
+      hour_start: '2026-06-02T12:00:00.000Z',
+      spend_category: 'variable',
+      total_microdollars: 42,
+      spend_record_count: 2,
+    });
+    await db.insert(cost_insight_owner_hour_driver_buckets).values({
+      owned_by_user_id: userId,
+      hour_start: '2026-06-02T12:00:00.000Z',
+      spend_category: 'variable',
+      driver_key: driver.driverKey,
+      source: 'ai_gateway',
+      product_key: 'other',
+      feature_key: 'other',
+      model_or_plan_key: 'rollup-model',
+      provider_key: 'provider',
+      actor_user_id: userId,
+      total_microdollars: 42,
+      spend_record_count: 2,
+    });
+    await db.insert(microdollar_usage).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: userId,
+      cost: 7,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: '2026-06-02T12:15:00.000Z',
+      provider: 'provider',
+      model: 'canonical-model',
+      requested_model: 'canonical-model',
+      inference_provider: 'provider',
+      has_error: false,
+      abuse_classification: 0,
+    });
+
+    await expect(
+      getOwnerHourDriverEvidence(db, {
+        owner,
+        hourStart: '2026-06-02T12:00:00.000Z',
+        intervalEnd: '2026-06-02T12:30:00.000Z',
+        category: 'variable',
+      })
+    ).resolves.toEqual({
+      startInclusive: '2026-06-02T12:00:00.000Z',
+      endExclusive: '2026-06-02T12:30:00.000Z',
+      variableMicrodollars: 7,
+      scheduledMicrodollars: 0,
+      totalMicrodollars: 7,
+      topDrivers: [
+        expect.objectContaining({
+          modelOrPlanKey: 'canonical-model',
+          totalMicrodollars: 7,
+          spendRecordCount: 1,
+        }),
+      ],
+      usedCanonicalFallback: true,
+      degradedIntervalCount: 0,
+    });
+  });
+
+  test('uses rollup-backed completed-hour driver evidence when coverage is complete', async () => {
+    const userId = await createUser();
+    await initializeCoverage();
+    const owner = { type: 'user', id: userId } as const;
+    const driver = await aiGatewayDriver('rollup-model', userId);
+    await db.insert(cost_insight_owner_hour_totals).values({
+      owned_by_user_id: userId,
+      hour_start: '2026-06-02T12:00:00.000Z',
+      spend_category: 'variable',
+      total_microdollars: 42,
+      spend_record_count: 2,
+    });
+    await db.insert(cost_insight_owner_hour_driver_buckets).values({
+      owned_by_user_id: userId,
+      hour_start: '2026-06-02T12:00:00.000Z',
+      spend_category: 'variable',
+      driver_key: driver.driverKey,
+      source: 'ai_gateway',
+      product_key: 'other',
+      feature_key: 'other',
+      model_or_plan_key: 'rollup-model',
+      provider_key: 'provider',
+      actor_user_id: userId,
+      total_microdollars: 42,
+      spend_record_count: 2,
+    });
+    await db.insert(microdollar_usage).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: userId,
+      cost: 7,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: '2026-06-02T12:15:00.000Z',
+      provider: 'provider',
+      model: 'canonical-model',
+      requested_model: 'canonical-model',
+      inference_provider: 'provider',
+      has_error: false,
+      abuse_classification: 0,
+    });
+
+    await expect(
+      getOwnerHourDriverEvidence(db, {
+        owner,
+        hourStart: '2026-06-02T12:00:00.000Z',
+        intervalEnd: '2026-06-02T13:00:00.000Z',
+        category: 'variable',
+      })
+    ).resolves.toEqual({
+      startInclusive: '2026-06-02T12:00:00.000Z',
+      endExclusive: '2026-06-02T13:00:00.000Z',
+      variableMicrodollars: 42,
+      scheduledMicrodollars: 0,
+      totalMicrodollars: 42,
+      topDrivers: [
+        expect.objectContaining({
+          modelOrPlanKey: 'rollup-model',
+          totalMicrodollars: 42,
+          spendRecordCount: 2,
+        }),
+      ],
+      usedCanonicalFallback: false,
+      degradedIntervalCount: 0,
+    });
+  });
+
+  test('falls back to canonical current-hour driver evidence when coverage is degraded', async () => {
+    const userId = await createUser();
+    await initializeCoverage();
+    const owner = { type: 'user', id: userId } as const;
+    const driver = await aiGatewayDriver('degraded-rollup-model', userId);
+    await db.insert(cost_insight_owner_hour_totals).values({
+      owned_by_user_id: userId,
+      hour_start: '2026-06-02T12:00:00.000Z',
+      spend_category: 'variable',
+      total_microdollars: 999,
+      spend_record_count: 1,
+    });
+    await db.insert(cost_insight_owner_hour_driver_buckets).values({
+      owned_by_user_id: userId,
+      hour_start: '2026-06-02T12:00:00.000Z',
+      spend_category: 'variable',
+      driver_key: driver.driverKey,
+      source: 'ai_gateway',
+      product_key: 'other',
+      feature_key: 'other',
+      model_or_plan_key: 'degraded-rollup-model',
+      provider_key: 'provider',
+      actor_user_id: userId,
+      total_microdollars: 999,
+      spend_record_count: 1,
+    });
+    await db.insert(cost_insight_rollup_degraded_intervals).values({
+      start_hour: '2026-06-02T12:00:00.000Z',
+      end_hour_exclusive: '2026-06-02T13:00:00.000Z',
+      reason: 'capture_bypass',
+    });
+    await db.insert(microdollar_usage).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: userId,
+      cost: 11,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: '2026-06-02T12:15:00.000Z',
+      provider: 'provider',
+      model: 'canonical-model',
+      requested_model: 'canonical-model',
+      inference_provider: 'provider',
+      has_error: false,
+      abuse_classification: 0,
+    });
+
+    await expect(
+      getOwnerHourDriverEvidence(db, {
+        owner,
+        hourStart: '2026-06-02T12:00:00.000Z',
+        intervalEnd: '2026-06-02T12:30:00.000Z',
+        category: 'variable',
+      })
+    ).resolves.toEqual({
+      startInclusive: '2026-06-02T12:00:00.000Z',
+      endExclusive: '2026-06-02T12:30:00.000Z',
+      variableMicrodollars: 11,
+      scheduledMicrodollars: 0,
+      totalMicrodollars: 11,
+      topDrivers: [
+        expect.objectContaining({
+          modelOrPlanKey: 'canonical-model',
+          totalMicrodollars: 11,
+          spendRecordCount: 1,
+        }),
+      ],
+      usedCanonicalFallback: true,
+      degradedIntervalCount: 1,
     });
   });
 

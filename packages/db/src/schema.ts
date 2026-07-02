@@ -319,6 +319,12 @@ export const credit_transactions = pgTable(
     index('IDX_credit_transactions_is_free').on(table.is_free),
     index('IDX_credit_transactions_kilo_user_id').on(table.kilo_user_id),
     index('IDX_credit_transactions_credit_category').on(table.credit_category),
+    index('IDX_credit_transactions_user_negative_created')
+      .on(table.kilo_user_id, table.created_at)
+      .where(sql`${table.amount_microdollars} < 0`),
+    index('IDX_credit_transactions_org_negative_created')
+      .on(table.organization_id, table.created_at)
+      .where(sql`${table.amount_microdollars} < 0 AND ${table.organization_id} IS NOT NULL`),
     uniqueIndex('IDX_credit_transactions_stripe_payment_id').on(table.stripe_payment_id),
     uniqueIndex('IDX_credit_transactions_original_transaction_id').on(
       table.original_transaction_id
@@ -8806,6 +8812,9 @@ export const exa_usage_log = pgTable(
   table => [
     primaryKey({ columns: [table.id, table.created_at] }),
     index('idx_exa_usage_log_user_created').on(table.kilo_user_id, table.created_at),
+    index('idx_exa_usage_log_org_created')
+      .on(table.organization_id, table.created_at)
+      .where(sql`${table.organization_id} IS NOT NULL`),
   ]
 );
 

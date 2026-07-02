@@ -8,9 +8,9 @@ import { sql } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import {
   getOwnerHourlySpend,
+  getOwnerHourDriverEvidence,
   getOwnerRollingDriverEvidenceExact,
   getOwnerRollingSpendExact,
-  getOwnerSpendDriverEvidenceExact,
   type OwnerTopSpendDriver,
 } from './spend-repository';
 import {
@@ -65,6 +65,9 @@ export type CostInsightEvaluationSummary = {
   threshold7DayEventCreated: boolean;
   threshold30DayEventCreated: boolean;
   suggestionCreated: boolean;
+  durationMs: number;
+  rawCanonicalFallbackCount: number;
+  rollupDegradedIntervalCount: number;
 };
 
 const thresholdWindowDescriptors = {
@@ -223,21 +226,31 @@ async function evaluateAnomalyInterval(params: {
   owner: CostInsightSpendOwner;
   hourStart: string;
   intervalEnd: string;
-}): Promise<boolean> {
-  if (Date.parse(params.intervalEnd) <= Date.parse(params.hourStart)) return false;
+}): Promise<{
+  eventCreated: boolean;
+  rawCanonicalFallbackCount: number;
+  rollupDegradedIntervalCount: number;
+}> {
+  if (Date.parse(params.intervalEnd) <= Date.parse(params.hourStart)) {
+    return {
+      eventCreated: false,
+      rawCanonicalFallbackCount: 0,
+      rollupDegradedIntervalCount: 0,
+    };
+  }
 
   const anomalyPolicy = await getCostInsightAnomalyPolicy(
     params.database,
     params.owner,
     params.hourStart
   );
-  const evidence = await getOwnerSpendDriverEvidenceExact(params.database, {
+  const evidence = await getOwnerHourDriverEvidence(params.database, {
     owner: params.owner,
-    startInclusive: params.hourStart,
-    endExclusive: params.intervalEnd,
+    hourStart: params.hourStart,
+    intervalEnd: params.intervalEnd,
     category: 'variable',
   });
-  return await maybeCreateAnomalyAlert({
+  const eventCreated = await maybeCreateAnomalyAlert({
     database: params.database,
     owner: params.owner,
     hourStart: params.hourStart,
@@ -246,6 +259,11 @@ async function evaluateAnomalyInterval(params: {
     anomalyPolicy,
     topDrivers: evidence.topDrivers,
   });
+  return {
+    eventCreated,
+    rawCanonicalFallbackCount: evidence.usedCanonicalFallback ? 1 : 0,
+    rollupDegradedIntervalCount: evidence.degradedIntervalCount ?? 0,
+  };
 }
 
 async function maybeCreateThresholdAlert(params: {
@@ -445,6 +463,7 @@ async function evaluateCostInsightsForOwnerLocked(
   owner: CostInsightSpendOwner,
   options: { asOf?: string; recoverCompletedHour?: boolean } = {}
 ): Promise<CostInsightEvaluationSummary> {
+  const startedAt = performance.now();
   const requestedAsOf = options.asOf ?? new Date().toISOString();
   const asOfTimestamp = Date.parse(requestedAsOf);
   if (!Number.isFinite(asOfTimestamp)) throw new Error('Cost Insights evaluation asOf is invalid.');
@@ -454,34 +473,6 @@ async function evaluateCostInsightsForOwnerLocked(
   const suggestionWindowStart = addDays(suggestionWindowEnd, -7);
 
   const config = await getCostInsightOwnerConfig(database, owner);
-  const suggestionEvidence = await getOwnerRollingDriverEvidenceExact(database, {
-    owner,
-    asOf,
-    windowHours: 7 * 24,
-  });
-  const rolling24HourSpend = await getOwnerRollingSpendExact(database, {
-    owner,
-    asOf,
-    windowHours: 24,
-  });
-  const rolling7DaySpend =
-    config?.spend_alerts_enabled && config.spend_7_day_threshold_microdollars !== null
-      ? await getOwnerRollingSpendExact(database, {
-          owner,
-          asOf,
-          windowHours: 7 * 24,
-          fallbackToCanonical: true,
-        })
-      : { totalMicrodollars: null };
-  const rolling30DaySpend =
-    config?.spend_alerts_enabled && config.spend_30_day_threshold_microdollars !== null
-      ? await getOwnerRollingSpendExact(database, {
-          owner,
-          asOf,
-          windowHours: 30 * 24,
-          fallbackToCanonical: true,
-        })
-      : { totalMicrodollars: null };
 
   let anomalyEventCreated = false;
   let recoveredAnomalyEventCreated = false;
@@ -489,52 +480,88 @@ async function evaluateCostInsightsForOwnerLocked(
   let threshold7DayEventCreated = false;
   let threshold30DayEventCreated = false;
   let suggestionCreated = false;
+  let rawCanonicalFallbackCount = 0;
+  let rollupDegradedIntervalCount = 0;
 
   if (config?.spend_alerts_enabled) {
     if (config.anomaly_alerts_enabled) {
       if (options.recoverCompletedHour) {
         const completedHourStart = addHours(currentHourStart, -1);
-        recoveredAnomalyEventCreated = await evaluateAnomalyInterval({
+        const recoveredAnomaly = await evaluateAnomalyInterval({
           database,
           owner,
           hourStart: completedHourStart,
           intervalEnd: currentHourStart,
         });
+        recoveredAnomalyEventCreated = recoveredAnomaly.eventCreated;
+        rawCanonicalFallbackCount += recoveredAnomaly.rawCanonicalFallbackCount;
+        rollupDegradedIntervalCount += recoveredAnomaly.rollupDegradedIntervalCount;
       }
-      anomalyEventCreated = await evaluateAnomalyInterval({
+      const anomaly = await evaluateAnomalyInterval({
         database,
         owner,
         hourStart: currentHourStart,
         intervalEnd: asOf,
       });
+      anomalyEventCreated = anomaly.eventCreated;
+      rawCanonicalFallbackCount += anomaly.rawCanonicalFallbackCount;
+      rollupDegradedIntervalCount += anomaly.rollupDegradedIntervalCount;
     }
-    thresholdEventCreated = await maybeCreateThresholdAlert({
-      database,
-      owner,
-      asOf,
-      alertKind: 'threshold',
-      thresholdMicrodollars: config.spend_threshold_microdollars,
-      rollingMicrodollars: rolling24HourSpend.totalMicrodollars,
-    });
-    threshold7DayEventCreated = await maybeCreateThresholdAlert({
-      database,
-      owner,
-      asOf,
-      alertKind: 'threshold_7d',
-      thresholdMicrodollars: config.spend_7_day_threshold_microdollars,
-      rollingMicrodollars: rolling7DaySpend.totalMicrodollars,
-    });
-    threshold30DayEventCreated = await maybeCreateThresholdAlert({
-      database,
-      owner,
-      asOf,
-      alertKind: 'threshold_30d',
-      thresholdMicrodollars: config.spend_30_day_threshold_microdollars,
-      rollingMicrodollars: rolling30DaySpend.totalMicrodollars,
-    });
+    if (config.spend_threshold_microdollars !== null) {
+      const rolling24HourSpend = await getOwnerRollingSpendExact(database, {
+        owner,
+        asOf,
+        windowHours: 24,
+      });
+      thresholdEventCreated = await maybeCreateThresholdAlert({
+        database,
+        owner,
+        asOf,
+        alertKind: 'threshold',
+        thresholdMicrodollars: config.spend_threshold_microdollars,
+        rollingMicrodollars: rolling24HourSpend.totalMicrodollars,
+      });
+    }
+    if (config.spend_7_day_threshold_microdollars !== null) {
+      const rolling7DaySpend = await getOwnerRollingSpendExact(database, {
+        owner,
+        asOf,
+        windowHours: 7 * 24,
+        fallbackToCanonical: true,
+      });
+      threshold7DayEventCreated = await maybeCreateThresholdAlert({
+        database,
+        owner,
+        asOf,
+        alertKind: 'threshold_7d',
+        thresholdMicrodollars: config.spend_7_day_threshold_microdollars,
+        rollingMicrodollars: rolling7DaySpend.totalMicrodollars,
+      });
+    }
+    if (config.spend_30_day_threshold_microdollars !== null) {
+      const rolling30DaySpend = await getOwnerRollingSpendExact(database, {
+        owner,
+        asOf,
+        windowHours: 30 * 24,
+        fallbackToCanonical: true,
+      });
+      threshold30DayEventCreated = await maybeCreateThresholdAlert({
+        database,
+        owner,
+        asOf,
+        alertKind: 'threshold_30d',
+        thresholdMicrodollars: config.spend_30_day_threshold_microdollars,
+        rollingMicrodollars: rolling30DaySpend.totalMicrodollars,
+      });
+    }
   }
 
   if (config?.cost_suggestions_enabled ?? true) {
+    const suggestionEvidence = await getOwnerRollingDriverEvidenceExact(database, {
+      owner,
+      asOf,
+      windowHours: 7 * 24,
+    });
     suggestionCreated = await maybeCreateCostSuggestion({
       database,
       owner,
@@ -555,6 +582,9 @@ async function evaluateCostInsightsForOwnerLocked(
     threshold7DayEventCreated,
     threshold30DayEventCreated,
     suggestionCreated,
+    durationMs: Math.round(performance.now() - startedAt),
+    rawCanonicalFallbackCount,
+    rollupDegradedIntervalCount,
   };
 }
 
@@ -586,6 +616,9 @@ export type CostInsightDirtyEvaluationSummary = {
   claimed: number;
   evaluatedOwners: CostInsightSpendOwner[];
   failedOwners: Array<{ owner: CostInsightSpendOwner; error: string }>;
+  evaluationDurationMs: number;
+  rawCanonicalFallbackCount: number;
+  rollupDegradedIntervalCount: number;
 };
 
 function ownerFromDirtyRow(row: CostInsightClaimedDirtyOwner): CostInsightSpendOwner {
@@ -701,6 +734,9 @@ export async function processPendingCostInsightEvaluations(
     claimed: 0,
     evaluatedOwners: [],
     failedOwners: [],
+    evaluationDurationMs: 0,
+    rawCanonicalFallbackCount: 0,
+    rollupDegradedIntervalCount: 0,
   };
 
   while (summary.claimed < limit) {
@@ -715,10 +751,13 @@ export async function processPendingCostInsightEvaluations(
       rows.map(async row => {
         const owner = ownerFromDirtyRow(row);
         try {
-          await evaluateCostInsightsForOwner(database, owner, {
+          const evaluation = await evaluateCostInsightsForOwner(database, owner, {
             asOf: options.asOf,
             recoverCompletedHour: options.recoverCompletedHour,
           });
+          summary.evaluationDurationMs += evaluation.durationMs;
+          summary.rawCanonicalFallbackCount += evaluation.rawCanonicalFallbackCount;
+          summary.rollupDegradedIntervalCount += evaluation.rollupDegradedIntervalCount;
           await completeDirtyCostInsightOwner(database, row);
           if (
             !summary.evaluatedOwners.some(

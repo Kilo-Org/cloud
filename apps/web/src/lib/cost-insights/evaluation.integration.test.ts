@@ -503,10 +503,21 @@ describe('Cost Insights evaluation integration', () => {
       .from(cost_insight_evaluation_dirty_owners)
       .where(eq(cost_insight_evaluation_dirty_owners.owned_by_user_id, userId));
     expect(dirtyOwner?.generation).toBe(3);
+    expect(Date.parse(dirtyOwner?.next_attempt_at ?? '')).toBeGreaterThan(Date.now());
+
+    await db
+      .update(cost_insight_evaluation_dirty_owners)
+      .set({ next_attempt_at: '2026-06-26T10:29:00.000Z' })
+      .where(eq(cost_insight_evaluation_dirty_owners.owned_by_user_id, userId));
 
     await expect(
       processPendingCostInsightEvaluations(db, { owner, asOf: '2026-06-26T10:30:00.000Z' })
-    ).resolves.toMatchObject({ claimed: 1, evaluatedOwners: [owner], failedOwners: [] });
+    ).resolves.toMatchObject({
+      claimed: 1,
+      evaluatedOwners: [owner],
+      failedOwners: [],
+      rawCanonicalFallbackCount: 0,
+    });
     await expect(
       db
         .select()

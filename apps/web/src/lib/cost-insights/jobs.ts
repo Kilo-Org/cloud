@@ -29,6 +29,11 @@ export type CostInsightHourlySweepSummary = {
   failedOwners: Array<{ owner: CostInsightSpendOwner; error: string }>;
   dirtyEvaluations: Awaited<ReturnType<typeof processPendingCostInsightEvaluations>>;
   notifications: Awaited<ReturnType<typeof dispatchPendingCostInsightNotifications>>;
+  dirtyQueueDepthBefore: number;
+  dirtyQueueDepthAfter: number;
+  evaluationDurationMs: number;
+  rawCanonicalFallbackCount: number;
+  rollupDegradedIntervalCount: number;
   alreadyRunning: boolean;
   deadlineReached: boolean;
   ownerCycleComplete: boolean;
@@ -53,6 +58,7 @@ export async function runCostInsightHourlySweep(
   const asOf = options.asOf ?? new Date().toISOString();
   const deadline = performance.now() + (options.timeBudgetMs ?? DEFAULT_SWEEP_TIME_BUDGET_MS);
   const ownerConcurrency = options.ownerConcurrency ?? OWNER_CONCURRENCY;
+  const dirtyQueueDepthBefore = await countCostInsightDirtyOwnerQueueDepth(database);
   const dirtyEvaluations = await processPendingCostInsightEvaluations(database, {
     limit: options.dirtyOwnerLimit ?? DIRTY_OWNER_LIMIT,
     asOf,
@@ -69,6 +75,9 @@ export async function runCostInsightHourlySweep(
     ...dirtyEvaluations.failedOwners,
   ];
   let evaluatedOwners = dirtyEvaluations.evaluatedOwners.length;
+  let evaluationDurationMs = dirtyEvaluations.evaluationDurationMs;
+  let rawCanonicalFallbackCount = dirtyEvaluations.rawCanonicalFallbackCount;
+  let rollupDegradedIntervalCount = dirtyEvaluations.rollupDegradedIntervalCount;
   let alreadyRunning = false;
   let deadlineReached = false;
   let ownerCycleComplete = false;
@@ -101,15 +110,15 @@ export async function runCostInsightHourlySweep(
             limitOwnerWork(async () => {
               if (claimedOwnerKeys.has(ownerKey(owner))) return { owner, skipped: true as const };
               try {
-                await evaluateCostInsightsForOwner(database, owner, {
+                const evaluation = await evaluateCostInsightsForOwner(database, owner, {
                   asOf: lease.cycleAsOf,
                   recoverCompletedHour: true,
                 });
-                return { owner, skipped: false as const, error: null };
+                return { owner, skipped: false as const, error: null, evaluation };
               } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 await markCostInsightOwnerDirtyForRetry(database, owner, message);
-                return { owner, skipped: false as const, error: message };
+                return { owner, skipped: false as const, error: message, evaluation: null };
               }
             })
           )
@@ -119,7 +128,15 @@ export async function runCostInsightHourlySweep(
           if (outcome.error) {
             failedOwners.push({ owner: outcome.owner, error: outcome.error });
           } else {
+            if (!outcome.evaluation) {
+              throw new Error(
+                'Cost Insights sweep evaluation summary missing for successful owner.'
+              );
+            }
             evaluatedOwners += 1;
+            evaluationDurationMs += outcome.evaluation.durationMs;
+            rawCanonicalFallbackCount += outcome.evaluation.rawCanonicalFallbackCount;
+            rollupDegradedIntervalCount += outcome.evaluation.rollupDegradedIntervalCount;
           }
         }
         if (page.nextCursor) {
@@ -148,11 +165,30 @@ export async function runCostInsightHourlySweep(
       database,
       options.notificationLimit ?? NOTIFICATION_LIMIT
     ),
+    dirtyQueueDepthBefore,
+    dirtyQueueDepthAfter: await countCostInsightDirtyOwnerQueueDepth(database),
+    evaluationDurationMs,
+    rawCanonicalFallbackCount,
+    rollupDegradedIntervalCount,
     alreadyRunning,
     deadlineReached,
     ownerCycleComplete,
     cycleId,
   };
+}
+
+async function countCostInsightDirtyOwnerQueueDepth(
+  database: CostInsightRootDatabase
+): Promise<number> {
+  const result = await database.execute<{ count: string | number | bigint }>(sql`
+    SELECT COUNT(*)::text AS count
+    FROM cost_insight_evaluation_dirty_owners
+  `);
+  const value = Number(result.rows[0]?.count ?? 0);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error('Cost Insights dirty-owner queue depth is outside the safe integer range.');
+  }
+  return value;
 }
 
 async function markCostInsightOwnerDirtyForRetry(

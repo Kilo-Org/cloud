@@ -20,6 +20,7 @@ export const COST_INSIGHT_DRIVER_FALLBACK = 'other';
 export const COST_INSIGHT_CODING_PLAN_PRODUCT_KEY = 'coding-plan';
 export const COST_INSIGHT_EXA_PRODUCT_KEY = 'exa';
 export const COST_INSIGHT_KILOCLAW_PRODUCT_KEY = 'kiloclaw-hosting';
+export const COST_INSIGHT_EVALUATION_DEBOUNCE_MS = 60_000;
 
 const DRIVER_KEY_SERIALIZATION_VERSION = 'cost-insight-driver-key:v1';
 const DRIVER_IDENTIFIER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$/;
@@ -294,6 +295,8 @@ function costInsightConflictTargets(owner: CostInsightSpendOwner): {
       };
 }
 
+const COST_INSIGHT_EVALUATION_DEBOUNCE_SECONDS = COST_INSIGHT_EVALUATION_DEBOUNCE_MS / 1_000;
+
 async function writeCostInsightSpend(
   tx: CostInsightRollupTransactionWriter,
   values: {
@@ -412,7 +415,9 @@ async function writeCostInsightSpend(
         capture_input.owned_by_user_id,
         capture_input.owned_by_organization_id,
         pg_catalog.clock_timestamp(),
-        pg_catalog.clock_timestamp()
+        pg_catalog.clock_timestamp() + make_interval(
+          secs => ${COST_INSIGHT_EVALUATION_DEBOUNCE_SECONDS}
+        )
       FROM capture_input
       CROSS JOIN driver_upsert
       WHERE TRUE
@@ -420,7 +425,9 @@ async function writeCostInsightSpend(
       DO UPDATE SET
         generation = dirty_owner.generation + 1,
         dirty_at = pg_catalog.clock_timestamp(),
-        next_attempt_at = LEAST(dirty_owner.next_attempt_at, pg_catalog.clock_timestamp()),
+        next_attempt_at = pg_catalog.clock_timestamp() + make_interval(
+          secs => ${COST_INSIGHT_EVALUATION_DEBOUNCE_SECONDS}
+        ),
         updated_at = pg_catalog.clock_timestamp()
       RETURNING 'ok'::text AS outcome
     )

@@ -18,6 +18,9 @@ function summary(failedOwners: Array<{ owner: { type: 'user'; id: string }; erro
       claimed: 1,
       evaluatedOwners: [{ type: 'user' as const, id: 'user-1' }],
       failedOwners: [],
+      evaluationDurationMs: 25,
+      rawCanonicalFallbackCount: 0,
+      rollupDegradedIntervalCount: 0,
     },
     notifications: {
       claimed: 1,
@@ -26,6 +29,11 @@ function summary(failedOwners: Array<{ owner: { type: 'user'; id: string }; erro
       terminalized: 0,
       failed: 0,
     },
+    dirtyQueueDepthBefore: 3,
+    dirtyQueueDepthAfter: 1,
+    evaluationDurationMs: 50,
+    rawCanonicalFallbackCount: 1,
+    rollupDegradedIntervalCount: 2,
     alreadyRunning: false,
     deadlineReached: false,
     ownerCycleComplete: true,
@@ -53,6 +61,15 @@ describe('GET /api/cron/cost-insights-hourly', () => {
     expect(response.status).toBe(500);
     expect(body).toMatchObject({ success: false, partialFailure: true });
     expect(mockSentryLog).toHaveBeenCalledWith(
+      'Cost Insights hourly sweep completed',
+      expect.objectContaining({
+        evaluatedOwnerCount: 2,
+        dirtyQueueDepthBefore: 3,
+        rawCanonicalFallbackCount: 1,
+        rollupDegradedIntervalCount: 2,
+      })
+    );
+    expect(mockSentryLog).toHaveBeenCalledWith(
       'Cost Insights hourly sweep completed with partial failures',
       expect.objectContaining({ failedOwnerCount: 1 })
     );
@@ -72,7 +89,13 @@ describe('GET /api/cron/cost-insights-hourly', () => {
       success: true,
       partialFailure: false,
     });
-    expect(mockSentryLog).not.toHaveBeenCalled();
+    expect(mockSentryLog).toHaveBeenCalledWith(
+      'Cost Insights hourly sweep completed',
+      expect.objectContaining({
+        evaluatedOwnerCount: 2,
+        deadlineReached: false,
+      })
+    );
   });
 
   test('exports a bounded function duration for resumable sweeps', () => {

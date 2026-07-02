@@ -81,6 +81,8 @@ export type OwnerSpendDriverEvidenceExact = {
   scheduledMicrodollars: number;
   totalMicrodollars: number;
   topDrivers: OwnerTopSpendDriver[];
+  usedCanonicalFallback?: boolean;
+  degradedIntervalCount?: number;
 };
 
 export type OwnerRollingDriverEvidenceExact = {
@@ -90,6 +92,11 @@ export type OwnerRollingDriverEvidenceExact = {
   scheduledMicrodollars: number;
   totalMicrodollars: number;
   topDrivers: OwnerTopSpendDriver[];
+};
+
+type OwnerHourDriverEvidence = OwnerSpendDriverEvidenceExact & {
+  usedCanonicalFallback: boolean;
+  degradedIntervalCount: number;
 };
 
 export type RollingWindowFragments = {
@@ -762,6 +769,21 @@ function summarizeSpendDrivers(drivers: MergeableSpendDriver[]): {
   };
 }
 
+function toMergeableSpendDrivers(drivers: OwnerTopSpendDriver[]): MergeableSpendDriver[] {
+  return drivers.map(driver => ({
+    ...driver,
+    driverKey: JSON.stringify([
+      driver.category,
+      driver.source,
+      driver.productKey,
+      driver.featureKey,
+      driver.modelOrPlanKey,
+      driver.providerKey,
+      driver.actorUserId,
+    ]),
+  }));
+}
+
 async function getInteriorRollupDrivers(
   executor: CostInsightQueryExecutor,
   owner: CostInsightSpendOwner,
@@ -915,6 +937,130 @@ export async function getOwnerSpendDriverEvidenceExact(
           'exact driver total microdollars'
         ),
         topDrivers,
+      };
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' }
+  );
+}
+
+export async function getOwnerHourDriverEvidence(
+  primaryDatabase: ExactRollingDatabase,
+  params: {
+    owner: CostInsightSpendOwner;
+    hourStart: string;
+    intervalEnd: string;
+    category?: CostInsightSpendCategory;
+  }
+): Promise<OwnerHourDriverEvidence> {
+  const hourStart = requireUtcHour(params.hourStart, 'hourStart');
+  const intervalEnd = requireUtcTimestamp(params.intervalEnd, 'intervalEnd');
+  const hourEndExclusive = new Date(Date.parse(hourStart) + HOUR_MS).toISOString();
+  if (Date.parse(intervalEnd) <= Date.parse(hourStart)) {
+    throw new Error('Cost Insights hour evidence interval must end after hourStart.');
+  }
+  if (Date.parse(intervalEnd) > Date.parse(hourEndExclusive)) {
+    throw new Error('Cost Insights hour evidence interval cannot exceed one UTC hour.');
+  }
+  const isCompleteHour = intervalEnd === hourEndExclusive;
+
+  return primaryDatabase.transaction(
+    async transaction => {
+      const coverage = await getCostInsightRollupCoverage(transaction, {
+        startHour: hourStart,
+        endHourExclusive: hourEndExclusive,
+      });
+
+      if (!coverage.isFullyCovered) {
+        const canonicalDrivers = (
+          await getCanonicalDrivers(transaction, {
+            owner: params.owner,
+            startInclusive: hourStart,
+            endExclusive: intervalEnd,
+          })
+        ).filter(driver => !params.category || driver.category === params.category);
+        const canonicalEvidence = summarizeSpendDrivers(canonicalDrivers);
+        return {
+          startInclusive: hourStart,
+          endExclusive: intervalEnd,
+          ...canonicalEvidence,
+          usedCanonicalFallback: true,
+          degradedIntervalCount: coverage.degradedIntervals.length,
+        };
+      }
+
+      if (!isCompleteHour) {
+        const canonicalDrivers = (
+          await getCanonicalDrivers(transaction, {
+            owner: params.owner,
+            startInclusive: hourStart,
+            endExclusive: intervalEnd,
+          })
+        ).filter(driver => !params.category || driver.category === params.category);
+        const canonicalEvidence = summarizeSpendDrivers(canonicalDrivers);
+        return {
+          startInclusive: hourStart,
+          endExclusive: intervalEnd,
+          ...canonicalEvidence,
+          usedCanonicalFallback: true,
+          degradedIntervalCount: 0,
+        };
+      }
+
+      const hourly = await getOwnerHourlySpend(transaction, {
+        owner: params.owner,
+        startHour: hourStart,
+        endHourExclusive: hourEndExclusive,
+      });
+      const hour = hourly[0];
+      if (!hour?.isCovered) {
+        const canonicalDrivers = (
+          await getCanonicalDrivers(transaction, {
+            owner: params.owner,
+            startInclusive: hourStart,
+            endExclusive: intervalEnd,
+          })
+        ).filter(driver => !params.category || driver.category === params.category);
+        const canonicalEvidence = summarizeSpendDrivers(canonicalDrivers);
+        return {
+          startInclusive: hourStart,
+          endExclusive: intervalEnd,
+          ...canonicalEvidence,
+          usedCanonicalFallback: true,
+          degradedIntervalCount: coverage.degradedIntervals.length,
+        };
+      }
+
+      const drivers = await getOwnerTopSpendDrivers(transaction, {
+        owner: params.owner,
+        startHour: hourStart,
+        endHourExclusive: hourEndExclusive,
+        category: params.category,
+      });
+      const evidence = summarizeSpendDrivers(toMergeableSpendDrivers(drivers));
+      const categoryFiltered = params.category
+        ? {
+            variableMicrodollars:
+              params.category === 'variable' ? (hour.variableMicrodollars ?? 0) : 0,
+            scheduledMicrodollars:
+              params.category === 'scheduled' ? (hour.scheduledMicrodollars ?? 0) : 0,
+          }
+        : {
+            variableMicrodollars: hour.variableMicrodollars ?? 0,
+            scheduledMicrodollars: hour.scheduledMicrodollars ?? 0,
+          };
+      return {
+        startInclusive: hourStart,
+        endExclusive: intervalEnd,
+        variableMicrodollars: categoryFiltered.variableMicrodollars,
+        scheduledMicrodollars: categoryFiltered.scheduledMicrodollars,
+        totalMicrodollars: sumSafe(
+          categoryFiltered.variableMicrodollars,
+          categoryFiltered.scheduledMicrodollars,
+          'hour driver total microdollars'
+        ),
+        topDrivers: evidence.topDrivers,
+        usedCanonicalFallback: false,
+        degradedIntervalCount: 0,
       };
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }

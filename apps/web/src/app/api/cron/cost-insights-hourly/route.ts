@@ -26,6 +26,20 @@ export async function GET(request: Request) {
   }
 
   const summary = await runCostInsightHourlySweep(db);
+  sentryLogger('cron', 'info')('Cost Insights hourly sweep completed', {
+    evaluatedOwnerCount: summary.evaluatedOwners,
+    failedOwnerCount: summary.failedOwners.length,
+    dirtyQueueDepthBefore: summary.dirtyQueueDepthBefore,
+    dirtyQueueDepthAfter: summary.dirtyQueueDepthAfter,
+    dirtyClaimedCount: summary.dirtyEvaluations.claimed,
+    evaluationDurationMs: summary.evaluationDurationMs,
+    rawCanonicalFallbackCount: summary.rawCanonicalFallbackCount,
+    rollupDegradedIntervalCount: summary.rollupDegradedIntervalCount,
+    notificationClaimedCount: summary.notifications.claimed,
+    deadlineReached: summary.deadlineReached,
+    ownerCycleComplete: summary.ownerCycleComplete,
+    alreadyRunning: summary.alreadyRunning,
+  });
   const hasFailures =
     summary.failedOwners.length > 0 ||
     summary.notifications.failed > 0 ||

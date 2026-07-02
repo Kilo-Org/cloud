@@ -4,6 +4,7 @@ import { eq, or, sql } from 'drizzle-orm';
 import { createDrizzleClient } from './client';
 import {
   COST_INSIGHT_DRIVER_DIMENSION_MAX_LENGTH,
+  COST_INSIGHT_EVALUATION_DEBOUNCE_MS,
   buildCostInsightDriver,
   captureCostInsightSpend,
   getCostInsightUtcHourStart,
@@ -15,6 +16,7 @@ import { computeDatabaseUrl } from './database-url';
 import {
   cost_insight_owner_hour_driver_buckets,
   cost_insight_owner_hour_totals,
+  cost_insight_evaluation_dirty_owners,
   cost_insight_rollup_coverage,
   cost_insight_rollup_degraded_intervals,
   kilocode_users,
@@ -58,6 +60,14 @@ async function withCostInsightFixture(
   try {
     await testFn({ userId, organizationId });
   } finally {
+    await testDatabase.db
+      .delete(cost_insight_evaluation_dirty_owners)
+      .where(
+        or(
+          eq(cost_insight_evaluation_dirty_owners.owned_by_user_id, userId),
+          eq(cost_insight_evaluation_dirty_owners.owned_by_organization_id, organizationId)
+        )
+      );
     await testDatabase.db
       .delete(cost_insight_owner_hour_driver_buckets)
       .where(
@@ -309,6 +319,33 @@ describe('Cost Insights rollup capture', () => {
         spend_record_count: 4,
       });
       expect(new Date(drivers[0]?.hour_start ?? '').toISOString()).toBe('2026-11-01T05:00:00.000Z');
+    });
+  });
+
+  it('debounces dirty-owner evaluation while coalescing generations', async () => {
+    await withCostInsightFixture(async fixture => {
+      await testDatabase.db.transaction(async tx => {
+        await captureCostInsightSpend(tx, captureInput(fixture));
+        await captureCostInsightSpend(
+          tx,
+          captureInput(fixture, { amountMicrodollars: 75, spendRecordCount: 2 })
+        );
+      });
+
+      const databaseNowResult = await testDatabase.db.execute<{
+        database_now: string | Date;
+      }>(sql`SELECT CURRENT_TIMESTAMP AS database_now`);
+      const databaseNow = databaseNowResult.rows[0]?.database_now;
+      const [dirtyOwner] = await testDatabase.db
+        .select()
+        .from(cost_insight_evaluation_dirty_owners)
+        .where(eq(cost_insight_evaluation_dirty_owners.owned_by_user_id, fixture.userId));
+      const nextAttemptDelayMs =
+        Date.parse(String(dirtyOwner?.next_attempt_at)) - Date.parse(String(databaseNow));
+
+      expect(dirtyOwner?.generation).toBe(2);
+      expect(nextAttemptDelayMs).toBeGreaterThan(COST_INSIGHT_EVALUATION_DEBOUNCE_MS - 10_000);
+      expect(nextAttemptDelayMs).toBeLessThan(COST_INSIGHT_EVALUATION_DEBOUNCE_MS + 10_000);
     });
   });
 

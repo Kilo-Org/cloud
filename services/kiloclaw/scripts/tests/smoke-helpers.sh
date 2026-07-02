@@ -42,38 +42,29 @@ PY
 assert_kilo_chat_plugin_loaded() {
   local cid="$1"
   local plugin_json
+  local plugin_err
   local details
   local diagnostic_details
 
-  if ! plugin_json=$(docker exec "$cid" openclaw plugins inspect kilo-chat --json 2>&1); then
+  # openclaw writes the --json payload to stdout and its logs (e.g. the
+  # "[state-migrations]" warnings emitted by createSubsystemLogger) to stderr.
+  # Capture the two streams separately so the parsed value is pure JSON; keep
+  # stderr only to surface on failure.
+  plugin_err=$(mktemp)
+  if ! plugin_json=$(docker exec "$cid" openclaw plugins inspect kilo-chat --json 2>"$plugin_err"); then
     check "kilo-chat plugin inspect" "loaded" "failed"
     echo "  output: $plugin_json"
+    echo "  stderr: $(cat "$plugin_err")"
+    rm -f "$plugin_err"
     return
   fi
+  rm -f "$plugin_err"
 
   if details=$(python3 -c '
 import json
 import sys
 
-# openclaw >=2026.6.11 may print log lines (e.g. "[state-migrations] ...") on
-# stderr, which the 2>&1 capture interleaves ahead of the JSON payload. A bare
-# "[state-migrations]" line also begins with "[", and a log line may contain a
-# stray "{", so we cannot just take the first bracket — try every "["/"{"
-# candidate offset until one decodes.
-raw = sys.stdin.read()
-doc = None
-for _start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
-    try:
-        _cand, _ = json.JSONDecoder().raw_decode(raw[_start:])
-    except Exception:
-        continue
-    # Accept only the real payload object, not a self-contained JSON fragment
-    # (e.g. a "[1, 2, 3]" list) embedded in an interleaved log line.
-    if isinstance(_cand, dict) and "plugin" in _cand:
-        doc = _cand
-        break
-if doc is None:
-    raise SystemExit("no plugin JSON object in command output")
+doc = json.load(sys.stdin)
 plugin = doc.get("plugin", {})
 status = plugin.get("status")
 error = plugin.get("error")
@@ -95,22 +86,7 @@ import json
 import sys
 
 known_message = "channel plugin manifest declares kilo-chat without channelConfigs metadata; add openclaw.plugin.json#channelConfigs so config schema and setup surfaces work before runtime loads. Channels without channelConfigs still appear in channel listings, but setup UI may be limited."
-# Tolerate stderr log lines interleaved by the 2>&1 capture (see above): try
-# every "["/"{" candidate offset until one decodes.
-raw = sys.stdin.read()
-doc = None
-for _start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
-    try:
-        _cand, _ = json.JSONDecoder().raw_decode(raw[_start:])
-    except Exception:
-        continue
-    # Accept only the real payload object, not a self-contained JSON fragment
-    # (e.g. a stray list) embedded in an interleaved log line.
-    if isinstance(_cand, dict) and "diagnostics" in _cand:
-        doc = _cand
-        break
-if doc is None:
-    raise SystemExit("no diagnostics JSON object in command output")
+doc = json.load(sys.stdin)
 diagnostics = doc.get("diagnostics", [])
 if not isinstance(diagnostics, list):
     raise SystemExit("diagnostics is not a list")

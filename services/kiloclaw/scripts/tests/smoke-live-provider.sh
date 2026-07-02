@@ -260,11 +260,13 @@ print(json.dumps({
 PY
   )
 
+  # openclaw writes the --json payload to stdout and logs to stderr; drop stderr
+  # (it can contain provider/credential detail) so the parsed value is pure JSON.
   if ! output=$(docker exec "$CID" openclaw gateway call agent \
     --params "$params" \
     --expect-final \
     --timeout 240000 \
-    --json 2>&1); then
+    --json 2>/dev/null); then
     check "live Auto Free agent turn" "nonce returned" "command failed"
     echo "  Gateway output suppressed because provider errors can contain live credentials."
     return
@@ -275,25 +277,7 @@ import json
 import sys
 
 nonce = sys.argv[1]
-# openclaw >=2026.6.11 may print log lines (e.g. "[state-migrations] ...") on
-# stderr, which the 2>&1 capture interleaves ahead of the JSON payload. A bare
-# "[state-migrations]" line also begins with "[", and a log line may contain a
-# stray "{", so we cannot just take the first bracket — try every "["/"{"
-# candidate offset until one decodes.
-raw = sys.stdin.read()
-doc = None
-for _start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
-    try:
-        _cand, _ = json.JSONDecoder().raw_decode(raw[_start:])
-    except Exception:
-        continue
-    # Accept only the real response object, not a self-contained JSON fragment
-    # (e.g. a stray list) embedded in an interleaved log line.
-    if isinstance(_cand, dict) and ("result" in _cand or "payloads" in _cand):
-        doc = _cand
-        break
-if doc is None:
-    raise SystemExit("no result JSON object in command output")
+doc = json.load(sys.stdin)
 result = doc.get("result", doc)
 payloads = result.get("payloads", []) if isinstance(result, dict) else []
 texts = [entry.get("text", "") for entry in payloads if isinstance(entry, dict)]
@@ -307,6 +291,35 @@ print("nonce returned")
     echo "  details: $parsed"
     echo "  Gateway output suppressed because provider responses can contain sensitive data."
   fi
+}
+
+assert_kilocode_provider_loaded() {
+  # Guards Fix 1 (openclaw #93470): the kilocode provider was externalized out of
+  # openclaw core into @openclaw/kilocode-provider, installed by the Dockerfile and
+  # wired in via plugins.load.paths by config-writer. The keyless image-check only
+  # proves the package is installed; this proves it is actually present in the
+  # RUNNING config and loaded by the gateway — i.e. model routing won't silently die.
+  local path_present
+  path_present=$(docker exec -i "$CID" python3 - <<'PY'
+import json
+from pathlib import Path
+doc = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
+paths = (((doc.get('plugins') or {}).get('load') or {}).get('paths') or [])
+print('yes' if '/usr/local/lib/node_modules/@openclaw/kilocode-provider' in paths else 'no')
+PY
+  )
+  check "kilocode provider on plugins.load.paths" "yes" "$path_present"
+
+  # And confirm the gateway actually loaded it (openclaw writes JSON to stdout,
+  # logs to stderr which we drop).
+  local status
+  status=$(docker exec "$CID" openclaw plugins inspect kilocode --json 2>/dev/null \
+    | python3 -c 'import json,sys
+try:
+    print((json.load(sys.stdin).get("plugin") or {}).get("status") or "missing")
+except Exception:
+    print("unparseable")')
+  check "kilocode provider plugin loaded" "loaded" "$status"
 }
 
 assert_kilocode_vision_capability() {
@@ -326,37 +339,11 @@ assert_kilocode_vision_capability() {
     result=$(python3 -c '
 import json, sys
 
-raw = sys.stdin.read()
-# Tolerate any non-JSON log preamble (e.g. openclaw [state-migrations]) by trying
-# each candidate JSON start until one decodes to the model catalog shape. A bare
-# "[state-migrations]" line also begins with "[", and a self-contained fragment
-# (e.g. a stray list) in an interleaved log line could parse on its own, so accept
-# only a top-level list of model objects (or a dict with a "models" list).
-def _as_catalog(cand):
-    if isinstance(cand, dict) and isinstance(cand.get("models"), list):
-        cand = cand["models"]
-    # Require a non-empty list whose entries look like model objects (have a
-    # "key" or "provider"), so an empty list or a stray list of unrelated dicts
-    # from interleaved log noise is not mistaken for the real catalog.
-    if (
-        isinstance(cand, list)
-        and cand
-        and all(isinstance(x, dict) for x in cand)
-        and any(("key" in x or "provider" in x) for x in cand)
-    ):
-        return cand
-    return None
-
-models = None
-for start in [0] + [i for i, c in enumerate(raw) if c in "[{"]:
-    try:
-        cand, _ = json.JSONDecoder().raw_decode(raw[start:])
-    except Exception:
-        continue
-    models = _as_catalog(cand)
-    if models is not None:
-        break
-if models is None:
+# openclaw writes the --json catalog to stdout and logs to stderr (dropped via
+# 2>/dev/null above), so stdout is pure JSON.
+data = json.load(sys.stdin)
+models = data.get("models", data) if isinstance(data, dict) else data
+if not isinstance(models, list):
     print("no-catalog"); raise SystemExit(0)
 
 def is_kilocode(m):
@@ -414,6 +401,9 @@ run_phase() {
     assert_app_config_patch "$CID" "$PORT" "$TOKEN"
     assert_app_config_agent_defaults "$CID" "$PORT" "$TOKEN"
     assert_app_config_agents_crud "$CID" "$PORT" "$TOKEN"
+    # Candidate only: confirm the externalized kilocode provider is wired into the
+    # running config and loaded by the gateway (model routing depends on it).
+    assert_kilocode_provider_loaded
     # Candidate only: prove the removed #4054 catalog-refresh workaround is no
     # longer needed — native discovery must supply kilocode image capability.
     assert_kilocode_vision_capability

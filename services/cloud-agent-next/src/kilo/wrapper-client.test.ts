@@ -2212,6 +2212,21 @@ describe('WrapperClient', () => {
       expect(error.name).toBe('WrapperError');
     });
 
+    it('maps workspace reconciliation failures to service unavailable', async () => {
+      const session = createMockSession(
+        createErrorResponse(
+          'WORKSPACE_RECONCILIATION_FAILED',
+          'Restored workspace could not be reconciled'
+        )
+      );
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await expect(client.ensureSessionReady({} as never)).rejects.toMatchObject({
+        code: 'WORKSPACE_RECONCILIATION_FAILED',
+        statusCode: 503,
+      });
+    });
+
     it('WrapperNotReadyError has correct properties', () => {
       const error = new WrapperNotReadyError('Not ready');
 

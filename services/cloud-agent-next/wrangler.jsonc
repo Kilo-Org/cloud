@@ -53,9 +53,12 @@
     "CLI_TIMEOUT_SECONDS": "900",
     "REAPER_INTERVAL_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
+    "BACKUP_BUCKET_NAME": "kilocode-sessions",
+    "CLOUDFLARE_R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
     "MANAGED_SCM_CONTAINMENT_ORG_IDS": "",
+    "REPO_SNAPSHOT_ORG_IDS": "",
   },
   "placement": { "mode": "smart" },
   /**
@@ -139,6 +142,10 @@
   "r2_buckets": [
     {
       "binding": "R2_BUCKET",
+      "bucket_name": "kilocode-sessions",
+    },
+    {
+      "binding": "BACKUP_BUCKET",
       "bucket_name": "kilocode-sessions",
     },
   ],
@@ -372,13 +379,17 @@
         "GITHUB_LITE_APP_SLUG": "",
         "GITHUB_LITE_APP_BOT_USER_ID": "",
         "WORKER_URL": "http://localhost:8794",
+        "SANDBOX_TRANSPORT": "rpc",
         "CLI_TIMEOUT_SECONDS": "900",
         "REAPER_INTERVAL_MS": "300000",
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
+        "BACKUP_BUCKET_NAME": "kilocode-sessions-dev",
+        "CLOUDFLARE_R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
         "PER_SESSION_SANDBOX_ORG_IDS": "*",
         "MANAGED_SCM_CONTAINMENT_ORG_IDS": "",
+        "REPO_SNAPSHOT_ORG_IDS": "",
       },
       "services": [
         {
@@ -407,6 +418,10 @@
       "r2_buckets": [
         {
           "binding": "R2_BUCKET",
+          "bucket_name": "kilocode-sessions-dev",
+        },
+        {
+          "binding": "BACKUP_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
         },
       ],

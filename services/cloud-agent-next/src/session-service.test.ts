@@ -86,6 +86,7 @@ import { parseSessionMetadata } from './persistence/session-metadata.js';
 import type { ExecutionSession, SandboxId, SandboxInstance, SessionId } from './types.js';
 import type { FencedWrapperDispatchRequest } from './execution/types.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
+import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from './shared/runtime-environment.js';
 import {
   SandboxCapacityInspectionError,
   WorkspaceCapacityAdmissionRejectedError,
@@ -95,6 +96,30 @@ type MockExecutionSession = ExecutionSession & {
   exec: ReturnType<typeof vi.fn>;
   gitCheckout: ReturnType<typeof vi.fn>;
 };
+
+describe('SessionService.buildRuntimeEnv', () => {
+  it('forces a stable pnpm store while preserving the session home', () => {
+    const service = new SessionService();
+    const context = service.buildContext({
+      sandboxId: 'usr-test',
+      userId: 'user_test',
+      sessionId: 'agent_test',
+      envVars: {
+        [PNPM_STORE_ENV_VAR]: '/home/old-session/.local/share/pnpm/store/v11',
+      },
+    });
+
+    const runtimeEnv = service.buildRuntimeEnv({
+      context,
+      env: createEnv(),
+      originalToken: 'kilo-token',
+    });
+
+    expect(runtimeEnv.HOME).toBe('/home/agent_test');
+    expect(runtimeEnv.SESSION_HOME).toBe('/home/agent_test');
+    expect(runtimeEnv[PNPM_STORE_ENV_VAR]).toBe(PNPM_STORE_DIR);
+  });
+});
 
 describe('code-review command guard policy', () => {
   it('allows required review publication and remote refresh commands while denying repository mutation', () => {

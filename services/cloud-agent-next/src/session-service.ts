@@ -73,6 +73,7 @@ import {
   type WrapperWorkspaceReady,
 } from './shared/wrapper-bootstrap.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
+import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from './shared/runtime-environment.js';
 import type {
   FencedLegacyExecutionRequest,
   FencedWrapperDispatchRequest,
@@ -1341,6 +1342,7 @@ export class SessionService {
       HOME: sessionHome,
       SESSION_ID: sessionId,
       SESSION_HOME: sessionHome,
+      [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
       // Inject Kilocode credentials (with override support)
       KILOCODE_TOKEN: kilocodeToken,
       KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: originalToken } }),

@@ -209,6 +209,16 @@ describe('router sessionId validation', () => {
       }
     });
 
+    it('should reject the system-managed pnpm store variable', () => {
+      const result = envVarsSchema.safeParse({
+        pnpm_config_store_dir: '/custom/pnpm-store',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toContain('pnpm_config_store_dir');
+      }
+    });
+
     it('should reject multiple reserved variables', () => {
       const result = envVarsSchema.safeParse({
         HOME: '/custom/home',

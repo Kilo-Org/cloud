@@ -48,6 +48,10 @@ PER_SESSION_SANDBOX_ORG_IDS=
 # Comma-separated list of org IDs that use managed SCM containment, or `*` for all orgs
 MANAGED_SCM_CONTAINMENT_ORG_IDS=
 
+# Repo snapshot org IDs (optional)
+# Comma-separated list of org IDs that receive workspace repo snapshots, or `*` for all orgs/users
+REPO_SNAPSHOT_ORG_IDS=
+
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App
 # Format for git config:
@@ -74,6 +78,10 @@ R2_ENDPOINT=""
 R2_ATTACHMENTS_BUCKET=""
 R2_ATTACHMENTS_READONLY_ACCESS_KEY_ID=""
 R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY=""
+
+# Optional: production R2 credentials for Cloudflare Sandbox directory backups
+R2_ACCESS_KEY_ID=""
+R2_SECRET_ACCESS_KEY=""
 
 # Session ingest URL used by the wrapper to post session data.
 # Sandbox containers reach the host via `host.docker.internal`.

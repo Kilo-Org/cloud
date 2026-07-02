@@ -111,6 +111,8 @@ export type PreparingStep =
   | 'branch'
   | 'devcontainer_setup'
   | 'setup_commands'
+  | 'workspace_restore'
+  | 'workspace_backup'
   | 'kilo_server'
   | 'kilo_session'
   | 'ready'

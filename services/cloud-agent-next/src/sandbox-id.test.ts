@@ -6,6 +6,7 @@ import {
   generateSandboxRoutingTarget,
   getOutboundContainerId,
   getSandboxNamespace,
+  isOrgInList,
 } from './sandbox-id.js';
 import type { Env, SandboxId } from './types.js';
 
@@ -546,5 +547,39 @@ describe('getOutboundContainerId', () => {
     expect(getOutboundContainerId(env, sandboxId, { managedScmContainment: true })).toBe(
       `${expected}:${sandboxId}`
     );
+  });
+});
+
+describe('isOrgInList', () => {
+  it('returns false for an empty list', () => {
+    expect(isOrgInList('', 'org-a')).toBe(false);
+  });
+
+  it('returns false when the list is undefined', () => {
+    expect(isOrgInList(undefined, 'org-a')).toBe(false);
+  });
+
+  it('returns true for any org when the list is "*"', () => {
+    expect(isOrgInList('*', 'org-a')).toBe(true);
+  });
+
+  it('returns true for undefined orgId when the list is "*"', () => {
+    expect(isOrgInList('*', undefined)).toBe(true);
+  });
+
+  it('returns true when orgId is in the list', () => {
+    expect(isOrgInList('org-a,org-b', 'org-b')).toBe(true);
+  });
+
+  it('trims whitespace around entries', () => {
+    expect(isOrgInList(' org-a , org-b ', 'org-a')).toBe(true);
+  });
+
+  it('returns false when orgId is not in the list', () => {
+    expect(isOrgInList('org-a,org-b', 'org-c')).toBe(false);
+  });
+
+  it('returns false for undefined orgId when the list is specific', () => {
+    expect(isOrgInList('org-a,org-b', undefined)).toBe(false);
   });
 });

@@ -1,4 +1,45 @@
-import { parseModelsDevProviderModels } from './sync-direct-byok';
+import {
+  parseModelsDevProviderModels,
+  parseOpenAICompatibleProviderModels,
+} from './sync-direct-byok';
+
+describe('parseOpenAICompatibleProviderModels', () => {
+  test('parses Morph OpenAI-compatible model metadata', () => {
+    const models = parseOpenAICompatibleProviderModels({
+      data: [
+        {
+          id: 'morph-qwen35-397b',
+          name: 'Morph: Qwen 3.5 397B',
+          input_modalities: ['text', 'image'],
+          output_modalities: ['text'],
+          context_length: 262144,
+          max_output_length: 131072,
+        },
+        {
+          id: 'morph-v3-fast',
+          max_model_len: 262144,
+        },
+      ],
+    });
+
+    expect(models).toEqual([
+      {
+        id: 'morph-qwen35-397b',
+        name: 'Morph: Qwen 3.5 397B',
+        context_length: 262144,
+        max_completion_tokens: 131072,
+        input_modalities: ['text', 'image'],
+      },
+      {
+        id: 'morph-v3-fast',
+        name: undefined,
+        context_length: 262144,
+        max_completion_tokens: undefined,
+        input_modalities: undefined,
+      },
+    ]);
+  });
+});
 
 describe('parseModelsDevProviderModels', () => {
   test('excludes deprecated models while retaining other statuses', () => {

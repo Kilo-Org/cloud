@@ -89,16 +89,20 @@ function openAICompatibleFetcher(options: {
           `Failed to fetch ${options.label} models: ${response.status} ${response.statusText}`
         );
       }
-      const parsed = OpenAICompatibleModelsResponseSchema.parse(await response.json());
-      return parsed.data.map(model => ({
-        id: model.id,
-        name: shortenDisplayName(model.name),
-        context_length: model.context_length ?? model.max_model_len,
-        max_completion_tokens: model.max_output_length,
-        input_modalities: model.input_modalities,
-      }));
+      return parseOpenAICompatibleProviderModels(await response.json());
     },
   };
+}
+
+export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] {
+  const parsed = OpenAICompatibleModelsResponseSchema.parse(entry);
+  return parsed.data.map(model => ({
+    id: model.id,
+    name: shortenDisplayName(model.name),
+    context_length: model.context_length ?? model.max_model_len,
+    max_completion_tokens: model.max_output_length,
+    input_modalities: model.input_modalities,
+  }));
 }
 
 export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
@@ -176,6 +180,11 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     providerId: 'synthetic',
     label: 'Synthetic',
     url: 'https://api.synthetic.new/v1/models',
+  }),
+  openAICompatibleFetcher({
+    providerId: 'morph',
+    label: 'Morph',
+    url: 'https://www.morphllm.com/api/models/json',
   }),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud'),

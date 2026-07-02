@@ -80,7 +80,6 @@ export function createSafeProcessDiagnostic(result: ExecResult): string {
     result.terminationReason === undefined && result.exitCode !== 0
       ? `exit code ${result.exitCode}`
       : undefined,
-    result.elapsedMs === undefined ? undefined : `elapsed ${result.elapsedMs}ms`,
     result.stdoutTruncated === true || result.stderrTruncated === true
       ? TRUNCATION_MARKER
       : undefined,

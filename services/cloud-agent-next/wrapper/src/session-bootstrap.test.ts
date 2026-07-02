@@ -738,7 +738,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     });
     expect(setupError.message).toBe('Setup command 1 failed');
     expect(setupError).toMatchObject({
-      detail: 'termination nonzero exit, exit code 1, elapsed 17ms, output truncated',
+      detail: 'termination nonzero exit, exit code 1, output truncated',
     });
     const projectedError = JSON.stringify(setupError);
     for (const sensitiveValue of [

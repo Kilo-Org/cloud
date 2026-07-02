@@ -121,7 +121,7 @@ describe('session readiness errors', () => {
           code: 'WORKSPACE_SETUP_FAILED',
           subtype: 'git_clone_timeout',
           message: 'Repository clone timed out',
-          detail: 'termination timeout, elapsed 120000ms, output truncated',
+          detail: 'termination timeout, output truncated',
           retryable: true,
         },
       }),
@@ -156,7 +156,7 @@ describe('session readiness errors', () => {
       error: 'WORKSPACE_SETUP_FAILED',
       subtype: 'git_clone_timeout',
       message: 'Repository clone timed out',
-      detail: 'termination timeout, elapsed 120000ms, output truncated',
+      detail: 'termination timeout, output truncated',
       retryable: true,
     });
     expect(fetchHandler).toBeDefined();

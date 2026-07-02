@@ -114,12 +114,18 @@ export type OperationResult<T = void> = {
 export type PersistenceEnv = {
   /** Durable Object namespace for shared Sandbox instances */
   Sandbox: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for shared Sandbox instances with SCM credential containment */
+  SandboxContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for per-session Sandbox instances */
   SandboxSmall: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for per-session Sandbox instances with SCM credential containment */
+  SandboxSmallContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for Docker-in-Docker Sandbox instances */
   SandboxDIND: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for code-review ephemeral Sandbox instances */
   SandboxCodeReview: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for code-review ephemeral Sandbox instances with SCM credential containment */
+  SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Service binding for the session ingest worker */

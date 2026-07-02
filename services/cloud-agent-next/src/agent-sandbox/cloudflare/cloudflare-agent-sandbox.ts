@@ -97,8 +97,19 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       dependencies.resolveSandbox ??
       ((sandboxId, options) =>
         options
-          ? getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId, options)
-          : getSandbox(getSandboxNamespace(this.env, sandboxId), sandboxId));
+          ? getSandbox(
+              getSandboxNamespace(this.env, sandboxId, {
+                managedScmContainment: this.metadata.workspace?.managedScmContainment === true,
+              }),
+              sandboxId,
+              options
+            )
+          : getSandbox(
+              getSandboxNamespace(this.env, sandboxId, {
+                managedScmContainment: this.metadata.workspace?.managedScmContainment === true,
+              }),
+              sandboxId
+            ));
     this.stopObserved = dependencies.stopObservedWrappers ?? stopObservedWrappers;
     this.sleep = dependencies.sleep ?? (ms => new Promise(resolve => setTimeout(resolve, ms)));
     this.stopObservationDelaysMs =

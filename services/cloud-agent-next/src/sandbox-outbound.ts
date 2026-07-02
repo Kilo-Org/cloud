@@ -396,35 +396,43 @@ export function handleManagedScmOutbound(
     : handleManagedGitLabOutbound(request, env, capability, ctx.containerId);
 }
 
-export class Sandbox extends StockSandbox<Cloudflare.Env> {
-  enableInternet = true;
-  interceptHttps = true;
-}
-
-Sandbox.outboundHandlers = {
+const managedScmOutboundHandlers = {
   [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
 };
+
+export class Sandbox extends StockSandbox<Cloudflare.Env> {
+  enableInternet = true;
+  interceptHttps = false;
+}
 
 export class SandboxSmall extends StockSandbox<Cloudflare.Env> {
   enableInternet = true;
-  interceptHttps = true;
+  interceptHttps = false;
 }
-
-SandboxSmall.outboundHandlers = {
-  [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-};
 
 export class SandboxDIND extends StockSandbox<Cloudflare.Env> {
   enableInternet = true;
+  interceptHttps = false;
 }
 
 export class SandboxCodeReview extends StockSandbox<Cloudflare.Env> {
   enableInternet = true;
-  interceptHttps = true;
+  interceptHttps = false;
 }
 
-SandboxCodeReview.outboundHandlers = {
-  [MANAGED_SCM_OUTBOUND_HANDLER]: handleManagedScmOutbound,
-};
+export class SandboxContainment extends Sandbox {
+  interceptHttps = true;
+  static outboundHandlers = managedScmOutboundHandlers;
+}
+
+export class SandboxSmallContainment extends SandboxSmall {
+  interceptHttps = true;
+  static outboundHandlers = managedScmOutboundHandlers;
+}
+
+export class SandboxCodeReviewContainment extends SandboxCodeReview {
+  interceptHttps = true;
+  static outboundHandlers = managedScmOutboundHandlers;
+}
 
 export { ContainerProxy };

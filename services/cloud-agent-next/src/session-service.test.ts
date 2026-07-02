@@ -285,15 +285,26 @@ function createEnv(metadata?: CloudAgentSessionState | null): PersistenceEnv {
     Sandbox: {
       idFromName: vi.fn(() => 'sandbox-do-id' as unknown as DurableObjectId),
     } as unknown as PersistenceEnv['Sandbox'],
+    SandboxContainment: {
+      idFromName: vi.fn(() => 'containment-sandbox-do-id' as unknown as DurableObjectId),
+    } as unknown as PersistenceEnv['SandboxContainment'],
     SandboxSmall: {
       idFromName: vi.fn(() => 'small-sandbox-do-id' as unknown as DurableObjectId),
     } as unknown as PersistenceEnv['SandboxSmall'],
+    SandboxSmallContainment: {
+      idFromName: vi.fn(() => 'containment-small-sandbox-do-id' as unknown as DurableObjectId),
+    } as unknown as PersistenceEnv['SandboxSmallContainment'],
     SandboxDIND: {
       idFromName: vi.fn(() => 'dind-sandbox-do-id' as unknown as DurableObjectId),
     } as unknown as PersistenceEnv['SandboxDIND'],
     SandboxCodeReview: {
       idFromName: vi.fn(() => 'code-review-sandbox-do-id' as unknown as DurableObjectId),
     } as unknown as PersistenceEnv['SandboxCodeReview'],
+    SandboxCodeReviewContainment: {
+      idFromName: vi.fn(
+        () => 'containment-code-review-sandbox-do-id' as unknown as DurableObjectId
+      ),
+    } as unknown as PersistenceEnv['SandboxCodeReviewContainment'],
     CLOUD_AGENT_SESSION: {
       idFromName: vi.fn(() => 'do-id' as unknown as DurableObjectId),
       get: vi.fn(() => ({
@@ -1025,7 +1036,7 @@ describe('SessionService.prepareWorkspace', () => {
       {
         githubRepo: 'acme/repo',
         userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
+        outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: false,
       }
@@ -1290,7 +1301,7 @@ describe('SessionService.prepareWorkspace', () => {
       {
         gitUrl: 'https://gitlab.com/acme/repo.git',
         userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
+        outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         createdOnPlatform: 'code-review',
       }
@@ -1556,7 +1567,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         gitUrl: 'https://gitlab.com/acme/repo.git',
         userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
+        outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         createdOnPlatform: undefined,
       }
@@ -1573,7 +1584,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
       expect.any(Object),
-      expect.objectContaining({ outboundContainerId: 'sandbox-do-id' })
+      expect.objectContaining({ outboundContainerId: 'containment-sandbox-do-id' })
     );
     expect(tokenMocks.resolveManagedGitLabToken).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({ token: 'kgl2.default' });
@@ -1615,7 +1626,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         githubRepo: 'acme/repo',
         userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
+        outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: true,
       }
@@ -1638,7 +1649,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
     expect(tokenMocks.issueCloudAgentGitHubSessionCapability).toHaveBeenCalledWith(
       expect.any(Object),
-      expect.objectContaining({ outboundContainerId: 'sandbox-do-id' })
+      expect.objectContaining({ outboundContainerId: 'containment-sandbox-do-id' })
     );
     expect(tokenMocks.resolveCloudAgentGitHubAuthForRepo).not.toHaveBeenCalled();
     expect(result.readyRequest.repo).toMatchObject({ token: 'kgh2.default' });
@@ -1702,7 +1713,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.materialized.env.GITLAB_TOKEN).toBe('resolved-gitlab-token');
   });
 
-  it('derives a managed capability from the SandboxSmall container ID', async () => {
+  it('derives a managed capability from the SandboxSmallContainment container ID', async () => {
     await buildPromptWrapperRequests({
       ...createMetadata(),
       workspace: { sandboxId: 'ses-abcdef', managedScmContainment: true },
@@ -1710,11 +1721,11 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
       expect.any(Object),
-      expect.objectContaining({ outboundContainerId: 'small-sandbox-do-id' })
+      expect.objectContaining({ outboundContainerId: 'containment-small-sandbox-do-id' })
     );
   });
 
-  it('derives a managed capability from the shared Sandbox container ID', async () => {
+  it('derives a managed capability from the shared SandboxContainment container ID', async () => {
     await buildPromptWrapperRequests({
       ...createMetadata(),
       workspace: { sandboxId: 'usr-abcdef', managedScmContainment: true },
@@ -1722,7 +1733,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
     expect(tokenMocks.issueCloudAgentGitLabSessionCapability).toHaveBeenCalledWith(
       expect.any(Object),
-      expect.objectContaining({ outboundContainerId: 'sandbox-do-id' })
+      expect.objectContaining({ outboundContainerId: 'containment-sandbox-do-id' })
     );
   });
 
@@ -2126,7 +2137,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         githubRepo: 'acme/repo',
         userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
+        outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: true,
       }
@@ -2161,7 +2172,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         githubRepo: 'acme/repo',
         userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
+        outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         allowUserAuthorization: true,
       }
@@ -2186,7 +2197,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         {
           githubRepo: 'acme/repo',
           userId: 'user_test',
-          outboundContainerId: 'small-sandbox-do-id',
+          outboundContainerId: 'containment-small-sandbox-do-id',
           orgId: undefined,
           allowUserAuthorization: false,
         }
@@ -2287,7 +2298,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         gitUrl: 'https://gitlab.example.com:8443/gitlab/acme/platform/repo',
         userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
+        outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
       }
     );
@@ -2369,7 +2380,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       {
         gitUrl: 'https://gitlab.com/acme/repo.git',
         userId: 'user_test',
-        outboundContainerId: 'small-sandbox-do-id',
+        outboundContainerId: 'containment-small-sandbox-do-id',
         orgId: undefined,
         createdOnPlatform: 'code-review',
       }
@@ -2470,7 +2481,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         {
           gitUrl: 'https://gitlab.com/acme/repo.git',
           userId: 'user_test',
-          outboundContainerId: 'small-sandbox-do-id',
+          outboundContainerId: 'containment-small-sandbox-do-id',
           orgId: undefined,
           createdOnPlatform: 'code-review',
         }

@@ -187,6 +187,40 @@
       "max_instances": 1000,
       "rollout_active_grace_period": 1800,
     },
+    {
+      "class_name": "SandboxContainment",
+      "image": "./Dockerfile",
+      "instance_type": "standard-4",
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "7.3.54",
+      },
+      "max_instances": 400,
+      "rollout_active_grace_period": 1800,
+    },
+    {
+      "class_name": "SandboxSmallContainment",
+      "image": "./Dockerfile",
+      "instance_type": "standard-4",
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "7.3.54",
+      },
+      "max_instances": 300,
+      "rollout_active_grace_period": 1800,
+    },
+    {
+      "class_name": "SandboxCodeReviewContainment",
+      "image": "./Dockerfile",
+      "instance_type": {
+        "vcpu": 1,
+        "memory_mib": 4096,
+        "disk_mb": 8000,
+      },
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "7.3.54",
+      },
+      "max_instances": 1000,
+      "rollout_active_grace_period": 1800,
+    },
   ],
   "durable_objects": {
     "bindings": [
@@ -205,6 +239,18 @@
       {
         "class_name": "SandboxCodeReview",
         "name": "SandboxCodeReview",
+      },
+      {
+        "class_name": "SandboxContainment",
+        "name": "SandboxContainment",
+      },
+      {
+        "class_name": "SandboxSmallContainment",
+        "name": "SandboxSmallContainment",
+      },
+      {
+        "class_name": "SandboxCodeReviewContainment",
+        "name": "SandboxCodeReviewContainment",
       },
       {
         "class_name": "CloudAgentSession",
@@ -240,6 +286,14 @@
     {
       "new_sqlite_classes": ["SandboxCodeReview"],
       "tag": "v6",
+    },
+    {
+      "new_sqlite_classes": [
+        "SandboxContainment",
+        "SandboxSmallContainment",
+        "SandboxCodeReviewContainment",
+      ],
+      "tag": "v7",
     },
   ],
   /**
@@ -401,6 +455,40 @@
           "max_instances": 2,
           "rollout_active_grace_period": 60,
         },
+        {
+          "class_name": "SandboxContainment",
+          "image": "./Dockerfile.dev",
+          "instance_type": "standard-4",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.54",
+          },
+          "max_instances": 10,
+          "rollout_active_grace_period": 60,
+        },
+        {
+          "class_name": "SandboxSmallContainment",
+          "image": "./Dockerfile.dev",
+          "instance_type": "standard-4",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.54",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 60,
+        },
+        {
+          "class_name": "SandboxCodeReviewContainment",
+          "image": "./Dockerfile.dev",
+          "instance_type": {
+            "vcpu": 1,
+            "memory_mib": 4096,
+            "disk_mb": 8000,
+          },
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.54",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 60,
+        },
       ],
       "durable_objects": {
         "bindings": [
@@ -419,6 +507,18 @@
           {
             "class_name": "SandboxCodeReview",
             "name": "SandboxCodeReview",
+          },
+          {
+            "class_name": "SandboxContainment",
+            "name": "SandboxContainment",
+          },
+          {
+            "class_name": "SandboxSmallContainment",
+            "name": "SandboxSmallContainment",
+          },
+          {
+            "class_name": "SandboxCodeReviewContainment",
+            "name": "SandboxCodeReviewContainment",
           },
           {
             "class_name": "CloudAgentSession",

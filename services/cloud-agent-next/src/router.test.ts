@@ -339,6 +339,10 @@ describe('router sessionId validation', () => {
               SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
               SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
               SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+              SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+              SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+              SandboxCodeReviewContainment:
+                {} as TRPCContext['env']['SandboxCodeReviewContainment'],
               CLOUD_AGENT_SESSION: {
                 idFromName: vi.fn((id: string) => ({ id })),
                 get: vi.fn(() => ({
@@ -770,6 +774,9 @@ describe('router sessionId validation', () => {
             SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
             SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
             SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+            SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+            SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+            SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => mockSessionStub),
@@ -877,6 +884,9 @@ describe('router sessionId validation', () => {
             SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
             SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
             SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+            SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+            SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+            SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
@@ -1183,6 +1193,9 @@ describe('router sessionId validation', () => {
             SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
             SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
             SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+            SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+            SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+            SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
@@ -1468,6 +1481,9 @@ describe('router sessionId validation', () => {
             SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
             SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
             SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+            SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+            SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+            SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({

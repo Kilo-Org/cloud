@@ -394,12 +394,18 @@ export type GitTokenService = {
 
 export type Env = {
   Sandbox: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for shared sandbox containers with SCM credential containment */
+  SandboxContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for per-session sandbox containers (standard-3) */
   SandboxSmall: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for per-session sandbox containers with SCM credential containment */
+  SandboxSmallContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for Docker-in-Docker per-session sandbox containers (standard-3) */
   SandboxDIND: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for ephemeral Code Reviewer sandbox containers (standard-3) */
   SandboxCodeReview: DurableObjectNamespace<Sandbox>;
+  /** Durable Object namespace for ephemeral Code Reviewer sandbox containers with SCM credential containment */
+  SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */

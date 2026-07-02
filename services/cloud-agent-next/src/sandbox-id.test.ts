@@ -65,29 +65,29 @@ describe('generateSandboxId', () => {
         'org',
         'org-id',
         undefined,
-        'org-7d891a9e4905bb0d5ff8dffcb99ba76973039c70340665b0',
-        'org-1e1a41e3aaa921e0283d132325aeccbea85665f0eb8696df',
+        'org-3dd951780cb3512874a8a3862ca0389e1c13494a677607a3',
+        'org-4bec79d08eabcf42eaa2a388124758cd2d61ba5273685ec9',
       ],
       [
         'usr',
         undefined,
         undefined,
-        'usr-e4da69a737a38f1fc3283e8159b965e9d88f13d84c23cab1',
-        'usr-821f081306e3b48a67a9c1286d3f82d4ced0ae42b56e1c4f',
+        'usr-1ff364644f8c9e3b000eb3411592d4b6d15bb7a46da5c3d4',
+        'usr-bcbe81d943836000fb88aa07b983850e549b0fee3d0bfc64',
       ],
       [
         'bot',
         'org-id',
         'reviewer',
-        'bot-b7b5ae452e738ff4c3e88238a0bd903edb1039b22314e3dc',
-        'bot-84b4021610af9dafd01ba496ffabe13401b5c47fc857ed4e',
+        'bot-f404d7b8471e6abcfd94351ceaa066b7a7e83f75c14ad202',
+        'bot-0a14d4c299e776b24151a12725aa1c9b36c60390af40ce65',
       ],
       [
         'ubt',
         undefined,
         'reviewer',
-        'ubt-5714320d8e828e8d428046c7f8601c126755f3e04d55b0d6',
-        'ubt-4dd1985461fbef377d4d37f103e2b27140d57d1f52b1be6f',
+        'ubt-4ac50a2a29586ee24f93bd742afd37224b0cb153c25f52e0',
+        'ubt-e1d1603733e277a3bfdaab2faa6fcd3b0602056168b56ca7',
       ],
     ])(
       'provides stable base and suffixed IDs for %s shared sandboxes',
@@ -118,37 +118,37 @@ describe('generateSandboxId', () => {
         'org',
         'org-id',
         undefined,
+        'org-3dd951780cb3512874a8a3862ca0389e1c13494a677607a3',
         'org-7d891a9e4905bb0d5ff8dffcb99ba76973039c70340665b0',
-        'org-aa6ba1f356e062c430f121b97b5fd9cfd64c51487e5f28c5',
       ],
       [
         'usr',
         undefined,
         undefined,
+        'usr-1ff364644f8c9e3b000eb3411592d4b6d15bb7a46da5c3d4',
         'usr-e4da69a737a38f1fc3283e8159b965e9d88f13d84c23cab1',
-        'usr-3c060fe2d53dd0b6e7a7e03084b290b64c8e0f67a8988161',
       ],
       [
         'bot',
         'org-id',
         'reviewer',
+        'bot-f404d7b8471e6abcfd94351ceaa066b7a7e83f75c14ad202',
         'bot-b7b5ae452e738ff4c3e88238a0bd903edb1039b22314e3dc',
-        'bot-4415e0ae1dcbda7236e3bf04b66f13344682f349eac4500d',
       ],
       [
         'ubt',
         undefined,
         'reviewer',
+        'ubt-4ac50a2a29586ee24f93bd742afd37224b0cb153c25f52e0',
         'ubt-5714320d8e828e8d428046c7f8601c126755f3e04d55b0d6',
-        'ubt-fb0f08bd868516e812f84fc34ddc327364046281c8e4c978',
       ],
     ])(
-      'should use the second shared sandbox ID generation for %s IDs',
-      async (_prefix, orgId, botId, expectedId, legacyId) => {
+      'should use the current shared sandbox ID generation for %s IDs',
+      async (_prefix, orgId, botId, expectedId, previousId) => {
         const id = await generateSandboxId(undefined, orgId, 'user-id', 'session', botId);
 
         expect(id).toBe(expectedId);
-        expect(id).not.toBe(legacyId);
+        expect(id).not.toBe(previousId);
       }
     );
   });
@@ -425,14 +425,20 @@ describe('generateSandboxId', () => {
 
 describe('getSandboxNamespace', () => {
   const mockSandbox = {} as DurableObjectNamespace<Sandbox>;
+  const mockSandboxContainment = {} as DurableObjectNamespace<Sandbox>;
   const mockSandboxSmall = {} as DurableObjectNamespace<Sandbox>;
+  const mockSandboxSmallContainment = {} as DurableObjectNamespace<Sandbox>;
   const mockSandboxDIND = {} as DurableObjectNamespace<Sandbox>;
   const mockSandboxCodeReview = {} as DurableObjectNamespace<Sandbox>;
+  const mockSandboxCodeReviewContainment = {} as DurableObjectNamespace<Sandbox>;
   const mockEnv = {
     Sandbox: mockSandbox,
+    SandboxContainment: mockSandboxContainment,
     SandboxSmall: mockSandboxSmall,
+    SandboxSmallContainment: mockSandboxSmallContainment,
     SandboxDIND: mockSandboxDIND,
     SandboxCodeReview: mockSandboxCodeReview,
+    SandboxCodeReviewContainment: mockSandboxCodeReviewContainment,
   } as unknown as Env;
 
   it('should return SandboxDIND for dind- prefixed IDs', () => {
@@ -448,14 +454,41 @@ describe('getSandboxNamespace', () => {
     expect(ns).toBe(mockSandboxSmall);
   });
 
+  it('should return SandboxSmallContainment for contained ses- prefixed IDs', () => {
+    const ns = getSandboxNamespace(
+      mockEnv,
+      'ses-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
+      { managedScmContainment: true }
+    );
+    expect(ns).toBe(mockSandboxSmallContainment);
+  });
+
   it('should return SandboxCodeReview for crv- prefixed IDs', () => {
     const ns = getSandboxNamespace(mockEnv, 'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
     expect(ns).toBe(mockSandboxCodeReview);
   });
 
+  it('should return SandboxCodeReviewContainment for contained crv- prefixed IDs', () => {
+    const ns = getSandboxNamespace(
+      mockEnv,
+      'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
+      { managedScmContainment: true }
+    );
+    expect(ns).toBe(mockSandboxCodeReviewContainment);
+  });
+
   it('should return Sandbox for org- prefixed IDs', () => {
     const ns = getSandboxNamespace(mockEnv, 'org-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
     expect(ns).toBe(mockSandbox);
+  });
+
+  it('should return SandboxContainment for contained org- prefixed IDs', () => {
+    const ns = getSandboxNamespace(
+      mockEnv,
+      'org-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
+      { managedScmContainment: true }
+    );
+    expect(ns).toBe(mockSandboxContainment);
   });
 
   it('should return Sandbox for usr- prefixed IDs', () => {
@@ -466,6 +499,15 @@ describe('getSandboxNamespace', () => {
   it('should return Sandbox for bot- prefixed IDs', () => {
     const ns = getSandboxNamespace(mockEnv, 'bot-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6');
     expect(ns).toBe(mockSandbox);
+  });
+
+  it('should ignore containment for dind- prefixed IDs', () => {
+    const ns = getSandboxNamespace(
+      mockEnv,
+      'dind-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
+      { managedScmContainment: true }
+    );
+    expect(ns).toBe(mockSandboxDIND);
   });
 });
 
@@ -485,5 +527,24 @@ describe('getOutboundContainerId', () => {
     } as unknown as Env;
 
     expect(getOutboundContainerId(env, sandboxId)).toBe(`${expected}:${sandboxId}`);
+  });
+
+  it.each([
+    ['org-a1b2c3', 'containment-shared-do-id'],
+    ['ses-a1b2c3', 'containment-small-do-id'],
+    ['crv-a1b2c3', 'containment-code-review-do-id'],
+  ])('derives contained %s from the selected containment namespace', (sandboxId, expected) => {
+    const createNamespace = (containerId: string) => ({
+      idFromName: (name: string) => ({ toString: () => `${containerId}:${name}` }),
+    });
+    const env = {
+      SandboxContainment: createNamespace('containment-shared-do-id'),
+      SandboxSmallContainment: createNamespace('containment-small-do-id'),
+      SandboxCodeReviewContainment: createNamespace('containment-code-review-do-id'),
+    } as unknown as Env;
+
+    expect(getOutboundContainerId(env, sandboxId, { managedScmContainment: true })).toBe(
+      `${expected}:${sandboxId}`
+    );
   });
 });

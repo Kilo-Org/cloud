@@ -1684,7 +1684,9 @@ export class SessionService {
       const result = useManagedScmContainment
         ? await issueCloudAgentGitHubSessionCapability(env, {
             ...authParams,
-            outboundContainerId: getOutboundContainerId(env, sandboxId),
+            outboundContainerId: getOutboundContainerId(env, sandboxId, {
+              managedScmContainment: useManagedScmContainment,
+            }),
           })
         : await resolveCloudAgentGitHubAuthForRepo(env, authParams);
       if (!result.success) {
@@ -1722,7 +1724,9 @@ export class SessionService {
         const result = await issueCloudAgentGitLabSessionCapability(env, {
           gitUrl: git.url,
           userId: metadata.identity.userId,
-          outboundContainerId: getOutboundContainerId(env, sandboxId),
+          outboundContainerId: getOutboundContainerId(env, sandboxId, {
+            managedScmContainment: useManagedScmContainment,
+          }),
           orgId: metadata.identity.orgId,
           createdOnPlatform: metadata.identity.createdOnPlatform,
         });

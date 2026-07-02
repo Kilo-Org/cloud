@@ -3,13 +3,23 @@ import type { Sandbox } from '@cloudflare/sandbox';
 
 export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
 
-const SHARED_SANDBOX_ID_VERSION = 'shared-v2';
+const SHARED_SANDBOX_ID_VERSION = 'shared-v3';
 
 type SharedSandboxPrefix = 'org' | 'usr' | 'bot' | 'ubt';
 type SandboxNamespaceEnv = Pick<
   Env,
-  'Sandbox' | 'SandboxSmall' | 'SandboxDIND' | 'SandboxCodeReview'
+  | 'Sandbox'
+  | 'SandboxContainment'
+  | 'SandboxSmall'
+  | 'SandboxSmallContainment'
+  | 'SandboxDIND'
+  | 'SandboxCodeReview'
+  | 'SandboxCodeReviewContainment'
 >;
+
+type SandboxNamespaceOptions = {
+  managedScmContainment?: boolean;
+};
 
 export type SharedSandboxRoutingTarget = {
   kind: 'shared';
@@ -65,15 +75,27 @@ export function parseOrgIdList(raw: string | undefined): Set<string> {
  */
 export function getSandboxNamespace(
   env: SandboxNamespaceEnv,
-  sandboxId: string
+  sandboxId: string,
+  options: SandboxNamespaceOptions = {}
 ): DurableObjectNamespace<Sandbox> {
   if (sandboxId.startsWith('dind-')) return env.SandboxDIND;
-  if (sandboxId.startsWith('crv-')) return env.SandboxCodeReview;
-  return sandboxId.startsWith('ses-') ? env.SandboxSmall : env.Sandbox;
+  if (sandboxId.startsWith('crv-')) {
+    return options.managedScmContainment === true
+      ? env.SandboxCodeReviewContainment
+      : env.SandboxCodeReview;
+  }
+  if (sandboxId.startsWith('ses-')) {
+    return options.managedScmContainment === true ? env.SandboxSmallContainment : env.SandboxSmall;
+  }
+  return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
 }
 
-export function getOutboundContainerId(env: SandboxNamespaceEnv, sandboxId: string): string {
-  return getSandboxNamespace(env, sandboxId).idFromName(sandboxId).toString();
+export function getOutboundContainerId(
+  env: SandboxNamespaceEnv,
+  sandboxId: string,
+  options: SandboxNamespaceOptions = {}
+): string {
+  return getSandboxNamespace(env, sandboxId, options).idFromName(sandboxId).toString();
 }
 
 async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId> {

@@ -25,7 +25,7 @@ api.use('*', async (c: Context<{ Bindings: Env }, string>, next) => {
   if (!token) {
     return c.json({ error: 'Unauthorized' }, 401);
   }
-  return bearerAuth({ token })(c, next);
+  return bearerAuth<{ Bindings: Env }>({ token })(c, next);
 });
 
 const validateWorkerParam = validator('param', (value, c) => {

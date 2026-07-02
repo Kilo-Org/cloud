@@ -15,7 +15,7 @@ export default defineConfig({
         id: 'kilo-extension@kilocode.ai',
       },
     },
-    description: 'Kilo browser extension.',
+    description: 'Side-panel AI chat agent. Use open-weight or frontier models.',
     host_permissions: [
       '<all_urls>',
       'file:///*',
@@ -23,7 +23,7 @@ export default defineConfig({
       'http://127.0.0.1/*',
       'http://localhost/*',
     ],
-    name: 'Kilo Extension',
+    name: 'Kilo Code',
     permissions:
       browser === 'firefox'
         ? ['identity', 'scripting', 'storage', 'tabs']

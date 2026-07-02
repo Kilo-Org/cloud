@@ -1,8 +1,8 @@
 {
   "name": "kilo-extension",
-  "description": "Kilo browser extension.",
+  "description": "Side-panel AI chat agent. Use open-weight or frontier models.",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "dev": "wxt --port 3001",

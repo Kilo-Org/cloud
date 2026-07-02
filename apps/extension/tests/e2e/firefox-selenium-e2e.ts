@@ -479,7 +479,7 @@ const waitForTextGone = async (driver: WebDriver, text: string): Promise<void> =
 
 const findManifestUrl = async (driver: WebDriver): Promise<string> => {
   await driver.get('about:debugging#/runtime/this-firefox');
-  await waitForText(driver, 'Kilo Extension');
+  await waitForText(driver, 'Kilo Code');
 
   const bodyText = await getBodyText(driver);
   const manifestMatch = /Manifest URL\s+(moz-extension:\/\/\S+\/manifest\.json)/u.exec(bodyText);

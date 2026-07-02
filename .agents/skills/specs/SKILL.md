@@ -1,6 +1,6 @@
 ---
 name: specs
-description: Business-rule specs in .specs/ govern KiloClaw billing/lifecycle/controller/data model/Composio, MCP Gateway auth, model experiments, Security Agent, subscription center, team/enterprise seat billing, Impact affiliate/referrals, Kilo Pass, organization SSO, Stripe early fraud warnings, and coding plans. Load before making ANY change (bug fix, feature, refactor, or review) to a domain covered by one of these specs, to read the authoritative rules first.
+description: Business-rule specs for KiloClaw billing/lifecycle/controller/data model/Composio, MCP Gateway auth, model experiments, Security Agent, subscription center, team/enterprise seat billing, Impact affiliate/referrals, Kilo Pass, organization SSO, Stripe early fraud warnings, and coding plans. Load when you need context about the business requirements that guided the implementation.
 ---
 
 # Business-Rule Specs

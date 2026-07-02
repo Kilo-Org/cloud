@@ -311,14 +311,20 @@ PY
   check "kilocode provider on plugins.load.paths" "yes" "$path_present"
 
   # And confirm the gateway actually loaded it (openclaw writes JSON to stdout,
-  # logs to stderr which we drop).
+  # logs to stderr which we drop). Capture the inspect output first so a non-zero
+  # exit (e.g. the provider missing — the very case this guards) surfaces as a
+  # clean FAIL instead of aborting the whole run under `set -euo pipefail`.
+  local raw
   local status
-  status=$(docker exec "$CID" openclaw plugins inspect kilocode --json 2>/dev/null \
-    | python3 -c 'import json,sys
+  if ! raw=$(docker exec "$CID" openclaw plugins inspect kilocode --json 2>/dev/null); then
+    check "kilocode provider plugin loaded" "loaded" "inspect failed"
+    return
+  fi
+  status=$(python3 -c 'import json,sys
 try:
     print((json.load(sys.stdin).get("plugin") or {}).get("status") or "missing")
 except Exception:
-    print("unparseable")')
+    print("unparseable")' <<< "$raw")
   check "kilocode provider plugin loaded" "loaded" "$status"
 }
 
@@ -340,8 +346,17 @@ assert_kilocode_vision_capability() {
 import json, sys
 
 # openclaw writes the --json catalog to stdout and logs to stderr (dropped via
-# 2>/dev/null above), so stdout is pure JSON.
-data = json.load(sys.stdin)
+# 2>/dev/null above), so stdout is pure JSON. The `docker exec ... || true` above
+# can still yield empty/non-JSON output while the catalog is warming up, so treat
+# that as a retriable "no-catalog" (exit 0) rather than letting json.load raise
+# and abort the whole poll under `set -euo pipefail`.
+raw = sys.stdin.read().strip()
+if not raw:
+    print("no-catalog"); raise SystemExit(0)
+try:
+    data = json.loads(raw)
+except json.JSONDecodeError:
+    print("no-catalog"); raise SystemExit(0)
 models = data.get("models", data) if isinstance(data, dict) else data
 if not isinstance(models, list):
     print("no-catalog"); raise SystemExit(0)

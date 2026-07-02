@@ -6,7 +6,7 @@
 
 ## Specs
 
-This service is governed by `.specs/kiloclaw-billing.md` and `.specs/kiloclaw-billing-lifecycle.md`. Read them (and load the `specs` skill) before changing billing behavior here.
+Load the `specs` skill to access the business rules and invariants of the KiloClaw billing service when you need context about the business requirements that guided the implementation. 
 
 ## Allowed Writes
 

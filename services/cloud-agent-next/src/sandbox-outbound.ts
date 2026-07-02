@@ -422,17 +422,20 @@ export class SandboxCodeReview extends StockSandbox<Cloudflare.Env> {
 
 export class SandboxContainment extends Sandbox {
   interceptHttps = true;
-  static outboundHandlers = managedScmOutboundHandlers;
 }
+// Assignment (not a static class field) so it invokes the inherited Container.outboundHandlers
+// setter and registers into @cloudflare/containers' internal outboundHandlersRegistry. A static
+// class field here would shadow the inherited accessor and silently no-op the registration.
+SandboxContainment.outboundHandlers = managedScmOutboundHandlers;
 
 export class SandboxSmallContainment extends SandboxSmall {
   interceptHttps = true;
-  static outboundHandlers = managedScmOutboundHandlers;
 }
+SandboxSmallContainment.outboundHandlers = managedScmOutboundHandlers;
 
 export class SandboxCodeReviewContainment extends SandboxCodeReview {
   interceptHttps = true;
-  static outboundHandlers = managedScmOutboundHandlers;
 }
+SandboxCodeReviewContainment.outboundHandlers = managedScmOutboundHandlers;
 
 export { ContainerProxy };

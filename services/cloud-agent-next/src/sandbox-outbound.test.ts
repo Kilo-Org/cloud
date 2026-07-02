@@ -130,14 +130,14 @@ describe('managed GitHub sandbox outbound configuration', () => {
         headers: { Authorization: basicCredential(CAPABILITY) },
       }),
       env,
-      { containerId: 'container-test' }
+      { containerId: 'container-test', className: 'SandboxSmallContainment' }
     );
     await handler(
       new Request('https://api.github.com/user', {
         headers: { Authorization: `token ${CAPABILITY}` },
       }),
       env,
-      { containerId: 'container-test' }
+      { containerId: 'container-test', className: 'SandboxSmallContainment' }
     );
 
     expect(redeemGitHubSessionCapability).toHaveBeenCalledTimes(2);

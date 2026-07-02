@@ -49,6 +49,9 @@ export type GastownEventData = {
   // Use error (absence = success) instead of a wasSuccess boolean.
   statusCode?: number;
   containerStartedAt?: string;
+  // Cloudflare container identity (TownContainerDO Durable Object id) — aids
+  // correlation with Cloudflare support and the dashboard for container events.
+  containerId?: string;
   // Additional doubles for reconciler_tick events (double3–double10).
   // Analytics Engine supports up to 20 doubles per data point.
   double3?: number;
@@ -88,6 +91,7 @@ export function writeEvent(
         data.beadType ?? '', // blob13
         data.reason ?? '', // blob14
         data.containerStartedAt ?? '', // blob15
+        data.containerId ?? '', // blob16
       ],
       doubles: [
         data.durationMs ?? 0, // double1

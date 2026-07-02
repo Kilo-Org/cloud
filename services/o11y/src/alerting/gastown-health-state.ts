@@ -1,9 +1,12 @@
 import { z } from 'zod';
-import type { GastownHealthMetrics } from './gastown-health-query';
 
 const CONSECUTIVE_HEALTHY_TO_RESOLVE = 3;
 const STATE_KEY = 'o11y:gastown_container_health';
 
+// Event-driven dedup: an alert episode stays active while any town is wedged
+// (exhausted or sustained). We page once when the episode opens and again only
+// when the wedged town set escalates (a new town appears), then auto-resolve
+// after CONSECUTIVE_HEALTHY_TO_RESOLVE clean evaluations.
 const GastownHealthStateSchema = z.discriminatedUnion('active', [
   z.object({
     active: z.literal(false),
@@ -16,11 +19,19 @@ const GastownHealthStateSchema = z.discriminatedUnion('active', [
       .int()
       .min(0)
       .max(CONSECUTIVE_HEALTHY_TO_RESOLVE - 1),
-    lastNotifiedWeightedFailedChecks: z.number().finite().nonnegative().optional(),
+    notifiedTownIds: z.array(z.string()),
   }),
 ]);
 
 export type GastownHealthState = z.infer<typeof GastownHealthStateSchema>;
+
+export type GastownHealthStateInput = {
+  // Towns that justify paging this evaluation (exhausted or sustained).
+  wedgeTownIds: string[];
+  // Whether the fleet showed any successful health pings — proof the monitor is
+  // seeing live telemetry, so a clean evaluation can count toward resolution.
+  healthObserved: boolean;
+};
 
 export type GastownHealthTransition = {
   state: GastownHealthState;
@@ -32,60 +43,49 @@ function inactiveState(): GastownHealthState {
   return { active: false, consecutiveHealthyCount: 0 };
 }
 
+function mergeSorted(existing: string[], incoming: string[]): string[] {
+  return [...new Set([...existing, ...incoming])].sort();
+}
+
 export function transitionGastownHealthState(
   state: GastownHealthState,
-  metrics: GastownHealthMetrics,
-  thresholdCrossed: boolean,
-  renotifyFailedChecksStep: number
+  input: GastownHealthStateInput
 ): GastownHealthTransition {
-  if (thresholdCrossed) {
+  const wedged = input.wedgeTownIds.length > 0;
+
+  if (wedged) {
     if (!state.active) {
       return {
         state: {
           active: true,
           consecutiveHealthyCount: 0,
-          lastNotifiedWeightedFailedChecks: metrics.weightedFailedChecks,
+          notifiedTownIds: [...input.wedgeTownIds].sort(),
         },
         shouldNotify: true,
         stateChanged: true,
       };
     }
 
-    if (state.lastNotifiedWeightedFailedChecks === undefined) {
+    const escalated = input.wedgeTownIds.some(id => !state.notifiedTownIds.includes(id));
+    if (escalated) {
       return {
         state: {
           active: true,
           consecutiveHealthyCount: 0,
-          lastNotifiedWeightedFailedChecks:
-            Math.floor(metrics.weightedFailedChecks / renotifyFailedChecksStep) *
-            renotifyFailedChecksStep,
-        },
-        shouldNotify: false,
-        stateChanged: true,
-      };
-    }
-
-    if (
-      metrics.weightedFailedChecks >=
-      state.lastNotifiedWeightedFailedChecks + renotifyFailedChecksStep
-    ) {
-      return {
-        state: {
-          active: true,
-          consecutiveHealthyCount: 0,
-          lastNotifiedWeightedFailedChecks: metrics.weightedFailedChecks,
+          notifiedTownIds: mergeSorted(state.notifiedTownIds, input.wedgeTownIds),
         },
         shouldNotify: true,
         stateChanged: true,
       };
     }
 
+    // Still wedged, no new towns — reset any recovery progress without paging.
     if (state.consecutiveHealthyCount > 0) {
       return {
         state: {
           active: true,
           consecutiveHealthyCount: 0,
-          lastNotifiedWeightedFailedChecks: state.lastNotifiedWeightedFailedChecks,
+          notifiedTownIds: state.notifiedTownIds,
         },
         shouldNotify: false,
         stateChanged: true,
@@ -95,7 +95,8 @@ export function transitionGastownHealthState(
     return { state, shouldNotify: false, stateChanged: false };
   }
 
-  if (!state.active || metrics.weightedSuccessfulChecks <= 0) {
+  // No wedged towns this evaluation.
+  if (!state.active || !input.healthObserved) {
     return { state, shouldNotify: false, stateChanged: false };
   }
 
@@ -108,7 +109,7 @@ export function transitionGastownHealthState(
     state: {
       active: true,
       consecutiveHealthyCount,
-      lastNotifiedWeightedFailedChecks: state.lastNotifiedWeightedFailedChecks,
+      notifiedTownIds: state.notifiedTownIds,
     },
     shouldNotify: false,
     stateChanged: true,
@@ -121,6 +122,8 @@ export async function readGastownHealthState(kv: KVNamespace): Promise<GastownHe
 
   try {
     const parsed = GastownHealthStateSchema.safeParse(JSON.parse(raw));
+    // Legacy state shapes (pre-event-driven dedup) fail the schema and safely
+    // fall back to inactive — the next wedge re-opens a fresh episode.
     return parsed.success ? parsed.data : inactiveState();
   } catch {
     return inactiveState();

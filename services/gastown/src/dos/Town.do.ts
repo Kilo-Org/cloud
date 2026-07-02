@@ -34,6 +34,7 @@ import {
   CONTAINER_HEALTH_STORAGE_KEYS,
   recoverContainerIfWedged as _recoverContainerIfWedged,
   type ContainerHealthPingOutcome,
+  type ContainerRecoveryPathHint,
 } from './town/container-health-watchdog';
 import * as scm from './town/town-scm';
 import * as reconciler from './town/reconciler';
@@ -64,7 +65,7 @@ import {
 } from '../db/tables/agent-nudges.table';
 import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
-import { getTownContainerStub } from './TownContainer.do';
+import { getTownContainerDoId, getTownContainerStub } from './TownContainer.do';
 
 import { kiloTokenPayload } from '@kilocode/worker-utils';
 import { jwtVerify } from 'jose';
@@ -4562,6 +4563,7 @@ export class TownDO extends DurableObject<Env> {
   ): Promise<void> {
     await _recoverContainerIfWedged({
       townId,
+      containerDoId: getTownContainerDoId(this.env, townId),
       outcome,
       isDraining: () => this._draining,
       getConsecutiveHealthFailures: () =>
@@ -4592,6 +4594,20 @@ export class TownDO extends DurableObject<Env> {
         this.ctx.storage.put(CONTAINER_HEALTH_STORAGE_KEYS.autoRestartExhaustedWindowStart, value),
       deleteAutoRestartExhaustedWindowStart: () =>
         this.ctx.storage.delete(CONTAINER_HEALTH_STORAGE_KEYS.autoRestartExhaustedWindowStart),
+      getUnhealthyEpisodeStartedAt: () =>
+        this.ctx.storage.get<number>(CONTAINER_HEALTH_STORAGE_KEYS.unhealthyEpisodeStartedAt),
+      setUnhealthyEpisodeStartedAt: value =>
+        this.ctx.storage.put(CONTAINER_HEALTH_STORAGE_KEYS.unhealthyEpisodeStartedAt, value),
+      deleteUnhealthyEpisodeStartedAt: () =>
+        this.ctx.storage.delete(CONTAINER_HEALTH_STORAGE_KEYS.unhealthyEpisodeStartedAt),
+      getRecoveryPathHint: () =>
+        this.ctx.storage.get<ContainerRecoveryPathHint>(
+          CONTAINER_HEALTH_STORAGE_KEYS.recoveryPathHint
+        ),
+      setRecoveryPathHint: value =>
+        this.ctx.storage.put(CONTAINER_HEALTH_STORAGE_KEYS.recoveryPathHint, value),
+      deleteRecoveryPathHint: () =>
+        this.ctx.storage.delete(CONTAINER_HEALTH_STORAGE_KEYS.recoveryPathHint),
       getContainerStub: id => getTownContainerStub(this.env, id),
       writeEventFn: data => writeEvent(this.env, data),
       logWarnFn: data => logger.warn('container health watchdog', data),
@@ -4971,6 +4987,10 @@ export class TownDO extends DurableObject<Env> {
     const townId = this.townId;
     if (!townId) return;
 
+    // Cloudflare container identity, stamped on boot lifecycle telemetry so it
+    // correlates with Cloudflare support/dashboard and the watchdog events.
+    const containerId = getTownContainerDoId(this.env, townId);
+
     try {
       const container = getTownContainerStub(this.env, townId);
 
@@ -4983,14 +5003,31 @@ export class TownDO extends DurableObject<Env> {
           writeEvent(this.env, {
             event: 'container.cold_start',
             townId,
+            containerId,
+            durationMs: warm.durationMs,
+          });
+          // Dual-write boot lifecycle to Logpush (watchdog envelope) so Axiom
+          // carries it too. Runs inside the alarm's withLogTags source scope.
+          logger.warn('container health watchdog', {
+            event: 'container.cold_start',
+            townId,
+            containerId,
             durationMs: warm.durationMs,
           });
         }
       } catch (err) {
+        const error = err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300);
         writeEvent(this.env, {
           event: 'container.cold_start',
           townId,
-          error: err instanceof Error ? err.message.slice(0, 300) : String(err).slice(0, 300),
+          containerId,
+          error,
+        });
+        logger.warn('container health watchdog', {
+          event: 'container.cold_start',
+          townId,
+          containerId,
+          error,
         });
         // Fall through to /health ping anyway — the container may recover.
       }
@@ -5036,6 +5073,7 @@ export class TownDO extends DurableObject<Env> {
           writeEvent(this.env, {
             event: 'container.health_ping',
             townId,
+            containerId,
             durationMs,
             statusCode: healthResp.status,
             error: `non-ok status ${healthResp.status}`,
@@ -5051,6 +5089,7 @@ export class TownDO extends DurableObject<Env> {
           writeEvent(this.env, {
             event: 'container.health_ping',
             townId,
+            containerId,
             durationMs,
             statusCode: healthResp.status,
           });
@@ -5070,11 +5109,20 @@ export class TownDO extends DurableObject<Env> {
           const body = HealthBody.safeParse(rawBody);
           if (body.success && body.data.startedAt) {
             const containerStartedAt = new Date(body.data.startedAt).getTime();
+            const readyDurationMs = Date.now() - containerStartedAt;
             writeEvent(this.env, {
               event: 'container.ready_observed',
               townId,
+              containerId,
               containerStartedAt: body.data.startedAt,
-              durationMs: Date.now() - containerStartedAt,
+              durationMs: readyDurationMs,
+            });
+            // Dual-write boot lifecycle to Logpush (watchdog envelope) for Axiom.
+            logger.warn('container health watchdog', {
+              event: 'container.ready_observed',
+              townId,
+              containerId,
+              durationMs: readyDurationMs,
             });
 
             // Emit mayor.session_ready exactly once per container instance.
@@ -5104,6 +5152,7 @@ export class TownDO extends DurableObject<Env> {
         writeEvent(this.env, {
           event: 'container.health_ping',
           townId,
+          containerId,
           durationMs,
           error: 'timeout',
         });

@@ -55,7 +55,6 @@
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
-    "MANAGED_SCM_CONTAINMENT_ORG_IDS": "",
   },
   "placement": { "mode": "smart" },
   /**

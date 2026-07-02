@@ -109,10 +109,10 @@ describe('KiloSessionCapabilityCodec', () => {
     );
   });
 
-  it('rejects a capability issued in the future', () => {
+  it('rejects a capability issued beyond the clock-skew tolerance', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-07T12:00:00.000Z'));
-    const issuedAt = Date.now() + 60_000;
+    const issuedAt = Date.now() + 5 * 60_000;
     const capability = encryptedCapability({
       purpose: 'kilo_api_session',
       version: 1,
@@ -124,6 +124,24 @@ describe('KiloSessionCapabilityCodec', () => {
     expect(() => new KiloSessionCapabilityCodec(encryptionKey).decode(capability)).toThrowError(
       expect.objectContaining({ reason: 'invalid_capability' })
     );
+    vi.useRealTimers();
+  });
+
+  it('accepts a capability issued within the clock-skew tolerance', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-07T12:00:00.000Z'));
+    const issuedAt = Date.now() + 30_000;
+    const capability = encryptedCapability({
+      purpose: 'kilo_api_session',
+      version: 1,
+      ...claims,
+      issuedAt,
+      expiresAt: issuedAt + 60_000,
+    });
+
+    expect(new KiloSessionCapabilityCodec(encryptionKey).decode(capability)).toMatchObject({
+      issuedAt,
+    });
     vi.useRealTimers();
   });
 

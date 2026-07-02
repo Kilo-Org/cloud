@@ -6,6 +6,10 @@ const CAPABILITY_PREFIX = 'kka1.';
 const CAPABILITY_PURPOSE = 'kilo_api_session';
 const MAX_KILO_SESSION_CAPABILITY_LIFETIME_MS = 4 * 60 * 60 * 1000;
 const MAX_KILO_SESSION_CAPABILITY_LENGTH = 64 * 1024;
+// issue() and decode() can run on different isolates whose clocks are not
+// perfectly aligned; allow a small future skew so a freshly issued capability is
+// not spuriously rejected as forged on the first redemption.
+const KILO_SESSION_CAPABILITY_CLOCK_SKEW_TOLERANCE_MS = 60 * 1000;
 
 const KiloSessionCapabilityTargetsSchema = z
   .object({
@@ -110,7 +114,10 @@ export class KiloSessionCapabilityCodec {
     }
 
     const parsed = KiloSessionCapabilityClaimsSchema.safeParse(value);
-    if (!parsed.success || parsed.data.issuedAt > Date.now()) {
+    if (
+      !parsed.success ||
+      parsed.data.issuedAt > Date.now() + KILO_SESSION_CAPABILITY_CLOCK_SKEW_TOLERANCE_MS
+    ) {
       throw new KiloSessionCapabilityError('invalid_capability');
     }
     if (parsed.data.expiresAt <= Date.now()) {

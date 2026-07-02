@@ -1438,6 +1438,27 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
     ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });
   });
 
+  it('does not leak the user token to another session ingest route on a shared origin', async () => {
+    const service = createService();
+    const issued = await service.issueKiloSessionCapability({
+      ...kiloSubject,
+      targets: {
+        backendBaseUrl: 'https://api.kilo.ai',
+        providerBaseUrl: 'https://api.kilo.ai/api/openrouter',
+        sessionIngestBaseUrl: 'https://api.kilo.ai',
+      },
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemKiloSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestUrl: 'https://api.kilo.ai/api/session/another-session/export',
+      })
+    ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });
+  });
+
   it('does not redeem a capability from another outbound container', async () => {
     const service = createService();
     const issued = await service.issueKiloSessionCapability(kiloSubject);

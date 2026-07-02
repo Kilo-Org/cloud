@@ -78,6 +78,40 @@ describe('classifyKiloCapabilityRequest', () => {
       )
     ).toEqual({ success: false, reason: 'upstream_not_allowed' });
   });
+
+  it('fails closed for a non-string request url', () => {
+    expect(
+      classifyKiloCapabilityRequest(null as unknown as string, targets, kiloSessionId)
+    ).toEqual({ success: false, reason: 'invalid_upstream_url' });
+  });
+
+  describe('when backend and session ingest share an origin', () => {
+    const sharedOriginTargets = {
+      backendBaseUrl: 'https://api.kilo.ai',
+      providerBaseUrl: 'https://api.kilo.ai/api/openrouter',
+      sessionIngestBaseUrl: 'https://api.kilo.ai',
+    };
+
+    it('does not let the backend catch-all shadow another session ingest route', () => {
+      expect(
+        classifyKiloCapabilityRequest(
+          'https://api.kilo.ai/api/session/other-session/export',
+          sharedOriginTargets,
+          kiloSessionId
+        )
+      ).toEqual({ success: false, reason: 'upstream_not_allowed' });
+    });
+
+    it('still routes the bound session ingest route', () => {
+      expect(
+        classifyKiloCapabilityRequest(
+          `https://api.kilo.ai/api/session/${kiloSessionId}/export`,
+          sharedOriginTargets,
+          kiloSessionId
+        )
+      ).toEqual({ success: true, routeClass: 'session_ingest', credential: 'user' });
+    });
+  });
 });
 
 describe('areValidKiloCapabilityTargets', () => {

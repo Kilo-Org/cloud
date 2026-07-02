@@ -107,11 +107,23 @@ function isSessionIngestRoute(pathname: string, basePath: string, kiloSessionId:
   return pathname === `${sessionPrefix}/export` || pathname === `${sessionPrefix}/import`;
 }
 
+function isSessionIngestShapedRoute(pathname: string, basePath: string): boolean {
+  const sessionsPrefix = appendPath(basePath, '/api/session/');
+  if (!pathname.startsWith(sessionsPrefix)) return false;
+  return /^[^/]+\/(?:export|import)$/.test(pathname.slice(sessionsPrefix.length));
+}
+
 export function classifyKiloCapabilityRequest(
   requestUrl: string,
   targets: KiloSessionCapabilityTargets,
   kiloSessionId: string
 ): KiloCapabilityRouteClassification {
+  // requestUrl is only compile-time typed at the WorkerEntrypoint RPC boundary; a
+  // caller can still send a non-string, which must fail closed like every other
+  // branch instead of throwing from the .split below.
+  if (typeof requestUrl !== 'string') {
+    return { success: false, reason: 'invalid_upstream_url' };
+  }
   // Only the path is subject to the traversal/encoding guard; query strings may
   // legitimately carry percent-encoded slashes and dots.
   if (hasUnsafeEncodedPath(requestUrl.split(/[?#]/, 1)[0])) {
@@ -149,17 +161,24 @@ export function classifyKiloCapabilityRequest(
       credential: 'provider',
     };
   }
-  if (isWithinTarget(url, backend)) {
-    if (isProviderRoute(url.pathname, backend.basePath)) {
-      return { success: false, reason: 'upstream_not_allowed' };
-    }
-    return { success: true, routeClass: 'backend_api', credential: 'user' };
-  }
   if (
     isWithinTarget(url, sessionIngest) &&
     isSessionIngestRoute(url.pathname, sessionIngest.basePath, kiloSessionId)
   ) {
     return { success: true, routeClass: 'session_ingest', credential: 'user' };
+  }
+  // Backend is the catch-all for its origin, so it must exclude provider- and
+  // session-ingest-shaped paths. Otherwise a shared backend/session-ingest origin
+  // would let this branch serve another session's ingest route as backend_api,
+  // bypassing the bound-session guard above.
+  if (isWithinTarget(url, backend)) {
+    if (
+      isProviderRoute(url.pathname, backend.basePath) ||
+      isSessionIngestShapedRoute(url.pathname, backend.basePath)
+    ) {
+      return { success: false, reason: 'upstream_not_allowed' };
+    }
+    return { success: true, routeClass: 'backend_api', credential: 'user' };
   }
   return { success: false, reason: 'upstream_not_allowed' };
 }

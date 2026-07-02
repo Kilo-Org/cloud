@@ -5,11 +5,9 @@ description: Business-rule specs for KiloClaw billing/lifecycle/controller/data 
 
 # Business-Rule Specs
 
-Specs in `.specs/` are the authoritative source of truth for the business rules and
-invariants of the domains they cover. Before making **any** change to a covered
-domain — including bug fixes, new features, refactors, or reviews — you **must**
-first read the relevant spec. Implementation mechanics (route names, columns, retry
-cadence) belong in plans and code; the spec owns the rules and invariants.
+Specs in `.specs/` are context as to the original business intention, rules and
+invariants of the domains they cover. Consult them for context and flag inconsistencies
+to the user if instructions or changes will cause deviations from the original intent. 
 
 ## Index
 

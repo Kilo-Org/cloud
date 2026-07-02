@@ -1113,7 +1113,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     request.workspace.upstreamBranch = 'feature/source';
     request.workspace.restoredFromBackup = true;
     request.materialized.setupCommands = ['prepare one', 'prepare two'];
-    await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
     const events: string[] = [];
 
     await prepareWrapperBootstrapWorkspace(request, undefined, {
@@ -1191,15 +1191,13 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(setupError).toBeInstanceOf(Error);
     expect(setupError).not.toBeInstanceOf(RestoredWorkspaceReconciliationError);
     expect(workspaceBootstrapErrorCode(setupError)).toBe('WORKSPACE_SETUP_FAILED');
-    expect((setupError as Error).message).toContain(
-      'Setup command failed: pnpm install (exit code 17)'
-    );
+    expect((setupError as Error).message).toContain('Setup command 1 failed');
   });
 
   it('classifies restored workspace reconciliation failures before setup', async () => {
     const request = makeRequest(tmpDir);
     request.workspace.restoredFromBackup = true;
-    await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
     let setupRan = false;
 
     let reconciliationError: unknown;

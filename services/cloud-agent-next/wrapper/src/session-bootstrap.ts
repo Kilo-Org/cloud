@@ -833,6 +833,12 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     progress?.('kilo_server', 'Starting Kilo...');
     return { workspaceWasWarm };
   } catch (error) {
+    if (error instanceof RestoredWorkspaceReconciliationError) {
+      if (workspaceNeedsBootstrap) {
+        await cleanupWorkspace(request);
+      }
+      throw error;
+    }
     const bootstrapError =
       error instanceof WrapperBootstrapError
         ? error

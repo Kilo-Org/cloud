@@ -79,6 +79,7 @@ function openAICompatibleFetcher(options: {
   providerId: DirectUserByokInferenceProviderId;
   label: string;
   url: string;
+  excludeModelIds?: ReadonlyArray<string>;
 }): ProviderFetcher {
   return {
     providerId: options.providerId,
@@ -89,20 +90,28 @@ function openAICompatibleFetcher(options: {
           `Failed to fetch ${options.label} models: ${response.status} ${response.statusText}`
         );
       }
-      return parseOpenAICompatibleProviderModels(await response.json());
+      return parseOpenAICompatibleProviderModels(await response.json(), {
+        excludeModelIds: options.excludeModelIds,
+      });
     },
   };
 }
 
-export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] {
+export function parseOpenAICompatibleProviderModels(
+  entry: unknown,
+  options?: { excludeModelIds?: ReadonlyArray<string> }
+): RawModel[] {
+  const excludedIds = new Set(options?.excludeModelIds);
   const parsed = OpenAICompatibleModelsResponseSchema.parse(entry);
-  return parsed.data.map(model => ({
-    id: model.id,
-    name: shortenDisplayName(model.name),
-    context_length: model.context_length ?? model.max_model_len,
-    max_completion_tokens: model.max_output_length,
-    input_modalities: model.input_modalities,
-  }));
+  return parsed.data
+    .filter(model => !excludedIds.has(model.id))
+    .map(model => ({
+      id: model.id,
+      name: shortenDisplayName(model.name),
+      context_length: model.context_length ?? model.max_model_len,
+      max_completion_tokens: model.max_output_length,
+      input_modalities: model.input_modalities,
+    }));
 }
 
 export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
@@ -185,6 +194,8 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     providerId: 'morph',
     label: 'Morph',
     url: 'https://www.morphllm.com/api/models/json',
+    // the v3 apply models are specialized code-edit models, not general-purpose chat models
+    excludeModelIds: ['morph-v3-fast', 'morph-v3-large'],
   }),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud'),

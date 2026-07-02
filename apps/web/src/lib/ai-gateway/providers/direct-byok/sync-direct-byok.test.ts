@@ -16,8 +16,8 @@ describe('parseOpenAICompatibleProviderModels', () => {
           max_output_length: 131072,
         },
         {
-          id: 'morph-v3-fast',
-          max_model_len: 262144,
+          id: 'morph-minimax3-428b',
+          max_model_len: 256000,
         },
       ],
     });
@@ -31,13 +31,24 @@ describe('parseOpenAICompatibleProviderModels', () => {
         input_modalities: ['text', 'image'],
       },
       {
-        id: 'morph-v3-fast',
+        id: 'morph-minimax3-428b',
         name: undefined,
-        context_length: 262144,
+        context_length: 256000,
         max_completion_tokens: undefined,
         input_modalities: undefined,
       },
     ]);
+  });
+
+  test('excludes specified model ids', () => {
+    const models = parseOpenAICompatibleProviderModels(
+      {
+        data: [{ id: 'morph-qwen35-397b' }, { id: 'morph-v3-fast' }, { id: 'morph-v3-large' }],
+      },
+      { excludeModelIds: ['morph-v3-fast', 'morph-v3-large'] }
+    );
+
+    expect(models.map(model => model.id)).toEqual(['morph-qwen35-397b']);
   });
 });
 

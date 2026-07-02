@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { COST_INSIGHTS_ASK_KILO_UI_ENABLED } from '../feature-visibility';
 import { spendRangePeriodLabel } from '../formatting';
 import { CostInsightsLoadError } from '../shared/CostInsightsLoadError';
 import { StatusBadge } from '../shared/StatusBadge';
@@ -13,7 +15,6 @@ import { DisabledAlertsBanner, ReviewBanner, SuggestionCard } from './DashboardN
 import { EventPreviewCard } from './EventPreviewCard';
 import { SpendEvidenceCard } from './SpendEvidenceCard';
 import { TopDriversCard } from './TopDriversCard';
-import { cn } from '@/lib/utils';
 
 const toneClasses = {
   neutral: 'text-foreground',
@@ -92,7 +93,7 @@ export function CostInsightsDashboardView({
 
   return (
     <div className="space-y-6">
-      <AskKiloInput owner={data.owner} />
+      {COST_INSIGHTS_ASK_KILO_UI_ENABLED && <AskKiloInput owner={data.owner} />}
       {data.alerts.map(alert => (
         <ReviewBanner
           key={alert.type}

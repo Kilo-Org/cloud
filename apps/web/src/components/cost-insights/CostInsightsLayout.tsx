@@ -6,6 +6,7 @@ import { Activity, LayoutDashboard, MessageCircle, Settings2 } from 'lucide-reac
 import { HideAppTopbar } from '@/components/gastown/HideAppTopbar';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { COST_INSIGHTS_ASK_KILO_UI_ENABLED } from './feature-visibility';
 
 type CostInsightsLayoutProps = {
   basePath: string;
@@ -14,7 +15,9 @@ type CostInsightsLayoutProps = {
 
 const navItems = [
   { label: 'Overview', path: '', icon: LayoutDashboard },
-  { label: 'Ask Kilo', path: '/ask-kilo', icon: MessageCircle },
+  ...(COST_INSIGHTS_ASK_KILO_UI_ENABLED
+    ? [{ label: 'Ask Kilo', path: '/ask-kilo', icon: MessageCircle }]
+    : []),
   { label: 'Activity', path: '/activity', icon: Activity },
   { label: 'Alert settings', path: '/config', icon: Settings2 },
 ];

@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { DollarSign, Lock, UserRound, UsersRound } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { COST_INSIGHTS_ASK_KILO_UI_ENABLED } from '../feature-visibility';
 import { StatusBadge } from '../shared/StatusBadge';
 import type { CostInsightsAttention, CostInsightsOwner, CostInsightsPage } from '../types';
 
@@ -28,7 +29,9 @@ export function CostInsightsShellView({
 }) {
   const navItems = [
     { page: 'dashboard' as const, label: 'Overview', href: basePath },
-    { page: 'ask' as const, label: 'Ask Kilo', href: `${basePath}/ask-kilo` },
+    ...(COST_INSIGHTS_ASK_KILO_UI_ENABLED
+      ? [{ page: 'ask' as const, label: 'Ask Kilo', href: `${basePath}/ask-kilo` }]
+      : []),
     { page: 'events' as const, label: 'Activity', href: `${basePath}/activity` },
     { page: 'config' as const, label: 'Alert settings', href: `${basePath}/config` },
   ];

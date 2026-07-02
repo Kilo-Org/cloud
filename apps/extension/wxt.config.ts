@@ -33,4 +33,25 @@ export default defineConfig({
   vite: () => ({
     plugins: [tailwindcss()],
   }),
+  zip: {
+    includeSources: [
+      'package.json',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
+      'patches/**',
+      'apps/extension/AGENTS.md',
+      'apps/extension/SOURCE_CODE_REVIEW.md',
+      'apps/extension/package.json',
+      'apps/extension/playwright.config.ts',
+      'apps/extension/tsconfig.json',
+      'apps/extension/vitest.config.ts',
+      'apps/extension/wxt.config.ts',
+      'apps/extension/entrypoints/**',
+      'apps/extension/public/**',
+      'apps/extension/scripts/**',
+      'apps/extension/src/**',
+      'apps/extension/tests/e2e/**',
+    ],
+    sourcesRoot: '../..',
+  },
 });

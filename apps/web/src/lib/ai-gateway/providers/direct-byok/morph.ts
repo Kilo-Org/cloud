@@ -3,7 +3,7 @@ import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/
 
 export default {
   id: 'morph',
-  base_url: 'https://www.morphllm.com/api',
+  base_url: 'https://api.morphllm.com/v1',
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest() {},

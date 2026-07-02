@@ -146,7 +146,11 @@
     {
       "class_name": "Sandbox",
       "image": "./Dockerfile",
-      "instance_type": "standard-4",
+      "instance_type": {
+        "vcpu": 4,
+        "memory_mib": 12288,
+        "disk_mb": 20000,
+      },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
@@ -156,7 +160,11 @@
     {
       "class_name": "SandboxSmall",
       "image": "./Dockerfile",
-      "instance_type": "standard-4",
+      "instance_type": {
+        "vcpu": 2,
+        "memory_mib": 6144,
+        "disk_mb": 10000,
+      },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
@@ -166,7 +174,11 @@
     {
       "class_name": "SandboxDIND",
       "image": "./Dockerfile.dind",
-      "instance_type": "standard-3",
+      "instance_type": {
+        "vcpu": 2,
+        "memory_mib": 6144,
+        "disk_mb": 10000,
+      },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
@@ -190,7 +202,11 @@
     {
       "class_name": "SandboxContainment",
       "image": "./Dockerfile",
-      "instance_type": "standard-4",
+      "instance_type": {
+        "vcpu": 4,
+        "memory_mib": 12288,
+        "disk_mb": 20000,
+      },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },
@@ -200,7 +216,11 @@
     {
       "class_name": "SandboxSmallContainment",
       "image": "./Dockerfile",
-      "instance_type": "standard-4",
+      "instance_type": {
+        "vcpu": 2,
+        "memory_mib": 6144,
+        "disk_mb": 10000,
+      },
       "image_vars": {
         "KILOCODE_CLI_VERSION": "7.3.54",
       },

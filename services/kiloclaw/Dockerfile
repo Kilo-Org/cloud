@@ -3,8 +3,10 @@ ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
 # Bump APT_CACHE_BUST (any value change) to invalidate the base apt layer and
 # pick up the latest chromium / 1password-cli / etc. from Debian + vendor repos.
-# Last bumped 2026-05-08 to pull chromium 148.x (CVE-2026-7908, CVE-2026-7910).
-ARG APT_CACHE_BUST=2026-05-08
+# Last bumped 2026-07-02 to refresh chromium, gh, 1password-cli, and base apt
+# security updates (CVE hardening). Note: much of the chromium CVE volume has no
+# fixed version available, so it is not fully clearable by a version bump.
+ARG APT_CACHE_BUST=2026-07-02
 
 FROM debian:trixie-slim AS runtime
 
@@ -137,13 +139,13 @@ RUN ARCH="$(dpkg --print-architecture)" \
 # - npm/Node (installed to /usr/local) and apt packages (/usr/bin) are unaffected.
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
 RUN ARCH="$(dpkg --print-architecture)" \
-    && curl -fsSL "https://github.com/steipete/gogcli/releases/download/v0.14.0/gogcli_0.14.0_linux_${ARCH}.tar.gz" \
+    && curl -fsSL "https://github.com/openclaw/gogcli/releases/download/v0.31.1/gogcli_0.31.1_linux_${ARCH}.tar.gz" \
        | tar xz -C /usr/local/bin gog \
     && mv /usr/local/bin/gog /usr/local/bin/gog.real \
-    && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.3.0 \
-    && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.2 \
-    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.1.0 \
-    && GOBIN=/usr/local/bin go install github.com/steipete/gifgrep/cmd/gifgrep@v0.2.3 \
+    && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.4.3 \
+    && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.3 \
+    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.2.2 \
+    && GOBIN=/usr/local/bin go install github.com/steipete/gifgrep/cmd/gifgrep@v0.3.0 \
     && go clean -cache -modcache
 
 # Install uv (Python package manager, available at runtime).

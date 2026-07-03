@@ -252,51 +252,77 @@ function AlertDriverEvidencePanel({
       <ol className="divide-border divide-y">
         {evidence.drivers.map((driver, index) => {
           const share = percentOf(driver.spendUsd, evidence.totalSpendUsd);
+          const showShare = evidence.scope !== 'legacy';
           return (
             <li
               key={driver.id}
-              className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-3 gap-y-3 px-4 py-4 sm:grid-cols-[1.5rem_minmax(0,1fr)_auto]"
+              className="grid gap-3 px-4 py-4 lg:grid-cols-[1.5rem_minmax(0,1fr)_10rem] lg:items-center"
             >
-              <span className="text-chart-1 type-label pt-0.5 font-mono font-semibold tabular-nums">
+              <span className="type-label text-muted-foreground hidden font-mono lg:block">
                 {index + 1}
               </span>
               <div className="min-w-0">
                 <div className="type-body font-medium break-words">{driver.label}</div>
-                <div className="mt-2 flex flex-wrap items-center gap-2 type-label text-muted-foreground">
-                  <span className="border-border bg-surface-overlay text-foreground rounded-full border px-2 py-0.5">
-                    {sourceLabels[driver.source]}
-                  </span>
-                  {driver.actorLabel && <span>{driver.actorLabel}</span>}
-                  {driver.modelOrProvider && (
-                    <span className="font-mono break-all">{driver.modelOrProvider}</span>
+                <dl className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-3">
+                  {driver.actorLabel && (
+                    <div className="min-w-0">
+                      <dt className="type-eyebrow text-foreground-subtle">Member</dt>
+                      <dd className="type-label text-muted-foreground mt-1 break-words">
+                        {driver.actorLabel}
+                      </dd>
+                    </div>
                   )}
-                  {evidence.scope !== 'current_hour' && <span>{driver.category}</span>}
-                </div>
+                  <div className="min-w-0">
+                    <dt className="type-eyebrow text-foreground-subtle">Source</dt>
+                    <dd className="type-label text-muted-foreground mt-1 break-words">
+                      {sourceLabels[driver.source]}
+                    </dd>
+                  </div>
+                  {driver.modelOrProvider && (
+                    <div className="min-w-0">
+                      <dt className="type-eyebrow text-foreground-subtle">
+                        {driver.modelOrProviderLabel ?? 'Model'}
+                      </dt>
+                      <dd className="type-label text-muted-foreground mt-1 break-words">
+                        {driver.modelOrProvider}
+                      </dd>
+                    </div>
+                  )}
+                  {evidence.scope !== 'current_hour' && (
+                    <div className="min-w-0">
+                      <dt className="type-eyebrow text-foreground-subtle">Category</dt>
+                      <dd className="type-label text-muted-foreground mt-1 break-words">
+                        {driver.category}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
               </div>
-              <div className="col-start-2 flex items-baseline gap-2 sm:col-start-auto sm:block sm:text-right">
+              <div className="lg:text-right">
                 <div className="type-body font-mono font-semibold tabular-nums">
                   {money(driver.spendUsd)}
                 </div>
-                <div className="type-label tabular-nums">
-                  {evidence.scope !== 'legacy' && (
+                <div className="type-label text-muted-foreground mt-0.5 tabular-nums lg:whitespace-nowrap">
+                  {showShare && (
                     <span className="text-chart-1 font-mono font-semibold">{share}%</span>
                   )}
-                  {evidence.scope !== 'legacy' && (
-                    <span className="text-muted-foreground"> · </span>
-                  )}
-                  <span className="text-muted-foreground">
+                  {showShare && <span> · </span>}
+                  <span>
                     {driver.requestCount} {driver.requestCount === 1 ? 'record' : 'records'}
                   </span>
                 </div>
+                {showShare && (
+                  <div
+                    className="bg-surface-overlay mt-2 h-1 overflow-hidden rounded-full"
+                    aria-hidden="true"
+                  >
+                    <div
+                      className="bg-chart-1 h-full rounded-full"
+                      style={{ width: `${share}%` }}
+                    />
+                  </div>
+                )}
               </div>
-              {evidence.scope !== 'legacy' && (
-                <div
-                  className="bg-surface-overlay col-start-2 h-1.5 overflow-hidden rounded-full sm:col-span-2"
-                  aria-hidden="true"
-                >
-                  <div className="bg-chart-1 h-full rounded-full" style={{ width: `${share}%` }} />
-                </div>
-              )}
             </li>
           );
         })}

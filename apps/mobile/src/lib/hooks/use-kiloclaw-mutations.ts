@@ -390,6 +390,12 @@ export function useKiloClawMutations(organizationId?: string | null) {
         await Promise.all([
           invalidateStatus(),
           queryClient.invalidateQueries({ queryKey: listAllInstancesKey }),
+          // Reset (not invalidate) billing: the onboarding modal dismisses
+          // itself synchronously on cached `has_access` + instanceId before a
+          // refetch can land, and the unmount aborts that refetch — so stale
+          // billing data would make "Create your agent" a no-op until app
+          // relaunch. Dropping the cache forces a fresh fetch on next mount.
+          queryClient.resetQueries({ queryKey: billingStatusKey }),
         ]);
       },
     }),

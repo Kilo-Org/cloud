@@ -1,5 +1,5 @@
 import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { useTRPC } from '@/lib/trpc';
@@ -167,6 +167,45 @@ function groupSessionsByDate(sessions: StoredSession[]): DateGroup[] {
     label,
     sessions: buckets.get(label) ?? [],
   }));
+}
+
+// ── Search ───────────────────────────────────────────────────────────
+
+type UseAgentSessionSearchOptions = UseAgentSessionsOptions & {
+  searchQuery: string;
+};
+
+/**
+ * Server-side session search. The list itself is cursor-paginated, so
+ * client-side filtering would only see the pages loaded so far — this
+ * searches the user's full history instead.
+ */
+export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
+  const trpc = useTRPC();
+
+  const query = useQuery(
+    trpc.cliSessionsV2.search.queryOptions(
+      {
+        search_string: options.searchQuery,
+        // Endpoint max; no offset paging — past 50 matches, refining the query is the answer.
+        limit: 50,
+        includeChildren: false,
+        createdOnPlatform: options.createdOnPlatform,
+        gitUrl: options.gitUrl,
+        organizationId: options.organizationId,
+      },
+      {
+        staleTime: 30_000,
+        enabled: (options.enabled ?? true) && options.searchQuery.length > 0,
+        placeholderData: keepPreviousData,
+      }
+    )
+  );
+
+  const sessions = useMemo(() => query.data?.results ?? [], [query.data]);
+  const dateGroups = useMemo(() => groupSessionsByDate(sessions), [sessions]);
+
+  return { dateGroups, isPending: query.isPending, isError: query.isError };
 }
 
 // ── Main hook ────────────────────────────────────────────────────────

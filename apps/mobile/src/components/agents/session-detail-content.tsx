@@ -1,4 +1,6 @@
+/* eslint-disable max-lines */
 import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
+import { CLI_MODEL_ID, cliModelLabel } from 'cloud-agent-sdk/cli-model';
 import { useAtomValue } from 'jotai';
 import { useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
@@ -61,6 +63,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
+  const sessionType = useAtomValue(manager.atoms.sessionType);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -76,6 +79,22 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const organizationId = fetchedData?.organizationId ?? undefined;
 
   const { models: modelOptions } = useAvailableModels(organizationId);
+  const isRemote = sessionType === 'remote';
+  const composerModelOptions = useMemo(
+    () =>
+      isRemote
+        ? [
+            {
+              id: CLI_MODEL_ID,
+              name: cliModelLabel(sessionConfig),
+              variants: [],
+              isPreferred: false,
+            },
+            ...modelOptions,
+          ]
+        : modelOptions,
+    [isRemote, modelOptions, sessionConfig]
+  );
 
   const {
     currentMode,
@@ -84,7 +103,12 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     setCurrentMode,
     setCurrentModel,
     setCurrentVariant,
-  } = useSessionConfigSync({ fetchedData, sessionConfig, modelOptions });
+  } = useSessionConfigSync({
+    fetchedData,
+    sessionConfig,
+    modelOptions: composerModelOptions,
+    isRemote,
+  });
 
   const {
     flatListRef,
@@ -168,13 +192,14 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
         return;
       }
       try {
+        const isCliModel = currentModel === CLI_MODEL_ID;
         await manager.send({
           payload: {
             type: 'prompt',
             prompt: text,
             mode: currentMode,
-            model: currentModel,
-            variant: currentVariant || undefined,
+            model: isCliModel ? '' : currentModel,
+            variant: isCliModel ? undefined : currentVariant || undefined,
           },
         });
       } catch {
@@ -259,7 +284,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
               onModeChange={setCurrentMode}
               model={currentModel}
               variant={currentVariant}
-              modelOptions={modelOptions}
+              modelOptions={composerModelOptions}
               onModelSelect={(modelId, newVariant) => {
                 setCurrentModel(modelId);
                 setCurrentVariant(newVariant);

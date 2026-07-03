@@ -1,4 +1,5 @@
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { CLI_MODEL_ID } from 'cloud-agent-sdk/cli-model';
 
 export type ModelPickerRow =
   | { key: string; title: string; type: 'header' }
@@ -17,8 +18,13 @@ export function buildModelPickerRows({
   );
 
   const recommended = filtered.filter(m => m.isPreferred);
-  const all = filtered.filter(m => !m.isPreferred);
+  const cliModel = filtered.find(m => m.id === CLI_MODEL_ID);
+  const all = filtered.filter(m => !m.isPreferred && m.id !== CLI_MODEL_ID);
   const result: ModelPickerRow[] = [];
+
+  if (cliModel) {
+    result.push({ key: `model:${cliModel.id}`, model: cliModel, type: 'model' });
+  }
 
   if (recommended.length > 0) {
     result.push({ key: 'recommended', title: 'RECOMMENDED', type: 'header' });

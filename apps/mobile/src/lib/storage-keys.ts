@@ -11,5 +11,6 @@ export const ORGANIZATION_STORAGE_KEY = 'selected-organization';
 export const SESSION_FILTERS_KEY = 'agent-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
 export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
-export const LAST_SELECTED_MODEL_KEY = 'last-selected-agent-model';
 export const CONSENT_USER_KEY_PREFIX = 'consent-accepted-';
+export const AGENT_MODEL_PREFERENCE_KEY = 'agent-model-preference';
+export const REASONING_DEFAULT_EXPANDED_KEY = 'agent-reasoning-default-expanded';

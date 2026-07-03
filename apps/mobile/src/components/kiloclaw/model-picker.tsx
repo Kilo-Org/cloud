@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useInstanceContext } from '@/lib/hooks/use-instance-context';
 import { useKiloClawConfig, useKiloClawMutations } from '@/lib/hooks/use-kiloclaw-queries';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { addModelPrefix, stripModelPrefix } from '@/lib/model-id';
 
 type AutoModelCard = {
@@ -14,7 +15,7 @@ type AutoModelCard = {
   description: string;
   icon: LucideIcon;
   iconBg: string;
-  iconColor: string;
+  iconColorKey: 'agentSky' | 'agentYuki';
   cost: number;
   performance: number;
   performanceDotColor: string;
@@ -26,8 +27,8 @@ const AUTO_MODEL_CARDS: AutoModelCard[] = [
     label: 'Frontier',
     description: 'Highest performance. Routes to frontier models with reasoning.',
     icon: Zap,
-    iconBg: 'bg-purple-500/20',
-    iconColor: '#a855f7',
+    iconBg: 'bg-agent-yuki-tile-bg',
+    iconColorKey: 'agentYuki',
     cost: 3,
     performance: 3,
     performanceDotColor: 'bg-purple-400',
@@ -37,8 +38,8 @@ const AUTO_MODEL_CARDS: AutoModelCard[] = [
     label: 'Balanced',
     description: 'Smart balance of speed and capability at lower cost.',
     icon: Scale,
-    iconBg: 'bg-blue-500/20',
-    iconColor: '#3b82f6',
+    iconBg: 'bg-agent-sky-tile-bg',
+    iconColorKey: 'agentSky',
     cost: 2,
     performance: 2,
     performanceDotColor: 'bg-blue-400',
@@ -87,6 +88,7 @@ export function ModelPicker() {
   const { organizationId } = useInstanceContext(instanceId);
   const { data: config, isLoading } = useKiloClawConfig(organizationId);
   const mutations = useKiloClawMutations(organizationId);
+  const colors = useThemeColors();
 
   const currentModel = stripModelPrefix(config?.kilocodeDefaultModel);
   const isAutoModel = AUTO_MODEL_IDS.has(currentModel);
@@ -119,19 +121,26 @@ export function ModelPicker() {
           return (
             <Pressable
               key={card.id}
-              className={`relative gap-3 rounded-lg border p-4 ${selected ? 'border-blue-500 bg-blue-500/5' : 'border-border bg-secondary'}`}
+              className={`relative gap-3 rounded-lg border p-4 active:opacity-80 ${
+                selected
+                  ? 'border-primary bg-neutral-100 dark:bg-neutral-800'
+                  : 'border-border bg-secondary'
+              }`}
               disabled={mutations.updateModel.isPending}
               onPress={() => {
                 handleSelectAutoModel(card.id);
               }}
+              accessibilityRole="button"
+              accessibilityState={{ selected, disabled: mutations.updateModel.isPending }}
+              accessibilityLabel={`${card.label} auto model`}
             >
               {selected && (
                 <View className="absolute right-3 top-3">
-                  <CheckCircle2 size={20} color="#3b82f6" />
+                  <CheckCircle2 size={20} color={colors.primary} />
                 </View>
               )}
               <View className={`h-9 w-9 items-center justify-center rounded-lg ${card.iconBg}`}>
-                <Icon size={20} color={card.iconColor} />
+                <Icon size={20} color={colors[card.iconColorKey]} />
               </View>
               <View className="gap-1">
                 <Text className="font-semibold">{card.label}</Text>
@@ -161,10 +170,12 @@ export function ModelPicker() {
 
       {/* Navigate to full model list */}
       <Pressable
-        className="items-center py-2 active:opacity-70"
+        className="min-h-11 items-center justify-center py-2 active:opacity-70"
         onPress={() => {
           router.push(`/(app)/kiloclaw/${instanceId}/settings/model-list` as Href);
         }}
+        accessibilityRole="link"
+        accessibilityLabel="Browse all 500+ models"
       >
         <Text className="text-sm text-muted-foreground">or select from 500+ models</Text>
       </Pressable>

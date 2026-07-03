@@ -10,10 +10,15 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 type ReasoningPartRendererProps = {
   text: string;
   isStreaming?: boolean;
+  defaultExpanded?: boolean;
 };
 
-export function ReasoningPartRenderer({ text, isStreaming }: Readonly<ReasoningPartRendererProps>) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export function ReasoningPartRenderer({
+  text,
+  isStreaming,
+  defaultExpanded = false,
+}: Readonly<ReasoningPartRendererProps>) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const colors = useThemeColors();
 
   return (

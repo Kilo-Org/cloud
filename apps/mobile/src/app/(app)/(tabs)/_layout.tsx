@@ -16,8 +16,8 @@ const TAB_BAR_ICON_STYLE = {
 } satisfies ViewStyle;
 const TAB_BAR_LABEL_STYLE = {
   fontFamily: 'JetBrainsMono_500Medium',
-  fontSize: 10,
-  letterSpacing: 0,
+  fontSize: 11,
+  letterSpacing: 0.2,
   marginTop: 2,
   minWidth: TAB_BAR_ITEM_CONTENT_WIDTH,
   textAlign: 'center',

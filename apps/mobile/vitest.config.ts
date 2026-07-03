@@ -22,8 +22,10 @@ export default defineConfig({
     environment: 'node',
     include: [
       'src/lib/*.test.ts',
+      'src/lib/agent-attachments/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
+      'src/lib/hooks/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.tsx',
       'src/lib/onboarding/**/*.test.ts',

@@ -8948,3 +8948,32 @@ export const mcp_gateway_audit_events = pgTable(
 export type MCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferSelect;
 export type NewMCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferInsert;
 export type NewModelExperimentRequest = typeof model_experiment_request.$inferInsert;
+
+export type UserModelPreferenceLastSelected = {
+  model: string;
+  variant?: string;
+};
+
+export const user_model_preferences = pgTable(
+  'user_model_preferences',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    favorites: jsonb().$type<string[]>().notNull().default([]),
+    last_selected: jsonb().$type<UserModelPreferenceLastSelected | null>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [uniqueIndex('UQ_user_model_preferences_user_id').on(table.user_id)]
+);
+
+export type UserModelPreference = typeof user_model_preferences.$inferSelect;
+export type NewUserModelPreference = typeof user_model_preferences.$inferInsert;

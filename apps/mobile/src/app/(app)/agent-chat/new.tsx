@@ -30,6 +30,9 @@ import {
 } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
+import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
+import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -79,16 +82,16 @@ export default function NewSessionScreen() {
 
   // ── Models ───────────────────────────────────────────────────────
   const { models } = useAvailableModels(organizationId);
+  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
+  const { setModel: persistLocalModel } = usePersistedAgentModel();
+  const autoSelected = useAutoSelectModel(models, organizationId);
 
-  // Auto-select first model when models load
-  const hasAutoSelectedModel = useRef(false);
-  if (models.length > 0 && !model && !hasAutoSelectedModel.current) {
-    const firstModel = models[0];
-    if (firstModel) {
-      hasAutoSelectedModel.current = true;
-      setModel(firstModel.id);
-      setVariant(firstModel.variants[0] ?? '');
-    }
+  // Apply auto-selected model when the user hasn't picked one yet.
+  const hasAppliedAutoSelection = useRef(false);
+  if (!hasAppliedAutoSelection.current && autoSelected.model && !model) {
+    hasAppliedAutoSelection.current = true;
+    setModel(autoSelected.model);
+    setVariant(autoSelected.variant);
   }
 
   // ── Repositories ─────────────────────────────────────────────────
@@ -126,10 +129,15 @@ export default function NewSessionScreen() {
   }, [repoData]);
 
   // ── Handlers ─────────────────────────────────────────────────────
-  const handleModelSelect = useCallback((modelId: string, newVariant: string) => {
-    setModel(modelId);
-    setVariant(newVariant);
-  }, []);
+  const handleModelSelect = useCallback(
+    (modelId: string, newVariant: string) => {
+      setModel(modelId);
+      setVariant(newVariant);
+      persistLocalModel({ modelId, variant: newVariant });
+      persistServerLastSelected({ model: modelId, ...(newVariant ? { variant: newVariant } : {}) });
+    },
+    [persistLocalModel, persistServerLastSelected]
+  );
 
   const handleOpenGitHubIntegration = useCallback(async () => {
     try {

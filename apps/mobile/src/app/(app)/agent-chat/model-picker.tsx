@@ -1,6 +1,7 @@
+/* eslint-disable max-lines */
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { BookOpenCheck, Check, Search } from 'lucide-react-native';
+import { BookOpenCheck, Check, Search, Star } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +17,7 @@ import {
 } from '@/lib/free-model-data-disclosure';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
+import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { buildModelPickerRows, type ModelPickerRow } from '@/lib/model-picker-rows';
 import { clearModelPickerBridge, getModelPickerBridge } from '@/lib/picker-bridge';
 
@@ -32,6 +34,7 @@ export default function ModelPickerScreen() {
   const { bottom } = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [bridge, setBridge] = useState(() => getModelPickerBridge());
+  const { favorites, toggleFavorite } = useModelPreferences(undefined);
 
   const [selectedModel, setSelectedModel] = useState(bridge?.currentValue ?? '');
   const [selectedVariant, setSelectedVariant] = useState(bridge?.currentVariant ?? '');
@@ -44,6 +47,8 @@ export default function ModelPickerScreen() {
   const closePicker = useCallback(() => {
     router.back();
   }, [router]);
+
+  const favoriteIds = useMemo(() => new Set(favorites), [favorites]);
 
   useFocusEffect(
     useCallback(() => {
@@ -95,8 +100,8 @@ export default function ModelPickerScreen() {
   }, [currentModelOption]);
 
   const rows = useMemo<ModelPickerRow[]>(
-    () => buildModelPickerRows({ models: bridge?.options ?? [], search }),
-    [bridge, search]
+    () => buildModelPickerRows({ models: bridge?.options ?? [], search, favoriteIds }),
+    [bridge, search, favoriteIds]
   );
 
   const handleSelectVariant = useCallback(
@@ -202,6 +207,7 @@ export default function ModelPickerScreen() {
         }
 
         const modelOption = item.model;
+        const isFavorite = item.isFavorite;
         const selected = modelOption.id === selectedModel;
         const free = isFreeModelOption(modelOption);
         const byok = hasUserByokAvailable(modelOption);
@@ -259,6 +265,27 @@ export default function ModelPickerScreen() {
                   </View>
                 ) : null}
               </View>
+              <Pressable
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  toggleFavorite(modelOption.id);
+                }}
+                hitSlop={12}
+                className="min-h-[44px] min-w-[44px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  isFavorite
+                    ? `Remove ${modelOption.name} from favorites`
+                    : `Add ${modelOption.name} to favorites`
+                }
+                accessibilityState={{ selected: isFavorite }}
+              >
+                <Star
+                  size={20}
+                  color={isFavorite ? colors.primary : colors.mutedForeground}
+                  fill={isFavorite ? colors.primary : 'transparent'}
+                />
+              </Pressable>
               {selected && <Check size={18} color={colors.primary} />}
             </Pressable>
 

@@ -11,6 +11,7 @@ import type { Images } from '@/lib/images-schema';
 import type { NormalizedEvent } from './normalizer';
 import type { SuggestionAction } from './types';
 import { createChatProcessor } from './chat-processor';
+import { heartbeatDataSchema, sessionsListDataSchema } from './schemas';
 import { createServiceState } from './service-state';
 import type { ServiceState } from './service-state';
 import { createCloudAgentTransport } from './cloud-agent-transport';
@@ -173,6 +174,46 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
   let transport: Transport | null = null;
   let connectGeneration = 0;
+  let disarmUpgradeWatcher: (() => void) | null = null;
+
+  // A session resolves to 'read-only' when the CLI hasn't (yet) reported it as
+  // active — but that signal is eventually consistent: enabling remote on the
+  // CLI takes a connect + heartbeat round-trip to register. Without this
+  // watcher, opening the session inside that window pins it to the static
+  // historical snapshot forever. Watch the user-web connection for the session
+  // showing up in a CLI heartbeat/list and re-resolve to upgrade to live.
+  function armUpgradeWatcher(): void {
+    const connection = config.transport.userWebConnection;
+    if (!connection) return;
+
+    // Keep the socket alive while watching — nothing else retains it for a
+    // read-only session, and without it no heartbeats arrive.
+    const release = connection.retain?.();
+    const off = connection.onSystemEvent(({ event, data }) => {
+      if (event !== 'sessions.list' && event !== 'sessions.heartbeat') return;
+      const schema = event === 'sessions.list' ? sessionsListDataSchema : heartbeatDataSchema;
+      const parsed = schema.safeParse(data);
+      if (!parsed.success) return;
+      if (!parsed.data.sessions.some(session => session.id === config.kiloSessionId)) return;
+      connectInternal();
+    });
+    disarmUpgradeWatcher = () => {
+      off();
+      release?.();
+    };
+  }
+
+  function connectInternal(): void {
+    disarmUpgradeWatcher?.();
+    disarmUpgradeWatcher = null;
+    if (transport) {
+      transport.destroy();
+      transport = null;
+    }
+    connectGeneration += 1;
+    serviceState.setActivity({ type: 'connecting' });
+    void resolveAndConnect(connectGeneration);
+  }
 
   const sink: TransportSink = {
     onChatEvent(event) {
@@ -291,6 +332,10 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
     transport = factory(sink);
     transport.connect();
+
+    if (resolved.type === 'read-only') {
+      armUpgradeWatcher();
+    }
   }
 
   return {
@@ -367,15 +412,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       return transport?.interrupt !== undefined;
     },
     connect() {
-      if (transport) {
-        transport.destroy();
-        transport = null;
-      }
-      connectGeneration += 1;
-      serviceState.setActivity({ type: 'connecting' });
-      void resolveAndConnect(connectGeneration);
+      connectInternal();
     },
     disconnect() {
+      disarmUpgradeWatcher?.();
+      disarmUpgradeWatcher = null;
       connectGeneration += 1;
       if (transport) {
         transport.disconnect();
@@ -383,6 +424,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
     },
     destroy() {
+      disarmUpgradeWatcher?.();
+      disarmUpgradeWatcher = null;
       connectGeneration += 1;
       if (transport) {
         transport.destroy();

@@ -1,8 +1,5 @@
 import type { ShowCancelFlowParams } from '@/lib/churnkey/loader';
 
-const FALLBACK_CANCEL_CONFIRM_MESSAGE =
-  'Are you sure you want to cancel your Kilo Pass subscription?';
-
 export type KiloPassChurnkeyAuth = {
   hash: string;
   customerId: string;
@@ -18,7 +15,7 @@ export type OpenKiloPassChurnkeyCancelFlowParams = {
   invalidateKiloPassState: () => MaybePromise<unknown>;
   invalidateKiloPassScheduledChange: () => MaybePromise<unknown>;
   fallbackCancelSubscription: () => void;
-  confirmFallbackCancel: (message: string) => MaybePromise<boolean>;
+  confirmFallbackCancel: () => MaybePromise<boolean>;
   notifyCancellationScheduled: () => void;
   notifyError: (message: string) => void;
   onBeforeOpen?: () => void;
@@ -92,7 +89,7 @@ export function createKiloPassChurnkeyCancelFlow() {
         params.notifyError(message);
 
         try {
-          if (await params.confirmFallbackCancel(FALLBACK_CANCEL_CONFIRM_MESSAGE)) {
+          if (await params.confirmFallbackCancel()) {
             params.fallbackCancelSubscription();
           }
         } finally {

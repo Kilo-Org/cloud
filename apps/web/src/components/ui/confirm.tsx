@@ -50,6 +50,14 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  React.useEffect(
+    () => () => {
+      resolverRef.current?.(false);
+      resolverRef.current = null;
+    },
+    []
+  );
+
   const handleOpenChange = React.useCallback(
     (open: boolean) => {
       if (!open) settle(false);

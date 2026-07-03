@@ -4,10 +4,9 @@ import { DeploymentProvider } from '@/components/deployments/DeploymentContext';
 import type { DeploymentQueries, DeploymentMutations } from '@/lib/user-deployments/router-types';
 
 // EnvironmentSettings reads env vars + mutations from DeploymentContext.
-// Stories supply a fixture provider so the populated list (and its hand-rolled
-// `fixed inset-0` delete-confirmation modal, slated to move to AlertDialog)
-// render without a backend. The full query/mutation surfaces are large, so
-// only the fields this component touches are mocked and cast (fixture-only).
+// Stories supply a fixture provider so the populated list and AlertDialog delete
+// confirmation render without a backend. The full query/mutation surfaces are
+// large, so only the fields this component touches are mocked and cast.
 const envVars = [
   { key: 'DATABASE_URL', value: 'redacted-database-url', isSecret: true },
   { key: 'NODE_ENV', value: 'production', isSecret: false },
@@ -56,7 +55,7 @@ export const List: Story = {
   render: () => <EnvironmentSettings deploymentId="dep-1" />,
 };
 
-// Opens the hand-rolled delete-confirmation modal.
+// Opens the delete confirmation AlertDialog.
 export const DeleteConfirm: Story = {
   render: () => <EnvironmentSettings deploymentId="dep-1" />,
   play: async () => {

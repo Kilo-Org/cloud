@@ -34,6 +34,7 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
   const [billingCycleDialogOpen, setBillingCycleDialogOpen] = useState(false);
   const [seatCount, setSeatCount] = useState('1');
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [isCancelingSubscription, setIsCancelingSubscription] = useState(false);
   const [isCancelingCycleChange, setIsCancelingCycleChange] = useState(false);
 
   const organizationQuery = useOrganizationWithMembers(organizationId, {
@@ -100,25 +101,27 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
   }
 
   async function handleCancelSubscription() {
-    if (
-      !(await confirm({
+    if (isCancelingSubscription) return;
+    setIsCancelingSubscription(true);
+
+    try {
+      const shouldCancel = await confirm({
         title: 'Cancel seats subscription?',
         description:
           'The subscription stays active until the end of the current billing period, then cancels.',
         confirmLabel: 'Cancel at period end',
         cancelLabel: 'Keep subscription',
         destructive: true,
-      }))
-    ) {
-      return;
-    }
+      });
+      if (!shouldCancel) return;
 
-    try {
       await trpcClient.organizations.subscription.cancel.mutate({ organizationId });
       toast.success('Subscription will cancel at period end');
       await refreshData();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to cancel subscription');
+    } finally {
+      setIsCancelingSubscription(false);
     }
   }
 
@@ -295,8 +298,9 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
               variant="outline"
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={() => void handleCancelSubscription()}
+              disabled={isCancelingSubscription}
             >
-              Cancel Subscription
+              {isCancelingSubscription ? 'Canceling...' : 'Cancel Subscription'}
             </Button>
           )}
           <Button variant="outline" onClick={openCustomerPortal} disabled={isOpeningPortal}>

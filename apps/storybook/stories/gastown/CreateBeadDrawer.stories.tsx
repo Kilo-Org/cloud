@@ -4,7 +4,7 @@ import { CreateBeadDrawer } from '@/components/gastown/CreateBeadDrawer';
 import { Button } from '@/components/Button';
 import { withGastownTRPC } from '../../src/decorators/withGastownTRPC';
 
-// CreateBeadDrawer is a vaul drawer (slated to move to Sheet). It calls
+// CreateBeadDrawer renders inside a Sheet drawer. It calls
 // useGastownTRPC for enrichment/create, which only fire on interaction, so the
 // open shell renders under the gastown tRPC provider without network.
 

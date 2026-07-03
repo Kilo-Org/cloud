@@ -2,13 +2,13 @@ import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/di
 import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
-  id: 'morph',
+  id: 'morph-byok',
   base_url: 'https://api.morphllm.com/v1',
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
-    providerId: 'morph',
+    providerId: 'morph-byok',
     recommendedModels: [
       {
         id: 'morph-qwen35-397b',

@@ -185,7 +185,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     url: 'https://api.synthetic.new/v1/models',
   }),
   openAICompatibleFetcher({
-    providerId: 'morph',
+    providerId: 'morph-byok',
     label: 'Morph',
     url: 'https://www.morphllm.com/api/models/json',
   }),

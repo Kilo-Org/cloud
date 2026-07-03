@@ -7,14 +7,8 @@ import {
   AGENT_ATTACHMENT_MIME_BY_EXTENSION,
   type AgentAttachmentExtension,
 } from '@/lib/agent-attachments/constants';
+import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { classifyAttachment } from '@/lib/agent-attachments/validate';
-
-type PickedAgentAttachment = {
-  name: string;
-  uri: string;
-  mimeType?: string;
-  size?: number;
-};
 
 const IMAGE_PICKER_OPTIONS = {
   mediaTypes: ['images'],
@@ -37,7 +31,7 @@ function normalizeImageAsset(asset: {
   fileName?: string | null;
   mimeType?: string | null;
   fileSize?: number | null;
-}): PickedAgentAttachment {
+}): AgentAttachmentCandidate {
   const name = asset.fileName ?? `image.${(asset.mimeType ?? 'image/png').split('/')[1] ?? 'png'}`;
   return {
     name,
@@ -52,7 +46,7 @@ function normalizeDocumentAsset(asset: {
   name: string;
   mimeType?: string;
   size?: number;
-}): PickedAgentAttachment {
+}): AgentAttachmentCandidate {
   const dot = asset.name.lastIndexOf('.');
   const ext =
     dot > 0 ? (asset.name.slice(dot + 1).toLowerCase() as AgentAttachmentExtension) : null;
@@ -65,7 +59,7 @@ function normalizeDocumentAsset(asset: {
   };
 }
 
-async function pickAgentCameraImage(): Promise<PickedAgentAttachment[]> {
+async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
     showPermissionSettingsAlert({
@@ -84,7 +78,7 @@ async function pickAgentCameraImage(): Promise<PickedAgentAttachment[]> {
   });
 }
 
-async function pickAgentLibraryImages(): Promise<PickedAgentAttachment[]> {
+async function pickAgentLibraryImages(): Promise<AgentAttachmentCandidate[]> {
   const result = await ImagePicker.launchImageLibraryAsync({
     ...IMAGE_PICKER_OPTIONS,
     allowsMultipleSelection: true,
@@ -98,7 +92,7 @@ async function pickAgentLibraryImages(): Promise<PickedAgentAttachment[]> {
   });
 }
 
-async function pickAgentDocuments(): Promise<PickedAgentAttachment[]> {
+async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
   const result = await DocumentPicker.getDocumentAsync({
     copyToCacheDirectory: true,
     multiple: true,
@@ -115,7 +109,7 @@ async function pickAgentDocuments(): Promise<PickedAgentAttachment[]> {
 
 type AttachmentSource = 'camera' | 'library' | 'files';
 
-async function pickFromSource(source: AttachmentSource): Promise<PickedAgentAttachment[]> {
+async function pickFromSource(source: AttachmentSource): Promise<AgentAttachmentCandidate[]> {
   if (source === 'camera') {
     return pickAgentCameraImage();
   }
@@ -125,10 +119,10 @@ async function pickFromSource(source: AttachmentSource): Promise<PickedAgentAtta
   return pickAgentDocuments();
 }
 
-export function pickAgentAttachments(): Promise<PickedAgentAttachment[]> {
+export function pickAgentAttachments(): Promise<AgentAttachmentCandidate[]> {
   return new Promise(resolve => {
     let settled = false;
-    const settle = (value: PickedAgentAttachment[]) => {
+    const settle = (value: AgentAttachmentCandidate[]) => {
       if (!settled) {
         settled = true;
         resolve(value);

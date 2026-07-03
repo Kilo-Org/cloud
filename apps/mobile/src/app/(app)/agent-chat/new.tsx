@@ -32,8 +32,9 @@ import {
   getGitHubIntegrationUrl,
   shouldShowGitHubIntegrationPrompt,
 } from '@/lib/agent-github-integration';
+import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
-  type AgentAttachmentCandidate,
+  type AgentAttachmentWire,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -46,8 +47,10 @@ import { trpcClient, useTRPC } from '@/lib/trpc';
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
 const PROMPT_INPUT_LINE_HEIGHT = 24;
-const PROMPT_INPUT_VERTICAL_PADDING = 32;
-const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 32;
+// Must mirror the TextInput's actual padding: py-2 (16 total) and px-2 on
+// iOS (16 total) / the 24pt-per-side Android inset (48 total).
+const PROMPT_INPUT_VERTICAL_PADDING = 16;
+const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 const PROMPT_INPUT_MIN_HEIGHT =
   PROMPT_INPUT_LINE_HEIGHT * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
@@ -102,6 +105,11 @@ export default function NewSessionScreen() {
     if (hasAutoSelectedModel.current) {
       return;
     }
+    // Never overwrite a model the user already picked manually.
+    if (model) {
+      hasAutoSelectedModel.current = true;
+      return;
+    }
     if (models.length === 0 || !modelPrefLoaded) {
       return;
     }
@@ -118,7 +126,7 @@ export default function NewSessionScreen() {
       }
     }
     hasAutoSelectedModel.current = true;
-  }, [models, modelPrefLoaded, storedModelPref, organizationId]);
+  }, [models, modelPrefLoaded, storedModelPref, organizationId, model]);
 
   // ── Repositories ─────────────────────────────────────────────────
   const trpc = useTRPC();
@@ -175,7 +183,8 @@ export default function NewSessionScreen() {
 
   const handleCreate = useCallback(async () => {
     const prompt = promptRef.current.trim();
-    if ((!prompt && !attachments.toWirePayload()) || !selectedRepo || !model) {
+    // The backend requires a non-empty prompt even when attachments are present.
+    if (!prompt || !selectedRepo || !model) {
       return;
     }
     if (attachments.isUploading) {
@@ -200,7 +209,7 @@ export default function NewSessionScreen() {
         githubRepo: string;
         autoCommit: boolean;
         autoInitiate: boolean;
-        attachments?: { path: string; files: string[] };
+        attachments?: AgentAttachmentWire;
       } = {
         prompt,
         initialMessageId,
@@ -257,22 +266,12 @@ export default function NewSessionScreen() {
     attachments,
   ]);
 
-  const canStart =
-    (hasPrompt || attachments.attachments.some(a => a.status === 'uploaded')) &&
-    selectedRepo.length > 0 &&
-    model.length > 0 &&
-    !isCreating;
+  const canStart = hasPrompt && selectedRepo.length > 0 && model.length > 0 && !isCreating;
 
+  const { addCandidates } = attachments;
   const handleAddAttachment = useCallback(async () => {
-    const picked = await pickAgentAttachments();
-    const candidates: AgentAttachmentCandidate[] = picked.map(p => ({
-      name: p.name,
-      uri: p.uri,
-      mimeType: p.mimeType,
-      size: p.size,
-    }));
-    attachments.addCandidates(candidates);
-  }, [attachments]);
+    addCandidates(await pickAgentAttachments());
+  }, [addCandidates]);
 
   function handlePromptInputLayout(event: LayoutChangeEvent) {
     const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
@@ -296,12 +295,12 @@ export default function NewSessionScreen() {
               attachments.removeAttachment(id);
             }}
           />
-          <View className="flex-row items-end px-2 pt-2" onLayout={handlePromptInputLayout}>
+          <View className="flex-row items-end px-2 pt-2">
             <Pressable
               onPress={() => {
                 void handleAddAttachment();
               }}
-              disabled={isCreating || attachments.attachments.length >= 5}
+              disabled={isCreating || attachments.attachments.length >= AGENT_ATTACHMENT_MAX_FILES}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               className="h-9 w-9 items-center justify-center rounded-full active:opacity-70"
               accessibilityRole="button"

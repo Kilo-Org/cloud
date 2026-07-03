@@ -1,3 +1,4 @@
+import { formatFileSize } from '@kilocode/kilo-chat';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { AlertCircle, File as FileIcon, X } from 'lucide-react-native';
 
@@ -13,16 +14,6 @@ type Props = {
 };
 
 const REMOVE_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)} KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function AttachmentChip({
   attachment,
@@ -64,7 +55,7 @@ function AttachmentChip({
               {attachment.filename}
             </Text>
             <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-              {formatSize(attachment.size)}
+              {formatFileSize(attachment.size)}
             </Text>
           </View>
         </View>

@@ -1,5 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
 import {
   contextKey,
@@ -7,59 +6,26 @@ import {
   parseStoredModelPreference,
   type StoredModelPreference,
 } from '@/lib/hooks/agent-model-preference';
+import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
 import { AGENT_MODEL_PREFERENCE_KEY } from '@/lib/storage-keys';
 
+const store = createSecureStorePreference<StoredModelPreference>({
+  key: AGENT_MODEL_PREFERENCE_KEY,
+  defaultValue: {},
+  parse: parseStoredModelPreference,
+  serialize: value => JSON.stringify(value),
+});
+
+export function clearAgentModelPreference() {
+  store.clear();
+}
+
+function saveModel(organizationId: string | undefined, entry: ModelPreferenceEntry) {
+  store.set({ ...store.get(), [contextKey(organizationId)]: entry });
+}
+
 export function usePersistedAgentModel() {
-  const [stored, setStored] = useState<StoredModelPreference>({});
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const storedRef = useRef<StoredModelPreference>({});
-
-  useEffect(() => {
-    let active = true;
-
-    const load = async () => {
-      try {
-        const raw = await SecureStore.getItemAsync(AGENT_MODEL_PREFERENCE_KEY);
-        if (!active) {
-          return;
-        }
-        const parsed = parseStoredModelPreference(raw);
-        storedRef.current = parsed;
-        setStored(parsed);
-        setHasLoaded(true);
-      } catch {
-        if (active) {
-          setHasLoaded(true);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const saveModel = useCallback(
-    (organizationId: string | undefined, entry: ModelPreferenceEntry) => {
-      const key = contextKey(organizationId);
-      const next = { ...storedRef.current, [key]: entry };
-      storedRef.current = next;
-      setStored(next);
-
-      const persist = async () => {
-        try {
-          await SecureStore.setItemAsync(AGENT_MODEL_PREFERENCE_KEY, JSON.stringify(next));
-        } catch {
-          // Keep in-memory preference even if storage write fails.
-        }
-      };
-
-      void persist();
-    },
-    []
-  );
-
+  const stored = useSyncExternalStore(store.subscribe, store.get);
+  const hasLoaded = useSyncExternalStore(store.subscribe, store.getHasLoaded);
   return { stored, hasLoaded, saveModel };
 }

@@ -18,8 +18,8 @@ import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { BlurBar } from '@/components/ui/blur-bar';
+import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
-  type AgentAttachmentCandidate,
   type AgentAttachmentWire,
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
@@ -49,6 +49,8 @@ type ChatComposerProps = {
   modelOptions: ModelOption[];
   onModelSelect: (modelId: string, variant: string) => void;
   organizationId?: string;
+  /** Only Cloud Agent sessions can receive attachments. */
+  attachmentsEnabled?: boolean;
 };
 
 export function ChatComposer({
@@ -64,6 +66,7 @@ export function ChatComposer({
   modelOptions,
   onModelSelect,
   organizationId,
+  attachmentsEnabled = true,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const textRef = useRef('');
@@ -82,8 +85,8 @@ export function ChatComposer({
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
   });
 
-  const hasUploadedAttachments = upload.attachments.some(a => a.status === 'uploaded');
-  const canSend = (hasText || hasUploadedAttachments) && !disabled && !isStreaming;
+  // The backend requires a non-empty prompt even when attachments are present.
+  const canSend = hasText && !disabled && !isStreaming;
   const showToolbar = isFocused || hasText || upload.attachments.length > 0;
   const toolbarDisabled = disabled || isStreaming;
 
@@ -95,7 +98,7 @@ export function ChatComposer({
 
   function handleSend() {
     const trimmed = textRef.current.trim();
-    if (!canSend) {
+    if (!trimmed || !canSend) {
       return;
     }
     if (upload.isUploading) {
@@ -104,9 +107,6 @@ export function ChatComposer({
     }
     if (trimmed.startsWith('/') && upload.attachments.length > 0) {
       toast.error('Attachments cannot be sent with slash commands.');
-      return;
-    }
-    if (!trimmed && !hasUploadedAttachments) {
       return;
     }
 
@@ -131,23 +131,11 @@ export function ChatComposer({
     setInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
 
-  const handleAddAttachment = useCallback(async () => {
-    const picked = await pickAgentAttachments();
-    const candidates: AgentAttachmentCandidate[] = picked.map(p => ({
-      name: p.name,
-      uri: p.uri,
-      mimeType: p.mimeType,
-      size: p.size,
-    }));
-    upload.addCandidates(candidates);
-  }, [upload]);
+  const { addCandidates, removeAttachment } = upload;
 
-  const handleRemoveAttachment = useCallback(
-    (id: string) => {
-      upload.removeAttachment(id);
-    },
-    [upload]
-  );
+  const handleAddAttachment = useCallback(async () => {
+    addCandidates(await pickAgentAttachments());
+  }, [addCandidates]);
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,
@@ -179,21 +167,25 @@ export function ChatComposer({
         </Animated.View>
       ) : null}
 
-      <AttachmentPreviewStrip attachments={upload.attachments} onRemove={handleRemoveAttachment} />
+      {attachmentsEnabled ? (
+        <AttachmentPreviewStrip attachments={upload.attachments} onRemove={removeAttachment} />
+      ) : null}
 
       <View className="flex-row items-center p-2.5 px-3">
-        <Pressable
-          onPress={() => {
-            void handleAddAttachment();
-          }}
-          disabled={toolbarDisabled || upload.attachments.length >= 5}
-          hitSlop={PAPERCLIP_HIT_SLOP}
-          className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel="Add attachment"
-        >
-          <Paperclip size={18} color={colors.mutedForeground} />
-        </Pressable>
+        {attachmentsEnabled ? (
+          <Pressable
+            onPress={() => {
+              void handleAddAttachment();
+            }}
+            disabled={toolbarDisabled || upload.attachments.length >= AGENT_ATTACHMENT_MAX_FILES}
+            hitSlop={PAPERCLIP_HIT_SLOP}
+            className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel="Add attachment"
+          >
+            <Paperclip size={18} color={colors.mutedForeground} />
+          </Pressable>
+        ) : null}
 
         <View
           className="mx-2.5 flex-1 overflow-hidden rounded-[20px] border border-border bg-card"

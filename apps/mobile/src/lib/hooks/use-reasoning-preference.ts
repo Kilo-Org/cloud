@@ -1,60 +1,25 @@
-import * as SecureStore from 'expo-secure-store';
-import { useCallback, useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
-import { parseReasoningDefault } from '@/lib/hooks/parse-reasoning-default';
+import { createSecureStorePreference } from '@/lib/hooks/secure-store-preference';
 import { REASONING_DEFAULT_EXPANDED_KEY } from '@/lib/storage-keys';
 
-type UseReasoningPreferenceReturn = {
-  defaultExpanded: boolean;
-  hasLoaded: boolean;
-  setDefaultExpanded: (value: boolean) => void;
-};
+const store = createSecureStorePreference<boolean>({
+  key: REASONING_DEFAULT_EXPANDED_KEY,
+  defaultValue: false,
+  parse: raw => raw === 'true',
+  serialize: value => (value ? 'true' : 'false'),
+});
 
-export function useReasoningPreference(): UseReasoningPreferenceReturn {
-  const [defaultExpanded, setDefaultExpandedState] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
+export function clearReasoningPreference() {
+  store.clear();
+}
 
-  useEffect(() => {
-    let active = true;
+function setDefaultExpanded(value: boolean) {
+  store.set(value);
+}
 
-    const load = async () => {
-      try {
-        const raw = await SecureStore.getItemAsync(REASONING_DEFAULT_EXPANDED_KEY);
-        if (!active) {
-          return;
-        }
-        setDefaultExpandedState(parseReasoningDefault(raw));
-      } catch {
-        if (active) {
-          setDefaultExpandedState(false);
-        }
-      } finally {
-        if (active) {
-          setHasLoaded(true);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const setDefaultExpanded = useCallback((value: boolean) => {
-    setDefaultExpandedState(value);
-
-    const persist = async () => {
-      try {
-        await SecureStore.setItemAsync(REASONING_DEFAULT_EXPANDED_KEY, value ? 'true' : 'false');
-      } catch {
-        // Keep in-memory preference even if storage write fails.
-      }
-    };
-
-    void persist();
-  }, []);
-
+export function useReasoningPreference() {
+  const defaultExpanded = useSyncExternalStore(store.subscribe, store.get);
+  const hasLoaded = useSyncExternalStore(store.subscribe, store.getHasLoaded);
   return { defaultExpanded, hasLoaded, setDefaultExpanded };
 }

@@ -57,27 +57,29 @@ export function ChatToolbar({
       {order === 'model-first' ? modeSelector : modelSelector}
       <View className="flex-1" />
       {showReasoningSettings ? (
-        <Pressable
-          onPress={() => {
-            if (!disabled) {
-              setIsSettingsOpen(true);
-            }
-          }}
-          disabled={disabled}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel="Reasoning settings"
-        >
-          <Settings2 size={16} color={colors.mutedForeground} />
-        </Pressable>
+        <>
+          <Pressable
+            onPress={() => {
+              if (!disabled) {
+                setIsSettingsOpen(true);
+              }
+            }}
+            disabled={disabled}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel="Reasoning settings"
+          >
+            <Settings2 size={16} color={colors.mutedForeground} />
+          </Pressable>
+          <ReasoningSettingsModal
+            visible={isSettingsOpen}
+            onClose={() => {
+              setIsSettingsOpen(false);
+            }}
+          />
+        </>
       ) : null}
-      <ReasoningSettingsModal
-        visible={isSettingsOpen}
-        onClose={() => {
-          setIsSettingsOpen(false);
-        }}
-      />
     </View>
   );
 }

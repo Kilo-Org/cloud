@@ -24,6 +24,7 @@ import { useSessionConfigSync } from '@/components/agents/use-session-config-syn
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
@@ -33,17 +34,10 @@ type SessionDetailContentProps = {
   sessionId: KiloSessionId;
 };
 
-function getComposerPlaceholder(cloudStatusType: CloudStatus['type'] | undefined) {
-  if (cloudStatusType === 'preparing') {
-    return 'Setting up environment...';
-  }
-
-  if (cloudStatusType === 'finalizing') {
-    return 'Wrapping up...';
-  }
-
-  return 'Message...';
-}
+const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
+  preparing: 'Setting up environment...',
+  finalizing: 'Wrapping up...',
+};
 
 export function SessionDetailContent({ sessionId }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
@@ -58,6 +52,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
+  const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const totalCost = useAtomValue(manager.atoms.totalCost);
@@ -163,11 +158,12 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     Boolean(activeQuestion) ||
     (requiresModel && !currentModel);
   const showInteractionCards = activeQuestion ?? activePermission;
-  const composerPlaceholder = getComposerPlaceholder(cloudStatus?.type);
+  const composerPlaceholder =
+    (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSend = useCallback(
-    async (text: string, attachments?: { path: string; files: string[] }) => {
+    async (text: string, attachments?: AgentAttachmentWire) => {
       if (requiresModel && !currentModel) {
         toast.error('Select a model before sending');
         return;
@@ -272,6 +268,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
                 savePersistedModel(organizationId, { model: modelId, variant: newVariant });
               }}
               organizationId={organizationId}
+              attachmentsEnabled={supportsAttachments}
             />
           ))}
       </>

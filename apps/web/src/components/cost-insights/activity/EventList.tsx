@@ -102,7 +102,7 @@ export function EventList({
                         return (
                           <li
                             key={`${event.id}-${driver.id}`}
-                            className="grid gap-3 px-4 py-3 lg:grid-cols-[1.5rem_minmax(0,1fr)_8rem] lg:items-center"
+                            className="grid gap-3 px-4 py-3 lg:grid-cols-[1.5rem_minmax(0,1fr)_10rem] lg:items-center"
                           >
                             <span className="type-label text-muted-foreground hidden font-mono lg:block">
                               {index + 1}
@@ -111,17 +111,36 @@ export function EventList({
                               <div className="type-body font-medium break-words">
                                 {driver.label}
                               </div>
-                              <div className="type-label text-muted-foreground mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                                <span>{driver.actorLabel ?? 'No member attributed'}</span>
-                                <span>{sourceLabels[driver.source]}</span>
-                                {driver.modelOrProvider && <span>{driver.modelOrProvider}</span>}
-                              </div>
+                              <dl className="mt-3 grid gap-x-4 gap-y-3 sm:grid-cols-3">
+                                <div className="min-w-0">
+                                  <dt className="type-eyebrow text-foreground-subtle">Member</dt>
+                                  <dd className="type-label text-muted-foreground mt-1 break-words">
+                                    {driver.actorLabel ?? 'No member attributed'}
+                                  </dd>
+                                </div>
+                                <div className="min-w-0">
+                                  <dt className="type-eyebrow text-foreground-subtle">Source</dt>
+                                  <dd className="type-label text-muted-foreground mt-1 break-words">
+                                    {sourceLabels[driver.source]}
+                                  </dd>
+                                </div>
+                                {driver.modelOrProvider && (
+                                  <div className="min-w-0">
+                                    <dt className="type-eyebrow text-foreground-subtle">
+                                      {driver.modelOrProviderLabel ?? 'Model'}
+                                    </dt>
+                                    <dd className="type-label text-muted-foreground mt-1 break-words">
+                                      {driver.modelOrProvider}
+                                    </dd>
+                                  </div>
+                                )}
+                              </dl>
                             </div>
                             <div className="lg:text-right">
                               <div className="type-body font-mono font-semibold tabular-nums">
                                 {money(driver.spendUsd)}
                               </div>
-                              <div className="type-label text-muted-foreground mt-0.5">
+                              <div className="type-label text-muted-foreground mt-0.5 lg:whitespace-nowrap">
                                 {share}% of captured spend
                               </div>
                               <div

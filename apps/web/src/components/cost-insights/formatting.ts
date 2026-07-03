@@ -3,13 +3,8 @@ import type { SpendDriver, SpendRange } from './types';
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
   currency: 'USD',
+  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
-});
-
-const wholeDollarFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 0,
 });
 
 export const sourceLabels = {
@@ -32,7 +27,7 @@ export function spendRangePeriodLabel(range: SpendRange) {
 }
 
 export function money(value: number) {
-  return (value >= 100 ? wholeDollarFormatter : currencyFormatter).format(value);
+  return currencyFormatter.format(value);
 }
 
 export function formatCostInsightDateTime(timestamp: string, timeZone?: string) {
@@ -48,11 +43,9 @@ export function formatCostInsightDateTime(timestamp: string, timeZone?: string) 
 
 export function formatSpendEvidenceTime(timestamp: string, range: SpendRange, timeZone?: string) {
   const dateFields =
-    range === '30d' || range === '90d'
+    range === '7d' || range === '30d' || range === '90d'
       ? { month: 'short' as const, day: 'numeric' as const }
-      : range === '7d'
-        ? { month: 'short' as const, day: 'numeric' as const, hour: '2-digit' as const }
-        : { hour: '2-digit' as const };
+      : { hour: '2-digit' as const, minute: '2-digit' as const };
 
   return new Intl.DateTimeFormat('en-US', {
     ...dateFields,
@@ -109,4 +102,17 @@ export function percentOf(value: number, total: number) {
 export function spendBarHeightPercent(value: number, maximum: number) {
   if (value <= 0 || maximum <= 0) return 0;
   return Math.max(2, percentOf(value, maximum));
+}
+
+/**
+ * Rounds a spend maximum up to a readable axis bound (1, 2, or 5 times a power
+ * of ten) so the chart's gridline labels stay clean and comparable across
+ * ranges. Returns 0 for non-positive input so callers can render an empty axis.
+ */
+export function niceCeil(value: number) {
+  if (value <= 0) return 0;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / magnitude;
+  const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return niceNormalized * magnitude;
 }

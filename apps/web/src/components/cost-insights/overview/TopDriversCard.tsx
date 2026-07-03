@@ -1,6 +1,5 @@
 import { UsersRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { money, percentOf, sourceLabels, spendRangePeriodLabel } from '../formatting';
 import { EmptyPanel } from '../shared/EmptyPanel';
@@ -19,24 +18,22 @@ export function TopDriversCard({
 }) {
   const total = drivers.reduce((sum, driver) => sum + driver.spendUsd, 0);
   return (
-    <Card className="min-w-0">
-      <CardHeader>
-        <CardTitle className="type-heading">Where spend went</CardTitle>
-        <CardDescription>Largest contributors in {spendRangePeriodLabel(period)}.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <section className="min-w-0" aria-labelledby="top-drivers-title">
+      <div className="mb-4">
+        <h3 id="top-drivers-title" className="type-heading">
+          Largest contributors in {spendRangePeriodLabel(period)}
+        </h3>
+      </div>
+      <div className="space-y-4">
         {drivers.length === 0 ? (
           <EmptyPanel
             title="No spend drivers"
             description="Products and members will appear after Credit spend is recorded."
           />
         ) : (
-          <ol className="grid gap-x-8 gap-y-6 overflow-hidden lg:grid-cols-2">
+          <ol className="divide-border divide-y overflow-hidden">
             {drivers.slice(0, 5).map(driver => (
-              <li
-                key={driver.id}
-                className="border-border min-w-0 border-t pt-5 first:border-t-0 first:pt-0 lg:[&:nth-child(2)]:border-t-0 lg:[&:nth-child(2)]:pt-0"
-              >
+              <li key={driver.id} className="min-w-0 py-5 first:pt-0 last:pb-0">
                 <DriverRow
                   driver={driver}
                   total={total}
@@ -59,8 +56,8 @@ export function TopDriversCard({
             </a>
           </Button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -73,6 +70,7 @@ function DriverRow({
   total: number;
   showMember: boolean;
 }) {
+  const share = percentOf(driver.spendUsd, total);
   const row = (
     <div
       className={cn(
@@ -80,45 +78,50 @@ function DriverRow({
           'hover:bg-surface-hover focus-visible:ring-ring -mx-2 rounded-md px-2 py-2 focus-visible:ring-2 focus-visible:outline-none'
       )}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start">
         <div className="min-w-0">
           <div className="type-body font-medium break-words">{driver.label}</div>
-          <dl className="mt-2 grid gap-x-4 gap-y-1 type-label text-muted-foreground sm:grid-cols-2">
-            <div>
-              <dt className="sr-only">Product</dt>
-              <dd>{sourceLabels[driver.source]}</dd>
-            </div>
+          <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-[minmax(8rem,1fr)_minmax(8rem,1fr)_minmax(10rem,1.5fr)]">
             {showMember && (
-              <div>
-                <dt className="sr-only">Member</dt>
-                <dd>{driver.actorLabel ?? 'No member attributed'}</dd>
+              <div className="min-w-0">
+                <dt className="type-eyebrow text-foreground-subtle">Member</dt>
+                <dd className="type-label text-muted-foreground mt-1 break-words">
+                  {driver.actorLabel ?? 'No member attributed'}
+                </dd>
               </div>
             )}
+            <div className="min-w-0">
+              <dt className="type-eyebrow text-foreground-subtle">Source</dt>
+              <dd className="type-label text-muted-foreground mt-1 break-words">
+                {sourceLabels[driver.source]}
+              </dd>
+            </div>
             {driver.modelOrProvider && (
-              <div className="sm:col-span-2">
-                <dt className="sr-only">Model or provider</dt>
-                <dd>{driver.modelOrProvider}</dd>
+              <div className="min-w-0">
+                <dt className="type-eyebrow text-foreground-subtle">
+                  {driver.modelOrProviderLabel ?? 'Model'}
+                </dt>
+                <dd className="type-label text-muted-foreground mt-1 break-words">
+                  {driver.modelOrProvider}
+                </dd>
               </div>
             )}
           </dl>
         </div>
-        <div className="max-w-28 shrink-0 text-right sm:max-w-none">
+        <div className="sm:text-right">
           <div className="type-body font-mono font-semibold tabular-nums">
             {money(driver.spendUsd)}
           </div>
-          <div className="type-label text-muted-foreground">
-            {percentOf(driver.spendUsd, total)}% of shown spend
+          <div className="type-label text-muted-foreground mt-3 sm:whitespace-nowrap">
+            {share}% of shown spend
+          </div>
+          <div
+            className="bg-surface-overlay mt-2 h-1 overflow-hidden rounded-full"
+            aria-hidden="true"
+          >
+            <div className="bg-chart-1 h-full rounded-full" style={{ width: `${share}%` }} />
           </div>
         </div>
-      </div>
-      <div
-        className="bg-surface-overlay mt-3 h-1.5 overflow-hidden rounded-full"
-        aria-hidden="true"
-      >
-        <div
-          className="bg-chart-1 h-full rounded-full"
-          style={{ width: `${percentOf(driver.spendUsd, total)}%` }}
-        />
       </div>
     </div>
   );

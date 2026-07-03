@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { COST_INSIGHTS_ASK_KILO_UI_ENABLED } from '../feature-visibility';
@@ -143,52 +144,57 @@ export function CostInsightsDashboardView({
       </section>
 
       <section id="spend-evidence" aria-labelledby="spend-evidence-title" className="scroll-mt-6">
-        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h2 id="spend-evidence-title" className="type-heading">
-              Spend over time
-            </h2>
-            <p className="type-body text-muted-foreground mt-1">
-              Usage-based spend, scheduled spend, and largest contributors for{' '}
-              {spendRangePeriodLabel(activeRange)}.
-            </p>
-          </div>
-          <fieldset
-            aria-label="Spend range"
-            className="border-input bg-input-background flex w-full gap-1 overflow-x-auto rounded-md border p-1 lg:w-auto"
-          >
-            {rangeOptions.map(option => (
-              <Button
-                key={option.value}
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-pressed={activeRange === option.value}
-                className={cn(
-                  'min-h-control-touch shrink-0 px-3 type-label lg:min-h-9',
-                  activeRange === option.value &&
-                    'bg-surface-selected text-foreground hover:bg-surface-selected'
-                )}
-                onClick={() => {
-                  if (activeRange === option.value) return;
-                  setSelectedRange(option.value);
-                  onSpendRangeChange?.(option.value);
-                }}
+        <Card className="min-w-0">
+          <CardHeader className="gap-4 pb-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 id="spend-evidence-title" className="type-heading">
+                  Spend over time
+                </h2>
+                <p className="type-body text-muted-foreground mt-1">
+                  Usage timeline and largest contributors for {spendRangePeriodLabel(activeRange)}.
+                </p>
+              </div>
+              <fieldset
+                aria-label="Spend range"
+                className="border-input bg-input-background flex w-full gap-1 overflow-x-auto rounded-md border p-1 lg:w-auto"
               >
-                {option.label}
-              </Button>
-            ))}
-          </fieldset>
-        </div>
-        <div className="space-y-6">
-          <SpendEvidenceCard data={data} range={activeRange} />
-          <TopDriversCard
-            drivers={data.driversByRange[activeRange]}
-            period={activeRange}
-            owner={data.owner}
-            memberLimitsHref={data.memberLimitsHref}
-          />
-        </div>
+                {rangeOptions.map(option => (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    aria-pressed={activeRange === option.value}
+                    className={cn(
+                      'min-h-control-touch shrink-0 px-3 type-label lg:min-h-9',
+                      activeRange === option.value &&
+                        'bg-surface-selected text-foreground hover:bg-surface-selected'
+                    )}
+                    onClick={() => {
+                      if (activeRange === option.value) return;
+                      setSelectedRange(option.value);
+                      onSpendRangeChange?.(option.value);
+                    }}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </fieldset>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-8">
+            <SpendEvidenceCard data={data} range={activeRange} />
+            <div className="border-border border-t pt-6">
+              <TopDriversCard
+                drivers={data.driversByRange[activeRange]}
+                period={activeRange}
+                owner={data.owner}
+                memberLimitsHref={data.memberLimitsHref}
+              />
+            </div>
+          </CardContent>
+        </Card>
       </section>
 
       <EventPreviewCard events={data.eventPreview} activityHref={activityHref} />
@@ -205,10 +211,7 @@ function DashboardSkeleton() {
           <Skeleton key={index} className="h-32 rounded-none" />
         ))}
       </div>
-      <div className="space-y-6">
-        <Skeleton className="h-96 rounded-xl" />
-        <Skeleton className="h-72 rounded-xl" />
-      </div>
+      <Skeleton className="h-[42rem] rounded-xl" />
     </output>
   );
 }

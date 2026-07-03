@@ -6,7 +6,7 @@ This spec defines business rules and invariants for Cost Insights, Spend Alerts,
 
 ## Status
 
-Draft -- created 2026-06-24. Updated 2026-06-24 to remove spend-blocking controls. Updated 2026-06-25 to rename the feature from Spend Insights to Cost Insights and add Cost Suggestions. Updated 2026-06-26 to require local-time UI timestamps, make Spend Anomaly Alerts opt-out by default, add independent rolling 7-day and rolling 30-day spend thresholds, and limit initial access to Kilo platform admins.
+Draft -- created 2026-06-24. Updated 2026-06-24 to remove spend-blocking controls. Updated 2026-06-25 to rename the feature from Spend Insights to Cost Insights and add Cost Suggestions. Updated 2026-06-26 to require local-time UI timestamps, make Spend Anomaly Alerts opt-out by default, add independent rolling 7-day and rolling 30-day spend thresholds, and limit initial access to Kilo platform admins. Updated 2026-07-03 to render the 7-day spend-over-time evidence chart in daily buckets instead of hourly for readability; hourly owner-hour rollups and anomaly detection remain unchanged.
 
 ## Conventions
 
@@ -78,7 +78,7 @@ Cost Insights does not replace low-balance alerts, auto-top-up setup, existing o
 3. Settings MUST show Spend Anomaly Alerts, the optional rolling 24-hour spend threshold, the optional rolling 7-day spend threshold, and the optional rolling 30-day spend threshold in that order as sub-options of Spend Alerts.
 4. V1 settings MUST NOT expose hard spend limits, spend pauses, throttles, product exclusions, model exclusions, custom recipients, anomaly sensitivity controls, custom anomaly multipliers, custom anomaly floors, or per-member Spend Alert policy.
 5. Cost Insights dashboard MUST show read-only recent spend evidence even when Spend Alerts are disabled.
-6. Cost Insights dashboard default evidence MUST show a 24-hour spend summary and 7-day hourly chart.
+6. Cost Insights dashboard default evidence MUST show a 24-hour spend summary and 7-day spend chart.
 7. Cost Insights dashboard MUST support preset evidence ranges: current UTC hour, 24h, 7d, 30d, and 90d.
 8. Selecting current UTC hour MUST update both spend-over-time evidence and top spend drivers to the current partial UTC-hour bucket.
 

@@ -3,6 +3,7 @@ import {
   formatCostInsightElapsedWindow,
   formatCostInsightHourWindow,
   formatSpendEvidenceTime,
+  niceCeil,
   spendBarHeightPercent,
   spendRangePeriodLabel,
 } from './formatting';
@@ -14,6 +15,15 @@ describe('Cost Insights formatting', () => {
 
   it('keeps a visible minimum for nonzero chart buckets', () => {
     expect(spendBarHeightPercent(0.1, 100)).toBe(2);
+  });
+
+  it('rounds spend axis maxima up to readable 1/2/5 bounds', () => {
+    expect(niceCeil(0)).toBe(0);
+    expect(niceCeil(160.96)).toBe(200);
+    expect(niceCeil(127.08)).toBe(200);
+    expect(niceCeil(95)).toBe(100);
+    expect(niceCeil(1.65)).toBe(2);
+    expect(niceCeil(0.57)).toBe(1);
   });
 
   it('labels every selectable spend period', () => {
@@ -44,10 +54,10 @@ describe('Cost Insights formatting', () => {
 
   it('formats evidence labels in the requested time zone', () => {
     expect(formatSpendEvidenceTime('2026-06-26T08:00:00.000Z', '24h', 'America/New_York')).toBe(
-      '04'
+      '04:00'
     );
     expect(formatSpendEvidenceTime('2026-06-26T08:00:00.000Z', '7d', 'America/New_York')).toBe(
-      'Jun 26, 04'
+      'Jun 26'
     );
     expect(formatSpendEvidenceTime('2026-06-26T00:00:00.000Z', '30d', 'America/Los_Angeles')).toBe(
       'Jun 25'

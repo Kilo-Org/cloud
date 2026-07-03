@@ -56,7 +56,14 @@ const sourceDisplay = {
   other: 'Other',
 } satisfies Record<OwnerTopSpendDriver['source'], string>;
 
+const aiGatewayTransportFeatureKeys = new Set(['chat_completions', 'messages', 'responses']);
+
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+type DriverDisplayInput = Pick<
+  OwnerTopSpendDriver,
+  'source' | 'productKey' | 'featureKey' | 'modelOrPlanKey' | 'providerKey'
+>;
 
 const thresholdAlertPresentation = {
   threshold: {
@@ -94,7 +101,8 @@ function money(microdollars: number | null): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    maximumFractionDigits: microdollars >= 100_000_000 ? 0 : 2,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(microdollarsToUsd(microdollars));
 }
 
@@ -127,22 +135,46 @@ function sentenceLabel(value: string): string {
     .join(' ');
 }
 
-function formatHourLabel(timestamp: string, range: SpendRange): string {
-  const date = new Date(timestamp);
-  if (range === '1h' || range === '24h') {
-    return new Intl.DateTimeFormat('en-US', {
-      hour: '2-digit',
-      hourCycle: 'h23',
-      timeZone: 'UTC',
-    }).format(date);
+function shouldShowDriverFeature(
+  source: OwnerTopSpendDriver['source'],
+  featureKey: string
+): boolean {
+  if (featureKey === 'other') return false;
+  if (source === 'kiloclaw' && (featureKey === 'enrollment' || featureKey === 'renewal')) {
+    return false;
   }
+  return source !== 'ai_gateway' || !aiGatewayTransportFeatureKeys.has(featureKey);
+}
+
+function driverPrimaryLabel(source: OwnerTopSpendDriver['source'], productKey: string): string {
+  if (
+    source === 'kiloclaw' &&
+    (productKey === 'kiloclaw-hosting' || productKey === 'kiloclaw_hosting')
+  ) {
+    return 'KiloClaw subscription';
+  }
+  return productKey !== 'other' ? sentenceLabel(productKey) : sourceDisplay[source];
+}
+
+function driverModelOrProvider(driver: DriverDisplayInput): string | undefined {
+  if (driver.modelOrPlanKey !== 'other') return driver.modelOrPlanKey;
+  return driver.providerKey !== 'other' ? driver.providerKey : undefined;
+}
+
+function driverModelOrProviderLabel(
+  driver: DriverDisplayInput
+): SpendDriver['modelOrProviderLabel'] | undefined {
+  if (!driverModelOrProvider(driver)) return undefined;
+  if (driver.modelOrPlanKey === 'other') return 'Provider';
+  return driver.source === 'ai_gateway' ? 'Model' : 'Plan';
+}
+
+function formatHourLabel(timestamp: string): string {
   return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
     hour: '2-digit',
     hourCycle: 'h23',
     timeZone: 'UTC',
-  }).format(date);
+  }).format(new Date(timestamp));
 }
 
 function formatDayLabel(timestamp: string): string {
@@ -227,10 +259,10 @@ export function formatSpendEvidence(
   points: OwnerHourlySpend[],
   range: SpendRange
 ): SpendEvidencePoint[] {
-  if (range === '1h' || range === '24h' || range === '7d') {
+  if (range === '1h' || range === '24h') {
     return points.map(point => {
       const common = {
-        label: formatHourLabel(point.hourStart, range),
+        label: formatHourLabel(point.hourStart),
         periodStart: normalizeCostInsightTimestamp(point.hourStart),
         periodEndExclusive: addHours(normalizeCostInsightTimestamp(point.hourStart), 1),
         coveredHours: point.isCovered ? 1 : 0,
@@ -255,7 +287,7 @@ export function formatSpendEvidence(
   }
 
   const days = groupByUtcDay(points);
-  if (range === '30d') {
+  if (range === '7d' || range === '30d') {
     return days.map(presentEvidenceBucket);
   }
 
@@ -358,17 +390,12 @@ function mapDrivers(
   actorLabels: Map<string, string>
 ): SpendDriver[] {
   return drivers.map(driver => {
-    const primaryLabel =
-      driver.productKey !== 'other'
-        ? sentenceLabel(driver.productKey)
-        : sourceDisplay[driver.source];
-    const featureLabel = driver.featureKey !== 'other' ? sentenceLabel(driver.featureKey) : null;
-    const modelOrProvider =
-      driver.modelOrPlanKey !== 'other'
-        ? driver.modelOrPlanKey
-        : driver.providerKey !== 'other'
-          ? driver.providerKey
-          : undefined;
+    const primaryLabel = driverPrimaryLabel(driver.source, driver.productKey);
+    const featureLabel = shouldShowDriverFeature(driver.source, driver.featureKey)
+      ? sentenceLabel(driver.featureKey)
+      : null;
+    const modelOrProvider = driverModelOrProvider(driver);
+    const modelOrProviderLabel = modelOrProvider ? driverModelOrProviderLabel(driver) : undefined;
     return {
       id: JSON.stringify([
         driver.category,
@@ -386,6 +413,7 @@ function mapDrivers(
           ? (actorLabels.get(driver.actorUserId) ?? 'Deleted member')
           : undefined,
       modelOrProvider,
+      ...(modelOrProviderLabel ? { modelOrProviderLabel } : {}),
       category: driver.category === 'variable' ? 'Variable Credit spend' : 'Scheduled Credit spend',
       spendUsd: microdollarsToUsd(driver.totalMicrodollars),
       requestCount: driver.spendRecordCount,
@@ -641,17 +669,12 @@ function mapSnapshotDrivers(
   actorLabels: ReadonlyMap<string, string>
 ): SpendDriver[] {
   return drivers.map(driver => {
-    const primaryLabel =
-      driver.productKey !== 'other'
-        ? sentenceLabel(driver.productKey)
-        : sourceDisplay[driver.source];
-    const featureLabel = driver.featureKey !== 'other' ? sentenceLabel(driver.featureKey) : null;
-    const modelOrProvider =
-      driver.modelOrPlanKey !== 'other'
-        ? driver.modelOrPlanKey
-        : driver.providerKey !== 'other'
-          ? driver.providerKey
-          : undefined;
+    const primaryLabel = driverPrimaryLabel(driver.source, driver.productKey);
+    const featureLabel = shouldShowDriverFeature(driver.source, driver.featureKey)
+      ? sentenceLabel(driver.featureKey)
+      : null;
+    const modelOrProvider = driverModelOrProvider(driver);
+    const modelOrProviderLabel = modelOrProvider ? driverModelOrProviderLabel(driver) : undefined;
     return {
       id: JSON.stringify([
         driver.spendCategory,
@@ -669,6 +692,7 @@ function mapSnapshotDrivers(
           ? (actorLabels.get(driver.actorUserId) ?? 'Deleted member')
           : undefined,
       modelOrProvider,
+      ...(modelOrProviderLabel ? { modelOrProviderLabel } : {}),
       category:
         driver.spendCategory === 'variable' ? 'Variable Credit spend' : 'Scheduled Credit spend',
       spendUsd: microdollarsToUsd(driver.totalMicrodollars),

@@ -123,10 +123,11 @@ describe('Cost Insights presenter', () => {
           drivers: [
             {
               id: '["variable","ai_gateway","cli","messages","claude-sonnet-4","anthropic",null]',
-              label: 'CLI: Messages',
+              label: 'CLI',
               source: 'ai_gateway',
               actorLabel: undefined,
               modelOrProvider: 'claude-sonnet-4',
+              modelOrProviderLabel: 'Model',
               category: 'Variable Credit spend',
               spendUsd: 74.2,
               requestCount: 184,
@@ -155,10 +156,11 @@ describe('Cost Insights presenter', () => {
           drivers: [
             {
               id: '["scheduled","kiloclaw","kiloclaw_hosting","renewal","standard","other",null]',
-              label: 'Kiloclaw Hosting: Renewal',
+              label: 'KiloClaw subscription',
               source: 'kiloclaw',
               actorLabel: undefined,
               modelOrProvider: 'standard',
+              modelOrProviderLabel: 'Plan',
               category: 'Scheduled Credit spend',
               spendUsd: 63.9,
               requestCount: 1,
@@ -361,6 +363,7 @@ describe('Cost Insights presenter', () => {
     );
 
     expect(event?.occurredAt).toBe('2026-06-25T19:02:00.000Z');
+    expect(event?.amountLabel).toBe('$25.00');
     expect(event?.topDrivers).toEqual([
       {
         id: '["variable","ai_gateway","kilo_code","chat","claude-sonnet-4","anthropic","member-1"]',
@@ -368,11 +371,68 @@ describe('Cost Insights presenter', () => {
         source: 'ai_gateway',
         actorLabel: 'Current Member',
         modelOrProvider: 'claude-sonnet-4',
+        modelOrProviderLabel: 'Model',
         category: 'Variable Credit spend',
         spendUsd: 12.5,
         requestCount: 4,
       },
     ]);
+  });
+
+  it('omits implementation detail dimensions from contributor labels', () => {
+    const events = [
+      {
+        id: 'event-threshold',
+        eventType: 'threshold_crossed',
+        alertKind: 'threshold',
+        suggestionKind: null,
+        actorUserId: null,
+        actorName: null,
+        title: 'Spend Threshold Alert',
+        description: 'Rolling spend crossed the threshold.',
+        snapshot: {
+          rolling24HourMicrodollars: 25_000_000,
+          topDrivers: [
+            {
+              spendCategory: 'variable',
+              source: 'ai_gateway',
+              productKey: 'cloud_agent',
+              featureKey: 'responses',
+              modelOrPlanKey: 'openai/gpt-4.1',
+              providerKey: 'openai',
+              actorUserId: 'member-1',
+              totalMicrodollars: 12_500_000,
+              spendRecordCount: 4,
+            },
+            {
+              spendCategory: 'scheduled',
+              source: 'kiloclaw',
+              productKey: 'kiloclaw_hosting',
+              featureKey: 'renewal',
+              modelOrPlanKey: 'standard',
+              providerKey: 'other',
+              actorUserId: 'member-1',
+              totalMicrodollars: 10_000_000,
+              spendRecordCount: 1,
+            },
+          ],
+        },
+        occurredAt: '2026-06-25T19:02:00.000Z',
+      },
+    ] as Parameters<typeof formatCostInsightEvents>[1];
+
+    const [event] = formatCostInsightEvents(
+      { type: 'organization', id: 'organization-1' },
+      events,
+      new Map([['member-1', 'Current Member']])
+    );
+
+    expect(event?.topDrivers?.map(driver => driver.label)).toEqual([
+      'Cloud Agent',
+      'KiloClaw subscription',
+    ]);
+    expect(event?.topDrivers?.at(1)?.modelOrProvider).toBe('standard');
+    expect(event?.topDrivers?.at(1)?.modelOrProviderLabel).toBe('Plan');
   });
 
   it('preserves uncovered hourly evidence as unavailable instead of zero spend', () => {
@@ -502,6 +562,39 @@ describe('Cost Insights presenter', () => {
         scheduledUsd: 2,
       },
     ]);
+  });
+
+  it('aggregates 7-day evidence into daily buckets instead of hourly bars', () => {
+    const points = Array.from({ length: 26 }, (_, index) => ({
+      hourStart: new Date(Date.UTC(2026, 5, 25, index)).toISOString(),
+      variableMicrodollars: 1_000_000,
+      scheduledMicrodollars: 0,
+      totalMicrodollars: 1_000_000,
+      variableRecordCount: 1,
+      scheduledRecordCount: 0,
+      isCovered: true,
+    }));
+
+    const buckets = formatSpendEvidence(points, '7d');
+
+    expect(buckets).toHaveLength(2);
+    expect(buckets[0]).toMatchObject({
+      label: 'Jun 25',
+      periodStart: '2026-06-25T00:00:00.000Z',
+      coverage: 'complete',
+      coveredHours: 24,
+      totalHours: 24,
+      variableUsd: 24,
+      scheduledUsd: 0,
+    });
+    expect(buckets[1]).toMatchObject({
+      label: 'Jun 26',
+      periodStart: '2026-06-26T00:00:00.000Z',
+      coverage: 'complete',
+      coveredHours: 2,
+      totalHours: 2,
+      variableUsd: 2,
+    });
   });
 
   it('normalizes production-shaped Postgres timestamps at the presentation boundary', () => {

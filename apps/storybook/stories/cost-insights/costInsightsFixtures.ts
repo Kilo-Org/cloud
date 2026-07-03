@@ -161,13 +161,13 @@ export const evidenceAnomaly = completeSpendEvidence(
 );
 
 export const evidence7d = completeSpendEvidence(
-  Array.from({ length: 168 }, (_, index) => ({
-    label: `Hour ${index + 1}`,
-    variableUsd: index % 19 === 0 ? 0 : 3 + ((index * 13) % 47),
-    scheduledUsd: index % 72 === 24 ? 12 : 0,
+  Array.from({ length: 7 }, (_, index) => ({
+    label: `Day ${index + 1}`,
+    variableUsd: 12 + ((index * 17) % 39),
+    scheduledUsd: index === 4 ? 12 : 0,
     anomalyThresholdUsd: 48,
   })),
-  { start: '2026-06-19T10:00:00.000Z', periodHours: 1 }
+  { start: '2026-06-20T00:00:00.000Z', periodHours: 24 }
 );
 
 export const evidence30d = completeSpendEvidence(
@@ -203,6 +203,7 @@ export const personalDrivers: SpendDriver[] = [
     label: 'KiloClaw instance runtime',
     source: 'kiloclaw',
     modelOrProvider: 'openclaw-standard',
+    modelOrProviderLabel: 'Plan',
     category: 'Scheduled Credit spend',
     spendUsd: 12,
     requestCount: 1,
@@ -266,6 +267,7 @@ export const organizationDrivers: SpendDriver[] = [
     source: 'kiloclaw',
     actorLabel: 'Noah Williams',
     modelOrProvider: 'openclaw-large',
+    modelOrProviderLabel: 'Plan',
     category: 'Scheduled Credit spend',
     spendUsd: 72,
     requestCount: 3,

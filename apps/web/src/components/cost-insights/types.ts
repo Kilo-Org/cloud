@@ -46,6 +46,7 @@ export type SpendDriver = {
   source: 'ai_gateway' | 'kiloclaw' | 'coding_plan' | 'other';
   actorLabel?: string;
   modelOrProvider?: string;
+  modelOrProviderLabel?: 'Model' | 'Plan' | 'Provider';
   category: 'Variable Credit spend' | 'Scheduled Credit spend';
   spendUsd: number;
   requestCount: number;

@@ -166,6 +166,10 @@ export function ChatComposer({
           <Pressable
             onPress={handleStop}
             disabled={disabled}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Stop generating"
+            accessibilityState={{ disabled }}
             className="h-8 w-8 items-center justify-center rounded-full bg-neutral-400 active:opacity-70 dark:bg-neutral-500"
           >
             <Square size={14} color="white" fill="white" />
@@ -174,6 +178,10 @@ export function ChatComposer({
           <Pressable
             onPress={handleSend}
             disabled={!canSend}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            accessibilityState={{ disabled: !canSend }}
             className={`h-8 w-8 items-center justify-center rounded-full active:opacity-70 ${
               canSend ? 'bg-accent-soft' : 'bg-muted'
             }`}

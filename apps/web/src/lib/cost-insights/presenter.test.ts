@@ -636,7 +636,7 @@ describe('Cost Insights presenter', () => {
         ...base,
         uiOwner: { type: 'organization', name: 'Org', authorizedRole: 'admin' },
       })
-    ).toBe('/organizations/organization-1');
+    ).toBeUndefined();
     expect(
       organizationMemberLimitsHref({
         ...base,

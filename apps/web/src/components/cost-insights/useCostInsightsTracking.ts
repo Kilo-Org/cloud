@@ -17,10 +17,10 @@ export function useCostInsightsTracking(organizationId?: string) {
   const { mutate: trackOrganizationInteraction } = useMutation(
     trpc.organizations.costInsights.trackUiInteraction.mutationOptions()
   );
-  const { mutate: trackPersonalSuggestionCta } = useMutation(
+  const { mutateAsync: trackPersonalSuggestionCta } = useMutation(
     trpc.costInsights.trackSuggestionCta.mutationOptions()
   );
-  const { mutate: trackOrganizationSuggestionCta } = useMutation(
+  const { mutateAsync: trackOrganizationSuggestionCta } = useMutation(
     trpc.organizations.costInsights.trackSuggestionCta.mutationOptions()
   );
 
@@ -36,12 +36,12 @@ export function useCostInsightsTracking(organizationId?: string) {
   );
 
   const trackSuggestionCta = useCallback(
-    (suggestion: CostInsightsSuggestionCta) => {
+    async (suggestion: CostInsightsSuggestionCta) => {
       if (organizationId) {
-        trackOrganizationSuggestionCta({ organizationId, ...suggestion });
+        await trackOrganizationSuggestionCta({ organizationId, ...suggestion });
         return;
       }
-      trackPersonalSuggestionCta(suggestion);
+      await trackPersonalSuggestionCta(suggestion);
     },
     [organizationId, trackOrganizationSuggestionCta, trackPersonalSuggestionCta]
   );

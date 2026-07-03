@@ -36,6 +36,8 @@ export function SpendEvidenceCard({
   const totals = evidence.map(point => point.variableUsd + point.scheduledUsd);
   const axisMax = niceCeil(Math.max(0, ...totals));
   const hasSpend = axisMax > 0;
+  const hasIncompleteEvidence = evidence.some(point => point.coverage !== 'complete');
+  const shouldRenderChart = hasSpend || hasIncompleteEvidence;
   const rangeLabel = {
     '1h': 'This hour',
     '24h': 'Last 24 hours',
@@ -50,7 +52,6 @@ export function SpendEvidenceCard({
       const currentTotal = currentHighest.variableUsd + currentHighest.scheduledUsd;
       return point.variableUsd + point.scheduledUsd > currentTotal ? point : currentHighest;
     }, undefined);
-  const hasIncompleteEvidence = evidence.some(point => point.coverage !== 'complete');
   const completeTotal = hasIncompleteEvidence
     ? null
     : totals.reduce((sum, value) => sum + value, 0);
@@ -111,7 +112,7 @@ export function SpendEvidenceCard({
             Use Left and Right Arrow keys to inspect each period. Use Home and End to jump to the
             first or last period.
           </p>
-          {hasSpend ? (
+          {shouldRenderChart ? (
             <div className="border-border bg-surface-inset rounded-lg border p-4">
               <fieldset
                 aria-describedby={chartInstructionsId}

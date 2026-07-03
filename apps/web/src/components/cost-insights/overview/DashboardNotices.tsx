@@ -376,7 +376,24 @@ export function SuggestionCard({
         {canManage && (
           <div className="flex flex-col gap-2 sm:flex-row lg:w-52 lg:flex-col">
             <Button asChild className="min-h-control-touch w-full sm:min-h-0">
-              <a href={suggestion.ctaHref} onClick={onCta}>
+              <a
+                href={suggestion.ctaHref}
+                onClick={event => {
+                  if (!onCta) return;
+                  if (
+                    event.defaultPrevented ||
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  ) {
+                    return;
+                  }
+                  event.preventDefault();
+                  void onCta();
+                }}
+              >
                 {suggestion.ctaLabel}
                 <ArrowRight className="size-4" aria-hidden="true" />
               </a>

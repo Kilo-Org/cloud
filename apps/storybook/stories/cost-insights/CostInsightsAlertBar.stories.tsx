@@ -9,6 +9,7 @@ const meta = {
   args: {
     owner: organizationOwner,
     alertCount: 2,
+    reviewHref: '/organizations/4f2fc143-4b30-4c8a-878b-df89c89c6790/cost-insights',
   },
   decorators: [
     Story => (

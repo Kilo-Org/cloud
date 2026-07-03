@@ -255,7 +255,7 @@ function ThresholdOption({
           <p className="type-label text-muted-foreground mt-1">{description}</p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor={inputId}>Threshold amount (USD)</Label>
+          <Label htmlFor={inputId}>{title} amount (USD)</Label>
           <div className="relative">
             <span
               className="type-body text-muted-foreground absolute inset-y-0 left-3 flex items-center"

@@ -68,7 +68,9 @@ export function CostInsightsDashboardView({
   ) => void;
   onAlertDriversExpanded?: (alertKind: CostInsightsDashboardData['alerts'][number]['type']) => void;
   onSpendRangeChange?: (range: SpendRange) => void;
-  onSuggestionCta?: (suggestion: CostInsightsDashboardData['suggestions'][number]) => void;
+  onSuggestionCta?: (
+    suggestion: CostInsightsDashboardData['suggestions'][number]
+  ) => void | Promise<void>;
   onSuggestionDismiss?: (suggestionId: string) => void;
 }) {
   const [selectedRange, setSelectedRange] = useState<SpendRange>();

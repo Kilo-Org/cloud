@@ -5,14 +5,12 @@ import type { CostInsightsOwner } from '../types';
 export function CostInsightsAlertBar({
   owner,
   alertCount,
+  reviewHref,
 }: {
   owner: CostInsightsOwner;
   alertCount: number;
+  reviewHref: string;
 }) {
-  const reviewHref =
-    owner.type === 'organization'
-      ? '/organizations/acme-cost-insights/cost-insights'
-      : '/cost-insights';
   const alertLabel =
     alertCount === 1 ? 'Spend Alert needs review' : `${alertCount} Spend Alerts need review`;
 

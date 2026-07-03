@@ -356,7 +356,7 @@ export function organizationMemberLimitsHref(params: {
   if (
     params.owner.type !== 'organization' ||
     params.uiOwner.type !== 'organization' ||
-    (params.uiOwner.authorizedRole !== 'owner' && params.uiOwner.authorizedRole !== 'admin') ||
+    params.uiOwner.authorizedRole !== 'owner' ||
     params.plan !== 'enterprise' ||
     !params.usageLimitsEnabled
   ) {

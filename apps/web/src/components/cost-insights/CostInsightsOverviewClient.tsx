@@ -182,8 +182,12 @@ export function CostInsightsOverviewClient({
     personalDismissMutation.mutate({ suggestionId });
   };
 
-  const handleSuggestionCta = (suggestion: CostSuggestion) => {
-    trackSuggestionCta({ suggestionKind: suggestion.type });
+  const handleSuggestionCta = async (suggestion: CostSuggestion) => {
+    await Promise.race([
+      trackSuggestionCta({ suggestionKind: suggestion.type }).catch(() => undefined),
+      new Promise(resolve => window.setTimeout(resolve, 500)),
+    ]);
+    router.push(suggestion.ctaHref);
   };
 
   const handleSpendRangeChange = (range: SpendRange) => {

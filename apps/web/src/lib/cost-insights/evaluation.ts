@@ -181,7 +181,10 @@ async function maybeCreateAnomalyAlert(params: {
   }
 
   const dashboardState = await getCostInsightDashboardState(params.database, params.owner);
-  if (dashboardState.state?.activeAnomalyHourStart === params.hourStart) {
+  if (
+    dashboardState.state?.activeAnomalyHourStart &&
+    new Date(dashboardState.state.activeAnomalyHourStart).toISOString() === params.hourStart
+  ) {
     return false;
   }
 

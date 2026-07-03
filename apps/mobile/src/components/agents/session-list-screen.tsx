@@ -20,7 +20,11 @@ import {
 } from '@/components/agents/session-list-helpers';
 import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
-import { useAgentSessions, useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
+import {
+  useAgentSessions,
+  useAgentSessionSearch,
+  useRecentAgentRepositories,
+} from '@/lib/hooks/use-agent-sessions';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
@@ -80,12 +84,23 @@ export function AgentSessionListScreen() {
     activeSessionIds,
     isLoading,
     isError,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
     refetch,
   } = useAgentSessions({
     createdOnPlatform,
     gitUrl,
     organizationId,
     enabled: ready,
+  });
+  const isSearching = searchQuery.length > 0;
+  const search = useAgentSessionSearch({
+    searchQuery,
+    createdOnPlatform,
+    gitUrl,
+    organizationId,
+    enabled: ready && isSearching,
   });
   const { data: recentRepositories } = useRecentAgentRepositories({
     organizationId,
@@ -158,15 +173,15 @@ export function AgentSessionListScreen() {
       });
     }
 
-    for (const group of dateGroups) {
-      const filteredSessions = searchQuery
-        ? group.sessions.filter(s => matchesSearch(searchQuery, s.title, s.git_url))
-        : group.sessions;
-
-      if (filteredSessions.length > 0) {
+    // Stored sessions are cursor-paginated, so a client-side filter would only
+    // see the loaded pages. When a query is active, use the server search
+    // results (which cover the full history) instead.
+    const storedGroups = searchQuery ? search.dateGroups : dateGroups;
+    for (const group of storedGroups) {
+      if (group.sessions.length > 0) {
         result.push({
           title: group.label,
-          data: filteredSessions.map(
+          data: group.sessions.map(
             (session): StoredSessionItem => ({
               kind: 'stored',
               session,
@@ -178,7 +193,15 @@ export function AgentSessionListScreen() {
     }
 
     return result;
-  }, [activeSessionIds, activeSessions, dateGroups, projectFilter, searchQuery, storedSessions]);
+  }, [
+    activeSessionIds,
+    activeSessions,
+    dateGroups,
+    projectFilter,
+    search.dateGroups,
+    searchQuery,
+    storedSessions,
+  ]);
 
   const navigateToSession = useCallback(
     (sessionId: string, sessionOrgId?: string | null) => {
@@ -189,6 +212,12 @@ export function AgentSessionListScreen() {
     },
     [router]
   );
+
+  const handleEndReached = useCallback(() => {
+    if (!isSearching && hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, isSearching]);
 
   const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
 
@@ -244,9 +273,11 @@ export function AgentSessionListScreen() {
           sections={sections}
           storedSessions={storedSessions}
           hasAnySessions={storedSessions.length > 0 || activeSessions.length > 0}
-          isLoading={isLoading || !ready}
-          isError={isError}
+          isLoading={isLoading || !ready || (isSearching && search.isPending)}
+          isError={isError || (isSearching && search.isError)}
+          isFetchingNextPage={isFetchingNextPage}
           refetch={refetch}
+          onEndReached={handleEndReached}
           onSessionPress={navigateToSession}
           onSearchChange={handleSearchChange}
           onCreateSession={() => {

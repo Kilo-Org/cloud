@@ -11,6 +11,7 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { useConfirm } from '@/components/ui/confirm';
 import { Shield, Loader2, CheckCircle, Edit, X, Trash2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -239,16 +240,20 @@ export function OrganizationWorkOSCard({ organizationId }: OrganizationWorkOSCar
   } = useOrganizationSSOConfig(organizationId);
   const createConfig = useCreateSSOConfig();
   const deleteConfig = useDeleteSSOConfig();
+  const confirm = useConfirm();
 
   const handleEnrollInWorkOS = () => {
     createConfig.mutate({ organizationId });
   };
 
-  const handleDeleteSSO = () => {
+  const handleDeleteSSO = async () => {
     if (
-      confirm(
-        'Are you sure you want to delete the SSO configuration? This action cannot be undone.'
-      )
+      await confirm({
+        title: 'Delete the SSO configuration?',
+        description: 'This permanently removes the WorkOS SSO configuration and cannot be undone.',
+        confirmLabel: 'Delete configuration',
+        destructive: true,
+      })
     ) {
       deleteConfig.mutate({ organizationId });
     }

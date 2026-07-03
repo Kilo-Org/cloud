@@ -27,6 +27,7 @@ import {
   getPlatformOAuthCallbackPath,
   getPlatformOAuthConnectPath,
 } from '@/lib/integrations/oauth/paths';
+import { useConfirm } from '@/components/ui/confirm';
 
 type GitLabIntegrationDetailsProps = {
   organizationId?: string;
@@ -87,6 +88,7 @@ export function GitLabIntegrationDetails({
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const validationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const patValidationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const gitLabOAuthCallbackPath = getPlatformOAuthCallbackPath(PLATFORM.GITLAB);
@@ -341,8 +343,15 @@ export function GitLabIntegrationDetails({
     window.location.href = queryString ? `${basePath}?${queryString}` : basePath;
   };
 
-  const handleDisconnect = () => {
-    if (confirm('Are you sure you want to disconnect GitLab?')) {
+  const handleDisconnect = async () => {
+    if (
+      await confirm({
+        title: 'Disconnect GitLab?',
+        description: 'Kilo will lose access to your GitLab projects and stop running workflows.',
+        confirmLabel: 'Disconnect',
+        destructive: true,
+      })
+    ) {
       disconnectMutation.mutate(input, {
         onSuccess: () => {
           toast.success('GitLab disconnected');

@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useConfirm } from '@/components/ui/confirm';
 import {
   Select,
   SelectContent,
@@ -212,6 +213,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const confirm = useConfirm();
 
   // Build query options - only include organizationId if provided
   const listQueryInput = organizationId ? { organizationId } : {};
@@ -371,12 +373,19 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (keyId: string, providerName: string) => {
+  const handleDelete = async (keyId: string, providerName: string) => {
     if (isInstalledCodingPlanKey(keyId)) {
       setInstalledKeyWarningAction({ type: 'delete', keyId });
       return;
     }
-    if (confirm(`Are you sure you want to delete the API key for ${providerName}?`)) {
+    if (
+      await confirm({
+        title: `Delete the ${providerName} API key?`,
+        description: 'This key will be removed and can no longer be used for requests.',
+        confirmLabel: 'Delete key',
+        destructive: true,
+      })
+    ) {
       deleteMutation.mutate({ ...(organizationId && { organizationId }), id: keyId });
     }
   };

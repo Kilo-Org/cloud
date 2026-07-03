@@ -4,10 +4,12 @@ import {
   kilocode_users,
   organizations,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { eq, and, isNull, isNotNull, inArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { sentryLogger } from '@/lib/utils.server';
+
+type DbOrTx = typeof db | DrizzleTransaction;
 
 export type ExpiringTransaction = Pick<
   CreditTransaction,
@@ -253,7 +255,7 @@ export function computeNextExpirationAmount(
 
 export async function fetchExpiringTransactionsForOrganization(
   organizationId: string,
-  fromDb: typeof db = db
+  fromDb: DbOrTx = db
 ) {
   const expiredCredits = alias(creditTransactionsTable, 'expired_credits');
 
@@ -284,6 +286,60 @@ export async function fetchExpiringTransactionsForOrganization(
         isNull(expiredCredits.id)
       )
     );
+}
+
+/**
+ * Closes out every still-open (unprocessed) expiring credit grant for an
+ * organization, inserting `credits_expired` entries for any unclaimed portion.
+ *
+ * Without this, an admin who nullifies an organization's credits and later
+ * re-grants credits with a different expiration date leaves the original
+ * grant's row untouched: it still has its original `expiry_date` and no
+ * matching `credits_expired` entry, so every downstream "credits expiring
+ * soon" computation (the org Balance page's `getCreditBlocks`, and the admin
+ * panel's `computeNextExpirationAmount`) keeps counting it, on top of the new
+ * grant, forever inflating the total.
+ *
+ * Must be called inside the same transaction that also nullifies/adjusts the
+ * organization's balance, so the closure is atomic with that change.
+ *
+ * Returns the total microdollars closed out (negative, or 0 if nothing was open).
+ */
+export async function closeOutExpiringOrganizationCredits(
+  organizationId: string,
+  microdollars_used: number,
+  tx: DrizzleTransaction
+): Promise<number> {
+  const openTransactions = await fetchExpiringTransactionsForOrganization(organizationId, tx);
+  if (openTransactions.length === 0) return 0;
+
+  // Use a far-future "now" so every still-open grant is treated as expired
+  // right away, regardless of its actual expiry_date.
+  const forceExpireAt = new Date('9999-01-01T00:00:00.000Z');
+  const expirationResult = computeExpiration(
+    openTransactions,
+    { id: organizationId, microdollars_used },
+    forceExpireAt,
+    'system'
+  );
+
+  if (expirationResult.newTransactions.length) {
+    await tx.insert(creditTransactionsTable).values(
+      expirationResult.newTransactions.map(t => ({
+        ...t,
+        organization_id: organizationId,
+      }))
+    );
+  }
+
+  for (const [transactionId, newBaseline] of expirationResult.newBaselines) {
+    await tx
+      .update(creditTransactionsTable)
+      .set({ expiration_baseline_microdollars_used: newBaseline })
+      .where(eq(creditTransactionsTable.id, transactionId));
+  }
+
+  return expirationResult.newTransactions.reduce((sum, t) => sum + (t.amount_microdollars ?? 0), 0);
 }
 
 type OrganizationForExpiration = {

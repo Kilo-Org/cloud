@@ -315,12 +315,17 @@ function DailyChart({ data }: { data: DailyChartData[] }) {
 
 // --- Dev Nuke All Button ---
 
-function DevNukeAllButton() {
-  if (process.env.NODE_ENV !== 'development') return null;
+type NukeResult = {
+  destroyed: number;
+  total: number;
+  errors: { userId: string; error: string }[];
+};
 
+function DevNukeAllButton() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [result, setResult] = useState<NukeResult | null>(null);
 
   const nukeAll = useMutation(
     trpc.admin.kiloclawInstances.devNukeAll.mutationOptions({
@@ -331,14 +336,12 @@ function DevNukeAllButton() {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.stats.queryKey(),
         });
-        const errorSuffix =
-          data.errors.length > 0
-            ? `\n${data.errors.length} failed:\n${data.errors.map(e => `  ${e.userId}: ${e.error}`).join('\n')}`
-            : '';
-        alert(`Destroyed ${data.destroyed}/${data.total} instances${errorSuffix}`);
+        setResult({ destroyed: data.destroyed, total: data.total, errors: data.errors });
       },
     })
   );
+
+  if (process.env.NODE_ENV !== 'development') return null;
 
   return (
     <>
@@ -366,6 +369,38 @@ function DevNukeAllButton() {
             >
               Nuke All
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Result summary — persistent so per-user failures stay readable. */}
+      <AlertDialog open={result !== null} onOpenChange={open => !open && setResult(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Destroyed {result?.destroyed ?? 0}/{result?.total ?? 0} instances
+            </AlertDialogTitle>
+            {result && result.errors.length > 0 ? (
+              <AlertDialogDescription>
+                {result.errors.length} failed to destroy.
+              </AlertDialogDescription>
+            ) : (
+              <AlertDialogDescription>All instances destroyed successfully.</AlertDialogDescription>
+            )}
+          </AlertDialogHeader>
+          {result && result.errors.length > 0 && (
+            <div className="max-h-64 overflow-y-auto rounded-md border border-border bg-surface-inset p-3">
+              <ul className="space-y-1 font-mono text-xs">
+                {result.errors.map(e => (
+                  <li key={e.userId}>
+                    <span className="text-muted-foreground">{e.userId}:</span> {e.error}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setResult(null)}>Close</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

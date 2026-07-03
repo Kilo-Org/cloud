@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export function CreateKilocodeOrgButton() {
   const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +35,7 @@ export function CreateKilocodeOrgButton() {
       router.push(`/organizations/${data.organizationId}`);
     } catch (error) {
       console.error('Error creating organization:', error);
-      alert(
+      toast.error(
         error instanceof Error ? error.message : 'Failed to create organization. Please try again.'
       );
     } finally {

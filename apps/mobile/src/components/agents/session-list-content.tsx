@@ -1,6 +1,13 @@
 import { Bot, Plus, Search } from 'lucide-react-native';
 import { useCallback, useMemo } from 'react';
-import { Platform, RefreshControl, SectionList, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  RefreshControl,
+  SectionList,
+  TextInput,
+  View,
+} from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,7 +33,9 @@ type AgentSessionListContentProps = {
   hasAnySessions: boolean;
   isLoading: boolean;
   isError: boolean;
+  isFetchingNextPage: boolean;
   refetch: () => Promise<void>;
+  onEndReached: () => void;
   onSessionPress: (sessionId: string, organizationId?: string | null) => void;
   onSearchChange: (text: string) => void;
   onCreateSession: () => void;
@@ -38,7 +47,9 @@ export function AgentSessionListContent({
   hasAnySessions,
   isLoading,
   isError,
+  isFetchingNextPage,
   refetch,
+  onEndReached,
   onSessionPress,
   onSearchChange,
   onCreateSession,
@@ -46,7 +57,9 @@ export function AgentSessionListContent({
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { deleteSession, renameSession } = useSessionMutations();
-  const emptyStateContainerStyle = useMemo(
+  // The tab bar is an absolutely-positioned overlay, so scrollable content
+  // must clear it or the last rows are stuck underneath it.
+  const tabBarClearanceStyle = useMemo(
     () => ({ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS) }),
     [bottom]
   );
@@ -178,7 +191,7 @@ export function AgentSessionListContent({
       <Animated.View
         entering={FadeIn.duration(200)}
         className="flex-1 items-center justify-center"
-        style={emptyStateContainerStyle}
+        style={tabBarClearanceStyle}
       >
         <EmptyState
           icon={Bot}
@@ -199,8 +212,18 @@ export function AgentSessionListContent({
         keyExtractor={keyExtractor}
         ListHeaderComponent={listHeader}
         ListEmptyComponent={listEmptyComponent}
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <View className="py-4">
+              <ActivityIndicator color={colors.mutedForeground} />
+            </View>
+          ) : null
+        }
+        contentContainerStyle={tabBarClearanceStyle}
         contentOffset={{ x: 0, y: SEARCH_BAR_HEIGHT }}
         keyboardDismissMode="on-drag"
+        onEndReached={onEndReached}
+        onEndReachedThreshold={0.5}
         refreshControl={<RefreshControl refreshing={false} onRefresh={handleRefresh} />}
       />
     </Animated.View>

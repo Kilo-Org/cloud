@@ -140,6 +140,9 @@ export function getAiSdkProvider(
     // with 'openai' (Responses API) prompt caching doesn't work
     return 'openai-compatible';
   }
+  if (directProviderId === 'morph-byok') {
+    return 'openai-compatible';
+  }
   if (directProviderId === 'opencode-go' && (isMinimaxModel(model) || isQwenModel(model))) {
     return 'anthropic';
   }

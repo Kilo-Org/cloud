@@ -32,7 +32,6 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
-import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -83,8 +82,10 @@ export default function NewSessionScreen() {
   // ── Models ───────────────────────────────────────────────────────
   const { models } = useAvailableModels(organizationId);
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
-  const { setModel: persistLocalModel } = usePersistedAgentModel();
-  const autoSelected = useAutoSelectModel(models, organizationId);
+  const { selection: autoSelected, persistModel: persistLocalModel } = useAutoSelectModel(
+    models,
+    organizationId
+  );
 
   // Apply auto-selected model when the user hasn't picked one yet.
   const hasAppliedAutoSelection = useRef(false);

@@ -11,45 +11,42 @@ function pickVariant(model: ModelOption, preferredVariant: string | undefined): 
   return model.variants[0] ?? '';
 }
 
-function preferredVariantFor(args: {
-  serverMatch: ModelOption | undefined;
-  serverLastSelected: { variant?: string } | undefined | null;
-  localMatch: ModelOption | undefined;
-  localPersisted: { variant: string } | null;
-}): string | undefined {
-  if (args.serverMatch) {
-    return args.serverLastSelected?.variant;
-  }
-  if (args.localMatch) {
-    return args.localPersisted?.variant;
-  }
-  return undefined;
-}
+const NO_SELECTION = { model: '', variant: '' };
 
-export function useAutoSelectModel(
-  models: ModelOption[],
-  organizationId: string | undefined
-): { model: string; variant: string } {
-  const { lastSelected } = useModelPreferences(organizationId);
-  const { value: persistedModel, hasLoaded: persistedHasLoaded } = usePersistedAgentModel();
+export function useAutoSelectModel(models: ModelOption[], organizationId: string | undefined) {
+  const { lastSelected, isLoading } = useModelPreferences(organizationId);
+  const {
+    value: persistedModel,
+    hasLoaded: persistedHasLoaded,
+    setModel: persistModel,
+  } = usePersistedAgentModel();
   const chosenRef = useRef<{ model: string; variant: string } | null>(null);
 
-  if (!persistedHasLoaded || models.length === 0 || chosenRef.current) {
-    return chosenRef.current ?? { model: '', variant: '' };
+  if (chosenRef.current) {
+    return { selection: chosenRef.current, persistModel };
+  }
+  // Wait for the server preference too, or the shared value loses the race
+  // against the local cache on cold start and is never applied.
+  if (isLoading || !persistedHasLoaded || models.length === 0) {
+    return { selection: NO_SELECTION, persistModel };
   }
   const serverMatch = lastSelected ? models.find(m => m.id === lastSelected.model) : undefined;
   const localMatch = persistedModel ? models.find(m => m.id === persistedModel.modelId) : undefined;
-  const chosen = serverMatch ?? localMatch ?? models[0];
-  if (!chosen) {
-    return { model: '', variant: '' };
+  const fallback = models[0];
+  if (serverMatch) {
+    chosenRef.current = {
+      model: serverMatch.id,
+      variant: pickVariant(serverMatch, lastSelected?.variant),
+    };
+  } else if (localMatch) {
+    chosenRef.current = {
+      model: localMatch.id,
+      variant: pickVariant(localMatch, persistedModel?.variant),
+    };
+  } else if (fallback) {
+    chosenRef.current = { model: fallback.id, variant: pickVariant(fallback, undefined) };
+  } else {
+    return { selection: NO_SELECTION, persistModel };
   }
-  const preferredVariant = preferredVariantFor({
-    serverMatch,
-    serverLastSelected: lastSelected,
-    localMatch,
-    localPersisted: persistedModel,
-  });
-  const result = { model: chosen.id, variant: pickVariant(chosen, preferredVariant) };
-  chosenRef.current = result;
-  return result;
+  return { selection: chosenRef.current, persistModel };
 }

@@ -289,13 +289,16 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       if (newModel && newModel !== model) {
         setModel(newModel);
         setIsModelUserSelected(false);
-        // Restore the last-used variant for this model, otherwise fall back to the first
+        // Restore the server-synced variant when seeding the server's model,
+        // then the last-used variant, otherwise fall back to the first
         // available variant (typically "none").
+        const serverVariant =
+          newModel === serverLastSelected?.model ? serverLastSelected.variant : undefined;
         const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
         setVariant(
           getPreferredInitialVariant({
             availableVariants: newVariants,
-            lastUsedVariant: getLastUsedVariant(newModel, organizationId),
+            lastUsedVariant: serverVariant ?? getLastUsedVariant(newModel, organizationId),
           })
         );
       }
@@ -306,7 +309,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
     model,
     isModelUserSelected,
     organizationId,
-    serverLastSelected?.model,
+    serverLastSelected,
   ]);
 
   const handleModelChange = useCallback(

@@ -70,7 +70,12 @@ export function useDeviceAuth(): DeviceAuthResult {
             case 200: {
               const data = (await response.json()) as { token: string };
               cleanup();
-              WebBrowser.dismissAuthSession();
+              // dismissAuthSession closes the iOS ASWebAuthenticationSession sheet. On
+              // Android we open a plain custom tab (no auth session) and the native module
+              // has no dismissBrowser, so calling it there is at best a no-op and can throw.
+              if (Platform.OS !== 'android') {
+                WebBrowser.dismissAuthSession();
+              }
               setState(previous => ({
                 status: 'approved',
                 code,

@@ -186,7 +186,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   }),
   openAICompatibleFetcher({
     providerId: 'morph-byok',
-    label: 'Morph',
+    label: 'Morph BYOK',
     url: 'https://www.morphllm.com/api/models/json',
   }),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),

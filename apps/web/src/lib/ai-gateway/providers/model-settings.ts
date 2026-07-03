@@ -1,8 +1,4 @@
-import {
-  isClaudeModel,
-  isFableModel,
-  isOpusModel,
-} from '@/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isGemini3Model, isGemmaModel } from '@/lib/ai-gateway/providers/google';
 import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
@@ -52,20 +48,11 @@ export const REASONING_VARIANTS_NONE_HIGH_XHIGH = {
   xhigh: { reasoning: { enabled: true, effort: 'xhigh' } },
 } as const;
 
-const REASONING_VARIANTS_CLAUDE_BASE = {
+const REASONING_VARIANTS_CLAUDE = {
   none: { reasoning: { enabled: false, effort: 'none' } },
   low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
   medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
   high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-} as const;
-
-export const REASONING_VARIANTS_CLAUDE = {
-  ...REASONING_VARIANTS_CLAUDE_BASE,
-  max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
-} as const;
-
-export const REASONING_VARIANTS_OPUS = {
-  ...REASONING_VARIANTS_CLAUDE_BASE,
   xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
   max: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'max' },
 } as const;
@@ -81,9 +68,6 @@ export const REASONING_VARIANTS_INSTANT_LOW_MEDIUM_HIGH = {
 } as const;
 
 export function getModelVariants(model: string): OpenCodeSettings['variants'] {
-  if (isOpusModel(model) || isFableModel(model)) {
-    return REASONING_VARIANTS_OPUS;
-  }
   if (isClaudeModel(model)) {
     return REASONING_VARIANTS_CLAUDE;
   }

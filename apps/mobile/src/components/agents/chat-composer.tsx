@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { ArrowUp, Square } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { ArrowUp, Paperclip, Square } from 'lucide-react-native';
+import { useCallback, useRef, useState } from 'react';
 import {
   Keyboard,
   type LayoutChangeEvent,
@@ -10,11 +10,19 @@ import {
   View,
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { toast } from 'sonner-native';
 
+import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
+import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { useTextHeight } from '@/components/agents/use-text-height';
 import { BlurBar } from '@/components/ui/blur-bar';
+import {
+  type AgentAttachmentCandidate,
+  type AgentAttachmentWire,
+  useAgentAttachmentUpload,
+} from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -26,8 +34,10 @@ const TEXT_INPUT_MIN_HEIGHT = TEXT_INPUT_LINE_HEIGHT + TEXT_INPUT_VERTICAL_PADDI
 const TEXT_INPUT_MAX_HEIGHT =
   TEXT_INPUT_LINE_HEIGHT * TEXT_INPUT_MAX_LINES + TEXT_INPUT_VERTICAL_PADDING;
 
+const PAPERCLIP_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+
 type ChatComposerProps = {
-  onSend: (text: string) => void | Promise<void>;
+  onSend: (text: string, attachments?: AgentAttachmentWire) => void | Promise<void>;
   onStop?: () => void | Promise<void>;
   disabled?: boolean;
   isStreaming?: boolean;
@@ -38,6 +48,7 @@ type ChatComposerProps = {
   variant: string;
   modelOptions: ModelOption[];
   onModelSelect: (modelId: string, variant: string) => void;
+  organizationId?: string;
 };
 
 export function ChatComposer({
@@ -52,6 +63,7 @@ export function ChatComposer({
   variant,
   modelOptions,
   onModelSelect,
+  organizationId,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
   const textRef = useRef('');
@@ -59,6 +71,7 @@ export function ChatComposer({
   const [hasText, setHasText] = useState(false);
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
+  const upload = useAgentAttachmentUpload({ organizationId });
 
   const measure = useTextHeight({
     minHeight: TEXT_INPUT_MIN_HEIGHT,
@@ -69,8 +82,9 @@ export function ChatComposer({
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
   });
 
-  const canSend = hasText && !disabled && !isStreaming;
-  const showToolbar = isFocused || hasText;
+  const hasUploadedAttachments = upload.attachments.some(a => a.status === 'uploaded');
+  const canSend = (hasText || hasUploadedAttachments) && !disabled && !isStreaming;
+  const showToolbar = isFocused || hasText || upload.attachments.length > 0;
   const toolbarDisabled = disabled || isStreaming;
 
   function handleChangeText(value: string) {
@@ -81,16 +95,29 @@ export function ChatComposer({
 
   function handleSend() {
     const trimmed = textRef.current.trim();
-    if (!trimmed || !canSend) {
+    if (!canSend) {
+      return;
+    }
+    if (upload.isUploading) {
+      toast.error('Wait for attachments to finish uploading.');
+      return;
+    }
+    if (trimmed.startsWith('/') && upload.attachments.length > 0) {
+      toast.error('Attachments cannot be sent with slash commands.');
+      return;
+    }
+    if (!trimmed && !hasUploadedAttachments) {
       return;
     }
 
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    void onSend(trimmed);
+    const payload = upload.toWirePayload();
+    void onSend(trimmed, payload);
     textRef.current = '';
     setHasText(false);
     measure.reset();
     inputRef.current?.clear();
+    upload.reset();
     Keyboard.dismiss();
   }
 
@@ -103,6 +130,24 @@ export function ChatComposer({
     const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
     setInputWidth(current => (current === nextWidth ? current : nextWidth));
   }
+
+  const handleAddAttachment = useCallback(async () => {
+    const picked = await pickAgentAttachments();
+    const candidates: AgentAttachmentCandidate[] = picked.map(p => ({
+      name: p.name,
+      uri: p.uri,
+      mimeType: p.mimeType,
+      size: p.size,
+    }));
+    upload.addCandidates(candidates);
+  }, [upload]);
+
+  const handleRemoveAttachment = useCallback(
+    (id: string) => {
+      upload.removeAttachment(id);
+    },
+    [upload]
+  );
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,
@@ -134,7 +179,22 @@ export function ChatComposer({
         </Animated.View>
       ) : null}
 
+      <AttachmentPreviewStrip attachments={upload.attachments} onRemove={handleRemoveAttachment} />
+
       <View className="flex-row items-center p-2.5 px-3">
+        <Pressable
+          onPress={() => {
+            void handleAddAttachment();
+          }}
+          disabled={toolbarDisabled || upload.attachments.length >= 5}
+          hitSlop={PAPERCLIP_HIT_SLOP}
+          className="h-8 w-8 items-center justify-center rounded-full active:opacity-70"
+          accessibilityRole="button"
+          accessibilityLabel="Add attachment"
+        >
+          <Paperclip size={18} color={colors.mutedForeground} />
+        </Pressable>
+
         <View
           className="mx-2.5 flex-1 overflow-hidden rounded-[20px] border border-border bg-card"
           onLayout={handleInputLayout}

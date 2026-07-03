@@ -26,6 +26,8 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
@@ -76,6 +78,8 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const organizationId = fetchedData?.organizationId ?? undefined;
 
   const { models: modelOptions } = useAvailableModels(organizationId);
+  const { saveModel: savePersistedModel } = usePersistedAgentModel();
+  const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
 
   const {
     currentMode,
@@ -117,9 +121,10 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
         isLastAssistantMessage={index === lastAssistantIndex}
         isSessionStreaming={isStreaming}
         getChildMessages={getChildMessages}
+        defaultReasoningExpanded={reasoningDefaultExpanded}
       />
     ),
-    [lastAssistantIndex, isStreaming, getChildMessages]
+    [lastAssistantIndex, isStreaming, getChildMessages, reasoningDefaultExpanded]
   );
 
   const handleStop = useCallback(async () => {
@@ -162,7 +167,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, attachments?: { path: string; files: string[] }) => {
       if (requiresModel && !currentModel) {
         toast.error('Select a model before sending');
         return;
@@ -176,6 +181,7 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
             model: currentModel,
             variant: currentVariant || undefined,
           },
+          ...(attachments ? { attachments } : {}),
         });
       } catch {
         toast.error('Failed to send message. Please try again.');
@@ -263,7 +269,9 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
               onModelSelect={(modelId, newVariant) => {
                 setCurrentModel(modelId);
                 setCurrentVariant(newVariant);
+                savePersistedModel(organizationId, { model: modelId, variant: newVariant });
               }}
+              organizationId={organizationId}
             />
           ))}
       </>

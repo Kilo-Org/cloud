@@ -19,9 +19,15 @@ type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
+  defaultReasoningExpanded?: boolean;
 };
 
-export function PartRenderer({ part, isStreaming, getChildMessages }: Readonly<PartRendererProps>) {
+export function PartRenderer({
+  part,
+  isStreaming,
+  getChildMessages,
+  defaultReasoningExpanded,
+}: Readonly<PartRendererProps>) {
   if (isTextPart(part)) {
     return (
       <MessageErrorBoundary>
@@ -46,6 +52,7 @@ export function PartRenderer({ part, isStreaming, getChildMessages }: Readonly<P
         <ReasoningPartRenderer
           text={part.text}
           isStreaming={isStreaming && isPartStreaming(part)}
+          defaultExpanded={defaultReasoningExpanded}
         />
       </MessageErrorBoundary>
     );

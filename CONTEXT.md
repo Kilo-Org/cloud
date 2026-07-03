@@ -114,7 +114,7 @@ Kilo Code Cloud hosts Kilo Code agents, integrations, and automation. This contr
 - Spend Alert config events store changed fields plus resulting key settings, not full config snapshots.
 - **Cost Insights** is the dedicated Usage-adjacent surface for Spend Alerts: `/cost-insights` and `/organizations/[id]/cost-insights` are dashboard routes; `/cost-insights/config` and `/organizations/[id]/cost-insights/config` are settings routes.
 - Cost Insights dashboard shows current alert state, review actions, and spend evidence. Cost Insights settings owns Spend Alerts policy.
-- Cost Insights appears directly below Usage in the personal and organization sidebars and shows attention state for unreviewed Spend Alert.
+- Cost Insights appears directly below Usage in the personal and organization sidebars and shows attention state for unreviewed Spend Alerts and active Cost Suggestions.
 - Organization Cost Insights identifies member spend drivers and links to existing organization member daily limit controls; v1 does not add per-member Spend Alert policy.
 - Personal and organization Cost Insights routes, navigation, attention queries, and API procedures are visible only to users whose current Kilo platform user record has `is_admin` set to `true`.
 - Kilo platform admins may inspect organization Spend Alerts under existing admin patterns, but v1 disable and settings changes require owner or billing-manager authority.

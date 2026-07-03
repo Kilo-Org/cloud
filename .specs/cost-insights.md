@@ -68,7 +68,7 @@ Cost Insights does not replace low-balance alerts, auto-top-up setup, existing o
 3. Organization Cost Insights dashboard MUST be served at `/organizations/[id]/cost-insights`.
 4. Organization Cost Insights settings MUST be served at `/organizations/[id]/cost-insights/config`.
 5. Cost Insights MUST appear directly below Usage in personal and organization sidebars for Kilo platform admins only.
-6. Cost Insights sidebar item MUST show attention state when owner has an unreviewed Spend Alert.
+6. Cost Insights sidebar item MUST show attention state when owner has an unreviewed Spend Alert or active Cost Suggestion.
 7. Cost Insights routes MUST require current Kilo platform admin authorization and MUST NOT require a feature flag in v1.
 
 ### Dashboard and Settings
@@ -102,7 +102,8 @@ Cost Insights does not replace low-balance alerts, auto-top-up setup, existing o
 16. Spend Alerts MUST take visual and ordering priority over Cost Suggestions when both are active.
 17. Cost Suggestion CTA and dismissal actions MUST be available to the same authorized users who can manage Cost Insights for the Spend owner.
 18. Cost Suggestion evaluation and display MUST NOT depend on Spend Alerts being enabled.
-19. Cost Suggestion emails MAY link directly to the relevant CTA destination or to Cost Insights suggestion context.
+19. Active, undismissed Cost Suggestions MUST count toward the Cost Insights sidebar attention count while Cost Suggestions are enabled.
+20. Cost Suggestion emails MAY link directly to the relevant CTA destination or to Cost Insights suggestion context.
 
 ### Anomaly Detection
 

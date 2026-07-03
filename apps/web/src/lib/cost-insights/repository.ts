@@ -1180,6 +1180,32 @@ export async function countUnreviewedCostInsightAlerts(
   );
 }
 
+export async function countOpenCostInsightReviewItems(
+  database: CostInsightDatabase,
+  owner: CostInsightSpendOwner
+): Promise<number> {
+  const alertCount = await countUnreviewedCostInsightAlerts(database, owner);
+  const [config] = await database
+    .select({ costSuggestionsEnabled: cost_insight_owner_configs.cost_suggestions_enabled })
+    .from(cost_insight_owner_configs)
+    .where(costInsightOwnerWhere(owner, cost_insight_owner_configs))
+    .limit(1);
+
+  if (config?.costSuggestionsEnabled === false) return alertCount;
+
+  const [suggestions] = await database
+    .select({ value: count() })
+    .from(cost_insight_active_suggestions)
+    .where(
+      and(
+        costInsightOwnerWhere(owner, cost_insight_active_suggestions),
+        isNull(cost_insight_active_suggestions.dismissed_at)
+      )
+    );
+
+  return alertCount + (suggestions?.value ?? 0);
+}
+
 export const costInsightRepositoryInternals = {
   acknowledgeCostInsightAlertInTransaction,
   dismissCostInsightSuggestionInTransaction,

@@ -192,7 +192,7 @@ describe('Cost Insights router', () => {
     const caller = await createCallerForUser(user.id);
     await expect(caller.costInsights.getAttentionState()).resolves.toEqual({
       attention: 'alert',
-      reviewItemCount: 4,
+      reviewItemCount: 5,
     });
 
     await db

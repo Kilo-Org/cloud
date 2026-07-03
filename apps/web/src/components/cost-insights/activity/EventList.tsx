@@ -44,7 +44,7 @@ export function EventList({
           event.topDrivers?.reduce((sum, driver) => sum + driver.spendUsd, 0) ?? 0;
         return (
           <li key={event.id} className={cn(compact ? 'py-5 first:pt-0 last:pb-0' : 'p-4 sm:p-6')}>
-            <div className="grid gap-3 lg:grid-cols-[7.5rem_minmax(0,1fr)_auto] lg:gap-5">
+            <div className="grid gap-3 lg:grid-cols-[10rem_minmax(0,1fr)_auto] lg:gap-5">
               <div className="flex items-center gap-3 lg:flex-col lg:items-start lg:gap-2">
                 <LocalDateTime
                   timestamp={event.occurredAt}

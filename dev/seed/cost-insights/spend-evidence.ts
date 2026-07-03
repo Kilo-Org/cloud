@@ -407,8 +407,39 @@ function floorUtcHour(timestamp: number): number {
   return Math.floor(timestamp / HOUR_MS) * HOUR_MS;
 }
 
+export type CostInsightsSeedClock = {
+  seededAtMs: number;
+  seededAtIso: string;
+  currentHour: number;
+  currentHourIso: string;
+  nextHourIso: string;
+  coverageStartIso: string;
+  maintenanceStartIso: string;
+  lateArrivalHourIso: string;
+  staleRollupHourIso: string;
+};
+
+export function buildCostInsightsSeedClock(now: number = Date.now()): CostInsightsSeedClock {
+  const currentHour = floorUtcHour(now);
+  return {
+    seededAtMs: now,
+    seededAtIso: new Date(now).toISOString(),
+    currentHour,
+    currentHourIso: new Date(currentHour).toISOString(),
+    nextHourIso: new Date(currentHour + HOUR_MS).toISOString(),
+    coverageStartIso: new Date(currentHour - COVERAGE_DAYS * DAY_MS).toISOString(),
+    maintenanceStartIso: timestampAtHourOffset(currentHour, 25),
+    lateArrivalHourIso: timestampAtHourOffset(currentHour, 4),
+    staleRollupHourIso: timestampAtHourOffset(currentHour, 25),
+  };
+}
+
 function timestampAtHourOffset(currentHour: number, hourOffset: number): string {
   return new Date(currentHour - hourOffset * HOUR_MS).toISOString();
+}
+
+function timestampAtMsOffset(anchorMs: number, offsetMs: number): string {
+  return new Date(anchorMs - offsetMs).toISOString();
 }
 
 async function ensureExaUsageLogPartitions(
@@ -448,7 +479,10 @@ function chooseByIndex<T>(values: T[], index: number, label: string): T {
   return value;
 }
 
-function buildVariableSpendEvents(currentHour: number): VariableSpendEvent[] {
+function buildVariableSpendEvents(
+  currentHour: number,
+  currentEventAt: string
+): VariableSpendEvent[] {
   const events: VariableSpendEvent[] = [];
   const organizationActors = [PERSONAL_OWNER_ID, BILLING_MANAGER_ID, ORGANIZATION_MEMBER_ID];
 
@@ -515,7 +549,7 @@ function buildVariableSpendEvents(currentHour: number): VariableSpendEvent[] {
       ...chooseByIndex(PERSONAL_DRIVERS, index, 'personal spike driver'),
       owner: PERSONAL_OWNER,
       actorUserId: PERSONAL_OWNER_ID,
-      occurredAt: new Date(currentHour).toISOString(),
+      occurredAt: currentEventAt,
       amountMicrodollars,
     });
   }
@@ -526,7 +560,7 @@ function buildVariableSpendEvents(currentHour: number): VariableSpendEvent[] {
       ...chooseByIndex(ORGANIZATION_DRIVERS, index, 'organization spike driver'),
       owner: ORGANIZATION_OWNER,
       actorUserId: chooseByIndex(organizationActors, index, 'organization spike actor'),
-      occurredAt: new Date(currentHour).toISOString(),
+      occurredAt: currentEventAt,
       amountMicrodollars,
     });
   }
@@ -534,12 +568,15 @@ function buildVariableSpendEvents(currentHour: number): VariableSpendEvent[] {
   return events;
 }
 
-function buildScheduledSpendEvents(currentHour: number): ScheduledSpendEvent[] {
+function buildScheduledSpendEvents(
+  seededAtMs: number,
+  currentEventAt: string
+): ScheduledSpendEvent[] {
   return [
     {
       owner: PERSONAL_OWNER,
       actorUserId: PERSONAL_OWNER_ID,
-      occurredAt: new Date(currentHour).toISOString(),
+      occurredAt: currentEventAt,
       amountMicrodollars: 63_908_000,
       featureKey: 'renewal',
       planKey: 'standard',
@@ -547,7 +584,7 @@ function buildScheduledSpendEvents(currentHour: number): ScheduledSpendEvent[] {
     {
       owner: PERSONAL_OWNER,
       actorUserId: PERSONAL_OWNER_ID,
-      occurredAt: new Date(currentHour - 30 * DAY_MS).toISOString(),
+      occurredAt: timestampAtMsOffset(seededAtMs, 30 * DAY_MS),
       amountMicrodollars: 29_000_000,
       featureKey: 'renewal',
       planKey: 'standard',
@@ -555,7 +592,7 @@ function buildScheduledSpendEvents(currentHour: number): ScheduledSpendEvent[] {
     {
       owner: PERSONAL_OWNER,
       actorUserId: PERSONAL_OWNER_ID,
-      occurredAt: new Date(currentHour - 60 * DAY_MS).toISOString(),
+      occurredAt: timestampAtMsOffset(seededAtMs, 60 * DAY_MS),
       amountMicrodollars: 99_000_000,
       featureKey: 'enrollment',
       planKey: 'commit',
@@ -563,7 +600,7 @@ function buildScheduledSpendEvents(currentHour: number): ScheduledSpendEvent[] {
     {
       owner: ORGANIZATION_OWNER,
       actorUserId: BILLING_MANAGER_ID,
-      occurredAt: new Date(currentHour).toISOString(),
+      occurredAt: currentEventAt,
       amountMicrodollars: 49_000_000,
       featureKey: 'renewal',
       planKey: 'standard',
@@ -571,7 +608,7 @@ function buildScheduledSpendEvents(currentHour: number): ScheduledSpendEvent[] {
     {
       owner: ORGANIZATION_OWNER,
       actorUserId: ORGANIZATION_MEMBER_ID,
-      occurredAt: new Date(currentHour - 30 * DAY_MS).toISOString(),
+      occurredAt: timestampAtMsOffset(seededAtMs, 30 * DAY_MS),
       amountMicrodollars: 49_000_000,
       featureKey: 'renewal',
       planKey: 'standard',
@@ -579,7 +616,7 @@ function buildScheduledSpendEvents(currentHour: number): ScheduledSpendEvent[] {
     {
       owner: ORGANIZATION_OWNER,
       actorUserId: PERSONAL_OWNER_ID,
-      occurredAt: new Date(currentHour - 60 * DAY_MS).toISOString(),
+      occurredAt: timestampAtMsOffset(seededAtMs, 60 * DAY_MS),
       amountMicrodollars: 149_000_000,
       featureKey: 'enrollment',
       planKey: 'commit',
@@ -810,14 +847,20 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
 
   const databaseTarget = assertLocalDatabaseTarget();
   const db = getSeedDb();
-  const currentHour = floorUtcHour(Date.now());
-  const currentHourIso = new Date(currentHour).toISOString();
-  const coverageStartIso = new Date(currentHour - COVERAGE_DAYS * DAY_MS).toISOString();
-  const maintenanceStartIso = timestampAtHourOffset(currentHour, 25);
-  const lateArrivalHourIso = timestampAtHourOffset(currentHour, 4);
-  const staleRollupHourIso = timestampAtHourOffset(currentHour, 25);
-  const variableEvents = buildVariableSpendEvents(currentHour);
-  const scheduledEvents = buildScheduledSpendEvents(currentHour);
+  const seedClock = buildCostInsightsSeedClock();
+  const {
+    seededAtMs,
+    seededAtIso,
+    currentHour,
+    currentHourIso,
+    nextHourIso,
+    coverageStartIso,
+    maintenanceStartIso,
+    lateArrivalHourIso,
+    staleRollupHourIso,
+  } = seedClock;
+  const variableEvents = buildVariableSpendEvents(currentHour, seededAtIso);
+  const scheduledEvents = buildScheduledSpendEvents(seededAtMs, seededAtIso);
   const exaEvents = buildExaSpendEvents(currentHour);
   const codingPlanEvents = buildCodingPlanSpendEvents(currentHour);
   const unattributedVariableEvents = buildUnattributedVariableSpendEvents(currentHour);
@@ -844,8 +887,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     modelKey: 'anthropic/claude-sonnet-4',
     providerKey: 'anthropic',
   };
-  const suggestionWindowStart = new Date(currentHour - 7 * DAY_MS).toISOString();
-  const suggestionWindowEnd = new Date(currentHour).toISOString();
+  const suggestionWindowStart = timestampAtMsOffset(seededAtMs, 7 * DAY_MS);
+  const suggestionWindowEnd = seededAtIso;
   const personalAnomalyEventId = randomUUID();
   const personalThresholdEventId = randomUUID();
   const organizationAnomalyEventId = randomUUID();
@@ -928,12 +971,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         ),
         topDriversWindow: {
           startInclusive: currentHourIso,
-          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          endExclusive: seededAtIso,
           spendCategory: 'variable',
         },
       },
       dedupe_key: `dev-seed:personal:anomaly:${currentHourIso}`,
-      occurred_at: currentHourIso,
+      occurred_at: seededAtIso,
     },
     {
       id: personalThresholdEventId,
@@ -948,8 +991,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         thresholdMicrodollars: personalThresholdMicrodollars,
         topDrivers: seedTopDrivers(PERSONAL_OWNER),
         topDriversWindow: {
-          startInclusive: new Date(currentHour - 24 * HOUR_MS + 42 * 60 * 1_000).toISOString(),
-          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          startInclusive: timestampAtMsOffset(seededAtMs, 24 * HOUR_MS),
+          endExclusive: seededAtIso,
         },
       },
       dedupe_key: `dev-seed:personal:threshold:${currentHourIso}`,
@@ -1065,12 +1108,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         ),
         topDriversWindow: {
           startInclusive: currentHourIso,
-          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          endExclusive: seededAtIso,
           spendCategory: 'variable',
         },
       },
       dedupe_key: `dev-seed:organization:anomaly:${currentHourIso}`,
-      occurred_at: currentHourIso,
+      occurred_at: seededAtIso,
     },
     {
       id: organizationThresholdEventId,
@@ -1085,8 +1128,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         thresholdMicrodollars: organizationThresholdMicrodollars,
         topDrivers: seedTopDrivers(ORGANIZATION_OWNER),
         topDriversWindow: {
-          startInclusive: new Date(currentHour - 24 * HOUR_MS + 42 * 60 * 1_000).toISOString(),
-          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          startInclusive: timestampAtMsOffset(seededAtMs, 24 * HOUR_MS),
+          endExclusive: seededAtIso,
         },
       },
       dedupe_key: `dev-seed:organization:threshold:${currentHourIso}`,
@@ -1139,7 +1182,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   const costInsightStateRows = [
     {
       ...costInsightOwnerColumns(PERSONAL_OWNER),
-      last_evaluated_at: currentHourIso,
+      last_evaluated_at: seededAtIso,
       active_anomaly_event_id: personalAnomalyEventId,
       active_anomaly_episode_id: personalAnomalyEventId,
       active_anomaly_hour_start: currentHourIso,
@@ -1152,7 +1195,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         ),
         topDriversWindow: {
           startInclusive: currentHourIso,
-          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          endExclusive: seededAtIso,
           spendCategory: 'variable',
         },
       },
@@ -1166,8 +1209,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         thresholdMicrodollars: personalThresholdMicrodollars,
         topDrivers: seedTopDrivers(PERSONAL_OWNER),
         topDriversWindow: {
-          startInclusive: new Date(currentHour - 24 * HOUR_MS + 42 * 60 * 1_000).toISOString(),
-          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          startInclusive: timestampAtMsOffset(seededAtMs, 24 * HOUR_MS),
+          endExclusive: seededAtIso,
         },
       },
       threshold_reviewed_at: null,
@@ -1175,7 +1218,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     },
     {
       ...costInsightOwnerColumns(ORGANIZATION_OWNER),
-      last_evaluated_at: currentHourIso,
+      last_evaluated_at: seededAtIso,
       active_anomaly_event_id: organizationAnomalyEventId,
       active_anomaly_episode_id: organizationAnomalyEventId,
       active_anomaly_hour_start: currentHourIso,
@@ -1188,7 +1231,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         ),
         topDriversWindow: {
           startInclusive: currentHourIso,
-          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          endExclusive: seededAtIso,
           spendCategory: 'variable',
         },
       },
@@ -1202,8 +1245,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
         thresholdMicrodollars: organizationThresholdMicrodollars,
         topDrivers: seedTopDrivers(ORGANIZATION_OWNER),
         topDriversWindow: {
-          startInclusive: new Date(currentHour - 24 * HOUR_MS + 42 * 60 * 1_000).toISOString(),
-          endExclusive: new Date(currentHour + 42 * 60 * 1_000).toISOString(),
+          startInclusive: timestampAtMsOffset(seededAtMs, 24 * HOUR_MS),
+          endExclusive: seededAtIso,
         },
       },
       threshold_reviewed_at: null,
@@ -1269,11 +1312,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   }
 
   if (coverageMode === 'disposable-full') {
-    await assertDisposableFullCoverageSafe(
-      db,
-      coverageStartIso,
-      new Date(currentHour + HOUR_MS).toISOString()
-    );
+    await assertDisposableFullCoverageSafe(db, coverageStartIso, nextHourIso);
   }
 
   await ensureExaUsageLogPartitions(
@@ -1781,7 +1820,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
             current_period_start: periodStart,
             current_period_end: periodEnd,
             credit_renewal_at: periodEnd,
-            canceled_at: currentHourIso,
+            canceled_at: seededAtIso,
             cancellation_reason: 'user_canceled',
           } satisfies typeof coding_plan_subscriptions.$inferInsert,
           transaction: {
@@ -2032,6 +2071,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     organizationMemberEmail: ORGANIZATION_MEMBER_EMAIL,
     organizationMemberStripeCustomerId:
       seedUsers.find(user => user.id === ORGANIZATION_MEMBER_ID)?.stripeCustomerId ?? null,
+    seededAt: seededAtIso,
     coverageStartHour: coverageStartIso,
     rollupCoverageStartHour: finalCoverage?.coverage_start_hour
       ? new Date(finalCoverage.coverage_start_hour).toISOString()

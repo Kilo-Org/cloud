@@ -1,5 +1,6 @@
 import {
   assertDisposableFullCoverageSafe,
+  buildCostInsightsSeedClock,
   parseSpendEvidenceArgs,
 } from '../../../../../dev/seed/cost-insights/spend-evidence';
 import type { SQL } from 'drizzle-orm';
@@ -29,6 +30,22 @@ describe('Cost Insights spend-evidence seed', () => {
     expect(() => parseSpendEvidenceArgs(['--coverage-mode', 'global'])).toThrow(
       'Unknown coverage mode: global'
     );
+  });
+
+  test('builds seed dates relative to the seed timestamp', () => {
+    const seedClock = buildCostInsightsSeedClock(Date.parse('2026-07-02T16:38:42.123Z'));
+
+    expect(seedClock).toEqual({
+      seededAtMs: Date.parse('2026-07-02T16:38:42.123Z'),
+      seededAtIso: '2026-07-02T16:38:42.123Z',
+      currentHour: Date.parse('2026-07-02T16:00:00.000Z'),
+      currentHourIso: '2026-07-02T16:00:00.000Z',
+      nextHourIso: '2026-07-02T17:00:00.000Z',
+      coverageStartIso: '2026-04-03T16:00:00.000Z',
+      maintenanceStartIso: '2026-07-01T15:00:00.000Z',
+      lateArrivalHourIso: '2026-07-02T12:00:00.000Z',
+      staleRollupHourIso: '2026-07-01T15:00:00.000Z',
+    });
   });
 
   test('refuses disposable coverage when unrelated evidence exists', async () => {

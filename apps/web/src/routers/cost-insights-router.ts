@@ -12,7 +12,7 @@ import {
   acknowledgeCostInsightAlert,
   clearCostInsightThresholdEpisode,
   createCostInsightEvent,
-  countUnreviewedCostInsightAlerts,
+  countOpenCostInsightReviewItems,
   dismissCostInsightSuggestion,
   getCostInsightConfigChanges,
   getCostInsightSettingsSnapshot,
@@ -255,7 +255,7 @@ export const costInsightsRouter = createTRPCRouter({
     });
   }),
   getAttentionState: adminProcedure.query(async ({ ctx }) => {
-    const reviewItemCount = await countUnreviewedCostInsightAlerts(db, {
+    const reviewItemCount = await countOpenCostInsightReviewItems(db, {
       type: 'user',
       id: ctx.user.id,
     });

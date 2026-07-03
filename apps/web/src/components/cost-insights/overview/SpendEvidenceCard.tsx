@@ -92,7 +92,7 @@ export function SpendEvidenceCard({
               </span>
               <span className="flex items-center gap-2">
                 <span className="bg-chart-2 size-2.5 rounded-sm" />
-                Scheduled
+                Subscriptions
               </span>
             </div>
             <p className="sr-only">
@@ -214,7 +214,7 @@ export function SpendEvidenceCard({
                             </dd>
                             <dt className="flex items-center gap-1.5 text-muted-foreground">
                               <span className="bg-chart-2 size-2 rounded-sm" aria-hidden="true" />
-                              Scheduled
+                              Subscriptions
                             </dt>
                             <dd className="text-right font-mono tabular-nums">
                               {money(point.scheduledUsd)}

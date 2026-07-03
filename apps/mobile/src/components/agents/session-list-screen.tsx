@@ -234,8 +234,10 @@ export function AgentSessionListScreen() {
               onPress={() => {
                 router.push(getNewAgentSessionPath(organizationId) as Href);
               }}
-              hitSlop={8}
+              hitSlop={11}
+              accessibilityRole="button"
               accessibilityLabel="New session"
+              className="active:opacity-70"
             >
               <Plus size={22} color={colors.foreground} />
             </Pressable>
@@ -243,8 +245,10 @@ export function AgentSessionListScreen() {
               onPress={() => {
                 setShowFilterModal(true);
               }}
-              hitSlop={8}
+              hitSlop={12}
+              accessibilityRole="button"
               accessibilityLabel="Filter sessions"
+              className="active:opacity-70"
             >
               <SlidersHorizontal
                 size={20}

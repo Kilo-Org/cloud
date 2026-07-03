@@ -64,7 +64,9 @@ export function ScreenHeader({
     titleNode = onTitlePress ? (
       <Pressable
         onPress={onTitlePress}
-        hitSlop={8}
+        hitSlop={13}
+        accessibilityRole="button"
+        accessibilityLabel={title ? `Open menu for ${title}` : 'Open menu'}
         className="flex-row items-center gap-1 active:opacity-70"
       >
         {titleText}

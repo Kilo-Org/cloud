@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 
-import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { type ModelOption, useOrgDefaultModel } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 
@@ -15,6 +15,8 @@ const NO_SELECTION = { model: '', variant: '' };
 
 export function useAutoSelectModel(models: ModelOption[], organizationId: string | undefined) {
   const { lastSelected, isLoading } = useModelPreferences(organizationId);
+  const { defaultModel: orgDefaultModel, isLoading: orgDefaultIsLoading } =
+    useOrgDefaultModel(organizationId);
   const {
     value: persistedModel,
     hasLoaded: persistedHasLoaded,
@@ -25,14 +27,15 @@ export function useAutoSelectModel(models: ModelOption[], organizationId: string
   if (chosenRef.current) {
     return { selection: chosenRef.current, persistModel };
   }
-  // Wait for the server preference too, or the shared value loses the race
-  // against the local cache on cold start and is never applied.
-  if (isLoading || !persistedHasLoaded || models.length === 0) {
+  // Wait for the server preference and org default too, or the shared value
+  // loses the race against the local cache on cold start and is never applied.
+  if (isLoading || orgDefaultIsLoading || !persistedHasLoaded || models.length === 0) {
     return { selection: NO_SELECTION, persistModel };
   }
   const serverMatch = lastSelected ? models.find(m => m.id === lastSelected.model) : undefined;
   const localMatch = persistedModel ? models.find(m => m.id === persistedModel.modelId) : undefined;
-  const fallback = models[0];
+  const orgDefaultMatch = orgDefaultModel ? models.find(m => m.id === orgDefaultModel) : undefined;
+  const fallback = orgDefaultMatch ?? models[0];
   if (serverMatch) {
     chosenRef.current = {
       model: serverMatch.id,

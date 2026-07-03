@@ -80,6 +80,9 @@ export function AgentSessionListScreen() {
     activeSessionIds,
     isLoading,
     isError,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
     refetch,
   } = useAgentSessions({
     createdOnPlatform,
@@ -190,6 +193,12 @@ export function AgentSessionListScreen() {
     [router]
   );
 
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      void fetchNextPage();
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+
   const hasActiveFilter = platformFilter.length > 0 || projectFilter.length > 0;
 
   return (
@@ -246,7 +255,9 @@ export function AgentSessionListScreen() {
           hasAnySessions={storedSessions.length > 0 || activeSessions.length > 0}
           isLoading={isLoading || !ready}
           isError={isError}
+          isFetchingNextPage={isFetchingNextPage}
           refetch={refetch}
+          onEndReached={handleEndReached}
           onSessionPress={navigateToSession}
           onSearchChange={handleSearchChange}
           onCreateSession={() => {

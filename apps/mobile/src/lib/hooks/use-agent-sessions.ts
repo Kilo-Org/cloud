@@ -1,5 +1,5 @@
 import { type inferRouterOutputs, type RootRouter } from '@kilocode/trpc';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
 import { useTRPC } from '@/lib/trpc';
@@ -50,21 +50,26 @@ function getUpdatedSince(days: number): string {
 
 // ── Queries ──────────────────────────────────────────────────────────
 
+const SESSIONS_PAGE_SIZE = 30;
+
 function useStoredSessions(options?: UseAgentSessionsOptions) {
   const trpc = useTRPC();
-  const updatedSince = useMemo(() => getUpdatedSince(5), []);
 
-  return useQuery(
-    trpc.cliSessionsV2.list.queryOptions(
+  return useInfiniteQuery(
+    trpc.cliSessionsV2.list.infiniteQueryOptions(
       {
-        updatedSince,
+        limit: SESSIONS_PAGE_SIZE,
         orderBy: 'updated_at',
         includeChildren: false,
         createdOnPlatform: options?.createdOnPlatform,
         gitUrl: options?.gitUrl,
         organizationId: options?.organizationId,
       },
-      { staleTime: 30_000, enabled: options?.enabled }
+      {
+        staleTime: 30_000,
+        enabled: options?.enabled,
+        getNextPageParam: lastPage => lastPage.nextCursor,
+      }
     )
   );
 }
@@ -170,21 +175,25 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
   const stored = useStoredSessions(options);
   const active = useActiveSessions(options);
 
-  const storedSessions = useMemo(() => stored.data?.cliSessions ?? [], [stored.data]);
+  // A session can repeat across pages when it is updated while older pages
+  // load (the cursor is its updated_at), so dedupe by session_id.
+  const storedSessions = useMemo(() => {
+    const seen = new Set<string>();
+    const sessions: StoredSession[] = [];
+    for (const page of stored.data?.pages ?? []) {
+      for (const session of page.cliSessions) {
+        if (!seen.has(session.session_id)) {
+          seen.add(session.session_id);
+          sessions.push(session);
+        }
+      }
+    }
+    return sessions;
+  }, [stored.data]);
 
   const activeSessions = useMemo(() => active.data?.sessions ?? [], [active.data]);
 
   const activeSessionIds = useMemo(() => new Set(activeSessions.map(s => s.id)), [activeSessions]);
-
-  const liveStoredSessions = useMemo(
-    () => storedSessions.filter(s => activeSessionIds.has(s.session_id)),
-    [storedSessions, activeSessionIds]
-  );
-
-  const offlineSessions = useMemo(
-    () => storedSessions.filter(s => !activeSessionIds.has(s.session_id)),
-    [storedSessions, activeSessionIds]
-  );
 
   const dateGroups = useMemo(() => groupSessionsByDate(storedSessions), [storedSessions]);
 
@@ -192,11 +201,12 @@ export function useAgentSessions(options?: UseAgentSessionsOptions) {
     storedSessions,
     activeSessions,
     activeSessionIds,
-    liveStoredSessions,
-    offlineSessions,
     dateGroups,
     isLoading: stored.isLoading || active.isLoading,
     isError: stored.isError || active.isError,
+    hasNextPage: stored.hasNextPage,
+    isFetchingNextPage: stored.isFetchingNextPage,
+    fetchNextPage: stored.fetchNextPage,
     refetch: async () => {
       await Promise.all([stored.refetch(), active.refetch()]);
     },

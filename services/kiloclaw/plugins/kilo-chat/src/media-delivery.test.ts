@@ -52,6 +52,31 @@ describe('loadOutboundMedia', () => {
     }
   });
 
+  it('resolves relative filenames containing colons against the agent working dir', async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), 'kilo-chat-agent-'));
+    const openclawWorkspace = await mkdtemp(join(tmpdir(), 'kilo-chat-ws-'));
+    const previousCwd = process.cwd();
+    try {
+      await writeFile(join(agentDir, 'report:2026-07-03.md'), '# Weekly Report');
+      process.chdir(agentDir);
+
+      const media = await loadOutboundMedia('report:2026-07-03.md', {
+        mediaAccess: {
+          localRoots: [openclawWorkspace],
+          workspaceDir: openclawWorkspace,
+          readFile: async path => Buffer.from(await readFile(path)),
+        },
+      });
+
+      expect(media.buffer.toString('utf8')).toBe('# Weekly Report');
+      expect(media.fileName).toBe('report:2026-07-03.md');
+    } finally {
+      process.chdir(previousCwd);
+      await rm(agentDir, { recursive: true, force: true });
+      await rm(openclawWorkspace, { recursive: true, force: true });
+    }
+  });
+
   it('allows files under the agent working dir even when it is outside the configured local roots', async () => {
     const agentDir = await mkdtemp(join(tmpdir(), 'kilo-chat-agent-'));
     const openclawWorkspace = await mkdtemp(join(tmpdir(), 'kilo-chat-ws-'));

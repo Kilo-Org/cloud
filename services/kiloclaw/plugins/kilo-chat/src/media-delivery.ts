@@ -100,7 +100,7 @@ function agentWorkingDir(): string {
 }
 
 function hasUriScheme(raw: string): boolean {
-  return /^[a-z][a-z0-9+.-]*:/i.test(raw.trim());
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(raw.trim());
 }
 
 function withAgentDirRoot(

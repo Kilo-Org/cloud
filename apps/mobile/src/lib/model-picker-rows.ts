@@ -1,4 +1,5 @@
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { CLI_MODEL_ID } from 'cloud-agent-sdk/cli-model';
 
 export type ModelPickerRow =
   | { key: string; title: string; type: 'header' }
@@ -18,10 +19,16 @@ export function buildModelPickerRows({
     m => !query || m.name.toLowerCase().includes(query) || m.id.toLowerCase().includes(query)
   );
 
-  const favorites = filtered.filter(m => favoriteIds.has(m.id));
-  const recommended = filtered.filter(m => !favoriteIds.has(m.id) && m.isPreferred);
-  const all = filtered.filter(m => !favoriteIds.has(m.id) && !m.isPreferred);
+  const cliModel = filtered.find(m => m.id === CLI_MODEL_ID);
+  const rest = filtered.filter(m => m.id !== CLI_MODEL_ID);
+  const favorites = rest.filter(m => favoriteIds.has(m.id));
+  const recommended = rest.filter(m => !favoriteIds.has(m.id) && m.isPreferred);
+  const all = rest.filter(m => !favoriteIds.has(m.id) && !m.isPreferred);
   const result: ModelPickerRow[] = [];
+
+  if (cliModel) {
+    result.push({ key: `model:${cliModel.id}`, model: cliModel, isFavorite: false, type: 'model' });
+  }
 
   if (favorites.length > 0) {
     result.push({ key: 'favorites', title: 'FAVORITES', type: 'header' });

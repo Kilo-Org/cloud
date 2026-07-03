@@ -5,6 +5,7 @@ import { BookOpenCheck, Check, Search, Star } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CLI_MODEL_ID } from 'cloud-agent-sdk/cli-model';
 
 import { Text } from '@/components/ui/text';
 import {
@@ -213,6 +214,7 @@ export default function ModelPickerScreen() {
         const byok = hasUserByokAvailable(modelOption);
         const collectsData = mayTrainOnYourPrompts(modelOption);
         const hasVariants = modelOption.variants.length > 1;
+        const isCliModel = modelOption.id === CLI_MODEL_ID;
         const accessibilityLabel = [
           modelOption.name,
           byok ? BYOK_MODEL_LABEL : undefined,
@@ -235,7 +237,9 @@ export default function ModelPickerScreen() {
             >
               <View className="flex-1">
                 <Text className="text-base text-foreground">{modelOption.name}</Text>
-                <Text className="text-xs text-muted-foreground">{modelOption.id}</Text>
+                {!isCliModel && (
+                  <Text className="text-xs text-muted-foreground">{modelOption.id}</Text>
+                )}
                 {free || byok || collectsData ? (
                   <View className="mt-1 flex-row items-center gap-1 self-start">
                     {free && !byok ? (
@@ -265,27 +269,29 @@ export default function ModelPickerScreen() {
                   </View>
                 ) : null}
               </View>
-              <Pressable
-                onPress={() => {
-                  void Haptics.selectionAsync();
-                  toggleFavorite(modelOption.id);
-                }}
-                hitSlop={12}
-                className="min-h-[44px] min-w-[44px] items-center justify-center"
-                accessibilityRole="button"
-                accessibilityLabel={
-                  isFavorite
-                    ? `Remove ${modelOption.name} from favorites`
-                    : `Add ${modelOption.name} to favorites`
-                }
-                accessibilityState={{ selected: isFavorite }}
-              >
-                <Star
-                  size={20}
-                  color={isFavorite ? colors.primary : colors.mutedForeground}
-                  fill={isFavorite ? colors.primary : 'transparent'}
-                />
-              </Pressable>
+              {!isCliModel && (
+                <Pressable
+                  onPress={() => {
+                    void Haptics.selectionAsync();
+                    toggleFavorite(modelOption.id);
+                  }}
+                  hitSlop={12}
+                  className="min-h-[44px] min-w-[44px] items-center justify-center"
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    isFavorite
+                      ? `Remove ${modelOption.name} from favorites`
+                      : `Add ${modelOption.name} to favorites`
+                  }
+                  accessibilityState={{ selected: isFavorite }}
+                >
+                  <Star
+                    size={20}
+                    color={isFavorite ? colors.primary : colors.mutedForeground}
+                    fill={isFavorite ? colors.primary : 'transparent'}
+                  />
+                </Pressable>
+              )}
               {selected && <Check size={18} color={colors.primary} />}
             </Pressable>
 

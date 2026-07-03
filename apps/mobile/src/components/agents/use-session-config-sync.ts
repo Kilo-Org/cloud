@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { CLI_MODEL_ID } from 'cloud-agent-sdk/cli-model';
 
 type SessionConfigSnapshot = {
   mode?: string | null;
@@ -14,6 +15,7 @@ type UseSessionConfigSyncOptions = {
   fetchedData: SessionConfigSnapshot | null;
   sessionConfig: SessionConfigSnapshot | null | undefined;
   modelOptions: ModelOption[];
+  isRemote: boolean;
 };
 
 type UseSessionConfigSyncResult = {
@@ -33,6 +35,7 @@ export function useSessionConfigSync({
   fetchedData,
   sessionConfig,
   modelOptions,
+  isRemote,
 }: UseSessionConfigSyncOptions): UseSessionConfigSyncResult {
   const [currentMode, setCurrentMode] = useState<AgentMode>(() =>
     normalizeAgentMode(fetchedData?.mode)
@@ -46,16 +49,19 @@ export function useSessionConfigSync({
       setCurrentMode(normalizeAgentMode(mode));
     }
 
-    const model = sessionConfig?.model ?? fetchedData?.model;
-    if (model) {
-      setCurrentModel(model);
-    }
+    if (!isRemote) {
+      const model = sessionConfig?.model ?? fetchedData?.model;
+      if (model) {
+        setCurrentModel(model);
+      }
 
-    const variant = sessionConfig?.variant ?? fetchedData?.variant;
-    if (variant) {
-      setCurrentVariant(variant);
+      const variant = sessionConfig?.variant ?? fetchedData?.variant;
+      if (variant) {
+        setCurrentVariant(variant);
+      }
     }
   }, [
+    isRemote,
     sessionConfig?.mode,
     sessionConfig?.model,
     sessionConfig?.variant,
@@ -65,7 +71,7 @@ export function useSessionConfigSync({
   ]);
 
   useEffect(() => {
-    if (currentModel || modelOptions.length === 0 || fetchedData === null) {
+    if (isRemote || currentModel || modelOptions.length === 0 || fetchedData === null) {
       return;
     }
     const firstModel = modelOptions[0];
@@ -73,7 +79,15 @@ export function useSessionConfigSync({
       setCurrentModel(firstModel.id);
       setCurrentVariant(firstModel.variants[0] ?? '');
     }
-  }, [currentModel, modelOptions, fetchedData]);
+  }, [isRemote, currentModel, modelOptions, fetchedData]);
+
+  useEffect(() => {
+    if (!isRemote) {
+      return;
+    }
+    setCurrentModel(CLI_MODEL_ID);
+    setCurrentVariant('');
+  }, [isRemote]);
 
   return {
     currentMode,

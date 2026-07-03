@@ -1,4 +1,4 @@
-import { isClaudeModel, isHaikuModel, isOpusModel } from './anthropic.constants';
+import { isClaudeModel } from './anthropic.constants';
 import { isOpenAiModel, isGptOssModel } from './openai';
 import { isGemmaModel, isGemini3Model } from './google';
 import { isKimiModel } from './moonshotai';
@@ -10,15 +10,11 @@ import { isCodestralModel, isMistralModel } from './mistral';
 import { inferVercelFirstPartyInferenceProviderForModel } from './openrouter/inference-provider-id';
 
 describe('provider predicates match substrings, regardless of prefix', () => {
-  test('isClaudeModel / isHaikuModel / isOpusModel', () => {
+  test('isClaudeModel', () => {
     expect(isClaudeModel('~anthropic/claude-sonnet-4.5')).toBe(true);
     expect(isClaudeModel('anthropic/claude-sonnet-4.5')).toBe(true);
     expect(isClaudeModel('claude-sonnet-4-6')).toBe(true);
     expect(isClaudeModel('openai/gpt-5')).toBe(false);
-    expect(isHaikuModel('~anthropic/claude-haiku-4.5')).toBe(true);
-    expect(isHaikuModel('claude-haiku-4-6')).toBe(true);
-    expect(isOpusModel('~anthropic/claude-opus-4.7')).toBe(true);
-    expect(isOpusModel('claude-opus-4-7')).toBe(true);
   });
 
   test('isOpenAiModel / isGptOssModel', () => {

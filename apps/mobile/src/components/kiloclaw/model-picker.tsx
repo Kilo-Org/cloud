@@ -122,7 +122,9 @@ export function ModelPicker() {
             <Pressable
               key={card.id}
               className={`relative gap-3 rounded-lg border p-4 active:opacity-80 ${
-                selected ? 'border-primary bg-accent-soft' : 'border-border bg-secondary'
+                selected
+                  ? 'border-primary bg-neutral-100 dark:bg-neutral-800'
+                  : 'border-border bg-secondary'
               }`}
               disabled={mutations.updateModel.isPending}
               onPress={() => {
@@ -130,7 +132,7 @@ export function ModelPicker() {
               }}
               accessibilityRole="button"
               accessibilityState={{ selected, disabled: mutations.updateModel.isPending }}
-              accessibilityLabel={`${card.label} auto model${selected ? ', selected' : ''}`}
+              accessibilityLabel={`${card.label} auto model`}
             >
               {selected && (
                 <View className="absolute right-3 top-3">

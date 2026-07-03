@@ -91,6 +91,7 @@ export function ScreenHeader({
                 }
               }}
               hitSlop={12}
+              accessibilityRole="button"
               accessibilityLabel="Go back"
               className="-ml-1 mr-1 active:opacity-70"
             >

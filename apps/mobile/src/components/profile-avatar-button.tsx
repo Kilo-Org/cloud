@@ -18,7 +18,6 @@ export function ProfileAvatarButton() {
       accessibilityRole="button"
       accessibilityLabel="Open profile"
       className="h-11 w-11 items-center justify-center rounded-full active:opacity-70"
-      hitSlop={6}
     >
       <CircleUserRound size={22} color={colors.foreground} />
     </Pressable>

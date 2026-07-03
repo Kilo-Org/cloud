@@ -5,7 +5,7 @@ import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { type Part, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { MessageErrorBoundary } from './message-error-boundary';
 import { isToolPart } from './part-types';
@@ -265,7 +265,7 @@ function ChildSessionMessage({
   );
 }
 
-function getStatusBorderColor(status: string, colors: ReturnType<typeof useThemeColors>): string {
+function getStatusBorderColor(status: string, colors: ThemeColors): string {
   if (status === 'error') {
     return colors.destructive;
   }

@@ -234,7 +234,8 @@ export function AgentSessionListScreen() {
               onPress={() => {
                 router.push(getNewAgentSessionPath(organizationId) as Href);
               }}
-              hitSlop={11}
+              // right slop capped so the expanded targets don't overlap inside the 16px gap
+              hitSlop={{ top: 11, bottom: 11, left: 11, right: 8 }}
               accessibilityRole="button"
               accessibilityLabel="New session"
               className="active:opacity-70"
@@ -245,7 +246,7 @@ export function AgentSessionListScreen() {
               onPress={() => {
                 setShowFilterModal(true);
               }}
-              hitSlop={12}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
               accessibilityRole="button"
               accessibilityLabel="Filter sessions"
               className="active:opacity-70"

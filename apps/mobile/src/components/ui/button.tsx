@@ -22,7 +22,6 @@ const buttonVariants = cva(
         sm: 'h-9 gap-1.5 rounded-md px-3',
         lg: 'h-11 rounded-md px-6',
         icon: 'h-10 w-10',
-        touch: 'h-11 min-w-11 px-4 py-2',
       },
     },
     defaultVariants: {
@@ -48,7 +47,6 @@ const buttonTextVariants = cva('text-foreground text-sm font-semibold', {
       sm: '',
       lg: '',
       icon: '',
-      touch: '',
     },
   },
   defaultVariants: {
@@ -73,21 +71,5 @@ function Button({ className, variant, size, ...props }: ButtonProps) {
   );
 }
 
-type IconButtonProps = Omit<ButtonProps, 'accessibilityLabel' | 'children' | 'role'> & {
-  /** Required — icon-only buttons must announce their action. */
-  accessibilityLabel: string;
-  children: React.ReactNode;
-};
-
-/**
- * Icon-only `Button`. Requires `accessibilityLabel` at the type level so
- * VoiceOver / TalkBack always has a name. Use for dense toolbars; consider
- * adding `hitSlop` to reach a 44dp effective target where the visual is
- * smaller than 44dp.
- */
-function IconButton({ className, variant = 'outline', size = 'icon', ...props }: IconButtonProps) {
-  return <Button variant={variant} size={size} className={className} role="button" {...props} />;
-}
-
-export { Button, buttonTextVariants, buttonVariants, IconButton };
-export type { ButtonProps, IconButtonProps };
+export { Button, buttonTextVariants, buttonVariants };
+export type { ButtonProps };

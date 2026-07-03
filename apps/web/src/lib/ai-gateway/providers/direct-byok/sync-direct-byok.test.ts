@@ -14,6 +14,7 @@ describe('parseOpenAICompatibleProviderModels', () => {
           output_modalities: ['text'],
           context_length: 262144,
           max_output_length: 131072,
+          supported_features: ['tools', 'json_mode'],
         },
         {
           id: 'morph-minimax3-428b',
@@ -40,15 +41,17 @@ describe('parseOpenAICompatibleProviderModels', () => {
     ]);
   });
 
-  test('excludes specified model ids', () => {
-    const models = parseOpenAICompatibleProviderModels(
-      {
-        data: [{ id: 'morph-qwen35-397b' }, { id: 'morph-v3-fast' }, { id: 'morph-v3-large' }],
-      },
-      { excludeModelIds: ['morph-v3-fast', 'morph-v3-large'] }
-    );
+  test('excludes models with supported features that do not include tools', () => {
+    const models = parseOpenAICompatibleProviderModels({
+      data: [
+        { id: 'without-supported-features' },
+        { id: 'supports-tools', supported_features: ['tools', 'json_mode'] },
+        { id: 'unsupported-tools', supported_features: ['json_mode'] },
+        { id: 'empty-supported-features', supported_features: [] },
+      ],
+    });
 
-    expect(models.map(model => model.id)).toEqual(['morph-qwen35-397b']);
+    expect(models.map(model => model.id)).toEqual(['without-supported-features', 'supports-tools']);
   });
 });
 

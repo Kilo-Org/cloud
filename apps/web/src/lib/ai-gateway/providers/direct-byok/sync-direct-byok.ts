@@ -20,6 +20,7 @@ const OpenAICompatibleModelsResponseSchema = z.object({
       max_model_len: z.number().optional(),
       max_output_length: z.number().optional(),
       input_modalities: z.array(ModalitySchema).optional(),
+      supported_features: z.array(z.string()).optional(),
     })
   ),
 });
@@ -79,7 +80,6 @@ function openAICompatibleFetcher(options: {
   providerId: DirectUserByokInferenceProviderId;
   label: string;
   url: string;
-  excludeModelIds?: ReadonlyArray<string>;
 }): ProviderFetcher {
   return {
     providerId: options.providerId,
@@ -90,21 +90,15 @@ function openAICompatibleFetcher(options: {
           `Failed to fetch ${options.label} models: ${response.status} ${response.statusText}`
         );
       }
-      return parseOpenAICompatibleProviderModels(await response.json(), {
-        excludeModelIds: options.excludeModelIds,
-      });
+      return parseOpenAICompatibleProviderModels(await response.json());
     },
   };
 }
 
-export function parseOpenAICompatibleProviderModels(
-  entry: unknown,
-  options?: { excludeModelIds?: ReadonlyArray<string> }
-): RawModel[] {
-  const excludedIds = new Set(options?.excludeModelIds);
+export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] {
   const parsed = OpenAICompatibleModelsResponseSchema.parse(entry);
   return parsed.data
-    .filter(model => !excludedIds.has(model.id))
+    .filter(model => !model.supported_features || model.supported_features.includes('tools'))
     .map(model => ({
       id: model.id,
       name: shortenDisplayName(model.name),
@@ -194,8 +188,6 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     providerId: 'morph',
     label: 'Morph',
     url: 'https://www.morphllm.com/api/models/json',
-    // the v3 apply models are specialized code-edit models, not general-purpose chat models
-    excludeModelIds: ['morph-v3-fast', 'morph-v3-large'],
   }),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud'),

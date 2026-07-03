@@ -14,6 +14,7 @@ import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombob
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthConnectPath } from '@/lib/integrations/oauth/paths';
+import { useConfirm } from '@/components/ui/confirm';
 
 type LinearIntegrationDetailsProps = {
   organizationId?: string;
@@ -37,6 +38,7 @@ export function LinearIntegrationDetails({
 }: LinearIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const input = organizationId ? { organizationId } : undefined;
 
   const {
@@ -113,8 +115,15 @@ export function LinearIntegrationDetails({
     window.location.href = getPlatformOAuthConnectPath(PLATFORM.LINEAR, organizationId);
   };
 
-  const handleUninstall = () => {
-    if (confirm('Are you sure you want to disconnect Linear?')) {
+  const handleUninstall = async () => {
+    if (
+      await confirm({
+        title: 'Disconnect Linear?',
+        description: 'Kilo will stop responding to @-mentions on your Linear issues and comments.',
+        confirmLabel: 'Disconnect',
+        destructive: true,
+      })
+    ) {
       uninstallApp.mutate(input, {
         onSuccess: async () => {
           toast.success('Linear disconnected');
@@ -129,9 +138,14 @@ export function LinearIntegrationDetails({
     }
   };
 
-  const handleDevRemoveDbRowOnly = () => {
+  const handleDevRemoveDbRowOnly = async () => {
     if (
-      confirm('This will remove the database row but keep the Linear app installed. Are you sure?')
+      await confirm({
+        title: 'Remove database row?',
+        description: 'This removes the database row but keeps the Linear app installed.',
+        confirmLabel: 'Remove row',
+        destructive: true,
+      })
     ) {
       devRemoveDbRowOnly.mutate(input, {
         onSuccess: async () => {

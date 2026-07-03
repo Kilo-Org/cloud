@@ -24,6 +24,7 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 import { buildGitHubInstallState } from './github-install-state';
+import { useConfirm } from '@/components/ui/confirm';
 
 type GitHubIntegrationDetailsProps = {
   organizationId?: string;
@@ -48,6 +49,7 @@ export function GitHubIntegrationDetails({
 }: GitHubIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const input = organizationId ? { organizationId } : undefined;
 
   // Fetch organization data to check GitHub app type
@@ -277,8 +279,15 @@ export function GitHubIntegrationDetails({
     });
   };
 
-  const handleDisconnectIdentity = () => {
-    if (confirm('Disconnect your GitHub identity from Kilo?')) {
+  const handleDisconnectIdentity = async () => {
+    if (
+      await confirm({
+        title: 'Disconnect your GitHub identity?',
+        description: 'Kilo will no longer act on your behalf with your personal GitHub account.',
+        confirmLabel: 'Disconnect',
+        destructive: true,
+      })
+    ) {
       disconnectUserAuthorization.mutate(undefined, {
         onError: error => {
           toast.error('Failed to disconnect GitHub identity', { description: error.message });
@@ -287,8 +296,15 @@ export function GitHubIntegrationDetails({
     }
   };
 
-  const handleUninstall = () => {
-    if (confirm('Are you sure you want to uninstall the Kilo GitHub App?')) {
+  const handleUninstall = async () => {
+    if (
+      await confirm({
+        title: 'Uninstall the Kilo GitHub App?',
+        description: 'Kilo will lose access to your repositories until the app is reinstalled.',
+        confirmLabel: 'Uninstall',
+        destructive: true,
+      })
+    ) {
       uninstallApp.mutate(input, {
         onSuccess: async () => {
           toast.success('GitHub App uninstalled');
@@ -303,8 +319,16 @@ export function GitHubIntegrationDetails({
     }
   };
 
-  const handleCancelPending = () => {
-    if (confirm('Are you sure you want to cancel this installation request?')) {
+  const handleCancelPending = async () => {
+    if (
+      await confirm({
+        title: 'Cancel this installation request?',
+        description: 'The pending GitHub App installation request will be withdrawn.',
+        confirmLabel: 'Cancel request',
+        cancelLabel: 'Keep request',
+        destructive: true,
+      })
+    ) {
       cancelPendingInstallation.mutate(input, {
         onSuccess: async () => {
           toast.success('Installation request cancelled');

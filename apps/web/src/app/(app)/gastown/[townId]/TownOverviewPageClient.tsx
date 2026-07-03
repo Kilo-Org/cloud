@@ -39,6 +39,7 @@ import type { GastownOutputs } from '@/lib/gastown/trpc';
 import { AdminViewingBanner } from '@/components/gastown/AdminViewingBanner';
 import { DrainStatusBanner } from '@/components/gastown/DrainStatusBanner';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { useConfirm } from '@/components/ui/confirm';
 
 type Agent = GastownOutputs['gastown']['listAgents'][number];
 
@@ -97,6 +98,7 @@ export function TownOverviewPageClient({
   const townBasePath = basePathOverride ?? `/gastown/${townId}`;
   const router = useRouter();
   const trpc = useGastownTRPC();
+  const confirm = useConfirm();
   const [isCreateRigOpen, setIsCreateRigOpen] = useState(false);
   const [convoysCollapsed, setConvoysCollapsed] = useState(false);
   const { open: openDrawer } = useDrawerStack();
@@ -467,11 +469,21 @@ export function TownOverviewPageClient({
                       </div>
                     </div>
                     <button
+                      type="button"
                       onClick={e => {
                         e.stopPropagation();
-                        if (confirm(`Delete rig "${rig.name}"?`)) {
-                          deleteRig.mutate({ rigId: rig.id });
-                        }
+                        void (async () => {
+                          if (
+                            await confirm({
+                              title: `Delete rig "${rig.name}"?`,
+                              description: 'This permanently removes the rig and cannot be undone.',
+                              confirmLabel: 'Delete rig',
+                              destructive: true,
+                            })
+                          ) {
+                            deleteRig.mutate({ rigId: rig.id });
+                          }
+                        })();
                       }}
                       className="rounded p-1 text-white/20 opacity-0 transition-all group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-400"
                     >

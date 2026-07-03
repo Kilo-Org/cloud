@@ -18,7 +18,7 @@ export type OpenKiloPassChurnkeyCancelFlowParams = {
   invalidateKiloPassState: () => MaybePromise<unknown>;
   invalidateKiloPassScheduledChange: () => MaybePromise<unknown>;
   fallbackCancelSubscription: () => void;
-  confirmFallbackCancel: (message: string) => boolean;
+  confirmFallbackCancel: (message: string) => MaybePromise<boolean>;
   notifyCancellationScheduled: () => void;
   notifyError: (message: string) => void;
   onBeforeOpen?: () => void;
@@ -88,13 +88,15 @@ export function createKiloPassChurnkeyCancelFlow() {
           },
         });
       } catch (error) {
-        setIsInFlight(false, params);
-
         const message = error instanceof Error ? error.message : 'Failed to open cancel flow';
         params.notifyError(message);
 
-        if (params.confirmFallbackCancel(FALLBACK_CANCEL_CONFIRM_MESSAGE)) {
-          params.fallbackCancelSubscription();
+        try {
+          if (await params.confirmFallbackCancel(FALLBACK_CANCEL_CONFIRM_MESSAGE)) {
+            params.fallbackCancelSubscription();
+          }
+        } finally {
+          setIsInFlight(false, params);
         }
       }
     },

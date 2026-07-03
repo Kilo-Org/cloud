@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import type { ReactionSummary } from '@kilocode/kilo-chat';
 import { EmojiPicker } from './EmojiPicker';
 
@@ -20,7 +20,6 @@ export function ReactionPills({
   onRemove,
 }: ReactionPillsProps) {
   const [showPicker, setShowPicker] = useState(false);
-  const addButtonRef = useRef<HTMLButtonElement>(null);
 
   const handlePickerSelect = useCallback(
     (emoji: string) => {
@@ -59,21 +58,16 @@ export function ReactionPills({
           </button>
         );
       })}
-      <button
-        ref={addButtonRef}
-        onClick={() => setShowPicker(prev => !prev)}
-        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm cursor-pointer transition-colors border bg-muted border-border hover:bg-accent text-muted-foreground"
-        title="Add reaction"
-      >
-        +
-      </button>
-      {showPicker && (
-        <EmojiPicker
-          onSelect={handlePickerSelect}
-          onClose={() => setShowPicker(false)}
-          anchorRef={addButtonRef}
-        />
-      )}
+      <EmojiPicker open={showPicker} onOpenChange={setShowPicker} onSelect={handlePickerSelect}>
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-sm cursor-pointer transition-colors border bg-muted border-border hover:bg-accent text-muted-foreground"
+          title="Add reaction"
+          aria-label="Add reaction"
+        >
+          +
+        </button>
+      </EmojiPicker>
     </div>
   );
 }

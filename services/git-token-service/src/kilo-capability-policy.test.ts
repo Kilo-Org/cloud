@@ -33,6 +33,12 @@ describe('classifyKiloCapabilityRequest', () => {
       'session_ingest',
       'user',
     ],
+    [
+      'session ingest upload',
+      'https://ingest.kilosessions.ai/api/session/kilo-session-1/ingest',
+      'session_ingest',
+      'user',
+    ],
   ] as const)(
     'routes %s with the right credential',
     (_description, requestUrl, routeClass, credential) => {
@@ -91,6 +97,10 @@ describe('classifyKiloCapabilityRequest', () => {
       providerBaseUrl: 'https://api.kilo.ai/api/openrouter',
       sessionIngestBaseUrl: 'https://api.kilo.ai',
     };
+    const prefixedSessionIngestTargets = {
+      ...sharedOriginTargets,
+      sessionIngestBaseUrl: 'https://api.kilo.ai/ingest',
+    };
 
     it('does not let the backend catch-all shadow another session ingest route', () => {
       expect(
@@ -111,6 +121,19 @@ describe('classifyKiloCapabilityRequest', () => {
         )
       ).toEqual({ success: true, routeClass: 'session_ingest', credential: 'user' });
     });
+
+    it.each(['export', 'ingest'] as const)(
+      'does not let the backend catch-all shadow a prefixed %s route for another session',
+      operation => {
+        expect(
+          classifyKiloCapabilityRequest(
+            `https://api.kilo.ai/ingest/api/session/other-session/${operation}`,
+            prefixedSessionIngestTargets,
+            kiloSessionId
+          )
+        ).toEqual({ success: false, reason: 'upstream_not_allowed' });
+      }
+    );
   });
 });
 

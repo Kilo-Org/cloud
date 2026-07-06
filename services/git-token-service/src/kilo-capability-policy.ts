@@ -104,13 +104,17 @@ function isOrganizationModelsRoute(pathname: string, basePath: string): boolean 
 
 function isSessionIngestRoute(pathname: string, basePath: string, kiloSessionId: string): boolean {
   const sessionPrefix = appendPath(basePath, `/api/session/${encodeURIComponent(kiloSessionId)}`);
-  return pathname === `${sessionPrefix}/export` || pathname === `${sessionPrefix}/import`;
+  return (
+    pathname === `${sessionPrefix}/export` ||
+    pathname === `${sessionPrefix}/import` ||
+    pathname === `${sessionPrefix}/ingest`
+  );
 }
 
 function isSessionIngestShapedRoute(pathname: string, basePath: string): boolean {
   const sessionsPrefix = appendPath(basePath, '/api/session/');
   if (!pathname.startsWith(sessionsPrefix)) return false;
-  return /^[^/]+\/(?:export|import)$/.test(pathname.slice(sessionsPrefix.length));
+  return /^[^/]+\/(?:export|import|ingest)$/.test(pathname.slice(sessionsPrefix.length));
 }
 
 export function classifyKiloCapabilityRequest(
@@ -174,7 +178,8 @@ export function classifyKiloCapabilityRequest(
   if (isWithinTarget(url, backend)) {
     if (
       isProviderRoute(url.pathname, backend.basePath) ||
-      isSessionIngestShapedRoute(url.pathname, backend.basePath)
+      (url.origin === sessionIngest.origin &&
+        isSessionIngestShapedRoute(url.pathname, sessionIngest.basePath))
     ) {
       return { success: false, reason: 'upstream_not_allowed' };
     }

@@ -28,7 +28,6 @@ const KiloSessionCapabilityClaimsSchema = z
     kiloSessionId: z.string().min(1),
     outboundContainerId: z.string().min(1),
     userToken: z.string().min(1),
-    providerToken: z.string().min(1).optional(),
     targets: KiloSessionCapabilityTargetsSchema,
     issuedAt: z.number().int().nonnegative(),
     expiresAt: z.number().int().positive(),
@@ -44,7 +43,6 @@ export type KiloSessionCapabilitySubject = {
   kiloSessionId: string;
   outboundContainerId: string;
   userToken: string;
-  providerToken?: string;
   targets: KiloSessionCapabilityTargets;
 };
 export type KiloSessionCapabilityClaims = z.infer<typeof KiloSessionCapabilityClaimsSchema>;

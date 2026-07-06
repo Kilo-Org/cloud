@@ -7,11 +7,7 @@ export type KiloCapabilityRouteClass =
   | 'session_ingest';
 
 export type KiloCapabilityRouteClassification =
-  | {
-      success: true;
-      routeClass: KiloCapabilityRouteClass;
-      credential: 'user' | 'provider';
-    }
+  | { success: true; routeClass: KiloCapabilityRouteClass }
   | { success: false; reason: 'invalid_upstream_url' | 'upstream_not_allowed' };
 
 type ParsedTarget = {
@@ -152,24 +148,16 @@ export function classifyKiloCapabilityRequest(
   }
 
   if (isWithinTarget(url, provider) && isProviderRoute(url.pathname, provider.basePath)) {
-    return {
-      success: true,
-      routeClass: 'provider_model',
-      credential: 'provider',
-    };
+    return { success: true, routeClass: 'provider_model' };
   }
   if (isWithinTarget(url, backend) && isOrganizationModelsRoute(url.pathname, backend.basePath)) {
-    return {
-      success: true,
-      routeClass: 'organization_models',
-      credential: 'provider',
-    };
+    return { success: true, routeClass: 'organization_models' };
   }
   if (
     isWithinTarget(url, sessionIngest) &&
     isSessionIngestRoute(url.pathname, sessionIngest.basePath, kiloSessionId)
   ) {
-    return { success: true, routeClass: 'session_ingest', credential: 'user' };
+    return { success: true, routeClass: 'session_ingest' };
   }
   // Backend is the catch-all for its origin, so it must exclude provider- and
   // session-ingest-shaped paths. Otherwise a shared backend/session-ingest origin
@@ -183,7 +171,7 @@ export function classifyKiloCapabilityRequest(
     ) {
       return { success: false, reason: 'upstream_not_allowed' };
     }
-    return { success: true, routeClass: 'backend_api', credential: 'user' };
+    return { success: true, routeClass: 'backend_api' };
   }
   return { success: false, reason: 'upstream_not_allowed' };
 }

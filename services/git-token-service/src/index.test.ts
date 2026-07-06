@@ -1314,18 +1314,16 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
     kiloSessionId: 'kilo-session-1',
     outboundContainerId,
     userToken: 'raw-user-token',
-    providerToken: 'raw-provider-token',
     targets: kiloTargets,
   };
 
-  it('issues an opaque Kilo capability that does not leak the enclosed tokens', async () => {
+  it('issues an opaque Kilo capability that does not leak the enclosed token', async () => {
     const result = await createService().issueKiloSessionCapability(kiloSubject);
 
     expect(result).toMatchObject({ success: true });
     if (!result.success) throw new Error('Expected successful issuance');
     expect(result.capability).toMatch(/^kka1\./);
     expect(result.capability).not.toContain(kiloSubject.userToken);
-    expect(result.capability).not.toContain(kiloSubject.providerToken);
   });
 
   it('rejects issuance for malformed targets', async () => {
@@ -1349,7 +1347,7 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
     });
   });
 
-  it('redeems the provider token for provider model routes', async () => {
+  it('redeems the user token for provider model routes', async () => {
     const service = createService();
     const issued = await service.issueKiloSessionCapability(kiloSubject);
     if (!issued.success) throw new Error('Expected successful issuance');
@@ -1362,7 +1360,7 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
       })
     ).resolves.toEqual({
       success: true,
-      authorization: 'Bearer raw-provider-token',
+      authorization: 'Bearer raw-user-token',
       routeClass: 'provider_model',
     });
   });
@@ -1382,27 +1380,6 @@ describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
       success: true,
       authorization: 'Bearer raw-user-token',
       routeClass: 'backend_api',
-    });
-  });
-
-  it('falls back to the user token for provider routes when no provider token was issued', async () => {
-    const service = createService();
-    const issued = await service.issueKiloSessionCapability({
-      ...kiloSubject,
-      providerToken: undefined,
-    });
-    if (!issued.success) throw new Error('Expected successful issuance');
-
-    await expect(
-      service.redeemKiloSessionCapability({
-        capability: issued.capability,
-        outboundContainerId,
-        requestUrl: 'https://api.kilo.ai/api/openrouter/v1/chat/completions',
-      })
-    ).resolves.toEqual({
-      success: true,
-      authorization: 'Bearer raw-user-token',
-      routeClass: 'provider_model',
     });
   });
 

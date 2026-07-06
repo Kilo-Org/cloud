@@ -13,7 +13,6 @@ const claims = {
   kiloSessionId: 'kilo-session-1',
   outboundContainerId: 'outbound-container-1',
   userToken: 'raw-user-token-sentinel',
-  providerToken: 'raw-provider-token-sentinel',
   targets: {
     backendBaseUrl: 'https://api.kilo.ai',
     providerBaseUrl: 'https://api.kilo.ai',
@@ -35,7 +34,6 @@ describe('KiloSessionCapabilityCodec', () => {
 
     expect(capability).toMatch(/^kka1\./);
     expect(capability).not.toContain(claims.userToken);
-    expect(capability).not.toContain(claims.providerToken);
     expect(codec.decode(capability)).toEqual({
       purpose: 'kilo_api_session',
       version: 1,
@@ -161,7 +159,6 @@ describe('KiloSessionCapabilityCodec', () => {
     expect(expiredError).toBeInstanceOf(KiloSessionCapabilityError);
     expect(expiredError).toMatchObject({ reason: 'expired_capability' });
     expect(JSON.stringify(expiredError)).not.toContain(claims.userToken);
-    expect(JSON.stringify(expiredError)).not.toContain(claims.providerToken);
 
     const changedOffset = capability.lastIndexOf('.') + 4;
     const changedCharacter = capability[changedOffset] === 'A' ? 'B' : 'A';

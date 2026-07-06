@@ -18,37 +18,29 @@ describe('classifyKiloCapabilityRequest', () => {
       'provider model',
       'https://api.kilo.ai/api/openrouter/v1/chat/completions',
       'provider_model',
-      'provider',
     ],
     [
       'organization models',
       'https://api.kilo.ai/api/organizations/org_1/models',
       'organization_models',
-      'provider',
     ],
-    ['backend api', 'https://api.kilo.ai/api/users/me', 'backend_api', 'user'],
+    ['backend api', 'https://api.kilo.ai/api/users/me', 'backend_api'],
     [
       'session ingest',
       'https://ingest.kilosessions.ai/api/session/kilo-session-1/export',
       'session_ingest',
-      'user',
     ],
     [
       'session ingest upload',
       'https://ingest.kilosessions.ai/api/session/kilo-session-1/ingest',
       'session_ingest',
-      'user',
     ],
-  ] as const)(
-    'routes %s with the right credential',
-    (_description, requestUrl, routeClass, credential) => {
-      expect(classifyKiloCapabilityRequest(requestUrl, targets, kiloSessionId)).toEqual({
-        success: true,
-        routeClass,
-        credential,
-      });
-    }
-  );
+  ] as const)('routes %s to the right route class', (_description, requestUrl, routeClass) => {
+    expect(classifyKiloCapabilityRequest(requestUrl, targets, kiloSessionId)).toEqual({
+      success: true,
+      routeClass,
+    });
+  });
 
   it('allows percent-encoded characters in the query string', () => {
     expect(
@@ -72,7 +64,7 @@ describe('classifyKiloCapabilityRequest', () => {
     expect(classifyKiloCapabilityRequest(requestUrl, targets, kiloSessionId).success).toBe(false);
   });
 
-  it('refuses to serve provider routes with the user credential when the provider lives elsewhere', () => {
+  it('refuses to serve provider routes against the backend when the provider lives elsewhere', () => {
     expect(
       classifyKiloCapabilityRequest(
         'https://api.kilo.ai/api/openrouter/v1/chat',
@@ -119,7 +111,7 @@ describe('classifyKiloCapabilityRequest', () => {
           sharedOriginTargets,
           kiloSessionId
         )
-      ).toEqual({ success: true, routeClass: 'session_ingest', credential: 'user' });
+      ).toEqual({ success: true, routeClass: 'session_ingest' });
     });
 
     it.each(['export', 'ingest'] as const)(

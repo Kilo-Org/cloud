@@ -1119,13 +1119,9 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: classification.reason };
     }
 
-    const token =
-      classification.credential === 'provider'
-        ? (claims.providerToken ?? claims.userToken)
-        : claims.userToken;
     return {
       success: true,
-      authorization: `Bearer ${token}`,
+      authorization: `Bearer ${claims.userToken}`,
       routeClass: classification.routeClass,
     };
   }

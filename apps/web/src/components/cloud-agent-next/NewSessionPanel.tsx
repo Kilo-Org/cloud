@@ -1511,6 +1511,18 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                       />
                     </button>
                   </div>
+                  {(bitbucketRepoData?.status === 'reconnect_required' ||
+                    bitbucketRepoData.status === 'insufficient_permissions') &&
+                    bitbucketIntegrationHref && (
+                      <div className="border-b px-3 py-2 text-xs">
+                        <Link
+                          href={bitbucketIntegrationHref}
+                          className="text-link hover:text-link-hover underline underline-offset-4"
+                        >
+                          Replace the Bitbucket token to list repositories
+                        </Link>
+                      </div>
+                    )}
                   <CommandEmpty>No repositories match your search</CommandEmpty>
                   <CommandList className="max-h-64 overflow-auto">
                     {recentRepos.length > 0 && (

@@ -10,10 +10,7 @@ type CloudAgentNextFilters = {
   endDate: string;
 };
 
-export type CloudAgentNextHealthFilters = CloudAgentNextFilters & {
-  bucket: 'hour' | 'day';
-  createdOnPlatform?: string | null;
-};
+export type CloudAgentNextHealthFilters = CloudAgentNextFilters;
 
 type CloudAgentNextHealthError = {
   source: 'setup' | 'run';
@@ -23,11 +20,6 @@ type CloudAgentNextHealthError = {
 
 function enabledForInterval(params: CloudAgentNextFilters) {
   return Boolean(params.startDate && params.endDate);
-}
-
-export function useCloudAgentNextHealthPlatforms() {
-  const trpc = useTRPC();
-  return useQuery(trpc.admin.cloudAgentNext.listHealthPlatforms.queryOptions());
 }
 
 export function useCloudAgentNextHealthOverview(
@@ -40,6 +32,7 @@ export function useCloudAgentNextHealthOverview(
     enabled: enabled && enabledForInterval(params),
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -55,7 +48,6 @@ export function useCloudAgentNextHealthErrorSessions(
       source: error?.source ?? 'run',
       stage: error?.stage ?? 'not-selected',
       code: error?.code ?? 'not-selected',
-      createdOnPlatform: params.createdOnPlatform,
     }),
     enabled: enabledForInterval(params) && Boolean(error),
   });

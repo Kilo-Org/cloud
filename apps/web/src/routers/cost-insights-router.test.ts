@@ -75,7 +75,6 @@ describe('Cost Insights router', () => {
           alertKind: 'anomaly',
           eventId: crypto.randomUUID(),
         }),
-      () => caller.costInsights.disableThreshold(),
       () => caller.costInsights.dismissSuggestion({ suggestionId: crypto.randomUUID() }),
     ];
 
@@ -382,61 +381,6 @@ describe('Cost Insights router', () => {
     expect(config?.spend_alerts_enabled).toBe(true);
     expect(state?.active_anomaly_event_id).toBe(alertEvent.id);
     expect(events).toEqual([{ eventType: 'anomaly_alert' }]);
-  });
-
-  it('turns off the threshold and clears the active threshold episode', async () => {
-    const user = await insertTestUser({ is_admin: true });
-    await db.insert(cost_insight_owner_configs).values({
-      owned_by_user_id: user.id,
-      spend_alerts_enabled: true,
-      cost_suggestions_enabled: true,
-      spend_threshold_microdollars: 150_000_000,
-    });
-    await db.insert(cost_insight_owner_states).values({
-      owned_by_user_id: user.id,
-      threshold_crossing_active: true,
-      threshold_crossing_started_at: '2026-06-25T19:00:00.000Z',
-    });
-
-    const caller = await createCallerForUser(user.id);
-    await expect(caller.costInsights.disableThreshold()).resolves.toEqual({ success: true });
-
-    const [config] = await db
-      .select()
-      .from(cost_insight_owner_configs)
-      .where(eq(cost_insight_owner_configs.owned_by_user_id, user.id));
-    const [state] = await db
-      .select()
-      .from(cost_insight_owner_states)
-      .where(eq(cost_insight_owner_states.owned_by_user_id, user.id));
-    const events = await db
-      .select()
-      .from(cost_insight_events)
-      .where(eq(cost_insight_events.owned_by_user_id, user.id));
-
-    expect(config?.spend_threshold_microdollars).toBeNull();
-    expect(state).toMatchObject({
-      threshold_crossing_active: false,
-      active_threshold_event_id: null,
-      threshold_crossing_started_at: null,
-      threshold_reviewed_at: null,
-    });
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({
-      event_type: 'config_changed',
-      actor_user_id: user.id,
-      description: 'Spend threshold was turned off.',
-      snapshot: {
-        changedFields: {
-          spendThresholdMicrodollars: { old: 150_000_000, new: null },
-        },
-        settings: {
-          spendAlertsEnabled: true,
-          costSuggestionsEnabled: true,
-          spendThresholdMicrodollars: null,
-        },
-      },
-    });
   });
 
   it('tracks accepted alert reviews and suggestion dismissals only once', async () => {

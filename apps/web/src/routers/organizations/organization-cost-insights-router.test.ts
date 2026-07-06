@@ -219,7 +219,6 @@ describe('Organization Cost Insights tracking', () => {
           alertKind: 'anomaly',
           eventId: crypto.randomUUID(),
         }),
-      () => caller.organizations.costInsights.disableThreshold({ organizationId }),
       () =>
         caller.organizations.costInsights.dismissSuggestion({
           organizationId,

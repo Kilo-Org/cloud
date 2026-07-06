@@ -10,13 +10,8 @@ import {
 } from '@/lib/cost-insights/presenter';
 import {
   acknowledgeCostInsightAlert,
-  clearCostInsightThresholdEpisode,
-  createCostInsightEvent,
   countOpenCostInsightReviewItems,
   dismissCostInsightSuggestion,
-  getCostInsightConfigChanges,
-  getCostInsightSettingsSnapshot,
-  updateCostInsightOwnerConfig,
   updateCostInsightSettings,
 } from '@/lib/cost-insights/repository';
 import { evaluateCostInsightsForOwner } from '@/lib/cost-insights/evaluation';
@@ -176,43 +171,6 @@ async function updateOwnerSettings(params: {
   return { success: true };
 }
 
-async function disableOwnerThreshold(params: {
-  owner: { type: 'user'; id: string } | { type: 'organization'; id: string };
-  actorUserId: string;
-  trackingContext: CostInsightsTrackingContext;
-}) {
-  const result = await db.transaction(async database => {
-    const { previous, current } = await updateCostInsightOwnerConfig(database, params.owner, {
-      spendThresholdMicrodollars: null,
-    });
-    await clearCostInsightThresholdEpisode(database, params.owner, null);
-
-    if (previous.spend_threshold_microdollars === null) {
-      return { success: true, previous, current, changed: false };
-    }
-
-    if (current.spend_alerts_enabled) {
-      await createCostInsightEvent(database, {
-        owner: params.owner,
-        eventType: 'config_changed',
-        actorUserId: params.actorUserId,
-        title: 'Cost Insights settings changed',
-        description: 'Spend threshold was turned off.',
-        snapshot: {
-          changedFields: getCostInsightConfigChanges(previous, current),
-          settings: getCostInsightSettingsSnapshot(current),
-        },
-      });
-    }
-
-    return { success: true, previous, current, changed: true };
-  });
-  if (result.changed) {
-    trackSettingsSaved(params.trackingContext, result.previous, result.current);
-  }
-  return { success: result.success };
-}
-
 export const costInsightsRouter = createTRPCRouter({
   trackUiInteraction: adminProcedure
     .input(CostInsightsUiInteractionSchema)
@@ -292,13 +250,6 @@ export const costInsightsRouter = createTRPCRouter({
       }
       return { success: true };
     }),
-  disableThreshold: adminProcedure.mutation(async ({ ctx }) => {
-    return await disableOwnerThreshold({
-      owner: { type: 'user', id: ctx.user.id },
-      actorUserId: ctx.user.id,
-      trackingContext: personalTrackingContext(ctx.user.id),
-    });
-  }),
   dismissSuggestion: adminProcedure
     .input(DismissCostInsightSuggestionSchema)
     .mutation(async ({ ctx, input }) => {
@@ -321,7 +272,6 @@ export const costInsightsRouter = createTRPCRouter({
 
 export const costInsightsRouterInternals = {
   updateOwnerSettings,
-  disableOwnerThreshold,
   UpdateCostInsightsSettingsSchema,
   AcknowledgeCostInsightAlertSchema,
   DismissCostInsightSuggestionSchema,

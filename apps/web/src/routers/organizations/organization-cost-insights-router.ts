@@ -213,16 +213,6 @@ export const organizationCostInsightsRouter = createTRPCRouter({
       }
       return { success: true };
     }),
-  disableThreshold: adminProcedure
-    .input(OrganizationIdInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const role = await ensureOrgManageAccess(ctx, input.organizationId);
-      return await costInsightsRouterInternals.disableOwnerThreshold({
-        owner: { type: 'organization', id: input.organizationId },
-        actorUserId: ctx.user.id,
-        trackingContext: organizationTrackingContext(ctx.user.id, input.organizationId, role),
-      });
-    }),
   dismissSuggestion: adminProcedure
     .input(
       OrganizationIdInputSchema.merge(

@@ -116,7 +116,7 @@ test(
       );
       tmux('select-pane', '-t', `${sessionName}:0.1`, '-T', serviceName);
 
-      restartServiceInTmux(sessionName, serviceName);
+      void restartServiceInTmux(sessionName, serviceName);
       breakPane(sessionName, 0, 1, serviceName);
 
       await sleep(1200);
@@ -196,9 +196,18 @@ process.stdin.on('data', d => {
       }
       assert.ok(fixtureUp, 'slow-shutdown fixture process should start');
 
-      restartServiceInTmux(sessionName, serviceName);
+      // A second restart before the first settles must take over the poll —
+      // otherwise both would relaunch, and the slower one would interrupt
+      // the freshly started service partway through its own poll.
+      const supersededRestart = restartServiceInTmux(sessionName, serviceName);
+      const outcome = await restartServiceInTmux(sessionName, serviceName);
+      assert.equal(await supersededRestart, 'superseded');
+      assert.ok(
+        outcome === 'relaunched' || outcome === 'recreated',
+        `restart should settle with a relaunch, got '${outcome}'`
+      );
 
-      await sleep(6000);
+      await sleep(500); // let the relaunch keystrokes echo before capturing
       // Depending on the wrapper shell's SIGINT semantics the pane either
       // survives (relaunch typed into its shell) or closes with the process
       // (service window recreated). Both count as a restart; the old fixed
@@ -264,9 +273,9 @@ test(
       );
       tmux('select-pane', '-t', `${sessionName}:0.1`, '-T', serviceName);
 
-      restartServiceInTmux(sessionName, serviceName);
+      const outcome = await restartServiceInTmux(sessionName, serviceName);
 
-      await sleep(1500);
+      assert.equal(outcome, 'recreated');
       assert.ok(
         listWindows(sessionName).some(window => window.name === serviceName),
         'service window should be recreated after its pane closed on interrupt'

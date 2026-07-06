@@ -638,7 +638,12 @@ async function cmdRestart(serviceName: string): Promise<void> {
     process.exit(1);
   }
 
-  restartServiceInTmux(sessionName, serviceName);
+  console.log(`Restarting ${serviceName} (waiting for the old process to shut down)...`);
+  const outcome = await restartServiceInTmux(sessionName, serviceName);
+  if (outcome === 'gave-up') {
+    console.error(`${serviceName} did not shut down in time; not relaunched`);
+    process.exit(1);
+  }
   console.log(`Restarted ${serviceName}`);
 }
 

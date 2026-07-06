@@ -694,7 +694,7 @@ function Dashboard({
       const item = sidebarItems[selectedIdx];
       if (!item || item.kind !== 'service') return;
       if (!runningServices.has(item.name)) return;
-      restartServiceInTmux(sessionName, item.name);
+      void restartServiceInTmux(sessionName, item.name);
       return;
     }
     if (input === 'q') {

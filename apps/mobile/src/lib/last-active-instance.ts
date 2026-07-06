@@ -17,3 +17,8 @@ export async function setLastActiveInstance(sandboxId: string): Promise<void> {
   cached = sandboxId;
   await SecureStore.setItemAsync(LAST_ACTIVE_INSTANCE_KEY, sandboxId);
 }
+
+export async function clearLastActiveInstance(): Promise<void> {
+  cached = null;
+  await SecureStore.deleteItemAsync(LAST_ACTIVE_INSTANCE_KEY);
+}

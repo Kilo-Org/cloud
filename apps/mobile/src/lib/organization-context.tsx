@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 
+import { useAuth } from '@/lib/auth/auth-context';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 type OrganizationContextValue = {
@@ -21,8 +22,18 @@ type OrganizationContextValue = {
 const OrganizationContext = createContext<OrganizationContextValue | undefined>(undefined);
 
 export function OrganizationProvider({ children }: { readonly children: ReactNode }) {
+  const { token } = useAuth();
   const [organizationId, setOrgState] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  // The provider mounts above the auth gate and never remounts, so the
+  // in-memory selection must be reset when the session ends — otherwise the
+  // previous user's org id keeps being sent after a different account signs in.
+  useEffect(() => {
+    if (!token) {
+      setOrgState(null);
+    }
+  }, [token]);
 
   useEffect(() => {
     let cancelled = false;

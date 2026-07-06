@@ -1,4 +1,5 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
+import { generateText } from 'ai';
 import { eq } from 'drizzle-orm';
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -16,14 +17,20 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 
+jest.mock('ai', () => ({
+  createGateway: jest.fn(() => jest.fn((modelId: string) => ({ modelId }))),
+  generateText: jest.fn(),
+}));
+
 const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
 const ULTRA_PLAN_ID = 'minimax-token-plan-ultra';
 const COST_MICRODOLLARS = 20_000_000;
 const MAX_COST_MICRODOLLARS = 50_000_000;
+const mockedGenerateText = jest.mocked(generateText);
 
-function inventoryEntry(key: string) {
-  return `${key}::minimax-plan-${crypto.randomUUID()}`;
+function inventoryEntry(key: string, upstreamPlanId = `minimax-plan-${crypto.randomUUID()}`) {
+  return `${key}::${upstreamPlanId}`;
 }
 
 afterEach(async () => {
@@ -34,6 +41,7 @@ afterEach(async () => {
   await db.delete(coding_plan_key_inventory);
   await db.delete(credit_transactions);
   await db.delete(kilocode_users);
+  jest.clearAllMocks();
 });
 
 describe('coding plans router', () => {
@@ -338,12 +346,15 @@ describe('coding plans router', () => {
   it('accepts provider and plan when admins upload inventory', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const caller = await createCallerForUser(admin.id);
+    mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
 
     await expect(
       caller.codingPlans.adminUploadKeys({
         providerId: 'minimax',
         planId: MAX_PLAN_ID,
-        entries: [inventoryEntry('admin-max-upload')],
+        entries: [
+          inventoryEntry('admin-max-upload', `minimax-token-plan-max-${crypto.randomUUID()}`),
+        ],
       })
     ).resolves.toEqual({ inserted: 1 });
 

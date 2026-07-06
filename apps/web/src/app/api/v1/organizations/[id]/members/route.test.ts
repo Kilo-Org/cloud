@@ -64,9 +64,12 @@ describe('GET /api/v1/organizations/[id]/members', () => {
     });
 
     expect(withMembers).toHaveBeenCalledWith({ organizationId: 'org-id' });
-    expect(invitedMember).toHaveProperty('inviteToken', 'secret-token');
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual([
+    const body = await response.json();
+
+    expect(body[1]).not.toHaveProperty('inviteToken');
+    expect(body[1]).not.toHaveProperty('inviteUrl');
+    expect(body).toEqual([
       {
         id: 'user-id',
         name: 'Active User',

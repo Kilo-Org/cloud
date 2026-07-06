@@ -2117,9 +2117,6 @@ export const microdollar_usage = pgTable(
     index('idx_microdollar_usage_organization_id')
       .on(table.organization_id)
       .where(isNotNull(table.organization_id)),
-    index('idx_microdollar_usage_org_created_at')
-      .on(table.organization_id, table.created_at)
-      .where(isNotNull(table.organization_id)),
   ]
 );
 
@@ -8693,7 +8690,6 @@ export const coding_plan_terms = pgTable(
       table.idempotency_key
     ),
     index('IDX_coding_plan_terms_subscription').on(table.subscription_id),
-    index('IDX_coding_plan_terms_credit_transaction').on(table.credit_transaction_id),
     enumCheck('coding_plan_terms_kind_check', table.kind, CodingPlanTermKind),
   ]
 );

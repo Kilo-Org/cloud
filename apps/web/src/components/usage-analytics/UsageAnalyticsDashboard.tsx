@@ -64,24 +64,38 @@ import { FeatureAdoptionView } from './FeatureAdoptionView';
 import { RecommendationsView } from './RecommendationsView';
 import { UsageViewNavigation } from './UsageViewNavigation';
 
-type UsageAnalyticsDashboardProps = {
-  context: 'personal' | 'organization';
-  organizationId: string | null;
-  /**
-   * Organization display name (org context). Used in the "Entire {name}"
-   * toggle label when the caller can view the entire org.
-   */
-  organizationName?: string;
-  /**
-   * Caller's role in `organizationId`. Required for the `organization` context
-   * to decide whether to render the "My Usage / Entire Organization" toggle.
-   * Ignored in personal context (role is resolved per-org via `organizations.list`).
-   */
-  callerRole?: OrganizationRole;
-  organizationPlan?: Organization['plan'];
-  /** Page title override. */
-  title?: string;
-};
+/**
+ * Personal usage never targets a single organization, so org-only props
+ * (`organizationId`, `organizationName`, `callerRole`, `organizationPlan`) are
+ * meaningless there; organization usage always targets a concrete org. Modeling
+ * these as a discriminated union stops callers from mixing the two — e.g.
+ * passing `context="organization"` with a null org id, or leaking org-only
+ * props into the personal page.
+ */
+type UsageAnalyticsDashboardProps =
+  | {
+      context: 'personal';
+      /** Page title override. */
+      title?: string;
+    }
+  | {
+      context: 'organization';
+      /** Target organization. Always present in organization context. */
+      organizationId: string;
+      /**
+       * Organization display name (org context). Used in the "Entire {name}"
+       * toggle label when the caller can view the entire org.
+       */
+      organizationName?: string;
+      /**
+       * Caller's role in `organizationId`. Decides whether to render the
+       * "My Usage / Entire Organization" toggle.
+       */
+      callerRole?: OrganizationRole;
+      organizationPlan?: Organization['plan'];
+      /** Page title override. */
+      title?: string;
+    };
 
 /** Sentinel written by DBT rollups for rows with NULL project_id. */
 const PROJECT_SENTINEL_NONE = '';
@@ -112,14 +126,16 @@ const METRIC_OPTIONS: MetricKey[] = [
   'outputInputRatio',
 ];
 
-export function UsageAnalyticsDashboard({
-  context,
-  organizationId,
-  organizationName,
-  callerRole,
-  organizationPlan,
-  title,
-}: UsageAnalyticsDashboardProps) {
+export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
+  const { context, title } = props;
+  // Normalize the discriminated props into the nullable locals the rest of the
+  // component expects: org-only fields collapse to null/undefined in personal
+  // context, preserving the previous `organizationId: string | null` contract.
+  const organizationId = props.context === 'organization' ? props.organizationId : null;
+  const organizationName = props.context === 'organization' ? props.organizationName : undefined;
+  const callerRole = props.context === 'organization' ? props.callerRole : undefined;
+  const organizationPlan = props.context === 'organization' ? props.organizationPlan : undefined;
+
   const trpc = useTRPC();
   // Migrate legacy `?viewAs=org-wide` links (which meant page-org-wide) to the
   // new `scope` model so existing bookmarks keep opening an org-wide view

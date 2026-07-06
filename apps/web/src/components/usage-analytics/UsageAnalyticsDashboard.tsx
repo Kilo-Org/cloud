@@ -128,13 +128,15 @@ const METRIC_OPTIONS: MetricKey[] = [
 
 export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   const { context, title } = props;
-  // Normalize the discriminated props into the nullable locals the rest of the
-  // component expects: org-only fields collapse to null/undefined in personal
-  // context, preserving the previous `organizationId: string | null` contract.
-  const organizationId = props.context === 'organization' ? props.organizationId : null;
-  const organizationName = props.context === 'organization' ? props.organizationName : undefined;
-  const callerRole = props.context === 'organization' ? props.callerRole : undefined;
-  const organizationPlan = props.context === 'organization' ? props.organizationPlan : undefined;
+  // Narrow the discriminated union once: personal context has no target org, so
+  // the org-only fields collapse to a single nullable object. The rest of the
+  // component reads these locals (with `organizationId: string | null`) without
+  // re-narrowing the union.
+  const org = props.context === 'organization' ? props : null;
+  const organizationId = org?.organizationId ?? null;
+  const organizationName = org?.organizationName;
+  const callerRole = org?.callerRole;
+  const organizationPlan = org?.organizationPlan;
 
   const trpc = useTRPC();
   // Migrate legacy `?viewAs=org-wide` links (which meant page-org-wide) to the
@@ -167,7 +169,12 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   const isOrgContext = context === 'organization';
   // Owners/billing_managers are the only roles that may view org-wide usage and
   // (via inheritance) child-org usage, so only they get the expanded scope list.
-  const isOrgAdmin = isOrgContext && (callerRole === 'owner' || callerRole === 'billing_manager');
+  // Keep the narrowed org variant (not just a boolean) so a non-null `adminOrg`
+  // carries the concrete `organizationId`; downstream org-admin queries then
+  // read a guaranteed string id without re-checking it for null.
+  const adminOrg =
+    org && (org.callerRole === 'owner' || org.callerRole === 'billing_manager') ? org : null;
+  const isOrgAdmin = adminOrg !== null;
   const hasEnterpriseUsageViews = context === 'organization' && organizationPlan === 'enterprise';
   const showDetailedUsage = !hasEnterpriseUsageViews || usageView === 'ai-usage';
 
@@ -184,7 +191,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   // owners/billing_managers; members never see the expanded scope list.
   const scopeOrgsQuery = useQuery(
     trpc.usageAnalytics.getScopeOrganizations.queryOptions(
-      isOrgAdmin && organizationId ? { organizationId } : skipToken
+      adminOrg ? { organizationId: adminOrg.organizationId } : skipToken
     )
   );
   const scopeOrgs = scopeOrgsQuery.data;
@@ -228,7 +235,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   // (and persist) the deep-linked grouping/user filters before validation runs.
   // Keyed off `isLoading` (not `!data`) so a failed scope-list fetch falls back
   // to clamping instead of honoring a stale/unknown scope indefinitely.
-  const scopeListPending = isOrgAdmin && !!organizationId && scopeOrgsQuery.isLoading;
+  const scopeListPending = adminOrg != null && scopeOrgsQuery.isLoading;
   const resolvedOrgScope = !isOrgAdmin
     ? ORG_SCOPE_SELF
     : scopeListPending || validOrgScopeValues.has(orgScope)
@@ -248,10 +255,13 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   const effectiveOrgId: string | null = isOrgContext ? orgContextOrgId : personalEffectiveOrgId;
 
   // Org ids aggregated by the "All Organizations" scope (parent + children).
+  // This scope is reachable only in organization context, so the page org id is
+  // always present; the precondition guard both documents that and narrows the
+  // nullable local to a string. Keyed on the stable `organizationId` primitive
+  // (not the per-render `props`/`org` object) to preserve memoization.
   const effectiveOrganizationIds = useMemo<string[] | null>(() => {
-    if (!isAllOrgsScope) return null;
-    const ids = new Set<string>();
-    if (organizationId) ids.add(organizationId);
+    if (!isAllOrgsScope || organizationId == null) return null;
+    const ids = new Set<string>([organizationId]);
     for (const child of childOrganizations) ids.add(child.organizationId);
     return Array.from(ids);
   }, [isAllOrgsScope, organizationId, childOrganizations]);

@@ -35,17 +35,27 @@ type CloudAgentTransportConfig = {
 function createCloudAgentTransport(config: CloudAgentTransportConfig): TransportFactory {
   const websocketBaseUrl = config.websocketBaseUrl;
 
-  function buildWebsocketUrl(): string {
-    const url = new URL('/stream', websocketBaseUrl);
-    url.searchParams.set('cloudAgentSessionId', config.sessionId);
-    url.searchParams.set('replay', 'false');
-    return url.toString();
-  }
-
   return (sink: TransportSink) => {
     let connection: Connection | null = null;
     let lifecycleGeneration = 0;
     let stoppedReceived = false;
+    // Last persisted event id seen on the wire (eventId 0 is the synthetic
+    // sentinel). Used as a replay cursor on reconnect: the DO replays every
+    // stored event after it, so content produced while the socket was dead is
+    // re-delivered in order instead of being left to snapshot freshness.
+    let lastEventId: number | null = null;
+
+    function buildWebsocketUrl(): string {
+      const url = new URL('/stream', websocketBaseUrl);
+      url.searchParams.set('cloudAgentSessionId', config.sessionId);
+      if (lastEventId === null) {
+        // First connect: messages are pre-loaded via REST, skip the full replay.
+        url.searchParams.set('replay', 'false');
+      } else {
+        url.searchParams.set('fromId', String(lastEventId));
+      }
+      return url.toString();
+    }
 
     function closeConnection(mode: 'disconnect' | 'destroy'): void {
       if (!connection) return;
@@ -80,11 +90,15 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       const stoppedEvent: ServiceEvent = { type: 'stopped', reason: 'transport-disconnected' };
 
       const nextConnection = createConnection({
-        websocketUrl: buildWebsocketUrl(),
+        websocketUrl: buildWebsocketUrl,
         ticket,
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
         onEvent: raw => {
+          if (raw.eventId > 0) {
+            lastEventId = raw.eventId;
+          }
+
           const event = normalize(raw);
           if (!event) return;
 
@@ -113,6 +127,11 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         onReconnected: () => {
           if (expectedGeneration !== lifecycleGeneration) return;
           stoppedReceived = false;
+          // With a replay cursor the socket itself re-delivers everything
+          // missed while dead — replaying a (possibly stale) snapshot on top
+          // would overwrite newer parts. Only fall back to the snapshot when
+          // no cursor exists yet.
+          if (lastEventId !== null) return;
           void config.fetchSnapshot(config.kiloSessionId).then(
             snapshot => {
               if (expectedGeneration !== lifecycleGeneration) return;

@@ -1511,30 +1511,6 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                       />
                     </button>
                   </div>
-                  {organizationId &&
-                    bitbucketIntegrationHref &&
-                    bitbucketRepoData?.status &&
-                    bitbucketRepoData.status !== 'available' && (
-                      <div className="border-b px-3 py-2 text-xs">
-                        {bitbucketRepoData.status === 'temporarily_unavailable' ? (
-                          <span className="text-muted-foreground">
-                            Bitbucket is temporarily unavailable. Refresh repositories to try again.
-                          </span>
-                        ) : (
-                          <Link
-                            href={bitbucketIntegrationHref}
-                            className="text-link hover:text-link-hover underline underline-offset-4"
-                          >
-                            {bitbucketRepoData.status === 'reconnect_required' ||
-                            bitbucketRepoData.status === 'insufficient_permissions'
-                              ? 'Replace the Bitbucket token to list repositories'
-                              : bitbucketRepoData.status === 'invalid_request'
-                                ? 'Review the Bitbucket connection'
-                                : 'Connect Bitbucket to list repositories'}
-                          </Link>
-                        )}
-                      </div>
-                    )}
                   <CommandEmpty>No repositories match your search</CommandEmpty>
                   <CommandList className="max-h-64 overflow-auto">
                     {recentRepos.length > 0 && (

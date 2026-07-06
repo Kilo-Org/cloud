@@ -1512,7 +1512,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
                     </button>
                   </div>
                   {(bitbucketRepoData?.status === 'reconnect_required' ||
-                    bitbucketRepoData.status === 'insufficient_permissions') &&
+                    bitbucketRepoData?.status === 'insufficient_permissions') &&
                     bitbucketIntegrationHref && (
                       <div className="border-b px-3 py-2 text-xs">
                         <Link

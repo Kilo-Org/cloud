@@ -130,7 +130,7 @@ export function LoginScreen() {
                 }}
                 accessibilityLabel="Copy sign-in link"
               >
-                <Text>Copy Link</Text>
+                <Text numberOfLines={1}>Copy Link</Text>
               </Button>
             </View>
             <Button variant="ghost" onPress={cancel} accessibilityLabel="Cancel sign in">

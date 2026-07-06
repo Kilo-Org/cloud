@@ -404,6 +404,26 @@ function isPaneRunningCommand(sessionName: string, pane: PaneInfo): boolean {
   }
 }
 
+/**
+ * Whether the pane's shell currently has a child process. `pane_current_command`
+ * cannot answer this: services run under a `$SHELL -lc '<cmd>; exec $SHELL -l'`
+ * wrapper, so it reports the wrapper shell even while the service is alive.
+ * Used to tell "service still shutting down" from "idle shell, safe to type".
+ */
+function paneHasRunningChild(sessionName: string, pane: PaneInfo): boolean {
+  try {
+    const panePid = execSync(
+      `tmux display-message -p -t ${sessionName}:${pane.windowIndex}.${pane.paneIndex} "#{pane_pid}"`,
+      { encoding: 'utf-8' }
+    ).trim();
+    if (!/^\d+$/.test(panePid)) return false;
+    execSync(`pgrep -P ${panePid}`, { stdio: 'ignore' });
+    return true; // pgrep exits 0 only when at least one child matches
+  } catch {
+    return false;
+  }
+}
+
 function selectPane(sessionName: string, windowTarget: string | number, pane: number): void {
   execSync(`tmux select-pane -t ${sessionName}:${windowTarget}.${pane}`, { stdio: 'ignore' });
 }
@@ -504,6 +524,7 @@ export {
   countPanes,
   findServicePane,
   isPaneRunningCommand,
+  paneHasRunningChild,
   selectPane,
   setPaneTitle,
   enablePaneBorders,

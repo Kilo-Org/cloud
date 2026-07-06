@@ -14,6 +14,7 @@ import {
   breakPane,
   countPanes,
   findServicePane,
+  paneHasRunningChild,
   selectPane,
   setPaneTitle,
   setMainLeftLayout,
@@ -285,7 +286,18 @@ export function restartServiceInTmux(sessionName: string, serviceName: string): 
   const pane = findServicePane(sessionName, serviceName);
   if (!pane) return;
   sendInterrupt(sessionName, pane.windowIndex, pane.paneIndex);
-  setTimeout(() => {
+  // Poll until the old process is actually gone before relaunching. A fixed
+  // delay is not enough: slow-shutdown services (wrangler with containers
+  // takes 10s+ on SIGINT) are still in the foreground when the relaunch
+  // keystrokes arrive, which feeds the command into the dying process's
+  // stdin instead of the shell and leaves the service stopped.
+  const POLL_MS = 500;
+  const ESCALATE_AT_MS = 15_000; // second SIGINT for shutdowns stuck on children
+  const GIVE_UP_AT_MS = 60_000;
+  let elapsed = 0;
+  let escalated = false;
+  const timer = setInterval(() => {
+    elapsed += POLL_MS;
     const currentPane = findServicePane(sessionName, serviceName);
     if (!currentPane) {
       // The pane can close together with the process (SIGINT kills the
@@ -293,6 +305,7 @@ export function restartServiceInTmux(sessionName: string, serviceName: string): 
       // tmux closes a pane when its process exits). Recreate the service
       // window instead of leaving the service stopped after reporting
       // "Restarted"; the new window inherits the tmux session environment.
+      clearInterval(timer);
       try {
         startServiceInTmux(sessionName, serviceName);
       } catch {
@@ -301,13 +314,31 @@ export function restartServiceInTmux(sessionName: string, serviceName: string): 
       }
       return;
     }
+    if (paneHasRunningChild(sessionName, currentPane)) {
+      if (elapsed >= GIVE_UP_AT_MS) {
+        // Refuses to die — typing into it would only feed its stdin.
+        clearInterval(timer);
+      } else if (!escalated && elapsed >= ESCALATE_AT_MS) {
+        // Mirror a human's second ctrl-c: wrangler and friends force-quit
+        // on a repeated interrupt when a graceful shutdown hangs.
+        escalated = true;
+        try {
+          sendInterrupt(sessionName, currentPane.windowIndex, currentPane.paneIndex);
+        } catch {
+          // Pane may vanish between the check and the signal; next tick
+          // handles it via the recreate branch.
+        }
+      }
+      return;
+    }
+    clearInterval(timer);
     try {
       sendKeys(sessionName, currentPane.windowIndex, cmd, currentPane.paneIndex);
     } catch {
       // The dashboard may have moved or closed the pane after we resolved it.
       // Keep the TUI alive; the next explicit restart/view action can retry.
     }
-  }, 1000);
+  }, POLL_MS);
 }
 
 // ---------------------------------------------------------------------------

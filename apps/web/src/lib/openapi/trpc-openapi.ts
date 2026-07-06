@@ -83,6 +83,13 @@ function requestShapeForProcedure(procedure: TrpcOpenApiProcedure) {
 }
 
 function operationForProcedure(procedure: TrpcOpenApiProcedure) {
+  const routeSpecificErrorResponses = Object.fromEntries(
+    Object.entries(procedure.errorResponses ?? {}).map(([status, description]) => [
+      status,
+      errorResponse(description),
+    ])
+  );
+
   return {
     operationId: procedure.procedurePath.replaceAll('.', '_'),
     tags: procedure.tags,
@@ -102,7 +109,7 @@ function operationForProcedure(procedure: TrpcOpenApiProcedure) {
       '400': errorResponse('Invalid request'),
       '401': errorResponse('Authentication required'),
       '403': errorResponse('Access denied'),
-      '404': errorResponse('Resource not found'),
+      ...routeSpecificErrorResponses,
       '500': errorResponse('Unexpected server error'),
     },
   };

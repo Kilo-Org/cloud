@@ -23,6 +23,7 @@ export type TrpcOpenApiProcedure = {
   tags: string[];
   summary: string;
   description?: string;
+  errorResponses?: Partial<Record<'404', string>>;
   input: z.ZodType;
   output: z.ZodType;
 };
@@ -90,6 +91,9 @@ export const publicTrpcOpenApiProcedures = [
     summary: 'Return organization members',
     description:
       'Returns active and invited members for an organization the authenticated user can access. Invite tokens and invite URLs are omitted from the response.',
+    errorResponses: {
+      '404': 'Resource not found',
+    },
     input: OrganizationMembersInputSchema,
     output: PublicOrganizationMembersSchema,
   },

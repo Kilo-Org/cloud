@@ -237,16 +237,6 @@ describe('generateTrpcOpenApiDocument', () => {
             },
           },
         },
-        '404': {
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                required: ['error'],
-              },
-            },
-          },
-        },
       },
     });
   });

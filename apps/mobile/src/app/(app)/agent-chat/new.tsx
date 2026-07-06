@@ -80,7 +80,6 @@ export default function NewSessionScreen() {
 
   // Prompt ref (uncontrolled TextInput on iOS)
   const promptRef = useRef('');
-  const [hasPrompt, setHasPrompt] = useState(false);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
     minHeight: PROMPT_INPUT_MIN_HEIGHT,
@@ -163,7 +162,16 @@ export default function NewSessionScreen() {
   const handleCreate = useCallback(async () => {
     const prompt = promptRef.current.trim();
     // The backend requires a non-empty prompt even when attachments are present.
-    if (!prompt || !selectedRepo || !model) {
+    if (!prompt) {
+      toast.error('Enter a prompt first.');
+      return;
+    }
+    if (!selectedRepo) {
+      toast.error('Select a repository first.');
+      return;
+    }
+    if (!model) {
+      toast.error('Select a model first.');
       return;
     }
     if (attachments.isUploading) {
@@ -245,8 +253,6 @@ export default function NewSessionScreen() {
     attachments,
   ]);
 
-  const canStart = hasPrompt && selectedRepo.length > 0 && model.length > 0 && !isCreating;
-
   const { addCandidates } = attachments;
   const handleAddAttachment = useCallback(async () => {
     addCandidates(await pickAgentAttachments());
@@ -303,7 +309,6 @@ export default function NewSessionScreen() {
               onChangeText={text => {
                 promptRef.current = text;
                 promptMeasure.setText(text);
-                setHasPrompt(text.trim().length > 0);
               }}
               onLayout={handlePromptInputLayout}
               scrollEnabled={promptMeasure.height >= PROMPT_INPUT_MAX_HEIGHT}
@@ -374,7 +379,7 @@ export default function NewSessionScreen() {
         <Button
           size="lg"
           className="mt-6"
-          disabled={!canStart}
+          disabled={isCreating}
           onPress={() => {
             void handleCreate();
           }}

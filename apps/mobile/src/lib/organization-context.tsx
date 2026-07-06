@@ -29,13 +29,14 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
   // The provider mounts above the auth gate and never remounts, so the
   // in-memory selection must be reset when the session ends — otherwise the
   // previous user's org id keeps being sent after a different account signs in.
+  // Loading from storage is gated on the same token so a sign-out cancels any
+  // in-flight read that would otherwise reinstate the previous user's org id.
   useEffect(() => {
     if (!token) {
       setOrgState(null);
+      setIsLoaded(true);
+      return undefined;
     }
-  }, [token]);
-
-  useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
@@ -53,7 +54,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [token]);
 
   const setOrganizationId = useCallback((id: string | null) => {
     setOrgState(id);

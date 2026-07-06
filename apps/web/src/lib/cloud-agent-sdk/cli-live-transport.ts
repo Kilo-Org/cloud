@@ -62,6 +62,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       if (sessionStopped) return;
       sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
       sessionStopped = true;
+      // The disconnected state is only cleared by a session.status event, so
+      // the next post-reconnect heartbeat must always forward one — even when
+      // the CLI comes back with the same status it had before the drop.
+      lastForwardedHeartbeatStatus = null;
     }
 
     // Heartbeats carry the CLI's current per-session status. Forwarding it

@@ -142,6 +142,32 @@ describe('CliLiveTransport unified user web connection', () => {
     transport.destroy();
   });
 
+  it('re-forwards an unchanged heartbeat status after a disconnect', () => {
+    const { userWebConnection, transport, serviceEvents } = createTransportWithSinks();
+    transport.connect();
+
+    const heartbeat = (sessions: Array<{ id: string; status: string; title: string }>) => {
+      userWebConnection.emitSystem({
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'owner', sessions },
+      });
+    };
+
+    heartbeat([{ id: KILO_SESSION_ID, status: 'idle', title: 'Tracked' }]);
+    heartbeat([]);
+    heartbeat([{ id: KILO_SESSION_ID, status: 'idle', title: 'Tracked' }]);
+
+    // idle → stopped(disconnected) → idle again: the post-reconnect status must
+    // be forwarded even though it matches the pre-disconnect one, because only
+    // a session.status event clears the disconnected UI state.
+    expect(serviceEvents).toEqual([
+      { type: 'session.status', sessionId: KILO_SESSION_ID, status: { type: 'idle' } },
+      { type: 'stopped', reason: 'disconnected' },
+      { type: 'session.status', sessionId: KILO_SESSION_ID, status: { type: 'idle' } },
+    ]);
+    transport.destroy();
+  });
+
   it('buffers chat during initial snapshot replay but does not delay service events', async () => {
     let resolveSnapshot: ((snapshot: SessionSnapshot) => void) | undefined;
     const fetchSnapshot = jest.fn(

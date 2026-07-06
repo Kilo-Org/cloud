@@ -283,6 +283,7 @@ type RevocationWorkItem = {
   upstreamPlanId: string;
   status: string;
   revocationRequestedAt: string | null;
+  subscriptionExpiresAt: string | null;
   revocationAttemptCount: number;
   lastRevocationError: string | null;
 };
@@ -458,6 +459,7 @@ function OperationsTabs({
                     <TableHead>Upstream plan ID</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Requested</TableHead>
+                    <TableHead>Subscription expires</TableHead>
                     <TableHead className="text-right">Attempts</TableHead>
                     <TableHead>Latest failure</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -466,13 +468,13 @@ function OperationsTabs({
                 <TableBody>
                   {queueError ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="h-24 text-center text-red-300">
+                      <TableCell colSpan={9} className="h-24 text-center text-red-300">
                         Unable to load manual revocation work. Refresh to retry.
                       </TableCell>
                     </TableRow>
                   ) : workItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-muted-foreground h-24 text-center">
+                      <TableCell colSpan={9} className="text-muted-foreground h-24 text-center">
                         {queueLoading ? 'Loading manual work...' : 'No revocation work pending.'}
                       </TableCell>
                     </TableRow>
@@ -503,6 +505,9 @@ function OperationsTabs({
                         </TableCell>
                         <TableCell className="whitespace-nowrap font-mono text-xs">
                           {formatTimestamp(item.revocationRequestedAt)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap font-mono text-xs">
+                          {formatTimestamp(item.subscriptionExpiresAt)}
                         </TableCell>
                         <TableCell className="text-right font-mono tabular-nums">
                           {item.revocationAttemptCount}

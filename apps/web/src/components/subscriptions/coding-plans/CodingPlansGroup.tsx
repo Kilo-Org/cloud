@@ -15,7 +15,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AvailableProductCard } from '@/components/subscriptions/AvailableProductCard';
 import { SubscriptionCard } from '@/components/subscriptions/SubscriptionCard';
 import { SubscriptionGroup } from '@/components/subscriptions/SubscriptionGroup';
@@ -29,6 +28,7 @@ import {
   isCodingPlanTerminal,
 } from '@/components/subscriptions/helpers';
 import { useTRPC } from '@/lib/trpc/utils';
+import { cn } from '@/lib/utils';
 import { MiniMaxPlanIcon } from './MiniMaxPlanIcon';
 
 export function CodingPlansGroup({
@@ -52,7 +52,10 @@ export function CodingPlansGroup({
 
   const subscriptions = subscriptionQuery.data ?? [];
   const catalog = catalogQuery.data ?? [];
-  const hasExistingMiniMaxKey = byokQuery.data?.some(key => key.provider_id === 'minimax') ?? false;
+  const minimaxKeys = byokQuery.data?.filter(key => key.provider_id === 'minimax') ?? [];
+  const hasManagedMiniMaxKey = minimaxKeys.some(key => key.management_source === 'coding_plan');
+  const hasUserManagedMiniMaxKey = minimaxKeys.some(key => key.management_source !== 'coding_plan');
+  const hasMiniMaxKey = minimaxKeys.length > 0;
   const selectedPlan = catalog.find(plan => plan.planId === subscriptionRequest?.planId) ?? null;
   const nonTerminalSubscriptions = subscriptions.filter(
     subscription => !isCodingPlanTerminal(subscription.status)
@@ -60,6 +63,7 @@ export function CodingPlansGroup({
   const liveProviderIds = new Set(
     nonTerminalSubscriptions.map(subscription => subscription.providerId)
   );
+  const hasLiveMiniMaxSubscription = liveProviderIds.has('minimax');
   const visibleSubscriptions = subscriptions.filter(
     subscription => !isCodingPlanTerminal(subscription.status) || showTerminal
   );
@@ -106,10 +110,7 @@ export function CodingPlansGroup({
   );
 
   function openSubscribeDialog(plan: CodingPlanOffer) {
-    if (
-      liveProviderIds.has(plan.providerId) ||
-      (plan.providerId === 'minimax' && hasExistingMiniMaxKey)
-    ) {
+    if (liveProviderIds.has(plan.providerId) || (plan.providerId === 'minimax' && hasMiniMaxKey)) {
       return;
     }
     setSubscriptionRequest({ planId: plan.planId, idempotencyKey: crypto.randomUUID() });
@@ -126,7 +127,7 @@ export function CodingPlansGroup({
       !selectedPlan ||
       !subscriptionRequest ||
       liveProviderIds.has(selectedPlan.providerId) ||
-      (selectedPlan.providerId === 'minimax' && hasExistingMiniMaxKey) ||
+      (selectedPlan.providerId === 'minimax' && hasMiniMaxKey) ||
       subscribeMutation.isPending
     ) {
       return;
@@ -205,22 +206,40 @@ export function CodingPlansGroup({
               No Coding Plans are currently available.
             </p>
           ) : (
-            <div className="grid gap-4">
-              {catalog.map(plan => (
-                <CodingPlanOfferCard
-                  key={plan.planId}
-                  plan={plan}
-                  hasExistingMiniMaxKey={plan.providerId === 'minimax' && hasExistingMiniMaxKey}
-                  hasLiveProviderSubscription={liveProviderIds.has(plan.providerId)}
-                  notificationPending={
-                    notificationMutation.isPending &&
-                    notificationMutation.variables?.planId === plan.planId
-                  }
-                  notificationSaving={notificationMutation.isPending}
-                  onSubscribe={() => openSubscribeDialog(plan)}
-                  onRequestNotification={() => notificationMutation.mutate({ planId: plan.planId })}
+            <div className="space-y-4">
+              {hasLiveMiniMaxSubscription || hasMiniMaxKey ? (
+                <MiniMaxAccessNotice
+                  hasLiveSubscription={hasLiveMiniMaxSubscription}
+                  hasManagedKey={hasManagedMiniMaxKey}
+                  hasUserManagedKey={hasUserManagedMiniMaxKey}
                 />
-              ))}
+              ) : null}
+              <div
+                className={cn(
+                  'grid gap-4',
+                  catalog.length === 2 && 'lg:grid-cols-2',
+                  catalog.length >= 3 && 'lg:grid-cols-3'
+                )}
+              >
+                {catalog.map(plan => (
+                  <CodingPlanOfferCard
+                    key={plan.planId}
+                    plan={plan}
+                    compact={catalog.length > 1}
+                    hasBlockingMiniMaxKey={plan.providerId === 'minimax' && hasMiniMaxKey}
+                    hasLiveProviderSubscription={liveProviderIds.has(plan.providerId)}
+                    notificationPending={
+                      notificationMutation.isPending &&
+                      notificationMutation.variables?.planId === plan.planId
+                    }
+                    notificationSaving={notificationMutation.isPending}
+                    onSubscribe={() => openSubscribeDialog(plan)}
+                    onRequestNotification={() =>
+                      notificationMutation.mutate({ planId: plan.planId })
+                    }
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -276,26 +295,74 @@ type CodingPlanOffer = {
   notificationRequested: boolean;
 };
 
+function MiniMaxAccessNotice({
+  hasLiveSubscription,
+  hasManagedKey,
+  hasUserManagedKey,
+}: {
+  hasLiveSubscription: boolean;
+  hasManagedKey: boolean;
+  hasUserManagedKey: boolean;
+}) {
+  let description = (
+    <span>MiniMax Coding Plans are unavailable while this BYOK key is active.</span>
+  );
+  if (hasLiveSubscription) {
+    description = (
+      <span>
+        Keep your current Coding Plan, or cancel it and wait for access to end before switching
+        tiers. Kilo removes its managed MiniMax BYOK key automatically when plan access ends.
+      </span>
+    );
+  } else if (hasManagedKey) {
+    description = (
+      <span>
+        Your previous Coding Plan is finishing cleanup. Kilo removes its managed MiniMax BYOK key
+        automatically; try subscribing again after cleanup completes.
+      </span>
+    );
+  } else if (hasUserManagedKey) {
+    description = (
+      <span>
+        Remove your existing MiniMax key in{' '}
+        <Link href="/byok" className="text-foreground underline underline-offset-4">
+          BYOK settings
+        </Link>{' '}
+        before subscribing to a MiniMax Coding Plan.
+      </span>
+    );
+  }
+
+  return (
+    <div className="border-border bg-muted/40 text-muted-foreground rounded-lg border px-4 py-3 text-sm">
+      <p className="text-foreground font-medium">MiniMax access is already active.</p>
+      <p className="mt-1">{description}</p>
+    </div>
+  );
+}
+
 function CodingPlanOfferCard({
   plan,
-  hasExistingMiniMaxKey,
+  hasBlockingMiniMaxKey,
   hasLiveProviderSubscription,
   notificationPending,
   notificationSaving,
+  compact,
   onSubscribe,
   onRequestNotification,
 }: {
   plan: CodingPlanOffer;
-  hasExistingMiniMaxKey: boolean;
+  hasBlockingMiniMaxKey: boolean;
   hasLiveProviderSubscription: boolean;
   notificationPending: boolean;
   notificationSaving: boolean;
+  compact: boolean;
   onSubscribe: () => void;
   onRequestNotification: () => void;
 }) {
   const isSoldOut = plan.availabilityStatus === 'sold_out';
   const price = getCodingPlanPriceParts(plan.costKiloCredits, plan.billingPeriodDays, plan.planId);
-  const subscribeBlocked = hasExistingMiniMaxKey || hasLiveProviderSubscription;
+  const subscribeBlocked = hasBlockingMiniMaxKey || hasLiveProviderSubscription;
 
   return (
     <AvailableProductCard
@@ -304,6 +371,7 @@ function CodingPlanOfferCard({
       price={price}
       status={isSoldOut ? 'Sold out' : undefined}
       features={plan.features}
+      featureLayout={compact ? 'single' : 'responsive'}
       cta={
         isSoldOut
           ? {
@@ -316,43 +384,13 @@ function CodingPlanOfferCard({
               disabled: plan.notificationRequested || notificationSaving,
               busy: notificationPending,
               trailingIcon: plan.notificationRequested ? <CircleCheck aria-hidden /> : undefined,
+              visualStyle: 'solid-neutral',
             }
           : {
               label: 'Subscribe with Kilo Credits',
               onClick: onSubscribe,
               disabled: subscribeBlocked,
             }
-      }
-      details={
-        isSoldOut || hasLiveProviderSubscription || hasExistingMiniMaxKey ? (
-          <div className="space-y-3">
-            {isSoldOut ? (
-              <p className="border-border text-muted-foreground rounded-lg border px-4 py-3 text-sm">
-                Currently sold out. More {plan.providerName} capacity is coming soon.
-              </p>
-            ) : null}
-            {hasLiveProviderSubscription ? (
-              <Alert variant="warning">
-                <AlertDescription>
-                  You already have a live {plan.providerName} Coding Plan. Cancel the current plan
-                  and wait until access ends before subscribing to another {plan.providerName}{' '}
-                  Coding Plan.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-            {hasExistingMiniMaxKey ? (
-              <Alert variant="warning">
-                <AlertDescription>
-                  MiniMax is already configured in BYOK. Delete your existing MiniMax key in{' '}
-                  <Link href="/byok" className="underline underline-offset-4">
-                    BYOK settings
-                  </Link>{' '}
-                  before subscribing, including if it is disabled.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-          </div>
-        ) : null
       }
     />
   );

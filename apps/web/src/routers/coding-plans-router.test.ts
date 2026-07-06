@@ -352,9 +352,7 @@ describe('coding plans router', () => {
       caller.codingPlans.adminUploadKeys({
         providerId: 'minimax',
         planId: MAX_PLAN_ID,
-        entries: [
-          inventoryEntry('admin-max-upload', `minimax-token-plan-max-${crypto.randomUUID()}`),
-        ],
+        entries: [inventoryEntry('admin-max-upload', `provider-plan-${crypto.randomUUID()}`)],
       })
     ).resolves.toEqual({ inserted: 1 });
 
@@ -401,6 +399,7 @@ describe('coding plans router', () => {
   it('restricts manual remediation and returns only the MiniMax plan ID needed to deprovision', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();
+    const subscriptionExpiresAt = '2026-07-20T12:00:00.000Z';
     const [workItem] = await db
       .insert(coding_plan_key_inventory)
       .values({
@@ -413,6 +412,20 @@ describe('coding plans router', () => {
         revocation_requested_at: new Date().toISOString(),
       })
       .returning();
+    await db.insert(coding_plan_subscriptions).values({
+      user_id: user.id,
+      plan_id: PLAN_ID,
+      provider_id: 'minimax',
+      key_inventory_id: workItem.id,
+      status: 'canceled',
+      cost_microdollars: COST_MICRODOLLARS,
+      billing_period_days: 30,
+      current_period_start: '2026-06-20T12:00:00.000Z',
+      current_period_end: subscriptionExpiresAt,
+      credit_renewal_at: subscriptionExpiresAt,
+      canceled_at: subscriptionExpiresAt,
+      cancellation_reason: 'user_cancelled',
+    });
     const adminCaller = await createCallerForUser(admin.id);
     const userCaller = await createCallerForUser(user.id);
 
@@ -424,6 +437,7 @@ describe('coding plans router', () => {
       planId: PLAN_ID,
       providerId: 'minimax',
       upstreamPlanId: 'minimax-deprovision-plan',
+      subscriptionExpiresAt,
     });
     expect(queue[0]).not.toHaveProperty('encrypted_api_key');
     expect(queue[0]).not.toHaveProperty('apiKey');

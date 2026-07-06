@@ -323,6 +323,7 @@ export const codingPlansRouter = createTRPCRouter({
       return workItems.map(item => ({
         ...item,
         revocationRequestedAt: toNullableIsoTimestamp(item.revocationRequestedAt),
+        subscriptionExpiresAt: toNullableIsoTimestamp(item.subscriptionExpiresAt),
         revokedAt: toNullableIsoTimestamp(item.revokedAt),
         updatedAt: toIsoTimestamp(item.updatedAt),
       }));

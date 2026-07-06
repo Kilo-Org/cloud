@@ -50,7 +50,7 @@ describe('validateMiniMaxCodingPlanCredential', () => {
       validateMiniMaxCodingPlanCredential({
         apiKey: 'limited-key',
         planId: 'minimax-token-plan-max',
-        upstreamPlanId: 'minimax-token-plan-max-123',
+        upstreamPlanId: 'provider-issued-plan-123',
       })
     ).resolves.toBe(true);
   });
@@ -79,15 +79,17 @@ describe('validateMiniMaxCodingPlanCredential', () => {
     ).resolves.toBe(false);
   });
 
-  it('rejects upstream plan IDs that do not match the selected MiniMax token tier', async () => {
+  it('treats upstream plan IDs as opaque operational metadata', async () => {
+    mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
+
     await expect(
       validateMiniMaxCodingPlanCredential({
-        apiKey: 'wrong-tier-key',
+        apiKey: 'opaque-plan-key',
         planId: 'minimax-token-plan-ultra',
-        upstreamPlanId: 'minimax-token-plan-plus-123',
+        upstreamPlanId: 'provider-plan-without-tier-marker',
       })
-    ).resolves.toBe(false);
+    ).resolves.toBe(true);
 
-    expect(mockedGenerateText).not.toHaveBeenCalled();
+    expect(mockedGenerateText).toHaveBeenCalled();
   });
 });

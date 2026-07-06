@@ -32,7 +32,7 @@ import {
   Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { BackgroundChart } from '../BackgroundChart';
+import { BackgroundChart } from './BackgroundChart';
 import { AIAdoptionDistribution } from './AIAdoptionDistribution';
 import { MetricDetailDrawer } from './MetricDetailDrawer';
 import { AIAdoptionEmptyState } from './AIAdoptionEmptyState';

@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs';
-import { AIAdoptionEmptyState } from '@/components/organizations/usage-details/components/AIAdoptionEmptyState';
+import { AIAdoptionEmptyState } from '@/components/usage-analytics/AIAdoptionEmptyState';
 
 const meta: Meta<typeof AIAdoptionEmptyState> = {
-  title: 'Overlays/Drawers/AIAdoptionEmptyState',
+  title: 'Usage Analytics/AIAdoptionEmptyState',
   component: AIAdoptionEmptyState,
   parameters: {
     layout: 'fullscreen',

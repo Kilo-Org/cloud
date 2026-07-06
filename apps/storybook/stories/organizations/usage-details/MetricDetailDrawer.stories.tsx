@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/nextjs';
 import { useState } from 'react';
-import { MetricDetailDrawer } from '@/components/organizations/usage-details/components/MetricDetailDrawer';
+import { MetricDetailDrawer } from '@/components/usage-analytics/MetricDetailDrawer';
 import { Button } from '@/components/ui/button';
 
 const meta: Meta<typeof MetricDetailDrawer> = {
-  title: 'Overlays/Drawers/MetricDetailDrawer',
+  title: 'Usage Analytics/MetricDetailDrawer',
   component: MetricDetailDrawer,
   parameters: {
     layout: 'fullscreen',

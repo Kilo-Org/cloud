@@ -21,7 +21,7 @@ import {
   type CostInsightsAuthorizedRole,
   type CostInsightsTrackingContext,
 } from '@/lib/cost-insights/posthog-tracking';
-import { ensureOrganizationAccess, OrganizationIdInputSchema } from './utils';
+import { OrganizationIdInputSchema } from './utils';
 import { costInsightsRouterInternals } from '../cost-insights-router';
 
 async function getDirectCostInsightsRole(organizationId: string, userId: string) {
@@ -51,24 +51,13 @@ async function getOrganizationName(organizationId: string): Promise<string> {
 
 async function resolveOrgReadContext(ctx: TRPCContext, organizationId: string) {
   const name = await getOrganizationName(organizationId);
-  if (ctx.user.is_admin) {
-    const directRole = await getDirectCostInsightsRole(organizationId, ctx.user.id);
-    const canManage = directRole === 'owner' || directRole === 'billing_manager';
-    return {
-      name,
-      authorizedRole: canManage ? directRole : 'admin',
-      readOnly: !canManage,
-    } as const;
-  }
-
-  const role = await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
-  if (role !== 'owner' && role !== 'billing_manager') {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Only an organization owner or billing manager can view Cost Insights.',
-    });
-  }
-  return { name, authorizedRole: role, readOnly: false } as const;
+  const directRole = await getDirectCostInsightsRole(organizationId, ctx.user.id);
+  const canManage = directRole === 'owner' || directRole === 'billing_manager';
+  return {
+    name,
+    authorizedRole: canManage ? directRole : 'admin',
+    readOnly: !canManage,
+  } as const;
 }
 
 function organizationTrackingContext(
@@ -86,14 +75,6 @@ function organizationTrackingContext(
 }
 
 async function ensureOrgManageAccess(ctx: TRPCContext, organizationId: string) {
-  if (!ctx.user.is_admin) {
-    const role = await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
-    if (role === 'owner' || role === 'billing_manager') return role;
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Only an organization owner or billing manager can change Cost Insights.',
-    });
-  }
   const directRole = await getDirectCostInsightsRole(organizationId, ctx.user.id);
   if (directRole !== 'owner' && directRole !== 'billing_manager') {
     throw new TRPCError({

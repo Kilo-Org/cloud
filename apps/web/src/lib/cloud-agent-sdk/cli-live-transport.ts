@@ -15,12 +15,18 @@ type CliLiveTransportConfig = {
   onError?: (message: string) => void;
 };
 
+// How long after a reconnect to re-fetch the snapshot a second time. Covers
+// the session store's persistence lag behind the live stream; bump if holes
+// still appear after long backgrounding.
+const RECONNECT_RESYNC_DELAY_MS = 5000;
+
 function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactory {
   return (sink: TransportSink) => {
     let generation = 0;
     let cleanup: (() => void) | null = null;
     let sessionStopped = false;
     let ownerConnectionId: string | null = null;
+    let lastForwardedHeartbeatStatus: string | null = null;
 
     function replaySnapshot(snapshot: SessionSnapshot): void {
       sink.onServiceEvent({ type: 'session.created', info: snapshot.info });
@@ -58,6 +64,21 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       sessionStopped = true;
     }
 
+    // Heartbeats carry the CLI's current per-session status. Forwarding it
+    // re-derives activity after a reconnect: a terminal `session.status: idle`
+    // fired while the socket was dead is never replayed, which otherwise
+    // leaves the UI stuck on a busy indicator forever.
+    function forwardHeartbeatStatus(status: string): void {
+      if (status !== 'idle' && status !== 'busy') return;
+      if (status === lastForwardedHeartbeatStatus) return;
+      lastForwardedHeartbeatStatus = status;
+      sink.onServiceEvent({
+        type: 'session.status',
+        sessionId: config.kiloSessionId,
+        status: { type: status },
+      });
+    }
+
     function handleSystemMessage(event: string, data: unknown): void {
       if (event === 'cli.disconnected') {
         const parsed = cliConnectionDataSchema.safeParse(data);
@@ -75,6 +96,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (session) {
           ownerConnectionId = session.connectionId;
           sessionStopped = false;
+          forwardHeartbeatStatus(session.status);
           return;
         }
 
@@ -90,6 +112,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (session) {
           ownerConnectionId = parsed.data.connectionId;
           sessionStopped = false;
+          forwardHeartbeatStatus(session.status);
           return;
         }
 
@@ -115,6 +138,8 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         releaseConnection();
         sessionStopped = false;
         ownerConnectionId = null;
+        lastForwardedHeartbeatStatus = null;
+        let resyncTimer: ReturnType<typeof setTimeout> | null = null;
 
         let bufferedCliEvents: UserWebCliEvent[] | null = [];
         let bufferedEventsFromSupersededSnapshot: UserWebCliEvent[] = [];
@@ -193,6 +218,15 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
         const offReconnect = config.userWebConnection.onReconnect(() => {
           replayCurrentSnapshot(false);
+          // The snapshot store lags the live stream, and the CLI only forwards
+          // events "from now" after a resubscribe — parts finalized while the
+          // socket was dead are in neither. One delayed re-sync picks them up
+          // once persistence catches up.
+          if (resyncTimer) clearTimeout(resyncTimer);
+          resyncTimer = setTimeout(() => {
+            resyncTimer = null;
+            replayCurrentSnapshot(false);
+          }, RECONNECT_RESYNC_DELAY_MS);
         });
         const releaseSubscription = config.userWebConnection.subscribeToCliSession(
           config.kiloSessionId
@@ -201,6 +235,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         cleanup = () => {
           if (released) return;
           released = true;
+          if (resyncTimer) clearTimeout(resyncTimer);
           offCli();
           offSystem();
           offReconnect();

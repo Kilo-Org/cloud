@@ -186,9 +186,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     const connection = config.transport.userWebConnection;
     if (!connection) return;
 
-    // Keep the socket alive while watching — nothing else retains it for a
-    // read-only session, and without it no heartbeats arrive.
-    const release = connection.retain?.();
+    // Subscribe (not just retain) while watching: the server only pushes
+    // sessions.heartbeat and subscribe-triggered sessions.list re-sends to
+    // sockets subscribed to the session, so a bare retain never sees the
+    // upgrade trigger. Subscribing also retains the socket.
+    const release = connection.subscribeToCliSession(config.kiloSessionId);
     const off = connection.onSystemEvent(({ event, data }) => {
       if (event !== 'sessions.list' && event !== 'sessions.heartbeat') return;
       const schema = event === 'sessions.list' ? sessionsListDataSchema : heartbeatDataSchema;
@@ -199,7 +201,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     });
     disarmUpgradeWatcher = () => {
       off();
-      release?.();
+      release();
     };
   }
 

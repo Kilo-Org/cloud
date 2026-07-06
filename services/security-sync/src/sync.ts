@@ -668,6 +668,47 @@ async function upsertSecurityFinding(
   const ownerOrganizationId = isOrgOwner(owner) ? owner.organizationId : null;
   const ownerUserId = isOrgOwner(owner) ? null : owner.userId;
 
+  // Only rewrite an existing finding when a material field actually differs from the
+  // incoming source data. Re-syncing an unchanged finding otherwise rewrote the row on
+  // every run (bumping last_synced_at/updated_at), which — multiplied by ~13 indexes and
+  // the TOASTed raw_data column — produced large amounts of WAL for findings that had not
+  // changed. raw_data and last_synced_at are intentionally excluded from this comparison:
+  // raw_data is debug-only and its meaningful content is already captured by the material
+  // columns, and last_synced_at is not used for staleness or analysis freshness. When
+  // nothing material changed the DO UPDATE returns no row and the fallback SELECT below
+  // returns the existing finding with wasInserted=false and no status/severity delta, so
+  // notifications and audit events behave exactly as they did for an unchanged re-sync.
+  const materialChangePredicate = sql`(
+        ${security_findings.severity} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.severity.name)}
+        OR ${security_findings.ghsa_id} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.ghsa_id.name)}
+        OR ${security_findings.cve_id} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.cve_id.name)}
+        OR ${security_findings.package_name} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.package_name.name)}
+        OR ${security_findings.package_ecosystem} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.package_ecosystem.name)}
+        OR ${security_findings.vulnerable_version_range} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.vulnerable_version_range.name)}
+        OR ${security_findings.patched_version} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.patched_version.name)}
+        OR ${security_findings.manifest_path} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.manifest_path.name)}
+        OR ${security_findings.title} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.title.name)}
+        OR ${security_findings.description} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.description.name)}
+        OR ${security_findings.fixed_at} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.fixed_at.name)}
+        OR ${security_findings.sla_due_at} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)}
+        OR ${security_findings.dependabot_html_url} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.dependabot_html_url.name)}
+        OR ${security_findings.cwe_ids} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.cwe_ids.name)}
+        OR ${security_findings.cvss_score} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.cvss_score.name)}
+        OR ${security_findings.dependency_scope} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.dependency_scope.name)}
+        OR ${security_findings.status} IS DISTINCT FROM (CASE
+          WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.status}
+          ELSE EXCLUDED.${sql.identifier(security_findings.status.name)}
+        END)
+        OR ${security_findings.ignored_reason} IS DISTINCT FROM (CASE
+          WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.ignored_reason}
+          ELSE EXCLUDED.${sql.identifier(security_findings.ignored_reason.name)}
+        END)
+        OR ${security_findings.ignored_by} IS DISTINCT FROM (CASE
+          WHEN ${security_findings.ignored_reason} LIKE 'superseded:%' THEN ${security_findings.ignored_by}
+          ELSE EXCLUDED.${sql.identifier(security_findings.ignored_by.name)}
+        END)
+      )`;
+
   const result = await db.execute<Record<string, unknown>>(sql`
     WITH existing_match AS (
       SELECT ${security_findings.id} AS id,
@@ -773,7 +814,7 @@ async function upsertSecurityFinding(
         ${sql.identifier(security_findings.dependency_scope.name)} = EXCLUDED.${sql.identifier(security_findings.dependency_scope.name)},
         ${sql.identifier(security_findings.last_synced_at.name)} = now(),
         ${sql.identifier(security_findings.updated_at.name)} = now()
-      WHERE EXISTS (SELECT 1 FROM existing_match)
+      WHERE EXISTS (SELECT 1 FROM existing_match) AND ${materialChangePredicate}
       RETURNING
         ${security_findings.id} AS id,
         (xmax = 0) AS was_inserted,

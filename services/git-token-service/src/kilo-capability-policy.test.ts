@@ -14,11 +14,7 @@ describe('classifyKiloCapabilityRequest', () => {
   const kiloSessionId = 'kilo-session-1';
 
   it.each([
-    [
-      'provider model',
-      'https://api.kilo.ai/api/openrouter/v1/chat/completions',
-      'provider_model',
-    ],
+    ['provider model', 'https://api.kilo.ai/api/openrouter/v1/chat/completions', 'provider_model'],
     [
       'organization models',
       'https://api.kilo.ai/api/organizations/org_1/models',

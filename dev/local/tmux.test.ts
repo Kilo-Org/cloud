@@ -127,3 +127,48 @@ test(
     }
   }
 );
+
+test(
+  'restartServiceInTmux recreates the service window when the pane dies with the process',
+  { skip: !hasTmux },
+  async () => {
+    const sessionName = `kilo-tmux-test-${process.pid}-${Date.now()}`;
+    const serviceName = 'stripe';
+    const tmux = (...args: string[]) => execFileSync('tmux', args, { stdio: 'ignore' });
+
+    try {
+      tmux('new-session', '-d', '-s', sessionName, '-n', 'dashboard', 'sleep 120');
+      // Run the process directly (no wrapper shell) so the pane closes as
+      // soon as SIGINT kills it — the state restart used to silently bail
+      // on after reporting success.
+      tmux('new-window', '-d', '-t', sessionName, '-n', serviceName, 'sleep 120');
+
+      const serviceWindow = listWindows(sessionName).find(window => window.name === serviceName);
+      assert.ok(serviceWindow);
+
+      tmux(
+        'join-pane',
+        '-h',
+        '-s',
+        `${sessionName}:${serviceWindow.index}.0`,
+        '-t',
+        `${sessionName}:0.0`
+      );
+      tmux('select-pane', '-t', `${sessionName}:0.1`, '-T', serviceName);
+
+      restartServiceInTmux(sessionName, serviceName);
+
+      await sleep(1500);
+      assert.ok(
+        listWindows(sessionName).some(window => window.name === serviceName),
+        'service window should be recreated after its pane closed on interrupt'
+      );
+    } finally {
+      try {
+        tmux('kill-session', '-t', sessionName);
+      } catch {
+        // Session may already be gone if tmux fails during setup.
+      }
+    }
+  }
+);

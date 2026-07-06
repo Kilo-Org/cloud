@@ -122,7 +122,7 @@ export function getAnalysisPresentation(finding: SecurityFinding): FindingStatus
     case 'not-exploitable':
       return {
         icon: ShieldCheck,
-        label: 'No reachable path',
+        label: 'Unreachable',
         tone: 'success',
         tooltip: sandbox?.summary || 'Codebase analysis found no reachable vulnerable path',
       };

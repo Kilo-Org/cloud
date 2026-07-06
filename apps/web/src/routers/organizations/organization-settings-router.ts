@@ -1,4 +1,8 @@
-import { getOrganizationById, updateOrganizationSettings } from '@/lib/organizations/organizations';
+import {
+  getOrganizationById,
+  setOrganizationRecommendationsDigestEnabled,
+  updateOrganizationSettings,
+} from '@/lib/organizations/organizations';
 import type {
   OpenRouterModelsResponse,
   OrganizationSettings,
@@ -8,6 +12,7 @@ import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
+  organizationOwnerMutationProcedure,
 } from '@/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -140,6 +145,11 @@ const UpdateMinimumBalanceAlertInputSchema = OrganizationIdInputSchema.extend({
       'When enabled is true, minimum_balance must be a positive number and minimum_balance_alert_email must have at least one email',
   }
 );
+
+const UpdateRecommendationsDigestInputSchema = OrganizationIdInputSchema.extend({
+  // The digest is a simple on/off toggle; when on it emails the org's owners.
+  enabled: z.boolean(),
+});
 
 const SettingsResponseSchema = z.object({
   settings: z.custom<OrganizationSettings>(),
@@ -443,6 +453,56 @@ export const organizationsSettingsRouter = createTRPCRouter({
           message: enabled
             ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
             : 'Minimum balance alert: disabled',
+          organization_id: organizationId,
+        });
+      }
+
+      return {
+        settings: updatedSettings,
+      };
+    }),
+
+  // Owners-only: toggle the weekly enterprise recommendations digest email.
+  // Enterprise-gated and owner-only (matching the recommendations dismiss/restore
+  // permission model). When on, the digest is emailed to the org's owners.
+  updateRecommendationsDigest: organizationOwnerMutationProcedure
+    .input(UpdateRecommendationsDigestInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, enabled } = input;
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Organization not found',
+        });
+      }
+
+      // Enterprise-only feature.
+      if (existingOrg.plan !== 'enterprise') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'The recommendations digest is not available for this organization.',
+        });
+      }
+
+      const wasEnabled = existingOrg.settings?.recommendations_digest_enabled === true;
+
+      // Atomic single-key JSONB update so a concurrent settings mutation can't be
+      // clobbered by a stale read-modify-write of the whole settings object.
+      const updatedSettings = await setOrganizationRecommendationsDigestEnabled(
+        organizationId,
+        enabled
+      );
+
+      if (enabled !== wasEnabled) {
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: enabled ? 'Recommendations digest: enabled' : 'Recommendations digest: disabled',
           organization_id: organizationId,
         });
       }

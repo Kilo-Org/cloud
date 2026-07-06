@@ -71,6 +71,12 @@ export async function handlePlatformOAuthConnect(
   request: NextRequest,
   platform: string
 ): Promise<Response> {
+  if (platform === PLATFORM.BITBUCKET) {
+    return (
+      await import('@/lib/integrations/oauth/platforms/bitbucket-connect')
+    ).handleBitbucketOAuthConnect(request);
+  }
+
   if (platform === PLATFORM.GITLAB) {
     return (
       await import('@/lib/integrations/oauth/platforms/gitlab-connect')
@@ -114,6 +120,10 @@ export async function handlePlatformOAuthCallback(
   platform: string
 ): Promise<Response> {
   switch (platform) {
+    case PLATFORM.BITBUCKET:
+      return (
+        await import('@/lib/integrations/oauth/platforms/bitbucket-callback')
+      ).handleBitbucketOAuthCallback(request);
     case PLATFORM.DISCORD:
       return (
         await import('@/lib/integrations/oauth/platforms/discord-callback')

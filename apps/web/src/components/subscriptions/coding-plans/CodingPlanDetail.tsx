@@ -106,6 +106,7 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
   const periodEnd = formatDateLabel(subscription.currentPeriodEnd);
   const hasInstalledPlanKey = subscription.hasInstalledByokKey;
   const subscriptionTitle = `${subscription.providerName} ${subscription.planName}`;
+  const providerPlanLabel = `${subscription.providerName} Coding Plan`;
 
   return (
     <div className="space-y-6">
@@ -139,8 +140,9 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
             <Alert variant="warning">
               <CalendarClock />
               <AlertDescription>
-                Token Plan Plus remains active through {periodEnd}. Kilo deletes the installed
-                MiniMax key if unchanged and revokes the issued credential when billing ends.
+                {subscription.planName} remains active through {periodEnd}. Kilo deletes the
+                installed MiniMax key if unchanged and revokes the issued credential when billing
+                ends.
               </AlertDescription>
             </Alert>
           ) : isPastDue ? (
@@ -148,16 +150,16 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
               <CalendarClock />
               <AlertDescription>
                 Renewal requires Kilo Credits. If payment recovery fails by {formattedBillingDate},
-                Token Plan Plus ends and Kilo revokes its issued MiniMax credential. A MiniMax key
-                you replaced or created yourself is not deleted.
+                {subscription.planName} ends and Kilo revokes its issued MiniMax credential. A
+                MiniMax key you replaced or created yourself is not deleted.
               </AlertDescription>
             </Alert>
           ) : isCanceled ? (
             <Alert>
               <CalendarClock />
               <AlertDescription>
-                Token Plan Plus ended on {formattedBillingDate}. Kilo has initiated revocation of
-                the MiniMax credential issued for this subscription.
+                {subscription.planName} ended on {formattedBillingDate}. Kilo has initiated
+                revocation of the MiniMax credential issued for this subscription.
               </AlertDescription>
             </Alert>
           ) : null}
@@ -184,7 +186,7 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
                     </Link>
                   </>
                 ) : (
-                  'No Token Plan Plus-managed BYOK key installed'
+                  `No ${providerPlanLabel}-managed BYOK key installed`
                 )
               }
             />
@@ -245,9 +247,9 @@ export function CodingPlanDetail({ subscriptionId }: { subscriptionId: string })
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel {subscription.planName} at period end?</AlertDialogTitle>
             <AlertDialogDescription>
-              Your {subscription.providerName} Token Plan Plus subscription remains active through{' '}
-              {periodEnd}. At that point, billing stops, Kilo deletes the installed MiniMax key if
-              you have not replaced it, and revokes the credential issued for this subscription.
+              Your {subscriptionTitle} subscription remains active through {periodEnd}. At that
+              point, billing stops, Kilo deletes the installed MiniMax key if you have not replaced
+              it, and revokes the credential issued for this subscription.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

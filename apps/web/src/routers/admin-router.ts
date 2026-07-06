@@ -61,6 +61,7 @@ import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-life
 import * as z from 'zod';
 import { eq, and, ne, or, ilike, desc, asc, sql, isNull, inArray } from 'drizzle-orm';
 import { findUsersByIds, findUserById } from '@/lib/user';
+import { blockUser } from '@/lib/user/block';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { toNonNullish } from '@/lib/utils';
@@ -69,6 +70,7 @@ import { assertNoError, successResult } from '@/lib/maybe-result';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
+import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import {
   kilo_pass_issuances,
   kilo_pass_issuance_items,
@@ -519,23 +521,28 @@ export const adminRouter = createTRPCRouter({
           const wasBlocked = Boolean(current?.blocked_reason);
           didTransition = isBlocking !== wasBlocked;
 
-          const blockMetadata = isBlocking
-            ? {
-                blocked_reason: input.blocked_reason,
-                blocked_at: new Date().toISOString(),
-                blocked_by_kilo_user_id: ctx.user.id,
-              }
-            : {
+          if (input.blocked_reason) {
+            await blockUser({
+              kiloUserId: input.userId,
+              reason: input.blocked_reason,
+              blockedByKiloUserId: ctx.user.id,
+              dbOrTx: tx,
+            });
+          } else {
+            await tx
+              .update(kilocode_users)
+              .set({
                 blocked_reason: null,
                 blocked_at: null,
                 blocked_by_kilo_user_id: null,
-              };
-
-          await tx
-            .update(kilocode_users)
-            .set(blockMetadata)
-            .where(eq(kilocode_users.id, input.userId));
+              })
+              .where(eq(kilocode_users.id, input.userId));
+          }
         });
+
+        if (didTransition && isBlocking) {
+          await revokeGatewayGrantsForBlockedUser(input.userId);
+        }
 
         if (didTransition) {
           void reportEvents({

@@ -1,8 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BooleanBadge } from '@/components/ui/boolean-badge';
-import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-import { useAdminOrganizationCreditTransactions } from '@/app/admin/api/organizations/hooks';
+import {
+  useAdminOrganizationCreditTransactions,
+  useAdminOrganizationNextCreditExpiration,
+} from '@/app/admin/api/organizations/hooks';
 import { ErrorCard } from '@/components/ErrorCard';
 import { LoadingCard } from '@/components/LoadingCard';
 import { FormattedMicrodollars } from '@/components/organizations/FormattedMicrodollars';
@@ -11,9 +13,102 @@ import { Loader2, Receipt } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { toast } from 'sonner';
-import { formatRelativeTime } from '@/lib/admin-utils';
+import { formatRelativeTime, formatDateOnly } from '@/lib/admin-utils';
 import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+
+function NextCreditExpiration({ organizationId }: { organizationId: string }) {
+  const { data, isLoading, isError, isFetching, refetch } =
+    useAdminOrganizationNextCreditExpiration(organizationId);
+
+  if (isLoading) {
+    return (
+      <span className="text-muted-foreground text-xs" aria-live="polite">
+        Loading next expiration...
+      </span>
+    );
+  }
+
+  if (isError && !data) {
+    return (
+      <div className="flex items-center gap-2" role="alert">
+        <span className="text-status-destructive text-xs">Expiration unavailable.</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2"
+          onClick={() => void refetch()}
+          disabled={isFetching}
+        >
+          {isFetching ? (
+            <>
+              <Loader2 className="size-icon-sm animate-spin" />
+              Retrying...
+            </>
+          ) : (
+            'Retry'
+          )}
+        </Button>
+      </div>
+    );
+  }
+
+  const refreshError = isError ? (
+    <div className="flex items-center gap-1" role="alert">
+      <span className="text-status-destructive text-xs">Refresh failed.</span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2"
+        onClick={() => void refetch()}
+        disabled={isFetching}
+      >
+        {isFetching ? <Loader2 className="size-icon-sm animate-spin" /> : 'Retry'}
+      </Button>
+    </div>
+  ) : null;
+
+  if (!data?.next_credit_expiration_at || data.next_credit_expiration_amount == null) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground text-xs">Next expiration: None</span>
+        {refreshError}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground h-auto px-1 py-0 hover:text-foreground"
+            suppressHydrationWarning
+          >
+            <FormattedMicrodollars
+              microdollars={data.next_credit_expiration_amount}
+              className="inline whitespace-nowrap tabular-nums"
+              inline={true}
+              decimalPlaces={2}
+            />{' '}
+            in credits{' '}
+            {new Date(data.next_credit_expiration_at) > new Date() ? 'expires' : 'expired'}{' '}
+            {formatRelativeTime(data.next_credit_expiration_at)}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" sideOffset={8}>
+          Expiration date: {formatDateOnly(data.next_credit_expiration_at)}
+        </TooltipContent>
+      </Tooltip>
+      {refreshError}
+    </div>
+  );
+}
 
 export function OrganizationAdminCreditTransactions({
   organizationId,
@@ -22,7 +117,6 @@ export function OrganizationAdminCreditTransactions({
 }) {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
-  const { data: orgData } = useOrganizationWithMembers(organizationId);
   const { canManageCredits } = useAdminCreditManagementPermission();
 
   const invalidateOrgCreditQueries = () => {
@@ -31,6 +125,9 @@ export function OrganizationAdminCreditTransactions({
     });
     void queryClient.invalidateQueries({
       queryKey: trpc.organizations.admin.creditTransactions.queryKey({ organizationId }),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.organizations.admin.nextCreditExpiration.queryKey({ organizationId }),
     });
     void queryClient.invalidateQueries({
       queryKey: trpc.organizations.getCreditBlocks.queryKey({ organizationId }),
@@ -122,12 +219,7 @@ export function OrganizationAdminCreditTransactions({
             Credit Transactions ({credit_transactions.length})
           </CardTitle>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-muted-foreground text-xs">
-              Next expiration:{' '}
-              {orgData?.next_credit_expiration_at
-                ? formatRelativeTime(orgData.next_credit_expiration_at)
-                : 'None'}
-            </span>
+            <NextCreditExpiration organizationId={organizationId} />
             <Button
               variant="outline"
               size="sm"

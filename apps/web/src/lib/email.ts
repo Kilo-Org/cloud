@@ -58,6 +58,7 @@ export const subjects = {
   securityFindingNew: 'Kilo Security Agent: New finding',
   securityFindingSlaWarning: 'Kilo Security Agent: SLA warning',
   securityFindingSlaBreach: 'Kilo Security Agent: SLA breached',
+  recommendationsDigest: 'Kilo: Your weekly recommendations',
 } as const;
 
 export type TemplateName = keyof typeof subjects;
@@ -582,5 +583,71 @@ export async function sendKiloPassDuplicateCardCanceledEmail(
     to,
     templateName: 'kiloPassDuplicateCardCanceled',
     templateVars: { support_url },
+  });
+}
+
+type RecommendationsDigestRecommendation = {
+  title: string;
+  description: string;
+  actionLabel: string;
+  // Relative path (e.g. /organizations/<id>/integrations); prefixed with the app URL.
+  actionUrl: string;
+};
+
+type SendRecommendationsDigestEmailProps = {
+  organizationId: string;
+  organizationName: string;
+  adoptedCount: number;
+  totalCount: number;
+  openCount: number;
+  recommendations: RecommendationsDigestRecommendation[];
+};
+
+function buildRecommendationsDigestSection(
+  recommendations: RecommendationsDigestRecommendation[],
+  baseUrl: string
+): RawHtml {
+  const rows = recommendations
+    .map(rec => {
+      const href = `${baseUrl}${escapeHtml(rec.actionUrl)}`;
+      return `
+        <tr>
+          <td style="padding: 14px 0; border-top: 1px solid #ebebea">
+            <p style="margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #1a1a1a">${escapeHtml(
+              rec.title
+            )}</p>
+            <p style="margin: 0 0 8px; font-size: 13px; line-height: 18px; color: #555">${escapeHtml(
+              rec.description
+            )}</p>
+            <a href="${href}" style="font-size: 13px; color: #1a1a1a; text-decoration: underline">${escapeHtml(
+              rec.actionLabel
+            )}</a>
+          </td>
+        </tr>`;
+    })
+    .join('');
+  return new RawHtml(
+    `<table width="100%" cellpadding="0" cellspacing="0" style="margin: 0 0 8px">${rows}</table>`
+  );
+}
+
+export async function sendRecommendationsDigestEmail(
+  to: string,
+  props: SendRecommendationsDigestEmailProps
+): Promise<SendResult> {
+  const dashboard_url = `${NEXTAUTH_URL}/organizations/${props.organizationId}/usage-details?view=feature-adoption`;
+  return send({
+    to,
+    templateName: 'recommendationsDigest',
+    templateVars: {
+      organization_name: renderNonAutolinkedText(props.organizationName),
+      adopted_summary: `${props.adoptedCount} of ${props.totalCount}`,
+      open_count: String(props.openCount),
+      recommendations_section: buildRecommendationsDigestSection(
+        props.recommendations,
+        NEXTAUTH_URL
+      ),
+      dashboard_url,
+    },
   });
 }

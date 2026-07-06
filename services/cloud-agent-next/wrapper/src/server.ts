@@ -28,6 +28,7 @@ import {
   type WrapperSessionReadyResponse,
 } from '../../src/shared/wrapper-bootstrap.js';
 import { createProxyRequest } from '../../src/shared/http-proxy.js';
+import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
 import type { SessionBoundFeedPolicy } from './global-feed-manager.js';
 
 // ---------------------------------------------------------------------------
@@ -144,6 +145,7 @@ const WORKSPACE_TERMINAL_ENV = {
   // Shell startup files may replace inherited PS1, so reapply it before each prompt.
   PROMPT_COMMAND: "PS1='\\n\\W\\n\\$ '",
   PS1: '\\n\\W\\n\\$ ',
+  [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
 } satisfies Record<string, string>;
 
 function jsonResponse(data: unknown, status = 200): Response {

@@ -1,12 +1,16 @@
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as readline from 'node:readline';
+import { Writable } from 'node:stream';
 
 export const PROJECTS = ['kilocode-app', 'kilocode-global-app'] as const;
 export const ENVIRONMENTS = ['development', 'staging', 'production'] as const;
 export const VAULT = 'Kilo Web ENV Production';
+const VERCEL_PACKAGE = 'vercel@53.3.1';
+const VERCEL_COMMAND = `pnpm dlx ${VERCEL_PACKAGE}`;
+const ONE_PASSWORD_CLI_DOCS = 'https://www.1password.dev/cli/get-started';
 
 export type Project = (typeof PROJECTS)[number];
 export type Environment = (typeof ENVIRONMENTS)[number];
@@ -41,10 +45,52 @@ function stringValue(record: JsonRecord, key: string): string | undefined {
   return typeof record[key] === 'string' ? record[key] : undefined;
 }
 
+function errorCode(error: unknown): string | undefined {
+  return isRecord(error) && typeof error.code === 'string' ? error.code : undefined;
+}
+
+function onePasswordInstallInstructions(): string[] {
+  return [
+    'Install 1Password CLI (`op`). On macOS with Homebrew: `brew install 1password-cli`.',
+    `Linux and manual install options: ${ONE_PASSWORD_CLI_DOCS}`,
+    'After installing, verify with `op --version`, then sign in with `op signin`.',
+  ];
+}
+
+function missingCommandMessage(command: string, args: string[]): string | undefined {
+  if (command === 'op') {
+    return [
+      '1Password CLI (`op`) is not installed or is not on PATH.',
+      ...onePasswordInstallInstructions(),
+      `Verify access with \`op vault get "${VAULT}" --format=json\`.`,
+    ].join('\n');
+  }
+
+  if (command === 'pnpm' && args[0] === 'dlx' && args[1]?.startsWith('vercel@')) {
+    return [
+      'Vercel access checks require pnpm, but `pnpm` is not installed or is not on PATH.',
+      'Install pnpm with Corepack (`corepack enable`) or enter the repo dev shell.',
+      'Then verify access with `pnpm dlx vercel@53.3.1 whoami --scope kilocode --format=json`.',
+    ].join('\n');
+  }
+
+  return undefined;
+}
+
+// Thrown when a required executable is absent. Its message already carries the
+// full install/verify guidance, so callers rethrow it as-is instead of wrapping
+// it in a provider-access error (which would repeat the same instructions).
+class MissingCommandError extends Error {}
+
 export function run(
   command: string,
   args: string[],
-  options: { cwd?: string; env?: NodeJS.ProcessEnv; input?: string } = {}
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    input?: string;
+    includeFailureOutput?: boolean;
+  } = {}
 ): string {
   const result = spawnSync(command, args, {
     cwd: options.cwd,
@@ -54,9 +100,13 @@ export function run(
     stdio: ['pipe', 'pipe', 'pipe'],
     maxBuffer: 10 * 1024 * 1024,
   });
+  if (errorCode(result.error) === 'ENOENT') {
+    const message = missingCommandMessage(command, args);
+    if (message) throw new MissingCommandError(message);
+  }
   if (result.status !== 0) {
     const operation = `${command} ${args.slice(0, 3).join(' ')}`;
-    if (command === 'op') {
+    if (command === 'op' || options.includeFailureOutput) {
       const output = [result.stderr, result.stdout, result.error?.message]
         .filter(Boolean)
         .join('\n')
@@ -68,12 +118,17 @@ export function run(
   return result.stdout;
 }
 
-function vercel(context: VercelContext | undefined, args: string[], input?: string): string {
+function vercel(
+  context: VercelContext | undefined,
+  args: string[],
+  input?: string,
+  options: { includeFailureOutput?: boolean } = {}
+): string {
   return run(
     'pnpm',
     [
       'dlx',
-      'vercel@53.3.1',
+      VERCEL_PACKAGE,
       ...args,
       '--scope',
       'kilocode',
@@ -91,16 +146,57 @@ function vercel(context: VercelContext | undefined, args: string[], input?: stri
           }
         : process.env,
       input,
+      includeFailureOutput: options.includeFailureOutput,
     }
   );
 }
 
+function vercelAccessError(error: unknown): Error {
+  const details = error instanceof Error ? error.message.trim() : '';
+  return new Error(
+    [
+      'Could not verify Vercel access for the kilocode team.',
+      `Run \`${VERCEL_COMMAND} login\` with an account that has access to the kilocode team.`,
+      `Verify access with \`${VERCEL_COMMAND} whoami --scope kilocode --format=json\`.`,
+      details ? `Vercel reported:\n${details}` : undefined,
+    ]
+      .filter(Boolean)
+      .join('\n')
+  );
+}
+
+function onePasswordAccessError(error: unknown): Error {
+  const details = error instanceof Error ? error.message.trim() : '';
+  return new Error(
+    [
+      `Could not verify 1Password access to the ${VAULT} vault.`,
+      ...onePasswordInstallInstructions(),
+      `Verify access with \`op vault get "${VAULT}" --format=json\`.`,
+      'If verification says the vault is missing or forbidden, ask for access to that vault.',
+      details ? `1Password reported:\n${details}` : undefined,
+    ]
+      .filter(Boolean)
+      .join('\n')
+  );
+}
+
 export function resolveVercelContexts(tempDirectory: string): VercelContext[] {
-  const whoami = parseJson(vercel(undefined, ['whoami', '--format=json']), 'Vercel login');
+  let whoami: JsonRecord;
+  try {
+    whoami = parseJson(
+      vercel(undefined, ['whoami', '--format=json'], undefined, { includeFailureOutput: true }),
+      'Vercel login'
+    );
+  } catch (error) {
+    if (error instanceof MissingCommandError) throw error;
+    throw vercelAccessError(error);
+  }
   const team = isRecord(whoami.team) ? whoami.team : undefined;
   const orgId = team ? stringValue(team, 'id') : undefined;
   if (!orgId || stringValue(team ?? {}, 'slug') !== 'kilocode') {
-    throw new Error('Sign in to the kilocode Vercel team with `vercel login`.');
+    throw vercelAccessError(
+      new Error('The authenticated Vercel account is not scoped to the kilocode team.')
+    );
   }
 
   return PROJECTS.map(project => ({ project, orgId, cwd: tempDirectory }));
@@ -129,11 +225,91 @@ export function setVariable(
   );
 }
 
+// setVaultValue streams the secret template to `op` over /dev/fd/3 (see
+// runOpWithTemplate), which only exists on Unix. resolveVault calls this so the
+// update flow fails before touching any provider; runOpWithTemplate re-checks as
+// the authoritative gate in case setVaultValue is ever invoked on its own.
+function assertSecureTemplateSupported(): void {
+  if (process.platform !== 'darwin' && process.platform !== 'linux') {
+    throw new Error('1Password updates require macOS or Linux for secure template transport.');
+  }
+}
+
 export function resolveVault(): string {
-  const vault = parseJson(run('op', ['vault', 'get', VAULT, '--format=json']), 'Resolve vault');
+  assertSecureTemplateSupported();
+  let vault: JsonRecord;
+  try {
+    vault = parseJson(run('op', ['vault', 'get', VAULT, '--format=json']), 'Resolve vault');
+  } catch (error) {
+    if (error instanceof MissingCommandError) throw error;
+    throw onePasswordAccessError(error);
+  }
   const vaultId = stringValue(vault, 'id');
-  if (!vaultId) throw new Error(`Could not resolve 1Password vault ${VAULT}.`);
+  if (!vaultId) {
+    throw onePasswordAccessError(new Error(`Could not resolve 1Password vault ${VAULT}.`));
+  }
   return vaultId;
+}
+
+function runOpWithTemplate(args: string[], template: string): Promise<string> {
+  assertSecureTemplateSupported();
+  return new Promise((resolve, reject) => {
+    const operation = `op ${args.slice(0, 3).join(' ')}`;
+    const child = spawn('op', args, { stdio: ['ignore', 'pipe', 'pipe', 'pipe'] });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    const maxOutputBytes = 10 * 1024 * 1024;
+    let outputBytes = 0;
+    let settled = false;
+
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
+    const capture = (chunks: Buffer[], chunk: Buffer) => {
+      outputBytes += chunk.length;
+      if (outputBytes > maxOutputBytes) {
+        child.kill();
+        fail(new Error(`${operation} failed; provider output exceeded 10 MiB.`));
+        return;
+      }
+      chunks.push(chunk);
+    };
+
+    if (!child.stdout || !child.stderr) {
+      child.kill();
+      fail(new Error(`${operation} failed to open output pipes.`));
+      return;
+    }
+    child.stdout.on('data', chunk => capture(stdout, Buffer.from(chunk)));
+    child.stderr.on('data', chunk => capture(stderr, Buffer.from(chunk)));
+    child.once('error', error => fail(new Error(`${operation} failed:\n${error.message}`)));
+    child.once('close', status => {
+      if (settled) return;
+      if (status === 0) {
+        settled = true;
+        resolve(Buffer.concat(stdout).toString('utf8'));
+        return;
+      }
+      const output = Buffer.concat([...stderr, ...stdout])
+        .toString('utf8')
+        .trim();
+      fail(new Error(`${operation} failed${output ? `:\n${output}` : '.'}`));
+    });
+
+    const templateInput = child.stdio[3];
+    if (!(templateInput instanceof Writable)) {
+      child.kill();
+      fail(new Error(`${operation} failed to open the secure template pipe.`));
+      return;
+    }
+    templateInput.once('error', error => {
+      child.kill();
+      fail(new Error(`${operation} failed to write the secure template:\n${error.message}`));
+    });
+    templateInput.end(template);
+  });
 }
 
 function findVaultItem(vaultId: string, name: string): JsonRecord | undefined {
@@ -174,7 +350,7 @@ function setAuditNote(item: JsonRecord, note: string): void {
   notes.value = preserved ? `${preserved}\n${note}` : note;
 }
 
-export function setVaultValue(vaultId: string, name: string, value: string): void {
+export async function setVaultValue(vaultId: string, name: string, value: string): Promise<void> {
   const note = auditNote();
   const existing = findVaultItem(vaultId, name);
   if (!existing) {
@@ -200,9 +376,10 @@ export function setVaultValue(vaultId: string, name: string, value: string): voi
       sections: [],
     };
     const created = parseJson(
-      run('op', ['item', 'create', '-', '--vault', vaultId, '--format=json'], {
-        input: JSON.stringify(item),
-      }),
+      await runOpWithTemplate(
+        ['item', 'create', '--template=/dev/fd/3', '--vault', vaultId, '--format=json'],
+        JSON.stringify(item)
+      ),
       `Create ${name}`
     );
     const createdPassword = records(created.fields).find(field => field.id === 'password');
@@ -230,9 +407,10 @@ export function setVaultValue(vaultId: string, name: string, value: string): voi
     'value'
   );
   const updated = parseJson(
-    run('op', ['item', 'edit', id, '--vault', vaultId, '--format=json'], {
-      input: JSON.stringify(item),
-    }),
+    await runOpWithTemplate(
+      ['item', 'edit', id, '--template=/dev/fd/3', '--vault', vaultId, '--format=json'],
+      JSON.stringify(item)
+    ),
     `Update ${name}`
   );
   const updatedPassword = records(updated.fields).find(field => field.id === 'password');

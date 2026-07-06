@@ -1,11 +1,14 @@
 import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
 import {
+  kilocode_users,
+  organization_invitations,
+  organization_memberships,
   organization_seats_purchases,
   organization_membership_removals,
   organizations,
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and, count, gt, isNull, ne, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import type Stripe from 'stripe';
 import {
@@ -101,12 +104,32 @@ export async function getMostRecentEndedSeatPurchase(
 export async function getOrganizationSeatUsage(
   organizationId: Organization['id']
 ): Promise<{ used: number; total: number }> {
-  const [members, organization] = await Promise.all([
-    getOrganizationMembers(organizationId),
+  const [activeMembers, pendingInvitations, organization] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(organization_memberships)
+      .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+      .where(
+        and(
+          eq(organization_memberships.organization_id, organizationId),
+          ne(organization_memberships.role, 'billing_manager'),
+          eq(kilocode_users.is_bot, false)
+        )
+      ),
+    db
+      .select({ value: count() })
+      .from(organization_invitations)
+      .where(
+        and(
+          eq(organization_invitations.organization_id, organizationId),
+          ne(organization_invitations.role, 'billing_manager'),
+          isNull(organization_invitations.accepted_at),
+          gt(organization_invitations.expires_at, sql`NOW()`)
+        )
+      ),
     getOrganizationById(organizationId),
   ]);
-  // Exclude billing_manager role from seat count
-  const used = members.filter(m => m.role !== 'billing_manager').length;
+  const used = (activeMembers[0]?.value ?? 0) + (pendingInvitations[0]?.value ?? 0);
   const total = organization?.seat_count || 0;
   return { used, total };
 }

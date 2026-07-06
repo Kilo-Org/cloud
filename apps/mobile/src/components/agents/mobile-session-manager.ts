@@ -142,6 +142,7 @@ export function createMobileAgentSessionManager({
             payload,
             autoCommit: true,
             messageId: input.messageId,
+            ...(input.attachments ? { attachments: input.attachments } : {}),
           };
           if (organizationId) {
             await trpcClient.organizations.cloudAgentNext.sendMessage.mutate(

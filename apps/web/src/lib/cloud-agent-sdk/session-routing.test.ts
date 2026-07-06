@@ -201,6 +201,129 @@ describe('session transport routing', () => {
     });
   });
 
+  describe('read-only session upgrade', () => {
+    function makeFakeUserWebConnection() {
+      const systemListeners = new Set<(event: { event: string; data: unknown }) => void>();
+      const releaseRetain = jest.fn();
+      const offSystemEvent = jest.fn();
+      const subscribeRelease = jest.fn();
+      return {
+        connection: {
+          retain: jest.fn(() => releaseRetain),
+          connect: jest.fn(),
+          disconnect: jest.fn(),
+          destroy: jest.fn(),
+          subscribeToCliSession: jest.fn(() => subscribeRelease),
+          sendCommand: jest.fn(() => Promise.resolve()),
+          onCliEvent: jest.fn(() => jest.fn()),
+          onSystemEvent: jest.fn((listener: (event: { event: string; data: unknown }) => void) => {
+            systemListeners.add(listener);
+            return () => {
+              offSystemEvent();
+              systemListeners.delete(listener);
+            };
+          }),
+          onReconnect: jest.fn(() => jest.fn()),
+          onSessionEvent: jest.fn(() => jest.fn()),
+        },
+        emitSystemEvent(event: string, data: unknown) {
+          for (const listener of systemListeners) listener({ event, data });
+        },
+        releaseRetain,
+        offSystemEvent,
+      };
+    }
+
+    it('re-resolves to remote when a CLI heartbeat reports the session as active', async () => {
+      const snapshot = makeSnapshot({ id: SES_ID }, [
+        {
+          info: stubUserMessage({ id: 'msg-1', sessionID: SES_ID }),
+          parts: [
+            stubTextPart({ id: 'part-1', messageID: 'msg-1', sessionID: SES_ID, text: 'hi' }),
+          ],
+        },
+      ]);
+
+      const resolveSession = jest
+        .fn<Promise<ResolvedSession>, [unknown]>()
+        .mockResolvedValueOnce({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+        .mockResolvedValue({ type: 'remote', kiloSessionId: kiloId(SES_ID) });
+
+      const fake = makeFakeUserWebConnection();
+
+      const session = createCloudAgentSession({
+        kiloSessionId: kiloId(SES_ID),
+        resolveSession,
+        transport: {
+          fetchSnapshot: jest.fn(() => Promise.resolve(snapshot)),
+          userWebConnection: fake.connection,
+        },
+      });
+
+      session.connect();
+      await Promise.resolve(); // resolveSession resolves
+      await Promise.resolve(); // fetchSnapshot resolves
+
+      expect(resolveSession).toHaveBeenCalledTimes(1);
+      expect(fake.connection.retain).toHaveBeenCalledTimes(1);
+      expect(session.storage.getMessageIds()).toContain('msg-1');
+
+      // A heartbeat for a different session must not trigger a re-resolve.
+      fake.emitSystemEvent('sessions.heartbeat', {
+        connectionId: 'conn-1',
+        sessions: [{ id: 'ses-other', status: 'busy', title: 'Other' }],
+      });
+      expect(resolveSession).toHaveBeenCalledTimes(1);
+
+      // The watched session shows up in a heartbeat → upgrade to live.
+      fake.emitSystemEvent('sessions.heartbeat', {
+        connectionId: 'conn-1',
+        sessions: [{ id: SES_ID, status: 'busy', title: 'Review' }],
+      });
+      await Promise.resolve(); // second resolveSession resolves
+
+      expect(resolveSession).toHaveBeenCalledTimes(2);
+      expect(fake.connection.subscribeToCliSession).toHaveBeenCalledWith(SES_ID);
+      // Watcher is disarmed once the upgrade kicks off.
+      expect(fake.offSystemEvent).toHaveBeenCalledTimes(1);
+      expect(fake.releaseRetain).toHaveBeenCalledTimes(1);
+
+      session.destroy();
+    });
+
+    it('disarms the watcher on destroy without re-resolving', async () => {
+      const resolveSession = jest.fn(
+        (): Promise<ResolvedSession> =>
+          Promise.resolve({ type: 'read-only', kiloSessionId: kiloId(SES_ID) })
+      );
+
+      const fake = makeFakeUserWebConnection();
+
+      const session = createCloudAgentSession({
+        kiloSessionId: kiloId(SES_ID),
+        resolveSession,
+        transport: {
+          fetchSnapshot: jest.fn(() => Promise.resolve(makeSnapshot({ id: SES_ID }, []))),
+          userWebConnection: fake.connection,
+        },
+      });
+
+      session.connect();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      session.destroy();
+      expect(fake.offSystemEvent).toHaveBeenCalledTimes(1);
+      expect(fake.releaseRetain).toHaveBeenCalledTimes(1);
+
+      fake.emitSystemEvent('sessions.heartbeat', {
+        connectionId: 'conn-1',
+        sessions: [{ id: SES_ID, status: 'busy', title: 'Review' }],
+      });
+      expect(resolveSession).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // NOTE: The old "completed Cloud Agent session" case (cloudAgentSessionId present
   // but isLive=false) no longer exists. With the discriminated union, the resolver
   // decides the session type. A completed cloud agent session is resolved as

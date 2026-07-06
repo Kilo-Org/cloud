@@ -3,8 +3,10 @@ ARG CONTROLLER_COMMIT=unknown
 ARG CONTROLLER_CACHE_BUST=1
 # Bump APT_CACHE_BUST (any value change) to invalidate the base apt layer and
 # pick up the latest chromium / 1password-cli / etc. from Debian + vendor repos.
-# Last bumped 2026-05-08 to pull chromium 148.x (CVE-2026-7908, CVE-2026-7910).
-ARG APT_CACHE_BUST=2026-05-08
+# Last bumped 2026-07-02 to refresh chromium, gh, 1password-cli, and base apt
+# security updates (CVE hardening). Note: much of the chromium CVE volume has no
+# fixed version available, so it is not fully clearable by a version bump.
+ARG APT_CACHE_BUST=2026-07-02
 
 FROM debian:trixie-slim AS runtime
 
@@ -64,12 +66,14 @@ RUN git config --system url."https://github.com/".insteadOf "ssh://git@github.co
 # under boot load routinely need 27-35s for the first TLS+fetch to complete.
 # Match the KiloCode chunk explicitly because OpenClaw also ships other provider
 # discovery timeout constants. Remove this patch once the timeout is configurable.
-RUN npm install -g pnpm openclaw@2026.6.8 clawhub mcporter@0.7.3 @steipete/summarize@0.12.0 @kilocode/cli@7.2.31 \
+# NOTE: the KiloCode provider was externalized from openclaw core into the standalone
+# @openclaw/kilocode-provider package (openclaw #93470, 2026.6.9); it is installed
+# alongside openclaw and its provider-models bundle is a single non-hashed file.
+RUN npm install -g pnpm openclaw@2026.6.11 @openclaw/kilocode-provider@2026.6.11 clawhub mcporter@0.7.3 @steipete/summarize@0.15.1 @kilocode/cli@7.2.31 \
     && OC_DIST=/usr/local/lib/node_modules/openclaw/dist \
-    && PM_FILES=$(grep -l 'KILOCODE_MODELS_URL' "$OC_DIST"/provider-models-*.js 2>/dev/null || true) \
-    && PM_FILE_COUNT=$(printf '%s\n' "$PM_FILES" | grep -c .) \
-    && if [ "$PM_FILE_COUNT" -ne 1 ]; then echo "ERROR: expected exactly 1 KiloCode provider-models chunk, found $PM_FILE_COUNT - openclaw may have changed" >&2; exit 1; fi \
-    && PM_FILE="$PM_FILES" \
+    && KP_DIST=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist \
+    && PM_FILE="$KP_DIST/provider-models.js" \
+    && if [ ! -f "$PM_FILE" ] || ! grep -q 'KILOCODE_MODELS_URL' "$PM_FILE"; then echo "ERROR: @openclaw/kilocode-provider provider-models.js missing or no KILOCODE_MODELS_URL - openclaw may have changed" >&2; exit 1; fi \
     && BEFORE=$(grep -c 'DISCOVERY_TIMEOUT_MS = 5e3' "$PM_FILE" 2>/dev/null || true) \
     && if [ "$BEFORE" -ne 1 ]; then echo "ERROR: expected exactly 1 KiloCode DISCOVERY_TIMEOUT_MS = 5e3 occurrence, found $BEFORE - openclaw may have changed" >&2; exit 1; fi \
     && sed -i 's/DISCOVERY_TIMEOUT_MS = 5e3/DISCOVERY_TIMEOUT_MS = 60e3/' "$PM_FILE" \
@@ -98,7 +102,7 @@ RUN COMPOSIO_INSTALL_TAG="%40composio%2Fcli%40${COMPOSIO_CLI_VERSION}" \
 # Bake bundled plugin runtime deps into OpenClaw's external stage dir so first
 # boot is pure startup — no npm install from `openclaw doctor` or gateway plugin
 # load on shared-cpu Fly machines. The stage-root naming mirrors OpenClaw
-# 2026.6.8's resolveExternalBundledRuntimeDepsInstallRoot().
+# 2026.6.11's resolveExternalBundledRuntimeDepsInstallRoot().
 RUN cd /usr/local/lib/node_modules/openclaw \
     && OPENCLAW_PACKAGE_ROOT="$(pwd -P)" \
     && OPENCLAW_PACKAGE_VERSION="$(node -p "require('./package.json').version")" \
@@ -135,13 +139,13 @@ RUN ARCH="$(dpkg --print-architecture)" \
 # - npm/Node (installed to /usr/local) and apt packages (/usr/bin) are unaffected.
 ENV PATH="/usr/local/go/bin:/root/go/bin:$PATH"
 RUN ARCH="$(dpkg --print-architecture)" \
-    && curl -fsSL "https://github.com/steipete/gogcli/releases/download/v0.14.0/gogcli_0.14.0_linux_${ARCH}.tar.gz" \
+    && curl -fsSL "https://github.com/openclaw/gogcli/releases/download/v0.31.1/gogcli_0.31.1_linux_${ARCH}.tar.gz" \
        | tar xz -C /usr/local/bin gog \
     && mv /usr/local/bin/gog /usr/local/bin/gog.real \
-    && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.3.0 \
-    && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.2 \
-    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.1.0 \
-    && GOBIN=/usr/local/bin go install github.com/steipete/gifgrep/cmd/gifgrep@v0.2.3 \
+    && GOBIN=/usr/local/bin go install github.com/steipete/goplaces/cmd/goplaces@v0.4.3 \
+    && GOBIN=/usr/local/bin go install github.com/Hyaxia/blogwatcher/cmd/blogwatcher@v0.0.3 \
+    && GOBIN=/usr/local/bin go install github.com/xdevplatform/xurl@v1.2.2 \
+    && GOBIN=/usr/local/bin go install github.com/steipete/gifgrep/cmd/gifgrep@v0.3.0 \
     && go clean -cache -modcache
 
 # Install uv (Python package manager, available at runtime).
@@ -259,8 +263,8 @@ RUN mkdir -p /root/.openclaw \
     && mkdir -p /root/clawd/skills
 
 # Copy helper scripts (used at runtime by the controller/gateway)
-# Build cache bust: 2026-06-17-v71-openclaw-2026.6.8
-RUN echo "16"
+# Build cache bust: 2026-07-01-v73-openclaw-2026.6.11-kilocode-provider
+RUN echo "18"
 COPY openclaw-pairing-list.js /usr/local/bin/openclaw-pairing-list.js
 COPY openclaw-device-pairing-list.js /usr/local/bin/openclaw-device-pairing-list.js
 

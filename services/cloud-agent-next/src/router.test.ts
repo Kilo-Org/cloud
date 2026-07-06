@@ -105,6 +105,7 @@ type MockSessionStub = {
   createTerminal?: ReturnType<typeof vi.fn>;
   resizeTerminal?: ReturnType<typeof vi.fn>;
   closeTerminal?: ReturnType<typeof vi.fn>;
+  isSandboxCleanupScheduled?: ReturnType<typeof vi.fn>;
 };
 
 type MockCAS = {
@@ -119,8 +120,8 @@ function legacySessionMetadata(input: Record<string, unknown>): CloudAgentSessio
 // Note: Balance validation is now handled in the worker entry point (index.ts)
 // via pre-flight validation before the tRPC handler is called.
 // This returns proper HTTP status codes (401, 402) instead of SSE error events.
-// See cloud-agent/src/balance-validation.ts for the implementation.
-// Tests for balance validation are in cloud-agent/src/balance-validation.test.ts
+// See cloud-agent-next/src/balance-validation.ts for the implementation.
+// Tests for balance validation are in cloud-agent-next/src/balance-validation.test.ts
 
 describe('router sessionId validation', () => {
   it('should reject invalid session ID formats', () => {
@@ -205,6 +206,16 @@ describe('router sessionId validation', () => {
       if (!result.success) {
         expect(result.error.issues[0]?.message).toContain('reserved environment variables');
         expect(result.error.issues[0]?.message).toContain('SESSION_HOME');
+      }
+    });
+
+    it('should reject the system-managed pnpm store variable', () => {
+      const result = envVarsSchema.safeParse({
+        pnpm_config_store_dir: '/custom/pnpm-store',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0]?.message).toContain('pnpm_config_store_dir');
       }
     });
 
@@ -337,6 +348,11 @@ describe('router sessionId validation', () => {
               Sandbox: {} as TRPCContext['env']['Sandbox'],
               SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
               SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
+              SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+              SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+              SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+              SandboxCodeReviewContainment:
+                {} as TRPCContext['env']['SandboxCodeReviewContainment'],
               CLOUD_AGENT_SESSION: {
                 idFromName: vi.fn((id: string) => ({ id })),
                 get: vi.fn(() => ({
@@ -346,6 +362,7 @@ describe('router sessionId validation', () => {
                 })),
               } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
               USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+              SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
               SESSION_INGEST: {
                 fetch: vi.fn(),
               } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -766,11 +783,16 @@ describe('router sessionId validation', () => {
             Sandbox: {} as TRPCContext['env']['Sandbox'],
             SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
             SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
+            SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+            SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+            SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+            SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => mockSessionStub),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+            SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -871,6 +893,10 @@ describe('router sessionId validation', () => {
             Sandbox: {} as TRPCContext['env']['Sandbox'],
             SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
             SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
+            SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+            SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+            SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+            SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
@@ -880,6 +906,7 @@ describe('router sessionId validation', () => {
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+            SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -1155,6 +1182,7 @@ describe('router sessionId validation', () => {
       let mockGetCurrentRuntimeExecution: ReturnType<typeof vi.fn>;
       let mockGetCurrentMessageWork: ReturnType<typeof vi.fn>;
       let mockListProcesses: ReturnType<typeof vi.fn>;
+      let mockIsSandboxCleanupScheduled: ReturnType<typeof vi.fn>;
 
       beforeEach(() => {
         vi.clearAllMocks();
@@ -1163,6 +1191,7 @@ describe('router sessionId validation', () => {
         mockGetCurrentRuntimeExecution = vi.fn().mockResolvedValue(null);
         mockGetCurrentMessageWork = vi.fn().mockResolvedValue(null);
         mockListProcesses = vi.fn().mockResolvedValue([]);
+        mockIsSandboxCleanupScheduled = vi.fn().mockResolvedValue(false);
 
         mockContext = {
           userId: 'test-user-123',
@@ -1173,15 +1202,21 @@ describe('router sessionId validation', () => {
             Sandbox: {} as TRPCContext['env']['Sandbox'],
             SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
             SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
+            SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+            SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+            SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+            SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
                 getMetadata: mockGetMetadata,
                 getCurrentRuntimeExecution: mockGetCurrentRuntimeExecution,
                 getCurrentMessageWork: mockGetCurrentMessageWork,
+                isSandboxCleanupScheduled: mockIsSandboxCleanupScheduled,
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+            SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],
@@ -1363,6 +1398,37 @@ describe('router sessionId validation', () => {
         expect(mockGetCurrentRuntimeExecution).not.toHaveBeenCalled();
       });
 
+      it('reports Code Reviewer sandbox cleanup as destroyed without probing compute', async () => {
+        const sessionId: SessionId = 'agent_44444444-4444-4444-4444-444444444444';
+        mockIsSandboxCleanupScheduled.mockResolvedValue(true);
+        mockGetMetadata.mockResolvedValue(
+          legacySessionMetadata({
+            metadataSchemaVersion: 2,
+            identity: {
+              sessionId,
+              orgId: 'org-123',
+              userId: 'test-user-123',
+              createdOnPlatform: 'code-review',
+            },
+            auth: {},
+            workspace: {
+              sandboxId: 'crv-a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6',
+            },
+            lifecycle: { version: 1, timestamp: 123456789 },
+          })
+        );
+
+        const result = await caller.getSessionHealth({ cloudAgentSessionId: sessionId });
+
+        expect(result).toMatchObject({
+          cloudAgentSessionId: sessionId,
+          sandboxStatus: 'destroyed',
+          executionHealth: 'none',
+        });
+        expect(mockIsSandboxCleanupScheduled).toHaveBeenCalledOnce();
+        expect(getSandbox).not.toHaveBeenCalled();
+      });
+
       it('returns NOT_FOUND for missing session metadata', async () => {
         const sessionId: SessionId = 'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
         mockGetMetadata.mockResolvedValue(null);
@@ -1424,6 +1490,10 @@ describe('router sessionId validation', () => {
             Sandbox: {} as TRPCContext['env']['Sandbox'],
             SandboxSmall: {} as TRPCContext['env']['SandboxSmall'],
             SandboxDIND: {} as TRPCContext['env']['SandboxDIND'],
+            SandboxCodeReview: {} as TRPCContext['env']['SandboxCodeReview'],
+            SandboxContainment: {} as TRPCContext['env']['SandboxContainment'],
+            SandboxSmallContainment: {} as TRPCContext['env']['SandboxSmallContainment'],
+            SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
@@ -1432,6 +1502,7 @@ describe('router sessionId validation', () => {
               })),
             } as unknown as TRPCContext['env']['CLOUD_AGENT_SESSION'],
             USER_KILO_FACADE: {} as TRPCContext['env']['USER_KILO_FACADE'],
+            SHARED_SANDBOX_OVERRIDES: {} as TRPCContext['env']['SHARED_SANDBOX_OVERRIDES'],
             SESSION_INGEST: {
               fetch: vi.fn(),
             } as unknown as TRPCContext['env']['SESSION_INGEST'],

@@ -9,7 +9,7 @@ import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-midd
 import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import type { Owner } from '@/lib/integrations/core/types';
-import type { StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
+import type { RetainedOAuthPlatform, StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
 
 type AuthenticatedOAuthUser = Parameters<typeof ensureOrganizationAccess>[0]['user'];
 
@@ -99,7 +99,7 @@ export function buildIntegrationOAuthRedirectPathFromState(
 }
 
 export function buildIntegrationOAuthConnectErrorPath(
-  platform: StandardOAuthPlatform,
+  platform: RetainedOAuthPlatform,
   organizationId: string | null | undefined,
   errorCode: string
 ): string {

@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import type { PlatformRepository } from '@/lib/integrations/core/types';
+import {
+  requireNumericPlatformRepositories,
+  type PlatformRepository,
+} from '@/lib/integrations/core/types';
 import {
   findIntegrationByInstallationId,
   updateIntegrationRepositories,
@@ -27,7 +30,7 @@ export async function handleInstallationRepositories(payload: InstallationReposi
   }
 
   // Get current repositories
-  const currentRepos = integration.repositories || [];
+  const currentRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
   let updatedRepos: PlatformRepository[] = currentRepos;
 
   if (action === GITHUB_ACTION.ADDED && repositories_added) {

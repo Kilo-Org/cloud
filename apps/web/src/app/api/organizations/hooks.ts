@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { Organization } from '@kilocode/db/schema';
-import type { OrgTrialStatus, TimePeriod } from '@/lib/organizations/organization-types';
+import type { OrgTrialStatus } from '@/lib/organizations/organization-types';
 import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
 import { z } from 'zod';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
@@ -20,6 +20,52 @@ export function useOrganizationWithMembers(id: string, options?: { enabled?: boo
         },
       }
     )
+  );
+}
+
+export function useOrganizationChildren(id: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.childOrganizations.queryOptions(
+      { organizationId: id },
+      {
+        trpc: {
+          context: {
+            skipBatch: true,
+          },
+        },
+      }
+    )
+  );
+}
+
+export function useOrganizationChildBalances(id: string) {
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.organizations.funds.childBalances.queryOptions(
+      { organizationId: id },
+      {
+        trpc: {
+          context: {
+            skipBatch: true,
+          },
+        },
+      }
+    )
+  );
+}
+
+export function useDistributeFundsToChildren() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.funds.distribute.mutationOptions({
+      onSuccess: async () => {
+        // Balances change on both the parent and the children, so refresh all
+        // organization-scoped queries.
+        await queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
   );
 }
 
@@ -43,42 +89,6 @@ export const useInvalidateAllOrganizationData = () => {
   };
 };
 
-export function useOrganizationUsageDetails(
-  organizationId: string,
-  timePeriod: string = 'week',
-  userFilter: string = 'all',
-  groupByModel: boolean = false
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.usageDetails.get.queryOptions({
-      organizationId,
-      period: timePeriod as 'week' | 'month' | 'year' | 'all',
-      userFilter: userFilter as 'all' | 'me',
-      groupByModel,
-    })
-  );
-}
-
-export function useOrganizationUsageTimeseries(
-  organizationId: string,
-  startDate: string,
-  endDate: string,
-  options?: { enabled?: boolean }
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.usageDetails.getTimeSeries.queryOptions(
-      {
-        organizationId,
-        startDate,
-        endDate,
-      },
-      options
-    )
-  );
-}
-
 export function useOrganizationCreditTransactions(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.creditTransactions.queryOptions({ organizationId }));
@@ -87,19 +97,6 @@ export function useOrganizationCreditTransactions(organizationId: string) {
 export function useOrganizationUsageStats(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.usageStats.queryOptions({ organizationId }));
-}
-
-export function useOrganizationAutocompleteMetrics(
-  organizationId: string,
-  period: TimePeriod = 'month'
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.usageDetails.getAutocomplete.queryOptions({
-      organizationId,
-      period,
-    })
-  );
 }
 
 export function useOrganizationInvoices(organizationId: string, timePeriod: string = 'year') {
@@ -148,6 +145,16 @@ export function useInviteMember() {
   const onSuccess = useInvalidateAllOrganizationData();
   return useMutation(
     trpc.organizations.members.invite.mutationOptions({
+      onSuccess,
+    })
+  );
+}
+
+export function useSetChildMemberships() {
+  const trpc = useTRPC();
+  const onSuccess = useInvalidateOrganizationAndMembers();
+  return useMutation(
+    trpc.organizations.members.setChildMemberships.mutationOptions({
       onSuccess,
     })
   );
@@ -279,6 +286,21 @@ export function useUpdateMinimumBalanceAlert() {
     trpc.organizations.settings.updateMinimumBalanceAlert.mutationOptions({
       onSuccess: () => {
         // Invalidate organization data to refresh settings
+        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
+      },
+    })
+  );
+}
+
+export function useUpdateRecommendationsDigest() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.organizations.settings.updateRecommendationsDigest.mutationOptions({
+      onSuccess: () => {
+        // Invalidate organization data to refresh settings (shared with the
+        // spending-alerts surface, so both stay in sync).
         void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
       },
     })

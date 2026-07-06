@@ -538,10 +538,98 @@ describe('buildSecurityAgentAuditReportFromRows', () => {
     });
     expect(report.findings[1]).toMatchObject({
       findingId: '22222222-2222-4222-8222-222222222222',
-      title: 'Legacy Security Finding',
+      title: 'Security Finding 22222222-2222-4222-8222-222222222222',
       hasLegacySupplementalActivity: true,
     });
     expect(report.hasLegacySupplementalActivity).toBe(true);
+  });
+
+  it('uses current finding metadata to describe legacy activity', () => {
+    const legacyFindingId = '22222222-2222-4222-8222-222222222222';
+    const report = buildSecurityAgentAuditReportFromRows({
+      owner: {
+        type: 'organization',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Acme',
+      },
+      period,
+      generatedAt: '2026-06-12T15:00:00.000Z',
+      dataThrough: '2026-06-12T15:00:00.000Z',
+      isRequestingUserKiloAdmin: false,
+      rows: [
+        row({
+          finding_id: null,
+          resource_id: legacyFindingId,
+          occurred_at: null,
+          finding_snapshot: null,
+        }),
+      ],
+      currentFindings: [
+        {
+          findingId: legacyFindingId,
+          snapshot: {
+            source: 'dependabot',
+            source_id: '84',
+            repo_full_name: 'kilo/cloud',
+            title: 'Cross-origin request routing in undici',
+            severity: 'high',
+            status: 'ignored',
+            package_name: 'undici',
+            package_ecosystem: 'npm',
+            manifest_path: 'pnpm-lock.yaml',
+            patched_version: '7.28.0',
+            first_detected_at: '2026-03-28T17:40:00.000Z',
+          },
+        },
+      ],
+    });
+
+    expect(report.findings[0]).toMatchObject({
+      findingId: legacyFindingId,
+      source: 'dependabot',
+      sourceId: '84',
+      repository: 'kilo/cloud',
+      title: 'Cross-origin request routing in undici',
+      severity: 'high',
+      status: 'ignored',
+      packageName: 'undici',
+      packageEcosystem: 'npm',
+      manifestPath: 'pnpm-lock.yaml',
+      patchedVersion: '7.28.0',
+      firstDetectedAt: '2026-03-28T17:40:00.000Z',
+      hasLegacySupplementalActivity: true,
+    });
+  });
+
+  it('prefers recorded snapshots over current finding metadata', () => {
+    const report = buildSecurityAgentAuditReportFromRows({
+      owner: {
+        type: 'organization',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        displayName: 'Acme',
+      },
+      period,
+      generatedAt: '2026-06-12T15:00:00.000Z',
+      dataThrough: '2026-06-12T15:00:00.000Z',
+      isRequestingUserKiloAdmin: false,
+      rows: [row({})],
+      currentFindings: [
+        {
+          findingId: '11111111-1111-4111-8111-111111111111',
+          snapshot: {
+            title: 'Current title',
+            severity: 'low',
+            repo_full_name: 'kilo/current',
+          },
+        },
+      ],
+    });
+
+    expect(report.findings[0]).toMatchObject({
+      title: 'Prototype Pollution in lodash',
+      severity: 'high',
+      repository: 'kilo/repo',
+    });
   });
 
   it('masks actors from persisted classification', () => {

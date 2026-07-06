@@ -136,6 +136,7 @@ type ActiveMember = {
   inviteDate: string | null;
   dailyUsageLimitUsd: number | null;
   currentDailyUsageUsd: number | null;
+  childOrganizationMemberships?: ChildOrganizationMembership[];
 };
 
 export type OrganizationMember = InvitedMember | ActiveMember;
@@ -162,6 +163,15 @@ export const OrganizationWithMembersSchema = OrganizationSchema.extend({
   members: z.array(OrganizationMemberSchema),
 });
 
+export type ChildOrganizationSummary = {
+  id: string;
+  name: string;
+};
+
+export type ChildOrganizationMembership = ChildOrganizationSummary & {
+  role: OrganizationRole;
+};
+
 export type OrganizationSsoPolicyView = {
   required: boolean;
   source: 'self' | 'direct_parent' | null;
@@ -171,6 +181,7 @@ export type OrganizationSsoPolicyView = {
 
 export type OrganizationWithMembers = z.infer<typeof OrganizationSchema> & {
   members: OrganizationMember[];
+  childOrganizations: ChildOrganizationSummary[];
   effectiveSsoPolicy: OrganizationSsoPolicyView;
 };
 
@@ -257,6 +268,11 @@ const OpenRouterModelSchema = z.object({
   isFree: z.boolean().optional(),
   mayTrainOnYourPrompts: z.boolean().optional(),
   hasUserByokAvailable: z.boolean().optional(),
+  autoRouting: z
+    .object({
+      models: z.array(z.string()),
+    })
+    .optional(),
   terminalBench: z
     .object({
       overallScore: z.number(),

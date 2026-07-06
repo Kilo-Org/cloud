@@ -3,7 +3,11 @@ import {
   credit_transactions as creditTransactionsTable,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { computeExpiration, processLocalExpirations } from './creditExpiration';
+import {
+  computeExpiration,
+  computeNextExpirationAmount,
+  processLocalExpirations,
+} from './creditExpiration';
 import { db } from '@/lib/drizzle';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
@@ -885,5 +889,82 @@ describe('processLocalExpirations', () => {
     const balance =
       (updatedUser!.total_microdollars_acquired - updatedUser!.microdollars_used) / 1_000_000;
     expect(balance).toBe(2); // $2 balance
+  });
+});
+
+describe('computeNextExpirationAmount', () => {
+  it('returns null when nextExpirationAt is null', () => {
+    const result = computeNextExpirationAmount([], { id: 'org', microdollars_used: 0 }, null);
+    expect(result).toBeNull();
+  });
+
+  it('returns total unused amount for a single grant with no usage', () => {
+    const transactions = [makeTransaction('t1', '2024-02-01', 0, 1_000_000)];
+    const entity = { id: 'org', microdollars_used: 0 };
+
+    const result = computeNextExpirationAmount(transactions, entity, '2024-02-01');
+
+    expect(result).toBe(1_000_000);
+  });
+
+  it('subtracts consumed credits from the expiring amount', () => {
+    // Grant of $1, but $0.40 was consumed → $0.60 expires
+    const transactions = [makeTransaction('t1', '2024-02-01', 0, 1_000_000)];
+    const entity = { id: 'org', microdollars_used: 400_000 };
+
+    const result = computeNextExpirationAmount(transactions, entity, '2024-02-01');
+
+    expect(result).toBe(600_000);
+  });
+
+  it('sums multiple grants expiring on the same date', () => {
+    // Grant A ($10) + Grant B ($9) both expire Feb 1; Grant C ($50) expires Mar 1
+    const transactions = [
+      makeTransaction('t1', '2024-02-01', 0, 10_000_000),
+      makeTransaction('t2', '2024-02-01', 0, 9_000_000),
+      makeTransaction('t3', '2024-03-01', 0, 50_000_000),
+    ];
+    const entity = { id: 'org', microdollars_used: 0 };
+
+    const result = computeNextExpirationAmount(transactions, entity, '2024-02-01');
+
+    // Only Feb 1 grants are summed; Mar 1 grant is excluded
+    expect(result).toBe(19_000_000);
+  });
+
+  it('excludes grants expiring on a later date', () => {
+    const transactions = [makeTransaction('t1', '2024-03-01', 0, 50_000_000)];
+    const entity = { id: 'org', microdollars_used: 0 };
+
+    // Next expiration is Feb 1 but the only grant expires Mar 1
+    const result = computeNextExpirationAmount(transactions, entity, '2024-02-01');
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when all grants expiring at that date are fully consumed', () => {
+    // Grant of $1, but $1.50 was already consumed → nothing expires
+    const transactions = [makeTransaction('t1', '2024-02-01', 0, 1_000_000)];
+    const entity = { id: 'org', microdollars_used: 1_500_000 };
+
+    const result = computeNextExpirationAmount(transactions, entity, '2024-02-01');
+
+    expect(result).toBeNull();
+  });
+
+  it('accounts for baseline propagation when usage spans multiple grants', () => {
+    // Two grants of $10 each expiring Feb 1; total usage = $10 (claims from t1)
+    // t1: baseline=0, amount=10M, usage=10M, expires=0
+    // t2: baseline raised to 10M by propagation, usageEnd=min(20M,10M)=10M, usage=max(0,10M-10M)=0, expires=10M
+    const transactions = [
+      makeTransaction('t1', '2024-02-01', 0, 10_000_000),
+      makeTransaction('t2', '2024-02-01', 0, 10_000_000),
+    ];
+    const entity = { id: 'org', microdollars_used: 10_000_000 };
+
+    const result = computeNextExpirationAmount(transactions, entity, '2024-02-01');
+
+    // t1 fully consumed, t2 fully expires → total 10M
+    expect(result).toBe(10_000_000);
   });
 });

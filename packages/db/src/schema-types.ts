@@ -746,6 +746,11 @@ const OrganizationSettingsSchema = z.object({
   projects_ui_enabled: z.boolean().optional(),
   minimum_balance: z.number().optional(),
   minimum_balance_alert_email: z.array(z.email()).optional(),
+  // Whether the weekly enterprise recommendations digest email is enabled. When on,
+  // the digest is emailed to the organization's owners. Enterprise-only feature.
+  // Named "recommendations" (not "adoption") to avoid confusion with AI adoption
+  // usage data and the Feature adoption tab.
+  recommendations_digest_enabled: z.boolean().optional(),
   suppress_trial_messaging: z.boolean().optional(),
   // OSS Sponsorship fields
   // null/undefined = not an OSS org, values: 1, 2, or 3
@@ -918,6 +923,7 @@ export const AuditLogAction = z.enum([
   'organization.mode.delete', // ✅
   'organization.created', // ✅
   'organization.token.generate', // ✅
+  'organization.funds.distribute_to_children', // ✅
 ]);
 
 // --- EncryptedData ---
@@ -969,11 +975,12 @@ export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
 
 export type IntegrationPermissions = Record<string, string>;
 
-export type PlatformRepository = {
-  id: number;
+export type PlatformRepository<TId extends number | string = number> = {
+  id: TId;
   name: string;
   full_name: string;
   private: boolean;
+  default_branch?: string;
 };
 
 export const REVIEW_MEMORY_PLATFORMS = ['github'] as const;
@@ -1111,6 +1118,9 @@ export type CodeReviewFindingSecurityClass =
 
 // --- CodeReviewAgentConfig ---
 
+export const CODE_REVIEW_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
+export type CodeReviewPlatform = (typeof CODE_REVIEW_PLATFORMS)[number];
+
 export const ManuallyAddedRepositorySchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -1134,7 +1144,7 @@ export const CodeReviewAgentConfigSchema = z.object({
     .nullable()
     .optional(),
   repository_selection_mode: z.enum(['all', 'selected']).optional(),
-  selected_repository_ids: z.array(z.number()).optional(),
+  selected_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
   disable_review_md: z.boolean().optional(),
@@ -1150,6 +1160,16 @@ export const CodeReviewAgentConfigSchema = z.object({
 });
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;
+
+export const ManualCodeReviewConfigSchema = z
+  .object({
+    agentConfig: CodeReviewAgentConfigSchema,
+    instructions: z.string().max(4_000).nullable(),
+    outputMode: z.enum(['provider', 'kilo']),
+  })
+  .strict();
+
+export type ManualCodeReviewConfig = z.infer<typeof ManualCodeReviewConfigSchema>;
 
 // --- Security types ---
 
@@ -1534,7 +1554,7 @@ export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 export const EndpointSchema = z.object({
   tag: z.string().optional(),
   provider_name: z.string().optional(),
-  context_length: z.number(),
+  context_length: z.number().optional(),
   pricing: z
     .object({
       prompt: z.string(),
@@ -1690,6 +1710,15 @@ export const MCPGatewayProviderGrantStatus = {
 
 export type MCPGatewayProviderGrantStatus =
   (typeof MCPGatewayProviderGrantStatus)[keyof typeof MCPGatewayProviderGrantStatus];
+
+export const MCPGatewayOAuthGrantStatus = {
+  Pending: 'pending',
+  Active: 'active',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayOAuthGrantStatus =
+  (typeof MCPGatewayOAuthGrantStatus)[keyof typeof MCPGatewayOAuthGrantStatus];
 
 export const MCPGatewaySecretKind = {
   StaticProviderCredentials: 'static_provider_credentials',

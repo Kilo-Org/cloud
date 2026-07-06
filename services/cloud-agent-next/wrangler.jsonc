@@ -53,6 +53,8 @@
     "CLI_TIMEOUT_SECONDS": "900",
     "REAPER_INTERVAL_MS": "300000",
     "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments",
+    "BACKUP_BUCKET_NAME": "kilocode-sessions",
+    "CLOUDFLARE_R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
     "WS_ALLOWED_ORIGINS": "https://app.kilo.ai,https://api.kilo.ai",
     "KILO_SESSION_INGEST_URL": "https://ingest.kilosessions.ai",
   },
@@ -140,14 +142,22 @@
       "binding": "R2_BUCKET",
       "bucket_name": "kilocode-sessions",
     },
+    {
+      "binding": "BACKUP_BUCKET",
+      "bucket_name": "kilocode-sessions",
+    },
   ],
   "containers": [
     {
       "class_name": "Sandbox",
       "image": "./Dockerfile",
-      "instance_type": "standard-4",
+      "instance_type": {
+        "vcpu": 4,
+        "memory_mib": 12288,
+        "disk_mb": 20000,
+      },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.21",
+        "KILOCODE_CLI_VERSION": "7.3.54",
       },
       "max_instances": 400,
       "rollout_active_grace_period": 1800,
@@ -155,9 +165,13 @@
     {
       "class_name": "SandboxSmall",
       "image": "./Dockerfile",
-      "instance_type": "standard-4",
+      "instance_type": {
+        "vcpu": 2,
+        "memory_mib": 6144,
+        "disk_mb": 10000,
+      },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.21",
+        "KILOCODE_CLI_VERSION": "7.3.54",
       },
       "max_instances": 300,
       "rollout_active_grace_period": 1800,
@@ -165,11 +179,71 @@
     {
       "class_name": "SandboxDIND",
       "image": "./Dockerfile.dind",
-      "instance_type": "standard-3",
+      "instance_type": {
+        "vcpu": 2,
+        "memory_mib": 6144,
+        "disk_mb": 10000,
+      },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.3.21",
+        "KILOCODE_CLI_VERSION": "7.3.54",
       },
       "max_instances": 20,
+      "rollout_active_grace_period": 1800,
+    },
+    {
+      "class_name": "SandboxCodeReview",
+      "image": "./Dockerfile",
+      "instance_type": {
+        "vcpu": 1,
+        "memory_mib": 4096,
+        "disk_mb": 8000,
+      },
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "7.3.54",
+      },
+      "max_instances": 1000,
+      "rollout_active_grace_period": 1800,
+    },
+    {
+      "class_name": "SandboxContainment",
+      "image": "./Dockerfile",
+      "instance_type": {
+        "vcpu": 4,
+        "memory_mib": 12288,
+        "disk_mb": 20000,
+      },
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "7.3.54",
+      },
+      "max_instances": 400,
+      "rollout_active_grace_period": 1800,
+    },
+    {
+      "class_name": "SandboxSmallContainment",
+      "image": "./Dockerfile",
+      "instance_type": {
+        "vcpu": 2,
+        "memory_mib": 6144,
+        "disk_mb": 10000,
+      },
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "7.3.54",
+      },
+      "max_instances": 300,
+      "rollout_active_grace_period": 1800,
+    },
+    {
+      "class_name": "SandboxCodeReviewContainment",
+      "image": "./Dockerfile",
+      "instance_type": {
+        "vcpu": 1,
+        "memory_mib": 4096,
+        "disk_mb": 8000,
+      },
+      "image_vars": {
+        "KILOCODE_CLI_VERSION": "7.3.54",
+      },
+      "max_instances": 1000,
       "rollout_active_grace_period": 1800,
     },
   ],
@@ -186,6 +260,22 @@
       {
         "class_name": "SandboxDIND",
         "name": "SandboxDIND",
+      },
+      {
+        "class_name": "SandboxCodeReview",
+        "name": "SandboxCodeReview",
+      },
+      {
+        "class_name": "SandboxContainment",
+        "name": "SandboxContainment",
+      },
+      {
+        "class_name": "SandboxSmallContainment",
+        "name": "SandboxSmallContainment",
+      },
+      {
+        "class_name": "SandboxCodeReviewContainment",
+        "name": "SandboxCodeReviewContainment",
       },
       {
         "class_name": "CloudAgentSession",
@@ -218,6 +308,18 @@
       "new_sqlite_classes": ["UserKiloFacade"],
       "tag": "v5",
     },
+    {
+      "new_sqlite_classes": ["SandboxCodeReview"],
+      "tag": "v6",
+    },
+    {
+      "new_sqlite_classes": [
+        "SandboxContainment",
+        "SandboxSmallContainment",
+        "SandboxCodeReviewContainment",
+      ],
+      "tag": "v7",
+    },
   ],
   /**
    * Hyperdrive Bindings
@@ -228,6 +330,11 @@
       "binding": "HYPERDRIVE",
       "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "SHARED_SANDBOX_OVERRIDES",
     },
   ],
 
@@ -277,6 +384,11 @@
           "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
         },
       ],
+      "kv_namespaces": [
+        {
+          "binding": "SHARED_SANDBOX_OVERRIDES",
+        },
+      ],
       "vars": {
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
         "KILO_OPENROUTER_BASE": "http://localhost:3000/api",
@@ -285,12 +397,17 @@
         "GITHUB_LITE_APP_SLUG": "",
         "GITHUB_LITE_APP_BOT_USER_ID": "",
         "WORKER_URL": "http://localhost:8794",
+        "SANDBOX_TRANSPORT": "rpc",
         "CLI_TIMEOUT_SECONDS": "900",
         "REAPER_INTERVAL_MS": "300000",
         "R2_ATTACHMENTS_BUCKET": "cloud-agent-attachments-dev",
+        "BACKUP_BUCKET_NAME": "kilocode-sessions-dev",
+        "CLOUDFLARE_R2_ACCOUNT_ID": "e115e769bcdd4c3d66af59d3332cb394",
         "WS_ALLOWED_ORIGINS": "http://localhost:3000,http://host.docker.internal:3000",
         "KILO_SESSION_INGEST_URL": "http://localhost:8800",
         "PER_SESSION_SANDBOX_ORG_IDS": "*",
+        "MANAGED_SCM_CONTAINMENT_ORG_IDS": "",
+        "REPO_SNAPSHOT_ORG_IDS": "",
       },
       "services": [
         {
@@ -321,6 +438,10 @@
           "binding": "R2_BUCKET",
           "bucket_name": "kilocode-sessions-dev",
         },
+        {
+          "binding": "BACKUP_BUCKET",
+          "bucket_name": "kilocode-sessions-dev",
+        },
       ],
       "containers": [
         {
@@ -328,7 +449,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.21",
+            "KILOCODE_CLI_VERSION": "7.3.54",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -338,7 +459,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.21",
+            "KILOCODE_CLI_VERSION": "7.3.54",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -348,7 +469,55 @@
           "image": "./Dockerfile.dind",
           "instance_type": "standard-3",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.3.21",
+            "KILOCODE_CLI_VERSION": "7.3.54",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 60,
+        },
+        {
+          "class_name": "SandboxCodeReview",
+          "image": "./Dockerfile.dev",
+          "instance_type": {
+            "vcpu": 1,
+            "memory_mib": 4096,
+            "disk_mb": 8000,
+          },
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.54",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 60,
+        },
+        {
+          "class_name": "SandboxContainment",
+          "image": "./Dockerfile.dev",
+          "instance_type": "standard-4",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.54",
+          },
+          "max_instances": 10,
+          "rollout_active_grace_period": 60,
+        },
+        {
+          "class_name": "SandboxSmallContainment",
+          "image": "./Dockerfile.dev",
+          "instance_type": "standard-4",
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.54",
+          },
+          "max_instances": 2,
+          "rollout_active_grace_period": 60,
+        },
+        {
+          "class_name": "SandboxCodeReviewContainment",
+          "image": "./Dockerfile.dev",
+          "instance_type": {
+            "vcpu": 1,
+            "memory_mib": 4096,
+            "disk_mb": 8000,
+          },
+          "image_vars": {
+            "KILOCODE_CLI_VERSION": "7.3.54",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -367,6 +536,22 @@
           {
             "class_name": "SandboxDIND",
             "name": "SandboxDIND",
+          },
+          {
+            "class_name": "SandboxCodeReview",
+            "name": "SandboxCodeReview",
+          },
+          {
+            "class_name": "SandboxContainment",
+            "name": "SandboxContainment",
+          },
+          {
+            "class_name": "SandboxSmallContainment",
+            "name": "SandboxSmallContainment",
+          },
+          {
+            "class_name": "SandboxCodeReviewContainment",
+            "name": "SandboxCodeReviewContainment",
           },
           {
             "class_name": "CloudAgentSession",

@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "UQ_coding_plan_sub_live_user_provider" ON "coding_plan_subscriptions" USING btree ("user_id","provider_id") WHERE "coding_plan_subscriptions"."status" IN ('active', 'past_due');

@@ -1,6 +1,7 @@
 'use client';
 
 import { Toaster } from '@/components/ui/sonner';
+import { ConfirmProvider } from '@/components/ui/confirm';
 import { TRPCContext } from '@/lib/trpc/client';
 import { GastownTRPCProvider, createGastownTRPCClient } from '@/lib/gastown/trpc';
 import { WastelandTRPCProvider, createWastelandTRPCClient } from '@/lib/wasteland/trpc';
@@ -33,7 +34,7 @@ export function Providers({ children }: PropsWithChildren) {
             <WastelandTRPCProvider trpcClient={wastelandClient} queryClient={queryClient}>
               <SessionProvider>
                 <SignInHintEmailSyncer />
-                {children}
+                <ConfirmProvider>{children}</ConfirmProvider>
               </SessionProvider>
             </WastelandTRPCProvider>
           </GastownTRPCProvider>

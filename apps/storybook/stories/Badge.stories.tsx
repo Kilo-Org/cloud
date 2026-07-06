@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs';
+import { CheckCircle2, Clock3, ExternalLink, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const meta: Meta<typeof Badge> = {
-  title: 'Components/Badge',
+  title: 'Components/Data Display/Badge',
   component: Badge,
   parameters: {
     layout: 'centered',
@@ -15,6 +16,22 @@ const meta: Meta<typeof Badge> = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+const variants = [
+  'default',
+  'secondary',
+  'secondary-outline',
+  'destructive',
+  'outline',
+  'beta',
+  'new',
+] as const;
+
+function StorySurface({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="storybook-canvas flex min-w-80 items-center justify-center p-6">{children}</div>
+  );
+}
 
 export const Default: Story = {
   args: {
@@ -66,13 +83,67 @@ export const BetaUppercase: Story = {
 
 export const AllVariants: Story = {
   render: () => (
-    <div className="flex flex-wrap gap-2">
-      <Badge>Default</Badge>
-      <Badge variant="secondary">Secondary</Badge>
-      <Badge variant="secondary-outline">Secondary Outline</Badge>
-      <Badge variant="destructive">Destructive</Badge>
-      <Badge variant="outline">Outline</Badge>
-      <Badge variant="beta">beta</Badge>
-    </div>
+    <StorySurface>
+      <div className="flex flex-wrap gap-2">
+        {variants.map(variant => (
+          <Badge key={variant} variant={variant}>
+            {variant}
+          </Badge>
+        ))}
+      </div>
+    </StorySurface>
+  ),
+};
+
+export const WithIcons: Story = {
+  render: () => (
+    <StorySurface>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="new">
+          <CheckCircle2 />
+          Active
+        </Badge>
+        <Badge variant="secondary">
+          <Clock3 />
+          Pending
+        </Badge>
+        <Badge variant="destructive">
+          <ShieldAlert />
+          Action needed
+        </Badge>
+      </div>
+    </StorySurface>
+  ),
+};
+
+export const LongLabels: Story = {
+  render: () => (
+    <StorySurface>
+      <div className="flex w-80 max-w-full flex-wrap gap-2">
+        <Badge className="max-w-full whitespace-normal text-center">
+          Organization admin approval required
+        </Badge>
+        <Badge variant="secondary-outline" className="max-w-full whitespace-normal text-center">
+          Usage threshold review scheduled
+        </Badge>
+      </div>
+    </StorySurface>
+  ),
+};
+
+export const FocusableLink: Story = {
+  render: () => (
+    <StorySurface>
+      <Badge asChild variant="outline">
+        <a
+          href="#billing-history"
+          className="ring-ring ring-[3px]"
+          aria-label="View billing history"
+        >
+          View billing history
+          <ExternalLink />
+        </a>
+      </Badge>
+    </StorySurface>
   ),
 };

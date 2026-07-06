@@ -5,7 +5,7 @@ import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { type Part, type StoredMessage, type ToolPart } from 'cloud-agent-sdk';
 
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 import { MessageErrorBoundary } from './message-error-boundary';
 import { isToolPart } from './part-types';
@@ -116,7 +116,7 @@ export function ChildSessionSection({
 
   const currentTool = isRunning ? getCurrentRunningTool(childMessages) : undefined;
 
-  const borderColor = getStatusBorderColor(status, colors.destructive);
+  const borderColor = getStatusBorderColor(status, colors);
 
   const handlePress = useCallback(() => {
     setIsExpanded(prev => !prev);
@@ -142,7 +142,11 @@ export function ChildSessionSection({
           style={{ transform: [{ rotate: isExpanded ? '90deg' : '0deg' }] }}
         />
 
-        {isRunning ? <Loader2 size={16} color="#3b82f6" /> : <Bot size={16} color="#3b82f6" />}
+        {isRunning ? (
+          <Loader2 size={16} color={colors.agentSky} />
+        ) : (
+          <Bot size={16} color={colors.agentSky} />
+        )}
 
         <View className="flex-1">
           <Text className="text-sm text-foreground" numberOfLines={1}>
@@ -150,7 +154,7 @@ export function ChildSessionSection({
           </Text>
           {currentTool ? (
             <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-              <Text className="text-xs text-blue-500">{currentTool.tool}</Text>
+              <Text className="text-xs text-agent-sky">{currentTool.tool}</Text>
               {currentTool.context ? ` ${currentTool.context}` : ''}
             </Text>
           ) : null}
@@ -261,14 +265,14 @@ function ChildSessionMessage({
   );
 }
 
-function getStatusBorderColor(status: string, destructiveColor: string): string {
+function getStatusBorderColor(status: string, colors: ThemeColors): string {
   if (status === 'error') {
-    return destructiveColor;
+    return colors.destructive;
   }
   if (status === 'completed') {
-    return '#22c55e';
+    return colors.good;
   }
-  return '#3b82f6';
+  return colors.agentSky;
 }
 
 function StatusBadge({ status }: Readonly<{ status: string }>) {

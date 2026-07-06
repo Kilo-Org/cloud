@@ -27,6 +27,83 @@ describe('loadOutboundMedia', () => {
     }
   });
 
+  it('resolves relative paths against the agent working dir, not the OpenClaw workspace', async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), 'kilo-chat-agent-'));
+    const openclawWorkspace = await mkdtemp(join(tmpdir(), 'kilo-chat-ws-'));
+    const previousCwd = process.cwd();
+    try {
+      await writeFile(join(agentDir, 'report.md'), '# Weekly Report');
+      process.chdir(agentDir);
+
+      const media = await loadOutboundMedia('report.md', {
+        mediaAccess: {
+          localRoots: [openclawWorkspace],
+          workspaceDir: openclawWorkspace,
+          readFile: async path => Buffer.from(await readFile(path)),
+        },
+      });
+
+      expect(media.buffer.toString('utf8')).toBe('# Weekly Report');
+      expect(media.fileName).toBe('report.md');
+    } finally {
+      process.chdir(previousCwd);
+      await rm(agentDir, { recursive: true, force: true });
+      await rm(openclawWorkspace, { recursive: true, force: true });
+    }
+  });
+
+  it('resolves relative filenames containing colons against the agent working dir', async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), 'kilo-chat-agent-'));
+    const openclawWorkspace = await mkdtemp(join(tmpdir(), 'kilo-chat-ws-'));
+    const previousCwd = process.cwd();
+    try {
+      await writeFile(join(agentDir, 'report:2026-07-03.md'), '# Weekly Report');
+      process.chdir(agentDir);
+
+      const media = await loadOutboundMedia('report:2026-07-03.md', {
+        mediaAccess: {
+          localRoots: [openclawWorkspace],
+          workspaceDir: openclawWorkspace,
+          readFile: async path => Buffer.from(await readFile(path)),
+        },
+      });
+
+      expect(media.buffer.toString('utf8')).toBe('# Weekly Report');
+      expect(media.fileName).toBe('report:2026-07-03.md');
+    } finally {
+      process.chdir(previousCwd);
+      await rm(agentDir, { recursive: true, force: true });
+      await rm(openclawWorkspace, { recursive: true, force: true });
+    }
+  });
+
+  it('allows files under the agent working dir even when it is outside the configured local roots', async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), 'kilo-chat-agent-'));
+    const openclawWorkspace = await mkdtemp(join(tmpdir(), 'kilo-chat-ws-'));
+    const previousCwd = process.cwd();
+    try {
+      const filePath = join(agentDir, 'report.md');
+      await writeFile(filePath, '# Weekly Report');
+      process.chdir(agentDir);
+
+      // No readFile → exercises the real OpenClaw loader and its local-roots gating.
+      const media = await loadOutboundMedia(filePath, {
+        mediaAccess: {
+          localRoots: [openclawWorkspace],
+          workspaceDir: openclawWorkspace,
+        },
+      });
+
+      expect(media.buffer.toString('utf8')).toBe('# Weekly Report');
+      expect(media.contentType).toBe('text/markdown');
+      expect(media.fileName).toBe('report.md');
+    } finally {
+      process.chdir(previousCwd);
+      await rm(agentDir, { recursive: true, force: true });
+      await rm(openclawWorkspace, { recursive: true, force: true });
+    }
+  });
+
   it('passes custom mediaReadFile through to the OpenClaw media loader', async () => {
     const media = await loadOutboundMedia('/virtual/generated.txt', {
       mediaLocalRoots: 'any',

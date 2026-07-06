@@ -147,13 +147,13 @@ export function AutoTopUpToggle() {
     return (
       <div className="mt-1 space-y-4">
         <p className="text-muted-foreground text-sm">
-          Automatically top up your balance when it drops below ${AUTO_TOP_UP_THRESHOLD_DOLLARS}.
+          Automatically add credits when your balance falls below ${AUTO_TOP_UP_THRESHOLD_DOLLARS}.
         </p>
 
         <Dialog open={configureModalOpen} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button variant="outline" data-ph-action="open-autotopup-config">
-              Configure automatic top up
+              Configure automatic top-up
             </Button>
           </DialogTrigger>
           <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">

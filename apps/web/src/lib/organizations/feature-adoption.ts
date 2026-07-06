@@ -25,7 +25,7 @@ export type FeatureAdoptionCheck = {
   actionUrl: string;
 };
 
-type FeatureAdoptionState = {
+export type FeatureAdoptionState = {
   sourceControlConnected: boolean;
   codeReviewerEnabled: boolean;
   securityAgentEnabled: boolean;
@@ -114,7 +114,9 @@ export function buildFeatureAdoptionChecks(
   ];
 }
 
-async function getFeatureAdoptionState(organizationId: string): Promise<FeatureAdoptionState> {
+export async function getFeatureAdoptionState(
+  organizationId: string
+): Promise<FeatureAdoptionState> {
   const result = await readDb.execute(sql`
     SELECT
       EXISTS (

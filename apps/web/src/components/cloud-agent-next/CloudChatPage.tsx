@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { ArrowDown, GitBranch } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
+import { CLI_MODEL_ID, cliModelLabel, type KiloSessionId } from '@/lib/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
@@ -222,8 +222,10 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
+  const sessionType = useAtomValue(manager.atoms.sessionType);
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
+  const [useCliModel, setUseCliModel] = useState(false);
 
   const [attachmentMessageUuid] = useState(() => uuidv4());
   const [workspaceTabs, setWorkspaceTabs] = useState(createWorkspaceTabsState);
@@ -240,8 +242,18 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   // -- Organization models --------------------------------------------------
   const { modelOptions, isLoadingModels, contextLengthByModelId } =
     useOrganizationModels(organizationId);
+  const isRemote = sessionType === 'remote';
+  const pinnedModelOption = useMemo(
+    () =>
+      isRemote ? { id: CLI_MODEL_ID, name: cliModelLabel(sessionConfig), variants: [] } : undefined,
+    [isRemote, sessionConfig]
+  );
   const contextWindow = resolveContextWindow(contextUsage, contextLengthByModelId);
   const { availableCommands } = useSlashCommandSets();
+
+  useEffect(() => {
+    setUseCliModel(sessionType === 'remote');
+  }, [sessionType, sessionIdFromParams]);
 
   // -- Sound effects --------------------------------------------------------
   const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
@@ -406,10 +418,16 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
           type: 'prompt',
           prompt,
           mode: sessionConfig?.mode ?? 'code',
-          model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
-          variant: agentModelOverrideForSend
-            ? agentVariantOverrideForSend
-            : (sessionConfig?.variant ?? undefined),
+          model:
+            useCliModel && !agentModelOverrideForSend
+              ? ''
+              : (agentModelOverrideForSend ?? sessionConfig?.model ?? ''),
+          variant:
+            useCliModel && !agentModelOverrideForSend
+              ? undefined
+              : agentModelOverrideForSend
+                ? agentVariantOverrideForSend
+                : (sessionConfig?.variant ?? undefined),
         },
         attachments: supportsAttachments ? attachments : undefined,
       });
@@ -421,7 +439,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
       }
       return accepted;
     },
-    [manager, scheduleScrollToBottom, sessionConfig, setChatUI, supportsAttachments]
+    [manager, scheduleScrollToBottom, sessionConfig, setChatUI, supportsAttachments, useCliModel]
   );
 
   const handleSendSlashCommand = useCallback(
@@ -581,6 +599,11 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const handleModelChange = useCallback(
     (model: string) => {
       if (!sessionConfig) return;
+      if (model === CLI_MODEL_ID) {
+        setUseCliModel(true);
+        return;
+      }
+      setUseCliModel(false);
       // Reset variant to first available (typically "none") when switching models if current is invalid
       const newModelVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
       const validVariant =
@@ -625,6 +648,13 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     ? agentVariantOverride
     : (sessionConfig?.variant ?? undefined);
   const displayAvailableVariants = modelPickerLocked ? [] : availableVariants;
+  const inputModel = modelPickerLocked ? displayModel : useCliModel ? CLI_MODEL_ID : displayModel;
+  const inputVariant = modelPickerLocked
+    ? displayVariant
+    : useCliModel
+      ? undefined
+      : displayVariant;
+  const inputAvailableVariants = modelPickerLocked || useCliModel ? [] : displayAvailableVariants;
 
   const placeholder = isLoading
     ? 'Loading session…'
@@ -807,14 +837,15 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                 placeholder={placeholder}
                                 slashCommands={availableCommands}
                                 mode={sessionConfig?.mode as AgentMode | undefined}
-                                model={displayModel}
+                                model={inputModel}
                                 modelOptions={modelOptions}
+                                pinnedModelOption={pinnedModelOption}
                                 isLoadingModels={isLoadingModels}
                                 onModeChange={handleModeChange}
                                 onModelChange={handleModelChange}
-                                variant={displayVariant}
+                                variant={inputVariant}
                                 onVariantChange={handleVariantChange}
-                                availableVariants={displayAvailableVariants}
+                                availableVariants={inputAvailableVariants}
                                 showToolbar={Boolean(sessionIdFromParams)}
                                 initialValue={failedPrompt ?? undefined}
                                 customModeOptions={customModeOptions}

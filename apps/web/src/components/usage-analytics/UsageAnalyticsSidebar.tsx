@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { X } from 'lucide-react';
 import { FilterGeneratorPopover } from './FilterGeneratorPopover';
+import { ORG_SCOPE_ALL_ORGS, ORG_SCOPE_SELF } from './useUsageDashboardState';
 import {
   COST_SOURCE_LABELS,
   DIMENSION_LABELS,
@@ -58,6 +59,8 @@ export type ViewAs = 'self' | 'org-wide';
 type UsageAnalyticsSidebarProps = {
   context: 'personal' | 'organization';
   organizationId: string | null;
+  /** Multi-org aggregate scope (parent + children) for value-suggestion queries. */
+  organizationIds: string[] | null;
   dateRange: DateRange;
   personalScope: PersonalScope;
 
@@ -66,12 +69,23 @@ type UsageAnalyticsSidebarProps = {
   onPersonalViewChange: (value: PersonalView) => void;
   organizations: OrganizationSummary[];
 
-  // View-as toggle (org context, role-gated)
+  // Scope (org context, role-gated)
   viewAs: ViewAs;
-  onViewAsChange: (value: ViewAs) => void;
   /**
-   * Whether the caller's role lets them flip to the org-wide view. Drives the
-   * visibility of the "My Usage / Entire Organization" toggle only.
+   * Org-context scope selection: `'self'`, `'all-orgs'`, or an organization id.
+   */
+  orgScope: string;
+  onOrgScopeChange: (value: string) => void;
+  /** The org whose usage page this is (the parent, when it has children). */
+  pageOrganizationId: string | null;
+  pageOrganizationName: string | null;
+  /** Direct child orgs, when the page org is a parent. */
+  childOrganizations: OrganizationSummary[];
+  /** True when the page org has at least one child org. */
+  isParentOrg: boolean;
+  /**
+   * Whether the caller's role lets them view org-wide usage. Drives the
+   * visibility of the org-context Scope selector.
    */
   canViewAllOrgUsers: boolean;
   /**
@@ -80,8 +94,6 @@ type UsageAnalyticsSidebarProps = {
    * Becomes false when the caller is seeing only their own usage.
    */
   isOrgWideView: boolean;
-  /** Name used in the "Entire {orgName}" label. Falls back to "Organization". */
-  effectiveOrganizationName: string | null;
 
   // Period
   period: PeriodOption;
@@ -115,16 +127,21 @@ type UsageAnalyticsSidebarProps = {
 export function UsageAnalyticsSidebar({
   context,
   organizationId,
+  organizationIds,
   dateRange,
   personalScope,
   personalView,
   onPersonalViewChange,
   organizations,
   viewAs,
-  onViewAsChange,
+  orgScope,
+  onOrgScopeChange,
+  pageOrganizationId,
+  pageOrganizationName,
+  childOrganizations,
+  isParentOrg,
   canViewAllOrgUsers,
   isOrgWideView,
-  effectiveOrganizationName,
   period,
   onPeriodChange,
   granularity,
@@ -146,12 +163,10 @@ export function UsageAnalyticsSidebar({
 }: UsageAnalyticsSidebarProps) {
   const isOrgContext = context === 'organization';
   const showPersonalViewSelector = context === 'personal' && organizations.length > 0;
-  // Per plan: the view-as toggle is only rendered on the organization usage
-  // page and only when the caller has permission to see all org users.
-  const showViewAsSelector = isOrgContext && canViewAllOrgUsers;
-  const entireOrgLabel = effectiveOrganizationName
-    ? `${effectiveOrganizationName}`
-    : 'Organization';
+  // The org-context Scope selector is only rendered on the organization usage
+  // page and only when the caller may view org-wide usage.
+  const showOrgScopeSelector = isOrgContext && canViewAllOrgUsers && !!pageOrganizationId;
+  const pageOrgLabel = pageOrganizationName ?? 'Organization';
 
   const groupByOptions: (Dimension | 'none')[] = useMemo(() => {
     const opts: (Dimension | 'none')[] = [
@@ -194,15 +209,23 @@ export function UsageAnalyticsSidebar({
           </Section>
         )}
 
-        {showViewAsSelector && (
+        {showOrgScopeSelector && pageOrganizationId && (
           <Section title="Scope">
-            <Select value={viewAs} onValueChange={v => onViewAsChange(v as ViewAs)}>
+            <Select value={orgScope} onValueChange={onOrgScopeChange}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="self">My Usage</SelectItem>
-                <SelectItem value="org-wide">{entireOrgLabel}</SelectItem>
+                <SelectItem value={ORG_SCOPE_SELF}>My Usage</SelectItem>
+                {isParentOrg && (
+                  <SelectItem value={ORG_SCOPE_ALL_ORGS}>All Organizations</SelectItem>
+                )}
+                <SelectItem value={pageOrganizationId}>{pageOrgLabel}</SelectItem>
+                {childOrganizations.map(child => (
+                  <SelectItem key={child.organizationId} value={child.organizationId}>
+                    {child.organizationName}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Section>
@@ -304,6 +327,7 @@ export function UsageAnalyticsSidebar({
           <div className="flex flex-col gap-2">
             <FilterGeneratorPopover
               organizationId={organizationId}
+              organizationIds={organizationIds}
               dateRange={dateRange}
               personalScope={personalScope}
               viewAs={viewAs}

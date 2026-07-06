@@ -20,7 +20,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { OrganizationPlan, OrganizationRole } from '@/lib/organizations/organization-types';
 import { Loader2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
@@ -63,7 +62,6 @@ type InviteMemberDialogProps = {
   onOpenChange: (open: boolean) => void;
   organizationId: string;
   onMemberInvited: () => void;
-  blockClose?: boolean; // If true, prevents closing the dialog (hides close button and disables cancel)
 };
 
 type InviteSeatCapacity = {
@@ -87,7 +85,6 @@ export function InviteMemberDialog({
   onOpenChange,
   organizationId,
   onMemberInvited,
-  blockClose = false,
 }: InviteMemberDialogProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<OrganizationRole>('member');
@@ -192,10 +189,6 @@ export function InviteMemberDialog({
   };
 
   const handleClose = () => {
-    // Prevent closing if blockClose is true
-    if (blockClose) {
-      return;
-    }
     onOpenChange(false);
     handleReset();
   };
@@ -203,7 +196,7 @@ export function InviteMemberDialog({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <LockableContainer>
-        <DialogContent className="sm:max-w-[600px]" showCloseButton={!blockClose}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Invite Member</DialogTitle>
             <DialogDescription className="text-pretty">
@@ -315,32 +308,13 @@ export function InviteMemberDialog({
           </div>
 
           <DialogFooter>
-            {blockClose ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="inline-block">
-                    <Button
-                      variant="outline"
-                      onClick={handleClose}
-                      disabled={inviteMemberMutation.isPending || blockClose}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Invite someone to continue</p>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <Button
-                variant="outline"
-                onClick={handleClose}
-                disabled={inviteMemberMutation.isPending || blockClose}
-              >
-                Cancel
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              onClick={handleClose}
+              disabled={inviteMemberMutation.isPending}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={handleInviteMember}
               disabled={

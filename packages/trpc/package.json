@@ -13,7 +13,10 @@
     }
   },
   "dependencies": {
+    "@kilocode/kilo-chat": "workspace:*",
+    "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
     "@trpc/server": "catalog:",
     "@workos-inc/node": "catalog:",
     "drizzle-orm": "catalog:",

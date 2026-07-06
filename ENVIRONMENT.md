@@ -164,7 +164,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
 - `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. [SERVER]
-- `DATABASE_URL` - Generic/alternate Postgres URL used by E2E tests and some services (`cloud-agent`, `kiloclaw`). `[SECRET]`
+- `DATABASE_URL` - Generic/alternate Postgres URL used by E2E tests and some services (`cloud-agent-next`, `kiloclaw`). `[SECRET]`
 
 ### Redis & Queue
 
@@ -198,10 +198,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY` - Auth key for the deployments dispatcher. `[SECRET]`
 - `USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY` - Public key for encrypting user deployment env vars. [SERVER]
 - `USER_DEPLOYMENTS_ENV_VARS_PRIVATE_KEY` - Private key counterpart for decrypting user deployment env vars. `[SECRET]`
-- `CLOUD_AGENT_API_URL` - URL for Cloud Agent Next API; used by App Builder chat and other clients. [SERVER]
-- `CLOUD_AGENT_NEXT_API_URL` - Alias for `CLOUD_AGENT_API_URL` in local dev overrides. [SERVER]
-- `NEXT_PUBLIC_CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent (legacy) from browser. [PUBLIC]
-- `NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL` - WebSocket URL for Cloud Agent Next from browser. [PUBLIC]
+- `CLOUD_AGENT_NEXT_API_URL` - URL for the Cloud Agent Next API; used by App Builder chat and other clients. [SERVER]
+- `NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL` - WebSocket URL for Cloud Agent Next from the browser. [PUBLIC]
 - `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` - R2 bucket for cloud agent file attachments. [SERVER]
 - `GASTOWN_SERVICE_URL` - URL for the Gastown service. [SERVER]
 - `NEXT_PUBLIC_GASTOWN_URL` - Client-side base URL for Gastown. [PUBLIC]
@@ -312,16 +310,12 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 ### Cloud Agent Services
 
-- `KILOCODE_TOKEN` - Auth token for KiloCode/Session service identity; used by `cloud-agent-next` wrapper and Gastown containers. `[SECRET]`
+- `KILOCODE_TOKEN` - Auth token for KiloCode/Session service identity; used by the Cloud Agent Next wrapper and Gastown containers. `[SECRET]`
 - `KILOCODE_TOKEN_FILE` - Path to a file containing the KiloCode token (alternative to the env var). [SERVER]
-- `KILO_SESSION_ID` - Legacy/session-wrapper session identifier. [SERVER]
-- `KILO_SESSION_INGEST_URL` - URL for ingesting session data from the cloud agent wrapper. [SERVER]
-- `INGEST_URL` - URL for telemetry/event ingest from `cloud-agent/wrapper`. [SERVER]
-- `KILO_PLATFORM` - Target platform identifier for the cloud-agent wrapper (`darwin`, `linux`, etc.). [SERVER]
-- `CLI_LOG_PATH` - File path for the cloud-agent wrapper's local CLI log output. [SERVER]
-- `WRAPPER_LOG_PATH` - File path for the cloud-agent-next wrapper's log output. [SERVER]
+- `KILO_SESSION_INGEST_URL` - URL used by the Cloud Agent Next wrapper to ingest session data. [SERVER]
+- `KILO_PLATFORM` - Target platform identifier used by the Cloud Agent Next wrapper (`darwin`, `linux`, etc.). [SERVER]
+- `WRAPPER_LOG_PATH` - File path for the Cloud Agent Next wrapper's log output. [SERVER]
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
-- `UPSTREAM_BRANCH` - Default upstream branch name for the cloud-agent wrapper workspace. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
@@ -357,7 +351,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 - `API_BASE_URL` - Base HTTPS URL for the mobile app's API (e.g. `https://api.kilo.ai`). Bundled into the binary. [PUBLIC]
 - `WEB_BASE_URL` - Base HTTPS URL for the mobile in-app web views (e.g. `https://app.kilo.ai`). Bundled into the binary. [PUBLIC]
-- `CLOUD_AGENT_WS_URL` - WebSocket URL for cloud-agent streaming in the mobile app. Bundled into the binary. [PUBLIC]
+- `CLOUD_AGENT_WS_URL` - WebSocket URL for Cloud Agent Next streaming in the mobile app. Bundled into the binary. [PUBLIC]
 - `SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the mobile app. Bundled into the binary. [PUBLIC]
 - `APPSFLYER_DEV_KEY` - AppsFlyer development key for mobile attribution. Bundled into the binary (not secret — it's a device-level SDK key). [PUBLIC]
 - `APPSFLYER_APP_ID` - AppsFlyer app ID for mobile attribution tracking. [PUBLIC]

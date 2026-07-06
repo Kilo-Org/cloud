@@ -12,6 +12,12 @@ describe('getRemediationUnavailableCopy', () => {
     expect(getRemediationUnavailableCopy('finding_not_found')).toBe(
       'Security finding no longer exists.'
     );
+    expect(getRemediationUnavailableCopy('not_exploitable')).toBe(
+      'Analysis found no reachable vulnerable path. Auto Remediation is unavailable.'
+    );
+    expect(getRemediationUnavailableCopy('action_not_concrete')).toBe(
+      'No concrete dependency patch or suggested fix is available.'
+    );
   });
 });
 

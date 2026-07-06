@@ -4,7 +4,7 @@ import { db } from '@/lib/drizzle';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { eq, isNotNull } from 'drizzle-orm';
 import type { getUserFromAuth } from '@/lib/user/server';
 import { failureResult } from '@/lib/maybe-result';
 
@@ -27,6 +27,11 @@ describe('getAuthorizedOrgContext', () => {
     // Clean up organization_memberships table
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_memberships);
+    // Self-referential organization FKs require unlinking children before deleting all orgs.
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: null })
+      .where(isNotNull(organizations.parent_organization_id));
     // Clean up organizations table
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
@@ -252,6 +257,108 @@ describe('getAuthorizedOrgContext', () => {
         expect(result.nextResponse.status).toBe(404);
         const responseBody = await result.nextResponse.json();
         expect(responseBody.error).toBe('Organization not found');
+      }
+    });
+
+    test('should allow parent organization owners to access child organizations', async () => {
+      const parentOwner = await insertTestUser({ is_admin: false });
+      const [childOrganization] = await db
+        .insert(organizations)
+        .values({ name: 'Child Organization', parent_organization_id: testOrganizationId })
+        .returning();
+
+      await db.insert(organization_memberships).values({
+        organization_id: testOrganizationId,
+        kilo_user_id: parentOwner.id,
+        role: 'owner',
+        invited_by: 'test-admin',
+      });
+
+      await db.insert(organization_memberships).values({
+        organization_id: childOrganization.id,
+        kilo_user_id: parentOwner.id,
+        role: 'member',
+        invited_by: 'test-admin',
+      });
+
+      const mockGetUserFromAuth: typeof getUserFromAuth = async () => ({
+        user: parentOwner,
+        authFailedResponse: null,
+      });
+
+      const result = await getAuthorizedOrgContext(
+        childOrganization.id,
+        undefined,
+        mockGetUserFromAuth
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.user).toEqual({ ...parentOwner, role: 'owner' });
+        expect(result.data.organization.id).toBe(childOrganization.id);
+      }
+    });
+
+    test('should allow parent organization billing managers to access child billing pages', async () => {
+      const parentBillingManager = await insertTestUser({ is_admin: false });
+      const [childOrganization] = await db
+        .insert(organizations)
+        .values({ name: 'Child Billing Organization', parent_organization_id: testOrganizationId })
+        .returning();
+
+      await db.insert(organization_memberships).values({
+        organization_id: testOrganizationId,
+        kilo_user_id: parentBillingManager.id,
+        role: 'billing_manager',
+        invited_by: 'test-admin',
+      });
+
+      const mockGetUserFromAuth: typeof getUserFromAuth = async () => ({
+        user: parentBillingManager,
+        authFailedResponse: null,
+      });
+
+      const result = await getAuthorizedOrgContext(
+        childOrganization.id,
+        ['owner', 'billing_manager'],
+        mockGetUserFromAuth
+      );
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.user).toEqual({ ...parentBillingManager, role: 'billing_manager' });
+        expect(result.data.organization.id).toBe(childOrganization.id);
+      }
+    });
+
+    test('should deny parent organization members access to child organizations', async () => {
+      const parentMember = await insertTestUser({ is_admin: false });
+      const [childOrganization] = await db
+        .insert(organizations)
+        .values({ name: 'Child Member Organization', parent_organization_id: testOrganizationId })
+        .returning();
+
+      await db.insert(organization_memberships).values({
+        organization_id: testOrganizationId,
+        kilo_user_id: parentMember.id,
+        role: 'member',
+        invited_by: 'test-admin',
+      });
+
+      const mockGetUserFromAuth: typeof getUserFromAuth = async () => ({
+        user: parentMember,
+        authFailedResponse: null,
+      });
+
+      const result = await getAuthorizedOrgContext(
+        childOrganization.id,
+        undefined,
+        mockGetUserFromAuth
+      );
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.nextResponse.status).toBe(404);
       }
     });
   });

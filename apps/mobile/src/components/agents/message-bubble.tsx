@@ -1,8 +1,5 @@
 import { type StoredMessage } from 'cloud-agent-sdk';
-import * as Clipboard from 'expo-clipboard';
-import { useCallback } from 'react';
-import { ActionSheetIOS, Platform, Pressable, View } from 'react-native';
-import { toast } from 'sonner-native';
+import { Pressable, View } from 'react-native';
 
 import { Bubble } from '@/components/ui/bubble';
 
@@ -11,12 +8,14 @@ import { FilePartRenderer } from './file-part-renderer';
 import { MarkdownText } from './markdown-text';
 import { PartRenderer } from './part-renderer';
 import { isFilePart, isTextPart } from './part-types';
+import { useMessageCopy } from './use-message-copy';
 
 type MessageBubbleProps = {
   message: StoredMessage;
   isLastAssistantMessage?: boolean;
   isSessionStreaming?: boolean;
   getChildMessages?: (sessionId: string) => StoredMessage[];
+  defaultReasoningExpanded?: boolean;
 };
 
 export function MessageBubble({
@@ -24,33 +23,14 @@ export function MessageBubble({
   isLastAssistantMessage,
   isSessionStreaming,
   getChildMessages,
+  defaultReasoningExpanded,
 }: Readonly<MessageBubbleProps>) {
   const isUser = message.info.role === 'user';
+  const { copyMessage } = useMessageCopy();
 
-  const handleLongPress = useCallback(() => {
-    const textContent = message.parts
-      .filter(isTextPart)
-      .map(p => p.text)
-      .join('\n');
-    if (!textContent) {
-      return;
-    }
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Copy Text', 'Cancel'], cancelButtonIndex: 1 },
-        buttonIndex => {
-          if (buttonIndex === 0) {
-            void Clipboard.setStringAsync(textContent);
-            toast.success('Copied to clipboard');
-          }
-        }
-      );
-    } else {
-      void Clipboard.setStringAsync(textContent);
-      toast.success('Copied to clipboard');
-    }
-  }, [message.parts]);
+  const handleLongPress = () => {
+    void copyMessage(message);
+  };
 
   // Compaction-only message renders as a separator
   const firstPart = message.parts[0];
@@ -70,14 +50,20 @@ export function MessageBubble({
     const fileParts = message.parts.filter(isFilePart);
 
     return (
-      <View className="px-4 py-1">
+      <Pressable
+        onLongPress={handleLongPress}
+        className="px-4 py-1"
+        accessibilityRole="text"
+        accessibilityLabel="User message"
+        accessibilityHint="Long press to copy message text"
+      >
         <Bubble side="user">
           {textContent ? <MarkdownText value={textContent} variant="user" /> : null}
           {fileParts.map(part => (
             <FilePartRenderer key={part.id} part={part} />
           ))}
         </Bubble>
-      </View>
+      </Pressable>
     );
   }
 
@@ -90,7 +76,7 @@ export function MessageBubble({
       onLongPress={handleLongPress}
       accessibilityRole="text"
       accessibilityLabel="Assistant message"
-      accessibilityHint="Long press to copy text"
+      accessibilityHint="Long press to copy message text"
     >
       <View className="gap-2">
         {message.parts.map(part => (
@@ -99,6 +85,7 @@ export function MessageBubble({
             part={part}
             isStreaming={isStreaming}
             getChildMessages={getChildMessages}
+            defaultReasoningExpanded={defaultReasoningExpanded}
           />
         ))}
       </View>

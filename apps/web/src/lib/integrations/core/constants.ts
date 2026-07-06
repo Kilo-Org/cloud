@@ -149,6 +149,7 @@ export const GITLAB_ACTION = {
 export const PLATFORM = {
   GITHUB: 'github',
   GITLAB: 'gitlab',
+  BITBUCKET: 'bitbucket',
   SLACK: 'slack',
   DISCORD: 'discord',
   LINEAR: 'linear',

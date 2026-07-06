@@ -7,6 +7,7 @@
 
 import * as z from 'zod';
 import type { CloudAgentCodeReview } from '@kilocode/db/schema';
+import { CODE_REVIEW_PLATFORMS, ManualCodeReviewConfigSchema } from '@kilocode/db/schema-types';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 
 // ============================================================================
@@ -106,7 +107,7 @@ export const CodeReviewWebhookPayloadSchema = z.object({
 /**
  * Platform type for code reviews
  */
-export const CodeReviewPlatformSchema = z.enum(['github', 'gitlab']);
+export const CodeReviewPlatformSchema = z.enum(CODE_REVIEW_PLATFORMS);
 export type CodeReviewPlatform = z.infer<typeof CodeReviewPlatformSchema>;
 
 /**
@@ -126,6 +127,7 @@ export const CreateReviewParamsSchema = z.object({
   headSha: z.string().min(1),
   platform: CodeReviewPlatformSchema.default('github'),
   platformProjectId: z.number().int().positive().optional(),
+  manualConfig: ManualCodeReviewConfigSchema.nullable().optional(),
 });
 
 /**

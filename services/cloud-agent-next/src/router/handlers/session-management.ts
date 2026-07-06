@@ -32,17 +32,20 @@ import { requireCurrentSessionAccess } from '../../session-access.js';
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
   gitUrl?: string;
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
 } {
   const repository = metadata.repository;
   if (!repository) return {};
-  if (repository.type === 'github') {
-    return { githubRepo: repository.repo, platform: repository.platform ?? 'github' };
+  switch (repository.type) {
+    case 'github':
+      return { githubRepo: repository.repo, platform: repository.platform ?? 'github' };
+    case 'gitlab':
+      return { gitUrl: repository.url, platform: 'gitlab' };
+    case 'bitbucket':
+      return { gitUrl: repository.url, platform: 'bitbucket' };
+    case 'git':
+      return { gitUrl: repository.url, platform: repository.platform };
   }
-  return {
-    gitUrl: repository.url,
-    platform: repository.platform ?? (repository.type === 'gitlab' ? 'gitlab' : undefined),
-  };
 }
 
 async function deleteSessionResources(
@@ -282,7 +285,10 @@ export function createSessionManagementHandlers() {
               sessionMetadata.identity.orgId,
               userId,
               sessionMetadata.identity.sessionId,
-              sessionMetadata.identity.botId
+              sessionMetadata.identity.botId,
+              {
+                createdOnPlatform: sessionMetadata.identity.createdOnPlatform,
+              }
             ));
 
           logger.setTags({ sandboxId, orgId: sessionMetadata.identity.orgId ?? '(personal)' });
@@ -387,7 +393,10 @@ export function createSessionManagementHandlers() {
               metadata.identity.orgId,
               userId,
               metadata.identity.sessionId,
-              metadata.identity.botId
+              metadata.identity.botId,
+              {
+                createdOnPlatform: metadata.identity.createdOnPlatform,
+              }
             ));
 
           logger.setTags({ sandboxId, orgId: metadata.identity.orgId ?? '(personal)' });
@@ -403,14 +412,23 @@ export function createSessionManagementHandlers() {
           const activeExecutionStatus = activeMessageWork?.status;
           const executionHealth = activeMessageWork?.health ?? 'none';
 
-          let sandboxStatus: 'healthy' | 'unreachable' = 'healthy';
-          try {
-            await createAgentSandbox(env, metadata).probeHealth();
-          } catch (error) {
-            sandboxStatus = 'unreachable';
-            logger
-              .withFields({ error: error instanceof Error ? error.message : String(error) })
-              .warn('Sandbox health probe failed');
+          const cleanupScheduled = await withDORetry(
+            getStub,
+            s => s.isSandboxCleanupScheduled(),
+            'isSandboxCleanupScheduled'
+          );
+          let sandboxStatus: 'healthy' | 'destroyed' | 'unreachable' = cleanupScheduled
+            ? 'destroyed'
+            : 'healthy';
+          if (!cleanupScheduled) {
+            try {
+              await createAgentSandbox(env, metadata).probeHealth();
+            } catch (error) {
+              sandboxStatus = 'unreachable';
+              logger
+                .withFields({ error: error instanceof Error ? error.message : String(error) })
+                .warn('Sandbox health probe failed');
+            }
           }
 
           logger.info('Session health retrieved successfully', {

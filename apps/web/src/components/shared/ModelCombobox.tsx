@@ -59,6 +59,8 @@ export type ModelComboboxProps = {
   className?: string;
   /** Whether the combobox is disabled */
   disabled?: boolean;
+  /** Optional model option rendered above all grouped models without an id subtitle. */
+  pinnedModel?: ModelOption;
   /**
    * Render the popover as a modal layer. Required when the combobox is
    * itself inside a Radix Dialog — without this, the dialog's focus/pointer
@@ -85,6 +87,7 @@ export function ModelCombobox({
   variant = 'full',
   className,
   disabled = false,
+  pinnedModel,
   modal = false,
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
@@ -120,7 +123,7 @@ export function ModelCombobox({
     return { preferred, others };
   }, [models]);
 
-  const selectedModel = models.find(model => model.id === value);
+  const selectedModel = [pinnedModel, ...models].find(model => model?.id === value);
   const isCompact = variant === 'compact';
   const showLabel = !isCompact && label;
   const selectedCollectsData = mayTrainOnYourPrompts(selectedModel);
@@ -175,7 +178,7 @@ export function ModelCombobox({
     );
   }
 
-  if (!models || models.length === 0) {
+  if ((!models || models.length === 0) && !pinnedModel) {
     if (isCompact) {
       return (
         <Button
@@ -236,6 +239,32 @@ export function ModelCombobox({
             <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearchChange} />
             <CommandEmpty>{noResultsText}</CommandEmpty>
             <CommandList ref={listRef} className="max-h-64 overflow-auto">
+              {pinnedModel && (
+                <CommandGroup>
+                  <CommandItem
+                    key={pinnedModel.id}
+                    value={`${pinnedModel.name} ${pinnedModel.id}`}
+                    keywords={[pinnedModel.id, pinnedModel.name]}
+                    onSelect={() => {
+                      onValueChange(pinnedModel.id);
+                      setOpen(false);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <div className="flex flex-col truncate">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate">{pinnedModel.name}</span>
+                      </div>
+                    </div>
+                    <Check
+                      className={cn(
+                        'ml-auto h-4 w-4 shrink-0',
+                        pinnedModel.id === value ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                  </CommandItem>
+                </CommandGroup>
+              )}
               {sortedModels.preferred.length > 0 && (
                 <CommandGroup heading="Recommended">
                   {sortedModels.preferred.map(model => (
@@ -360,6 +389,32 @@ export function ModelCombobox({
             <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearchChange} />
             <CommandEmpty>{noResultsText}</CommandEmpty>
             <CommandList ref={listRef} className="max-h-64 overflow-auto">
+              {pinnedModel && (
+                <CommandGroup>
+                  <CommandItem
+                    key={pinnedModel.id}
+                    value={`${pinnedModel.name} ${pinnedModel.id}`}
+                    keywords={[pinnedModel.id, pinnedModel.name]}
+                    onSelect={() => {
+                      onValueChange(pinnedModel.id);
+                      setOpen(false);
+                    }}
+                    className="flex items-center gap-2"
+                  >
+                    <div className="flex flex-col truncate">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate">{pinnedModel.name}</span>
+                      </div>
+                    </div>
+                    <Check
+                      className={cn(
+                        'ml-auto h-4 w-4 shrink-0',
+                        pinnedModel.id === value ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                  </CommandItem>
+                </CommandGroup>
+              )}
               {sortedModels.preferred.length > 0 && (
                 <CommandGroup heading="Recommended">
                   {sortedModels.preferred.map(model => (

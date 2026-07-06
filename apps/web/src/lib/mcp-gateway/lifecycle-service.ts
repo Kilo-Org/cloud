@@ -7,6 +7,7 @@ import {
   mcp_gateway_configs,
   mcp_gateway_connect_resources,
   mcp_gateway_connection_instances,
+  mcp_gateway_oauth_grants,
   mcp_gateway_pending_provider_authorizations,
   mcp_gateway_provider_grants,
   mcp_gateway_refresh_tokens,
@@ -14,6 +15,7 @@ import {
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { GatewayDatabase } from './repository';
 import { nowIso } from './crypto';
+import { revokeGrantIdsWithTx } from './oauth-grant-service';
 
 async function deleteInstanceSensitiveState(database: GatewayDatabase, instanceIds: string[]) {
   if (instanceIds.length === 0) return;
@@ -101,6 +103,9 @@ export async function revokeGatewayStateForUser(database: GatewayDatabase, userI
   await database
     .delete(mcp_gateway_refresh_tokens)
     .where(eq(mcp_gateway_refresh_tokens.kilo_user_id, userId));
+  await database
+    .delete(mcp_gateway_oauth_grants)
+    .where(eq(mcp_gateway_oauth_grants.kilo_user_id, userId));
 }
 
 export async function revokeGatewayStateForOrganizationMember(
@@ -124,6 +129,22 @@ export async function revokeGatewayStateForOrganizationMember(
       )
     );
   const configIds = assignments.map(assignment => assignment.configId);
+  const grants = await database
+    .select({ oauth_grant_id: mcp_gateway_oauth_grants.oauth_grant_id })
+    .from(mcp_gateway_oauth_grants)
+    .where(
+      and(
+        eq(mcp_gateway_oauth_grants.owner_scope, 'organization'),
+        eq(mcp_gateway_oauth_grants.owner_id, organizationId),
+        eq(mcp_gateway_oauth_grants.kilo_user_id, userId),
+        isNull(mcp_gateway_oauth_grants.revoked_at)
+      )
+    );
+  await revokeGrantIdsWithTx(
+    database,
+    grants.map(g => g.oauth_grant_id),
+    'organization_membership_removed'
+  );
   if (configIds.length === 0) return;
   await database
     .update(mcp_gateway_assignments)

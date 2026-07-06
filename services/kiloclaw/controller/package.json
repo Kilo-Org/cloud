@@ -6,10 +6,13 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@zip.js/zip.js": "2.8.26",
     "hono": "catalog:",
+    "tar-stream": "3.1.9",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "@types/tar-stream": "3.1.4"
   }
 }

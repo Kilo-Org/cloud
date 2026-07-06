@@ -51,6 +51,27 @@ const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
 const mockVerifyUserOwnsSessionV2ByCloudAgentId =
   jest.fn<() => Promise<{ kiloSessionId: string } | null>>();
+const mockGetBalanceForUser = jest.fn<(user: User) => Promise<{ balance: number }>>();
+const mockFetchGitHubRepositoriesForUser = jest.fn<
+  (
+    userId: string,
+    forceRefresh: boolean
+  ) => Promise<{
+    repositories: unknown[];
+    integrationInstalled: boolean;
+    syncedAt: null;
+  }>
+>();
+const mockFetchGitLabRepositoriesForUser = jest.fn<
+  (
+    userId: string,
+    forceRefresh: boolean
+  ) => Promise<{
+    repositories: unknown[];
+    integrationInstalled: boolean;
+    syncedAt: null;
+  }>
+>();
 
 jest.mock('@/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
@@ -63,6 +84,20 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 
 jest.mock('@/lib/posthog-feature-flags', () => ({
   isFeatureFlagEnabledOrDevelopment: mockIsFeatureFlagEnabledOrDevelopment,
+}));
+
+jest.mock('@/lib/user/balance', () => ({
+  getBalanceForUser: mockGetBalanceForUser,
+}));
+
+jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
+  fetchGitHubRepositoriesForUser: mockFetchGitHubRepositoriesForUser,
+}));
+
+jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
+  buildGitLabCloneUrl: jest.fn(),
+  fetchGitLabRepositoriesForUser: mockFetchGitLabRepositoriesForUser,
+  getGitLabInstanceUrlForUser: jest.fn(),
 }));
 
 jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
@@ -79,7 +114,12 @@ let createCaller: (ctx: { user: User }) => {
     prompt: string;
     mode: string;
     model: string;
-    githubRepo: string;
+    githubRepo?: string;
+    bitbucketRepo?: {
+      fullName: string;
+      workspaceUuid: string;
+      repositoryUuid: string;
+    };
     autoInitiate: boolean;
     devcontainer: boolean;
     images?: { path: string; files: string[] };
@@ -99,6 +139,9 @@ let createCaller: (ctx: { user: User }) => {
     contentType: 'application/pdf';
     contentLength: number;
   }) => Promise<unknown>;
+  checkEligibility: () => Promise<{ balance: number; minBalance: number; isEligible: boolean }>;
+  listGitHubRepositories: (input: { forceRefresh: boolean }) => Promise<unknown>;
+  listGitLabRepositories: (input: { forceRefresh: boolean }) => Promise<unknown>;
 };
 
 beforeAll(async () => {
@@ -180,6 +223,49 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
   });
 });
 
+describe('cloudAgentNextRouter helper procedures', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it.each([
+    { balance: 1, isEligible: true },
+    { balance: 0.99, isEligible: false },
+  ])('reports eligibility for a $balance balance', async ({ balance, isEligible }) => {
+    mockGetBalanceForUser.mockResolvedValue({ balance });
+    const user = { id: 'user-eligibility', is_admin: false } as User;
+    const caller = createCaller({ user });
+
+    await expect(caller.checkEligibility()).resolves.toEqual({
+      balance,
+      minBalance: 1,
+      isEligible,
+    });
+    expect(mockGetBalanceForUser).toHaveBeenCalledWith(user);
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['GitHub', 'listGitHubRepositories', mockFetchGitHubRepositoriesForUser],
+    ['GitLab', 'listGitLabRepositories', mockFetchGitLabRepositoriesForUser],
+  ] as const)(
+    'lists %s repositories without creating a runtime client',
+    async (_, method, fetchRepositories) => {
+      const repositories = {
+        repositories: [],
+        integrationInstalled: true,
+        syncedAt: null,
+      };
+      fetchRepositories.mockResolvedValue(repositories);
+      const caller = createCaller({ user: { id: 'user-repositories', is_admin: false } as User });
+
+      await expect(caller[method]({ forceRefresh: true })).resolves.toEqual(repositories);
+      expect(fetchRepositories).toHaveBeenCalledWith('user-repositories', true);
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    }
+  );
+});
+
 describe('cloudAgentNextRouter.prepareSession', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -235,6 +321,29 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       expect.objectContaining({ attachments: images, createdOnPlatform: 'cloud-agent-web' })
     );
     expect(mockPrepareSession).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
+  });
+
+  it('rejects personal Bitbucket sessions before constructing a Cloud Agent client', async () => {
+    const caller = createCaller({
+      user: { id: 'user-1', is_admin: false } as User,
+    });
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Inspect the repository',
+        mode: 'code',
+        model: 'kilo/test-model',
+        bitbucketRepo: {
+          fullName: 'acme/api',
+          workspaceUuid: '11111111-1111-4111-8111-111111111111',
+          repositoryUuid: '22222222-2222-4222-8222-222222222222',
+        },
+        autoInitiate: true,
+        devcontainer: false,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
   it('forwards devcontainer sessions when the feature flag is enabled', async () => {

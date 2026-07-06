@@ -187,6 +187,32 @@ describe('computeDecision', () => {
       sticky: false,
     });
   });
+  it('skips virtual auto-model candidates', () => {
+    const pollutedTable: RoutingTable = {
+      ...table,
+      routes: {
+        ...table.routes,
+        'implementation/code_generation': [
+          {
+            model: 'kilo-auto/efficient',
+            accuracy: 1,
+            avgCostUsd: 0.001,
+            meetsThreshold: true,
+          },
+          {
+            model: 'concrete/chat',
+            accuracy: 0.9,
+            avgCostUsd: 0.002,
+            meetsThreshold: true,
+          },
+        ],
+      },
+    };
+
+    const decision = computeDecision(classification, pollutedTable, null);
+
+    expect(decision).toMatchObject({ model: 'concrete/chat', sticky: false });
+  });
   it('returns null when every route candidate is denied', () => {
     const decision = computeDecision(
       classification,

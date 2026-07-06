@@ -9,9 +9,10 @@ export const STANDARD_OAUTH_PLATFORMS = [
 ] as const;
 
 export type StandardOAuthPlatform = (typeof STANDARD_OAUTH_PLATFORMS)[number];
+export type RetainedOAuthPlatform = StandardOAuthPlatform | typeof PLATFORM.BITBUCKET;
 
 export function getPlatformOAuthConnectPath(
-  platform: StandardOAuthPlatform,
+  platform: RetainedOAuthPlatform,
   organizationId?: string,
   returnTo?: string
 ): string {

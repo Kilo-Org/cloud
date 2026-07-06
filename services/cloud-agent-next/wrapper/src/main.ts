@@ -35,6 +35,7 @@ import type {
 import {
   materializePromptAttachments,
   prepareWrapperBootstrapWorkspace,
+  RestoredWorkspaceReconciliationError,
 } from './session-bootstrap.js';
 
 // ---------------------------------------------------------------------------
@@ -643,12 +644,18 @@ async function main() {
       const bootstrapError =
         error instanceof WrapperBootstrapError
           ? error
-          : new WrapperBootstrapError({
-              code: 'WORKSPACE_SETUP_FAILED',
-              subtype: 'workspace_setup_unknown',
-              message: 'Workspace setup failed',
-              retryable: true,
-            });
+          : error instanceof RestoredWorkspaceReconciliationError
+            ? new WrapperBootstrapError({
+                code: 'WORKSPACE_RECONCILIATION_FAILED',
+                message: error.message,
+                retryable: true,
+              })
+            : new WrapperBootstrapError({
+                code: 'WORKSPACE_SETUP_FAILED',
+                subtype: 'workspace_setup_unknown',
+                message: 'Workspace setup failed',
+                retryable: true,
+              });
       logToFile(
         `session/ready failed kiloSessionId=${request.kiloSessionId} elapsedMs=${Date.now() - readyStartedAt} code=${bootstrapError.code} subtype=${bootstrapError.subtype ?? '(none)'} error=${bootstrapError.message}${bootstrapError.detail ? ` detail=${bootstrapError.detail}` : ''}`
       );

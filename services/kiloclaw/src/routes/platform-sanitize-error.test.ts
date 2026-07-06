@@ -39,7 +39,9 @@ function envWithDOError(error: Error, writeDataPoint = vi.fn()) {
     HYPERDRIVE: { connectionString: 'postgresql://fake' },
     KILOCLAW_REGISTRY: {
       idFromName: (id: string) => id,
-      get: () => ({ repairCompletedProvision: vi.fn().mockResolvedValue(false) }),
+      get: () => ({
+        repairCompletedProvision: vi.fn().mockResolvedValue(false),
+      }),
     },
     KILOCLAW_BILLING: {
       resolveProvisionEntitlement: vi.fn().mockResolvedValue({
@@ -130,7 +132,9 @@ describe('sanitizeError: Instance-not-* status correction', () => {
   });
 
   it('preserves original status when .status is present (not lost across RPC)', async () => {
-    const err = Object.assign(new Error('Instance not provisioned'), { status: 409 });
+    const err = Object.assign(new Error('Instance not provisioned'), {
+      status: 409,
+    });
     const env = envWithDOError(err);
 
     const resp = await platform.request('/status?userId=user-1', {}, env);
@@ -300,7 +304,10 @@ describe('kilo-cli-run/start: conflict response handling', () => {
     });
     expect(fetchSpy).toHaveBeenCalledWith(
       'https://app-1.fly.dev/_kilo/cli-run/start',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify({ prompt: 'fix this' }) })
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ prompt: 'fix this' }),
+      })
     );
   });
 
@@ -506,7 +513,9 @@ describe('doctor-controller: response handling', () => {
   });
 
   it('returns 404 when the controller route is unavailable', async () => {
-    const env = envWithDoctorStub({ startDoctorViaController: () => Promise.resolve(null) });
+    const env = envWithDoctorStub({
+      startDoctorViaController: () => Promise.resolve(null),
+    });
 
     const resp = await platform.request(
       '/doctor-controller/start',
@@ -917,7 +926,10 @@ describe('openclaw import platform route', () => {
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ userId: 'user-1', files: [{ path: 123, content: true }] }),
+        body: JSON.stringify({
+          userId: 'user-1',
+          files: [{ path: 123, content: true }],
+        }),
       },
       env
     );
@@ -1077,6 +1089,177 @@ describe('openclaw import platform route', () => {
     await expect(jsonBody(resp)).resolves.toEqual({
       error: 'Import exceeds byte limit',
       code: 'openclaw_import_too_large',
+    });
+  });
+});
+
+describe('openclaw export platform route', () => {
+  type ExportResult = {
+    bytes: ArrayBuffer;
+    contentType: string;
+    fileCount: number;
+    totalBytes: number;
+    skipped: number;
+  };
+
+  function envWithExportOpenclawWorkspace(
+    exportOpenclawWorkspace: (request: {
+      format: 'tar.gz' | 'zip';
+      password?: string;
+    }) => Promise<ExportResult | null>,
+    getStatus: () => Promise<{ status: string }> | { status: string } = async () => ({
+      status: 'running',
+    })
+  ) {
+    return {
+      KILOCLAW_INSTANCE: {
+        idFromName: (id: string) => id,
+        get: () => ({ exportOpenclawWorkspace, getStatus }),
+      },
+      KILOCLAW_AE: { writeDataPoint: vi.fn() },
+      KV_CLAW_CACHE: {
+        get: vi.fn().mockResolvedValue(null),
+        put: vi.fn().mockResolvedValue(undefined),
+        delete: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue({ keys: [], list_complete: true }),
+        getWithMetadata: vi.fn().mockResolvedValue({ value: null, metadata: null }),
+      },
+    } as never;
+  }
+
+  it('streams the archive bytes + metadata headers and forwards format/password', async () => {
+    const archive = new Uint8Array([1, 2, 3, 4, 5]);
+    const exportOpenclawWorkspace = vi.fn().mockResolvedValue({
+      bytes: archive.buffer,
+      contentType: 'application/zip',
+      fileCount: 3,
+      totalBytes: 1234,
+      skipped: 1,
+    } satisfies ExportResult);
+    const env = envWithExportOpenclawWorkspace(exportOpenclawWorkspace);
+
+    const resp = await platform.request(
+      '/files/export-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          format: 'zip',
+          password: 'hunter2',
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(200);
+    expect(resp.headers.get('content-type')).toBe('application/zip');
+    expect(resp.headers.get('content-disposition')).toBe(
+      'attachment; filename="openclaw-workspace-export.zip"'
+    );
+    expect(resp.headers.get('x-openclaw-export-file-count')).toBe('3');
+    expect(resp.headers.get('x-openclaw-export-total-bytes')).toBe('1234');
+    expect(resp.headers.get('x-openclaw-export-skipped')).toBe('1');
+    expect(new Uint8Array(await resp.arrayBuffer())).toEqual(archive);
+    expect(exportOpenclawWorkspace).toHaveBeenCalledWith({
+      format: 'zip',
+      password: 'hunter2',
+    });
+  });
+
+  it('rejects encryption for tar.gz before reaching the DO', async () => {
+    const exportOpenclawWorkspace = vi.fn();
+    const env = envWithExportOpenclawWorkspace(exportOpenclawWorkspace);
+
+    const resp = await platform.request(
+      '/files/export-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'user-1',
+          format: 'tar.gz',
+          password: 'secret',
+        }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(400);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      error: 'Encryption is only supported for zip exports',
+      code: 'openclaw_export_encryption_unsupported',
+    });
+    expect(exportOpenclawWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 controller_route_unavailable when DO returns null', async () => {
+    const env = envWithExportOpenclawWorkspace(async () => null);
+
+    const resp = await platform.request(
+      '/files/export-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', format: 'tar.gz' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(404);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      error: 'OpenClaw export not available (controller too old)',
+      code: 'controller_route_unavailable',
+    });
+  });
+
+  it('returns 503 when instance is not running', async () => {
+    const exportOpenclawWorkspace = vi.fn();
+    const env = envWithExportOpenclawWorkspace(exportOpenclawWorkspace, async () => ({
+      status: 'stopped',
+    }));
+
+    const resp = await platform.request(
+      '/files/export-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', format: 'zip' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(503);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      error: 'Instance is not running',
+      code: 'instance_not_running',
+    });
+    expect(exportOpenclawWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('passes through sanitized openclaw export error code', async () => {
+    const upstream = Object.assign(new Error('Export archive exceeds the transfer limit'), {
+      status: 413,
+      code: 'openclaw_export_too_large',
+    });
+    const env = envWithExportOpenclawWorkspace(async () => {
+      throw upstream;
+    });
+
+    const resp = await platform.request(
+      '/files/export-openclaw-workspace',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ userId: 'user-1', format: 'zip' }),
+      },
+      env
+    );
+
+    expect(resp.status).toBe(413);
+    await expect(jsonBody(resp)).resolves.toEqual({
+      error: 'Export archive exceeds the transfer limit',
+      code: 'openclaw_export_too_large',
     });
   });
 });

@@ -11,6 +11,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
 import {
   getUserOrganizationsWithSeats,
+  getProfileOrganizations,
   createOrganization,
   addUserToOrganization,
   addSsoUserToOrganization,
@@ -35,6 +36,30 @@ describe('Organizations', () => {
     await db.delete(organization_membership_removals);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
+  });
+
+  describe('createOrganization', () => {
+    test('enables recommendations digest for new enterprise organizations only', async () => {
+      const user = await insertTestUser();
+
+      const enterprise = await createOrganization(
+        'Enterprise with recommendations',
+        user.id,
+        true,
+        undefined,
+        'enterprise'
+      );
+      const teams = await createOrganization(
+        'Teams without recommendations',
+        user.id,
+        true,
+        undefined,
+        'teams'
+      );
+
+      expect(enterprise.settings.recommendations_digest_enabled).toBe(true);
+      expect(teams.settings.recommendations_digest_enabled).toBeUndefined();
+    });
   });
 
   describe('getUserOrganizationsWithSeats', () => {
@@ -95,6 +120,110 @@ describe('Organizations', () => {
       const result = await getUserOrganizationsWithSeats(user1.id);
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('getProfileOrganizations', () => {
+    test('returns standalone organizations', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Standalone Organization', user.id);
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result).toEqual([
+        {
+          id: organization.id,
+          name: organization.name,
+          role: 'owner',
+        },
+      ]);
+    });
+
+    test('hides a parent when the user is also a member of its child', async () => {
+      const user = await insertTestUser();
+      const parent = await createOrganization('Parent Organization', user.id);
+      const child = await createOrganization('Child Organization', user.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result).toEqual([
+        {
+          id: child.id,
+          name: child.name,
+          role: 'owner',
+        },
+      ]);
+    });
+
+    test('returns a parent when the user has no child membership', async () => {
+      const user = await insertTestUser();
+      const childOwner = await insertTestUser();
+      const parent = await createOrganization('Parent Organization', user.id);
+      const child = await createOrganization('Child Organization', childOwner.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result).toEqual([
+        {
+          id: parent.id,
+          name: parent.name,
+          role: 'owner',
+        },
+      ]);
+    });
+
+    test('returns a child when the user has no parent membership', async () => {
+      const hierarchyOwner = await insertTestUser();
+      const user = await insertTestUser();
+      const parent = await createOrganization('Parent Organization', hierarchyOwner.id);
+      const child = await createOrganization('Child Organization', hierarchyOwner.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await addUserToOrganization(child.id, user.id, 'member');
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result).toEqual([
+        {
+          id: child.id,
+          name: child.name,
+          role: 'member',
+        },
+      ]);
+    });
+
+    test('keeps unrelated organizations alongside child memberships', async () => {
+      const user = await insertTestUser();
+      const parent = await createOrganization('Parent Organization', user.id);
+      const childOne = await createOrganization('First Child', user.id);
+      const childTwo = await createOrganization('Second Child', user.id);
+      const unrelated = await createOrganization('Unrelated Organization', user.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, childOne.id));
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, childTwo.id));
+
+      const result = await getProfileOrganizations(user.id);
+
+      expect(result).toHaveLength(3);
+      expect(result.map(organization => organization.id)).toEqual(
+        expect.arrayContaining([childOne.id, childTwo.id, unrelated.id])
+      );
+      expect(result.map(organization => organization.id)).not.toContain(parent.id);
     });
   });
 
@@ -897,52 +1026,18 @@ describe('Organizations', () => {
       ).rejects.toThrow('User must join this organization through SSO');
     });
 
-    test('creates a WorkOS-bound invitation for a same-domain child user', async () => {
+    test('rejects invitations into a child organization', async () => {
       const owner = await insertTestUser();
-      const parent = await createOrganization('Parent SSO Org', owner.id);
-      await db
-        .update(organizations)
-        .set({ sso_domain: 'example.com' })
-        .where(eq(organizations.id, parent.id));
+      const parent = await createOrganization('Parent Org', owner.id);
       const child = await createOrganization('Child Org', owner.id);
       await db
         .update(organizations)
         .set({ parent_organization_id: parent.id })
         .where(eq(organizations.id, child.id));
 
-      const invitation = await inviteUserToOrganization(
-        child.id,
-        owner.id,
-        'member@example.com',
-        'member'
-      );
-
-      expect(invitation.authentication_requirement).toBe('workos');
-      expect(invitation.sso_source_organization_id).toBe(parent.id);
-    });
-
-    test('keeps external child invitations on default authentication', async () => {
-      const owner = await insertTestUser();
-      const parent = await createOrganization('Parent SSO Org', owner.id);
-      await db
-        .update(organizations)
-        .set({ sso_domain: 'example.com' })
-        .where(eq(organizations.id, parent.id));
-      const child = await createOrganization('Child Org', owner.id);
-      await db
-        .update(organizations)
-        .set({ parent_organization_id: parent.id })
-        .where(eq(organizations.id, child.id));
-
-      const invitation = await inviteUserToOrganization(
-        child.id,
-        owner.id,
-        'contractor@external.test',
-        'member'
-      );
-
-      expect(invitation.authentication_requirement).toBe('default');
-      expect(invitation.sso_source_organization_id).toBeNull();
+      await expect(
+        inviteUserToOrganization(child.id, owner.id, 'member@example.com', 'member')
+      ).rejects.toThrow('Child organizations cannot invite members');
     });
   });
 
@@ -1450,49 +1545,14 @@ describe('Organizations', () => {
         expect(storedInvitation?.accepted_at).not.toBeNull();
       });
 
-      test('requires matching WorkOS authentication for a child SSO invitation', async () => {
-        const owner = await insertTestUser();
-        const invitee = await insertTestUser({ google_user_email: 'member@example.com' });
-        const parent = await createOrganization('Parent SSO Org', owner.id);
-        await db
-          .update(organizations)
-          .set({ sso_domain: 'example.com' })
-          .where(eq(organizations.id, parent.id));
-        const child = await createOrganization('Child Org', owner.id);
-        await db
-          .update(organizations)
-          .set({ parent_organization_id: parent.id })
-          .where(eq(organizations.id, child.id));
-        const invitation = await inviteUserToOrganization(
-          child.id,
-          owner.id,
-          invitee.google_user_email,
-          'member'
-        );
-
-        const rejected = await acceptOrganizationInvite(invitee.id, invitation.token);
-        expect(rejected).toEqual({
-          success: false,
-          error: 'Invitation requires authentication through organization SSO',
-        });
-
-        const accepted = await acceptOrganizationInvite(invitee.id, invitation.token, {
-          provider: 'workos',
-          ssoSourceOrganizationId: parent.id,
-        });
-        expect(accepted.success).toBe(true);
-      });
-
-      test('rejects a legacy ordinary invitation after child SSO becomes effective', async () => {
+      test('rejects accepting a pre-existing invitation into a child organization', async () => {
         const owner = await insertTestUser();
         const invitee = await insertTestUser({ google_user_email: 'legacy@example.com' });
-        const parent = await createOrganization('Parent SSO Org', owner.id);
-        await db
-          .update(organizations)
-          .set({ sso_domain: 'example.com' })
-          .where(eq(organizations.id, parent.id));
+        const parent = await createOrganization('Parent Org', owner.id);
         const child = await createOrganization('Child Org', owner.id);
-        const token = 'legacy-sso-invitation';
+        // Invites can no longer be created for child orgs through the normal flow,
+        // so insert a pending invite directly, then reparent the org afterwards.
+        const token = 'legacy-child-invitation';
         await db.insert(organization_invitations).values({
           organization_id: child.id,
           email: invitee.google_user_email,
@@ -1506,15 +1566,15 @@ describe('Organizations', () => {
           .set({ parent_organization_id: parent.id })
           .where(eq(organizations.id, child.id));
 
-        const result = await acceptOrganizationInvite(invitee.id, token, {
-          provider: 'workos',
-          ssoSourceOrganizationId: parent.id,
-        });
+        const result = await acceptOrganizationInvite(invitee.id, token);
 
         expect(result).toEqual({
           success: false,
-          error: 'Invitation requires authentication through organization SSO',
+          error: 'Child organizations cannot accept invitations',
         });
+
+        const userOrgs = await getUserOrganizationsWithSeats(invitee.id);
+        expect(userOrgs).toHaveLength(0);
       });
 
       test('should accept invitation with owner role', async () => {

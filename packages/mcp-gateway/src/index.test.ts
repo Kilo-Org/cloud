@@ -11,6 +11,7 @@ import {
   ProviderGrantBundleSchema,
   OAuthClientMetadataSchema,
   OAuthAuthorizationQuerySchema,
+  GatewayTokenClaimsSchema,
 } from './index';
 
 describe('scoped routes', () => {
@@ -54,6 +55,54 @@ describe('scoped routes', () => {
     expect(
       parseScopedConnectPath('/mcp-connect/user/user-1/11111111-1111-4111-8111-111111111111/short')
     ).toBeNull();
+  });
+});
+
+describe('gateway token provenance', () => {
+  const baseClaims = {
+    iss: 'https://app.kilo.ai',
+    sub: 'user-123',
+    aud: 'https://mcp.kilosessions.ai/mcp-connect/user/user-123/11111111-1111-4111-8111-111111111111/abcdefghijklmnopqrstuvwxyzABCDEF',
+    exp: 1_800_000_000,
+    iat: 1_799_999_100,
+    scope: 'mcp:access',
+    MCPID:
+      'personal:user-123:11111111-1111-4111-8111-111111111111:abcdefghijklmnopqrstuvwxyzABCDEF',
+    owner_scope: 'personal' as const,
+    owner_id: 'user-123',
+    config_id: '11111111-1111-4111-8111-111111111111',
+    route_key: 'abcdefghijklmnopqrstuvwxyzABCDEF',
+    instance_id: '22222222-2222-4222-8222-222222222222',
+    execution_context: { type: 'personal' as const },
+    config_version: 1,
+  };
+
+  test('requires a grant identity for OAuth client tokens', () => {
+    expect(
+      GatewayTokenClaimsSchema.parse({
+        ...baseClaims,
+        token_source: 'oauth_client',
+        oauth_grant_id: '33333333-3333-4333-8333-333333333333',
+        client_id: 'mcp:client',
+      }).token_source
+    ).toBe('oauth_client');
+    expect(() =>
+      GatewayTokenClaimsSchema.parse({ ...baseClaims, token_source: 'oauth_client' })
+    ).toThrow();
+  });
+
+  test('rejects OAuth client identity on derived connect tokens', () => {
+    expect(
+      GatewayTokenClaimsSchema.parse({ ...baseClaims, token_source: 'derived_connect' })
+        .token_source
+    ).toBe('derived_connect');
+    expect(() =>
+      GatewayTokenClaimsSchema.parse({
+        ...baseClaims,
+        token_source: 'derived_connect',
+        oauth_grant_id: '33333333-3333-4333-8333-333333333333',
+      })
+    ).toThrow();
   });
 });
 

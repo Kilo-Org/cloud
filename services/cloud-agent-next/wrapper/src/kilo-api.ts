@@ -2,10 +2,11 @@
  * Adapter between the wrapper and the @kilocode/sdk client.
  *
  * Provides a stable `WrapperKiloClient` interface that all wrapper modules use.
- * Session and event subscription methods use the v1 SDK client (passed in from
- * main.ts, which uses createKilo() from the root @kilocode/sdk). Methods only
- * available in the v2 API (permission reply, question reply/reject, commit
- * message) use a v2 client created internally from the same server URL.
+ * Session methods use the v1 SDK client (passed in from main.ts, which uses
+ * createKilo() from the root @kilocode/sdk). Global event subscription and
+ * methods only available in the v2 API (permission reply, question
+ * reply/reject, commit message) use a v2 client created internally from the
+ * same server URL.
  *
  * The raw SDK client is not exposed on the returned interface — all access
  * goes through named methods.
@@ -18,6 +19,30 @@ import { toSlashCommandInfo, type SlashCommandInfo } from '../../src/shared/slas
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function isKiloEvent(value: unknown): value is KiloEvent {
+  return isRecord(value) && typeof value.type === 'string';
+}
+
+function isSyntheticKiloEvent(event: KiloEvent): boolean {
+  return event.type === 'server.connected' || event.type === 'server.heartbeat';
+}
+
+async function* globalFeedPayloads(
+  stream: AsyncIterable<unknown>,
+  workspacePath: string
+): AsyncGenerator<KiloEvent> {
+  for await (const envelope of stream) {
+    if (!isRecord(envelope)) continue;
+    const payload = envelope.payload;
+    if (!isKiloEvent(payload)) continue;
+
+    const directory = envelope.directory;
+    if (isSyntheticKiloEvent(payload) || directory === workspacePath) {
+      yield payload;
+    }
+  }
 }
 
 function providerIdFromRecord(provider: Record<string, unknown>): string | undefined {
@@ -140,10 +165,9 @@ export type WrapperPtySize = {
 };
 
 /**
- * Shape of an event yielded by `subscribeEvents().stream`. Both the real SDK's
- * `event.subscribe()` generator and the fake kilo's in-memory channel produce
- * values that structurally match this — `connection.ts` only reads `type`
- * and `properties`.
+ * Shape of an event yielded by `subscribeEvents().stream`. The wrapper unwraps
+ * the SDK global event envelope before handing events to `connection.ts`, which
+ * only reads `type` and `properties`.
  */
 export type KiloEvent = {
   type?: string;
@@ -237,10 +261,9 @@ export type WrapperKiloClient = {
 // ---------------------------------------------------------------------------
 
 /**
- * Create a WrapperKiloClient. Session/event operations use the v1 sdkClient
- * (from createKilo()). Permission/question/commitMessage operations use a v2
- * client created from the same server URL, since those APIs are only available
- * in the v2 SDK.
+ * Create a WrapperKiloClient. Session operations use the v1 sdkClient (from
+ * createKilo()). Event, permission, question, and commitMessage operations use
+ * a v2 client created from the same server URL.
  */
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
@@ -254,8 +277,10 @@ export function createWrapperKiloClient(
     serverUrl,
 
     subscribeEvents: async opts => {
-      const result = await sdkClient.event.subscribe({ signal: opts.signal });
-      return { stream: result.stream };
+      const result = await v2Client.global.event({ signal: opts.signal });
+      return {
+        stream: result.stream ? globalFeedPayloads(result.stream, workspacePath) : undefined,
+      };
     },
 
     createSession: async opts => {

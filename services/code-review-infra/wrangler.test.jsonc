@@ -22,7 +22,6 @@
     "API_URL": "https://api.example.test",
     "INTERNAL_API_SECRET": "test-internal-secret",
     "CALLBACK_TOKEN_SECRET": "test-callback-token-secret",
-    "CLOUD_AGENT_URL": "https://cloud-agent.example.test",
     "CLOUD_AGENT_NEXT_URL": "https://cloud-agent-next.example.test",
     "BACKEND_AUTH_TOKEN": "test-backend-token",
   },

@@ -1,4 +1,7 @@
 export const TOPUP_AMOUNT_QUERY_STRING_KEY = 'topup-amount-usd';
+export const TOPUP_TRANSACTION_QUERY_STRING_KEY = 'topup-transaction-id';
+export const TOPUP_STATUS_QUERY_STRING_KEY = 'topup-status';
+export const TOPUP_STATUS_PENDING = 'pending';
 export const TOPUP_CANCELED_QUERY_STRING_KEY = 'topup-canceled';
 // Default daily usage limit for members when accepting invitations
 export const DEFAULT_MEMBER_DAILY_LIMIT_USD = 25.0;

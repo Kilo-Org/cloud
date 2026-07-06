@@ -1,8 +1,8 @@
 import * as z from 'zod';
 import { and, eq, sql } from 'drizzle-orm';
 
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
+import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
 import { db } from '@/lib/drizzle';
 import { agent_configs } from '@kilocode/db/schema';
 
@@ -12,10 +12,6 @@ export type ReviewAnalyticsPlatform = 'github' | 'gitlab';
 const ReviewAnalyticsSettingsSchema = z.object({
   review_analytics_enabled: z.boolean().optional(),
 });
-
-type CodeReviewConfigWithAnalytics = CodeReviewAgentConfig & {
-  review_analytics_enabled: boolean;
-};
 
 export function getReviewAnalyticsEnabledFromConfig(config: unknown): boolean {
   const parsed = ReviewAnalyticsSettingsSchema.safeParse(config);
@@ -40,7 +36,7 @@ export async function setReviewAnalyticsEnabled(input: {
   enabled: boolean;
   createdBy: string;
 }): Promise<boolean> {
-  const config = createDefaultCodeReviewConfig(input.enabled);
+  const config = createDefaultCodeReviewConfig({ reviewAnalyticsEnabled: input.enabled });
   const updatedConfig = sql<CodeReviewAgentConfig | Record<string, unknown>>`jsonb_set(
     CASE
       WHEN jsonb_typeof(${agent_configs.config}) = 'object' THEN ${agent_configs.config}
@@ -79,25 +75,6 @@ export async function setReviewAnalyticsEnabled(input: {
   }
 
   return getReviewAnalyticsEnabledFromConfig(saved.config);
-}
-
-function createDefaultCodeReviewConfig(
-  reviewAnalyticsEnabled: boolean
-): CodeReviewConfigWithAnalytics {
-  return {
-    review_style: 'balanced',
-    focus_areas: [],
-    custom_instructions: null,
-    model_slug: PRIMARY_DEFAULT_MODEL,
-    thinking_effort: null,
-    gate_threshold: 'off',
-    repository_selection_mode: 'all',
-    selected_repository_ids: [],
-    manually_added_repositories: [],
-    disable_review_md: true,
-    review_memory_enabled: false,
-    review_analytics_enabled: reviewAnalyticsEnabled,
-  };
 }
 
 async function getReviewAnalyticsConfigRow(input: {

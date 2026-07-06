@@ -170,11 +170,19 @@ export async function getProfileOrganizations(userId: User['id']): Promise<Profi
       and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
     );
 
-  return results.map(result => ({
-    id: result.organization.id,
-    name: result.organization.name,
-    role: result.membership.role,
-  }));
+  const parentOrganizationIdsWithMembershipInAChild = new Set(
+    results.flatMap(result =>
+      result.organization.parent_organization_id ? [result.organization.parent_organization_id] : []
+    )
+  );
+
+  return results
+    .filter(result => !parentOrganizationIdsWithMembershipInAChild.has(result.organization.id))
+    .map(result => ({
+      id: result.organization.id,
+      name: result.organization.name,
+      role: result.membership.role,
+    }));
 }
 
 export async function createOrganization(
@@ -202,6 +210,7 @@ export async function createOrganization(
           enable_usage_limits: false,
           // all new orgs will have code indexing enabled by default
           code_indexing_enabled: true,
+          ...(plan === 'enterprise' ? { recommendations_digest_enabled: true } : {}),
         },
         ...(company_domain ? { company_domain } : {}),
         ...(plan ? { plan } : {}),
@@ -435,12 +444,10 @@ export async function inviteUserToOrganization(
     if (!organization) {
       throw new Error('Organization SSO policy is misconfigured');
     }
+    // Child organizations manage membership through their parent organization,
+    // so direct invitations into a child org are not allowed.
     if (organization.parentOrganizationId) {
-      await tx
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(eq(organizations.id, organization.parentOrganizationId))
-        .for('update');
+      throw new Error('Child organizations cannot invite members');
     }
 
     const policy = await resolveEffectiveOrganizationSsoPolicy(organizationId, tx);
@@ -663,12 +670,10 @@ export async function acceptOrganizationInvite(
       if (!organization) {
         return failureResult('Organization not found');
       }
+      // Child organizations manage membership through their parent organization.
+      // Reject any invitation (including pre-existing ones) into a child org.
       if (organization.parent_organization_id) {
-        await tx
-          .select({ id: organizations.id })
-          .from(organizations)
-          .where(eq(organizations.id, organization.parent_organization_id))
-          .for('update');
+        return failureResult('Child organizations cannot accept invitations');
       }
 
       const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organization.id, tx);
@@ -824,6 +829,29 @@ export async function updateOrganizationSettings(
     .where(eq(organizations.id, organizationId));
 
   return settings;
+}
+
+// Atomically update the recommendations-digest flag inside the settings JSONB
+// without a read-modify-write of the whole object, so a concurrent settings
+// mutation can't clobber other fields. Persist false to distinguish an explicit
+// opt-out from an organization that has never initialized this preference.
+export async function setOrganizationRecommendationsDigestEnabled(
+  organizationId: Organization['id'],
+  enabled: boolean
+): Promise<OrganizationSettings> {
+  const [row] = await db
+    .update(organizations)
+    .set({
+      settings: sql`jsonb_set(
+        COALESCE(${organizations.settings}, '{}'::jsonb),
+        '{recommendations_digest_enabled}',
+        ${JSON.stringify(enabled)}::jsonb
+      )`,
+    })
+    .where(eq(organizations.id, organizationId))
+    .returning({ settings: organizations.settings });
+
+  return row?.settings ?? {};
 }
 
 export async function markOrganizationAsDeleted(organizationId: Organization['id']): Promise<void> {

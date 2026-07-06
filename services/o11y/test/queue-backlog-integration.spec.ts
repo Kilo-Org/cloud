@@ -30,8 +30,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('evaluateAlerts queue backlog integration', () => {
-  it('sends a page alert even when SLO configuration is unavailable', async () => {
+describe('evaluateAlerts infrastructure isolation', () => {
+  it('continues other evaluations when Gastown health and SLO configuration fail', async () => {
     const kv = makeKv();
     const slackMessages: unknown[] = [];
     const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -48,6 +48,9 @@ describe('evaluateAlerts queue backlog integration', () => {
             oldest_message_timestamp_ms: 1_780_560_000_000,
           },
         });
+      }
+      if (url.includes('/analytics_engine/sql')) {
+        throw new Error('Gastown Analytics Engine unavailable');
       }
       if (url === 'https://hooks.slack.com/page') {
         slackMessages.push(JSON.parse(String(init?.body)));
@@ -67,8 +70,14 @@ describe('evaluateAlerts queue backlog integration', () => {
       O11Y_SLACK_WEBHOOK_TICKET: makeSecret('https://hooks.slack.com/ticket'),
     } as Env;
 
-    await expect(evaluateAlerts(env)).rejects.toThrow('Alert evaluation failed with 2 error(s)');
+    await expect(evaluateAlerts(env)).rejects.toThrow('Alert evaluation failed with 3 error(s)');
 
+    expect(
+      fetchFn.mock.calls.some(([input]) => String(input).includes('/containers/dash/applications'))
+    ).toBe(true);
+    expect(
+      fetchFn.mock.calls.some(([input]) => String(input).includes('/analytics_engine/sql'))
+    ).toBe(true);
     expect(slackMessages).toHaveLength(1);
     expect(JSON.stringify(slackMessages[0])).toContain('Queue Backlog Alert');
     expect(kv.store.has(`o11y:queue_backlog:${MONITORED_QUEUE_ID}`)).toBe(true);

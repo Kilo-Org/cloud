@@ -6,6 +6,13 @@ import { useRouter } from 'next/navigation';
 import { useGastownTRPC, gastownWsUrl, type GastownOutputs } from '@/lib/gastown/trpc';
 
 import { useSidebar } from '@/components/ui/sidebar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   useTerminalBar,
   COLLAPSED_SIZE,
@@ -502,30 +509,6 @@ function TabBar({
   setPosition: (position: TerminalPosition) => void;
   closeTab: (tabId: string) => void;
 }) {
-  const [showPositionPicker, setShowPositionPicker] = useState(false);
-  const [showBugMenu, setShowBugMenu] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
-  const bugMenuRef = useRef<HTMLDivElement>(null);
-
-  // Close picker on outside click
-  useEffect(() => {
-    if (!showPositionPicker && !showBugMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        showPositionPicker &&
-        pickerRef.current &&
-        !pickerRef.current.contains(e.target as Node)
-      ) {
-        setShowPositionPicker(false);
-      }
-      if (showBugMenu && bugMenuRef.current && !bugMenuRef.current.contains(e.target as Node)) {
-        setShowBugMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showPositionPicker, showBugMenu]);
-
   const borderClass = horizontal ? 'border-b border-white/[0.06]' : 'border-r border-white/[0.06]';
 
   return (
@@ -612,50 +595,13 @@ function TabBar({
 
       {/* Bug report dropdown */}
       {horizontal && (
-        <div ref={bugMenuRef} className="relative shrink-0">
-          <button
-            onClick={() => setShowBugMenu(p => !p)}
-            className="mr-2 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-white/30 transition-colors hover:bg-white/[0.04] hover:text-white/50"
-          >
-            <Bug className="size-3" />
-            <span className="hidden sm:inline">Report a Bug</span>
-          </button>
-          {showBugMenu && (
-            <BugReportMenu
-              position={position}
-              triggerRef={bugMenuRef}
-              onClose={() => setShowBugMenu(false)}
-            />
-          )}
+        <div className="shrink-0">
+          <BugReportMenu />
         </div>
       )}
 
       {/* Position picker */}
-      <div ref={pickerRef}>
-        <button
-          onClick={() => setShowPositionPicker(p => !p)}
-          className={`flex items-center justify-center text-white/30 transition-colors hover:text-white/50 ${
-            horizontal ? 'h-full px-2' : 'w-full py-2'
-          }`}
-          title="Change terminal position"
-        >
-          {position === 'bottom' && <PanelBottom className="size-3.5" />}
-          {position === 'top' && <PanelTop className="size-3.5" />}
-          {position === 'left' && <PanelLeft className="size-3.5" />}
-          {position === 'right' && <PanelRight className="size-3.5" />}
-        </button>
-        {showPositionPicker && (
-          <PositionPicker
-            current={position}
-            onSelect={p => {
-              setPosition(p);
-              setShowPositionPicker(false);
-            }}
-            position={position}
-            triggerRef={pickerRef}
-          />
-        )}
-      </div>
+      <PositionPicker current={position} onSelect={setPosition} horizontal={horizontal} />
     </div>
   );
 }
@@ -669,76 +615,54 @@ const POSITION_OPTIONS: { value: TerminalPosition; label: string; Icon: typeof P
   { value: 'right', label: 'Right', Icon: PanelRight },
 ];
 
-function PositionPicker({
+export function PositionPicker({
   current,
   onSelect,
-  position,
-  triggerRef,
+  horizontal,
 }: {
   current: TerminalPosition;
   onSelect: (p: TerminalPosition) => void;
-  position: TerminalPosition;
-  triggerRef: React.RefObject<HTMLDivElement | null>;
+  horizontal: boolean;
 }) {
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0 });
-
-  useEffect(() => {
-    const trigger = triggerRef.current;
-    const popover = popoverRef.current;
-    if (!trigger || !popover) return;
-    const tr = trigger.getBoundingClientRect();
-    const pr = popover.getBoundingClientRect();
-    const gap = 4;
-
-    let top: number;
-    let left: number;
-
-    if (position === 'bottom') {
-      top = tr.top - pr.height - gap;
-      left = tr.right - pr.width;
-    } else if (position === 'top') {
-      top = tr.bottom + gap;
-      left = tr.right - pr.width;
-    } else if (position === 'left') {
-      top = tr.top;
-      left = tr.right + gap;
-    } else {
-      // right
-      top = tr.top;
-      left = tr.left - pr.width - gap;
-    }
-
-    // Clamp to viewport
-    top = Math.max(4, Math.min(top, window.innerHeight - pr.height - 4));
-    left = Math.max(4, Math.min(left, window.innerWidth - pr.width - 4));
-
-    setStyle({ top, left, opacity: 1 });
-  }, [position, triggerRef]);
+  const [open, setOpen] = useState(false);
+  const CurrentIcon = { bottom: PanelBottom, top: PanelTop, left: PanelLeft, right: PanelRight }[
+    current
+  ];
 
   return (
-    <div
-      ref={popoverRef}
-      className="fixed z-[60] w-max rounded-lg border border-white/[0.15] bg-[#1e1e1e] p-1.5 shadow-2xl backdrop-blur-sm"
-      style={style}
-    >
-      <div className="grid grid-cols-2 gap-1">
-        {POSITION_OPTIONS.map(({ value, label, Icon }) => (
-          <button
-            key={value}
-            onClick={() => onSelect(value)}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] whitespace-nowrap transition-colors ${
-              current === value
-                ? 'bg-white/[0.12] text-white/90'
-                : 'text-white/50 hover:bg-white/[0.07] hover:text-white/70'
-            }`}
-          >
-            <Icon className="size-3.5" />
-            {label}
-          </button>
-        ))}
-      </div>
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        title="Change terminal position"
+        aria-label="Change terminal position"
+        className={`flex items-center justify-center text-white/30 transition-colors hover:text-white/50 ${
+          horizontal ? 'h-full px-2' : 'w-full py-2'
+        }`}
+      >
+        <CurrentIcon className="size-3.5" />
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={6} className="w-max p-1.5">
+        <div className="grid grid-cols-2 gap-1">
+          {POSITION_OPTIONS.map(({ value, label, Icon }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                onSelect(value);
+                setOpen(false);
+              }}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] whitespace-nowrap transition-colors ${
+                current === value
+                  ? 'bg-surface-selected text-foreground'
+                  : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+              }`}
+            >
+              <Icon className="size-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -757,71 +681,27 @@ const BUG_REPORT_OPTIONS = [
   },
 ];
 
-function BugReportMenu({
-  position,
-  triggerRef,
-  onClose,
-}: {
-  position: TerminalPosition;
-  triggerRef: React.RefObject<HTMLDivElement | null>;
-  onClose: () => void;
-}) {
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [style, setStyle] = useState<React.CSSProperties>({ opacity: 0 });
-
-  useEffect(() => {
-    const trigger = triggerRef.current;
-    const popover = popoverRef.current;
-    if (!trigger || !popover) return;
-    const tr = trigger.getBoundingClientRect();
-    const pr = popover.getBoundingClientRect();
-    const gap = 4;
-
-    let top: number;
-    let left: number;
-
-    if (position === 'bottom') {
-      top = tr.top - pr.height - gap;
-      left = tr.left;
-    } else if (position === 'top') {
-      top = tr.bottom + gap;
-      left = tr.left;
-    } else if (position === 'left') {
-      top = tr.top;
-      left = tr.right + gap;
-    } else {
-      top = tr.top;
-      left = tr.left - pr.width - gap;
-    }
-
-    top = Math.max(4, Math.min(top, window.innerHeight - pr.height - 4));
-    left = Math.max(4, Math.min(left, window.innerWidth - pr.width - 4));
-
-    setStyle({ top, left, opacity: 1 });
-  }, [position, triggerRef]);
-
+export function BugReportMenu() {
   return (
-    <div
-      ref={popoverRef}
-      className="fixed z-[60] w-max rounded-lg border border-white/[0.15] bg-[#1e1e1e] p-1.5 shadow-2xl backdrop-blur-sm"
-      style={style}
-    >
-      <div className="flex flex-col gap-0.5">
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label="Report a bug"
+        className="mr-2 flex items-center gap-1 rounded px-2 py-1 text-[10px] text-white/30 transition-colors hover:bg-white/[0.04] hover:text-white/50"
+      >
+        <Bug className="size-3" />
+        <span className="hidden sm:inline">Report a Bug</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" sideOffset={6} className="w-max">
         {BUG_REPORT_OPTIONS.map(({ label, href, Icon }) => (
-          <a
-            key={label}
-            href={href}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={onClose}
-            className="flex items-center gap-2 rounded-md px-3 py-2 text-[11px] text-white/50 whitespace-nowrap transition-colors hover:bg-white/[0.07] hover:text-white/70"
-          >
-            <Icon className="size-3.5" />
-            {label}
-          </a>
+          <DropdownMenuItem key={label} asChild>
+            <a href={href} target="_blank" rel="noopener noreferrer">
+              <Icon className="size-3.5" />
+              {label}
+            </a>
+          </DropdownMenuItem>
         ))}
-      </div>
-    </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

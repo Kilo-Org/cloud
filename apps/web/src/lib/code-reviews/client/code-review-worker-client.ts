@@ -42,23 +42,6 @@ export type DispatchReviewResponse = {
   status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 };
 
-/**
- * Code review event structure (used by SSE/cloud-agent flow)
- * Matches the CodeReviewEvent type from Cloudflare Worker
- */
-export type ReviewEvent = {
-  timestamp: string;
-  eventType: string;
-  message?: string;
-  content?: string;
-  sessionId?: string;
-};
-
-export type ReviewEventsResponse = {
-  reviewId: string;
-  events: ReviewEvent[];
-};
-
 export type CancelReviewResponse = {
   success: boolean;
   reviewId: string;
@@ -153,22 +136,6 @@ class CodeReviewWorkerClient {
       );
     }
     return data;
-  }
-
-  /**
-   * Get events for a code review (used by SSE/cloud-agent flow for polling)
-   */
-  async getReviewEvents(reviewId: string, attemptId?: string): Promise<ReviewEvent[]> {
-    const response = await fetchWithTimeout(this.buildReviewUrl(reviewId, 'events', attemptId), {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch review events: ${response.statusText}`);
-    }
-
-    const data: ReviewEventsResponse = await response.json();
-    return data.events;
   }
 
   /**

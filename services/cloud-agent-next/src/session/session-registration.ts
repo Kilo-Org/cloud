@@ -16,8 +16,9 @@
  */
 import { TRPCError } from '@trpc/server';
 
-import type { Env } from '../types.js';
+import type { Env, SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
+import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { generateSessionId, SessionService } from '../session-service.js';
@@ -26,7 +27,8 @@ import {
   recordCloudAgentSandboxIdentity,
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
-import { generateSandboxId } from '../sandbox-id.js';
+import { generateSandboxRoutingTarget, parseOrgIdList } from '../sandbox-id.js';
+import { resolveSharedSandboxAssignment } from '../shared-sandbox-route.js';
 import { generateKiloSessionId } from '../utils/kilo-session-id.js';
 import { createMessageId } from './message-id.js';
 import type {
@@ -39,6 +41,10 @@ import type { SessionCreateRequest } from './session-requests.js';
 
 export type SessionRegistrationInput = SessionCreateRequest;
 
+type SharedSandboxRouteMetadata = NonNullable<
+  NonNullable<SessionMetadata['workspace']>['sandboxRoute']
+>;
+
 export type SessionRegistrationContext = {
   env: Env;
   userId: string;
@@ -49,7 +55,8 @@ export type SessionRegistrationContext = {
 export type SessionRegistrationResult = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
-  sandboxId: Awaited<ReturnType<typeof generateSandboxId>>;
+  sandboxId: SandboxId;
+  sandboxRoute?: SharedSandboxRouteMetadata;
   /**
    * Canonical initial turn reserved for a later legacy initiation request.
    */
@@ -105,6 +112,7 @@ type SessionEstablishmentFailure =
   | { stage: 'transport'; code: 'do_rpc_outcome_unknown' };
 
 type NewSessionAllocation = SessionRegistrationResult & {
+  managedScmContainment: boolean;
   sessionService: SessionService;
   rollbackCliSession: () => Promise<void>;
 };
@@ -144,16 +152,40 @@ async function allocateNewSession(
     ctx.env
   );
 
-  let sandboxId: Awaited<ReturnType<typeof generateSandboxId>>;
+  const containmentOrgs = parseOrgIdList(ctx.env.MANAGED_SCM_CONTAINMENT_ORG_IDS);
+  const orgId = input.options?.kilocodeOrganizationId;
+  const useManagedScmContainment =
+    input.repository.type === 'github' &&
+    input.runtime?.devcontainer !== true &&
+    (containmentOrgs.has('*') || (orgId !== undefined && containmentOrgs.has(orgId)));
+  let sandboxId: SandboxId;
+  let sandboxRoute: SharedSandboxRouteMetadata | undefined;
   try {
-    sandboxId = await generateSandboxId(
+    const target = await generateSandboxRoutingTarget(
       ctx.env.PER_SESSION_SANDBOX_ORG_IDS,
       input.options?.kilocodeOrganizationId,
       ctx.userId,
       cloudAgentSessionId,
       ctx.botId,
-      input.runtime?.devcontainer
+      {
+        devcontainer: input.runtime?.devcontainer,
+        createdOnPlatform: input.options?.createdOnPlatform,
+      }
     );
+    if (target.kind === 'shared') {
+      const assignment = await resolveSharedSandboxAssignment(
+        ctx.env.SHARED_SANDBOX_OVERRIDES,
+        target.routeKey
+      );
+      sandboxId = assignment.sandboxId;
+      sandboxRoute = {
+        kind: 'shared',
+        routeKey: target.routeKey,
+        ...(assignment.suffix ? { suffix: assignment.suffix } : {}),
+      };
+    } else {
+      sandboxId = target.sandboxId;
+    }
   } catch (error) {
     await recordCloudAgentSessionFailure(
       {
@@ -202,7 +234,9 @@ async function allocateNewSession(
     cloudAgentSessionId,
     kiloSessionId,
     sandboxId,
+    sandboxRoute,
     initialTurn,
+    managedScmContainment: useManagedScmContainment,
     sessionService,
     rollbackCliSession: async () => {
       try {
@@ -223,7 +257,7 @@ async function allocateNewSession(
 function buildSessionRegistrationCommand(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
-  allocation: SessionRegistrationResult
+  allocation: NewSessionAllocation
 ) {
   return {
     identity: {
@@ -252,6 +286,8 @@ function buildSessionRegistrationCommand(
     workspace: {
       sandboxId: allocation.sandboxId,
       shallow: input.options?.shallow,
+      ...(allocation.sandboxRoute ? { sandboxRoute: allocation.sandboxRoute } : {}),
+      managedScmContainment: allocation.managedScmContainment,
       ...(input.runtime?.devcontainer ? { devcontainerRequested: true } : {}),
     },
   };

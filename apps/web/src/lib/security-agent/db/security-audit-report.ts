@@ -1,6 +1,6 @@
 import 'server-only';
 import { captureException, startSpan } from '@sentry/nextjs';
-import { security_audit_log } from '@kilocode/db/schema';
+import { security_audit_log, security_findings } from '@kilocode/db/schema';
 import {
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
@@ -187,6 +187,11 @@ type AuditReportRow = {
 type AuditReportCursor = {
   effectiveAt: string;
   id: string;
+};
+
+type AuditReportCurrentFinding = {
+  findingId: string;
+  snapshot: Record<string, unknown>;
 };
 
 type AuditReportFindingCutoffState = {
@@ -435,7 +440,7 @@ async function assembleSecurityAgentAuditReport(params: {
   isRequestingUserKiloAdmin: boolean;
   onEventCount: (eventCount: number) => void;
 }): Promise<SecurityAgentAuditReport> {
-  const { dataThrough, rows, cutoffStates } = await db.transaction(
+  const { dataThrough, rows, cutoffStates, currentFindings } = await db.transaction(
     async tx => {
       const dataThrough = await getDatabaseNow(tx);
       const eventCount = await countReportEvents(tx, params.owner, params.period);
@@ -461,9 +466,12 @@ async function assembleSecurityAgentAuditReport(params: {
           rows.map(getRowFindingId).filter((findingId): findingId is string => Boolean(findingId))
         )
       );
-      const cutoffStates = await loadReportFindingCutoffStates(tx, params.owner, findingIds);
+      const [cutoffStates, currentFindings] = await Promise.all([
+        loadReportFindingCutoffStates(tx, params.owner, findingIds),
+        loadCurrentReportFindings(tx, params.owner, findingIds),
+      ]);
 
-      return { dataThrough, rows, cutoffStates };
+      return { dataThrough, rows, cutoffStates, currentFindings };
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );
@@ -475,6 +483,7 @@ async function assembleSecurityAgentAuditReport(params: {
     dataThrough,
     rows,
     cutoffStates,
+    currentFindings,
     isRequestingUserKiloAdmin: params.isRequestingUserKiloAdmin,
   });
   assertSecurityAgentAuditReportSerializedByteBudget(report);
@@ -488,6 +497,7 @@ export function buildSecurityAgentAuditReportFromRows(params: {
   dataThrough: string;
   rows: AuditReportRow[];
   cutoffStates?: AuditReportFindingCutoffState[];
+  currentFindings?: AuditReportCurrentFinding[];
   isRequestingUserKiloAdmin: boolean;
 }): SecurityAgentAuditReport {
   const groups = new Map<string, AuditReportRow[]>();
@@ -502,8 +512,17 @@ export function buildSecurityAgentAuditReportFromRows(params: {
   const cutoffStateByFindingId = new Map(
     params.cutoffStates?.map(state => [state.findingId, state]) ?? []
   );
+  const currentFindingByFindingId = new Map(
+    params.currentFindings?.map(finding => [finding.findingId, finding.snapshot]) ?? []
+  );
   const findings = Array.from(groups.entries()).map(([findingId, rows]) =>
-    buildFindingSection(findingId, rows, params, cutoffStateByFindingId.get(findingId))
+    buildFindingSection(
+      findingId,
+      rows,
+      params,
+      cutoffStateByFindingId.get(findingId),
+      currentFindingByFindingId.get(findingId)
+    )
   );
 
   findings.sort((left, right) => {
@@ -725,6 +744,79 @@ async function loadReportFindingCutoffStates(
   }
 }
 
+async function loadCurrentReportFindings(
+  tx: DrizzleTransaction,
+  owner: SecurityAgentAuditReportOwner,
+  findingIds: string[]
+): Promise<AuditReportCurrentFinding[]> {
+  if (findingIds.length === 0) return [];
+
+  try {
+    const rows = await withSecurityAgentAuditReportTimeout(
+      tx
+        .select({
+          findingId: security_findings.id,
+          source: security_findings.source,
+          sourceId: security_findings.source_id,
+          repository: security_findings.repo_full_name,
+          title: security_findings.title,
+          severity: security_findings.severity,
+          status: security_findings.status,
+          packageName: security_findings.package_name,
+          packageEcosystem: security_findings.package_ecosystem,
+          manifestPath: security_findings.manifest_path,
+          patchedVersion: security_findings.patched_version,
+          ghsaId: security_findings.ghsa_id,
+          cveId: security_findings.cve_id,
+          cweIds: security_findings.cwe_ids,
+          cvssScore: security_findings.cvss_score,
+          dependabotUrl: security_findings.dependabot_html_url,
+          firstDetectedAt: security_findings.first_detected_at,
+        })
+        .from(security_findings)
+        .where(
+          and(
+            inArray(security_findings.id, findingIds),
+            owner.type === 'user'
+              ? eq(security_findings.owned_by_user_id, owner.id)
+              : eq(security_findings.owned_by_organization_id, owner.id)
+          )
+        ),
+      SECURITY_AGENT_AUDIT_REPORT_QUERY_TIMEOUT_MS,
+      'scan'
+    );
+
+    return rows.map(row => ({
+      findingId: row.findingId,
+      snapshot: {
+        finding_id: row.findingId,
+        source: row.source,
+        source_id: row.sourceId,
+        repo_full_name: row.repository,
+        title: row.title,
+        severity: row.severity,
+        status: row.status,
+        package_name: row.packageName,
+        package_ecosystem: row.packageEcosystem,
+        manifest_path: row.manifestPath,
+        patched_version: row.patchedVersion,
+        ghsa_id: row.ghsaId,
+        cve_id: row.cveId,
+        cwe_ids: row.cweIds,
+        cvss_score: row.cvssScore,
+        dependabot_html_url: row.dependabotUrl,
+        first_detected_at: row.firstDetectedAt,
+      },
+    }));
+  } catch (error) {
+    if (error instanceof SecurityAgentAuditReportQueryError) throw error;
+    throw new SecurityAgentAuditReportQueryError(
+      error instanceof Error ? error.message : 'Report query did not finish',
+      'scan'
+    );
+  }
+}
+
 function baseReportConditions(
   owner: SecurityAgentAuditReportOwner,
   period: NormalizedAuditReportPeriod
@@ -821,15 +913,17 @@ function buildFindingSection(
     dataThrough: string;
     isRequestingUserKiloAdmin: boolean;
   },
-  cutoffState: AuditReportFindingCutoffState | undefined
+  cutoffState: AuditReportFindingCutoffState | undefined,
+  currentFindingSnapshot: Record<string, unknown> | undefined
 ): SecurityFindingAuditSection {
   rows.sort(
     (left, right) =>
       left.effective_at.localeCompare(right.effective_at) || left.id.localeCompare(right.id)
   );
   const latestSnapshot = latestFindingSnapshot(rows);
+  const descriptiveSnapshot = mergeSnapshotFallback(latestSnapshot, currentFindingSnapshot);
   const evidenceSnapshot = withRecordedTimelineEvidence(rows, latestSnapshot);
-  const stateSnapshot = cutoffState ? cutoffState.snapshot : evidenceSnapshot;
+  const stateSnapshot = cutoffState?.snapshot ?? evidenceSnapshot ?? currentFindingSnapshot ?? null;
   const events = rows.map(row => buildReportEvent(row, reportParams.isRequestingUserKiloAdmin));
   const deleted = cutoffState
     ? cutoffState.deleted
@@ -838,22 +932,24 @@ function buildFindingSection(
 
   return {
     findingId,
-    source: stringFromSnapshot(latestSnapshot, 'source'),
-    sourceId: stringFromSnapshot(latestSnapshot, 'source_id'),
-    repository: stringFromSnapshot(latestSnapshot, 'repo_full_name'),
-    title: stringFromSnapshot(latestSnapshot, 'title') ?? 'Legacy Security Finding',
-    severity: severityFromSnapshot(latestSnapshot),
+    source: stringFromSnapshot(descriptiveSnapshot, 'source'),
+    sourceId: stringFromSnapshot(descriptiveSnapshot, 'source_id'),
+    repository: stringFromSnapshot(descriptiveSnapshot, 'repo_full_name'),
+    title: stringFromSnapshot(descriptiveSnapshot, 'title') ?? `Security Finding ${findingId}`,
+    severity: severityFromSnapshot(descriptiveSnapshot),
     status: stringFromSnapshot(stateSnapshot, 'status'),
-    packageName: stringFromSnapshot(latestSnapshot, 'package_name'),
-    packageEcosystem: stringFromSnapshot(latestSnapshot, 'package_ecosystem'),
-    manifestPath: stringFromSnapshot(latestSnapshot, 'manifest_path'),
-    patchedVersion: stringFromSnapshot(latestSnapshot, 'patched_version'),
-    ghsaId: stringFromSnapshot(latestSnapshot, 'ghsa_id'),
-    cveId: stringFromSnapshot(latestSnapshot, 'cve_id'),
-    cweIds: stringArrayFromSnapshot(latestSnapshot, 'cwe_ids'),
-    cvssScore: cvssFromSnapshot(latestSnapshot),
-    dependabotUrl: safeUrl(stringFromSnapshot(latestSnapshot, 'dependabot_html_url')),
-    firstDetectedAt: stringFromSnapshot(evidenceSnapshot, 'first_detected_at'),
+    packageName: stringFromSnapshot(descriptiveSnapshot, 'package_name'),
+    packageEcosystem: stringFromSnapshot(descriptiveSnapshot, 'package_ecosystem'),
+    manifestPath: stringFromSnapshot(descriptiveSnapshot, 'manifest_path'),
+    patchedVersion: stringFromSnapshot(descriptiveSnapshot, 'patched_version'),
+    ghsaId: stringFromSnapshot(descriptiveSnapshot, 'ghsa_id'),
+    cveId: stringFromSnapshot(descriptiveSnapshot, 'cve_id'),
+    cweIds: stringArrayFromSnapshot(descriptiveSnapshot, 'cwe_ids'),
+    cvssScore: cvssFromSnapshot(descriptiveSnapshot),
+    dependabotUrl: safeUrl(stringFromSnapshot(descriptiveSnapshot, 'dependabot_html_url')),
+    firstDetectedAt:
+      stringFromSnapshot(evidenceSnapshot, 'first_detected_at') ??
+      stringFromSnapshot(descriptiveSnapshot, 'first_detected_at'),
     canonicalFindingId: stringFromSnapshot(stateSnapshot, 'canonical_finding_id'),
     deleted,
     sla: buildSlaEvidence(stateSnapshot, reportParams.dataThrough, deleted),
@@ -924,6 +1020,15 @@ function latestFindingSnapshot(rows: AuditReportRow[]): Record<string, unknown> 
     if (snapshot) return snapshot;
   }
   return null;
+}
+
+function mergeSnapshotFallback(
+  recordedSnapshot: Record<string, unknown> | null,
+  currentSnapshot: Record<string, unknown> | undefined
+): Record<string, unknown> | null {
+  if (!recordedSnapshot) return currentSnapshot ?? null;
+  if (!currentSnapshot) return recordedSnapshot;
+  return { ...currentSnapshot, ...recordedSnapshot };
 }
 
 function withRecordedTimelineEvidence(

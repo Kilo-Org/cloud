@@ -1,7 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { createElement, useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import React, { createElement, useEffect, useState } from 'react';
 
 import {
   buildImpactAdvocateTokenUrl,
@@ -17,6 +18,11 @@ type WidgetState =
   | { status: 'loading' }
   | { status: 'ready'; token: string; widgetId: string }
   | { status: 'unavailable'; message: string };
+
+export const IMPACT_ADVOCATE_WIDGET_LOAD_TIMEOUT_MS = 10_000;
+
+export const IMPACT_ADVOCATE_WIDGET_LOAD_TIMEOUT_MESSAGE =
+  'Ad blockers or network filters can block the referral widget from loading. Either allow the blocked domains or turn off the ad blocker or network filters to see the referral widget.';
 
 async function getWidgetToken(product: ImpactAdvocateReferralProduct): Promise<WidgetToken> {
   const response = await fetch(buildImpactAdvocateTokenUrl(product), {
@@ -50,7 +56,44 @@ async function getWidgetToken(product: ImpactAdvocateReferralProduct): Promise<W
   return { token: payload.token, widgetId: payload.widgetId };
 }
 
-function WidgetContent({ state }: { state: WidgetState }) {
+export function WidgetFallbackContent({ hasTimedOut }: { hasTimedOut: boolean }) {
+  if (!hasTimedOut) {
+    return <div className="text-muted-foreground text-sm">Loading referral widget…</div>;
+  }
+
+  return (
+    <div
+      className="border-status-warning-border bg-status-warning-surface flex gap-3 rounded-lg border p-4"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <AlertTriangle className="text-status-warning-icon mt-0.5 size-4 shrink-0" />
+      <div>
+        <p className="text-status-warning type-heading">Referral widget did not load</p>
+        <p className="text-muted-foreground type-body mt-1">
+          {IMPACT_ADVOCATE_WIDGET_LOAD_TIMEOUT_MESSAGE}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ImpactWidgetFallback() {
+  const [hasTimedOut, setHasTimedOut] = useState(false);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setHasTimedOut(true);
+    }, IMPACT_ADVOCATE_WIDGET_LOAD_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  return <WidgetFallbackContent hasTimedOut={hasTimedOut} />;
+}
+
+export function WidgetContent({ state }: { state: WidgetState }) {
   switch (state.status) {
     case 'loading':
       return (
@@ -67,7 +110,7 @@ function WidgetContent({ state }: { state: WidgetState }) {
               widget: state.widgetId,
               className: 'block min-h-52 w-full',
             },
-            <div className="text-muted-foreground text-sm">Loading referral widget…</div>
+            <ImpactWidgetFallback />
           )}
         </div>
       );

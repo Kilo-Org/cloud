@@ -9,7 +9,7 @@ import {
 import { Label } from '@/components/ui/label';
 
 const meta: Meta = {
-  title: 'Components/Select',
+  title: 'Components/Forms/Select',
   parameters: {
     layout: 'centered',
   },

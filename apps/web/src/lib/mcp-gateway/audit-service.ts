@@ -11,6 +11,7 @@ export function createAuditService(repository: GatewayRepository) {
     configId?: string | null;
     connectResourceId?: string | null;
     instanceId?: string | null;
+    oauthGrantId?: string | null;
     eventType: string;
     outcome: GatewayAuditOutcome;
     metadata?: Record<string, unknown>;
@@ -22,6 +23,7 @@ export function createAuditService(repository: GatewayRepository) {
       config_id: params.configId ?? null,
       connect_resource_id: params.connectResourceId ?? null,
       instance_id: params.instanceId ?? null,
+      oauth_grant_id: params.oauthGrantId ?? null,
       event_type: params.eventType,
       outcome: params.outcome,
       correlation_metadata: params.metadata ?? {},

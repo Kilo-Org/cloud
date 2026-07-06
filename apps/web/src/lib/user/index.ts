@@ -32,10 +32,12 @@ import {
   organization_invitations,
   organization_membership_removals,
   organization_audit_logs,
+  organization_recommendation_dismissals,
   magic_link_tokens,
   device_auth_requests,
   auto_top_up_configs,
   platform_integrations,
+  platform_oauth_credentials,
   byok_api_keys,
   agent_configs,
   webhook_events,
@@ -856,6 +858,9 @@ export class SoftDeletePreconditionError extends Error {
  * - Stripe early-fraud-warning/dispute retained user links (FK nulled)
  * - deployments_ephemeral ownership link and cleanup claims (FK nulled;
  *   immediate cleanup scheduled)
+ * - Recommendation dismissal actor references (nulled)
+ * - platform_oauth_credentials (encrypted OAuth tokens and provider identity;
+ *   authorizations created by the user are removed, including organization grants)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   agent_configs, webhook_events, code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
@@ -1053,6 +1058,10 @@ export async function softDeleteUser(userId: string) {
       .update(organization_membership_removals)
       .set({ removed_by: null })
       .where(eq(organization_membership_removals.removed_by, userId));
+    await tx
+      .update(organization_recommendation_dismissals)
+      .set({ dismissed_by_user_id: null })
+      .where(eq(organization_recommendation_dismissals.dismissed_by_user_id, userId));
     // Delete invitations sent BY this user and invitations sent TO this user's email
     await tx
       .delete(organization_invitations)
@@ -1079,6 +1088,21 @@ export async function softDeleteUser(userId: string) {
       .delete(agent_environment_profiles)
       .where(eq(agent_environment_profiles.owned_by_user_id, userId));
 
+    const authorizedOAuthIntegrationIds = tx
+      .select({ id: platform_oauth_credentials.platform_integration_id })
+      .from(platform_oauth_credentials)
+      .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
+    await tx
+      .update(platform_integrations)
+      .set({
+        integration_status: 'suspended',
+        auth_invalid_at: new Date().toISOString(),
+        auth_invalid_reason: 'authorizing_user_deleted',
+      })
+      .where(inArray(platform_integrations.id, authorizedOAuthIntegrationIds));
+    await tx
+      .delete(platform_oauth_credentials)
+      .where(eq(platform_oauth_credentials.authorized_by_user_id, userId));
     await tx
       .delete(platform_integrations)
       .where(eq(platform_integrations.owned_by_user_id, userId));

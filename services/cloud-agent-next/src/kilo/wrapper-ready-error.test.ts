@@ -11,7 +11,7 @@ describe('wrapper ready error parsing', () => {
         error: 'WORKSPACE_SETUP_FAILED',
         subtype: 'git_clone_timeout',
         message: 'Repository clone timed out',
-        detail: 'termination timeout, elapsed 120000ms, output truncated',
+        detail: 'termination timeout, output truncated',
         retryable: true,
         wrapperRunId: 'wrapper_run_1',
       })
@@ -19,7 +19,7 @@ describe('wrapper ready error parsing', () => {
       error: 'WORKSPACE_SETUP_FAILED',
       subtype: 'git_clone_timeout',
       message: 'Repository clone timed out',
-      detail: 'termination timeout, elapsed 120000ms, output truncated',
+      detail: 'termination timeout, output truncated',
       retryable: true,
       wrapperRunId: 'wrapper_run_1',
     });

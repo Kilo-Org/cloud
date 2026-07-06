@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { OpenclawImportCard } from './OpenclawImportCard';
+import { OpenclawExportCard } from './OpenclawExportCard';
 
 import { usePostHog } from 'posthog-js/react';
 import Link from 'next/link';
@@ -333,9 +334,15 @@ function GoogleGIcon({ className }: { className?: string }) {
 // Read-only capability summary, mirrored from the onboarding calendar step
 // (CalendarConnectStep.tsx) so the settings copy stays consistent.
 const GOOGLE_CALENDAR_FEATURES: Array<{ included: boolean; label: string }> = [
-  { included: true, label: 'Read your calendar events (titles, times, attendees, locations)' },
+  {
+    included: true,
+    label: 'Read your calendar events (titles, times, attendees, locations)',
+  },
   { included: true, label: 'Read calendars you own and subscribe to' },
-  { included: false, label: 'Create, modify, or delete events (we never request write access)' },
+  {
+    included: false,
+    label: 'Create, modify, or delete events (we never request write access)',
+  },
 ];
 
 /**
@@ -2185,6 +2192,8 @@ export function SettingsTab({
   );
   const supportsOpenclawSaveValidation =
     controllerVersion?.capabilities?.includes('files.write-openclaw-config') === true;
+  const supportsOpenclawExportUi =
+    controllerVersion?.capabilities?.includes('files.export-openclaw-workspace') === true;
   // Fail OPEN: hide the interests editor only when the controller
   // version is positively parsed as too old, OR the worker reports an
   // explicit `version: null` (its positive old-controller signal for a
@@ -2386,12 +2395,27 @@ export function SettingsTab({
         )}
       </div>
 
-      {supportsOpenclawImportUi && (
-        <OpenclawImportCard
-          mutations={mutations}
-          isRunning={isRunning}
-          instanceStatus={status.status}
-        />
+      {(supportsOpenclawImportUi || supportsOpenclawExportUi) && (
+        <div>
+          <h2 className="text-foreground mb-3 text-base font-semibold">Import & Export</h2>
+          <div className="space-y-3">
+            {supportsOpenclawImportUi && (
+              <OpenclawImportCard
+                mutations={mutations}
+                isRunning={isRunning}
+                instanceStatus={status.status}
+              />
+            )}
+
+            {supportsOpenclawExportUi && (
+              <OpenclawExportCard
+                isRunning={isRunning}
+                instanceStatus={status.status}
+                organizationId={organizationId ?? null}
+              />
+            )}
+          </div>
+        </div>
       )}
 
       {/* ── Model Configuration ── */}

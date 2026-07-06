@@ -1,4 +1,8 @@
-import type { Owner, PlatformRepository } from '@/lib/integrations/core/types';
+import {
+  requireNumericPlatformRepositories,
+  type Owner,
+  type PlatformRepository,
+} from '@/lib/integrations/core/types';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 
@@ -26,7 +30,7 @@ export async function getGitLabRepositoryContext(owner: Owner): Promise<GitLabRe
     };
   }
 
-  const repositories = integration.repositories ? integration.repositories : null;
+  const repositories = requireNumericPlatformRepositories(integration.repositories);
   const metadata = integration.metadata as { gitlab_instance_url?: string } | null;
   const instanceUrl = metadata?.gitlab_instance_url || 'https://gitlab.com';
 

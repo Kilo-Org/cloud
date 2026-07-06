@@ -12,10 +12,7 @@ import {
 } from '@/lib/agent-config/db/agent-configs';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
-import {
-  fetchGitLabRepositoriesForUser,
-  searchGitLabRepositoriesForUser,
-} from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { fetchGitLabRepositoriesForUser } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -29,6 +26,10 @@ import {
   getCodeReviewActionRequiredState,
 } from '@/lib/code-reviews/action-required';
 import { getReviewMemoryEnabledFromConfig } from '@/lib/code-reviews/review-memory/settings';
+import {
+  createManualCodeReviewJob,
+  ManualCodeReviewJobInputSchema,
+} from '@/lib/code-reviews/manual-code-review-jobs';
 
 const PlatformSchema = z.enum(['github', 'gitlab']).default('github');
 
@@ -61,6 +62,13 @@ const SaveReviewConfigInputSchema = z.object({
 });
 
 export const personalReviewAgentRouter = createTRPCRouter({
+  createManualReviewJob: baseProcedure
+    .input(ManualCodeReviewJobInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
+      return await createManualCodeReviewJob({ owner, input });
+    }),
+
   /**
    * Gets the GitHub App installation status for personal user
    */
@@ -136,16 +144,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
     }),
 
   /**
-   * Search GitLab repositories by query string
-   * Used when users have 100+ repositories and need to find specific ones
-   */
-  searchGitLabRepositories: baseProcedure
-    .input(z.object({ query: z.string().min(2) }))
-    .query(async ({ ctx, input }) => {
-      return await searchGitLabRepositoriesForUser(ctx.user.id, input.query);
-    }),
-
-  /**
    * Gets the review agent configuration for personal user
    */
   getReviewConfig: baseProcedure
@@ -184,7 +182,9 @@ export const personalReviewAgentRouter = createTRPCRouter({
         thinkingEffort: cfg.thinking_effort ?? null,
         gateThreshold: cfg.gate_threshold ?? 'off',
         repositorySelectionMode: cfg.repository_selection_mode || 'all',
-        selectedRepositoryIds: cfg.selected_repository_ids || [],
+        selectedRepositoryIds: (cfg.selected_repository_ids ?? []).filter(
+          (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+        ),
         manuallyAddedRepositories: cfg.manually_added_repositories || [],
         disableReviewMd: cfg.disable_review_md ?? true,
         reviewMemoryEnabled: getReviewMemoryEnabledFromConfig(config.config),
@@ -253,11 +253,17 @@ export const personalReviewAgentRouter = createTRPCRouter({
                 // Get a valid access token (handles refresh if expired)
                 const accessToken = await getValidGitLabToken(integration);
 
+                const selectedRepositoryIds = (input.selectedRepositoryIds ?? []).filter(
+                  (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+                );
+                const previousSelectedRepositoryIds = previousRepoIds.filter(
+                  (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+                );
                 const { result, updatedWebhooks } = await syncWebhooksForRepositories(
                   accessToken,
                   webhookSecret,
-                  input.selectedRepositoryIds || [],
-                  previousRepoIds,
+                  selectedRepositoryIds,
+                  previousSelectedRepositoryIds,
                   configuredWebhooks,
                   instanceUrl
                 );

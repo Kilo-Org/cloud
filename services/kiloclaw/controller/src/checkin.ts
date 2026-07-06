@@ -93,7 +93,7 @@ export async function readNetStats(): Promise<NetStats> {
 /**
  * Parse the output of `df -B1 --output=avail,size /`. Returns null if unparseable.
  * Columns: avail (available bytes), size (total bytes). Matches the column order used
- * by cloud-agent/src/workspace.ts and cloud-agent-next/src/workspace.ts.
+ * by cloud-agent-next/src/workspace.ts.
  * usedBytes is derived as totalBytes - availableBytes (df does not report used directly).
  */
 export function parseDfOutput(raw: string): DiskStats {
@@ -109,7 +109,7 @@ export function parseDfOutput(raw: string): DiskStats {
 /**
  * Read disk usage for the root filesystem via `df`.
  * Returns null on any error — non-fatal for checkin.
- * Keep in sync with: cloud-agent/src/workspace.ts, cloud-agent-next/src/workspace.ts
+ * Keep in sync with: cloud-agent-next/src/workspace.ts
  */
 export async function readDiskStats(): Promise<DiskStats> {
   try {

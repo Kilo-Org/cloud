@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
 import { CRON_SECRET } from '@/lib/config.server';
 import { runCostInsightHourlySweep } from '@/lib/cost-insights/jobs';
+import { isCronAuthorizationValid } from '@/lib/cron-auth';
 import { sentryLogger } from '@/lib/utils.server';
 
 if (!CRON_SECRET) {
@@ -13,8 +14,7 @@ export const maxDuration = 300;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');
-  const expectedAuth = `Bearer ${CRON_SECRET}`;
-  if (authHeader !== expectedAuth) {
+  if (!isCronAuthorizationValid(authHeader, CRON_SECRET)) {
     sentryLogger(
       'cron',
       'warning'

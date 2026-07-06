@@ -46,6 +46,18 @@ describe('GET /api/cron/cost-insights-hourly', () => {
     jest.clearAllMocks();
   });
 
+  test('rejects invalid cron authorization', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost:3000/api/cron/cost-insights-hourly', {
+        headers: { authorization: 'Bearer wrong-secret' },
+      })
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(mockRunCostInsightHourlySweep).not.toHaveBeenCalled();
+  });
+
   test('returns failure status and telemetry for a partial owner failure', async () => {
     mockRunCostInsightHourlySweep.mockResolvedValue(
       summary([{ owner: { type: 'user', id: 'user-2' }, error: 'evaluation failed' }])

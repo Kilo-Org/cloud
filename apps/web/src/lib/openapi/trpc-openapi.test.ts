@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { TRPCError, initTRPC } from '@trpc/server';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import * as z from 'zod';
-import { publicRestOpenApiRoutes, publicTrpcOpenApiProcedures } from '@/lib/openapi/trpc-registry';
+import { publicTrpcOpenApiProcedures } from '@/lib/openapi/trpc-registry';
 import { generateTrpcOpenApiDocument } from '@/lib/openapi/trpc-openapi';
 import {
   TrpcErrorResponseSchema,
@@ -45,10 +45,7 @@ describe('generateTrpcOpenApiDocument', () => {
     const document = generateTrpcOpenApiDocument();
 
     expect(Object.keys(document.paths).sort()).toEqual(
-      [
-        ...publicTrpcOpenApiProcedures.map(procedure => `/api/trpc/${procedure.procedurePath}`),
-        ...publicRestOpenApiRoutes.map(route => route.path),
-      ].sort()
+      publicTrpcOpenApiProcedures.map(procedure => `/api/trpc/${procedure.procedurePath}`).sort()
     );
     expect(document.paths['/api/trpc/usageAnalytics.getTable']?.get).toMatchObject({
       operationId: 'usageAnalytics_getTable',
@@ -58,24 +55,36 @@ describe('generateTrpcOpenApiDocument', () => {
     expect(document.paths).not.toHaveProperty('/api/trpc/admin');
   });
 
-  it('generates the REST organization members endpoint', () => {
+  it('generates the tRPC organization members endpoint', () => {
     const document = generateTrpcOpenApiDocument();
-    const operation = document.paths['/api/v1/organizations/{id}/members']?.get as {
+    const operation = document.paths['/api/trpc/organizations.members.listPublic']?.get as {
       responses: Record<string, { content: Record<string, { schema: Record<string, any> }> }>;
     };
     const responseSchema = operation?.responses['200'].content['application/json'].schema;
+    const dataSchema = responseSchema.properties.result.properties.data;
+    const notFoundSchema = operation?.responses['404'].content['application/json'].schema;
 
     expect(document.info.title).toBe('Kilo Code API');
     expect(operation).toMatchObject({
-      operationId: 'organizations_getMembers',
+      operationId: 'organizations_members_listPublic',
       summary: 'Return organization members',
       tags: ['Organizations'],
       parameters: [
         {
-          name: 'id',
-          in: 'path',
+          name: 'input',
+          in: 'query',
           required: true,
-          schema: { type: 'string' },
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['organizationId'],
+                properties: {
+                  organizationId: { type: 'string', format: 'uuid' },
+                },
+              },
+            },
+          },
         },
       ],
       responses: {
@@ -83,14 +92,18 @@ describe('generateTrpcOpenApiDocument', () => {
           content: {
             'application/json': {
               schema: {
-                type: 'array',
+                type: 'object',
+                required: ['result'],
               },
             },
           },
         },
+        '404': {
+          description: 'Resource not found',
+        },
       },
     });
-    expect(responseSchema.items.oneOf).toEqual(
+    expect(dataSchema.items.oneOf).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           required: expect.arrayContaining(['id', 'name', 'email', 'status']),
@@ -106,8 +119,18 @@ describe('generateTrpcOpenApiDocument', () => {
         }),
       ])
     );
-    expect(JSON.stringify(responseSchema)).not.toContain('inviteToken');
-    expect(JSON.stringify(responseSchema)).not.toContain('inviteUrl');
+    expect(JSON.stringify(dataSchema)).not.toContain('inviteToken');
+    expect(JSON.stringify(dataSchema)).not.toContain('inviteUrl');
+    expect(notFoundSchema).toMatchObject({
+      type: 'object',
+      required: ['error'],
+      properties: {
+        error: {
+          type: 'object',
+          required: ['message', 'code', 'data'],
+        },
+      },
+    });
   });
 
   it('documents bearer auth metadata for protected procedures', () => {
@@ -210,6 +233,16 @@ describe('generateTrpcOpenApiDocument', () => {
                     },
                   },
                 },
+              },
+            },
+          },
+        },
+        '404': {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['error'],
               },
             },
           },

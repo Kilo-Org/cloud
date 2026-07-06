@@ -13,6 +13,10 @@ import {
   UsageAnalyticsFiltersSchema,
 } from '@/routers/usage-analytics-schemas';
 
+const OrganizationMembersInputSchema = z.object({
+  organizationId: z.uuid(),
+});
+
 export type TrpcOpenApiProcedure = {
   procedurePath: string;
   method: 'get' | 'post';
@@ -20,21 +24,6 @@ export type TrpcOpenApiProcedure = {
   summary: string;
   description?: string;
   input: z.ZodType;
-  output: z.ZodType;
-};
-
-export type RestOpenApiRoute = {
-  path: string;
-  method: 'get' | 'post';
-  operationId: string;
-  tags: string[];
-  summary: string;
-  description?: string;
-  pathParameters?: Array<{
-    name: string;
-    description: string;
-    schema: z.ZodType;
-  }>;
   output: z.ZodType;
 };
 
@@ -94,24 +83,14 @@ export const publicTrpcOpenApiProcedures = [
     input: TableInputSchema,
     output: TableOutputSchema,
   }),
-];
-
-export const publicRestOpenApiRoutes = [
   {
-    path: '/api/v1/organizations/{id}/members',
+    procedurePath: 'organizations.members.listPublic',
     method: 'get',
-    operationId: 'organizations_getMembers',
     tags: ['Organizations'],
     summary: 'Return organization members',
     description:
       'Returns active and invited members for an organization the authenticated user can access. Invite tokens and invite URLs are omitted from the response.',
-    pathParameters: [
-      {
-        name: 'id',
-        description: 'Organization ID.',
-        schema: z.string(),
-      },
-    ],
+    input: OrganizationMembersInputSchema,
     output: PublicOrganizationMembersSchema,
   },
-] satisfies RestOpenApiRoute[];
+] satisfies TrpcOpenApiProcedure[];

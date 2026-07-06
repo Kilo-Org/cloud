@@ -1,16 +1,9 @@
 import * as z from 'zod';
 import {
-  publicRestOpenApiRoutes,
   publicTrpcOpenApiProcedures,
-  type RestOpenApiRoute,
   type TrpcOpenApiProcedure,
 } from '@/lib/openapi/trpc-registry';
 import { TrpcErrorResponseSchema, trpcSuccessResponseJsonSchema } from '@/lib/trpc/transport';
-
-const RestErrorResponseSchema = z.object({
-  error: z.string(),
-  message: z.string().optional(),
-});
 
 type JsonSchema = Record<string, unknown>;
 
@@ -43,10 +36,6 @@ function pathForProcedure(procedure: TrpcOpenApiProcedure): `/api/trpc/${string}
 
 function successResponseSchema(data: JsonSchema): JsonSchema {
   return trpcSuccessResponseJsonSchema(data);
-}
-
-function jsonResponseSchema(data: JsonSchema): JsonSchema {
-  return data;
 }
 
 function errorResponse(description: string) {
@@ -93,20 +82,6 @@ function requestShapeForProcedure(procedure: TrpcOpenApiProcedure) {
   };
 }
 
-function pathParametersForRoute(route: RestOpenApiRoute) {
-  if (!route.pathParameters || route.pathParameters.length === 0) return {};
-
-  return {
-    parameters: route.pathParameters.map(parameter => ({
-      name: parameter.name,
-      in: 'path',
-      required: true,
-      description: parameter.description,
-      schema: zodToJsonSchema(parameter.schema),
-    })),
-  };
-}
-
 function operationForProcedure(procedure: TrpcOpenApiProcedure) {
   return {
     operationId: procedure.procedurePath.replaceAll('.', '_'),
@@ -127,60 +102,8 @@ function operationForProcedure(procedure: TrpcOpenApiProcedure) {
       '400': errorResponse('Invalid request'),
       '401': errorResponse('Authentication required'),
       '403': errorResponse('Access denied'),
+      '404': errorResponse('Resource not found'),
       '500': errorResponse('Unexpected server error'),
-    },
-  };
-}
-
-function operationForRoute(route: RestOpenApiRoute) {
-  return {
-    operationId: route.operationId,
-    tags: route.tags,
-    summary: route.summary,
-    description: route.description,
-    security: [{ bearerAuth: [] }],
-    ...pathParametersForRoute(route),
-    responses: {
-      '200': {
-        description: 'Successful response',
-        content: {
-          'application/json': {
-            schema: jsonResponseSchema(zodToJsonSchema(route.output)),
-          },
-        },
-      },
-      '400': {
-        ...errorResponse('Invalid request'),
-        content: {
-          'application/json': {
-            schema: zodToJsonSchema(RestErrorResponseSchema),
-          },
-        },
-      },
-      '401': {
-        ...errorResponse('Authentication required'),
-        content: {
-          'application/json': {
-            schema: zodToJsonSchema(RestErrorResponseSchema),
-          },
-        },
-      },
-      '403': {
-        ...errorResponse('Access denied'),
-        content: {
-          'application/json': {
-            schema: zodToJsonSchema(RestErrorResponseSchema),
-          },
-        },
-      },
-      '500': {
-        ...errorResponse('Unexpected server error'),
-        content: {
-          'application/json': {
-            schema: zodToJsonSchema(RestErrorResponseSchema),
-          },
-        },
-      },
     },
   };
 }
@@ -195,14 +118,6 @@ export function generateTrpcOpenApiDocument(): OpenApiDocument {
     paths[path] = {
       ...paths[path],
       [procedure.method]: operationForProcedure(procedure),
-    };
-  }
-
-  for (const route of publicRestOpenApiRoutes) {
-    for (const tag of route.tags) tagNames.add(tag);
-    paths[route.path] = {
-      ...paths[route.path],
-      [route.method]: operationForRoute(route),
     };
   }
 

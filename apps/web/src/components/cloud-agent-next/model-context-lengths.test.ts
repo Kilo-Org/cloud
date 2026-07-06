@@ -1,5 +1,9 @@
 import type { ContextUsage } from '@/lib/cloud-agent-sdk/context-usage';
-import { buildContextLengthByModelId, resolveContextWindow } from './model-context-lengths';
+import {
+  buildContextLengthByModelId,
+  buildContextLengthByProviderAndModel,
+  resolveContextWindow,
+} from './model-context-lengths';
 
 const contextUsage = {
   contextTokens: 32_418,
@@ -59,6 +63,28 @@ describe('buildContextLengthByModelId', () => {
   });
 });
 
+describe('buildContextLengthByProviderAndModel', () => {
+  it('keeps duplicate model ids distinct across CLI providers', () => {
+    expect(
+      buildContextLengthByProviderAndModel([
+        {
+          id: 'anthropic-local',
+          models: [{ id: 'shared/model', limits: { context: 200_000 } }],
+        },
+        {
+          id: 'custom-openai',
+          models: [{ id: 'shared/model', limits: { context: 32_000 } }],
+        },
+      ])
+    ).toEqual(
+      new Map([
+        ['anthropic-local', new Map([['shared/model', 200_000]])],
+        ['custom-openai', new Map([['shared/model', 32_000]])],
+      ])
+    );
+  });
+});
+
 describe('resolveContextWindow', () => {
   it('resolves a known kilo response by exact emitted model id', () => {
     expect(resolveContextWindow(contextUsage, new Map([[contextUsage.modelID, 200_000]]))).toBe(
@@ -66,7 +92,35 @@ describe('resolveContextWindow', () => {
     );
   });
 
-  it('returns undefined for missing usage or a non-kilo provider', () => {
+  it('resolves remote usage by exact provider and model identity', () => {
+    const remoteLengths = buildContextLengthByProviderAndModel([
+      {
+        id: 'anthropic-local',
+        models: [{ id: 'shared/model', limits: { context: 200_000 } }],
+      },
+      {
+        id: 'custom-openai',
+        models: [{ id: 'shared/model', limits: { context: 32_000 } }],
+      },
+    ]);
+
+    expect(
+      resolveContextWindow(
+        { ...contextUsage, providerID: 'anthropic-local', modelID: 'shared/model' },
+        new Map(),
+        remoteLengths
+      )
+    ).toBe(200_000);
+    expect(
+      resolveContextWindow(
+        { ...contextUsage, providerID: 'custom-openai', modelID: 'shared/model' },
+        new Map(),
+        remoteLengths
+      )
+    ).toBe(32_000);
+  });
+
+  it('returns undefined for missing usage or a non-kilo provider without a CLI catalog', () => {
     expect(
       resolveContextWindow(undefined, new Map([[contextUsage.modelID, 200_000]]))
     ).toBeUndefined();

@@ -13,10 +13,29 @@ import type { ServiceEvent } from './normalizer';
 import type { CloudAgentSessionId, KiloSessionId, SessionSnapshot } from './types';
 import type {
   CloudAgentApi,
+  CloudAgentSendPayload,
   CloudAgentStreamTicketResult,
   TransportFactory,
+  TransportSendPayload,
   TransportSink,
 } from './transport';
+
+function normalizeCloudAgentPayload(payload: TransportSendPayload): CloudAgentSendPayload {
+  if (payload.type === 'command') return payload;
+  if (!payload.mode) throw new Error('Cloud Agent mode is required');
+  if (!payload.model) throw new Error('Cloud Agent model is required');
+  if (payload.model.providerID !== 'kilo') {
+    throw new Error('Cloud Agent only supports Kilo models');
+  }
+
+  return {
+    type: 'prompt',
+    prompt: payload.prompt,
+    mode: payload.mode,
+    model: payload.model.modelID,
+    ...(payload.variant ? { variant: payload.variant } : {}),
+  };
+}
 
 type CloudAgentTransportConfig = {
   sessionId: CloudAgentSessionId;
@@ -200,7 +219,14 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         closeConnection('destroy');
       },
 
-      send: payload => config.api.send({ sessionId: config.sessionId, ...payload }),
+      send: async input =>
+        config.api.send({
+          sessionId: config.sessionId,
+          payload: normalizeCloudAgentPayload(input.payload),
+          ...(input.messageId ? { messageId: input.messageId } : {}),
+          ...(input.attachments ? { attachments: input.attachments } : {}),
+          ...(input.images ? { images: input.images } : {}),
+        }),
       interrupt: () => config.api.interrupt({ sessionId: config.sessionId }),
       answer: payload => config.api.answer({ sessionId: config.sessionId, ...payload }),
       reject: payload => config.api.reject({ sessionId: config.sessionId, ...payload }),

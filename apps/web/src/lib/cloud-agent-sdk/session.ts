@@ -10,6 +10,7 @@ import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import type { NormalizedEvent } from './normalizer';
 import type { SuggestionAction } from './types';
+import type { RemoteModelOverride, RemoteModelState } from './remote-model-catalog';
 import { createChatProcessor } from './chat-processor';
 import { heartbeatDataSchema, sessionsListDataSchema } from './schemas';
 import { createServiceState } from './service-state';
@@ -64,8 +65,11 @@ type CloudAgentSessionConfig = {
   onSuggestionResolved?: (requestId: string) => void;
   onBranchChanged?: (branch: string) => void;
   onResolved?: (resolved: ResolvedSession) => void;
+  onRemoteModelStateChange?: (state: RemoteModelState) => void;
+  onTransportCapabilityChange?: () => void;
   onSessionCreated?: (info: SessionInfo) => void;
   onSessionUpdated?: (info: SessionInfo) => void;
+  onReplayComplete?: () => void;
   onEvent?: (event: NormalizedEvent) => void;
   onMessageQueued?: (messageId: string) => void;
   onMessageCompleted?: (messageId: string) => void;
@@ -80,6 +84,7 @@ type CloudAgentSessionSendInput = {
   messageId?: string;
   attachments?: CloudAgentAttachments;
   images?: Images;
+  remoteModelOverride?: RemoteModelOverride;
 };
 
 type CloudAgentSessionAnswerInput = {
@@ -128,7 +133,7 @@ type CloudAgentSession = {
   state: ServiceState;
 
   // Commands
-  send: (payload: CloudAgentSessionSendInput) => unknown | Promise<unknown>;
+  send: (input: CloudAgentSessionSendInput) => unknown | Promise<unknown>;
   interrupt: () => unknown | Promise<unknown>;
   answer: (payload: CloudAgentSessionAnswerInput) => unknown | Promise<unknown>;
   reject: (payload: CloudAgentSessionRejectInput) => unknown | Promise<unknown>;
@@ -139,6 +144,7 @@ type CloudAgentSession = {
   dismissSuggestion: (
     payload: CloudAgentSessionDismissSuggestionInput
   ) => unknown | Promise<unknown>;
+  retryRemoteModels: () => void;
 
   // Capability checks
   canSend: boolean;
@@ -236,6 +242,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
       config.onEvent?.(event);
     },
+    onReplayComplete: () => config.onReplayComplete?.(),
   };
 
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {
@@ -251,6 +258,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           userWebConnection: config.transport.userWebConnection,
           fetchSnapshot: config.transport.fetchSnapshot,
           onError: config.onError,
+          onRemoteModelStateChange: config.onRemoteModelStateChange,
+          onCapabilityChange: config.onTransportCapabilityChange,
         });
       }
       case 'cloud-agent': {
@@ -340,15 +349,17 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     }
   }
 
+  const send = (input: CloudAgentSessionSendInput): unknown | Promise<unknown> => {
+    if (!transport?.send) {
+      throw new Error('CloudAgentSession transport.send is not configured');
+    }
+    return transport.send(input);
+  };
+
   return {
     storage,
     state: serviceState,
-    send: payload => {
-      if (!transport?.send) {
-        throw new Error('CloudAgentSession transport.send is not configured');
-      }
-      return transport.send(payload);
-    },
+    send,
     interrupt: () => {
       if (!transport?.interrupt) {
         throw new Error('CloudAgentSession transport.interrupt is not configured');
@@ -407,8 +418,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
       return result;
     },
+    retryRemoteModels() {
+      transport?.retryRemoteModels?.();
+    },
     get canSend() {
-      return transport?.send !== undefined;
+      return transport?.send !== undefined && (transport.canSend?.() ?? true);
     },
     get canInterrupt() {
       return transport?.interrupt !== undefined;

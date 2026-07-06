@@ -1,14 +1,14 @@
 'use client';
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { ArrowDown, GitBranch } from 'lucide-react';
+import { ArrowDown, GitBranch, Info, RefreshCw } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
-import { CLI_MODEL_ID, cliModelLabel, type KiloSessionId } from '@/lib/cloud-agent-sdk';
+import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
@@ -37,7 +37,12 @@ import {
   terminalTabId,
 } from './terminal-tabs';
 import { isMessageStreaming } from './types';
-import { useOrganizationModels } from './hooks/useOrganizationModels';
+import {
+  createRemoteModelOverride,
+  useSessionModels,
+  validateRemoteModelOverride,
+  type SessionModelNotice,
+} from './hooks/useSessionModels';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { resolveContextWindow } from './model-context-lengths';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
@@ -142,6 +147,41 @@ type CloudChatPageProps = { organizationId?: string };
 
 type TerminalStatusSummary = { status: TerminalStatus; statusText: string };
 
+function SessionModelNotices({
+  notices,
+  onRetry,
+}: {
+  notices: SessionModelNotice[];
+  onRetry: () => void;
+}) {
+  if (notices.length === 0) return null;
+
+  return (
+    <div className="space-y-1.5 px-[max(1rem,calc(50%_-_27rem))] pt-2">
+      {notices.map(notice => (
+        <div
+          key={notice.id}
+          role="status"
+          className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs"
+        >
+          <Info className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1">{notice.message}</span>
+          {notice.retry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="text-foreground hover:bg-accent focus-visible:ring-ring inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-2 font-medium focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <RefreshCw className="size-3" />
+              Retry
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TerminalPaneSlot({
   terminalId,
   active,
@@ -191,7 +231,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const childSessionDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
 
   // URL-driven session switching
-  const sessionIdFromParams = searchParams?.get('sessionId');
+  const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
   useEffect(() => {
     if (sessionIdFromParams) {
       childSessionDrawerFocusTargetRef.current = null;
@@ -222,10 +262,12 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const contextUsage = useAtomValue(manager.atoms.contextUsage);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const fetchedSessionData = useAtomValue(manager.atoms.fetchedSessionData);
-  const sessionType = useAtomValue(manager.atoms.sessionType);
+  const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
+  const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
+  const observedModel = useAtomValue(manager.atoms.observedModel);
+  const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
-  const [useCliModel, setUseCliModel] = useState(false);
 
   const [attachmentMessageUuid] = useState(() => uuidv4());
   const [workspaceTabs, setWorkspaceTabs] = useState(createWorkspaceTabsState);
@@ -239,21 +281,39 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
     setTerminalStatuses({});
   }, [sessionId]);
 
-  // -- Organization models --------------------------------------------------
-  const { modelOptions, isLoadingModels, contextLengthByModelId } =
-    useOrganizationModels(organizationId);
-  const isRemote = sessionType === 'remote';
-  const pinnedModelOption = useMemo(
-    () =>
-      isRemote ? { id: CLI_MODEL_ID, name: cliModelLabel(sessionConfig), variants: [] } : undefined,
-    [isRemote, sessionConfig]
-  );
-  const contextWindow = resolveContextWindow(contextUsage, contextLengthByModelId);
-  const { availableCommands } = useSlashCommandSets();
+  // -- Session models -------------------------------------------------------
+  const sessionModels = useSessionModels({
+    activeSessionType,
+    remoteModelState,
+    observedModel,
+    remoteModelOverride,
+    gatewayModelId: sessionConfig?.model,
+    gatewayVariant: sessionConfig?.variant,
+    fetchedSessionData,
+    routeOrganizationId: organizationId,
+    sessionIdFromParams,
+  });
+  const { modelOptions, isLoadingModels } = sessionModels;
 
   useEffect(() => {
-    setUseCliModel(sessionType === 'remote');
-  }, [sessionType, sessionIdFromParams]);
+    if (sessionModels.source !== 'remote-legacy-gateway' || isLoadingModels) return;
+
+    const validatedOverride = validateRemoteModelOverride(
+      remoteModelOverride,
+      modelOptions,
+      'legacy-gateway'
+    );
+    if (validatedOverride !== remoteModelOverride) {
+      manager.setRemoteModelOverride(validatedOverride);
+    }
+  }, [isLoadingModels, manager, modelOptions, remoteModelOverride, sessionModels.source]);
+
+  const contextWindow = resolveContextWindow(
+    contextUsage,
+    sessionModels.gatewayContextLengthByModelId,
+    sessionModels.remoteContextLengthByProviderAndModel
+  );
+  const { availableCommands } = useSlashCommandSets();
 
   // -- Sound effects --------------------------------------------------------
   const { play: playCelebrationSound, soundEnabled, setSoundEnabled } = useCelebrationSound();
@@ -418,16 +478,10 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
           type: 'prompt',
           prompt,
           mode: sessionConfig?.mode ?? 'code',
-          model:
-            useCliModel && !agentModelOverrideForSend
-              ? ''
-              : (agentModelOverrideForSend ?? sessionConfig?.model ?? ''),
-          variant:
-            useCliModel && !agentModelOverrideForSend
-              ? undefined
-              : agentModelOverrideForSend
-                ? agentVariantOverrideForSend
-                : (sessionConfig?.variant ?? undefined),
+          model: agentModelOverrideForSend ?? sessionConfig?.model ?? '',
+          variant: agentModelOverrideForSend
+            ? agentVariantOverrideForSend
+            : (sessionConfig?.variant ?? undefined),
         },
         attachments: supportsAttachments ? attachments : undefined,
       });
@@ -439,7 +493,7 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
       }
       return accepted;
     },
-    [manager, scheduleScrollToBottom, sessionConfig, setChatUI, supportsAttachments, useCliModel]
+    [manager, scheduleScrollToBottom, sessionConfig, setChatUI, supportsAttachments]
   );
 
   const handleSendSlashCommand = useCallback(
@@ -461,6 +515,10 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const handleStopExecution = useCallback(() => {
     void manager.interrupt();
+  }, [manager]);
+
+  const handleRetryRemoteModels = useCallback(() => {
+    manager.retryRemoteModels();
   }, [manager]);
 
   const handleToggleSound = useCallback(() => {
@@ -583,11 +641,13 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const agentVariantOverride = agentModelOverride
     ? selectedRuntimeAgent?.variant?.trim() || undefined
     : undefined;
-  const displayModel = agentModelOverride ?? sessionConfig?.model;
-  const modelPickerLocked = !!agentModelOverride;
+  const modelPickerLocked = activeSessionType === 'cloud-agent' && !!agentModelOverride;
+  const displayModel = modelPickerLocked ? agentModelOverride : sessionModels.selectedValue;
   const lockTooltip = modelPickerLocked
     ? `Locked by agent "${selectedRuntimeAgent?.name}"`
-    : undefined;
+    : sessionModels.modelPickerDisabled
+      ? 'Model changes are unavailable until this CLI model catalog is loaded.'
+      : undefined;
 
   const handleModeChange = useCallback(
     (mode: AgentMode) => {
@@ -598,28 +658,50 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const handleModelChange = useCallback(
     (model: string) => {
-      if (!sessionConfig) return;
-      if (model === CLI_MODEL_ID) {
-        setUseCliModel(true);
+      if (activeSessionType === 'remote') {
+        const option = modelOptions.find(candidate => candidate.id === model);
+        manager.setRemoteModelOverride(
+          createRemoteModelOverride(option, sessionModels.selectedVariant)
+        );
         return;
       }
-      setUseCliModel(false);
-      // Reset variant to first available (typically "none") when switching models if current is invalid
-      const newModelVariants = modelOptions.find(m => m.id === model)?.variants ?? [];
+      if (!sessionConfig) return;
+
+      const newModelVariants =
+        modelOptions.find(candidate => candidate.id === model)?.variants ?? [];
       const validVariant =
         sessionConfig.variant && newModelVariants.includes(sessionConfig.variant)
           ? sessionConfig.variant
           : newModelVariants[0];
       setSessionConfig({ ...sessionConfig, model, variant: validVariant });
     },
-    [sessionConfig, setSessionConfig, modelOptions]
+    [
+      activeSessionType,
+      manager,
+      modelOptions,
+      sessionConfig,
+      sessionModels.selectedVariant,
+      setSessionConfig,
+    ]
   );
 
   const handleVariantChange = useCallback(
     (variant: string) => {
+      if (activeSessionType === 'remote') {
+        const option = modelOptions.find(candidate => candidate.id === sessionModels.selectedValue);
+        manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
+        return;
+      }
       if (sessionConfig) setSessionConfig({ ...sessionConfig, variant });
     },
-    [sessionConfig, setSessionConfig]
+    [
+      activeSessionType,
+      manager,
+      modelOptions,
+      sessionConfig,
+      sessionModels.selectedValue,
+      setSessionConfig,
+    ]
   );
 
   // -- Delayed loading indicator (avoid flash for fast switches) ------------
@@ -635,26 +717,24 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   // -- Derived state --------------------------------------------------------
   const showChatInterface = Boolean(sessionConfig) || Boolean(sessionIdFromParams);
-  const currentModelOption = modelOptions.find(m => m.id === sessionConfig?.model);
+  const currentModelOption = modelOptions.find(model =>
+    activeSessionType === 'remote'
+      ? model.id === sessionModels.selectedValue
+      : model.id === sessionConfig?.model
+  );
   const modelDisplayName = currentModelOption?.name
     ? formatShortModelDisplayName(currentModelOption.name)
     : undefined;
-  const availableVariants = currentModelOption?.variants ?? [];
+  const availableVariants =
+    activeSessionType === 'remote'
+      ? sessionModels.availableVariants
+      : (currentModelOption?.variants ?? []);
   // When an agent locks the model, swap the user's session variant for the
   // agent's variant (which may be undefined — i.e. no thinking-effort chip).
   // The variant picker is hidden in that case; it only shows when the user is
   // free to pick their own model.
-  const displayVariant = modelPickerLocked
-    ? agentVariantOverride
-    : (sessionConfig?.variant ?? undefined);
+  const displayVariant = modelPickerLocked ? agentVariantOverride : sessionModels.selectedVariant;
   const displayAvailableVariants = modelPickerLocked ? [] : availableVariants;
-  const inputModel = modelPickerLocked ? displayModel : useCliModel ? CLI_MODEL_ID : displayModel;
-  const inputVariant = modelPickerLocked
-    ? displayVariant
-    : useCliModel
-      ? undefined
-      : displayVariant;
-  const inputAvailableVariants = modelPickerLocked || useCliModel ? [] : displayAvailableVariants;
 
   const placeholder = isLoading
     ? 'Loading session…'
@@ -828,6 +908,10 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                               </div>
                             )}
                             <div className={activeQuestion || activePermission ? 'hidden' : ''}>
+                              <SessionModelNotices
+                                notices={sessionModels.notices}
+                                onRetry={handleRetryRemoteModels}
+                              />
                               <ChatInput
                                 onSend={handleSendMessage}
                                 onSendCommand={handleSendSlashCommand}
@@ -837,21 +921,24 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                                 placeholder={placeholder}
                                 slashCommands={availableCommands}
                                 mode={sessionConfig?.mode as AgentMode | undefined}
-                                model={inputModel}
+                                model={displayModel}
                                 modelOptions={modelOptions}
-                                pinnedModelOption={pinnedModelOption}
                                 isLoadingModels={isLoadingModels}
                                 onModeChange={handleModeChange}
                                 onModelChange={handleModelChange}
-                                variant={inputVariant}
+                                variant={displayVariant}
                                 onVariantChange={handleVariantChange}
-                                availableVariants={inputAvailableVariants}
+                                availableVariants={displayAvailableVariants}
                                 showToolbar={Boolean(sessionIdFromParams)}
                                 initialValue={failedPrompt ?? undefined}
                                 customModeOptions={customModeOptions}
-                                modelPickerDisabled={modelPickerLocked}
+                                modelPickerDisabled={
+                                  modelPickerLocked || sessionModels.modelPickerDisabled
+                                }
                                 modelPickerTooltip={lockTooltip}
-                                variantPickerDisabled={modelPickerLocked}
+                                variantPickerDisabled={
+                                  modelPickerLocked || sessionModels.modelPickerDisabled
+                                }
                                 variantPickerTooltip={lockTooltip}
                                 attachmentsEnabled={supportsAttachments}
                                 attachmentUploadOptions={{

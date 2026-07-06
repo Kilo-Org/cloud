@@ -392,12 +392,17 @@ describe('CloudAgentTransport lifecycle', () => {
 });
 
 describe('CloudAgentTransport command delegation', () => {
-  it('send() delegates to api.send with bound sessionId', () => {
+  it('converts a Kilo model ref before delegating to api.send', async () => {
     const api = createMockApi();
     const { transport } = createTransportWithSinks(undefined, undefined, api);
 
-    void transport.send!({
-      payload: { type: 'prompt', prompt: 'hello', mode: 'code', model: 'gpt-4' },
+    await transport.send!({
+      payload: {
+        type: 'prompt',
+        prompt: 'hello',
+        mode: 'code',
+        model: { providerID: 'kilo', modelID: 'gpt-4' },
+      },
     });
 
     expect(api.send).toHaveBeenCalledWith({
@@ -408,7 +413,26 @@ describe('CloudAgentTransport command delegation', () => {
     transport.destroy();
   });
 
-  it('send() delegates canonical document attachments to api.send', () => {
+  it('rejects a non-Kilo model ref before calling the Cloud Agent API', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await expect(
+      transport.send!({
+        payload: {
+          type: 'prompt',
+          prompt: 'hello',
+          mode: 'code',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        },
+      })
+    ).rejects.toThrow('Cloud Agent only supports Kilo models');
+    expect(api.send).not.toHaveBeenCalled();
+
+    transport.destroy();
+  });
+
+  it('converts Kilo model refs while preserving canonical document attachments', async () => {
     const api = createMockApi();
     const { transport } = createTransportWithSinks(undefined, undefined, api);
     const attachments = {
@@ -416,8 +440,13 @@ describe('CloudAgentTransport command delegation', () => {
       files: ['87654321-4321-4321-8321-cba987654321.pdf'],
     };
 
-    void transport.send!({
-      payload: { type: 'prompt', prompt: 'read it', mode: 'code', model: 'gpt-4' },
+    await transport.send!({
+      payload: {
+        type: 'prompt',
+        prompt: 'read it',
+        mode: 'code',
+        model: { providerID: 'kilo', modelID: 'gpt-4' },
+      },
       attachments,
     });
 

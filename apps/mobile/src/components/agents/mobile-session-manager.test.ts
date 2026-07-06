@@ -6,6 +6,10 @@ const mocks = vi.hoisted(() => ({
   createSessionManager: vi.fn(config => ({ config })),
   createNativeUserWebConnectionLifecycleHooks: vi.fn(() => ({ marker: 'native-lifecycle-hooks' })),
   getWithRuntimeStateQuery: vi.fn(),
+  getSessionQuery: vi.fn(),
+  getSessionMessagesQuery: vi.fn(),
+  sendMessageMutate: vi.fn(),
+  prepareSessionMutate: vi.fn(),
 }));
 
 function noCleanup(): void {
@@ -64,7 +68,22 @@ vi.mock('@/lib/config', () => ({
 vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     cliSessionsV2: {
+      get: { query: mocks.getSessionQuery },
+      getSessionMessages: { query: mocks.getSessionMessagesQuery },
       getWithRuntimeState: { query: mocks.getWithRuntimeStateQuery },
+    },
+    activeSessions: {
+      list: { query: vi.fn() },
+    },
+    cloudAgentNext: {
+      sendMessage: { mutate: mocks.sendMessageMutate },
+      prepareSession: { mutate: mocks.prepareSessionMutate },
+    },
+    organizations: {
+      cloudAgentNext: {
+        sendMessage: { mutate: mocks.sendMessageMutate },
+        prepareSession: { mutate: mocks.prepareSessionMutate },
+      },
     },
   },
 }));
@@ -75,11 +94,22 @@ type CapturedSessionManagerConfig = {
   getAuthToken?: () => Promise<string>;
   lifecycleHooks?: unknown;
   fetchSession: (kiloSessionId: string) => Promise<{ associatedPr: unknown }>;
+  fetchSnapshot: (kiloSessionId: string) => Promise<{ info: unknown; messages: unknown[] }>;
+  prepare: (input: {
+    prompt: string;
+    mode: string;
+    model: string;
+    initialPayload?: unknown;
+  }) => Promise<unknown>;
 };
 
 describe('createMobileAgentSessionManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.prepareSessionMutate.mockResolvedValue({
+      cloudAgentSessionId: 'agent_123',
+      kiloSessionId: 'ses_123',
+    });
   });
 
   it('injects the app-scoped user web connection without raw viewer transport options', async () => {
@@ -109,6 +139,103 @@ describe('createMobileAgentSessionManager', () => {
     const config = mocks.createSessionManager.mock.calls[0]?.[0] as CapturedSessionManagerConfig;
     expect(mocks.createNativeUserWebConnectionLifecycleHooks).toHaveBeenCalledTimes(1);
     expect(config.lifecycleHooks).toEqual({ marker: 'native-lifecycle-hooks' });
+  });
+
+  it('converts an initial Kilo model ref to the Cloud Agent prepare payload', async () => {
+    const { createMobileAgentSessionManager } =
+      await import('@/components/agents/mobile-session-manager');
+
+    createMobileAgentSessionManager({
+      store: createStore(),
+      userWebConnection,
+    });
+
+    const config = mocks.createSessionManager.mock.calls[0]?.[0] as CapturedSessionManagerConfig;
+    await config.prepare({
+      prompt: 'Initial prompt',
+      mode: 'code',
+      model: 'fallback-model',
+      initialPayload: {
+        type: 'prompt',
+        prompt: 'Initial prompt',
+        mode: 'code',
+        model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+        variant: 'high',
+      },
+    });
+
+    expect(mocks.prepareSessionMutate).toHaveBeenCalledWith(
+      {
+        prompt: 'Initial prompt',
+        mode: 'code',
+        model: 'fallback-model',
+        initialPayload: {
+          type: 'prompt',
+          prompt: 'Initial prompt',
+          mode: 'code',
+          model: 'anthropic/claude-sonnet-4',
+          variant: 'high',
+        },
+      },
+      { context: { skipBatch: true } }
+    );
+  });
+
+  it('rejects a non-Kilo initial model ref before Cloud Agent prepare', async () => {
+    const { createMobileAgentSessionManager } =
+      await import('@/components/agents/mobile-session-manager');
+
+    createMobileAgentSessionManager({
+      store: createStore(),
+      userWebConnection,
+    });
+
+    const config = mocks.createSessionManager.mock.calls[0]?.[0] as CapturedSessionManagerConfig;
+    await expect(
+      config.prepare({
+        prompt: 'Initial prompt',
+        mode: 'code',
+        model: 'fallback-model',
+        initialPayload: {
+          type: 'prompt',
+          prompt: 'Initial prompt',
+          mode: 'code',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        },
+      })
+    ).rejects.toThrow('Cloud Agent only supports Kilo models');
+    expect(mocks.prepareSessionMutate).not.toHaveBeenCalled();
+  });
+
+  it('preserves snapshot model metadata from the session export', async () => {
+    const { createMobileAgentSessionManager } =
+      await import('@/components/agents/mobile-session-manager');
+    mocks.getSessionQuery.mockResolvedValue({
+      session_id: 'ses_123',
+      parent_session_id: null,
+    });
+    mocks.getSessionMessagesQuery.mockResolvedValue({
+      info: {
+        id: 'ses_123',
+        model: { providerID: 'anthropic', id: 'claude-sonnet-4', variant: 'high' },
+      },
+      messages: [],
+    });
+
+    createMobileAgentSessionManager({
+      store: createStore(),
+      userWebConnection,
+    });
+
+    const config = mocks.createSessionManager.mock.calls[0]?.[0] as CapturedSessionManagerConfig;
+    await expect(config.fetchSnapshot('ses_123')).resolves.toEqual({
+      info: {
+        id: 'ses_123',
+        parentID: undefined,
+        model: { providerID: 'anthropic', id: 'claude-sonnet-4', variant: 'high' },
+      },
+      messages: [],
+    });
   });
 
   it('propagates associatedPr from fetched session data', async () => {

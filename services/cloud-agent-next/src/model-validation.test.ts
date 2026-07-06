@@ -15,7 +15,6 @@ describe('model validation', () => {
 
   const officialEnv = {
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.test',
-    KILOCODE_TOKEN_OVERRIDE: 'override-token',
     KILOCODE_ORG_ID_OVERRIDE: 'override-org',
   } as unknown as Env;
 
@@ -50,7 +49,7 @@ describe('model validation', () => {
     if (typeof init.body !== 'string') throw new Error('Expected JSON request body');
     expect(JSON.parse(init.body)).toEqual({ modelId: 'anthropic/claude-sonnet' });
     const headers = init.headers as Headers;
-    expect(headers.get('Authorization')).toBe('Bearer override-token');
+    expect(headers.get('Authorization')).toBe('Bearer stored-token');
     expect(headers.get('X-KiloCode-OrganizationId')).toBe('override-org');
     expect(headers.get('X-KiloCode-Feature')).toBe('cloud-agent-web');
   });

@@ -27,6 +27,8 @@ function createGitTokenService() {
     redeemGitHubSessionCapability: vi.fn(),
     issueGitLabSessionCapability: vi.fn(),
     redeemGitLabSessionCapability: vi.fn(),
+    issueKiloSessionCapability: vi.fn(),
+    redeemKiloSessionCapability: vi.fn(),
   } satisfies GitTokenService;
 }
 

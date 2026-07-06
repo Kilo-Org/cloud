@@ -40,9 +40,11 @@ const CAPABILITY = 'kgh2.opaque';
 const LEGACY_CAPABILITY = 'kgh1.opaque';
 const GITLAB_CAPABILITY = 'kgl2.opaque';
 const LEGACY_GITLAB_CAPABILITY = 'kgl1.opaque';
+const KILO_CAPABILITY = 'kka1.opaque';
 const OUTBOUND_CONTEXT = { containerId: 'container-test', className: 'SandboxContainment' };
 const REDEEMED_GIT_AUTHORIZATION = `Basic ${Buffer.from('x-access-token:upstream-token').toString('base64')}`;
 const REDEEMED_GITLAB_AUTHORIZATION = `Basic ${Buffer.from('oauth2:upstream-token').toString('base64')}`;
+const REDEEMED_KILO_AUTHORIZATION = 'Bearer upstream-kilo-token';
 
 function basicCredential(password: string, scheme = 'Basic', username = 'x-access-token'): string {
   return `${scheme} ${Buffer.from(`${username}:${password}`).toString('base64')}`;
@@ -50,10 +52,17 @@ function basicCredential(password: string, scheme = 'Basic', username = 'x-acces
 
 function createEnv(
   redeemGitHubSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
-  redeemGitLabSessionCapability: ReturnType<typeof vi.fn> = vi.fn()
+  redeemGitLabSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
+  redeemKiloSessionCapability: ReturnType<typeof vi.fn> = vi.fn(),
+  logRejectedKiloUrls?: string
 ) {
   return {
-    GIT_TOKEN_SERVICE: { redeemGitHubSessionCapability, redeemGitLabSessionCapability },
+    GIT_TOKEN_SERVICE: {
+      redeemGitHubSessionCapability,
+      redeemGitLabSessionCapability,
+      redeemKiloSessionCapability,
+    },
+    LOG_REJECTED_KILO_URLS: logRejectedKiloUrls,
   } as never;
 }
 
@@ -988,5 +997,185 @@ describe('handleManagedScmOutbound API authorization', () => {
 
     expect(response.status).toBe(502);
     expect(forward).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleManagedScmOutbound Kilo authorization', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('redeems a managed Kilo capability, rewrites authorization and uses manual redirects', async () => {
+    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_KILO_AUTHORIZATION,
+      routeClass: 'backend_api',
+    });
+    const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
+    vi.stubGlobal('fetch', forward);
+
+    await handleOutbound(
+      new Request('https://api.kilo.ai/api/users/me', {
+        headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
+      }),
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability)
+    );
+
+    expect(redeemKiloSessionCapability).toHaveBeenCalledWith({
+      capability: KILO_CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
+      requestMethod: 'GET',
+      requestUrl: 'https://api.kilo.ai/api/users/me',
+      bootstrapKiloSessionId: undefined,
+    });
+    const forwarded = forward.mock.calls[0]?.[0] as Request;
+    expect(forwarded.headers.get('Authorization')).toBe(REDEEMED_KILO_AUTHORIZATION);
+    expect(forwarded.redirect).toBe('manual');
+  });
+
+  it('passes a matching session identity when redeeming Kilo session-ingest bootstrap', async () => {
+    const redeemKiloSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_KILO_AUTHORIZATION,
+      routeClass: 'session_ingest',
+    });
+    const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
+    vi.stubGlobal('fetch', forward);
+
+    await handleOutbound(
+      new Request('https://ingest.kilosessions.ai/api/session', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${KILO_CAPABILITY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sessionId: 'kilo-session-1' }),
+      }),
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability)
+    );
+
+    expect(redeemKiloSessionCapability).toHaveBeenCalledWith({
+      capability: KILO_CAPABILITY,
+      outboundContainerId: OUTBOUND_CONTEXT.containerId,
+      requestMethod: 'POST',
+      requestUrl: 'https://ingest.kilosessions.ai/api/session',
+      bootstrapKiloSessionId: 'kilo-session-1',
+    });
+  });
+
+  it('fails closed without logging a rejected Kilo URL by default', async () => {
+    const forward = vi.fn();
+    vi.stubGlobal('fetch', forward);
+    const rejectedUrl =
+      'https://api.kilo.ai/api/openrouter/v1/chat/completions?access_token=query-secret';
+
+    const response = await handleOutbound(
+      new Request(rejectedUrl, {
+        headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
+      }),
+      createEnv(
+        vi.fn(),
+        vi.fn(),
+        vi.fn().mockResolvedValue({ success: false, reason: 'upstream_not_allowed' })
+      )
+    );
+
+    expect(response.status).toBe(502);
+    expect(forward).not.toHaveBeenCalled();
+    expect(serializedLogCalls()).not.toContain(rejectedUrl);
+    expect(serializedLogCalls()).not.toContain('query-secret');
+  });
+
+  it('logs a rejected Kilo URL without its query string when local diagnostics are enabled', async () => {
+    const forward = vi.fn();
+    vi.stubGlobal('fetch', forward);
+    const rejectedUrl =
+      'https://api.kilo.ai/api/openrouter/v1/chat/completions?access_token=query-secret';
+
+    const response = await handleOutbound(
+      new Request(rejectedUrl, {
+        headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
+      }),
+      createEnv(
+        vi.fn(),
+        vi.fn(),
+        vi.fn().mockResolvedValue({ success: false, reason: 'upstream_not_allowed' }),
+        '1'
+      )
+    );
+
+    expect(response.status).toBe(502);
+    expect(forward).not.toHaveBeenCalled();
+    expect(logging.logger.withFields).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rejectedRequestUrl: 'https://api.kilo.ai/api/openrouter/v1/chat/completions',
+      })
+    );
+    expect(serializedLogCalls()).not.toContain('query-secret');
+    expect(logging.logger.debug).toHaveBeenCalledWith(
+      'Managed Kilo outbound redemption rejected with local URL diagnostics'
+    );
+    expect(logging.logger.warn).toHaveBeenCalledWith('Managed Kilo outbound redemption rejected');
+  });
+
+  it('fails closed without forwarding when Kilo redemption throws', async () => {
+    const forward = vi.fn();
+    vi.stubGlobal('fetch', forward);
+
+    const response = await handleOutbound(
+      new Request('https://api.kilo.ai/api/users/me', {
+        headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
+      }),
+      createEnv(vi.fn(), vi.fn(), vi.fn().mockRejectedValue(new Error('rpc unavailable')))
+    );
+
+    expect(response.status).toBe(502);
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the Kilo redemption binding is unavailable', async () => {
+    const forward = vi.fn();
+    vi.stubGlobal('fetch', forward);
+
+    const response = await handleOutbound(
+      new Request('https://api.kilo.ai/api/users/me', {
+        headers: { Authorization: `Bearer ${KILO_CAPABILITY}` },
+      }),
+      { GIT_TOKEN_SERVICE: {} } as never
+    );
+
+    expect(response.status).toBe(502);
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for an unsupported Kilo capability version', async () => {
+    const redeemKiloSessionCapability = vi.fn();
+    const forward = vi.fn();
+    vi.stubGlobal('fetch', forward);
+
+    const response = await handleOutbound(
+      new Request('https://api.kilo.ai/api/users/me', {
+        headers: { Authorization: 'Bearer kka2.opaque' },
+      }),
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability)
+    );
+
+    expect(response.status).toBe(502);
+    expect(redeemKiloSessionCapability).not.toHaveBeenCalled();
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('passes an ordinary unrelated outbound request through unchanged', async () => {
+    const redeemKiloSessionCapability = vi.fn();
+    const forward = vi.fn().mockResolvedValue(new Response('forwarded'));
+    vi.stubGlobal('fetch', forward);
+
+    await handleOutbound(
+      new Request('https://example.com/unrelated'),
+      createEnv(vi.fn(), vi.fn(), redeemKiloSessionCapability)
+    );
+
+    expect(redeemKiloSessionCapability).not.toHaveBeenCalled();
+    expect(forward).toHaveBeenCalledOnce();
   });
 });

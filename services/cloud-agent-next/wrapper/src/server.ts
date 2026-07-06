@@ -270,9 +270,17 @@ export async function bindSessionContext(
   binding: SessionBinding | undefined,
   config: ServerConfig,
   deps: ServerDependencies,
-  feedPolicy: SessionBoundFeedPolicy = 'restart'
+  feedPolicy: SessionBoundFeedPolicy = 'restart',
+  /**
+   * The kiloSessionId to bind, when the caller already knows it (e.g. from a
+   * fresh session/ready request) but hasn't yet written it back to `config`.
+   * Falls back to `config.sessionId` for callers that rebind an
+   * already-bootstrapped wrapper, where `config.sessionId` is already current.
+   */
+  kiloSessionIdOverride?: string
 ): Promise<Response | null> {
   const { state } = deps;
+  const kiloSessionId = kiloSessionIdOverride ?? config.sessionId;
   const blockedWrapperRunId = state.finalizingWrapperRunId;
   const isFreshRunAfterFinalization =
     state.admissionsBlocked &&
@@ -325,7 +333,7 @@ export async function bindSessionContext(
     deps.resetLifecycle();
 
     const sessionContext: SessionContext = {
-      kiloSessionId: config.sessionId,
+      kiloSessionId,
       ingestUrl: binding.ingestUrl,
       ingestToken: binding.ingestToken,
       workerAuthToken: binding.workerAuthToken,
@@ -342,21 +350,22 @@ export async function bindSessionContext(
     const logUploader = createLogUploader({
       workerBaseUrl,
       sessionId: config.agentSessionId,
+      getKiloSessionId: () => state.currentSession?.kiloSessionId ?? kiloSessionId,
       executionId: 'session',
       userId: config.userId,
-      workerAuthToken: binding.workerAuthToken,
+      getWorkerAuthToken: () => state.currentSession?.workerAuthToken ?? binding.workerAuthToken,
       cliLogDir,
       wrapperLogPath,
     });
     state.setLogUploader(logUploader);
     logUploader.start();
-    logToFile(`session bound: sessionId=${config.sessionId}`);
+    logToFile(`session bound: sessionId=${kiloSessionId}`);
     await notifySessionBound(deps, feedPolicy);
     return null;
   }
 
   const sessionContext: SessionContext = {
-    kiloSessionId: config.sessionId,
+    kiloSessionId,
     ingestUrl: binding.ingestUrl,
     ingestToken: binding.ingestToken,
     workerAuthToken: binding.workerAuthToken,

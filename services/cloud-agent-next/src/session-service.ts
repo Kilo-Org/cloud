@@ -10,15 +10,18 @@ import {
   type ManagedGitHubFallbackReason,
 } from './types.js';
 import { generateSandboxId, getOutboundContainerId } from './sandbox-id.js';
+import { mintWrapperDispatchTicket, resolveSecret } from './auth.js';
 import { normalizeKilocodeModel } from './persistence/model-utils.js';
 import {
   isTemporaryManagedBitbucketTokenFailure,
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
+  issueCloudAgentKiloSessionCapability,
   resolveCloudAgentGitHubAuthForRepo,
   resolveManagedBitbucketToken,
   resolveManagedGitLabToken,
 } from './services/git-token-service-client.js';
+import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 import { ExecutionError } from './execution/errors.js';
 import {
   checkDiskAndCleanBeforeSetup,
@@ -1255,7 +1258,8 @@ export class SessionService {
       sessionId,
       workspacePath,
       env: opts.env,
-      originalToken: opts.originalToken,
+      kiloCapability: opts.kiloCapability,
+      kiloProviderBaseUrl: opts.kiloProviderBaseUrl,
       kilocodeModel: opts.kilocodeModel,
       originalOrgId: opts.originalOrgId,
       githubToken: context.githubToken,
@@ -1281,7 +1285,8 @@ export class SessionService {
       sessionId,
       workspacePath,
       env,
-      originalToken,
+      kiloCapability,
+      kiloProviderBaseUrl,
       kilocodeModel,
       originalOrgId,
       githubToken,
@@ -1310,8 +1315,6 @@ export class SessionService {
     const runtimeAgents = profile?.runtimeAgents;
     const kiloCommands = profile?.kiloCommands;
 
-    // Use override if available, otherwise use original values from API
-    const kilocodeToken = env.KILOCODE_TOKEN_OVERRIDE ?? originalToken;
     const kilocodeOrganizationId = env.KILOCODE_ORG_ID_OVERRIDE ?? originalOrgId;
 
     // Bitbucket Code Reviewer sessions use only trusted worker-owned environment values.
@@ -1343,9 +1346,10 @@ export class SessionService {
       SESSION_ID: sessionId,
       SESSION_HOME: sessionHome,
       [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
-      // Inject Kilocode credentials (with override support)
-      KILOCODE_TOKEN: kilocodeToken,
-      KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: originalToken } }),
+      // Opaque Kilo capability — redeemed for the real credential at the outbound interceptor
+      KILOCODE_TOKEN: kiloCapability,
+      // Backend auth surface (session restore/import).
+      KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: kiloCapability } }),
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
       KILO_DISABLE_AUTOUPDATE: 'true',
@@ -1354,13 +1358,18 @@ export class SessionService {
     };
 
     const providerOptions: Record<string, string> = {
-      apiKey: kilocodeToken,
-      kilocodeToken: kilocodeToken,
+      apiKey: kiloCapability,
+      kilocodeToken: kiloCapability,
     };
     if (kilocodeOrganizationId) {
       providerOptions.kilocodeOrganizationId = kilocodeOrganizationId;
     }
-    if (env.KILO_OPENROUTER_BASE) {
+    if (kiloProviderBaseUrl) {
+      // Must match the provider target baked into the issued capability's claims —
+      // otherwise the outbound interceptor's route classification rejects the
+      // request as upstream_not_allowed even though the capability is valid.
+      providerOptions.baseURL = kiloProviderBaseUrl;
+    } else if (env.KILO_OPENROUTER_BASE) {
       providerOptions.baseURL = backendUrlForSandbox(env.KILO_OPENROUTER_BASE);
     }
     const isInteractive = createdOnPlatform == 'cloud-agent-web';
@@ -1612,7 +1621,8 @@ export class SessionService {
       sandbox,
       context,
       env,
-      originalToken,
+      kiloCapability,
+      kiloProviderBaseUrl,
       kilocodeModel,
       originalOrgId,
       createdOnPlatform,
@@ -1630,7 +1640,8 @@ export class SessionService {
     const saferEnvVars = this.buildRuntimeEnv({
       context,
       env,
-      originalToken,
+      kiloCapability,
+      kiloProviderBaseUrl,
       kilocodeModel,
       originalOrgId,
       createdOnPlatform,
@@ -1811,6 +1822,68 @@ export class SessionService {
     };
   }
 
+  /**
+   * Issue one Kilo capability for this dispatch when its sandbox uses managed
+   * credential containment, replacing every sandbox-visible carrier of the raw
+   * Kilo token (env vars, auth files, provider config). The outbound interceptor
+   * redeems it per-request; the sandbox never sees `userToken`.
+   *
+   * For uncontained sessions, or DIND sandboxes (`SandboxDIND`) which don't set
+   * `interceptHttps`/`outboundHandlers`, fall back to the real token so the
+   * sandbox can authenticate directly.
+   */
+  private async issueKiloSessionCapability(
+    env: PersistenceEnv,
+    params: {
+      userId: string;
+      cloudAgentSessionId: string;
+      kiloSessionId: string;
+      sandboxId: string;
+      managedScmContainment: boolean;
+      userToken: string;
+    }
+  ): Promise<{ capability: string; providerBaseUrl?: string }> {
+    if (params.sandboxId.startsWith('dind-')) {
+      return { capability: params.userToken };
+    }
+
+    if (!params.managedScmContainment) {
+      logger
+        .withFields({ sandboxId: params.sandboxId })
+        .info('Using raw Kilo token; session does not use managed containment');
+      return { capability: params.userToken };
+    }
+
+    const derivedTargets = deriveKiloSandboxTargets(env, params.userToken);
+    if (!derivedTargets.success) {
+      throw ExecutionError.invalidRequest('Unable to derive Kilo sandbox targets');
+    }
+    const issued = await issueCloudAgentKiloSessionCapability(env, {
+      userId: params.userId,
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      kiloSessionId: params.kiloSessionId,
+      outboundContainerId: getOutboundContainerId(env, params.sandboxId, {
+        managedScmContainment: true,
+      }),
+      userToken: params.userToken,
+      targets: derivedTargets.targets,
+    });
+    if (!issued.success) {
+      throw ExecutionError.invalidRequest(
+        `Kilo session capability issuance failed (${issued.error.reason})`
+      );
+    }
+    // The provider base URL baked into the capability's targets MUST match the
+    // baseURL the sandbox actually calls — otherwise the outbound interceptor's
+    // route classification rejects the request as `upstream_not_allowed`, even
+    // though the capability itself is valid. Never let getSaferEnvVars derive
+    // this independently from env.KILO_OPENROUTER_BASE.
+    return {
+      capability: issued.value.capability,
+      providerBaseUrl: derivedTargets.targets.providerBaseUrl,
+    };
+  }
+
   async buildWrapperSessionReadyAndPromptRequests(
     options: BuildWrapperSessionReadyAndPromptRequestsOptions
   ): Promise<
@@ -1834,6 +1907,19 @@ export class SessionService {
     if (!metadata.auth.kiloSessionId) {
       throw ExecutionError.invalidRequest('Missing kiloSessionId in session metadata');
     }
+    const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET);
+    if (!nextAuthSecret) {
+      throw ExecutionError.invalidRequest('NEXTAUTH_SECRET is not configured on the worker');
+    }
+    const { capability: kiloCapability, providerBaseUrl: kiloProviderBaseUrl } =
+      await this.issueKiloSessionCapability(env, {
+        userId,
+        cloudAgentSessionId: sessionId,
+        kiloSessionId: metadata.auth.kiloSessionId,
+        sandboxId,
+        managedScmContainment: metadata.workspace?.managedScmContainment === true,
+        userToken: metadata.auth.kilocodeToken,
+      });
 
     const devcontainerRequested =
       metadata.workspace?.devcontainerRequested === true || metadata.devcontainer !== undefined;
@@ -1876,7 +1962,8 @@ export class SessionService {
       sessionId,
       workspacePath,
       env,
-      originalToken: metadata.auth.kilocodeToken,
+      kiloCapability,
+      kiloProviderBaseUrl,
       kilocodeModel: agent.model,
       originalOrgId: orgId,
       githubToken: resolvedTokens.githubToken,
@@ -1912,9 +1999,10 @@ export class SessionService {
     const repo = this.buildWrapperRepoSource(metadata, resolvedTokens);
     const session = buildWrapperSessionBinding({
       workerUrl: env.WORKER_URL,
-      kilocodeToken: metadata.auth.kilocodeToken,
+      nextAuthSecret,
       userId,
       sessionId,
+      kiloSessionId: metadata.auth.kiloSessionId,
       wrapper,
       upstreamBranch: metadata.repository?.upstreamBranch,
     });
@@ -2068,6 +2156,15 @@ export class SessionService {
     if (!metadata.auth.kiloSessionId) {
       throw ExecutionError.invalidRequest('Missing kiloSessionId in session metadata');
     }
+    const { capability: kiloCapability, providerBaseUrl: kiloProviderBaseUrl } =
+      await this.issueKiloSessionCapability(env, {
+        userId,
+        cloudAgentSessionId: sessionId,
+        kiloSessionId: metadata.auth.kiloSessionId,
+        sandboxId,
+        managedScmContainment: metadata.workspace?.managedScmContainment === true,
+        userToken: metadata.auth.kilocodeToken,
+      });
 
     const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata, sandboxId);
     const github = githubRepository(metadata);
@@ -2122,7 +2219,8 @@ export class SessionService {
     const runtimeEnv = this.buildRuntimeEnv({
       context,
       env,
-      originalToken: metadata.auth.kilocodeToken,
+      kiloCapability,
+      kiloProviderBaseUrl,
       kilocodeModel: options.kilocodeModel,
       originalOrgId: orgId,
       createdOnPlatform: metadata.identity.createdOnPlatform,
@@ -2145,7 +2243,9 @@ export class SessionService {
         env,
         metadata,
         options.kilocodeModel,
-        orgId
+        orgId,
+        kiloCapability,
+        kiloProviderBaseUrl
       );
       if (
         !(await this.sanitizeBitbucketCodeReviewRemote(session, context.workspacePath, metadata))
@@ -2214,7 +2314,9 @@ export class SessionService {
       env,
       metadata,
       options.kilocodeModel,
-      orgId
+      orgId,
+      kiloCapability,
+      kiloProviderBaseUrl
     );
 
     let devcontainer: DevContainerHandle | undefined;
@@ -2227,7 +2329,7 @@ export class SessionService {
       await this.prepareBranch(session, workspacePath, branchName, metadata);
       await this.sanitizeBitbucketCodeReviewRemote(session, workspacePath, metadata);
 
-      await writeAuthFile(sandbox, sessionHome, metadata.auth.kilocodeToken);
+      await writeAuthFile(sandbox, sessionHome, kiloCapability);
       await writeGlobalRules(sandbox, sessionHome, sessionId);
 
       const detectedDevcontainer = metadata.workspace?.devcontainerRequested
@@ -2282,7 +2384,7 @@ export class SessionService {
           devcontainer,
           dockerEnv,
           env,
-          kilocodeToken: metadata.auth.kilocodeToken,
+          kiloCapability,
           runtimeEnv,
           sessionHome,
         }
@@ -2325,16 +2427,16 @@ export class SessionService {
     env: PersistenceEnv,
     metadata: CloudAgentSessionState,
     kilocodeModel: string | undefined,
-    orgId: string | undefined
+    orgId: string | undefined,
+    kiloCapability: string,
+    kiloProviderBaseUrl: string | undefined
   ): Promise<ExecutionSession> {
-    if (!metadata.auth.kilocodeToken) {
-      throw ExecutionError.invalidRequest('Missing kilocodeToken in session metadata');
-    }
     return this.getOrCreateSession({
       sandbox,
       context,
       env,
-      originalToken: metadata.auth.kilocodeToken,
+      kiloCapability,
+      kiloProviderBaseUrl,
       kilocodeModel,
       originalOrgId: orgId,
       createdOnPlatform: metadata.identity.createdOnPlatform,
@@ -2554,7 +2656,7 @@ export class SessionService {
     options: RestoreRuntimeOptions
   ): Promise<boolean> {
     const restoreTokenFilePath = options.devcontainer
-      ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kilocodeToken)
+      ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kiloCapability)
       : undefined;
     const restoreCommand = buildRestoreCommand({
       kiloSessionId,
@@ -2631,7 +2733,7 @@ export class SessionService {
       : `/tmp/kilo-empty-session-${kiloSessionId}.json`;
     await sandbox.writeFile(importFilePath, minimalSessionJson);
     const restoreTokenFilePath = options.devcontainer
-      ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kilocodeToken)
+      ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kiloCapability)
       : undefined;
     const restoreCommand = buildRestoreCommand({
       kiloSessionId,
@@ -2747,7 +2849,8 @@ export type GetOrCreateSessionOptions = {
   sandbox: SandboxInstance;
   context: SessionContext;
   env: PersistenceEnv;
-  originalToken: string;
+  kiloCapability: string;
+  kiloProviderBaseUrl?: string;
   kilocodeModel?: string;
   originalOrgId?: string;
   createdOnPlatform?: string;
@@ -2762,7 +2865,7 @@ type RestoreRuntimeOptions = {
   devcontainer?: DevContainerHandle;
   dockerEnv?: Record<string, string>;
   env: PersistenceEnv;
-  kilocodeToken: string;
+  kiloCapability: string;
   runtimeEnv: Record<string, string>;
   sessionHome: string;
 };
@@ -2772,7 +2875,8 @@ type GetSaferEnvVarsOptions = {
   sessionId: string;
   workspacePath: string;
   env: PersistenceEnv;
-  originalToken: string;
+  kiloCapability: string;
+  kiloProviderBaseUrl?: string;
   kilocodeModel?: string;
   originalOrgId?: string;
   githubToken?: string;
@@ -2828,13 +2932,15 @@ export type BuildWrapperSessionReadyAndPromptRequestsOptions = {
 
 function buildWrapperSessionBinding(options: {
   workerUrl?: string;
-  kilocodeToken: string;
+  nextAuthSecret: string;
   userId: string;
   sessionId: string;
+  kiloSessionId: string;
   wrapper: FencedWrapperDispatchRequest['wrapper'];
   upstreamBranch?: string;
 }): WrapperSessionReadyRequest['session'] {
-  const { workerUrl, kilocodeToken, userId, sessionId, wrapper, upstreamBranch } = options;
+  const { workerUrl, nextAuthSecret, userId, sessionId, kiloSessionId, wrapper, upstreamBranch } =
+    options;
   if (!workerUrl) {
     throw ExecutionError.invalidRequest('WORKER_URL is required for wrapper bootstrap');
   }
@@ -2843,9 +2949,22 @@ function buildWrapperSessionBinding(options: {
   wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
   wsUrl.pathname = `/sessions/${encodeURIComponent(userId)}/${sessionId}/ingest`;
 
+  const workerAuthToken = mintWrapperDispatchTicket(
+    {
+      type: 'wrapper_dispatch_ticket',
+      userId,
+      cloudAgentSessionId: sessionId,
+      kiloSessionId,
+      wrapperRunId: wrapper.fence.wrapperRunId,
+      wrapperGeneration: wrapper.fence.wrapperGeneration,
+      wrapperConnectionId: wrapper.fence.wrapperConnectionId,
+    },
+    nextAuthSecret
+  );
+
   return {
     ingestUrl: wsUrl.toString(),
-    workerAuthToken: kilocodeToken,
+    workerAuthToken,
     wrapperRunId: wrapper.fence.wrapperRunId,
     wrapperGeneration: wrapper.fence.wrapperGeneration,
     wrapperConnectionId: wrapper.fence.wrapperConnectionId,

@@ -350,6 +350,42 @@ type GetBitbucketTokenResult =
   | { success: true; token: string }
   | { success: false; reason: BitbucketTokenFailureReason };
 
+export type KiloSessionCapabilityTargets = {
+  backendBaseUrl: string;
+  providerBaseUrl: string;
+  sessionIngestBaseUrl: string;
+};
+
+export type KiloCapabilityRouteClass =
+  | 'provider_model'
+  | 'organization_models'
+  | 'backend_api'
+  | 'session_ingest';
+
+type IssueKiloSessionCapabilityResult =
+  | { success: true; capability: string }
+  | {
+      success: false;
+      reason:
+        | 'invalid_targets'
+        | 'invalid_capability'
+        | 'expired_capability'
+        | 'capability_configuration_error';
+    };
+
+type RedeemKiloSessionCapabilityResult =
+  | { success: true; authorization: string; routeClass: KiloCapabilityRouteClass }
+  | {
+      success: false;
+      reason:
+        | 'invalid_capability'
+        | 'expired_capability'
+        | 'capability_configuration_error'
+        | 'container_mismatch'
+        | 'invalid_upstream_url'
+        | 'upstream_not_allowed';
+    };
+
 export type GitTokenService = {
   getTokenForRepo(params: {
     githubRepo: string;
@@ -396,6 +432,21 @@ export type GitTokenService = {
     requestMethod: string;
     requestUrl: string;
   }): Promise<RedeemGitLabSessionCapabilityResult>;
+  issueKiloSessionCapability(params: {
+    userId: string;
+    cloudAgentSessionId: string;
+    kiloSessionId: string;
+    outboundContainerId: string;
+    userToken: string;
+    targets: KiloSessionCapabilityTargets;
+  }): Promise<IssueKiloSessionCapabilityResult>;
+  redeemKiloSessionCapability(params: {
+    capability: string;
+    outboundContainerId: string;
+    requestMethod: string;
+    requestUrl: string;
+    bootstrapKiloSessionId?: string;
+  }): Promise<RedeemKiloSessionCapabilityResult>;
 };
 
 export type Env = {

@@ -134,8 +134,6 @@ export type PersistenceEnv = {
   NEXTAUTH_SECRET: SecretBinding;
   /** Comma-separated list of allowed Origins for /stream WebSocket connections */
   WS_ALLOWED_ORIGINS?: string;
-  /** Optional override for Kilocode token injected into session environment (does not affect authentication) */
-  KILOCODE_TOKEN_OVERRIDE?: string;
   /** Optional override for Kilocode org ID injected into session environment (does not affect authentication) */
   KILOCODE_ORG_ID_OVERRIDE?: string;
   /** Backend base URL for API calls and session environment variables (defaults to https://kilo.ai) */

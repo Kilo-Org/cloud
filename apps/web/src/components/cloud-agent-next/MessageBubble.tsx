@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import React, { useCallback } from 'react';
 import { Scissors, Image, FileText, AlertCircle, Clock } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { AssistantMessage } from '@/types/opencode.gen';
@@ -140,7 +140,9 @@ function getAssistantTextContent(parts: Part[]): string {
 /**
  * Extract a human-readable error message from an AssistantMessage error field.
  */
-function getAssistantErrorMessage(error: NonNullable<AssistantMessage['error']>): string {
+function getAssistantErrorMessage(error: NonNullable<AssistantMessage['error']> | string): string {
+  if (typeof error === 'string') return error;
+
   if ('data' in error && 'message' in error.data && typeof error.data.message === 'string') {
     return error.data.message;
   }

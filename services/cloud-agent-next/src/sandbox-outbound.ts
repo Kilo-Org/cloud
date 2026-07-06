@@ -8,11 +8,14 @@ export { MANAGED_SCM_OUTBOUND_HANDLER } from './sandbox-id.js';
 
 const GITHUB_CAPABILITY_PREFIXES = ['kgh1.', 'kgh2.'];
 const GITLAB_CAPABILITY_PREFIXES = ['kgl1.', 'kgl2.'];
+const KILO_CAPABILITY_PREFIXES = ['kka1.'];
+const MAX_KILO_SESSION_BOOTSTRAP_BYTES = 16_000;
 
 type GitHubTokenRedemptionBinding = Pick<GitTokenService, 'redeemGitHubSessionCapability'>;
 type GitLabTokenRedemptionBinding = Pick<GitTokenService, 'redeemGitLabSessionCapability'>;
+type KiloTokenRedemptionBinding = Pick<GitTokenService, 'redeemKiloSessionCapability'>;
 type ManagedScmOutboundContext = { containerId: string };
-type RedeemableAuthorization = { provider: 'github' | 'gitlab'; capability: string };
+type RedeemableAuthorization = { provider: 'github' | 'gitlab' | 'kilo'; capability: string };
 type AuthorizationExtraction =
   | { type: 'none' }
   | { type: 'capability'; value: RedeemableAuthorization }
@@ -31,6 +34,13 @@ type AuthorizationClass =
   | 'unmanaged'
   | 'none';
 type DiagnosticLevel = 'debug' | 'info' | 'warn';
+type LocalKiloUrlDiagnosticsEnvironment = { LOG_REJECTED_KILO_URLS?: string };
+
+function isLocalKiloUrlDiagnosticsEnabled(
+  env: Cloudflare.Env & LocalKiloUrlDiagnosticsEnvironment
+): boolean {
+  return env.LOG_REJECTED_KILO_URLS === '1';
+}
 
 function logDiagnostic(
   level: DiagnosticLevel,
@@ -110,8 +120,95 @@ function getCapabilityVersion(capability: string): string {
   return separator === -1 ? 'unknown' : capability.slice(0, separator);
 }
 
+function isKiloSessionBootstrapRequest(request: Request): boolean {
+  if (request.method.toUpperCase() !== 'POST') return false;
+  try {
+    return new URL(request.url).pathname.endsWith('/api/session');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reads a clone of the request body, stopping as soon as it exceeds maxBytes
+ * so an unbounded (or under-declared) body is never fully buffered.
+ */
+async function readBoundedRequestBody(
+  request: Request,
+  maxBytes: number
+): Promise<string | undefined> {
+  const body: ReadableStream<Uint8Array> | null = request.clone().body;
+  if (!body) return undefined;
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) return undefined;
+      chunks.push(value);
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+  const buffer = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(buffer);
+}
+
+async function getKiloSessionBootstrapId(request: Request): Promise<string | undefined> {
+  if (!isKiloSessionBootstrapRequest(request)) return undefined;
+  const contentType = request.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase();
+  if (contentType !== 'application/json') return undefined;
+
+  const contentLength = request.headers.get('Content-Length');
+  if (
+    contentLength &&
+    (!/^[0-9]+$/.test(contentLength) || Number(contentLength) > MAX_KILO_SESSION_BOOTSTRAP_BYTES)
+  ) {
+    return undefined;
+  }
+
+  try {
+    const body = await readBoundedRequestBody(request, MAX_KILO_SESSION_BOOTSTRAP_BYTES);
+    if (body === undefined) {
+      return undefined;
+    }
+    const parsed: unknown = JSON.parse(body);
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      'sessionId' in parsed &&
+      typeof parsed.sessionId === 'string' &&
+      parsed.sessionId.length > 0
+    ) {
+      return parsed.sessionId;
+    }
+  } catch {
+    // The broker rejects a bootstrap route without a matching session identity.
+  }
+  return undefined;
+}
+
 function classifyDiagnosticError(error: unknown): 'error' | 'unknown' {
   return error instanceof Error ? 'error' : 'unknown';
+}
+
+/** Query strings can carry credentials — even local diagnostics log only origin + path. */
+function redactUrlQuery(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return 'invalid-url';
+  }
 }
 
 function supportsGitHubSessionCapabilityRedemption(
@@ -136,6 +233,17 @@ function supportsGitLabSessionCapabilityRedemption(
   );
 }
 
+function supportsKiloSessionCapabilityRedemption(
+  service: unknown
+): service is KiloTokenRedemptionBinding {
+  return (
+    typeof service === 'object' &&
+    service !== null &&
+    'redeemKiloSessionCapability' in service &&
+    typeof service.redeemKiloSessionCapability === 'function'
+  );
+}
+
 function classifyCapability(capability: string): AuthorizationExtraction {
   if (GITHUB_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
     return { type: 'capability', value: { provider: 'github', capability } };
@@ -143,7 +251,10 @@ function classifyCapability(capability: string): AuthorizationExtraction {
   if (GITLAB_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
     return { type: 'capability', value: { provider: 'gitlab', capability } };
   }
-  return /^(?:kgh|kgl)\d+\./.test(capability)
+  if (KILO_CAPABILITY_PREFIXES.some(prefix => capability.startsWith(prefix))) {
+    return { type: 'capability', value: { provider: 'kilo', capability } };
+  }
+  return /^(?:kgh|kgl|kka)\d+\./.test(capability)
     ? { type: 'unsupported_capability' }
     : NO_AUTHORIZATION_CAPABILITY;
 }
@@ -313,6 +424,98 @@ async function handleManagedGitHubOutbound(
   return response;
 }
 
+async function handleManagedKiloOutbound(
+  request: Request,
+  env: Cloudflare.Env,
+  capability: { capability: string },
+  outboundContainerId: string
+): Promise<Response> {
+  const logFields = {
+    ...getSafeRequestLogFields(request),
+    provider: 'kilo',
+    capabilityVersion: getCapabilityVersion(capability.capability),
+    outboundContainerId,
+  };
+  logDiagnostic('debug', logFields, 'Redeeming managed Kilo outbound request');
+
+  const tokenService = env.GIT_TOKEN_SERVICE;
+  if (!supportsKiloSessionCapabilityRedemption(tokenService)) {
+    logDiagnostic(
+      'warn',
+      { ...logFields, failureStage: 'redemption-binding' },
+      'Managed Kilo outbound redemption unavailable'
+    );
+    return new Response('Kilo authorization unavailable', { status: 502 });
+  }
+
+  let result: Awaited<ReturnType<KiloTokenRedemptionBinding['redeemKiloSessionCapability']>>;
+  try {
+    const bootstrapKiloSessionId = await getKiloSessionBootstrapId(request);
+    result = await tokenService.redeemKiloSessionCapability({
+      capability: capability.capability,
+      outboundContainerId,
+      requestMethod: request.method,
+      requestUrl: request.url,
+      bootstrapKiloSessionId,
+    });
+  } catch (error) {
+    logDiagnostic(
+      'warn',
+      {
+        ...logFields,
+        failureStage: 'redemption-rpc',
+        errorClass: classifyDiagnosticError(error),
+      },
+      'Managed Kilo outbound redemption failed'
+    );
+    return new Response('Kilo authorization unavailable', { status: 502 });
+  }
+
+  if (!result.success) {
+    if (isLocalKiloUrlDiagnosticsEnabled(env)) {
+      logDiagnostic(
+        'debug',
+        {
+          ...logFields,
+          failureStage: 'redemption-policy',
+          reason: result.reason,
+          rejectedRequestUrl: redactUrlQuery(request.url),
+        },
+        'Managed Kilo outbound redemption rejected with local URL diagnostics'
+      );
+    }
+    logDiagnostic(
+      'warn',
+      { ...logFields, failureStage: 'redemption-policy', reason: result.reason },
+      'Managed Kilo outbound redemption rejected'
+    );
+    return new Response('Kilo authorization unavailable', { status: 502 });
+  }
+
+  let response: Response;
+  try {
+    response = await forwardRedeemedRequest(request, { authorization: result.authorization });
+  } catch (error) {
+    logDiagnostic(
+      'warn',
+      {
+        ...logFields,
+        failureStage: 'upstream-forward',
+        errorClass: classifyDiagnosticError(error),
+      },
+      'Managed Kilo outbound forwarding failed'
+    );
+    return new Response('Kilo authorization unavailable', { status: 502 });
+  }
+
+  logDiagnostic(
+    'info',
+    { ...logFields, upstreamStatus: response.status, routeClass: result.routeClass },
+    'Managed Kilo outbound request forwarded'
+  );
+  return response;
+}
+
 async function handleManagedGitLabOutbound(
   request: Request,
   env: Cloudflare.Env,
@@ -391,9 +594,13 @@ export function handleManagedScmOutbound(
   }
   const capability = authorizationCapability ?? gitLabPrivateTokenCapability;
   if (!capability) return fetch(request);
-  return capability.provider === 'github'
-    ? handleManagedGitHubOutbound(request, env, capability, ctx.containerId)
-    : handleManagedGitLabOutbound(request, env, capability, ctx.containerId);
+  if (capability.provider === 'github') {
+    return handleManagedGitHubOutbound(request, env, capability, ctx.containerId);
+  }
+  if (capability.provider === 'kilo') {
+    return handleManagedKiloOutbound(request, env, capability, ctx.containerId);
+  }
+  return handleManagedGitLabOutbound(request, env, capability, ctx.containerId);
 }
 
 const managedScmOutboundHandlers = {

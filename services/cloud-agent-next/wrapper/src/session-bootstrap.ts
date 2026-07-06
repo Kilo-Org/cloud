@@ -464,11 +464,16 @@ async function refreshGitRemoteToken(
 }
 
 async function writeSessionAuthFile(request: WrapperSessionReadyRequest): Promise<void> {
+  const kilocodeToken = request.materialized.env.KILOCODE_TOKEN;
+  if (!kilocodeToken) {
+    throw new Error('KILOCODE_TOKEN is required to write the Kilo auth file');
+  }
+
   const authFilePath = sessionAuthFilePath(request.workspace.sessionHome);
   await fs.mkdir(path.dirname(authFilePath), { recursive: true });
   await fs.writeFile(
     authFilePath,
-    JSON.stringify({ kilo: { type: 'api', key: request.session.workerAuthToken } }, null, 2)
+    JSON.stringify({ kilo: { type: 'api', key: kilocodeToken } }, null, 2)
   );
 }
 
@@ -786,6 +791,8 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(`bootstrap cold workspace clone ready kiloSessionId=${request.kiloSessionId}`);
     }
 
+    await writeSessionAuthFile(request);
+
     if (workspaceNeedsBootstrap) {
       progress?.('branch', 'Setting up branch...');
       logToFile(
@@ -808,7 +815,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       );
       await sanitizeBitbucketCodeReviewRemote(request, runGit);
 
-      await writeSessionAuthFile(request);
       await writeRuntimeSkills(request);
 
       progress?.(

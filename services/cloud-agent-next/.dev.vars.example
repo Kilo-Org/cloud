@@ -88,6 +88,10 @@ R2_SECRET_ACCESS_KEY=""
 # @url cloudflare-session-ingest
 KILO_SESSION_INGEST_URL=http://host.docker.internal:8800
 
+# Local debugging only. Set to 1 to log full URLs rejected during Kilo capability
+# redemption. Those URLs can contain tokens; never enable this in a deployed Worker.
+LOG_REJECTED_KILO_URLS=0
+
 # Local dev worker origins allowed to connect to /stream
 # @url nextjs,cloud-agent-next
 WS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8794

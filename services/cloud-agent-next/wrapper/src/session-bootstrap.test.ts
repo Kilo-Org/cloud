@@ -40,7 +40,7 @@ function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyReque
     materialized: {
       env: {
         HOME: path.join(tmpDir, 'home'),
-        KILOCODE_TOKEN: 'kilo-token',
+        KILOCODE_TOKEN: 'kilo-capability',
         [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
       },
       setupCommands: ['pnpm install'],
@@ -48,7 +48,7 @@ function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyReque
     },
     session: {
       ingestUrl: 'wss://worker.example.com/sessions/user_test/agent/ingest',
-      workerAuthToken: 'kilo-token',
+      workerAuthToken: 'wrapper-dispatch-ticket',
       wrapperRunId: 'wr_test',
       wrapperGeneration: 1,
       wrapperConnectionId: 'conn_test',
@@ -158,6 +158,12 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
+    const authFile = await fsp.readFile(
+      path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json'),
+      'utf8'
+    );
+    expect(JSON.parse(authFile)).toEqual({ kilo: { type: 'api', key: 'kilo-capability' } });
+    expect(authFile).not.toContain('wrapper-dispatch-ticket');
   });
 
   it('uses activity watchdogs and reports sanitized progress for long git operations', async () => {
@@ -1051,10 +1057,16 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         refreshRemote: true,
       },
       materialized: {
-        env: { KILO_PLATFORM: 'code-review' },
+        env: { KILO_PLATFORM: 'code-review', KILOCODE_TOKEN: 'kilo-capability' },
       },
     });
     await createCompleteGitWorkspace(request.workspace.workspacePath);
+    const authPath = path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json');
+    await fsp.mkdir(path.dirname(authPath), { recursive: true });
+    await fsp.writeFile(
+      authPath,
+      JSON.stringify({ kilo: { type: 'api', key: 'stale-capability' } })
+    );
     const gitCalls: string[][] = [];
 
     await prepareWrapperBootstrapWorkspace(request, undefined, {
@@ -1068,6 +1080,9 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       ['remote', 'set-url', 'origin', 'https://bitbucket.org/acme/repo.git'],
     ]);
     expect(gitCalls.at(-1)?.join(' ')).not.toContain('bitbucket-token');
+    expect(JSON.parse(await fsp.readFile(authPath, 'utf8'))).toEqual({
+      kilo: { type: 'api', key: 'kilo-capability' },
+    });
   });
 
   it('refreshes a warm GitHub remote, author, and selected CLI credential', async () => {
@@ -1086,7 +1101,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         refreshRemote: true,
       },
       materialized: {
-        env: { GH_TOKEN: 'user-token' },
+        env: { GH_TOKEN: 'user-token', KILOCODE_TOKEN: 'kilo-capability' },
       },
     });
     await createCompleteGitWorkspace(request.workspace.workspacePath);
@@ -1124,7 +1139,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       runProcess: async (command, args) => {
         events.push(`process:${command} ${args.join(' ')}`);
         expect(process.env.HOME).toBe(request.workspace.sessionHome);
-        expect(process.env.KILOCODE_TOKEN).toBe('kilo-token');
+        expect(process.env.KILOCODE_TOKEN).toBe('kilo-capability');
         expect(process.env[PNPM_STORE_ENV_VAR]).toBe(PNPM_STORE_DIR);
         expect(
           fs.existsSync(path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json'))

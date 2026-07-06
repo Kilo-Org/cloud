@@ -12,6 +12,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { IS_DEVELOPMENT } from '@/lib/constants';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useConfirm } from '@/components/ui/confirm';
 
 type DiscordIntegrationDetailsProps = {
   organizationId?: string;
@@ -26,6 +27,7 @@ export function DiscordIntegrationDetails({
 }: DiscordIntegrationDetailsProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const input = organizationId ? { organizationId } : undefined;
 
   // Fetch Discord installation status
@@ -129,8 +131,15 @@ export function DiscordIntegrationDetails({
     );
   };
 
-  const handleUninstall = () => {
-    if (confirm('Are you sure you want to disconnect Discord?')) {
+  const handleUninstall = async () => {
+    if (
+      await confirm({
+        title: 'Disconnect Discord?',
+        description: 'Kilo will stop responding in your Discord server. You can reconnect later.',
+        confirmLabel: 'Disconnect',
+        destructive: true,
+      })
+    ) {
       uninstallApp.mutate(input, {
         onSuccess: async () => {
           toast.success('Discord disconnected');
@@ -145,11 +154,14 @@ export function DiscordIntegrationDetails({
     }
   };
 
-  const handleDevRemoveDbRowOnly = () => {
+  const handleDevRemoveDbRowOnly = async () => {
     if (
-      confirm(
-        'This will remove the database row but keep the Discord bot in the server. Are you sure?'
-      )
+      await confirm({
+        title: 'Remove database row?',
+        description: 'This removes the database row but keeps the Discord bot in the server.',
+        confirmLabel: 'Remove row',
+        destructive: true,
+      })
     ) {
       devRemoveDbRowOnly.mutate(input, {
         onSuccess: async () => {

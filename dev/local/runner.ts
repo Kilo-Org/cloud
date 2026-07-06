@@ -287,7 +287,20 @@ export function restartServiceInTmux(sessionName: string, serviceName: string): 
   sendInterrupt(sessionName, pane.windowIndex, pane.paneIndex);
   setTimeout(() => {
     const currentPane = findServicePane(sessionName, serviceName);
-    if (!currentPane) return;
+    if (!currentPane) {
+      // The pane can close together with the process (SIGINT kills the
+      // non-interactive wrapper shell before its `exec $SHELL` runs, and
+      // tmux closes a pane when its process exits). Recreate the service
+      // window instead of leaving the service stopped after reporting
+      // "Restarted"; the new window inherits the tmux session environment.
+      try {
+        startServiceInTmux(sessionName, serviceName);
+      } catch {
+        // Same policy as below: keep the TUI alive; the next explicit
+        // restart/view action can retry.
+      }
+      return;
+    }
     try {
       sendKeys(sessionName, currentPane.windowIndex, cmd, currentPane.paneIndex);
     } catch {

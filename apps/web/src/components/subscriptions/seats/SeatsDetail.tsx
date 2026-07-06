@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useConfirm } from '@/components/ui/confirm';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { capitalize } from '@/lib/utils';
 import { SEAT_PRICING } from '@/lib/organizations/constants';
@@ -28,10 +29,12 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [seatDialogOpen, setSeatDialogOpen] = useState(false);
   const [billingCycleDialogOpen, setBillingCycleDialogOpen] = useState(false);
   const [seatCount, setSeatCount] = useState('1');
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [isCancelingSubscription, setIsCancelingSubscription] = useState(false);
   const [isCancelingCycleChange, setIsCancelingCycleChange] = useState(false);
 
   const organizationQuery = useOrganizationWithMembers(organizationId, {
@@ -95,6 +98,31 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
         setIsOpeningPortal(false);
       }
     })();
+  }
+
+  async function handleCancelSubscription() {
+    if (isCancelingSubscription) return;
+    setIsCancelingSubscription(true);
+
+    try {
+      const shouldCancel = await confirm({
+        title: 'Cancel seats subscription?',
+        description:
+          'The subscription stays active until the end of the current billing period, then cancels.',
+        confirmLabel: 'Cancel at period end',
+        cancelLabel: 'Keep subscription',
+        destructive: true,
+      });
+      if (!shouldCancel) return;
+
+      await trpcClient.organizations.subscription.cancel.mutate({ organizationId });
+      toast.success('Subscription will cancel at period end');
+      await refreshData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to cancel subscription');
+    } finally {
+      setIsCancelingSubscription(false);
+    }
   }
 
   const subscription = subscriptionQuery.data?.subscription ?? null;
@@ -269,22 +297,10 @@ export function SeatsDetail({ organizationId }: { organizationId: string }) {
             <Button
               variant="outline"
               className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-              onClick={() => {
-                if (!window.confirm('Cancel this seats subscription at period end?')) return;
-                void (async () => {
-                  try {
-                    await trpcClient.organizations.subscription.cancel.mutate({ organizationId });
-                    toast.success('Subscription will cancel at period end');
-                    await refreshData();
-                  } catch (error) {
-                    toast.error(
-                      error instanceof Error ? error.message : 'Failed to cancel subscription'
-                    );
-                  }
-                })();
-              }}
+              onClick={() => void handleCancelSubscription()}
+              disabled={isCancelingSubscription}
             >
-              Cancel Subscription
+              {isCancelingSubscription ? 'Canceling...' : 'Cancel Subscription'}
             </Button>
           )}
           <Button variant="outline" onClick={openCustomerPortal} disabled={isOpeningPortal}>

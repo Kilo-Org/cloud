@@ -5,13 +5,22 @@ import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 
 import { UserByokTestModels } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
+import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import { sentryLogger } from '@/lib/utils.server';
 
 const logWarning = sentryLogger('coding-plans-inventory-validation', 'warning');
 const MINIMAX_PROVIDER_ID = 'minimax';
 
-export async function validateTokenPlanPlusCredential(apiKey: string): Promise<boolean> {
+export type MiniMaxCodingPlanCredentialValidationInput = {
+  apiKey: string;
+  planId: CodingPlanId;
+  upstreamPlanId: string;
+};
+
+export async function validateMiniMaxCodingPlanCredential({
+  apiKey,
+}: MiniMaxCodingPlanCredentialValidationInput): Promise<boolean> {
   const [finalProvider, byokList] = getVercelInferenceProviderConfigForUserByok({
     providerId: MINIMAX_PROVIDER_ID,
     decryptedAPIKey: apiKey,

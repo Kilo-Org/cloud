@@ -62,6 +62,7 @@ import {
 import { Button as UIButton } from '@/components/ui/button';
 import { LinkButton } from '@/components/Button';
 import { cn } from '@/lib/utils';
+import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import type { SlashCommand } from '@/lib/cloud-agent/slash-commands';
 import {
   extractRepoFromGitUrl,
@@ -167,6 +168,8 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   // Models
   // ---------------------------------------------------------------------------
   const { data: modelsData } = useModelSelectorList(organizationId);
+  const { lastSelected: serverLastSelected, setLastSelected: persistServerLastSelected } =
+    useModelPreferences(organizationId);
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
   const allModels = modelsData?.data || [];
@@ -276,33 +279,45 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
 
     const isCurrentModelAvailable = modelOptions.some(m => m.id === model);
     if (!isCurrentModelAvailable || !model || !isModelUserSelected) {
+      const serverLastModelId = serverLastSelected?.model;
       const newModel = getPreferredInitialModel({
         modelOptions,
-        lastUsedModel: getLastUsedModel(organizationId),
+        lastUsedModel: serverLastModelId ?? getLastUsedModel(organizationId),
         defaultModel: defaultsData?.defaultModel,
       });
 
       if (newModel && newModel !== model) {
         setModel(newModel);
         setIsModelUserSelected(false);
-        // Restore the last-used variant for this model, otherwise fall back to the first
+        // Restore the server-synced variant when seeding the server's model,
+        // then the last-used variant, otherwise fall back to the first
         // available variant (typically "none").
+        const serverVariant =
+          newModel === serverLastSelected?.model ? serverLastSelected.variant : undefined;
         const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
         setVariant(
           getPreferredInitialVariant({
             availableVariants: newVariants,
-            lastUsedVariant: getLastUsedVariant(newModel, organizationId),
+            lastUsedVariant: serverVariant ?? getLastUsedVariant(newModel, organizationId),
           })
         );
       }
     }
-  }, [defaultsData?.defaultModel, modelOptions, model, isModelUserSelected, organizationId]);
+  }, [
+    defaultsData?.defaultModel,
+    modelOptions,
+    model,
+    isModelUserSelected,
+    organizationId,
+    serverLastSelected,
+  ]);
 
   const handleModelChange = useCallback(
     (newModel: string) => {
       setModel(newModel);
       setIsModelUserSelected(true);
       setLastUsedModel(newModel, organizationId);
+      persistServerLastSelected({ model: newModel });
       const newVariants = modelOptions.find(m => m.id === newModel)?.variants ?? [];
       setVariant(
         getPreferredInitialVariant({
@@ -312,7 +327,7 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
         })
       );
     },
-    [modelOptions, organizationId, variant]
+    [modelOptions, organizationId, variant, persistServerLastSelected]
   );
 
   const handleVariantChange = useCallback(
@@ -320,9 +335,10 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       setVariant(newVariant);
       if (model) {
         setLastUsedVariant(model, newVariant, organizationId);
+        persistServerLastSelected({ model, ...(newVariant ? { variant: newVariant } : {}) });
       }
     },
-    [model, organizationId]
+    [model, organizationId, persistServerLastSelected]
   );
 
   // ---------------------------------------------------------------------------

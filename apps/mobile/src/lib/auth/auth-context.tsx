@@ -12,6 +12,8 @@ import {
 import { trackEvent } from '@/lib/appsflyer';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
+import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import {
   AUTH_TOKEN_KEY,
@@ -61,6 +63,8 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await SecureStore.deleteItemAsync(ORGANIZATION_STORAGE_KEY);
     await SecureStore.deleteItemAsync(SESSION_FILTERS_KEY);
     await SecureStore.deleteItemAsync(NOTIFICATION_PROMPT_SEEN_KEY);
+    clearAgentModelPreference();
+    clearReasoningPreference();
     queryClient.clear();
     setToken(undefined);
   }, []);

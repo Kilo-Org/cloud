@@ -26,6 +26,7 @@ Updated 2026-05-28 -- Coding Plans API key configuration summary.
 Updated 2026-05-28 -- Coding Plans billing history USD amount display.
 Updated 2026-06-05 -- KiloClaw final Commit term continuation behavior.
 Updated 2026-07-01 -- Coding Plans installed-key deletion blocked in BYOK.
+Updated 2026-06-26 -- MiniMax token plan tiers and provider-level Coding Plan exclusivity.
 
 ## Conventions
 
@@ -271,10 +272,10 @@ historical Commit names, prices, invoices, and credit deductions.
 
 ### Coding Plans Subscriptions (Personal Route)
 
-27. A user MAY have multiple Coding Plans subscriptions — one per
-    configured Plan ID. The Coding Plans group MUST display one
-    Subscription Card for each non-terminal coding plan subscription,
-    including a `past_due` subscription in its warning state.
+27. A user MAY have multiple Coding Plans subscriptions -- one live
+    subscription per configured provider ID. The Coding Plans group MUST
+    display one Subscription Card for each non-terminal coding plan
+    subscription, including a `past_due` subscription in its warning state.
 
 28. The Coding Plans detail page MUST be served at
     `/subscriptions/coding-plans/[subscriptionId]`.
@@ -299,7 +300,7 @@ historical Commit names, prices, invoices, and credit deductions.
       (see Billing History rules)
 
     Before update or disable, `/byok` MUST warn that routing changes do not
-    cancel or pause Token Plan Plus billing and cancellation is managed in
+    cancel or pause MiniMax token plan billing and cancellation is managed in
     Subscription Center. `/byok` MUST block a direct delete of the Kilo-managed
     installed key and direct the user to cancel the plan in Subscription Center,
     which removes it at Effective Cancellation; customer surfaces MUST NOT
@@ -311,20 +312,24 @@ historical Commit names, prices, invoices, and credit deductions.
     only Kilo's unchanged installed configuration is removed, and that
     Kilo revokes its issued credential when plan access ends.
 
-32. When the user views Coding Plans with no non-terminal subscription,
-    the system MUST show each configured offering with provider name,
-    plan name, recurring USD price, billing period, and payment source.
-    An offering with assignable credential capacity MUST show a subscribe
-    action. For MiniMax Token Plan Plus, purchase messaging MUST explain
-    automatic MiniMax BYOK setup and purchase MUST be blocked when any
-    personal MiniMax BYOK key exists, including a disabled key. In that
-    state, the system MUST direct the user to delete the existing
-    user-managed key in `/byok` first. An offering without assignable
-    credential capacity MUST display a sold-out state and a `Notify me when
-    available` action. The
-    action MUST persist one notification intent per user and Plan ID without
-    charging credits or reserving inventory, and the surface MUST indicate
-    once that intent has been saved.
+32. When the user views Coding Plans, the system MUST show each configured
+    offering with provider name, plan name, recurring USD price, billing
+    period, payment source, and catalog feature copy. MiniMax token offerings
+    MUST include Token Plan Plus, Token Plan Max, and Token Plan Ultra. An
+    offering with assignable credential capacity MUST show a subscribe action.
+    Purchase messaging for MiniMax token plans MUST explain automatic MiniMax
+    BYOK setup and purchase MUST be blocked when any personal MiniMax BYOK key
+    exists, including a disabled key. In that state, the system MUST direct
+    the user to delete the existing key in `/byok` first. Purchase MUST also
+    be blocked when the user already has any non-terminal MiniMax Coding Plan,
+    including a subscription pending cancellation. In that state, the system
+    MUST explain that the user must cancel the current plan and wait until
+    access ends before subscribing to another MiniMax Coding Plan. An offering
+    without assignable credential capacity MUST display a sold-out state and a
+    `Notify me when available` action. The action MUST persist one
+    notification intent per user and Plan ID without charging credits or
+    reserving inventory, and the surface MUST indicate once that intent has
+    been saved.
 
 ### Teams/Enterprise Seats Subscriptions (Org Route)
 

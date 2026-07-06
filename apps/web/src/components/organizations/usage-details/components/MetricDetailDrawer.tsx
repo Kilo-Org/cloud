@@ -1,8 +1,13 @@
 'use client';
 
-import { Drawer } from 'vaul';
-import { X, Zap, Layers, Users } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Zap, Layers, Users } from 'lucide-react';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useMemo } from 'react';
 import Link from 'next/link';
@@ -224,108 +229,84 @@ export function MetricDetailDrawer({
   const IconComponent = info.icon;
 
   return (
-    <Drawer.Root open={open} onOpenChange={onOpenChange} direction="right">
-      <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 bg-black/40" />
-        <Drawer.Content
-          className="fixed top-2 right-2 bottom-2 z-50 flex w-full max-w-2xl outline-none"
-          style={{ '--initial-transform': 'calc(100% + 8px)' } as React.CSSProperties}
-        >
-          <div className="flex h-full w-full grow flex-col rounded-[16px] border-l-2 border-l-[#cccccc1f] bg-[#111]">
-            {/* Header */}
-            <div className="border-border flex flex-shrink-0 items-start justify-between border-b px-6 py-4">
-              <div className="flex flex-1 items-center gap-3">
-                <div
-                  className="flex h-10 w-10 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: `${info.color}20` }}
-                >
-                  <IconComponent className="h-5 w-5" style={{ color: info.color }} />
-                </div>
-                <div>
-                  <Drawer.Title className="text-xl font-semibold">{info.title}</Drawer.Title>
-                  <Drawer.Description className="text-muted-foreground mt-1 text-sm">
-                    Detailed analysis and improvement suggestions
-                  </Drawer.Description>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onOpenChange(false)}
-                className="ml-4 flex-shrink-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-2xl">
+        {/* Header */}
+        <SheetHeader className="border-border flex-row items-center gap-3 space-y-0 border-b px-6 py-4">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-lg"
+            style={{ backgroundColor: `${info.color}20` }}
+          >
+            <IconComponent className="h-5 w-5" style={{ color: info.color }} />
+          </div>
+          <div>
+            <SheetTitle className="text-xl font-semibold">{info.title}</SheetTitle>
+            <SheetDescription className="mt-1">
+              Detailed analysis and improvement suggestions
+            </SheetDescription>
+          </div>
+        </SheetHeader>
 
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-10">
-              {/* Condensed Chart */}
-              <div className="mb-8">
-                <h3 className="mb-3 text-sm font-medium text-gray-400">Trend Over Time</h3>
-                <div className="h-32 w-full rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={metricChartData}
-                      margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                      <XAxis
-                        dataKey="date"
-                        stroke="#a1a1a1"
-                        tick={{ fontSize: 9 }}
-                        interval="preserveStartEnd"
-                      />
-                      <YAxis stroke="#a1a1a1" tick={{ fontSize: 9 }} width={30} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(17, 24, 39, 0.95)',
-                          border: '1px solid #374151',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Bar
-                        dataKey="value"
-                        fill={info.color}
-                        radius={[4, 4, 0, 0]}
-                        isAnimationActive={false}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Improvement Section */}
-              <div>
-                <h3 className="mb-2 text-lg font-semibold">{info.improvementTitle}</h3>
-                <p className="text-muted-foreground mb-6 text-sm">
-                  <strong>Goal:</strong> {info.improvementGoal}
-                </p>
-
-                <div className="space-y-6">
-                  {info.options.map((option, index) => (
-                    <div
-                      key={index}
-                      className="rounded-lg border border-gray-800 bg-gray-900/50 p-4"
-                    >
-                      <div className="mb-2">
-                        <h4 className="font-semibold">{option.title}</h4>
-                        <p className="text-xs text-gray-400">{option.subtitle}</p>
-                      </div>
-                      <p className="mb-3 text-sm text-gray-300">{option.description}</p>
-                      {option.action && (
-                        <div className="rounded bg-gray-800/50 px-3 py-2">
-                          <code className="text-xs text-blue-400">{option.action}</code>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 pt-6 pb-10">
+          {/* Condensed Chart */}
+          <div className="mb-8">
+            <h3 className="mb-3 text-sm font-medium text-gray-400">Trend Over Time</h3>
+            <div className="h-32 w-full rounded-lg border border-gray-800 bg-gray-900/50 p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={metricChartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                  <XAxis
+                    dataKey="date"
+                    stroke="#a1a1a1"
+                    tick={{ fontSize: 9 }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis stroke="#a1a1a1" tick={{ fontSize: 9 }} width={30} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                      border: '1px solid #374151',
+                      borderRadius: '8px',
+                    }}
+                  />
+                  <Bar
+                    dataKey="value"
+                    fill={info.color}
+                    radius={[4, 4, 0, 0]}
+                    isAnimationActive={false}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+
+          {/* Improvement Section */}
+          <div>
+            <h3 className="mb-2 text-lg font-semibold">{info.improvementTitle}</h3>
+            <p className="text-muted-foreground mb-6 text-sm">
+              <strong>Goal:</strong> {info.improvementGoal}
+            </p>
+
+            <div className="space-y-6">
+              {info.options.map((option, index) => (
+                <div key={index} className="rounded-lg border border-gray-800 bg-gray-900/50 p-4">
+                  <div className="mb-2">
+                    <h4 className="font-semibold">{option.title}</h4>
+                    <p className="text-xs text-gray-400">{option.subtitle}</p>
+                  </div>
+                  <p className="mb-3 text-sm text-gray-300">{option.description}</p>
+                  {option.action && (
+                    <div className="rounded bg-gray-800/50 px-3 py-2">
+                      <code className="text-xs text-blue-400">{option.action}</code>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

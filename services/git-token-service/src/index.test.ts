@@ -1302,6 +1302,169 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   });
 });
 
+describe('GitTokenRPCEntrypoint Kilo session capability RPCs', () => {
+  const kiloTargets = {
+    backendBaseUrl: 'https://api.kilo.ai',
+    providerBaseUrl: 'https://api.kilo.ai',
+    sessionIngestBaseUrl: 'https://ingest.kilosessions.ai',
+  };
+  const kiloSubject = {
+    userId: 'user_1',
+    cloudAgentSessionId: 'cloud-agent-session-1',
+    kiloSessionId: 'kilo-session-1',
+    outboundContainerId,
+    userToken: 'raw-user-token',
+    targets: kiloTargets,
+  };
+
+  it('issues an opaque Kilo capability that does not leak the enclosed token', async () => {
+    const result = await createService().issueKiloSessionCapability(kiloSubject);
+
+    expect(result).toMatchObject({ success: true });
+    if (!result.success) throw new Error('Expected successful issuance');
+    expect(result.capability).toMatch(/^kka1\./);
+    expect(result.capability).not.toContain(kiloSubject.userToken);
+  });
+
+  it('rejects issuance for malformed targets', async () => {
+    const result = await createService().issueKiloSessionCapability({
+      ...kiloSubject,
+      targets: { ...kiloTargets, backendBaseUrl: 'https://user@api.kilo.ai' },
+    });
+
+    expect(result).toEqual({ success: false, reason: 'invalid_targets' });
+  });
+
+  it('returns a sanitized declared failure when capability key configuration is invalid', async () => {
+    const service = new GitTokenRPCEntrypoint(
+      {} as ExecutionContext,
+      { SCM_SESSION_CAPABILITY_ENCRYPTION_KEY: 'not-a-valid-key' } as unknown as CloudflareEnv
+    );
+
+    await expect(service.issueKiloSessionCapability(kiloSubject)).resolves.toEqual({
+      success: false,
+      reason: 'capability_configuration_error',
+    });
+  });
+
+  it('redeems the user token for provider model routes', async () => {
+    const service = createService();
+    const issued = await service.issueKiloSessionCapability(kiloSubject);
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemKiloSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestUrl: 'https://api.kilo.ai/api/openrouter/v1/chat/completions',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer raw-user-token',
+      routeClass: 'provider_model',
+    });
+  });
+
+  it('redeems the user token for backend API routes', async () => {
+    const service = createService();
+    const issued = await service.issueKiloSessionCapability(kiloSubject);
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemKiloSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestUrl: 'https://api.kilo.ai/api/users/me',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer raw-user-token',
+      routeClass: 'backend_api',
+    });
+  });
+
+  it('redeems the user token for session export/import routes', async () => {
+    const service = createService();
+    const issued = await service.issueKiloSessionCapability(kiloSubject);
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemKiloSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestUrl: 'https://ingest.kilosessions.ai/api/session/kilo-session-1/export',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer raw-user-token',
+      routeClass: 'session_ingest',
+    });
+  });
+
+  it('does not redeem a session ingest route for another Kilo session', async () => {
+    const service = createService();
+    const issued = await service.issueKiloSessionCapability(kiloSubject);
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemKiloSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestUrl: 'https://ingest.kilosessions.ai/api/session/another-session/export',
+      })
+    ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });
+  });
+
+  it('does not leak the user token to another session ingest route on a shared origin', async () => {
+    const service = createService();
+    const issued = await service.issueKiloSessionCapability({
+      ...kiloSubject,
+      targets: {
+        backendBaseUrl: 'https://api.kilo.ai',
+        providerBaseUrl: 'https://api.kilo.ai/api/openrouter',
+        sessionIngestBaseUrl: 'https://api.kilo.ai',
+      },
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemKiloSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestUrl: 'https://api.kilo.ai/api/session/another-session/export',
+      })
+    ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });
+  });
+
+  it('does not redeem a capability from another outbound container', async () => {
+    const service = createService();
+    const issued = await service.issueKiloSessionCapability(kiloSubject);
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemKiloSessionCapability({
+        capability: issued.capability,
+        outboundContainerId: 'another-outbound-container',
+        requestUrl: 'https://api.kilo.ai/api/users/me',
+      })
+    ).resolves.toEqual({ success: false, reason: 'container_mismatch' });
+  });
+
+  it('rejects redemption against a disallowed upstream', async () => {
+    const service = createService();
+    const issued = await service.issueKiloSessionCapability(kiloSubject);
+    if (!issued.success) throw new Error('Expected successful issuance');
+
+    await expect(
+      service.redeemKiloSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestUrl: 'https://evil.example.com/api/users/me',
+      })
+    ).resolves.toEqual({ success: false, reason: 'upstream_not_allowed' });
+  });
+});
+
 describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
   beforeEach(() => {
     vi.clearAllMocks();

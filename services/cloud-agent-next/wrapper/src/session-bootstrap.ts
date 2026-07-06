@@ -151,6 +151,21 @@ function longGitOptions(
   };
 }
 
+export class RestoredWorkspaceReconciliationError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'RestoredWorkspaceReconciliationError';
+  }
+}
+
+export function workspaceBootstrapErrorCode(
+  error: unknown
+): 'WORKSPACE_RECONCILIATION_FAILED' | 'WORKSPACE_SETUP_FAILED' {
+  return error instanceof RestoredWorkspaceReconciliationError
+    ? 'WORKSPACE_RECONCILIATION_FAILED'
+    : 'WORKSPACE_SETUP_FAILED';
+}
+
 function authenticatedUrl(
   gitUrl: string,
   token: string | undefined,
@@ -390,17 +405,43 @@ async function sanitizeBitbucketCodeReviewRemote(
   return true;
 }
 
+function repositoryUrls(request: WrapperSessionReadyRequest): {
+  canonical: string;
+  authenticated: string;
+} | null {
+  const repo = request.repo;
+  if (!repo) return null;
+  const canonical = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
+  const platform = repo.kind === 'git' ? repo.platform : 'github';
+  return {
+    canonical,
+    authenticated: authenticatedUrl(canonical, repo.token, platform),
+  };
+}
+
+async function setOriginUrl(
+  request: WrapperSessionReadyRequest,
+  runGit: GitRunner,
+  url: string
+): Promise<void> {
+  const result = await runGit(['remote', 'set-url', 'origin', url], {
+    cwd: request.workspace.workspacePath,
+    timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
+  });
+  if (result.exitCode !== 0) {
+    throw new Error('Failed to update git remote URL');
+  }
+}
+
 async function refreshGitRemoteToken(
   request: WrapperSessionReadyRequest,
   runGit: GitRunner
 ): Promise<void> {
   const repo = request.repo;
-  if (!repo?.refreshRemote || !repo.token) return;
+  const urls = repositoryUrls(request);
+  if (!repo?.refreshRemote || !repo.token || !urls) return;
 
-  const gitUrl = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
-  const platform = repo.kind === 'git' ? repo.platform : 'github';
-  const nextUrl = authenticatedUrl(gitUrl, repo.token, platform);
-  const result = await runGit(['remote', 'set-url', 'origin', nextUrl], {
+  const result = await runGit(['remote', 'set-url', 'origin', urls.authenticated], {
     cwd: request.workspace.workspacePath,
     timeoutMs: SHORT_GIT_COMMAND_TIMEOUT_MS,
   });
@@ -549,6 +590,51 @@ async function restoreOrBootstrapKiloSession(
   await bootstrapEmptyKiloSession(request, restore);
 }
 
+async function reconcileRestoredWorkspace(
+  request: WrapperSessionReadyRequest,
+  runGit: GitRunner,
+  progress: BootstrapProgress | undefined
+): Promise<void> {
+  const { workspacePath, branchName, upstreamBranch, strictBranch } = request.workspace;
+  if (strictBranch && isSyntheticReviewRef(branchName)) {
+    await fetchSyntheticReviewRef(runGit, workspacePath, branchName, progress);
+    return;
+  }
+
+  let sourceBranch: string;
+  if (upstreamBranch) {
+    sourceBranch = upstreamBranch;
+  } else if (strictBranch) {
+    sourceBranch = branchName;
+  } else {
+    const defaultBranchResult = await runGit(
+      ['ls-remote', '--symref', 'origin', 'HEAD'],
+      longGitOptions(progress, 'branch', 'Resolving default branch...', workspacePath)
+    );
+    const defaultBranchMatch = defaultBranchResult.stdout.match(/^ref: refs\/heads\/(.+)\s+HEAD$/m);
+    if (defaultBranchResult.exitCode !== 0 || !defaultBranchMatch?.[1]) {
+      throw new Error('Failed to resolve authoritative remote default branch');
+    }
+    sourceBranch = defaultBranchMatch[1];
+  }
+
+  const fetchResult = await runGit(
+    ['fetch', 'origin', sourceBranch],
+    longGitOptions(progress, 'branch', 'Fetching authoritative state...', workspacePath)
+  );
+  if (fetchResult.exitCode !== 0) {
+    throw new Error('Failed to fetch authoritative remote state');
+  }
+
+  const checkoutResult = await runGit(
+    ['checkout', '-B', branchName, 'FETCH_HEAD'],
+    longGitOptions(progress, 'branch', 'Checking out session branch...', workspacePath)
+  );
+  if (checkoutResult.exitCode !== 0) {
+    throw new Error(`Failed to create session branch ${branchName} from origin/${sourceBranch}`);
+  }
+}
+
 async function runSetupCommands(
   request: WrapperSessionReadyRequest,
   run: ProcessRunner,
@@ -661,10 +747,12 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
 
   let workspaceWasWarm = false;
   let workspaceNeedsBootstrap = true;
+  const restoredFromBackup = request.workspace.restoredFromBackup === true;
 
   try {
     workspaceWasWarm = await isCompleteGitWorkspace(request.workspace.workspacePath);
-    workspaceNeedsBootstrap = !workspaceWasWarm || !request.workspace.preferSnapshot;
+    workspaceNeedsBootstrap =
+      restoredFromBackup || !workspaceWasWarm || !request.workspace.preferSnapshot;
     logToFile(
       `bootstrap workspace plan kiloSessionId=${request.kiloSessionId} preferSnapshot=${request.workspace.preferSnapshot} workspaceWasWarm=${workspaceWasWarm} workspaceNeedsBootstrap=${workspaceNeedsBootstrap} workspacePath=${request.workspace.workspacePath} sessionHome=${request.workspace.sessionHome} home=${process.env.HOME ?? '(unset)'} homeMatchesSessionHome=${process.env.HOME === request.workspace.sessionHome} repoKind=${request.repo?.kind ?? '(none)'} setupCommandCount=${request.materialized.setupCommands?.length ?? 0} runtimeSkillCount=${request.materialized.runtimeSkills?.length ?? 0}`
     );
@@ -703,7 +791,18 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       logToFile(
         `bootstrap branch preparation starting kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName} strictBranch=${request.workspace.strictBranch ?? false}`
       );
-      await prepareBranch(request, runGit, progress);
+      if (restoredFromBackup) {
+        try {
+          const urls = repositoryUrls(request);
+          if (urls) await setOriginUrl(request, runGit, urls.authenticated);
+          await reconcileRestoredWorkspace(request, runGit, progress);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          throw new RestoredWorkspaceReconciliationError(message, { cause: error });
+        }
+      } else {
+        await prepareBranch(request, runGit, progress);
+      }
       logToFile(
         `bootstrap branch preparation ready kiloSessionId=${request.kiloSessionId} branchName=${request.workspace.branchName}`
       );
@@ -734,6 +833,12 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
     progress?.('kilo_server', 'Starting Kilo...');
     return { workspaceWasWarm };
   } catch (error) {
+    if (error instanceof RestoredWorkspaceReconciliationError) {
+      if (workspaceNeedsBootstrap) {
+        await cleanupWorkspace(request);
+      }
+      throw error;
+    }
     const bootstrapError =
       error instanceof WrapperBootstrapError
         ? error

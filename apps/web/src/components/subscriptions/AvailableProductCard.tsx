@@ -4,6 +4,7 @@ import { ArrowRight, Check } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export function AvailableProductCard({
   icon,
@@ -11,6 +12,7 @@ export function AvailableProductCard({
   price,
   status,
   features,
+  featureLayout = 'responsive',
   cta,
   details,
   action,
@@ -20,6 +22,7 @@ export function AvailableProductCard({
   price: { amount: string; cadenceLabel: string };
   status?: string;
   features?: readonly string[];
+  featureLayout?: 'responsive' | 'single';
   cta?: {
     label: string;
     href?: string;
@@ -27,14 +30,22 @@ export function AvailableProductCard({
     disabled?: boolean;
     busy?: boolean;
     trailingIcon?: ReactNode;
+    visualStyle?: 'primary' | 'solid-neutral';
   };
   details?: ReactNode;
   action?: ReactNode;
 }) {
+  const ctaVisualStyle = cta?.visualStyle ?? 'primary';
   const button = cta ? (
     <Button
       type="button"
-      className="bg-brand-primary text-primary-foreground hover:bg-brand-primary/90 focus-visible:ring-brand-primary/50 h-11 w-full sm:h-9"
+      className={cn(
+        'h-11 w-full sm:h-9',
+        ctaVisualStyle === 'primary' &&
+          'bg-brand-primary text-primary-foreground hover:bg-brand-primary-hover focus-visible:ring-brand-primary/50',
+        ctaVisualStyle === 'solid-neutral' &&
+          'bg-foreground text-background hover:bg-muted-foreground focus-visible:ring-brand-primary/50'
+      )}
       onClick={cta.onClick}
       disabled={cta.disabled}
       aria-busy={cta.busy}
@@ -66,7 +77,13 @@ export function AvailableProductCard({
       </div>
 
       {features ? (
-        <ul className="mt-4 grid flex-1 gap-x-8 gap-y-2 lg:grid-cols-2" aria-label="Plan benefits">
+        <ul
+          className={cn(
+            'mt-4 grid flex-1 gap-x-8 gap-y-2',
+            featureLayout === 'responsive' && 'lg:grid-cols-2'
+          )}
+          aria-label="Plan benefits"
+        >
           {features.map(feature => (
             <li
               key={feature}

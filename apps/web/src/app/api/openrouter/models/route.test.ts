@@ -1,15 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
-import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
-import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
-import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { GET } from './route';
-import { getBenchmarkRoutingTable } from '@/lib/ai-gateway/auto-routing-benchmark-admin-client';
-import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
@@ -26,16 +18,35 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: jest.fn(),
   getUserByokProviderIds: jest.fn(),
 }));
+jest.mock('@/lib/ai-gateway/models', () => ({
+  ...jest.requireActual('@/lib/ai-gateway/models'),
+  filterByFeature: jest.fn(),
+}));
 jest.mock('@/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
-  getBenchmarkRoutingTable: jest.fn(),
+jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
+  getCachedRoutingTable: jest.fn(),
 }));
 jest.mock('@/lib/ai-gateway/auto-model/resolution', () => ({
   getAutoFreeCandidates: jest.fn(),
 }));
 jest.mock('@/lib/drizzle', () => ({ readDb: {} }));
+
+const { getUserFromAuth } = jest.requireMock('@/lib/user/server');
+const { getEnhancedOpenRouterModels } = jest.requireMock('@/lib/ai-gateway/providers/openrouter');
+const { getDirectByokModelsForUser } = jest.requireMock('@/lib/ai-gateway/providers/direct-byok');
+const { listAvailableExperimentModels } = jest.requireMock(
+  '@/lib/ai-gateway/experiments/list-available-experiment-models'
+);
+const { addUserByokAvailability, getUserByokProviderIds } =
+  jest.requireMock('@/lib/ai-gateway/byok');
+const { getAvailableModelsForOrganization } = jest.requireMock(
+  '@/lib/organizations/organization-models'
+);
+const { getCachedRoutingTable } = jest.requireMock('@/lib/ai-gateway/auto-routing-table-cache');
+const { getAutoFreeCandidates } = jest.requireMock('@/lib/ai-gateway/auto-model/resolution');
+const { filterByFeature } = jest.requireMock('@/lib/ai-gateway/models');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
@@ -44,8 +55,9 @@ const mockedListAvailableExperimentModels = jest.mocked(listAvailableExperimentM
 const mockedAddUserByokAvailability = jest.mocked(addUserByokAvailability);
 const mockedGetUserByokProviderIds = jest.mocked(getUserByokProviderIds);
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
-const mockedGetBenchmarkRoutingTable = jest.mocked(getBenchmarkRoutingTable);
+const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
+const mockedFilterByFeature = jest.mocked(filterByFeature);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -64,13 +76,17 @@ function makeModel(id: string): OpenRouterModel {
   };
 }
 
-function request() {
-  return new NextRequest('http://localhost:3000/api/openrouter/models');
+function request(headers?: Record<string, string>) {
+  return new NextRequest('http://localhost:3000/api/openrouter/models', { headers });
 }
 
 describe('GET /api/openrouter/models', () => {
   beforeEach(() => {
     jest.resetAllMocks();
+    mockedFilterByFeature.mockImplementation(
+      (models: Array<{ id: string }>, feature: string | null) =>
+        feature === 'code-review' ? models.filter(model => model.id !== 'feature/excluded') : models
+    );
     mockedGetUserFromAuth.mockResolvedValue({
       user: null,
       organizationId: null,
@@ -81,10 +97,7 @@ describe('GET /api/openrouter/models', () => {
     mockedListAvailableExperimentModels.mockResolvedValue([]);
     mockedGetUserByokProviderIds.mockResolvedValue([]);
     mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
-    mockedGetBenchmarkRoutingTable.mockResolvedValue({
-      status: 200,
-      body: { table: null, publishedAt: null },
-    });
+    mockedGetCachedRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
   });
 
@@ -95,6 +108,8 @@ describe('GET /api/openrouter/models', () => {
     await expect(response.json()).resolves.toEqual({ data: [makeModel('public/model')] });
     expect(mockedGetUserByokProviderIds).not.toHaveBeenCalled();
     expect(mockedAddUserByokAvailability).not.toHaveBeenCalled();
+    expect(mockedGetCachedRoutingTable).not.toHaveBeenCalled();
+    expect(mockedGetAutoFreeCandidates).not.toHaveBeenCalled();
   });
 
   test('returns BYOK availability for regular and direct authenticated models', async () => {
@@ -135,21 +150,16 @@ describe('GET /api/openrouter/models', () => {
       'poolside/laguna-m.1:free',
       'missing/free-model',
     ]);
-    mockedGetBenchmarkRoutingTable.mockResolvedValue({
-      status: 200,
-      body: {
-        table: {
-          routes: {
-            'implementation/code_generation': [
-              { model: 'google/gemini-2.5-flash' },
-              { model: 'openai/gpt-5.4-mini' },
-            ],
-            'analysis/debugging': [
-              { model: 'kilo-auto/balanced' },
-              { model: 'google/gemini-2.5-flash' },
-            ],
-          },
-        },
+    mockedGetCachedRoutingTable.mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [
+          { model: 'google/gemini-2.5-flash' },
+          { model: 'openai/gpt-5.4-mini' },
+        ],
+        'analysis/debugging': [
+          { model: 'kilo-auto/balanced' },
+          { model: 'google/gemini-2.5-flash' },
+        ],
       },
     } as never);
 
@@ -174,6 +184,71 @@ describe('GET /api/openrouter/models', () => {
         geminiModel,
         gptMiniModel,
         poolsideModel,
+      ],
+    });
+  });
+
+  test('builds auto-routing choices from feature-filtered models', async () => {
+    const efficientModel = makeModel('kilo-auto/efficient');
+    const allowedModel = makeModel('openai/gpt-5.4-mini');
+    const excludedModel = makeModel('feature/excluded');
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+      data: [efficientModel, allowedModel, excludedModel],
+    });
+    mockedGetCachedRoutingTable.mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [{ model: allowedModel.id }, { model: excludedModel.id }],
+      },
+    } as never);
+
+    const response = await GET(request({ 'x-kilocode-feature': 'code-review' }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: [
+        {
+          ...efficientModel,
+          autoRouting: {
+            models: [allowedModel.id],
+          },
+        },
+        allowedModel,
+      ],
+    });
+  });
+
+  test('adds auto-routing to organization models after feature filtering', async () => {
+    const efficientModel = makeModel('kilo-auto/efficient');
+    const allowedModel = makeModel('openai/gpt-5.4-mini');
+    const excludedModel = makeModel('feature/excluded');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: 'org-1',
+      authFailedResponse: null,
+    } as never);
+    mockedGetAvailableModelsForOrganization.mockResolvedValue({
+      data: [efficientModel, allowedModel, excludedModel],
+    } as never);
+    mockedGetCachedRoutingTable.mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [{ model: allowedModel.id }, { model: excludedModel.id }],
+      },
+    } as never);
+
+    const response = await GET(request({ 'x-kilocode-feature': 'code-review' }));
+
+    // The feature-excluded model must appear in neither the top-level list nor the
+    // Auto Efficient choices — enrichment runs after filterByFeature.
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: [
+        {
+          ...efficientModel,
+          autoRouting: {
+            models: [allowedModel.id],
+          },
+        },
+        allowedModel,
       ],
     });
   });

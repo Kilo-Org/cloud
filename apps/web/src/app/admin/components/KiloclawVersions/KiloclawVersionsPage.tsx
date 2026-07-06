@@ -41,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useConfirm } from '@/components/ui/confirm';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -119,6 +120,7 @@ function RolloutStatusPanel({
 }) {
   const [optimisticPercent, setOptimisticPercent] = useState<number | null>(null);
   const displayPercent = optimisticPercent ?? candidate?.rollout_percent ?? 0;
+  const confirm = useConfirm();
 
   /**
    * Commit a percent change with edge-case affordances:
@@ -144,12 +146,12 @@ function RolloutStatusPanel({
         });
       }
       if (next === 100 && previous < 100) {
-        const ok = window.confirm(
-          `Reached 100% — every instance now qualifies for ${imageTag}. ` +
-            `Promote it to :latest now? This replaces the current :latest. ` +
-            `New instances and unpinned upgrades will go to this image, ` +
-            `and the rollout will close.\n\nClick Cancel to keep observing at 100% without promoting.`
-        );
+        const ok = await confirm({
+          title: 'Promote to :latest now?',
+          description: `Reached 100% — every instance now qualifies for ${imageTag}. Promoting replaces the current :latest, sends new instances and unpinned upgrades to this image, and closes the rollout.`,
+          confirmLabel: 'Promote to :latest',
+          cancelLabel: 'Keep observing at 100%',
+        });
         if (ok) {
           await onPromoteCandidate(imageTag);
         }
@@ -221,13 +223,18 @@ function RolloutStatusPanel({
                 size="sm"
                 className="h-7 text-xs"
                 onClick={() => {
-                  if (
-                    window.confirm(
-                      `Promote ${candidate.image_tag} to :latest? This replaces the current :latest. New instances and unpinned upgrades will go to this image.`
-                    )
-                  ) {
-                    void onPromoteCandidate(candidate.image_tag);
-                  }
+                  void (async () => {
+                    if (
+                      await confirm({
+                        title: `Promote ${candidate.image_tag} to :latest?`,
+                        description:
+                          'This replaces the current :latest. New instances and unpinned upgrades will go to this image.',
+                        confirmLabel: 'Promote to :latest',
+                      })
+                    ) {
+                      void onPromoteCandidate(candidate.image_tag);
+                    }
+                  })();
                 }}
               >
                 <CheckCircle2 className="mr-1 h-3 w-3" /> Promote to :latest
@@ -685,6 +692,7 @@ function SortableHeader({
 export function VersionsTab() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'disabled'>('all');
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
@@ -1184,15 +1192,23 @@ export function VersionsTab() {
                                   className="h-8 w-8 p-0"
                                   aria-label="Make :latest"
                                   onClick={() => {
-                                    if (
-                                      window.confirm(
-                                        isCandidate
-                                          ? `Promote ${version.image_tag} to :latest? This replaces the current :latest and ends the rollout.`
-                                          : `Mark ${version.image_tag} as :latest? This replaces the current :latest and clears any rollout percent on this image.`
-                                      )
-                                    ) {
-                                      void markLatest({ imageTag: version.image_tag });
-                                    }
+                                    void (async () => {
+                                      if (
+                                        await confirm({
+                                          title: isCandidate
+                                            ? `Promote ${version.image_tag} to :latest?`
+                                            : `Mark ${version.image_tag} as :latest?`,
+                                          description: isCandidate
+                                            ? 'This replaces the current :latest and ends the rollout.'
+                                            : 'This replaces the current :latest and clears any rollout percent on this image.',
+                                          confirmLabel: isCandidate
+                                            ? 'Promote to :latest'
+                                            : 'Make :latest',
+                                        })
+                                      ) {
+                                        void markLatest({ imageTag: version.image_tag });
+                                      }
+                                    })();
                                   }}
                                 >
                                   <Anchor className="h-4 w-4" />
@@ -1215,16 +1231,22 @@ export function VersionsTab() {
                                   className="h-8 w-8 p-0 text-red-500 hover:bg-red-950/30 hover:text-red-400"
                                   aria-label="Disable image"
                                   onClick={() => {
-                                    if (
-                                      window.confirm(
-                                        `Disable ${version.image_tag}? It will no longer be available for new pins or rollouts. Already pinned instances continue running it.`
-                                      )
-                                    ) {
-                                      void updateStatus({
-                                        imageTag: version.image_tag,
-                                        status: 'disabled',
-                                      });
-                                    }
+                                    void (async () => {
+                                      if (
+                                        await confirm({
+                                          title: `Disable ${version.image_tag}?`,
+                                          description:
+                                            'It will no longer be available for new pins or rollouts. Already pinned instances continue running it.',
+                                          confirmLabel: 'Disable image',
+                                          destructive: true,
+                                        })
+                                      ) {
+                                        void updateStatus({
+                                          imageTag: version.image_tag,
+                                          status: 'disabled',
+                                        });
+                                      }
+                                    })();
                                   }}
                                 >
                                   <Ban className="h-4 w-4" />

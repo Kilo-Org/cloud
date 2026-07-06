@@ -25,34 +25,26 @@ export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.3.54';
  */
 export const DEFAULT_SLASH_COMMANDS = [
   {
-    name: "init",
-    description: "guided AGENTS.md setup",
-    source: "command",
-    hints: [
-      "$ARGUMENTS"
-    ]
+    name: 'init',
+    description: 'guided AGENTS.md setup',
+    source: 'command',
+    hints: ['$ARGUMENTS'],
   },
   {
-    name: "local-review",
-    description: "local review (current branch, optional base or instructions)",
-    hints: [
-      "$ARGUMENTS"
-    ]
+    name: 'local-review',
+    description: 'local review (current branch, optional base or instructions)',
+    hints: ['$ARGUMENTS'],
   },
   {
-    name: "local-review-uncommitted",
-    description: "local review (uncommitted changes)",
-    hints: [
-      "$ARGUMENTS"
-    ]
+    name: 'local-review-uncommitted',
+    description: 'local review (uncommitted changes)',
+    hints: ['$ARGUMENTS'],
   },
   {
-    name: "review",
-    description: "review changes [commit|branch|pr], defaults to uncommitted",
-    source: "command",
+    name: 'review',
+    description: 'review changes [commit|branch|pr], defaults to uncommitted',
+    source: 'command',
     subtask: true,
-    hints: [
-      "$ARGUMENTS"
-    ]
-  }
+    hints: ['$ARGUMENTS'],
+  },
 ] satisfies SlashCommandInfo[];

@@ -1,4 +1,6 @@
+/* eslint-disable max-lines */
 import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
+import { CLI_MODEL_ID, cliModelLabel } from 'cloud-agent-sdk/cli-model';
 import { useAtomValue } from 'jotai';
 import { useCallback, useEffect, useMemo } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
@@ -24,24 +26,21 @@ import { useSessionConfigSync } from '@/components/agents/use-session-config-syn
 import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
+import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
 };
 
-function getComposerPlaceholder(cloudStatusType: CloudStatus['type'] | undefined) {
-  if (cloudStatusType === 'preparing') {
-    return 'Setting up environment...';
-  }
-
-  if (cloudStatusType === 'finalizing') {
-    return 'Wrapping up...';
-  }
-
-  return 'Message...';
-}
+const COMPOSER_PLACEHOLDERS: Partial<Record<CloudStatus['type'], string>> = {
+  preparing: 'Setting up environment...',
+  finalizing: 'Wrapping up...',
+};
 
 export function SessionDetailContent({ sessionId }: Readonly<SessionDetailContentProps>) {
   const manager = useSessionManager();
@@ -56,11 +55,13 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const canSend = useAtomValue(manager.atoms.canSend);
   const isReadOnly = useAtomValue(manager.atoms.isReadOnly);
+  const supportsAttachments = useAtomValue(manager.atoms.supportsAttachments);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
+  const sessionType = useAtomValue(manager.atoms.sessionType);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -76,6 +77,25 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const organizationId = fetchedData?.organizationId ?? undefined;
 
   const { models: modelOptions } = useAvailableModels(organizationId);
+  const { saveModel: savePersistedModel } = usePersistedAgentModel();
+  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
+  const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
+  const isRemote = sessionType === 'remote';
+  const composerModelOptions = useMemo(
+    () =>
+      isRemote
+        ? [
+            {
+              id: CLI_MODEL_ID,
+              name: cliModelLabel(sessionConfig),
+              variants: [],
+              isPreferred: false,
+            },
+            ...modelOptions,
+          ]
+        : modelOptions,
+    [isRemote, modelOptions, sessionConfig]
+  );
 
   const {
     currentMode,
@@ -84,7 +104,12 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     setCurrentMode,
     setCurrentModel,
     setCurrentVariant,
-  } = useSessionConfigSync({ fetchedData, sessionConfig, modelOptions });
+  } = useSessionConfigSync({
+    fetchedData,
+    sessionConfig,
+    modelOptions: composerModelOptions,
+    isRemote,
+  });
 
   const {
     flatListRef,
@@ -117,9 +142,10 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
         isLastAssistantMessage={index === lastAssistantIndex}
         isSessionStreaming={isStreaming}
         getChildMessages={getChildMessages}
+        defaultReasoningExpanded={reasoningDefaultExpanded}
       />
     ),
-    [lastAssistantIndex, isStreaming, getChildMessages]
+    [lastAssistantIndex, isStreaming, getChildMessages, reasoningDefaultExpanded]
   );
 
   const handleStop = useCallback(async () => {
@@ -158,24 +184,27 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     Boolean(activeQuestion) ||
     (requiresModel && !currentModel);
   const showInteractionCards = activeQuestion ?? activePermission;
-  const composerPlaceholder = getComposerPlaceholder(cloudStatus?.type);
+  const composerPlaceholder =
+    (cloudStatus && COMPOSER_PLACEHOLDERS[cloudStatus.type]) ?? 'Message...';
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, attachments?: AgentAttachmentWire) => {
       if (requiresModel && !currentModel) {
         toast.error('Select a model before sending');
         return;
       }
       try {
+        const isCliModel = currentModel === CLI_MODEL_ID;
         await manager.send({
           payload: {
             type: 'prompt',
             prompt: text,
             mode: currentMode,
-            model: currentModel,
-            variant: currentVariant || undefined,
+            model: isCliModel ? '' : currentModel,
+            variant: isCliModel ? undefined : currentVariant || undefined,
           },
+          ...(attachments ? { attachments } : {}),
         });
       } catch {
         toast.error('Failed to send message. Please try again.');
@@ -259,11 +288,22 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
               onModeChange={setCurrentMode}
               model={currentModel}
               variant={currentVariant}
-              modelOptions={modelOptions}
+              modelOptions={composerModelOptions}
               onModelSelect={(modelId, newVariant) => {
                 setCurrentModel(modelId);
                 setCurrentVariant(newVariant);
+                // The remote-session CLI pseudo-model is not a real model;
+                // persisting it would clobber the real preference.
+                if (modelId !== CLI_MODEL_ID) {
+                  savePersistedModel(organizationId, { model: modelId, variant: newVariant });
+                  persistServerLastSelected({
+                    model: modelId,
+                    ...(newVariant ? { variant: newVariant } : {}),
+                  });
+                }
               }}
+              organizationId={organizationId}
+              attachmentsEnabled={supportsAttachments}
             />
           ))}
       </>

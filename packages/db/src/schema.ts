@@ -7788,6 +7788,9 @@ export const coding_plan_subscriptions = pgTable(
     uniqueIndex('UQ_coding_plan_sub_live_user_plan')
       .on(table.user_id, table.plan_id)
       .where(sql`${table.status} IN ('active', 'past_due')`),
+    uniqueIndex('UQ_coding_plan_sub_live_user_provider')
+      .on(table.user_id, table.provider_id)
+      .where(sql`${table.status} IN ('active', 'past_due')`),
     index('IDX_coding_plan_sub_status').on(table.status),
     index('IDX_coding_plan_sub_renewal').on(table.credit_renewal_at),
     index('IDX_coding_plan_sub_inventory').on(table.key_inventory_id),
@@ -8948,3 +8951,32 @@ export const mcp_gateway_audit_events = pgTable(
 export type MCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferSelect;
 export type NewMCPGatewayAuditEvent = typeof mcp_gateway_audit_events.$inferInsert;
 export type NewModelExperimentRequest = typeof model_experiment_request.$inferInsert;
+
+export type UserModelPreferenceLastSelected = {
+  model: string;
+  variant?: string;
+};
+
+export const user_model_preferences = pgTable(
+  'user_model_preferences',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    favorites: jsonb().$type<string[]>().notNull().default([]),
+    last_selected: jsonb().$type<UserModelPreferenceLastSelected | null>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [uniqueIndex('UQ_user_model_preferences_user_id').on(table.user_id)]
+);
+
+export type UserModelPreference = typeof user_model_preferences.$inferSelect;
+export type NewUserModelPreference = typeof user_model_preferences.$inferInsert;

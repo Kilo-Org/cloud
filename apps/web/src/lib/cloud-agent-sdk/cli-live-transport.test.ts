@@ -258,6 +258,22 @@ describe('CliLiveTransport unified user web connection', () => {
         variant: 'v',
       },
     ],
+    [
+      'send',
+      () => ({
+        payload: {
+          type: 'prompt' as const,
+          prompt: 'hello',
+          mode: 'code',
+        },
+      }),
+      'send_message',
+      {
+        sessionID: KILO_SESSION_ID,
+        parts: [{ type: 'text', text: 'hello' }],
+        agent: 'code',
+      },
+    ],
     ['interrupt', () => undefined, 'interrupt', {}],
     [
       'answer',

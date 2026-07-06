@@ -67,6 +67,19 @@ export function parseOrgIdList(raw: string | undefined): Set<string> {
 }
 
 /**
+ * Returns true when orgId is included in a comma-separated org ID list.
+ * - Empty/unset list → false for everyone.
+ * - '*' → true for everyone.
+ * - Comma-separated list → true only when orgId is present.
+ */
+export function isOrgInList(raw: string | undefined, orgId: string | undefined): boolean {
+  const orgs = parseOrgIdList(raw);
+  if (orgs.size === 0) return false;
+  if (orgs.has('*')) return true;
+  return orgId !== undefined && orgs.has(orgId);
+}
+
+/**
  * Returns the correct DurableObjectNamespace for the given sandbox ID.
  * - Docker-in-Docker sandboxes (dind-* prefix) use SandboxDIND
  * - Code Reviewer ephemeral sandboxes (crv-* prefix) use SandboxCodeReview

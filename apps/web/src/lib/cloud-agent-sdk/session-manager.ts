@@ -35,6 +35,7 @@ import type { UserWebConnection } from './user-web-connection';
 import { generateMessageId } from './message-id';
 import { findLatestContextUsage } from './context-usage';
 import type { ContextUsage } from './context-usage';
+import { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -51,6 +52,7 @@ type SessionConfig = {
   repository: string;
   mode: string;
   model: string;
+  providerID?: string | null;
   variant?: string | null;
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
@@ -177,6 +179,7 @@ type SessionManagerAtoms = {
   agentStatus: W<AgentStatus>;
   cloudStatus: W<CloudStatus | null>;
   sessionConfig: W<SessionConfig | null>;
+  sessionType: W<ActiveSessionType | null>;
   chatUI: W<{ shouldAutoScroll: boolean }>;
   permission: W<PermissionState | null>;
   suggestion: W<SuggestionState | null>;
@@ -333,6 +336,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const agentStatusAtom = atom<AgentStatus>({ type: 'idle' });
   const cloudStatusAtom = atom<CloudStatus | null>(null);
   const sessionConfigAtom = atom<SessionConfig | null>(null);
+  const sessionTypeAtom = atom<ActiveSessionType | null>(null);
   const chatUIAtom = atom<{ shouldAutoScroll: boolean }>({ shouldAutoScroll: true });
   const activeQuestionAtom = atom<StandaloneQuestion | null>(null);
   const permissionAtom = atom<PermissionState | null>(null);
@@ -443,6 +447,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(agentStatusAtom, { type: 'idle' });
     store.set(cloudStatusAtom, null);
     store.set(sessionConfigAtom, null);
+    store.set(sessionTypeAtom, null);
     store.set(activeQuestionAtom, null);
     store.set(permissionAtom, null);
     store.set(activePermissionAtom, null);
@@ -662,6 +667,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       repository: data.repository ?? '',
       mode: data.mode ?? '',
       model: data.model ?? '',
+      providerID: null,
       variant: data.variant ?? null,
       runtimeAgents: data.runtimeAgents,
     });
@@ -724,6 +730,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onResolved: resolved => {
         activeSessionType = resolved.type;
+        store.set(sessionTypeAtom, resolved.type);
         store.set(supportsAttachmentsAtom, resolved.type === 'cloud-agent');
       },
       onBranchChanged: branch => {
@@ -760,12 +767,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           if (
             currentConfig &&
             (currentConfig.model !== event.info.modelID ||
+              currentConfig.providerID !== event.info.providerID ||
               currentConfig.mode !== event.info.agent ||
               currentConfig.variant !== (event.info.variant ?? null))
           ) {
             store.set(sessionConfigAtom, {
               ...currentConfig,
               model: event.info.modelID,
+              providerID: event.info.providerID,
               mode: event.info.agent,
               variant: event.info.variant ?? null,
             });
@@ -954,6 +963,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       agentStatus: agentStatusAtom,
       cloudStatus: cloudStatusAtom,
       sessionConfig: sessionConfigAtom,
+      sessionType: sessionTypeAtom,
       chatUI: chatUIAtom,
       activeQuestion: activeQuestionAtom,
       permission: permissionAtom,
@@ -975,8 +985,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   };
 }
 
-export { createSessionManager, formatError };
+export { CLI_MODEL_ID, cliModelLabel, createSessionManager, formatError };
 export type {
+  ActiveSessionType,
   SessionManager,
   SessionManagerConfig,
   SessionManagerAtoms,

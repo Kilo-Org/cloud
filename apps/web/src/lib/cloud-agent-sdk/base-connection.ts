@@ -76,6 +76,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   let hasConnectedOnce = false;
   let stalenessTimeoutId: ReturnType<typeof setTimeout> | null = null;
   let lastMessageTime = 0;
+  let hiddenAt = 0;
   let preconnectAuthRefreshAttempted = false;
   const stalenessTimeoutMs = config.stalenessTimeoutMs ?? DEFAULT_STALENESS_TIMEOUT_MS;
 
@@ -289,11 +290,28 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     };
   }
 
+  function replaceStaleSocketAndReconnect(currentGeneration: number): void {
+    if (destroyed || intentionalDisconnect || currentGeneration !== generation) return;
+    if (!notifyReplacingConnection(currentGeneration)) return;
+    const staleWs = ws;
+    if (staleWs !== null) {
+      ws = null;
+      staleWs.close();
+    }
+    if (connected) {
+      connected = false;
+      config.onDisconnected();
+    }
+    void refreshAndConnect(currentGeneration);
+  }
+
   function handleVisibilityResume(): void {
     if (destroyed || intentionalDisconnect) return;
 
     // Tab became visible
     reconnectAttempt = 0;
+    const wasHiddenSince = hiddenAt;
+    hiddenAt = 0;
 
     if (ws === null || ws.readyState !== WebSocket.OPEN) {
       clearReconnectTimer();
@@ -306,28 +324,28 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       return;
     }
 
+    // If we were hidden for at least a full staleness window, JS may have been
+    // suspended (e.g. mobile backgrounding) long enough for the OS to silently
+    // drop the socket while readyState still reports OPEN. Waiting another full
+    // timeout for a heartbeat that will never arrive on a zombie socket just
+    // freezes the UI — reconnect immediately instead.
+    if (wasHiddenSince !== 0 && Date.now() - wasHiddenSince >= stalenessTimeoutMs) {
+      replaceStaleSocketAndReconnect(generation);
+      return;
+    }
+
     // Socket appears open but no recent message — wait for the next server
     // heartbeat to confirm liveness; if nothing arrives, treat as stale.
     const currentGeneration = generation;
     stalenessTimeoutId = setTimeout(() => {
       stalenessTimeoutId = null;
-      if (destroyed || intentionalDisconnect || currentGeneration !== generation) return;
-      if (!notifyReplacingConnection(currentGeneration)) return;
-      const staleWs = ws;
-      if (staleWs !== null) {
-        ws = null;
-        staleWs.close();
-      }
-      if (connected) {
-        connected = false;
-        config.onDisconnected();
-      }
-      void refreshAndConnect(currentGeneration);
+      replaceStaleSocketAndReconnect(currentGeneration);
     }, stalenessTimeoutMs);
   }
 
   function handleVisibilityHidden(): void {
     if (destroyed || intentionalDisconnect) return;
+    hiddenAt = Date.now();
     clearStalenessTimeout();
   }
 

@@ -4,15 +4,12 @@ export function getKiloCodeVersionNumber(userAgent: string | null | undefined): 
   return getXKiloCodeVersionNumber(userAgent.slice(userAgentPrefix.length));
 }
 
-// The current Kilo Code extension (and Kilo CLI) send this User-Agent via the
-// shared Kilo gateway headers, e.g. `opencode-kilo-provider/7.1.0`. The CLI omits
-// the version, so a bare `opencode-kilo-provider` yields undefined.
-const openCodeUserAgentPrefix = 'opencode-kilo-provider/';
-export function getOpenCodeKiloVersionNumber(
-  userAgent: string | null | undefined
-): number | undefined {
-  if (!userAgent || !userAgent.startsWith(openCodeUserAgentPrefix)) return undefined;
-  return getXKiloCodeVersionNumber(userAgent.slice(openCodeUserAgentPrefix.length));
+// The legacy ("Roo-based") Kilo Code extension makes its API calls with axios from
+// the Node extension host, which sends `User-Agent: axios/<version>`. The current
+// extension and CLI use the shared Kilo gateway headers instead (`opencode-kilo-provider/...`),
+// so an axios User-Agent is a reliable signal that the client is the legacy extension.
+export function isLegacyKiloExtensionUserAgent(userAgent: string | null | undefined): boolean {
+  return !!userAgent && userAgent.startsWith('axios/');
 }
 export function getXKiloCodeVersionNumber(
   userAgent: string | null | undefined

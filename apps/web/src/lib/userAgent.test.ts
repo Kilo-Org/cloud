@@ -1,8 +1,8 @@
 import { describe, test, expect } from '@jest/globals';
 import {
   getKiloCodeVersionNumber,
-  getOpenCodeKiloVersionNumber,
   getXKiloCodeVersionNumber,
+  isLegacyKiloExtensionUserAgent,
 } from './userAgent';
 
 describe('getKiloCodeVersionNumber', () => {
@@ -56,24 +56,20 @@ describe('getKiloCodeVersionNumber', () => {
   });
 });
 
-describe('getOpenCodeKiloVersionNumber', () => {
-  test('returns undefined for non-opencode user agents', () => {
-    expect(getOpenCodeKiloVersionNumber(null)).toBeUndefined();
-    expect(getOpenCodeKiloVersionNumber(undefined)).toBeUndefined();
-    expect(getOpenCodeKiloVersionNumber('')).toBeUndefined();
-    expect(getOpenCodeKiloVersionNumber('Kilo-Code/7.1.0')).toBeUndefined();
-    // The Kilo CLI sends the base with no version — treated as unknown.
-    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider')).toBeUndefined();
-    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider/')).toBeUndefined();
+describe('isLegacyKiloExtensionUserAgent', () => {
+  test('matches the legacy extension axios User-Agent', () => {
+    expect(isLegacyKiloExtensionUserAgent('axios/1.7.2')).toBe(true);
+    expect(isLegacyKiloExtensionUserAgent('axios/0.27.2')).toBe(true);
   });
 
-  test('parses the current extension User-Agent', () => {
-    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider/7.1.0')).toBeCloseTo(7.001, 10);
-    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider/7.0.0')).toBeCloseTo(7, 10);
-    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider/6.99.9')).toBeCloseTo(6.099009, 10);
-    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider/7.2.3-beta')).toBeCloseTo(
-      7.002003,
-      10
-    );
+  test('does not match current extension, CLI, bot, or missing User-Agents', () => {
+    expect(isLegacyKiloExtensionUserAgent(null)).toBe(false);
+    expect(isLegacyKiloExtensionUserAgent(undefined)).toBe(false);
+    expect(isLegacyKiloExtensionUserAgent('')).toBe(false);
+    expect(isLegacyKiloExtensionUserAgent('opencode-kilo-provider/7.1.0')).toBe(false);
+    expect(isLegacyKiloExtensionUserAgent('opencode-kilo-provider')).toBe(false);
+    expect(isLegacyKiloExtensionUserAgent('Kilo-Code/5.1.0')).toBe(false);
+    expect(isLegacyKiloExtensionUserAgent('Mozilla/5.0 Test Browser')).toBe(false);
+    expect(isLegacyKiloExtensionUserAgent('my-axios/1.0.0')).toBe(false);
   });
 });

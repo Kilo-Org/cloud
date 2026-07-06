@@ -31,25 +31,22 @@ export type KiloNotification = {
   showIn?: ('extension' | 'extension-native' | 'cli')[];
   // ISO 8601 timestamp after which this notification should no longer be shown
   expiresAt?: string;
-  // When specified, only show to clients whose numeric version (major + minor/1000 + patch/1_000_000) is strictly below this value.
-  // Use an integer major version (e.g. 7 means "below 7.x.x"). An unknown/absent client
-  // version is treated as an old (pre-versioning) client and IS shown — legacy extensions
-  // send no version headers, so absence of data means "old", not "hide".
-  extensionVersionBelow?: number;
+  // When true, only show to the legacy ("Roo-based") Kilo Code extension, identified by
+  // its axios User-Agent. Used to target end-of-life notices at legacy-extension users.
+  showOnlyOnLegacyExtension?: boolean;
 };
 
 /**
- * Decide whether a version-gated notification should be shown to a client.
- * Absent version data (undefined) means a legacy/pre-versioning client, which
- * predates version headers and is therefore treated as "below" the threshold.
+ * Decide whether a legacy-targeted notification should be shown to a client.
+ * Notifications flagged showOnlyOnLegacyExtension are shown only when the request
+ * came from the legacy extension (detected via its axios User-Agent).
  */
-export function passesExtensionVersionGate(
-  notification: Pick<KiloNotification, 'extensionVersionBelow'>,
-  numericExtensionVersion: number | undefined
+export function passesLegacyExtensionGate(
+  notification: Pick<KiloNotification, 'showOnlyOnLegacyExtension'>,
+  isLegacyExtension: boolean
 ): boolean {
-  if (notification.extensionVersionBelow === undefined) return true;
-  if (numericExtensionVersion === undefined) return true;
-  return numericExtensionVersion < notification.extensionVersionBelow;
+  if (!notification.showOnlyOnLegacyExtension) return true;
+  return isLegacyExtension;
 }
 
 const normalUnconditionalNotifications: KiloNotification[] = [
@@ -65,7 +62,7 @@ const normalUnconditionalNotifications: KiloNotification[] = [
       actionURL: 'https://github.com/Kilo-Org/kilocode-legacy#legacy-ide-extensions-end-of-life',
     },
     showIn: ['extension'],
-    extensionVersionBelow: 7,
+    showOnlyOnLegacyExtension: true,
   },
   {
     id: 'star-giveaway-june-2026',
@@ -144,7 +141,7 @@ const normalUnconditionalNotifications: KiloNotification[] = [
 
 export async function generateUserNotifications(
   user: User,
-  { numericExtensionVersion }: { numericExtensionVersion?: number } = {}
+  { isLegacyExtension = false }: { isLegacyExtension?: boolean } = {}
 ): Promise<KiloNotification[]> {
   // Pre-fetch shared data once to avoid duplicate DB queries across generators.
   // This eliminates ~5 redundant queries per request (2× userHasOrganizations,
@@ -181,7 +178,7 @@ export async function generateUserNotifications(
   const now = new Date();
   return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications].filter(n => {
     if (n.expiresAt && new Date(n.expiresAt) <= now) return false;
-    if (!passesExtensionVersionGate(n, numericExtensionVersion)) return false;
+    if (!passesLegacyExtensionGate(n, isLegacyExtension)) return false;
     return true;
   });
 }

@@ -2049,6 +2049,31 @@ describe('WrapperSupervisor', () => {
     expect(harness.deleteSandbox).not.toHaveBeenCalled();
   });
 
+  it('does not destroy a sandbox when metadata.workspace is unset when cleanup is exhausted', async () => {
+    const metadata = createMetadata();
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 2,
+            target: { kind: 'session' },
+            reason: 'unhealthy-wrapper',
+            requestedAt: 1_000,
+            nextAttemptAt: 1_000,
+            attempts: 5,
+          },
+        ],
+      ],
+      { metadata }
+    );
+
+    await harness.supervisor.runMaintenance(1_000);
+
+    expect(harness.deleteSandbox).not.toHaveBeenCalled();
+  });
+
   it('clears timeout evidence after cleanup confirms wrapper absence', async () => {
     const harness = createHarness([
       [

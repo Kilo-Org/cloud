@@ -1007,8 +1007,9 @@ export function createWrapperSupervisor(
     const metadata = await getMetadata();
     if (!metadata) return;
     const workspace = metadata.workspace;
-    if (workspace?.sandboxRoute?.kind === 'shared') return;
-    if (workspace?.sandboxId && isGeneratedSharedSandboxId(workspace.sandboxId)) return;
+    if (!workspace?.sandboxId) return;
+    if (workspace.sandboxRoute?.kind === 'shared') return;
+    if (isGeneratedSharedSandboxId(workspace.sandboxId)) return;
     try {
       await deleteSandbox('recovery');
       logger

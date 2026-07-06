@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { logger } from '../logger.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type {
+  SandboxDeleteReason,
   StopWrappersResult,
   WrapperStopReason,
   WrapperStopTarget,
@@ -21,6 +22,7 @@ import {
 import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
 import type { LatestAssistantMessage } from './types.js';
 import type { SandboxId } from '../types.js';
+import { isGeneratedSharedSandboxId } from '../sandbox-id.js';
 import {
   MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_LOG_CHUNK_SIZE,
   MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_MAX_SERIALIZED_BYTES,
@@ -174,6 +176,7 @@ export type WrapperSupervisorDependencies = {
     attemptId: string;
     reason: WrapperStopReason;
   }) => Promise<StopWrappersResult>;
+  deleteSandbox?: (reason: SandboxDeleteReason) => Promise<void>;
   recordSharedSandboxFailover: (routeKey: SandboxId) => Promise<void>;
   requestAlarmAtOrBefore?: (deadline: number) => Promise<void>;
   getSessionIdForLogs: () => string | undefined;
@@ -358,6 +361,7 @@ export function createWrapperSupervisor(
     clearInterruptRequest,
     ensureAcceptedMessageBeforeTerminal,
     stopWrappers,
+    deleteSandbox,
     recordSharedSandboxFailover,
     requestAlarmAtOrBefore,
     getSessionIdForLogs,
@@ -995,6 +999,33 @@ export function createWrapperSupervisor(
         logTag: 'wrapper_cleanup_exhausted',
       })
       .error('Wrapper cleanup attempt limit exhausted');
+    await destroySingleSandboxIfCleanupExhausted();
+  }
+
+  async function destroySingleSandboxIfCleanupExhausted(): Promise<void> {
+    if (!deleteSandbox) return;
+    const metadata = await getMetadata();
+    if (!metadata) return;
+    const workspace = metadata.workspace;
+    if (workspace?.sandboxRoute?.kind === 'shared') return;
+    if (workspace?.sandboxId && isGeneratedSharedSandboxId(workspace.sandboxId)) return;
+    try {
+      await deleteSandbox('recovery');
+      logger
+        .withFields({
+          sessionId: getSessionIdForLogs(),
+          logTag: 'single_sandbox_destroyed_after_cleanup_exhausted',
+        })
+        .warn('Destroyed single sandbox after wrapper cleanup was exhausted');
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: getSessionIdForLogs(),
+          error: error instanceof Error ? error.message : String(error),
+          logTag: 'single_sandbox_destroy_after_cleanup_exhausted_failed',
+        })
+        .error('Failed to destroy single sandbox after wrapper cleanup was exhausted');
+    }
   }
 
   let sharedSandboxFailoverReconciliation: Promise<void> | undefined;

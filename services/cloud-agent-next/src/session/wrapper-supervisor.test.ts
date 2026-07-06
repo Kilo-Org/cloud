@@ -132,6 +132,7 @@ function createHarness(
   const sentPings: string[] = [];
   const stops: string[] = [];
   const stopWrappers = vi.fn().mockResolvedValue({ status: 'absent' });
+  const deleteSandbox = vi.fn().mockResolvedValue(undefined);
   const requestedAlarms: number[] = [];
   const currentMetadata = options?.metadata ?? createMetadata();
   const settlementOutbox = createMessageSettlementOutbox({
@@ -174,6 +175,7 @@ function createHarness(
     ensureAcceptedMessageBeforeTerminal:
       options?.ensureAcceptedMessageBeforeTerminal ?? (async () => {}),
     stopWrappers,
+    deleteSandbox,
     recordSharedSandboxFailover: routeKey => recordSharedSandboxFailover(routeKey),
     requestAlarmAtOrBefore: async deadline => {
       requestedAlarms.push(deadline);
@@ -188,6 +190,7 @@ function createHarness(
     sentPings,
     stops,
     stopWrappers,
+    deleteSandbox,
     requestedAlarms,
     requestPendingDrainIfNeeded,
     recordSharedSandboxFailover,
@@ -1949,6 +1952,101 @@ describe('WrapperSupervisor', () => {
       listProcessesTimeouts: 2,
       failoverPublication: { status: 'recorded', routeKey },
     });
+  });
+
+  it('destroys a single sandbox when wrapper cleanup is exhausted', async () => {
+    const sandboxId = `ses-${'a'.repeat(48)}` as SandboxId;
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId,
+      },
+    } satisfies SessionMetadata;
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 2,
+            target: { kind: 'session' },
+            reason: 'unhealthy-wrapper',
+            requestedAt: 1_000,
+            nextAttemptAt: 1_000,
+            attempts: 5,
+          },
+        ],
+      ],
+      { metadata }
+    );
+
+    await harness.supervisor.runMaintenance(1_000);
+
+    expect(harness.deleteSandbox).toHaveBeenCalledOnce();
+    expect(harness.deleteSandbox).toHaveBeenCalledWith('recovery');
+  });
+
+  it('does not destroy a shared sandbox when wrapper cleanup is exhausted', async () => {
+    const routeKey = `usr-${'d'.repeat(48)}` as SandboxId;
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId: routeKey,
+        sandboxRoute: { kind: 'shared', routeKey },
+      },
+    } satisfies SessionMetadata;
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 2,
+            target: { kind: 'session' },
+            reason: 'unhealthy-wrapper',
+            requestedAt: 1_000,
+            nextAttemptAt: 1_000,
+            attempts: 5,
+          },
+        ],
+      ],
+      { metadata }
+    );
+
+    await harness.supervisor.runMaintenance(1_000);
+
+    expect(harness.deleteSandbox).not.toHaveBeenCalled();
+  });
+
+  it('does not destroy a legacy shared sandbox missing sandboxRoute when cleanup is exhausted', async () => {
+    const sandboxId = `usr-${'e'.repeat(48)}` as SandboxId;
+    const metadata = {
+      ...createMetadata(),
+      workspace: {
+        sandboxId,
+      },
+    } satisfies SessionMetadata;
+    const harness = createHarness(
+      [
+        [
+          'wrapper_lease',
+          {
+            state: 'stop_needed',
+            nextInstanceGeneration: 2,
+            target: { kind: 'session' },
+            reason: 'unhealthy-wrapper',
+            requestedAt: 1_000,
+            nextAttemptAt: 1_000,
+            attempts: 5,
+          },
+        ],
+      ],
+      { metadata }
+    );
+
+    await harness.supervisor.runMaintenance(1_000);
+
+    expect(harness.deleteSandbox).not.toHaveBeenCalled();
   });
 
   it('clears timeout evidence after cleanup confirms wrapper absence', async () => {

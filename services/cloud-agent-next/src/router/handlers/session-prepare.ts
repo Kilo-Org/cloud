@@ -227,6 +227,7 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
         url: gitUrl,
         workspaceUuid: input.bitbucketWorkspaceUuid,
         repositoryUuid: input.bitbucketRepositoryUuid,
+        bitbucketIntegrationId: input.bitbucketIntegrationId,
         branch: input.upstreamBranch,
       };
     } else {

@@ -14,6 +14,7 @@ export type {
 } from './kilo-gateway-chat-client';
 
 export interface KiloGatewayModelOption {
+  readonly contextLength?: number;
   readonly hasUserByokAvailable?: boolean;
   readonly id: string;
   readonly isFree?: boolean;
@@ -45,6 +46,7 @@ interface FetchKiloOrganizationsOptions {
 }
 
 interface ParsedGatewayModelOption {
+  contextLength?: number;
   hasUserByokAvailable?: boolean;
   id: string;
   isFree?: boolean;
@@ -64,6 +66,7 @@ const modelSchema = z.object({
       input_modalities: z.array(z.string()).optional(),
     })
     .optional(),
+  context_length: z.number().nullable().optional(),
   hasUserByokAvailable: z.boolean().optional(),
   id: nonEmptyStringSchema,
   isFree: z.boolean().optional(),
@@ -129,6 +132,7 @@ const compareModelOptions = (
 
 const toGatewayModelOption = (model: ParsedGatewayModelOption): KiloGatewayModelOption => {
   const option: {
+    contextLength?: number;
     hasUserByokAvailable?: boolean;
     id: string;
     isFree?: boolean;
@@ -143,6 +147,10 @@ const toGatewayModelOption = (model: ParsedGatewayModelOption): KiloGatewayModel
     name: model.name,
     variants: model.variants,
   };
+
+  if (model.contextLength !== undefined) {
+    option.contextLength = model.contextLength;
+  }
 
   if (model.hasUserByokAvailable !== undefined) {
     option.hasUserByokAvailable = model.hasUserByokAvailable;
@@ -183,6 +191,11 @@ export const parseKiloGatewayModelsResponse = (value: unknown): KiloGatewayModel
         isPreferred: model.data.preferredIndex !== undefined,
         name: formatShortModelName(model.data.name),
         variants: getModelVariants(model.data),
+        ...(model.data.context_length !== undefined &&
+        model.data.context_length !== null &&
+        model.data.context_length > 0
+          ? { contextLength: model.data.context_length }
+          : {}),
         ...(model.data.hasUserByokAvailable === undefined
           ? {}
           : { hasUserByokAvailable: model.data.hasUserByokAvailable }),

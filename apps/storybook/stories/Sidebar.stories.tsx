@@ -40,6 +40,7 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar';
+import { AppShellSkipLink } from '@/components/AppShellSkipLink';
 import { OrganizationSwitcherView } from '@/app/(app)/components/OrganizationSwitcher';
 import SidebarMenuList from '@/app/(app)/components/SidebarMenuList';
 import SidebarUserFooter from '@/app/(app)/components/SidebarUserFooter';
@@ -294,7 +295,7 @@ function StoryOrganizationSwitcher() {
 
 function StoryTopbar({ title }: { title: string }) {
   return (
-    <header className="bg-background sticky top-0 z-10 flex h-14 shrink-0 items-center border-b">
+    <header className="bg-background sticky top-0 z-10 flex h-14 shrink-0 items-center border-b border-border">
       <div className="flex aspect-square h-14 items-center justify-center">
         <SidebarTrigger className="-ml-1" />
       </div>
@@ -309,7 +310,9 @@ function StoryInset({ title, children }: { title: string; children: ReactNode })
   return (
     <SidebarInset>
       <StoryTopbar title={title} />
-      <main className="bg-background w-full flex-1">{children}</main>
+      <main id="main-content" tabIndex={-1} className="bg-background w-full flex-1">
+        {children}
+      </main>
     </SidebarInset>
   );
 }
@@ -317,6 +320,7 @@ function StoryInset({ title, children }: { title: string; children: ReactNode })
 function AppSidebarShell({ children }: { children: ReactNode }) {
   return (
     <SidebarProvider defaultOpen>
+      <AppShellSkipLink />
       <div className="flex min-h-screen w-full">
         {children}
         <StoryInset title="Sessions">

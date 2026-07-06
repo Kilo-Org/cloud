@@ -2,6 +2,7 @@ import { credit_transactions as creditTransactionsTable, organizations } from '@
 import {
   processOrganizationExpirations,
   fetchExpiringTransactionsForOrganization,
+  closeOutExpiringOrganizationCredits,
 } from './creditExpiration';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -427,5 +428,117 @@ describe('processOrganizationExpirations', () => {
       .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
     expect(expirations).toHaveLength(1);
     expect(expirations[0].amount_microdollars).toBe(0);
+  });
+});
+
+describe('closeOutExpiringOrganizationCredits', () => {
+  let ownerId: string;
+  let orgId: string;
+
+  beforeAll(async () => {
+    const owner = await insertTestUser({
+      google_user_email: `close-out-exp-org-${Date.now()}@example.com`,
+    });
+    ownerId = owner.id;
+  });
+
+  beforeEach(async () => {
+    const org = await createTestOrg(ownerId);
+    orgId = org!.id;
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.organization_id, orgId));
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+  });
+
+  it('does nothing when there are no open expiring transactions', async () => {
+    const closedOut = await db.transaction(tx => closeOutExpiringOrganizationCredits(orgId, 0, tx));
+
+    expect(closedOut).toBe(0);
+    const expirations = await db
+      .select()
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.organization_id, orgId));
+    expect(expirations).toHaveLength(0);
+  });
+
+  it('closes out an unclaimed grant regardless of its expiry_date', async () => {
+    const txnId = randomUUID();
+    await db.insert(creditTransactionsTable).values({
+      id: txnId,
+      kilo_user_id: ownerId,
+      organization_id: orgId,
+      amount_microdollars: 10_000_000,
+      is_free: true,
+      expiry_date: '2030-01-01T00:00:00Z', // far in the future, not yet due
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 0,
+      description: 'Still-open grant',
+    });
+
+    const closedOut = await db.transaction(tx => closeOutExpiringOrganizationCredits(orgId, 0, tx));
+
+    expect(closedOut).toBe(-10_000_000);
+
+    const expirations = await db
+      .select()
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
+    expect(expirations).toHaveLength(1);
+    expect(expirations[0].amount_microdollars).toBe(-10_000_000);
+    expect(expirations[0].original_transaction_id).toBe(txnId);
+
+    // Once closed out, it is no longer reported as an open expiring transaction.
+    const stillOpen = await fetchExpiringTransactionsForOrganization(orgId);
+    expect(stillOpen).toHaveLength(0);
+  });
+
+  it('only closes out the unclaimed portion of a partially-used grant', async () => {
+    const txnId = randomUUID();
+    await db.insert(creditTransactionsTable).values({
+      id: txnId,
+      kilo_user_id: ownerId,
+      organization_id: orgId,
+      amount_microdollars: 10_000_000,
+      is_free: true,
+      expiry_date: '2030-01-01T00:00:00Z',
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 0,
+      description: 'Partially used grant',
+    });
+
+    const closedOut = await db.transaction(tx =>
+      closeOutExpiringOrganizationCredits(orgId, 4_000_000, tx)
+    );
+
+    expect(closedOut).toBe(-6_000_000);
+  });
+
+  it('is idempotent — a second call finds nothing left to close out', async () => {
+    await db.insert(creditTransactionsTable).values({
+      kilo_user_id: ownerId,
+      organization_id: orgId,
+      amount_microdollars: 10_000_000,
+      is_free: true,
+      expiry_date: '2030-01-01T00:00:00Z',
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 0,
+      description: 'Grant',
+    });
+
+    await db.transaction(tx => closeOutExpiringOrganizationCredits(orgId, 0, tx));
+    const secondCall = await db.transaction(tx =>
+      closeOutExpiringOrganizationCredits(orgId, 0, tx)
+    );
+
+    expect(secondCall).toBe(0);
+    const expirations = await db
+      .select()
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
+    expect(expirations).toHaveLength(1);
   });
 });

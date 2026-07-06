@@ -5,9 +5,10 @@ import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { filterByFeature } from '@/lib/ai-gateway/models';
 import { resolveOrganizationRouteIdentifier } from '@/lib/organizations/organization-route-utils.server';
 import { TRPCError } from '@trpc/server';
+import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const routeIdentifier = (await params).id;
+  const routeIdentifier = decodeURIComponent((await params).id);
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
 
   return handleTRPCRequest<OpenRouterModelsResponse>(request, async caller => {
@@ -17,6 +18,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const result = await caller.organizations.settings.listAvailableModels({ organizationId });
-    return { ...result, data: filterByFeature(result.data, feature) };
+    return {
+      ...result,
+      data: await addAutoRoutingModels(filterByFeature(result.data, feature)),
+    };
   });
 }

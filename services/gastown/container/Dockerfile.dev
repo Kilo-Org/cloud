@@ -1,8 +1,10 @@
 FROM --platform=linux/arm64 oven/bun:1-slim
 
+ARG DEBIAN_FRONTEND=noninteractive
+
 # Install dev toolchain, search tools, build deps, gh CLI, and Node.js
 # Package categories:
-#   version control: git, git-lfs
+#   version control: git; Git LFS binary is extracted below
 #   network/download: curl, wget, ca-certificates, gnupg, unzip
 #   build toolchain: build-essential, autoconf, cmake, pkg-config
 #   search tools: ripgrep, jq
@@ -20,7 +22,6 @@ FROM --platform=linux/arm64 oven/bun:1-slim
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
       git \
-      git-lfs \
       curl \
       wget \
       ca-certificates \
@@ -59,10 +60,14 @@ RUN apt-get update && \
          > /etc/apt/sources.list.d/github-cli.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends gh \
+    && apt-get install -y --download-only --no-install-recommends git-lfs \
+    && dpkg-deb -x /var/cache/apt/archives/git-lfs_*.deb / \
+    && git config --system filter.lfs.clean "git-lfs clean -- %f" \
+    && git config --system filter.lfs.smudge "git-lfs smudge -- %f" \
+    && git config --system filter.lfs.process "git-lfs filter-process" \
+    && git config --system filter.lfs.required true \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-RUN git lfs install --system
 
 # Install Kilo CLI globally via npm (needs real Node.js runtime).
 # npm's global install does not resolve optionalDependencies, so we must

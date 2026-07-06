@@ -218,7 +218,7 @@ describe('Stytch Fingerprint Functions', () => {
     });
 
     test('should autoban user when verdict is BLOCK with SMART_RATE_LIMIT_BANNED reason', async () => {
-      const user = await insertTestUser();
+      const user = await insertTestUser({ api_token_pepper: 'initial-pepper' });
       const fingerprintData = {
         ...createMockFingerprintData(),
         verdict: {
@@ -234,13 +234,16 @@ describe('Stytch Fingerprint Functions', () => {
 
       const updatedUser = await db.query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, user.id),
-        columns: { blocked_reason: true },
+        columns: { blocked_reason: true, api_token_pepper: true },
       });
       expect(updatedUser?.blocked_reason).toBe('autoban: stytch SMART_RATE_LIMIT_BANNED');
+      // Blocking rotates the pepper so existing API tokens are revoked everywhere.
+      expect(updatedUser?.api_token_pepper).toEqual(expect.any(String));
+      expect(updatedUser?.api_token_pepper).not.toBe('initial-pepper');
     });
 
     test('should not overwrite existing blocked_reason when autobanning', async () => {
-      const user = await insertTestUser();
+      const user = await insertTestUser({ api_token_pepper: 'initial-pepper' });
       await db
         .update(kilocode_users)
         .set({ blocked_reason: 'already blocked' })
@@ -261,9 +264,11 @@ describe('Stytch Fingerprint Functions', () => {
 
       const updatedUser = await db.query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, user.id),
-        columns: { blocked_reason: true },
+        columns: { blocked_reason: true, api_token_pepper: true },
       });
       expect(updatedUser?.blocked_reason).toBe('already blocked');
+      // Already-blocked users are left untouched, including their pepper.
+      expect(updatedUser?.api_token_pepper).toBe('initial-pepper');
     });
 
     test('should not autoban when verdict is BLOCK without SMART_RATE_LIMIT_BANNED reason', async () => {

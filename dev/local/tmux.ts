@@ -211,7 +211,9 @@ function listWindows(sessionName: string): WindowInfo[] {
 }
 
 function renameWindow(sessionName: string, windowTarget: string | number, newName: string): void {
-  execSync(`tmux rename-window -t ${sessionName}:${windowTarget} ${newName}`, { stdio: 'ignore' });
+  execSync(`tmux rename-window -t ${sessionName}:${windowTarget} ${escapeForShell(newName)}`, {
+    stdio: 'ignore',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -328,10 +330,23 @@ function breakPane(
   newWindowName: string
 ): number {
   const output = execSync(
-    `tmux break-pane -d -s ${sessionName}:${windowTarget}.${pane} -n ${newWindowName} -P -F "#{window_index}"`,
+    `tmux break-pane -d -s ${sessionName}:${windowTarget}.${pane} -n ${escapeForShell(
+      newWindowName
+    )} -P -F "#{window_index}"`,
     { encoding: 'utf-8' }
   ).trim();
-  return parseInt(output, 10);
+  const windowIndex = parseInt(output, 10);
+
+  // tmux creates windows from break-pane with automatic-rename enabled. On
+  // tmux 3.7, the new window is immediately renamed to the shell command
+  // (for example "zsh"), even when -n is provided. The dev dashboard later
+  // finds service panes by window name, so pin the service name after moving.
+  execSync(`tmux set-window-option -t ${sessionName}:${windowIndex} automatic-rename off`, {
+    stdio: 'ignore',
+  });
+  renameWindow(sessionName, windowIndex, newWindowName);
+
+  return windowIndex;
 }
 
 /** Count panes in a window */
@@ -384,6 +399,26 @@ function isPaneRunningCommand(sessionName: string, pane: PaneInfo): boolean {
     ).trim();
     const commandName = path.basename(command).replace(/^-/, '');
     return commandName !== '' && !['bash', 'fish', 'nu', 'sh', 'tcsh', 'zsh'].includes(commandName);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether the pane's shell currently has a child process. `pane_current_command`
+ * cannot answer this: services run under a `$SHELL -lc '<cmd>; exec $SHELL -l'`
+ * wrapper, so it reports the wrapper shell even while the service is alive.
+ * Used to tell "service still shutting down" from "idle shell, safe to type".
+ */
+function paneHasRunningChild(sessionName: string, pane: PaneInfo): boolean {
+  try {
+    const panePid = execSync(
+      `tmux display-message -p -t ${sessionName}:${pane.windowIndex}.${pane.paneIndex} "#{pane_pid}"`,
+      { encoding: 'utf-8' }
+    ).trim();
+    if (!/^\d+$/.test(panePid)) return false;
+    execSync(`pgrep -P ${panePid}`, { stdio: 'ignore' });
+    return true; // pgrep exits 0 only when at least one child matches
   } catch {
     return false;
   }
@@ -489,6 +524,7 @@ export {
   countPanes,
   findServicePane,
   isPaneRunningCommand,
+  paneHasRunningChild,
   selectPane,
   setPaneTitle,
   enablePaneBorders,

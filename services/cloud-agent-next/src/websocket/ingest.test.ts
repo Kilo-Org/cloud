@@ -41,6 +41,7 @@ function createFakeDOContext(): IngestDOContext {
     updateKiloSessionId: vi.fn().mockResolvedValue(undefined),
     updateUpstreamBranch: vi.fn().mockResolvedValue(undefined),
     setAvailableCommands: vi.fn().mockResolvedValue(undefined),
+    handleWrapperTerminalEvent: vi.fn().mockResolvedValue(undefined),
     terminalizeSessionMessageOnce: vi.fn().mockResolvedValue(undefined),
     wrapperSupervisor: {
       checkReconnect: vi.fn().mockResolvedValue({ accepted: true }),
@@ -49,7 +50,6 @@ function createFakeDOContext(): IngestDOContext {
       observePong: vi.fn().mockResolvedValue(undefined),
       observeMeaningfulOutput: vi.fn().mockResolvedValue(undefined),
       observeFinalizing: vi.fn().mockResolvedValue(undefined),
-      onTerminalEvent: vi.fn().mockResolvedValue(undefined),
     },
   };
 }
@@ -536,7 +536,7 @@ describe('createIngestHandler', () => {
       expect(ws.close).toHaveBeenCalledWith(4401, 'Obsolete wrapper connection');
       expect(eventQueries.insert).not.toHaveBeenCalled();
       expect(broadcastFn).not.toHaveBeenCalled();
-      expect(doContext.wrapperSupervisor.onTerminalEvent).not.toHaveBeenCalled();
+      expect(doContext.handleWrapperTerminalEvent).not.toHaveBeenCalled();
       expect(doContext.wrapperSupervisor.isCurrentConnection).not.toHaveBeenCalled();
     });
 
@@ -1247,7 +1247,7 @@ describe('createIngestHandler', () => {
         makeStreamMessage('error', { fatal: true, ...failure })
       );
 
-      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+      expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith({
         wrapperRunId: WRAPPER_RUN_ID,
         status: 'failed',
         ...failure,
@@ -1276,9 +1276,30 @@ describe('createIngestHandler', () => {
       await handler.handleIngestMessage(ws, message);
 
       expect(doContext.terminalizeSessionMessageOnce).not.toHaveBeenCalled();
-      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith(
+      expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'completed', wrapperRunId: WRAPPER_RUN_ID })
       );
+    });
+
+    it('routes wrapper complete events through the terminal lifecycle callback', async () => {
+      const doContext = createNewPathDOContext();
+      const handler = createIngestHandler(
+        createFakeState(),
+        createFakeEventQueries(),
+        SESSION_ID,
+        vi.fn(),
+        doContext
+      );
+      const ws = createFakeWebSocket(makeNewPathAttachment());
+
+      await handler.handleIngestMessage(ws, makeStreamMessage('complete', { exitCode: 0 }));
+
+      expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith({
+        status: 'completed',
+        wrapperRunId: WRAPPER_RUN_ID,
+        gateResult: undefined,
+        messageIds: undefined,
+      });
     });
 
     it('forwards legacy wrapper complete events without sealed membership', async () => {
@@ -1294,7 +1315,7 @@ describe('createIngestHandler', () => {
 
       await handler.handleIngestMessage(ws, makeStreamMessage('complete', { exitCode: 0 }));
 
-      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+      expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith({
         status: 'completed',
         wrapperRunId: WRAPPER_RUN_ID,
         gateResult: undefined,
@@ -1348,7 +1369,7 @@ describe('createIngestHandler', () => {
       expect(JSON.stringify(vi.mocked(eventQueries.insert).mock.calls)).not.toContain(
         'must be dropped'
       );
-      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+      expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith({
         wrapperRunId: WRAPPER_RUN_ID,
         status: 'failed',
         error: rawError,
@@ -1409,7 +1430,7 @@ describe('createIngestHandler', () => {
       });
       expect(publicCalls).not.toContain('retired-model');
       expect(publicCalls).not.toContain('vendor/alpha-model');
-      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+      expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith({
         wrapperRunId: WRAPPER_RUN_ID,
         status: 'failed',
         error: 'Model not found: kilo/retired-model',
@@ -1448,7 +1469,7 @@ describe('createIngestHandler', () => {
         })
       );
 
-      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+      expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith({
         wrapperRunId: WRAPPER_RUN_ID,
         status: 'failed',
         error: 'Rate limit exceeded for provider request',
@@ -1481,7 +1502,7 @@ describe('createIngestHandler', () => {
         })
       );
 
-      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+      expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith({
         wrapperRunId: WRAPPER_RUN_ID,
         status: 'failed',
         error: 'Wrapper process exited unexpectedly',
@@ -1535,7 +1556,7 @@ describe('createIngestHandler', () => {
       expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ payload: safePayload }));
       expect(JSON.stringify(vi.mocked(broadcast).mock.calls)).not.toContain('secret-');
       expect(JSON.stringify(vi.mocked(eventQueries.insert).mock.calls)).not.toContain('drop-me');
-      expect(doContext.wrapperSupervisor.onTerminalEvent).toHaveBeenCalledWith({
+      expect(doContext.handleWrapperTerminalEvent).toHaveBeenCalledWith({
         wrapperRunId: WRAPPER_RUN_ID,
         status: 'interrupted',
         error: input.reason,

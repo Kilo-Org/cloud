@@ -76,14 +76,12 @@ describe('security headers', () => {
 
   it('derives configured connect-src origins from public URLs', () => {
     const env: Record<string, string | undefined> = {
-      NEXT_PUBLIC_CLOUD_AGENT_WS_URL: 'wss://agent.example.com/path',
       NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL: 'wss://next-agent.example.com/path',
       NEXT_PUBLIC_SESSION_INGEST_WS_URL: 'wss://ingest.example.com/path',
       NEXT_PUBLIC_GASTOWN_URL: 'https://gastown.example.com/api',
     };
 
     expect(getConfiguredConnectSrcOrigins(env)).toEqual([
-      'wss://agent.example.com',
       'wss://next-agent.example.com',
       'wss://ingest.example.com',
       'https://gastown.example.com',

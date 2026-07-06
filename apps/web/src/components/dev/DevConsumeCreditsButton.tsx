@@ -5,9 +5,11 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/ui/input';
 import { DollarSign } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export function DevConsumeCreditsButton() {
   const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -16,9 +18,10 @@ export function DevConsumeCreditsButton() {
   const handleConsume = async () => {
     const dollarAmount = parseFloat(amount);
     if (isNaN(dollarAmount) || dollarAmount <= 0) {
-      alert('Please enter a valid amount greater than 0');
+      setAmountError('Enter an amount greater than 0.');
       return;
     }
+    setAmountError(null);
 
     setIsLoading(true);
     try {
@@ -40,7 +43,7 @@ export function DevConsumeCreditsButton() {
       router.refresh();
     } catch (error) {
       console.error('Error consuming credits:', error);
-      alert(
+      toast.error(
         error instanceof Error ? error.message : 'Failed to consume credits. Please try again.'
       );
     } finally {
@@ -57,9 +60,14 @@ export function DevConsumeCreditsButton() {
           min="0"
           placeholder="Amount in dollars"
           value={amount}
-          onChange={e => setAmount(e.target.value)}
+          onChange={e => {
+            setAmount(e.target.value);
+            if (amountError) setAmountError(null);
+          }}
           className="max-w-[200px]"
           disabled={isLoading}
+          aria-invalid={amountError !== null}
+          aria-describedby={amountError ? 'dev-consume-amount-error' : undefined}
         />
         <Button
           type="button"
@@ -73,6 +81,11 @@ export function DevConsumeCreditsButton() {
           {isLoading ? 'Consuming... (very slow, be patient)' : 'Consume'}
         </Button>
       </div>
+      {amountError && (
+        <p id="dev-consume-amount-error" className="text-destructive text-xs">
+          {amountError}
+        </p>
+      )}
     </div>
   );
 }

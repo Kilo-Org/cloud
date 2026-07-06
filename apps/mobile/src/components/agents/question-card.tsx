@@ -135,12 +135,12 @@ export function QuestionCard({
   const hasAnyAnswer = hasOptionSelected || hasCustomAnswer;
 
   return (
-    <View className="mx-4 my-2 overflow-hidden rounded-xl border border-border bg-card">
+    <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
       <View className="border-b border-border bg-secondary px-4 py-3">
         <Text className="text-sm font-medium">Agent Needs Input</Text>
       </View>
 
-      <ScrollView className="max-h-96" keyboardShouldPersistTaps="handled">
+      <ScrollView className="max-h-96 shrink" keyboardShouldPersistTaps="handled">
         <View className="gap-4 p-4">
           {questions.map((question, qIndex) => {
             const allowCustom = question.custom !== false;

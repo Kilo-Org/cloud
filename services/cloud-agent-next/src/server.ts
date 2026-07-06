@@ -5,7 +5,7 @@ import { appRouter } from './router.js';
 import type { Env } from './types.js';
 import type { HonoContext } from './hono-context.js';
 import { logger, withLogTags } from './logger.js';
-import { validateStreamTicket, validateKiloToken } from './auth.js';
+import { resolveSecret, validateStreamTicket, validateKiloToken } from './auth.js';
 import { createErrorHandler, createNotFoundHandler } from '@kilocode/worker-utils';
 import { createCallbackQueueConsumer } from './callbacks/index.js';
 import type { CallbackJob } from './callbacks/index.js';
@@ -68,7 +68,8 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
     return new Response('Missing ticket', { status: 401 });
   }
 
-  const ticketResult = validateStreamTicket(ticket, env.NEXTAUTH_SECRET);
+  const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET);
+  const ticketResult = validateStreamTicket(ticket, nextAuthSecret);
   if (!ticketResult.success) {
     logger
       .withFields({ cloudAgentSessionId, error: ticketResult.error })
@@ -186,10 +187,8 @@ async function routeToUserKiloFacade(
 }
 
 async function routeAuthenticatedKiloFacade(c: Context<HonoContext>): Promise<Response> {
-  const authResult = await validateKiloToken(
-    c.req.header('Authorization') ?? null,
-    c.env.NEXTAUTH_SECRET
-  );
+  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const authResult = await validateKiloToken(c.req.header('Authorization') ?? null, nextAuthSecret);
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
@@ -219,7 +218,8 @@ app.get('/stream', async (c: Context<HonoContext>) => {
     return c.text('Missing ticket', 401);
   }
 
-  const ticketResult = validateStreamTicket(ticket, c.env.NEXTAUTH_SECRET);
+  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const ticketResult = validateStreamTicket(ticket, nextAuthSecret);
   if (!ticketResult.success) {
     logger
       .withFields({ cloudAgentSessionId, error: ticketResult.error })
@@ -289,10 +289,8 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
     return c.text('Invalid userId encoding', 400);
   }
 
-  const authResult = await validateKiloToken(
-    c.req.header('Authorization') ?? null,
-    c.env.NEXTAUTH_SECRET
-  );
+  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const authResult = await validateKiloToken(c.req.header('Authorization') ?? null, nextAuthSecret);
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
@@ -380,7 +378,8 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
   }
 
   const authHeader = c.req.header('Authorization');
-  const authResult = await validateKiloToken(authHeader ?? null, c.env.NEXTAUTH_SECRET);
+  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const authResult = await validateKiloToken(authHeader ?? null, nextAuthSecret);
   if (!authResult.success) {
     return c.text(authResult.error, 401);
   }
@@ -432,7 +431,8 @@ app.put(
     }
 
     const authHeader = c.req.header('Authorization');
-    const authResult = await validateKiloToken(authHeader ?? null, c.env.NEXTAUTH_SECRET);
+    const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+    const authResult = await validateKiloToken(authHeader ?? null, nextAuthSecret);
     if (!authResult.success) {
       return c.text(authResult.error, 401);
     }

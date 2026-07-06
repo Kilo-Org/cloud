@@ -876,7 +876,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
       : sandboxIdFromUserId(userId);
     const isNew = !this.s.status;
     if (opts?.instanceId && !opts.freshProvision && isNew) {
-      throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
+      throw Object.assign(new Error('Instance not provisioned'), {
+        status: 404,
+      });
     }
     if (!isNew && opts?.provider && opts.provider !== this.s.provider) {
       throw Object.assign(
@@ -1290,7 +1292,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         });
         this.s.botIdentityApplyPending = false;
         pending.botIdentityApplyPending = false;
-        doLog(this.s, 'flushPendingConfigToGateway: bot identity applied', { reason });
+        doLog(this.s, 'flushPendingConfigToGateway: bot identity applied', {
+          reason,
+        });
       } catch (err) {
         doWarn(this.s, 'flushPendingConfigToGateway: bot identity failed; will retry', {
           reason,
@@ -1311,7 +1315,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         });
         this.s.execPresetApplyPending = false;
         pending.execPresetApplyPending = false;
-        doLog(this.s, 'flushPendingConfigToGateway: exec preset applied', { reason });
+        doLog(this.s, 'flushPendingConfigToGateway: exec preset applied', {
+          reason,
+        });
       } catch (err) {
         doWarn(this.s, 'flushPendingConfigToGateway: exec preset failed; will retry', {
           reason,
@@ -1328,7 +1334,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         }
         this.s.channelsApplyPending = false;
         pending.channelsApplyPending = false;
-        doLog(this.s, 'flushPendingConfigToGateway: channels applied', { reason });
+        doLog(this.s, 'flushPendingConfigToGateway: channels applied', {
+          reason,
+        });
       } catch (err) {
         doWarn(this.s, 'flushPendingConfigToGateway: channels failed; will retry', {
           reason,
@@ -1651,7 +1659,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     );
 
     // Merge catalog secrets (remapped to env var names) with custom secrets
-    const remappedSecrets: Record<string, EncryptedEnvelope> = { ...customSecrets };
+    const remappedSecrets: Record<string, EncryptedEnvelope> = {
+      ...customSecrets,
+    };
     for (const [key, value] of Object.entries(cleanedSecrets)) {
       const envName = FIELD_KEY_TO_ENV_VAR.get(key) ?? key;
       remappedSecrets[envName] = value;
@@ -2090,7 +2100,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     }
 
     if (!this.s.userId || !this.s.sandboxId) {
-      throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
+      throw Object.assign(new Error('Instance not provisioned'), {
+        status: 404,
+      });
     }
 
     const isFlyProvider = this.s.provider === 'fly';
@@ -2503,7 +2515,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.sandboxId) {
-      throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
+      throw Object.assign(new Error('Instance not provisioned'), {
+        status: 404,
+      });
     }
     const previousStatus = this.s.status;
     if (
@@ -2683,7 +2697,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
         ...pendingCleanup,
         releaseProvisionReservation: true,
       } satisfies PendingRegistryCleanup;
-      await this.ctx.storage.put({ [PENDING_REGISTRY_CLEANUP_KEY]: permittedCleanup });
+      await this.ctx.storage.put({
+        [PENDING_REGISTRY_CLEANUP_KEY]: permittedCleanup,
+      });
       await this.cleanupRegistryAfterFinalizedDestroy(
         permittedCleanup.userId,
         permittedCleanup.orgId,
@@ -2697,7 +2713,9 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     await this.loadState();
 
     if (!this.s.userId || !this.s.sandboxId) {
-      throw Object.assign(new Error('Instance not provisioned'), { status: 404 });
+      throw Object.assign(new Error('Instance not provisioned'), {
+        status: 404,
+      });
     }
     if (this.s.status === 'restoring') {
       throw new Error('Cannot destroy: instance is restoring from snapshot');
@@ -2993,7 +3011,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     let envKeyAppDOKey: string | null = null;
     try {
       if (this.s.userId || this.s.sandboxId) {
-        envKeyAppDOKey = getAppKey({ userId: this.s.userId, sandboxId: this.s.sandboxId });
+        envKeyAppDOKey = getAppKey({
+          userId: this.s.userId,
+          sandboxId: this.s.sandboxId,
+        });
         const appStub = this.env.KILOCLAW_APP.get(this.env.KILOCLAW_APP.idFromName(envKeyAppDOKey));
         envKeyDiag = await appStub.getDiagnostics();
       }
@@ -3112,7 +3133,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
    * Used by the controller checkin handler to trigger the one-time "instance
    * ready" email and mobile push.
    */
-  async tryMarkInstanceReady(): Promise<{ shouldNotify: boolean; userId: string | null }> {
+  async tryMarkInstanceReady(): Promise<{
+    shouldNotify: boolean;
+    userId: string | null;
+  }> {
     await this.loadState();
     if (this.s.instanceReadyEmailSent) {
       return { shouldNotify: false, userId: this.s.userId };
@@ -3140,7 +3164,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     return fly.listVolumeSnapshots(flyConfig, this.s.flyVolumeId);
   }
 
-  async cleanupRecoveryPreviousVolume(): Promise<{ ok: true; deletedVolumeId: string | null }> {
+  async cleanupRecoveryPreviousVolume(): Promise<{
+    ok: true;
+    deletedVolumeId: string | null;
+  }> {
     await this.loadState();
     return cleanupRecoveryPreviousVolume(this.recoveryRuntime());
   }
@@ -3158,7 +3185,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
     const usable = allVolumes.filter(v => v.state !== 'destroyed' && v.state !== 'destroying');
     return {
       currentVolumeId: this.s.flyVolumeId,
-      volumes: usable.map(v => ({ ...v, isCurrent: v.id === this.s.flyVolumeId })),
+      volumes: usable.map(v => ({
+        ...v,
+        isCurrent: v.id === this.s.flyVolumeId,
+      })),
     };
   }
 
@@ -3891,7 +3921,10 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   }
 
   /** Returns null if the controller is too old to have the /_kilo/config/read endpoint. */
-  async getOpenclawConfig(): Promise<{ config: Record<string, unknown>; etag?: string } | null> {
+  async getOpenclawConfig(): Promise<{
+    config: Record<string, unknown>;
+    etag?: string;
+  } | null> {
     await this.loadState();
     return gateway.getOpenclawConfig(this.s, this.env);
   }
@@ -4014,6 +4047,11 @@ export class KiloClawInstance extends DurableObject<KiloClawEnv> {
   async importOpenclawWorkspace(files: Array<{ path: string; content: string }>) {
     await this.loadState();
     return gateway.importOpenclawWorkspace(this.s, this.env, files);
+  }
+
+  async exportOpenclawWorkspace(request: { format: 'tar.gz' | 'zip'; password?: string }) {
+    await this.loadState();
+    return gateway.exportOpenclawWorkspace(this.s, this.env, request);
   }
 
   async getMorningBriefingStatus() {

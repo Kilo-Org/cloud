@@ -20,6 +20,7 @@ const authorization: BitbucketWorkspaceAccessTokenAuthorization = {
   integrationId: '123e4567-e89b-12d3-a456-426614174033',
   credentialId: '123e4567-e89b-12d3-a456-426614174034',
   credentialVersion: 7,
+  providerScopes: ['account', 'pullrequest', 'repository', 'repository:write', 'webhook'],
   workspace: { uuid: workspaceUuid, slug: 'acme' },
 };
 const repository: BitbucketRepository = {
@@ -227,7 +228,7 @@ describe('Bitbucket runtime token resolver', () => {
     [{ workspaceUuid: '123e4567-e89b-12d3-a456-426614174099' }, 'workspace_mismatch'],
     [{ repositoryUrl: 'https://bitbucket.org/other/widgets.git' }, 'workspace_mismatch'],
     [{ repositoryUrl: 'https://user@bitbucket.org/acme/widgets.git' }, 'invalid_request'],
-    [{ integrationId: '123e4567-e89b-12d3-a456-426614174099' }, 'not_connected'],
+    [{ expectedIntegrationId: '123e4567-e89b-12d3-a456-426614174099' }, 'integration_mismatch'],
   ] as const)(
     'fails before provider access when request identity drifts %#',
     async (overrides, reason) => {

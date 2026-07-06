@@ -27,19 +27,25 @@ export interface SessionInput {
   /** Generic git token for authentication (for GitLab and other platforms) */
   gitToken?: string;
   /** Git platform type for correct token/env var handling */
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
+  /** Managed Bitbucket workspace UUID. */
+  bitbucketWorkspaceUuid?: string;
+  /** Managed Bitbucket workspace slug. */
+  bitbucketWorkspaceSlug?: string;
+  /** Managed Bitbucket repository UUID. */
+  bitbucketRepositoryUuid?: string;
+  /** Managed Bitbucket repository slug. */
+  bitbucketRepositorySlug?: string;
+  /** Kilo Bitbucket platform integration ID. */
+  bitbucketIntegrationId?: string;
+  /** Bitbucket pull request ID. */
+  bitbucketPullRequestId?: number;
+  /** Head commit SHA that publication must remain fenced to. */
+  bitbucketExpectedHeadSha?: string;
   envVars?: Record<string, string>;
   mcpServers?: Record<string, MCPServerConfig>;
   /** Gate threshold — when not 'off', the agent should report gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
-}
-
-export interface CodeReviewEvent {
-  timestamp: string;
-  eventType: string;
-  message?: string;
-  content?: string; // Detailed content for expansion
-  sessionId?: string;
 }
 
 export interface CodeReview {
@@ -65,10 +71,7 @@ export interface CodeReview {
   totalTokensOut?: number;
   /** Accumulated cost in dollars across all LLM calls */
   totalCost?: number;
-  events?: CodeReviewEvent[];
   skipBalanceCheck?: boolean; // Skip balance validation in cloud agent (for OSS sponsorship)
-  /** Which cloud agent backend to use: 'v1' (cloud-agent SSE) or 'v2' (cloud-agent-next) */
-  agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
   sandboxRetryAttempted?: boolean;
@@ -137,8 +140,6 @@ export interface CodeReviewRequest {
   sessionInput: SessionInput;
   owner: Owner;
   skipBalanceCheck?: boolean;
-  /** Which cloud agent backend to use: 'v1' (cloud-agent SSE) or 'v2' (cloud-agent-next) */
-  agentVersion?: string;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
   /** Provider-reported repository storage size, formatted for log correlation. */
@@ -162,8 +163,6 @@ export interface Env {
   API_URL: string;
   INTERNAL_API_SECRET: string;
   CALLBACK_TOKEN_SECRET: string;
-  CLOUD_AGENT_URL: string;
-  /** cloud-agent-next URL (used when useCloudAgentNext feature flag is enabled) */
   CLOUD_AGENT_NEXT_URL: string;
   BACKEND_AUTH_TOKEN: string;
 

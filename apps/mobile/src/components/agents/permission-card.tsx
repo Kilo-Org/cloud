@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, ScrollView, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 import { Button } from '@/components/ui/button';
@@ -38,37 +38,39 @@ export function PermissionCard({
     .join(' ');
 
   return (
-    <View className="mx-4 my-2 overflow-hidden rounded-xl border border-border bg-card">
+    <View className="mx-4 my-2 shrink overflow-hidden rounded-xl border border-border bg-card">
       <View className="border-b border-border bg-secondary px-4 py-3">
         <Text className="text-sm font-medium">Permission Required</Text>
       </View>
 
-      <View className="gap-3 p-4">
-        <Text className="text-sm text-foreground">
-          Allow <Text className="font-medium">{permissionDisplay}</Text>?
-        </Text>
+      <ScrollView className="max-h-96 shrink">
+        <View className="gap-3 p-4">
+          <Text className="text-sm text-foreground">
+            Allow <Text className="font-medium">{permissionDisplay}</Text>?
+          </Text>
 
-        {patterns.length > 0 && (
-          <View className="gap-1 rounded-lg bg-muted p-2">
-            <Text className="text-xs font-medium text-muted-foreground">Applies to:</Text>
-            {patterns.map((pattern, index) => (
-              <Text key={index} className="text-xs text-muted-foreground">
-                • {pattern}
-              </Text>
-            ))}
-          </View>
-        )}
+          {patterns.length > 0 && (
+            <View className="gap-1 rounded-lg bg-muted p-2">
+              <Text className="text-xs font-medium text-muted-foreground">Applies to:</Text>
+              {patterns.map((pattern, index) => (
+                <Text key={index} className="text-xs text-muted-foreground">
+                  • {pattern}
+                </Text>
+              ))}
+            </View>
+          )}
 
-        {metadata && Object.keys(metadata).length > 0 && (
-          <View className="gap-1">
-            {Object.entries(metadata).map(([key, value]) => (
-              <Text key={key} className="text-xs text-muted-foreground">
-                {key}: {String(value)}
-              </Text>
-            ))}
-          </View>
-        )}
-      </View>
+          {metadata && Object.keys(metadata).length > 0 && (
+            <View className="gap-1">
+              {Object.entries(metadata).map(([key, value]) => (
+                <Text key={key} className="text-xs text-muted-foreground">
+                  {key}: {String(value)}
+                </Text>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
 
       <View className="flex-row gap-2 border-t border-border p-3">
         <Button

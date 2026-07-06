@@ -11,6 +11,7 @@ import { SetPageTitle } from '@/components/SetPageTitle';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GastownBackdrop } from '@/components/gastown/GastownBackdrop';
+import { useConfirm } from '@/components/ui/confirm';
 import { Plus, Factory, Trash2, Skull } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -43,6 +44,7 @@ export function TownListPageClient() {
   const router = useRouter();
   const trpc = useGastownTRPC();
   const wastelandTrpc = useWastelandTRPC();
+  const confirm = useConfirm();
 
   const queryClient = useQueryClient();
   const townsQuery = useQuery(trpc.gastown.listTowns.queryOptions());
@@ -160,13 +162,21 @@ export function TownListPageClient() {
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={e => {
                     e.stopPropagation();
-                    if (
-                      confirm(`Delete town "${town.name}"? This will also delete all its rigs.`)
-                    ) {
-                      deleteTown.mutate({ townId: town.id });
-                    }
+                    void (async () => {
+                      if (
+                        await confirm({
+                          title: `Delete town "${town.name}"?`,
+                          description: 'This also deletes all of its rigs and cannot be undone.',
+                          confirmLabel: 'Delete town',
+                          destructive: true,
+                        })
+                      ) {
+                        deleteTown.mutate({ townId: town.id });
+                      }
+                    })();
                   }}
                   className="rounded p-1.5 text-white/35 transition-colors hover:bg-red-500/10 hover:text-red-300"
                 >

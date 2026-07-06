@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { registerFileRoutes } from './files';
+import { CONTROLLER_ENDPOINT_CAPABILITIES } from '../endpoint-capabilities';
 
 vi.mock('node:fs', () => ({
   default: {
@@ -937,5 +938,56 @@ describe('file routes', () => {
       const body = (await res.json()) as any;
       expect(body.code).toBe('invalid_request_body');
     });
+  });
+
+  describe('export-openclaw-workspace', () => {
+    it('rejects unauthenticated requests', async () => {
+      const res = await app.request('/_kilo/files/export-openclaw-workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ format: 'zip' }),
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects encryption for tar.gz', async () => {
+      const res = await app.request('/_kilo/files/export-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ format: 'tar.gz', password: 'secret' }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('openclaw_export_encryption_unsupported');
+    });
+
+    it('rejects an invalid format', async () => {
+      const res = await app.request('/_kilo/files/export-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ format: 'rar' }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('invalid_request_body');
+    });
+
+    it('returns openclaw_export_no_files for an empty workspace', async () => {
+      (fs.existsSync as any).mockReturnValue(false);
+      const res = await app.request('/_kilo/files/export-openclaw-workspace', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ format: 'zip' }),
+      });
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as any;
+      expect(body.code).toBe('openclaw_export_no_files');
+    });
+  });
+});
+
+describe('endpoint capabilities', () => {
+  it('advertises the export-openclaw-workspace capability', () => {
+    expect(CONTROLLER_ENDPOINT_CAPABILITIES).toContain('files.export-openclaw-workspace');
   });
 });

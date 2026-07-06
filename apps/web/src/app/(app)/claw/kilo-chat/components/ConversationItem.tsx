@@ -5,6 +5,22 @@ import Link from 'next/link';
 import { MoreVertical } from 'lucide-react';
 import type { ConversationListItem } from '@kilocode/kilo-chat';
 import { CONVERSATION_TITLE_MAX_CHARS } from '@kilocode/kilo-chat';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useKiloChatContext } from './kiloChatContext';
 
 type ConversationItemProps = {
@@ -26,7 +42,6 @@ export function ConversationItem({
   const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
   const [renameValue, setRenameValue] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const timestamp = conversation.lastActivityAt ?? conversation.joinedAt;
   const displayTime = new Date(timestamp).toLocaleTimeString([], {
@@ -41,18 +56,6 @@ export function ConversationItem({
       inputRef.current.select();
     }
   }, [isRenaming]);
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!menuOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [menuOpen]);
 
   const handleStartRename = useCallback(() => {
     setRenameValue(conversation.title ?? '');
@@ -141,26 +144,6 @@ export function ConversationItem({
             className="bg-transparent min-w-0 flex-1 text-sm font-medium outline-none border-b border-current/20"
             maxLength={CONVERSATION_TITLE_MAX_CHARS}
           />
-        ) : isConfirmingLeave ? (
-          <>
-            <span className="text-sm">Leave?</span>
-            <span className="flex shrink-0 gap-1.5 text-xs">
-              <button
-                type="button"
-                onClick={handleConfirmLeave}
-                className="text-destructive hover:underline font-medium cursor-pointer"
-              >
-                Yes
-              </button>
-              <button
-                type="button"
-                onClick={handleCancelLeave}
-                className="text-muted-foreground hover:underline cursor-pointer"
-              >
-                No
-              </button>
-            </span>
-          </>
         ) : (
           <>
             <div className="flex min-w-0 flex-1 items-center gap-1.5">
@@ -186,47 +169,49 @@ export function ConversationItem({
               >
                 {displayTime}
               </span>
-              <div ref={menuRef} className="relative">
-                <button
-                  type="button"
+              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+                <DropdownMenuTrigger
                   aria-label="Conversation options"
-                  aria-haspopup="menu"
-                  aria-expanded={menuOpen}
-                  onClick={() => setMenuOpen(prev => !prev)}
                   className={`hover:bg-muted rounded p-0.5 cursor-pointer transition-colors ${
                     menuOpen ? 'block' : 'hidden group-hover:block'
                   }`}
                 >
                   <MoreVertical className="h-3.5 w-3.5" />
-                </button>
-                {menuOpen && (
-                  <div
-                    role="menu"
-                    className="bg-popover border-border absolute right-0 top-full z-10 mt-1 w-32 rounded-md border py-1 shadow-md"
-                  >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={handleStartRename}
-                      className="hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={handleStartLeave}
-                      className="text-destructive hover:bg-muted w-full px-3 py-1.5 text-left text-sm cursor-pointer transition-colors"
-                    >
-                      Leave
-                    </button>
-                  </div>
-                )}
-              </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-32">
+                  <DropdownMenuItem onSelect={handleStartRename}>Rename</DropdownMenuItem>
+                  <DropdownMenuItem variant="destructive" onSelect={handleStartLeave}>
+                    Leave
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </>
         )}
       </div>
+
+      <AlertDialog
+        open={isConfirmingLeave}
+        onOpenChange={open => {
+          if (!open) handleCancelLeave();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave this conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You will stop receiving messages from &ldquo;{title}&rdquo; and it will be removed
+              from your list.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleConfirmLeave}>
+              Leave conversation
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

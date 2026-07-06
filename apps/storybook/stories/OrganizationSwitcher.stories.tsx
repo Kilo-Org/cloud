@@ -29,6 +29,11 @@ const organizations: OrganizationSwitcherOrganization[] = [
     organizationName: 'Cloud Platform',
     role: 'member',
   },
+  {
+    organizationId: 'org-long',
+    organizationName: '[seed:cost-insights] Northstar Labs',
+    role: 'owner',
+  },
 ];
 
 function OrganizationSwitcherStory({
@@ -75,6 +80,12 @@ export const PersonalSelected: Story = {
 export const OrganizationSelected: Story = {
   args: {
     organizationId: 'org-kilo',
+  },
+};
+
+export const LongOrganizationSelected: Story = {
+  args: {
+    organizationId: 'org-long',
   },
 };
 

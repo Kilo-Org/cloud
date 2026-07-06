@@ -4,6 +4,7 @@ import { EmailDomainBackfill } from '../components/EmailDomainBackfill';
 import { BlockBlacklistedDomainsBackfill } from '../components/BlockBlacklistedDomainsBackfill';
 import { BlockedAtBackfill } from '../components/BlockedAtBackfill';
 import { OrganizationSlugBackfill } from '../components/OrganizationSlugBackfill';
+import { BlockedUserPepperBackfill } from '../components/BlockedUserPepperBackfill';
 import { SafetyIdentifierHashGenerator } from '../components/SafetyIdentifierHashGenerator';
 import AdminPage from '../components/AdminPage';
 import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
@@ -40,6 +41,10 @@ export default function BackfillsPage() {
           <h2 className="text-2xl font-bold">Organization Slug Backfill</h2>
         </div>
         <OrganizationSlugBackfill />
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold">Blocked User Pepper Backfill</h2>
+        </div>
+        <BlockedUserPepperBackfill />
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Safety Identifier Backfill</h2>
         </div>

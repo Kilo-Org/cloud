@@ -13,6 +13,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  SidebarRail,
 } from '@/components/ui/sidebar';
 import {
   ArrowLeft,
@@ -110,7 +111,11 @@ export function WastelandSidebar({
                 >
                   <SidebarMenuItem>
                     <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                      <Link href={item.url} prefetch={false}>
+                      <Link
+                        href={item.url}
+                        prefetch={false}
+                        aria-current={isActive(item.url) ? 'page' : undefined}
+                      >
                         <item.icon className="size-4" />
                         <span>{item.title}</span>
                       </Link>
@@ -127,7 +132,11 @@ export function WastelandSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild isActive={isActive(`${basePath}/settings`)}>
-              <Link href={`${basePath}/settings`} prefetch={false}>
+              <Link
+                href={`${basePath}/settings`}
+                prefetch={false}
+                aria-current={isActive(`${basePath}/settings`) ? 'page' : undefined}
+              >
                 <Settings className="size-4" />
                 <span>Settings</span>
               </Link>
@@ -135,6 +144,7 @@ export function WastelandSidebar({
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }

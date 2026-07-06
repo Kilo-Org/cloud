@@ -684,7 +684,7 @@ describe('organizations settings trpc router', () => {
       expect(updatedOrg?.settings?.recommendations_digest_enabled).toBe(true);
     });
 
-    it('should disable the digest and remove the flag', async () => {
+    it('should disable the digest and persist the explicit opt-out', async () => {
       const caller = await createCallerForUser(owner.id);
 
       await caller.organizations.settings.updateRecommendationsDigest({
@@ -697,10 +697,10 @@ describe('organizations settings trpc router', () => {
         enabled: false,
       });
 
-      expect(result.settings.recommendations_digest_enabled).toBeUndefined();
+      expect(result.settings.recommendations_digest_enabled).toBe(false);
 
       const updatedOrg = await getOrganizationById(testOrganization.id);
-      expect(updatedOrg?.settings?.recommendations_digest_enabled).toBeUndefined();
+      expect(updatedOrg?.settings?.recommendations_digest_enabled).toBe(false);
     });
 
     it('should throw UNAUTHORIZED error for non-owner users', async () => {

@@ -4,7 +4,7 @@ import { LinkButton } from '@/components/Button';
 
 export default function AccountDeletedPage() {
   return (
-    <main className="mx-auto flex w-full max-w-xl grow flex-col items-center justify-center">
+    <div className="mx-auto flex w-full max-w-xl grow flex-col items-center justify-center">
       <Card className="w-full rounded-xl shadow-lg">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-950">
@@ -27,6 +27,6 @@ export default function AccountDeletedPage() {
           </div>
         </CardContent>
       </Card>
-    </main>
+    </div>
   );
 }

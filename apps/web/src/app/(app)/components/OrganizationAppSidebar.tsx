@@ -1,6 +1,6 @@
 'use client';
 
-import { Sidebar, SidebarContent, SidebarHeader } from '@/components/ui/sidebar';
+import { Sidebar, SidebarContent, SidebarHeader, SidebarRail } from '@/components/ui/sidebar';
 import { useUser } from '@/hooks/useUser';
 import {
   Bot,
@@ -430,6 +430,7 @@ export default function OrganizationAppSidebar({
       </SidebarContent>
 
       <SidebarUserFooter user={user} isLoading={isLoading} />
+      <SidebarRail />
     </Sidebar>
   );
 }

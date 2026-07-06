@@ -2,10 +2,11 @@ import 'server-only';
 import { db } from '@/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, desc, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { requireNumericPlatformRepositories, type Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
+import { platformIntegrationHealthSql } from '@/lib/integrations/core/health';
 import {
   deleteIntegration,
   findPendingInstallationByKiloUserId,
@@ -54,6 +55,7 @@ export async function getInstallation(owner: Owner): Promise<PlatformIntegration
     .select()
     .from(platform_integrations)
     .where(and(ownershipCondition, eq(platform_integrations.platform, 'github')))
+    .orderBy(desc(platformIntegrationHealthSql()), desc(platform_integrations.updated_at))
     .limit(1);
 
   return integration || null;

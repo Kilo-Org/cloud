@@ -102,6 +102,7 @@ import {
   mcp_gateway_provider_grants,
   mcp_gateway_pending_provider_authorizations,
   mcp_gateway_oauth_clients,
+  mcp_gateway_oauth_grants,
   deployments_ephemeral,
 } from '@kilocode/db/schema';
 
@@ -237,6 +238,7 @@ describe('User', () => {
     await db.delete(mcp_gateway_pending_provider_authorizations);
     await db.delete(mcp_gateway_authorization_codes);
     await db.delete(mcp_gateway_authorization_requests);
+    await db.delete(mcp_gateway_oauth_grants);
     await db.delete(mcp_gateway_oauth_clients);
     await db.delete(mcp_gateway_provider_grants);
     await db.delete(mcp_gateway_connection_instances);
@@ -867,11 +869,28 @@ describe('User', () => {
           declared_scopes: ['mcp:access'],
         })
         .returning();
+      const [oauthGrant] = await db
+        .insert(mcp_gateway_oauth_grants)
+        .values({
+          oauth_client_id: oauthClient.oauth_client_id,
+          kilo_user_id: user.id,
+          owner_scope: 'personal',
+          owner_id: user.id,
+          config_id: config.config_id,
+          connect_resource_id: route.connect_resource_id,
+          instance_id: instance.instance_id,
+          redirect_uri: 'https://client.example/callback',
+          granted_scopes: ['mcp:access'],
+          execution_context: { type: 'personal' },
+          config_version: 1,
+        })
+        .returning();
       const [authorizationRequest] = await db
         .insert(mcp_gateway_authorization_requests)
         .values({
           request_state_hash: 'request-state-hash',
           oauth_client_id: oauthClient.oauth_client_id,
+          oauth_grant_id: oauthGrant.oauth_grant_id,
           client_id: 'mcp:test-client',
           owner_scope: 'personal',
           owner_id: user.id,
@@ -894,6 +913,7 @@ describe('User', () => {
         code_hash: 'authorization-code-hash',
         authorization_request_id: authorizationRequest.authorization_request_id,
         oauth_client_id: authorizationRequest.oauth_client_id,
+        oauth_grant_id: oauthGrant.oauth_grant_id,
         client_id: authorizationRequest.client_id,
         owner_scope: 'personal',
         owner_id: user.id,
@@ -911,6 +931,7 @@ describe('User', () => {
       });
       await db.insert(mcp_gateway_pending_provider_authorizations).values({
         state_hash: 'pending-state-hash',
+        oauth_grant_id: oauthGrant.oauth_grant_id,
         config_id: config.config_id,
         instance_id: instance.instance_id,
         owner_scope: 'personal',
@@ -951,11 +972,16 @@ describe('User', () => {
         .select()
         .from(mcp_gateway_authorization_requests)
         .where(eq(mcp_gateway_authorization_requests.kilo_user_id, user.id));
+      const oauthGrants = await db
+        .select()
+        .from(mcp_gateway_oauth_grants)
+        .where(eq(mcp_gateway_oauth_grants.kilo_user_id, user.id));
       expect(grants).toHaveLength(0);
       expect(configSecrets).toHaveLength(0);
       expect(pending).toHaveLength(0);
       expect(authorizationCodes).toHaveLength(0);
       expect(authorizationRequests).toHaveLength(0);
+      expect(oauthGrants).toHaveLength(0);
     });
 
     it('should anonymize the user row and preserve it', async () => {

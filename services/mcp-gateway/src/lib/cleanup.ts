@@ -2,6 +2,7 @@ import {
   mcp_gateway_authorization_codes,
   mcp_gateway_authorization_requests,
   mcp_gateway_audit_events,
+  mcp_gateway_oauth_grants,
   mcp_gateway_pending_provider_authorizations,
   mcp_gateway_rate_limit_windows,
   mcp_gateway_refresh_tokens,
@@ -30,6 +31,14 @@ export async function runCleanup(env: MCPGatewayEnv['Bindings']) {
           isNotNull(mcp_gateway_refresh_tokens.revoked_at)
         ),
         lt(mcp_gateway_refresh_tokens.created_at, sql`NOW() - INTERVAL '60 days'`)
+      )
+    );
+  await db
+    .delete(mcp_gateway_oauth_grants)
+    .where(
+      and(
+        isNotNull(mcp_gateway_oauth_grants.revoked_at),
+        lt(mcp_gateway_oauth_grants.revoked_at, sql`NOW() - INTERVAL '60 days'`)
       )
     );
   await db

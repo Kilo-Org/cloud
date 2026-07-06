@@ -17,6 +17,7 @@ export const EXTENSION_AGENT_SYSTEM_PROMPT = [
   'When using eval, return a JSON-serializable value and do not wrap code in markdown fences.',
   'In dangerous mode, act on behalf of the user, but ask first before irreversible, financial, privacy-sensitive, authentication, external-communication, or destructive actions.',
   'Do not claim that an action succeeded until the tool result confirms it.',
+  'Remote MCP tools may be available by name. Use them according to their tool descriptions.',
 ].join('\n');
 
 export const createEvalToolDefinition = (): KiloGatewayToolDefinition => ({
@@ -245,6 +246,23 @@ const getGatewayMessageText = (event: MessageEvent): string =>
   event.role === 'user' && event.systemEnvironment !== undefined
     ? `${event.text}\n\n${event.systemEnvironment}`
     : event.text;
+
+const getToolCallArguments = (toolCall: ToolCallEvent): string => {
+  if (toolCall.name === 'eval') {
+    return JSON.stringify({ code: toolCall.code });
+  }
+
+  if ('arguments' in toolCall) {
+    return JSON.stringify(toolCall.arguments);
+  }
+
+  return JSON.stringify({
+    ...(toolCall.elementId === undefined ? {} : { elementId: toolCall.elementId }),
+    ...(toolCall.query === undefined ? {} : { query: toolCall.query }),
+    ...(toolCall.snapshotId === undefined ? {} : { snapshotId: toolCall.snapshotId }),
+  });
+};
+
 export const buildGatewayMessagesFromEvents = (
   events: AgentConversationEvent[],
   { supportsImages = false }: { readonly supportsImages?: boolean } = {}
@@ -282,18 +300,7 @@ export const buildGatewayMessagesFromEvents = (
             role: 'assistant',
             tool_calls: toolCalls.map(toolCall => ({
               function: {
-                arguments:
-                  toolCall.name === 'eval'
-                    ? JSON.stringify({ code: toolCall.code })
-                    : JSON.stringify({
-                        ...(toolCall.elementId === undefined
-                          ? {}
-                          : { elementId: toolCall.elementId }),
-                        ...(toolCall.query === undefined ? {} : { query: toolCall.query }),
-                        ...(toolCall.snapshotId === undefined
-                          ? {}
-                          : { snapshotId: toolCall.snapshotId }),
-                      }),
+                arguments: getToolCallArguments(toolCall),
                 name: toolCall.name,
               },
               id: getProviderToolCallId(toolCall),

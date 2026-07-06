@@ -51,6 +51,7 @@ const evalFixtureCode = `const ${longEvalIdentifier} = document.documentElement.
 const chatCompletionsPath = '/api/gateway/v1/chat/completions';
 const dangerousToolNames = ['get_page_snapshot', 'get_element_details', 'find_in_page', 'eval'];
 interface MockGatewayModel {
+  readonly contextLength?: number;
   readonly id: string;
   readonly name: string;
   readonly variants?: Record<string, unknown>;
@@ -127,6 +128,7 @@ export const mockKiloApi = async (
         id: model.id,
         name: model.name,
         opencode: { variants: model.variants ?? { high: {}, low: {}, medium: {} } },
+        ...(model.contextLength === undefined ? {} : { context_length: model.contextLength }),
       };
 
       return Object.assign(
@@ -163,26 +165,36 @@ export const mockKiloApi = async (
     const toolNames =
       options.toolNamesByCall?.[chatCompletionCalls - 1] ?? options.toolNames ?? dangerousToolNames;
 
-    expect(body).toMatchObject({ stream: true, tool_choice: 'auto' });
-    expect(parsedBody.success ? expectedModelIds.includes(parsedBody.data.model) : false).toBe(
-      true
-    );
-    expect(
-      parsedBody.success && parsedBody.data.tools !== undefined
-        ? parsedBody.data.tools.map(tool => {
-            const parsedTool = toolDefinitionSchema.safeParse(tool);
+    // Summarization calls use tool_choice: 'none' (tools: []); skip normal-turn assertions for them.
+    const isSummarizationCall =
+      parsedBody.success &&
+      Array.isArray(parsedBody.data.tools) &&
+      parsedBody.data.tools.length === 0;
 
-            return parsedTool.success ? parsedTool.data.function.name : undefined;
-          })
-        : []
-    ).toStrictEqual(toolNames);
-    const userMessages = messages
-      .map(message => userMessageSchema.safeParse(message))
-      .filter(message => message.success)
-      .map(message => message.data);
-    expect(userMessages.at(-1)?.content).toEqual(expect.stringContaining('<system_environment>'));
-    expect(userMessages.at(-1)?.content).toEqual(expect.stringContaining('Current time:'));
-    expect(userMessages.at(-1)?.content).toEqual(expect.stringContaining('Timezone:'));
+    if (isSummarizationCall) {
+      // Summarization calls skip normal-turn assertions (tool_choice: 'none', tools: [])
+    } else {
+      expect(body).toMatchObject({ stream: true, tool_choice: 'auto' });
+      expect(parsedBody.success ? expectedModelIds.includes(parsedBody.data.model) : false).toBe(
+        true
+      );
+      expect(
+        parsedBody.success && parsedBody.data.tools !== undefined
+          ? parsedBody.data.tools.map(tool => {
+              const parsedTool = toolDefinitionSchema.safeParse(tool);
+
+              return parsedTool.success ? parsedTool.data.function.name : undefined;
+            })
+          : []
+      ).toStrictEqual(toolNames);
+      const userMessages = messages
+        .map(message => userMessageSchema.safeParse(message))
+        .filter(message => message.success)
+        .map(message => message.data);
+      expect(userMessages.at(-1)?.content).toEqual(expect.stringContaining('<system_environment>'));
+      expect(userMessages.at(-1)?.content).toEqual(expect.stringContaining('Current time:'));
+      expect(userMessages.at(-1)?.content).toEqual(expect.stringContaining('Timezone:'));
+    }
 
     if (chatCompletionCalls === 1) {
       if (options.beforeFirstCompletion !== undefined) {

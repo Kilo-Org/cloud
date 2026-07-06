@@ -5,6 +5,7 @@ import crofai from './crofai';
 import inceptronByok from './inceptron-byok';
 import kimiCoding from './kimi-coding';
 import martian from './martian';
+import morph from './morph';
 import neuralwatt from './neurowatt';
 import ollamaCloud from './ollama-cloud';
 import openCodeGo from './opencode-go';
@@ -21,6 +22,7 @@ export default [
   inceptronByok,
   kimiCoding,
   martian,
+  morph,
   neuralwatt,
   ollamaCloud,
   openCodeGo,

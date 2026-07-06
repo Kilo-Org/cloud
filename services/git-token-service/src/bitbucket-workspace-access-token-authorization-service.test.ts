@@ -266,6 +266,7 @@ describe('BitbucketWorkspaceAccessTokenAuthorizationService', () => {
       integrationId,
       credentialId,
       credentialVersion: 3,
+      providerScopes: ['account', 'pullrequest', 'repository', 'repository:write', 'webhook'],
       workspace: { uuid: workspaceUuid, slug: 'acme' },
     });
     expect(store.used).toEqual([{ fence: fence(storedCandidate), at: now.toISOString() }]);
@@ -408,6 +409,7 @@ describe('BitbucketWorkspaceAccessTokenAuthorizationService', () => {
       integrationId,
       credentialId,
       credentialVersion: original.credentialVersion,
+      providerScopes: ['account', 'pullrequest', 'repository', 'repository:write', 'webhook'],
       workspace: { uuid: workspaceUuid, slug: 'acme' },
     });
   });

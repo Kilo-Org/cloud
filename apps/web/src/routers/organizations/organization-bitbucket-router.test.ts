@@ -1,6 +1,9 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import {
+  agent_configs,
+  cloud_agent_code_review_attempts,
+  cloud_agent_code_reviews,
   kilocode_users,
   organization_memberships,
   organizations,
@@ -24,9 +27,16 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { BitbucketRepositoryListResult } from '@/lib/integrations/platforms/bitbucket/token-service-client';
 import type * as TokenServiceClientModule from '@/lib/integrations/platforms/bitbucket/token-service-client';
 import type * as BitbucketRepositoryCacheModule from '@/lib/integrations/platforms/bitbucket/repository-cache';
+import {
+  createCodeReview,
+  createCodeReviewAttempt,
+  updateCodeReviewStatus,
+} from '@/lib/code-reviews/db/code-reviews';
 
 const mockFetchBitbucketRepositoriesFromTokenService =
   jest.fn<(kiloUserId: string, organizationId: string) => Promise<BitbucketRepositoryListResult>>();
+const mockDeleteBitbucketWorkspaceWebhooksFromTokenService =
+  jest.fn<(input: unknown) => Promise<unknown>>();
 const mockScheduleBitbucketRepositoryCachePrime =
   jest.fn<
     (input: {
@@ -40,6 +50,8 @@ jest.mock('@/lib/integrations/platforms/bitbucket/token-service-client', () => (
   BitbucketRepositorySchema: jest.requireActual<typeof TokenServiceClientModule>(
     '@/lib/integrations/platforms/bitbucket/token-service-client'
   ).BitbucketRepositorySchema,
+  deleteBitbucketWorkspaceWebhooksFromTokenService:
+    mockDeleteBitbucketWorkspaceWebhooksFromTokenService,
   fetchBitbucketWorkspaceAccessTokenRepositoriesFromTokenService:
     mockFetchBitbucketRepositoriesFromTokenService,
 }));
@@ -73,6 +85,14 @@ jest.mock('@/lib/integrations/platforms/bitbucket/workspace-access-token-credent
   disconnectBitbucketWorkspaceAccessToken: mockDisconnect,
   rotateBitbucketWorkspaceAccessToken: mockRotate,
   BitbucketWorkspaceAccessTokenCredentialError: class extends Error {},
+}));
+
+const mockCancelReview = jest.fn<(reviewId: string, reason: string, attemptId?: string) => void>();
+
+jest.mock('@/lib/code-reviews/client/code-review-worker-client', () => ({
+  codeReviewWorkerClient: {
+    cancelReview: mockCancelReview,
+  },
 }));
 
 let createCallerForUser: typeof CreateCallerForUser;
@@ -243,6 +263,9 @@ describe('organization Bitbucket router', () => {
 
   afterEach(async () => {
     jest.clearAllMocks();
+    await db.delete(cloud_agent_code_review_attempts);
+    await db.delete(cloud_agent_code_reviews);
+    await db.delete(agent_configs);
     await db.delete(platform_oauth_credentials);
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
@@ -426,6 +449,91 @@ describe('organization Bitbucket router', () => {
       status: 'reconnect_required',
       recoveryAction: 'disconnect_and_connect',
       canManage: false,
+    });
+  });
+
+  it('disables Bitbucket Code Reviewer before disconnecting a Workspace Access Token', async () => {
+    const integration = await insertStaticIntegration(organization.id, owner.id);
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'code_review',
+      platform: 'bitbucket',
+      config: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'test-model',
+        repository_selection_mode: 'selected',
+        selected_repository_ids: [REPOSITORY_UUID],
+      },
+      is_enabled: true,
+      created_by: owner.id,
+    });
+    const reviewId = await createCodeReview({
+      owner: { type: 'org', id: organization.id, userId: owner.id },
+      platform: 'bitbucket',
+      platformIntegrationId: integration.id,
+      repoFullName: 'acme/api',
+      prNumber: 42,
+      prUrl: 'https://bitbucket.org/acme/api/pull-requests/42',
+      prTitle: 'Disconnect cleanup',
+      prAuthor: 'Ada Reviewer',
+      baseRef: 'main',
+      headRef: 'feature/disconnect-cleanup',
+      headSha: 'a'.repeat(40),
+    });
+    await updateCodeReviewStatus(reviewId, 'running', {
+      sessionId: 'agent-bitbucket-disconnect',
+      cliSessionId: 'ses_bitbucket_disconnect',
+    });
+    const attempt = await createCodeReviewAttempt({
+      codeReviewId: reviewId,
+      status: 'running',
+      sessionId: 'agent-bitbucket-disconnect',
+      cliSessionId: 'ses_bitbucket_disconnect',
+    });
+    mockDisconnect.mockImplementationOnce(async () => {
+      const [config] = await db
+        .select({ isEnabled: agent_configs.is_enabled })
+        .from(agent_configs)
+        .where(eq(agent_configs.owned_by_organization_id, organization.id));
+      const [review] = await db
+        .select({ status: cloud_agent_code_reviews.status })
+        .from(cloud_agent_code_reviews)
+        .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+      expect(config?.isEnabled).toBe(false);
+      expect(review?.status).toBe('cancelled');
+      return { integrationId: integration.id };
+    });
+    const caller = await createCallerForUser(owner.id);
+
+    await expect(
+      caller.organizations.bitbucket.disconnect({
+        organizationId: organization.id,
+        integrationId: integration.id,
+      })
+    ).resolves.toEqual({ integrationId: integration.id });
+
+    expect(mockCancelReview).toHaveBeenCalledWith(
+      reviewId,
+      'Bitbucket Code Reviewer disabled',
+      attempt.id
+    );
+    expect(mockDeleteBitbucketWorkspaceWebhooksFromTokenService).toHaveBeenCalledWith(
+      expect.objectContaining({
+        managerUserId: owner.id,
+        organizationId: organization.id,
+        workspace: {
+          integrationId: integration.id,
+          workspaceUuid: WORKSPACE_UUID,
+          workspaceSlug: 'acme',
+        },
+      })
+    );
+    expect(mockDisconnect).toHaveBeenCalledWith({
+      organizationId: organization.id,
+      actorUserId: owner.id,
+      integrationId: integration.id,
     });
   });
 

@@ -1,18 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
-const { mockResolveActiveRoute, mockResolveRuntimeState, mockVerifyGatewayToken } = vi.hoisted(
-  () => ({
-    mockResolveActiveRoute: vi.fn(),
-    mockResolveRuntimeState: vi.fn(),
-    mockVerifyGatewayToken: vi.fn(),
-  })
-);
+const {
+  mockResolveActiveOAuthGrant,
+  mockResolveActiveRoute,
+  mockResolveRuntimeState,
+  mockVerifyGatewayToken,
+} = vi.hoisted(() => ({
+  mockResolveActiveOAuthGrant: vi.fn(),
+  mockResolveActiveRoute: vi.fn(),
+  mockResolveRuntimeState: vi.fn(),
+  mockVerifyGatewayToken: vi.fn(),
+}));
 
 vi.mock('./db/runtime-repository', () => ({
+  resolveActiveOAuthGrant: mockResolveActiveOAuthGrant,
   resolveActiveRoute: mockResolveActiveRoute,
   resolveRuntimeState: mockResolveRuntimeState,
   recordRuntimeAudit: async () => undefined,
+  touchOAuthGrantUsage: async () => undefined,
 }));
 
 vi.mock('./lib/jwt', () => ({
@@ -48,9 +54,19 @@ beforeEach(() => {
   mockResolveActiveRoute.mockReset();
   mockResolveActiveRoute.mockImplementation(({ route }: { route: { routeKey: string } }) =>
     route.routeKey === 'abcdefghijklmnopqrstuvwxyzABCDEF'
-      ? { route: { route_key: route.routeKey }, config: { enabled: true } }
+      ? {
+          route: {
+            route_key: route.routeKey,
+            connect_resource_id: '55555555-5555-4555-8555-555555555555',
+          },
+          config: { enabled: true },
+        }
       : null
   );
+  mockResolveActiveOAuthGrant.mockReset();
+  mockResolveActiveOAuthGrant.mockResolvedValue({
+    oauth_grant_id: '66666666-6666-4666-8666-666666666666',
+  });
   mockResolveRuntimeState.mockReset();
   mockVerifyGatewayToken.mockReset();
 });
@@ -103,6 +119,7 @@ describe('MCP gateway route surface', () => {
       aud: `https://mcp.kilosessions.ai${userRoute}`,
       exp: Math.floor(Date.now() / 1000) + 900,
       iat: Math.floor(Date.now() / 1000),
+      token_source: 'derived_connect',
       scope: 'profile',
       MCPID:
         'personal:user-123:11111111-1111-4111-8111-111111111111:abcdefghijklmnopqrstuvwxyzABCDEF',
@@ -139,6 +156,9 @@ describe('MCP gateway route surface', () => {
       aud: `https://mcp.kilosessions.ai${userRoute}`,
       exp: Math.floor(Date.now() / 1000) + 900,
       iat: Math.floor(Date.now() / 1000),
+      token_source: 'oauth_client',
+      oauth_grant_id: '66666666-6666-4666-8666-666666666666',
+      client_id: 'mcp:client',
       scope: 'mcp:access',
       MCPID:
         'personal:user-123:11111111-1111-4111-8111-111111111111:abcdefghijklmnopqrstuvwxyzABCDEF',
@@ -160,7 +180,42 @@ describe('MCP gateway route surface', () => {
     expect(response.status).toBe(403);
     expect(response.headers.get('www-authenticate')).toBeNull();
     expect(mockResolveActiveRoute).toHaveBeenCalledOnce();
+    expect(mockResolveActiveOAuthGrant).toHaveBeenCalledOnce();
     expect(mockResolveRuntimeState).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an OAuth client token when its grant is unavailable', async () => {
+    mockVerifyGatewayToken.mockResolvedValue({
+      token_source: 'oauth_client',
+      oauth_grant_id: '66666666-6666-4666-8666-666666666666',
+      client_id: 'mcp:client',
+      iss: 'https://app.kilo.ai',
+      sub: 'user-123',
+      aud: `https://mcp.kilosessions.ai${userRoute}`,
+      exp: Math.floor(Date.now() / 1000) + 900,
+      iat: Math.floor(Date.now() / 1000),
+      scope: 'mcp:access',
+      MCPID:
+        'personal:user-123:11111111-1111-4111-8111-111111111111:abcdefghijklmnopqrstuvwxyzABCDEF',
+      owner_scope: 'personal',
+      owner_id: 'user-123',
+      config_id: '11111111-1111-4111-8111-111111111111',
+      route_key: 'abcdefghijklmnopqrstuvwxyzABCDEF',
+      instance_id: '44444444-4444-4444-8444-444444444444',
+      execution_context: { type: 'personal' },
+      config_version: 1,
+    });
+    mockResolveActiveOAuthGrant.mockResolvedValue(null);
+
+    const response = await app.request(
+      `https://mcp.kilosessions.ai${userRoute}`,
+      { headers: { Authorization: 'Bearer revoked-grant-token' } },
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect(mockResolveActiveOAuthGrant).toHaveBeenCalledOnce();
+    expect(mockResolveRuntimeState).not.toHaveBeenCalled();
   });
 
   it('returns generic and scoped protected-resource metadata', async () => {

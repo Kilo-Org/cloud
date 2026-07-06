@@ -3,7 +3,7 @@ import type { AgentConversationEvent } from './agent-conversation';
 type ToolCallEvent = Extract<AgentConversationEvent, { readonly type: 'tool-call' }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
 
-const isViewportScreenshotValue = (
+export const isViewportScreenshotValue = (
   value: unknown
 ): value is { readonly mediaType: string; readonly dataUrl: string } =>
   typeof value === 'object' &&
@@ -13,6 +13,18 @@ const isViewportScreenshotValue = (
   value.dataUrl.startsWith('data:image/') &&
   'mediaType' in value &&
   typeof value.mediaType === 'string';
+
+// The persisted counterpart of a screenshot result: dataUrl stripped, mediaType + note kept.
+export const isPersistedScreenshotStub = (
+  value: unknown
+): value is { readonly mediaType: string; readonly note: string } =>
+  typeof value === 'object' &&
+  value !== null &&
+  !('dataUrl' in value) &&
+  'mediaType' in value &&
+  typeof value.mediaType === 'string' &&
+  'note' in value &&
+  typeof value.note === 'string';
 
 const toPersistedToolResult = (
   event: ToolResultEvent,

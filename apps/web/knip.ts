@@ -76,10 +76,6 @@ const config: KnipConfig = {
         '@chromatic-com/storybook',
       ],
     },
-    '../../services/cloud-agent': {
-      entry: ['src/index.ts', 'test/**/*.test.ts'],
-      ignoreDependencies: ['cloudflare', '@vitest/coverage-v8'],
-    },
     '../../services/ai-attribution': {
       entry: ['src/ai-attribution.worker.ts'],
       ignoreDependencies: ['cloudflare'],

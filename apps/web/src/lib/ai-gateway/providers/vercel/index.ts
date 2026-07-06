@@ -73,10 +73,7 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  const [routingPercentage, vercelModels] = await Promise.all([
-    getVercelRoutingPercentage(),
-    getVercelModels(),
-  ]);
+  const routingPercentage = await getVercelRoutingPercentage();
 
   const passedRandomization =
     getRandomNumber('vercel_routing_' + randomSeed, 100) < routingPercentage;
@@ -85,6 +82,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
+  const vercelModels = await getVercelModels();
   const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);

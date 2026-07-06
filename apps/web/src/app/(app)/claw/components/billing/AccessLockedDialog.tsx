@@ -19,9 +19,11 @@ type AccessLockedDialogProps = {
   reason: ClawLockReason;
   billing: ClawBillingStatus;
   onSubscribeClick: () => void;
+  onReprovisionCreditsClick: () => void;
   onUpdatePaymentClick: () => void;
   onDestroyClick: () => void;
   isDestroying?: boolean;
+  isReprovisioning?: boolean;
 };
 
 function getLockContent(reason: ClawLockReason, billing: ClawBillingStatus) {
@@ -65,6 +67,16 @@ function getLockContent(reason: ClawLockReason, billing: ClawBillingStatus) {
         icon: Lock,
       };
     case 'subscription_expired_instance_destroyed':
+      if (billing.creditReprovisionRecovery.eligible) {
+        return {
+          title: 'Subscription Ended',
+          description:
+            'Your previous KiloClaw was destroyed. Your credits can activate a fresh Standard KiloClaw.',
+          cta: 'Reprovision and activate with credits',
+          action: 'reprovision_credits' as const,
+          icon: Coins,
+        };
+      }
       return {
         title: 'Subscription Ended',
         description: 'Your KiloClaw has been destroyed. Subscribe to provision a new one.',
@@ -116,6 +128,12 @@ function getInfoBoxMessage(reason: ClawLockReason, billing: ClawBillingStatus): 
     reason === 'trial_expired_instance_destroyed' ||
     reason === 'subscription_expired_instance_destroyed'
   ) {
+    if (
+      reason === 'subscription_expired_instance_destroyed' &&
+      billing.creditReprovisionRecovery.eligible
+    ) {
+      return 'Your current credits cover Standard hosting once your projected Kilo Pass bonus is included.';
+    }
     return "You'll need to provision a new KiloClaw after subscribing.";
   }
   if (reason === 'past_due_grace_exceeded') {
@@ -143,9 +161,11 @@ export function AccessLockedDialog({
   reason,
   billing,
   onSubscribeClick,
+  onReprovisionCreditsClick,
   onUpdatePaymentClick,
   onDestroyClick,
   isDestroying,
+  isReprovisioning,
 }: AccessLockedDialogProps) {
   const router = useRouter();
   const [confirmDestroy, setConfirmDestroy] = useState(false);
@@ -161,6 +181,8 @@ export function AccessLockedDialog({
   function handleCta() {
     if (content?.action === 'update_payment') {
       onUpdatePaymentClick();
+    } else if (content?.action === 'reprovision_credits') {
+      onReprovisionCreditsClick();
     } else if (content?.action === 'add_credits') {
       router.push('/credits');
     } else {
@@ -202,15 +224,24 @@ export function AccessLockedDialog({
         </div>
 
         <DialogFooter className="flex-col gap-3 sm:flex-col">
-          <Button onClick={handleCta} variant="primary" className="w-full py-3 font-semibold">
-            {content.cta}
+          <Button
+            onClick={handleCta}
+            variant="primary"
+            className="w-full py-3 font-semibold"
+            disabled={content.action === 'reprovision_credits' && isReprovisioning}
+          >
+            {content.action === 'reprovision_credits' && isReprovisioning
+              ? 'Activating...'
+              : content.cta}
           </Button>
           <p className="text-muted-foreground text-center text-xs">
             {content.action === 'add_credits'
               ? "You'll be redirected to the credits page to top up your balance"
-              : reason === 'past_due_grace_exceeded' && !isCreditFunded
-                ? "You'll be redirected to Stripe to update your payment method"
-                : "You'll be redirected to complete your purchase"}
+              : content.action === 'reprovision_credits'
+                ? 'A new KiloClaw will be provisioned before credits are charged'
+                : reason === 'past_due_grace_exceeded' && !isCreditFunded
+                  ? "You'll be redirected to Stripe to update your payment method"
+                  : "You'll be redirected to complete your purchase"}
           </p>
 
           {/* Secondary CTA: for credit-funded past-due, offer Kilo Pass as primary upgrade path */}

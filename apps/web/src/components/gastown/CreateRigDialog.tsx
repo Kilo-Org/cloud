@@ -44,7 +44,7 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
           organizationId,
           forceRefresh: false,
         })
-      : mainTrpc.cloudAgent.listGitHubRepositories.queryOptions({ forceRefresh: false })),
+      : mainTrpc.cloudAgentNext.listGitHubRepositories.queryOptions({ forceRefresh: false })),
     enabled: isOpen && mode === 'integration',
   });
 
@@ -54,7 +54,7 @@ export function CreateRigDialog({ townId, isOpen, onClose, organizationId }: Cre
           organizationId,
           forceRefresh: false,
         })
-      : mainTrpc.cloudAgent.listGitLabRepositories.queryOptions({ forceRefresh: false })),
+      : mainTrpc.cloudAgentNext.listGitLabRepositories.queryOptions({ forceRefresh: false })),
     enabled: isOpen && mode === 'integration',
   });
 

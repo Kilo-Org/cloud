@@ -695,11 +695,41 @@ export function createWrapperSupervisor(
     return (await listNonTerminalAcceptedMessages(storage, state.wrapperRunId)).length > 0;
   }
 
+  /**
+   * The liveness guards below silently stop tracking a wrapper run once they decide there's
+   * no active work for it. If a message is still sitting non-terminal/accepted somewhere (for
+   * this run or a stale one), that's the watchdog going dark on a message it should still be
+   * supervising — surface it, since neither guard branch otherwise leaves a trace.
+   */
+  async function warnIfLivenessGuardOrphansAcceptedMessage(
+    guard: 'missing_wrapper_connection' | 'no_active_wrapper_work',
+    state: WrapperRuntimeState
+  ): Promise<void> {
+    const orphaned = await listNonTerminalAcceptedMessages(storage);
+    if (orphaned.length === 0) return;
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        guard,
+        wrapperRunId: state.wrapperRunId,
+        wrapperGeneration: state.wrapperGeneration,
+        wrapperConnectionId: state.wrapperConnectionId,
+        orphanedMessageIds: orphaned.map(message => message.messageId),
+      })
+      .warn(
+        'Wrapper liveness watchdog stopped tracking while accepted messages remain non-terminal'
+      );
+  }
+
   async function getNextWrapperLivenessDeadline(): Promise<number | undefined> {
     const state = await getWrapperRuntimeState(storage);
-    if (!state.wrapperConnectionId) return undefined;
+    if (!state.wrapperConnectionId) {
+      await warnIfLivenessGuardOrphansAcceptedMessage('missing_wrapper_connection', state);
+      return undefined;
+    }
 
     if (!(await hasActiveWrapperWork(state))) {
+      await warnIfLivenessGuardOrphansAcceptedMessage('no_active_wrapper_work', state);
       const hasLivenessFields =
         state.noOutputDeadlineAt !== undefined ||
         state.pingDeadlineAt !== undefined ||
@@ -726,9 +756,13 @@ export function createWrapperSupervisor(
       state.noOutputDeadlineAt !== undefined ||
       state.pingDeadlineAt !== undefined ||
       state.nextPingAt !== undefined;
-    if (!hasLivenessDeadline || !state.wrapperConnectionId) return false;
+    if (!hasLivenessDeadline || !state.wrapperConnectionId) {
+      await warnIfLivenessGuardOrphansAcceptedMessage('missing_wrapper_connection', state);
+      return false;
+    }
 
     if (!(await hasActiveWrapperWork(state))) {
+      await warnIfLivenessGuardOrphansAcceptedMessage('no_active_wrapper_work', state);
       await clearCurrentWrapperRuntimeLivenessState(
         storage,
         state.wrapperGeneration,
@@ -1152,6 +1186,17 @@ export function createWrapperSupervisor(
     if (stopping.state !== 'stopping') return;
     await putWrapperLease(storage, stopping);
     await requestAlarmAtOrBefore?.(stopping.attemptDeadlineAt);
+
+    logger
+      .withFields({
+        sessionId: getSessionIdForLogs(),
+        reason: stopping.reason,
+        target: stopping.target,
+        attemptId,
+        attempts: stopping.attempts,
+        requestedAt: stopping.requestedAt,
+      })
+      .info('Reconciling physical wrapper stop');
 
     let result: StopWrappersResult;
     try {

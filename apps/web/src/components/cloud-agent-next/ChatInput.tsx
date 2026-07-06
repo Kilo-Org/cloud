@@ -64,6 +64,8 @@ type ChatInputProps = {
   model?: string;
   /** Available model options for the toolbar */
   modelOptions?: ModelOption[];
+  /** Optional model option pinned above regular gateway models. */
+  pinnedModelOption?: ModelOption;
   /** Whether models are loading */
   isLoadingModels?: boolean;
   /** Callback when mode changes */
@@ -103,6 +105,7 @@ export function ChatInput({
   mode,
   model,
   modelOptions = [],
+  pinnedModelOption,
   isLoadingModels = false,
   onModeChange,
   onModelChange,
@@ -157,8 +160,8 @@ export function ChatInput({
   // back to the raw id when the model isn't in the org's allowed list (e.g. an
   // agent pinned a model that was later restricted).
   const lockedModelOption = useMemo(
-    () => modelOptions.find(m => m.id === model),
-    [modelOptions, model]
+    () => [pinnedModelOption, ...modelOptions].find(m => m?.id === model),
+    [pinnedModelOption, modelOptions, model]
   );
   const lockedModelLabel = lockedModelOption
     ? formatShortModelDisplayName(lockedModelOption.name)
@@ -361,7 +364,8 @@ export function ChatInput({
     : undefined;
 
   // Check if toolbar should be rendered (has callbacks and options)
-  const hasToolbar = showToolbar && onModeChange && onModelChange && modelOptions.length > 0;
+  const hasToolbar =
+    showToolbar && onModeChange && onModelChange && (modelOptions.length > 0 || pinnedModelOption);
 
   return (
     <div className="px-[max(1rem,calc(50%_-_27rem))] py-3 md:py-4">
@@ -503,6 +507,7 @@ export function ChatInput({
                 onModeChange={onModeChange}
                 model={model}
                 modelOptions={modelOptions}
+                pinnedModelOption={pinnedModelOption}
                 onModelChange={onModelChange}
                 isLoadingModels={isLoadingModels}
                 variant={variant}
@@ -545,6 +550,7 @@ export function ChatInput({
                 ) : (
                   <ModelCombobox
                     models={modelOptions}
+                    pinnedModel={pinnedModelOption}
                     value={model}
                     onValueChange={onModelChange}
                     variant="compact"

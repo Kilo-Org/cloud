@@ -97,7 +97,11 @@ async function buildSystemPrompt(
     botPlatform.getConversationContext({ thread, triggerMessage, platformIntegration }),
   ]);
 
+  const currentDate = new Date().toISOString();
+
   return `You are Kilo Bot, a helpful AI assistant.
+
+Today's date: ${currentDate}
 
 ## Core behavior
 - Be concise and direct. Prefer short messages over long explanations.

@@ -4,7 +4,10 @@ import { useEffect, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { z } from 'zod';
 import { toPersistedConversationEvents } from '@/src/shared/agent-conversation-persistence';
-import type { AgentConversationEvent } from '@/src/shared/agent-conversation';
+import type {
+  AgentConversationEvent,
+  RemoteMcpAgentToolName,
+} from '@/src/shared/agent-conversation';
 import { normalizeStoredConversations } from '@/src/shared/agent-conversation-tabs';
 import type { StoredAgentConversationStore } from '@/src/shared/agent-conversation-tabs';
 export {
@@ -62,6 +65,18 @@ const conversationEventSchema = z.union([
     query: z.string().optional(),
     snapshotId: z.string().optional(),
     tabId: z.number(),
+    type: z.literal('tool-call'),
+  }),
+  z.object({
+    arguments: z.record(z.string(), z.unknown()),
+    id: z.string(),
+    name: z.custom<RemoteMcpAgentToolName>(
+      value => typeof value === 'string' && value.startsWith('mcp_')
+    ),
+    providerToolCallId: z.string().optional(),
+    remoteToolName: z.string(),
+    serverId: z.string(),
+    serverName: z.string(),
     type: z.literal('tool-call'),
   }),
   z.object({
@@ -143,6 +158,22 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
           break;
         }
 
+        if ('remoteToolName' in event) {
+          events.push({
+            arguments: event.arguments,
+            id: event.id,
+            name: event.name,
+            ...(event.providerToolCallId === undefined
+              ? {}
+              : { providerToolCallId: event.providerToolCallId }),
+            remoteToolName: event.remoteToolName,
+            serverId: event.serverId,
+            serverName: event.serverName,
+            type: event.type,
+          });
+          break;
+        }
+
         events.push({
           ...(event.elementId === undefined ? {} : { elementId: event.elementId }),
           id: event.id,
@@ -163,7 +194,7 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
   return events;
 };
 
-const normalizeStoredConversationStore = (
+export const normalizeStoredConversationStore = (
   value: unknown
 ): StoredAgentConversationStore | undefined => {
   const parsed = storedConversationsSchema.safeParse(value);
@@ -194,7 +225,7 @@ const normalizeStoredConversationStore = (
   });
 };
 
-const toPersistedConversationStore = (
+export const toPersistedConversationStore = (
   store: StoredAgentConversationStore
 ): StoredAgentConversationStore => ({
   ...store,

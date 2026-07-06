@@ -109,6 +109,8 @@ export function BitbucketConnectSetup({
   const oauthConnectHref = `/api/integrations/bitbucket/connect?organizationId=${encodeURIComponent(
     organizationId
   )}&returnTo=${encodeURIComponent(BITBUCKET_CONNECT_RETURN_PATH(organizationId))}`;
+  const readinessQueryKey =
+    trpc.organizations.reviewAgent.getBitbucketReadiness.queryKey(statusInput);
 
   const connectMutation = useMutation(
     trpc.organizations.bitbucket.connect.mutationOptions({
@@ -122,6 +124,7 @@ export function BitbucketConnectSetup({
         void Promise.all([
           queryClient.invalidateQueries({ queryKey: statusQueryKey }),
           queryClient.invalidateQueries({ queryKey: repositoryQueryKey }),
+          queryClient.invalidateQueries({ queryKey: readinessQueryKey }),
         ]);
         toast.success('Bitbucket workspace connected');
       },

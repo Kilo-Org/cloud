@@ -1,5 +1,8 @@
-export { createSessionManager, formatError as formatSessionError } from './session-manager';
+export { formatError as formatSessionError } from './session-manager';
+export { createSessionManager } from './session-manager';
+export { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 export type {
+  ActiveSessionType,
   SessionManager,
   SessionManagerConfig,
   SessionManagerAtoms,

@@ -581,7 +581,7 @@ export class MayorGastownClient {
   // The wasteland is auto-resolved by the worker from the town's connection.
 
   async wastelandBrowse(input: {
-    status?: 'open' | 'claimed' | 'done';
+    status?: 'open' | 'claimed' | 'in_review' | 'completed' | 'validated' | 'withdrawn';
     limit?: number;
   }): Promise<Array<Record<string, unknown>>> {
     const params = new URLSearchParams();

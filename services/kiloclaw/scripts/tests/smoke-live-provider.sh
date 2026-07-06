@@ -260,11 +260,13 @@ print(json.dumps({
 PY
   )
 
+  # openclaw writes the --json payload to stdout and logs to stderr; drop stderr
+  # (it can contain provider/credential detail) so the parsed value is pure JSON.
   if ! output=$(docker exec "$CID" openclaw gateway call agent \
     --params "$params" \
     --expect-final \
     --timeout 240000 \
-    --json 2>&1); then
+    --json 2>/dev/null); then
     check "live Auto Free agent turn" "nonce returned" "command failed"
     echo "  Gateway output suppressed because provider errors can contain live credentials."
     return
@@ -289,6 +291,109 @@ print("nonce returned")
     echo "  details: $parsed"
     echo "  Gateway output suppressed because provider responses can contain sensitive data."
   fi
+}
+
+assert_kilocode_provider_loaded() {
+  # Guards Fix 1 (openclaw #93470): the kilocode provider was externalized out of
+  # openclaw core into @openclaw/kilocode-provider, installed by the Dockerfile and
+  # wired in via plugins.load.paths by config-writer. The keyless image-check only
+  # proves the package is installed; this proves it is actually present in the
+  # RUNNING config and loaded by the gateway — i.e. model routing won't silently die.
+  # Guard the read: if openclaw.json is missing/unreadable/invalid (the very
+  # regression this guards), the embedded python exits non-zero. Testing it in an
+  # `if` keeps `set -e` from aborting the whole run so it fails cleanly here.
+  local path_present
+  if ! path_present=$(docker exec -i "$CID" python3 - <<'PY'
+import json
+from pathlib import Path
+doc = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
+paths = (((doc.get('plugins') or {}).get('load') or {}).get('paths') or [])
+print('yes' if '/usr/local/lib/node_modules/@openclaw/kilocode-provider' in paths else 'no')
+PY
+  ); then
+    path_present="config unreadable"
+  fi
+  check "kilocode provider on plugins.load.paths" "yes" "$path_present"
+
+  # And confirm the gateway actually loaded it (openclaw writes JSON to stdout,
+  # logs to stderr which we drop). Capture the inspect output first so a non-zero
+  # exit (e.g. the provider missing — the very case this guards) surfaces as a
+  # clean FAIL instead of aborting the whole run under `set -euo pipefail`.
+  local raw
+  local status
+  if ! raw=$(docker exec "$CID" openclaw plugins inspect kilocode --json 2>/dev/null); then
+    check "kilocode provider plugin loaded" "loaded" "inspect failed"
+    return
+  fi
+  status=$(python3 -c 'import json,sys
+try:
+    print((json.load(sys.stdin).get("plugin") or {}).get("status") or "missing")
+except Exception:
+    print("unparseable")' <<< "$raw")
+  check "kilocode provider plugin loaded" "loaded" "$status"
+}
+
+assert_kilocode_vision_capability() {
+  # Regression guard for the removed model-catalog-refresh workaround (was cloud
+  # #4054). That workaround wrote the gateway catalog into
+  # models.providers.kilocode.models so the image-capability gate saw vision
+  # modalities, because OpenClaw <2026.6.9 could skip runtime discovery for a
+  # refreshable catalog (openclaw #93775). openclaw #93786 (in 2026.6.9) fixes
+  # that, so on the candidate the kilocode catalog must advertise image input
+  # from NATIVE discovery alone. An "available" kilocode model with image input
+  # proves discovery repopulated capability metadata without the workaround.
+  local output
+  local result="pending"
+
+  for _ in $(seq 1 60); do
+    output=$(docker exec "$CID" openclaw models list --provider kilocode --all --json 2>/dev/null || true)
+    result=$(python3 -c '
+import json, sys
+
+# openclaw writes the --json catalog to stdout and logs to stderr (dropped via
+# 2>/dev/null above), so stdout is pure JSON. The `docker exec ... || true` above
+# can still yield empty/non-JSON output while the catalog is warming up, so treat
+# that as a retriable "no-catalog" (exit 0) rather than letting json.load raise
+# and abort the whole poll under `set -euo pipefail`.
+raw = sys.stdin.read().strip()
+if not raw:
+    print("no-catalog"); raise SystemExit(0)
+try:
+    data = json.loads(raw)
+except json.JSONDecodeError:
+    print("no-catalog"); raise SystemExit(0)
+models = data.get("models", data) if isinstance(data, dict) else data
+if not isinstance(models, list):
+    print("no-catalog"); raise SystemExit(0)
+
+def is_kilocode(m):
+    return str(m.get("key", "")).startswith("kilocode/") or m.get("provider") == "kilocode"
+
+def has_image(m):
+    inp = m.get("input")
+    if isinstance(inp, str):
+        return "image" in inp
+    if isinstance(inp, (list, tuple)):
+        return "image" in inp
+    return False
+
+kc = [m for m in models if isinstance(m, dict) and is_kilocode(m)]
+if any(has_image(m) and m.get("available") is True for m in kc):
+    print("image-capable")
+elif any(has_image(m) for m in kc):
+    print("image-capable-unavailable")
+elif kc:
+    print("text-only")
+else:
+    print("no-kilocode-models")
+' <<< "$output")
+    if [ "$result" = "image-capable" ]; then
+      break
+    fi
+    sleep 1
+  done
+
+  check "kilocode native vision capability (post-#4054-revert)" "image-capable" "$result"
 }
 
 run_phase() {
@@ -316,6 +421,12 @@ run_phase() {
     assert_app_config_patch "$CID" "$PORT" "$TOKEN"
     assert_app_config_agent_defaults "$CID" "$PORT" "$TOKEN"
     assert_app_config_agents_crud "$CID" "$PORT" "$TOKEN"
+    # Candidate only: confirm the externalized kilocode provider is wired into the
+    # running config and loaded by the gateway (model routing depends on it).
+    assert_kilocode_provider_loaded
+    # Candidate only: prove the removed #4054 catalog-refresh workaround is no
+    # longer needed — native discovery must supply kilocode image capability.
+    assert_kilocode_vision_capability
   fi
   assert_exec_approvals_seeded "$CID"
   echo

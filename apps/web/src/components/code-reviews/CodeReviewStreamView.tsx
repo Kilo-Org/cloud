@@ -19,8 +19,8 @@ import {
   type ConnectionState,
 } from '@/lib/cloud-agent-next/websocket-manager';
 import type { CloudAgentEvent, StreamError } from '@/lib/cloud-agent-next/event-types';
-import type { ReviewEvent } from '@/lib/code-reviews/client/code-review-worker-client';
 import { CLOUD_AGENT_NEXT_WS_URL } from '@/lib/constants';
+import { getCodeReviewDisplayBehavior } from './code-review-stream-behavior';
 
 type CodeReviewStreamViewProps = {
   reviewId: string;
@@ -142,19 +142,6 @@ function toDisplayEventFromKilocode(
 }
 
 // ---------------------------------------------------------------------------
-// SSE/cloud-agent event conversion (polling flow)
-// ---------------------------------------------------------------------------
-
-function reviewEventToDisplayEvent(event: ReviewEvent): DisplayEvent {
-  return {
-    timestamp: event.timestamp,
-    message: event.message || 'Event received',
-    content: event.content,
-    eventType: event.eventType,
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
@@ -266,13 +253,13 @@ export function CodeReviewStreamView({
     refetchInterval: query => {
       const data = query.state.data;
       if (!data?.success) return 2000;
-      // Terminal state — stop polling
-      if (['completed', 'failed', 'cancelled'].includes(data.status)) return false;
-      // cloud-agent-next (v2) mode: stop once we have the cloudAgentSessionId for WebSocket
-      if (data.agentVersion === 'v2' && data.cloudAgentSessionId) return false;
-      // cloud-agent (v1) mode: stop once we have stream info (polling handles the rest)
-      if (data.agentVersion !== 'v2') return false;
-      return 2000;
+
+      const behavior = getCodeReviewDisplayBehavior({
+        agentVersion: data.agentVersion,
+        status: data.status,
+        cloudAgentSessionId: data.cloudAgentSessionId,
+      });
+      return behavior.shouldPollStatus ? 2000 : false;
     },
     enabled: !!reviewId,
   });
@@ -280,8 +267,18 @@ export function CodeReviewStreamView({
   const cloudAgentSessionId = streamInfo?.success ? streamInfo.cloudAgentSessionId : null;
   const organizationId = streamInfo?.success ? streamInfo.organizationId : undefined;
   const reviewStatus = streamInfo?.success ? streamInfo.status : undefined;
+  const displayBehavior = streamInfo?.success
+    ? getCodeReviewDisplayBehavior({
+        agentVersion: streamInfo.agentVersion,
+        status: streamInfo.status,
+        cloudAgentSessionId: streamInfo.cloudAgentSessionId,
+      })
+    : null;
+  const isHistoricalReview = displayBehavior?.isHistorical ?? false;
+  const isTerminal = displayBehavior?.isTerminal ?? false;
+  const shouldLoadHistory = displayBehavior?.shouldLoadHistory ?? false;
 
-  // Determine mode from the agent version recorded at dispatch time
+  // Only current Cloud Agent Next attempts have a live runtime connection.
   const useWebSocket = streamInfo?.success
     ? streamInfo.agentVersion === 'v2' && isSelectedLatestAttempt
     : false;
@@ -397,57 +394,25 @@ export function CodeReviewStreamView({
   }, [useWebSocket, cloudAgentSessionId, isComplete, getTicket, handleEvent, handleWsError]);
 
   // ---------------------------------------------------------------------------
-  // Mode B: Polling (SSE/cloud-agent flow)
+  // Historical session data
   // ---------------------------------------------------------------------------
-
-  const { data: polledEvents } = useQuery({
-    ...trpc.codeReviews.getReviewEvents.queryOptions({ reviewId }),
-    refetchInterval: isComplete ? false : 2000,
-    // Only poll when NOT using WebSocket mode and the review exists
-    enabled: !!reviewId && !useWebSocket && isSelectedLatestAttempt && !!streamInfo?.success,
-  });
-
-  // Sync polled events into display events
-  useEffect(() => {
-    if (useWebSocket) return; // WebSocket mode handles its own events
-    if (!polledEvents?.success) return;
-
-    const displayEvents = polledEvents.events.map(reviewEventToDisplayEvent);
-    setEvents(displayEvents);
-
-    // Check for completion in polled events
-    const lastEvent = polledEvents.events[polledEvents.events.length - 1];
-    if (lastEvent?.eventType === 'complete') {
-      setIsComplete(true);
-      onComplete?.();
-    }
-  }, [useWebSocket, polledEvents, onComplete]);
-
-  // ---------------------------------------------------------------------------
-  // Mode C: Historical session data (completed reviews)
-  // ---------------------------------------------------------------------------
-
-  const isTerminal = ['completed', 'failed', 'cancelled', 'interrupted'].includes(
-    reviewStatus ?? ''
-  );
 
   const { data: sessionMessages, isLoading: isLoadingHistory } = useQuery({
     ...trpc.codeReviews.getSessionMessages.queryOptions({
       reviewId,
       attemptId: effectiveAttemptId,
     }),
-    // Only fetch historical data when the review is done and we have no live events
-    enabled: !!reviewId && isTerminal && events.length === 0,
+    enabled: !!reviewId && shouldLoadHistory && events.length === 0,
   });
 
   // Populate events from historical session data
   useEffect(() => {
-    if (!isTerminal || events.length > 0) return;
+    if (!shouldLoadHistory || events.length > 0) return;
     if (!sessionMessages?.success) return;
     if (sessionMessages.entries.length === 0) return;
 
     setEvents(sessionMessages.entries);
-  }, [isTerminal, sessionMessages, events.length]);
+  }, [shouldLoadHistory, sessionMessages, events.length]);
 
   // ---------------------------------------------------------------------------
   // Auto-scroll
@@ -503,9 +468,9 @@ export function CodeReviewStreamView({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Terminal className="h-4 w-4" />
             <CardTitle className="shrink-0 text-sm font-medium">
-              {isTerminal ? 'Session Log' : 'Code Review Progress'}
+              {shouldLoadHistory ? 'Session Log' : 'Code Review Progress'}
             </CardTitle>
-            {isTerminal && cloudAgentSessionId && (
+            {shouldLoadHistory && cloudAgentSessionId && (
               <span
                 title={cloudAgentSessionId}
                 className="bg-muted text-muted-foreground max-w-[min(20rem,50vw)] truncate rounded px-2 py-0.5 font-mono text-xs font-normal"
@@ -532,7 +497,12 @@ export function CodeReviewStreamView({
                 </Select>
               </div>
             )}
-            {isComplete ? (
+            {isHistoricalReview && !isTerminal ? (
+              <Badge variant="secondary" className="gap-1.5">
+                <AlertCircle className="h-3 w-3" />
+                Historical
+              </Badge>
+            ) : isComplete ? (
               reviewStatus === 'failed' ? (
                 <Badge variant="destructive" className="gap-1.5">
                   <XCircle className="h-3 w-3" />
@@ -579,12 +549,12 @@ export function CodeReviewStreamView({
             setAutoScroll(isAtBottom);
           }}
         >
-          {events.length === 0 && !isComplete ? (
+          {events.length === 0 && !shouldLoadHistory ? (
             <div className="flex items-center gap-2 text-slate-400">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>Waiting for events...</span>
             </div>
-          ) : events.length === 0 && isComplete ? (
+          ) : events.length === 0 ? (
             <div className="text-slate-500">
               {isLoadingHistory ? (
                 <div className="flex items-center gap-2">
@@ -615,7 +585,7 @@ export function CodeReviewStreamView({
                   )}
                 </div>
               ))}
-              {!isComplete && (
+              {!isComplete && !isHistoricalReview && (
                 <div className="flex items-center gap-2 px-2 py-1 text-slate-500">
                   <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-500" />
                   <span>Live</span>

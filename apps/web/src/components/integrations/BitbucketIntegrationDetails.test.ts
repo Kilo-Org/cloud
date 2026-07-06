@@ -63,6 +63,7 @@ describe('Bitbucket integration UI state', () => {
     expect(html).toContain('Token has additional permissions');
     expect(html).toContain('pipeline:write');
     expect(html).toContain('repository:admin');
+    expect(html).not.toContain('</code>. Cloud Agent');
   });
 
   it('omits redundant integration controls guidance for OAuth connections', () => {

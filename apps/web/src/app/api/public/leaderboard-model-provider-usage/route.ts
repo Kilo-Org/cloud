@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { normalizePublicInferenceProvider } from '@/lib/public-inference-provider';
 import {
-  getPublicSnowflakeReport,
+  createPublicSnowflakeReport,
   publicSnowflakeReportOptions,
 } from '@/lib/public-snowflake-report';
 import { LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY } from '@/lib/redis-keys';
@@ -163,15 +163,13 @@ function parseAndAggregateUsage(rows: string[][]): ModelProviderUsage[] {
     })).filter(usage => usage.errorRate < MAXIMUM_ERROR_RATE);
 }
 
-export async function GET() {
-  return getPublicSnowflakeReport({
-    cacheKey: LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY,
-    errorMessage: 'Failed to fetch leaderboard model provider usage',
-    parseRows: parseAndAggregateUsage,
-    query: LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY,
-    schema: modelProviderUsageSchema,
-    source: 'public-leaderboard-model-provider-usage-api',
-  });
-}
+export const GET = createPublicSnowflakeReport({
+  cacheKey: LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY,
+  errorMessage: 'Failed to fetch leaderboard model provider usage',
+  parseRows: parseAndAggregateUsage,
+  query: LEADERBOARD_MODEL_PROVIDER_USAGE_QUERY,
+  schema: modelProviderUsageSchema,
+  source: 'public-leaderboard-model-provider-usage-api',
+});
 
 export const OPTIONS = publicSnowflakeReportOptions;

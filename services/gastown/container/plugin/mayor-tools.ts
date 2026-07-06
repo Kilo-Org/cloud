@@ -536,7 +536,7 @@ export function createMayorTools(client: MayorGastownClient) {
         'Optionally filter by status and limit the number of results.',
       args: {
         status: tool.schema
-          .enum(['open', 'claimed', 'done'])
+          .enum(['open', 'claimed', 'in_review', 'completed', 'validated', 'withdrawn'])
           .describe('Filter by item status')
           .optional(),
         limit: tool.schema

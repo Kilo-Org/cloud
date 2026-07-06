@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState, useRef, memo } from 'react';
+import { useMemo, useState, memo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Pencil, Trash2, Reply, X, Check, AlertCircle, Smile, Copy } from 'lucide-react';
 import { EmojiQuickPick } from './EmojiQuickPick';
-import { EmojiPicker } from './EmojiPicker';
+import { EmojiMartPanel } from './EmojiPicker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ReactionPills } from './ReactionPills';
 import type {
   Message,
@@ -94,9 +95,9 @@ export const MessageBubble = memo(function MessageBubble({
   const [removedAttachmentIds, setRemovedAttachmentIds] = useState<Set<string>>(new Set());
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showActions, setShowActions] = useState(false);
-  const [showQuickPick, setShowQuickPick] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [reactionMenuOpen, setReactionMenuOpen] = useState(false);
   const [showFullPicker, setShowFullPicker] = useState(false);
-  const bubbleRef = useRef<HTMLDivElement>(null);
 
   const isBot = message.senderId.startsWith('bot:');
   const isOptimistic = message.id.startsWith('pending-');
@@ -205,8 +206,7 @@ export const MessageBubble = memo(function MessageBubble({
     );
   }
 
-  function handleQuickPickSelect(emoji: string) {
-    setShowQuickPick(false);
+  function applyReaction(emoji: string) {
     if (!actionAvailability.canReact) return;
     if (myReactions.has(emoji)) {
       onRemoveReaction(message.id, emoji);
@@ -215,14 +215,21 @@ export const MessageBubble = memo(function MessageBubble({
     }
   }
 
+  function handleQuickPickSelect(emoji: string) {
+    handleReactionMenuOpenChange(false);
+    applyReaction(emoji);
+  }
+
   function handleFullPickerSelect(emoji: string) {
-    setShowFullPicker(false);
-    setShowQuickPick(false);
-    if (!actionAvailability.canReact) return;
-    if (myReactions.has(emoji)) {
-      onRemoveReaction(message.id, emoji);
-    } else {
-      onAddReaction(message.id, emoji);
+    handleReactionMenuOpenChange(false);
+    applyReaction(emoji);
+  }
+
+  function handleReactionMenuOpenChange(open: boolean) {
+    setReactionMenuOpen(open);
+    if (!open) {
+      setShowFullPicker(false);
+      if (!isHovered) setShowActions(false);
     }
   }
 
@@ -235,13 +242,31 @@ export const MessageBubble = memo(function MessageBubble({
       }`}
     >
       {actionAvailability.canReact && (
-        <button
-          onClick={() => setShowQuickPick(prev => !prev)}
-          className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
-          title="React"
-        >
-          <Smile className="h-3.5 w-3.5" />
-        </button>
+        <Popover open={reactionMenuOpen} onOpenChange={handleReactionMenuOpenChange}>
+          <PopoverTrigger
+            type="button"
+            className="hover:bg-muted rounded p-1 cursor-pointer transition-colors"
+            title="React"
+            aria-label="React"
+          >
+            <Smile className="h-3.5 w-3.5" />
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            side="top"
+            className="w-auto border-none bg-transparent p-0 shadow-none"
+          >
+            {showFullPicker ? (
+              <EmojiMartPanel onSelect={handleFullPickerSelect} />
+            ) : (
+              <EmojiQuickPick
+                currentUserReactions={myReactions}
+                onSelect={handleQuickPickSelect}
+                onOpenFullPicker={() => setShowFullPicker(true)}
+              />
+            )}
+          </PopoverContent>
+        </Popover>
       )}
       <button
         onClick={() => {
@@ -288,12 +313,13 @@ export const MessageBubble = memo(function MessageBubble({
   return (
     <div
       className={`group flex [content-visibility:auto] [contain-intrinsic-size:0_120px] px-4 py-1 ${isOwn ? 'justify-end' : 'justify-start'}`}
-      onMouseEnter={() => setShowActions(true)}
+      onMouseEnter={() => {
+        setIsHovered(true);
+        setShowActions(true);
+      }}
       onMouseLeave={() => {
-        if (!showFullPicker) {
-          setShowActions(false);
-          setShowQuickPick(false);
-        }
+        setIsHovered(false);
+        if (!reactionMenuOpen) setShowActions(false);
       }}
     >
       <div className={`flex max-w-[75%] min-w-0 flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
@@ -316,27 +342,7 @@ export const MessageBubble = memo(function MessageBubble({
 
         <div className="relative min-w-0 max-w-full">
           {actionButtons}
-          {showQuickPick && actionAvailability.canReact && (
-            <div className={`absolute z-20 ${isOwn ? 'right-full mr-1' : 'left-full ml-1'} top-0`}>
-              <EmojiQuickPick
-                currentUserReactions={myReactions}
-                onSelect={handleQuickPickSelect}
-                onOpenFullPicker={() => {
-                  setShowQuickPick(false);
-                  setShowFullPicker(true);
-                }}
-              />
-            </div>
-          )}
-          {showFullPicker && actionAvailability.canReact && (
-            <EmojiPicker
-              onSelect={handleFullPickerSelect}
-              onClose={() => setShowFullPicker(false)}
-              anchorRef={bubbleRef}
-            />
-          )}
           <div
-            ref={bubbleRef}
             className={`overflow-hidden rounded-2xl px-3 py-2 ${
               isOwn ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
             }`}

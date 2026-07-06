@@ -1,10 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { X } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { useOnboardingTooltips, ONBOARDING_TOOLTIPS } from './useOnboardingTooltips';
 
 // ── localStorage key for tracking whether first-task completion was detected ──
@@ -99,7 +100,7 @@ export function OnboardingTooltips({ townId }: OnboardingTooltipsProps) {
 
 // ── Individual tooltip popover ───────────────────────────────────────────
 
-function OnboardingTooltipPopover({
+export function OnboardingTooltipPopover({
   tooltip,
   onDismiss,
   onDismissAll,
@@ -108,23 +109,20 @@ function OnboardingTooltipPopover({
   onDismiss: () => void;
   onDismissAll: () => void;
 }) {
+  const [anchorEl, setAnchorEl] = useState<Element | null>(null);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
-  // Find the anchor element via data attribute and observe its position
+  // Find the anchor element via its data attribute and track its rect so the
+  // highlight ring stays aligned on scroll/resize. Radix repositions the
+  // popover itself via the virtual anchor below.
   useEffect(() => {
     const findAnchor = () => {
       const el = document.querySelector(`[data-onboarding-target="${tooltip.target}"]`);
-      if (el) {
-        setAnchorRect(el.getBoundingClientRect());
-      }
+      setAnchorEl(el);
+      if (el) setAnchorRect(el.getBoundingClientRect());
     };
 
-    // Initial find with a brief delay for DOM rendering
     const timer = setTimeout(findAnchor, 300);
-
-    // Re-find on scroll/resize
     const handleUpdate = () => findAnchor();
     window.addEventListener('resize', handleUpdate);
     window.addEventListener('scroll', handleUpdate, true);
@@ -136,127 +134,79 @@ function OnboardingTooltipPopover({
     };
   }, [tooltip.target]);
 
-  // Calculate position relative to anchor
-  useEffect(() => {
-    if (!anchorRect || !popoverRef.current) return;
-
-    const popoverRect = popoverRef.current.getBoundingClientRect();
-    const gap = 12;
-
-    // Position to the right of the anchor by default
-    let top = anchorRect.top + anchorRect.height / 2 - popoverRect.height / 2;
-    let left = anchorRect.right + gap;
-
-    // If too far right, position to the left
-    if (left + popoverRect.width > window.innerWidth - 16) {
-      left = anchorRect.left - popoverRect.width - gap;
-    }
-
-    // If still off-screen (e.g., for terminal at bottom), position above
-    if (left < 16) {
-      left = anchorRect.left + anchorRect.width / 2 - popoverRect.width / 2;
-      top = anchorRect.top - popoverRect.height - gap;
-    }
-
-    // Clamp to viewport
-    top = Math.max(8, Math.min(top, window.innerHeight - popoverRect.height - 8));
-    left = Math.max(8, Math.min(left, window.innerWidth - popoverRect.width - 8));
-
-    setPosition({ top, left });
-  }, [anchorRect]);
-
-  // Dismiss on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onDismiss();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onDismiss]);
-
-  // Click outside to dismiss
-  const handleBackdropClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (
-        popoverRef.current &&
-        e.target instanceof Node &&
-        !popoverRef.current.contains(e.target)
-      ) {
-        onDismiss();
-      }
+  const virtualRef = {
+    current: {
+      getBoundingClientRect: () => anchorEl?.getBoundingClientRect() ?? new DOMRect(),
     },
-    [onDismiss]
-  );
+  };
 
-  if (!anchorRect) return null;
+  if (!anchorEl || !anchorRect) return null;
 
   return (
-    <AnimatePresence>
-      {/* Semi-transparent backdrop to catch outside clicks */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.15 }}
-        className="fixed inset-0 z-[100]"
-        onClick={handleBackdropClick}
-      >
-        {/* Highlight ring on the anchor element */}
+    <>
+      {/* Highlight ring on the anchor element (Radix popover is non-modal, so
+          there is no backdrop — the ring is portaled on top of the page). */}
+      {createPortal(
         <div
-          className="pointer-events-none absolute rounded-md ring-2 ring-[color:oklch(85%_0.15_250)] ring-offset-2 ring-offset-transparent"
+          aria-hidden="true"
+          className="pointer-events-none fixed z-50 rounded-md ring-2 ring-[color:oklch(85%_0.15_250)] ring-offset-2 ring-offset-transparent"
           style={{
             top: anchorRect.top - 4,
             left: anchorRect.left - 4,
             width: anchorRect.width + 8,
             height: anchorRect.height + 8,
           }}
-        />
+        />,
+        document.body
+      )}
 
-        {/* Popover content */}
-        <motion.div
-          ref={popoverRef}
-          initial={{ opacity: 0, scale: 0.95, y: 4 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 4 }}
-          transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-          className="pointer-events-auto absolute z-[101] w-72 rounded-lg border border-white/[0.15] bg-[#1a1a2e] p-4 shadow-2xl"
-          style={position ?? { top: anchorRect.top, left: anchorRect.right + 12, opacity: 0 }}
+      <Popover
+        open
+        onOpenChange={open => {
+          if (!open) onDismiss();
+        }}
+      >
+        <PopoverAnchor virtualRef={virtualRef} />
+        <PopoverContent
+          side="right"
+          align="center"
+          sideOffset={12}
+          collisionPadding={8}
+          className="w-72 p-4 motion-reduce:animate-none"
+          onOpenAutoFocus={e => e.preventDefault()}
         >
           {/* Close button */}
           <button
-            onClick={e => {
-              e.stopPropagation();
-              onDismiss();
-            }}
-            className="absolute top-2 right-2 rounded-md p-1 text-white/30 transition-colors hover:bg-white/[0.08] hover:text-white/60"
+            type="button"
+            onClick={onDismiss}
+            aria-label="Dismiss tip"
+            className="text-muted-foreground hover:bg-surface-hover hover:text-foreground absolute top-2 right-2 rounded-md p-1 transition-colors"
           >
             <X className="size-3.5" />
           </button>
 
           {/* Title */}
-          <div className="mb-1 text-sm font-semibold text-white/90">{tooltip.title}</div>
+          <div className="text-foreground mb-1 text-sm font-semibold">{tooltip.title}</div>
 
           {/* Description */}
-          <p className="mb-3 text-xs leading-relaxed text-white/55">{tooltip.description}</p>
+          <p className="text-muted-foreground mb-3 text-xs leading-relaxed">
+            {tooltip.description}
+          </p>
 
           {/* Actions */}
           <div className="flex items-center justify-between">
             <button
-              onClick={e => {
-                e.stopPropagation();
-                onDismissAll();
-              }}
-              className="text-[10px] text-white/25 transition-colors hover:text-white/50"
+              type="button"
+              onClick={onDismissAll}
+              className="text-muted-foreground hover:text-foreground text-[10px] transition-colors"
             >
               Don&apos;t show these again
             </button>
 
             <button
-              onClick={e => {
-                e.stopPropagation();
-                onDismiss();
-              }}
-              className="rounded-md bg-white/[0.08] px-3 py-1 text-xs font-medium text-white/70 transition-colors hover:bg-white/[0.14] hover:text-white/90"
+              type="button"
+              onClick={onDismiss}
+              className="bg-surface-hover text-foreground hover:bg-surface-selected rounded-md px-3 py-1 text-xs font-medium transition-colors"
             >
               Got it
             </button>
@@ -268,13 +218,13 @@ function OnboardingTooltipPopover({
               <div
                 key={t.id}
                 className={`size-1.5 rounded-full transition-colors ${
-                  t.id === tooltip.id ? 'bg-[color:oklch(85%_0.15_250)]' : 'bg-white/15'
+                  t.id === tooltip.id ? 'bg-[color:oklch(85%_0.15_250)]' : 'bg-border'
                 }`}
               />
             ))}
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        </PopoverContent>
+      </Popover>
+    </>
   );
 }

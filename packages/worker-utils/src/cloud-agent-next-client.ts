@@ -26,7 +26,14 @@ export type CloudAgentPrepareSessionInput = {
   githubToken?: string;
   gitUrl?: string;
   gitToken?: string;
-  platform?: 'github' | 'gitlab';
+  platform?: 'github' | 'gitlab' | 'bitbucket';
+  bitbucketWorkspaceUuid?: string;
+  bitbucketWorkspaceSlug?: string;
+  bitbucketRepositoryUuid?: string;
+  bitbucketRepositorySlug?: string;
+  bitbucketIntegrationId?: string;
+  bitbucketPullRequestId?: number;
+  bitbucketExpectedHeadSha?: string;
   kilocodeOrganizationId?: string;
   envVars?: Record<string, string>;
   mcpServers?: Record<string, unknown>;

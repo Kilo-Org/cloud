@@ -1,5 +1,6 @@
 import { createStore } from 'jotai';
 import {
+  cliModelLabel,
   createSessionManager,
   formatError,
   type SessionManagerConfig,
@@ -317,6 +318,7 @@ describe('createSessionManager', () => {
         repository: string;
         mode: string;
         model: string;
+        providerID?: string | null;
         variant?: string | null;
       }>(config.store, mgr.atoms.sessionConfig);
       expect(sessionConfig).toEqual({
@@ -324,7 +326,9 @@ describe('createSessionManager', () => {
         repository: 'test/repo',
         mode: 'code',
         model: 'claude-3-5-sonnet',
+        providerID: null,
         variant: null,
+        runtimeAgents: undefined,
       });
     });
 
@@ -2338,6 +2342,19 @@ describe('formatError', () => {
     expect(formatError('just a string')).toBe('Something went wrong. Please retry in a moment.');
     expect(formatError(null)).toBe('Something went wrong. Please retry in a moment.');
     expect(formatError(42)).toBe('Something went wrong. Please retry in a moment.');
+  });
+});
+
+describe('cliModelLabel', () => {
+  it.each([
+    [null, 'CLI default'],
+    [{ model: 'claude-3-5-sonnet', providerID: null }, 'CLI model — claude-3-5-sonnet'],
+    [
+      { model: 'claude-3-5-sonnet', providerID: 'anthropic' },
+      'CLI model — anthropic/claude-3-5-sonnet',
+    ],
+  ])('formats %p as %s', (config, expected) => {
+    expect(cliModelLabel(config)).toBe(expected);
   });
 });
 

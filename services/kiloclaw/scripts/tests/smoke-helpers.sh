@@ -42,14 +42,23 @@ PY
 assert_kilo_chat_plugin_loaded() {
   local cid="$1"
   local plugin_json
+  local plugin_err
   local details
   local diagnostic_details
 
-  if ! plugin_json=$(docker exec "$cid" openclaw plugins inspect kilo-chat --json 2>&1); then
+  # openclaw writes the --json payload to stdout and its logs (e.g. the
+  # "[state-migrations]" warnings emitted by createSubsystemLogger) to stderr.
+  # Capture the two streams separately so the parsed value is pure JSON; keep
+  # stderr only to surface on failure.
+  plugin_err=$(mktemp)
+  if ! plugin_json=$(docker exec "$cid" openclaw plugins inspect kilo-chat --json 2>"$plugin_err"); then
     check "kilo-chat plugin inspect" "loaded" "failed"
     echo "  output: $plugin_json"
+    echo "  stderr: $(cat "$plugin_err")"
+    rm -f "$plugin_err"
     return
   fi
+  rm -f "$plugin_err"
 
   if details=$(python3 -c '
 import json

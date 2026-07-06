@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useSidebar, type Sidebar } from '@/components/ui/sidebar';
 import { useUrlOrganizationIdentifier } from '@/hooks/useUrlOrganizationId';
@@ -41,6 +41,13 @@ function isKiloClawNewPath(pathname: string): boolean {
   );
 }
 
+function isOrganizationSetupStep(pathname: string, step: string | null): boolean {
+  return (
+    new RegExp(`^/organizations/${ORG_ROUTE_IDENTIFIER}/welcome$`).test(pathname) &&
+    step !== 'complete'
+  );
+}
+
 /** Extract the wastelandId from a /wasteland/[wastelandId] pathname, or null. */
 function extractWastelandId(pathname: string): string | null {
   const match = pathname.match(new RegExp(`^/wasteland/(${UUID})`));
@@ -61,6 +68,8 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
   const trpc = useTRPC();
   const currentOrgIdentifier = useUrlOrganizationIdentifier();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const setupStep = searchParams.get('step');
   const { open, setOpenMobile, setOpenTransient } = useSidebar();
   const previousSidebarOpen = useRef<boolean | null>(null);
   const currentSidebarOpen = useRef(open);
@@ -111,7 +120,7 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
   }, [setOpenMobile, setOpenTransient]);
 
   useEffect(() => {
-    if (isKiloClawNewPath(pathname)) {
+    if (isKiloClawNewPath(pathname) || isOrganizationSetupStep(pathname, setupStep)) {
       if (previousSidebarOpen.current === null) {
         previousSidebarOpen.current = currentSidebarOpen.current;
       }
@@ -124,7 +133,7 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
       sidebarActions.current.setOpenTransient(previousSidebarOpen.current);
       previousSidebarOpen.current = null;
     }
-  }, [pathname]);
+  }, [pathname, setupStep]);
 
   // Personal gastown town — show the town-specific sidebar
   const gastownTownId = extractGastownTownId(pathname);

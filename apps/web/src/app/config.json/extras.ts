@@ -103,6 +103,11 @@ export const kiloExtras = {
       description: 'Enable AI-powered codebase search',
       type: 'boolean',
     },
+    agent_requirements: {
+      description:
+        'Require declared agent skills, MCPs, and VS Code extensions before VS Code prompts can run',
+      type: 'boolean',
+    },
     native_notebook_tools: {
       description: 'Enable native tools for reading, editing, and executing VS Code notebooks',
       type: 'boolean',

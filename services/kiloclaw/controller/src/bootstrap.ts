@@ -667,13 +667,24 @@ export function configureGitHub(env: EnvLike, deps: BootstrapDeps = defaultDeps)
         stdio: 'pipe',
         env: ghEnv,
       });
-      deps.execFileSync('gh', ['auth', 'setup-git'], { stdio: 'pipe', env: ghEnv });
       console.log('gh CLI authenticated');
     } catch (err) {
       // gh's stderr on the env-conflict path carries no secret, but scrub the
       // token defensively in case a future gh error echoes the supplied value.
       console.warn(
         `WARNING: gh auth login failed: ${describeExecFailure(err, [env.GITHUB_TOKEN, env.GH_TOKEN])}`
+      );
+    }
+
+    // Separate try/catch: `gh auth login` already wrote hosts.yml, so if
+    // setup-git fails (e.g. git missing from PATH, or a credential-helper
+    // conflict) `gh` still works. Report it as its own failure rather than
+    // mislabeling it a login failure or discarding the login-success log.
+    try {
+      deps.execFileSync('gh', ['auth', 'setup-git'], { stdio: 'pipe', env: ghEnv });
+    } catch (err) {
+      console.warn(
+        `WARNING: gh auth setup-git failed: ${describeExecFailure(err, [env.GITHUB_TOKEN, env.GH_TOKEN])}`
       );
     }
 

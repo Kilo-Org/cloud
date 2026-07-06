@@ -591,6 +591,36 @@ describe('configureGitHub', () => {
     warnSpy.mockRestore();
   });
 
+  it('reports setup-git failure distinctly and still logs login success', () => {
+    // Guards against the shared-try regression: if `gh auth login` succeeds
+    // (hosts.yml written) but `gh auth setup-git` fails, gh still works — the
+    // failure must not be mislabeled "gh auth login failed" and the login
+    // success log must still be emitted.
+    const { deps, setExecBehavior } = fakeDeps();
+    setExecBehavior((cmd, args) => {
+      if (cmd === 'gh' && args.includes('setup-git')) {
+        const err = new Error('Command failed') as Error & { stderr?: string };
+        err.stderr = 'git: command not found';
+        return err;
+      }
+      return null;
+    });
+
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    configureGitHub({ GITHUB_TOKEN: 'ghp_token123' }, deps);
+
+    const logged = logSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    const warned = warnSpy.mock.calls.map(call => call.join(' ')).join('\n');
+    expect(logged).toContain('gh CLI authenticated'); // login success still reported
+    expect(warned).toContain('gh auth setup-git failed'); // accurate, named failure
+    expect(warned).not.toContain('gh auth login failed'); // not mislabeled
+
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
   it('surfaces gh stderr on failure with the token scrubbed', () => {
     const { deps, setExecBehavior } = fakeDeps();
     setExecBehavior((cmd, args) => {

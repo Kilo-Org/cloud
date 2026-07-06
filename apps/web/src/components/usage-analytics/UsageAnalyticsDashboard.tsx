@@ -136,7 +136,6 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   const organizationId = org?.organizationId ?? null;
   const organizationName = org?.organizationName;
   const callerRole = org?.callerRole;
-  const organizationPlan = org?.organizationPlan;
 
   const trpc = useTRPC();
   // Migrate legacy `?viewAs=org-wide` links (which meant page-org-wide) to the
@@ -145,10 +144,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   // `scope` is present.
   const searchParams = useSearchParams();
   const legacyOrgWideScope =
-    context === 'organization' &&
-    organizationId &&
-    searchParams.get('scope') == null &&
-    searchParams.get('viewAs') === 'org-wide'
+    organizationId && searchParams.get('scope') == null && searchParams.get('viewAs') === 'org-wide'
       ? organizationId
       : undefined;
   const { state, setState } = useUsageDashboardState(
@@ -175,7 +171,11 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   const adminOrg =
     org && (org.callerRole === 'owner' || org.callerRole === 'billing_manager') ? org : null;
   const isOrgAdmin = adminOrg !== null;
-  const hasEnterpriseUsageViews = context === 'organization' && organizationPlan === 'enterprise';
+  // Enterprise orgs get the dedicated feature-adoption / AI-usage views. Same
+  // pattern as `adminOrg`: a non-null `enterpriseOrg` carries the concrete org
+  // id those views require, so callers don't re-check the nullable local.
+  const enterpriseOrg = org?.organizationPlan === 'enterprise' ? org : null;
+  const hasEnterpriseUsageViews = enterpriseOrg !== null;
   const showDetailedUsage = !hasEnterpriseUsageViews || usageView === 'ai-usage';
 
   // `organizations.list` is always available to the caller and returns the
@@ -687,27 +687,27 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
               </div>
             )}
 
-            {hasEnterpriseUsageViews && organizationId && usageView === 'overview' ? (
+            {enterpriseOrg && usageView === 'overview' ? (
               <>
                 <UsageWarning />
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
                   <FeatureAdoptionView
-                    organizationId={organizationId}
+                    organizationId={enterpriseOrg.organizationId}
                     compact
                     onViewDetails={() => setState({ usageView: 'feature-adoption' })}
                   />
                   <AIAdoptionSummaryCard
-                    organizationId={organizationId}
+                    organizationId={enterpriseOrg.organizationId}
                     dateRange={dateRange}
                     onViewDetails={() => setState({ usageView: 'ai-usage' })}
                   />
                 </div>
               </>
-            ) : hasEnterpriseUsageViews && organizationId && usageView === 'feature-adoption' ? (
+            ) : enterpriseOrg && usageView === 'feature-adoption' ? (
               <div className="space-y-6">
-                <FeatureAdoptionView organizationId={organizationId} />
+                <FeatureAdoptionView organizationId={enterpriseOrg.organizationId} />
                 <RecommendationsView
-                  organizationId={organizationId}
+                  organizationId={enterpriseOrg.organizationId}
                   canDismiss={callerRole === 'owner'}
                 />
               </div>
@@ -808,11 +808,9 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                   }
                 />
 
-                {isOrgContext &&
-                  effectiveOrgId &&
-                  (callerRole === 'owner' || callerRole === 'billing_manager') && (
-                    <ActiveKiloclawsTable organizationId={effectiveOrgId} />
-                  )}
+                {isOrgAdmin && effectiveOrgId && (
+                  <ActiveKiloclawsTable organizationId={effectiveOrgId} />
+                )}
               </>
             )}
           </div>

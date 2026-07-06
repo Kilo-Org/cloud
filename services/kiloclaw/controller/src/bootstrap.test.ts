@@ -585,8 +585,6 @@ describe('configureGitHub', () => {
     expect(ghSetupGit?.env?.GH_TOKEN).toBeUndefined();
     // ...but ordinary env is still inherited so gh can resolve its binary/config.
     expect(ghLogin?.env?.PATH).toBe('/usr/bin');
-    // The token is still delivered to gh via stdin, not the environment.
-    expect(ghLogin && 'env' in ghLogin).toBe(true);
     // With the tokens stripped, gh no longer refuses → no failure warning.
     expect(warnSpy).not.toHaveBeenCalled();
 

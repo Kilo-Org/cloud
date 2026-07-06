@@ -31,10 +31,26 @@ export type KiloNotification = {
   showIn?: ('extension' | 'extension-native' | 'cli')[];
   // ISO 8601 timestamp after which this notification should no longer be shown
   expiresAt?: string;
-  // When specified, only show to extension clients whose numeric version (major + minor/1000 + patch/1_000_000) is strictly below this value.
-  // Use an integer major version (e.g. 7 means "below 7.x.x"). Hidden when the client version is unknown.
+  // When specified, only show to clients whose numeric version (major + minor/1000 + patch/1_000_000) is strictly below this value.
+  // Use an integer major version (e.g. 7 means "below 7.x.x"). An unknown/absent client
+  // version is treated as an old (pre-versioning) client and IS shown — legacy extensions
+  // send no version headers, so absence of data means "old", not "hide".
   extensionVersionBelow?: number;
 };
+
+/**
+ * Decide whether a version-gated notification should be shown to a client.
+ * Absent version data (undefined) means a legacy/pre-versioning client, which
+ * predates version headers and is therefore treated as "below" the threshold.
+ */
+export function passesExtensionVersionGate(
+  notification: Pick<KiloNotification, 'extensionVersionBelow'>,
+  numericExtensionVersion: number | undefined
+): boolean {
+  if (notification.extensionVersionBelow === undefined) return true;
+  if (numericExtensionVersion === undefined) return true;
+  return numericExtensionVersion < notification.extensionVersionBelow;
+}
 
 const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
@@ -165,11 +181,7 @@ export async function generateUserNotifications(
   const now = new Date();
   return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications].filter(n => {
     if (n.expiresAt && new Date(n.expiresAt) <= now) return false;
-    if (n.extensionVersionBelow !== undefined) {
-      // Hide when version is unknown or the client is at/above the threshold.
-      if (numericExtensionVersion === undefined) return false;
-      if (numericExtensionVersion >= n.extensionVersionBelow) return false;
-    }
+    if (!passesExtensionVersionGate(n, numericExtensionVersion)) return false;
     return true;
   });
 }

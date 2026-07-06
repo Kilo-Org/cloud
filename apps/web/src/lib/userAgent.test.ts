@@ -1,5 +1,9 @@
 import { describe, test, expect } from '@jest/globals';
-import { getKiloCodeVersionNumber, getXKiloCodeVersionNumber } from './userAgent';
+import {
+  getKiloCodeVersionNumber,
+  getOpenCodeKiloVersionNumber,
+  getXKiloCodeVersionNumber,
+} from './userAgent';
 
 describe('getKiloCodeVersionNumber', () => {
   test('returns undefined for non-Kilo-Code user agents', () => {
@@ -49,5 +53,27 @@ describe('getKiloCodeVersionNumber', () => {
   test('parses versions with pre-release tags followed by suffix', () => {
     expect(getKiloCodeVersionNumber('Kilo-Code/4.82.0-beta (Mac OS X)')).toBeCloseTo(4.082, 10);
     expect(getXKiloCodeVersionNumber('4.65.3-alpha.1 extra-info')).toBeCloseTo(4.065003, 10);
+  });
+});
+
+describe('getOpenCodeKiloVersionNumber', () => {
+  test('returns undefined for non-opencode user agents', () => {
+    expect(getOpenCodeKiloVersionNumber(null)).toBeUndefined();
+    expect(getOpenCodeKiloVersionNumber(undefined)).toBeUndefined();
+    expect(getOpenCodeKiloVersionNumber('')).toBeUndefined();
+    expect(getOpenCodeKiloVersionNumber('Kilo-Code/7.1.0')).toBeUndefined();
+    // The Kilo CLI sends the base with no version — treated as unknown.
+    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider')).toBeUndefined();
+    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider/')).toBeUndefined();
+  });
+
+  test('parses the current extension User-Agent', () => {
+    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider/7.1.0')).toBeCloseTo(7.001, 10);
+    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider/7.0.0')).toBeCloseTo(7, 10);
+    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider/6.99.9')).toBeCloseTo(6.099009, 10);
+    expect(getOpenCodeKiloVersionNumber('opencode-kilo-provider/7.2.3-beta')).toBeCloseTo(
+      7.002003,
+      10
+    );
   });
 });

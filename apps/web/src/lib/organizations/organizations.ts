@@ -1,4 +1,9 @@
-import type { User, Organization, OrganizationInvitation } from '@kilocode/db/schema';
+import type {
+  User,
+  Organization,
+  OrganizationInvitation,
+  OrganizationSeatsPurchase,
+} from '@kilocode/db/schema';
 import {
   type OrganizationRole,
   type UserOrganizationWithSeats,
@@ -11,17 +16,19 @@ import {
   organization_invitations,
   organization_membership_removals,
   organization_memberships,
+  organization_seats_purchases,
   organization_user_limits,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@/lib/drizzle';
-import { and, asc, eq, isNull, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import { randomUUID } from 'crypto';
 import { fromMicrodollars, getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
+import { classifyOrganizationEntitlement } from './trial-utils';
 import { logExceptInTest } from '@/lib/utils.server';
 import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -155,7 +162,17 @@ export type ProfileOrganization = {
   role: OrganizationRole;
 };
 
-export async function getProfileOrganizations(userId: User['id']): Promise<ProfileOrganization[]> {
+export type GetProfileOrganizationsOptions = {
+  // When true, omit organizations whose free trial has hard-expired without an
+  // active entitlement (the "Access Blocked" state). These orgs are locked to
+  // read-only, so they should not be offered as selectable profile orgs.
+  excludeAccessBlocked?: boolean;
+};
+
+export async function getProfileOrganizations(
+  userId: User['id'],
+  options: GetProfileOrganizationsOptions = {}
+): Promise<ProfileOrganization[]> {
   const results = await db
     .select({
       organization: organizations,
@@ -177,13 +194,68 @@ export async function getProfileOrganizations(userId: User['id']): Promise<Profi
     )
   );
 
-  return results
-    .filter(result => !parentOrganizationIdsWithMembershipInAChild.has(result.organization.id))
-    .map(result => ({
-      id: result.organization.id,
-      name: result.organization.name,
-      role: result.membership.role,
-    }));
+  const visible = results.filter(
+    result => !parentOrganizationIdsWithMembershipInAChild.has(result.organization.id)
+  );
+
+  const included = options.excludeAccessBlocked
+    ? await filterOutAccessBlockedOrganizations(visible)
+    : visible;
+
+  return included.map(result => ({
+    id: result.organization.id,
+    name: result.organization.name,
+    role: result.membership.role,
+  }));
+}
+
+/**
+ * Drops organizations in the "Access Blocked" state — free trial hard-expired
+ * with no active entitlement. Uses one batched query for the latest seat
+ * purchase status per org so this stays a single round-trip regardless of how
+ * many organizations the user belongs to.
+ */
+async function filterOutAccessBlockedOrganizations<T extends { organization: Organization }>(
+  rows: T[]
+): Promise<T[]> {
+  if (rows.length === 0) return rows;
+
+  const latestSeatPurchaseStatusByOrgId = await getLatestSeatPurchaseStatusByOrgId(
+    rows.map(row => row.organization.id)
+  );
+
+  const now = new Date();
+  return rows.filter(row => {
+    const classification = classifyOrganizationEntitlement({
+      organization: row.organization,
+      latestSeatPurchaseStatus: latestSeatPurchaseStatusByOrgId.get(row.organization.id) ?? null,
+      now,
+    });
+    return !classification.isTrialExpiredForEnforcement;
+  });
+}
+
+/**
+ * organization_seats_purchases is append-only; the most recently created row
+ * per org reflects its current subscription state (mirrors
+ * getMostRecentSeatPurchase, but batched across many orgs).
+ */
+async function getLatestSeatPurchaseStatusByOrgId(
+  organizationIds: Organization['id'][]
+): Promise<Map<string, OrganizationSeatsPurchase['subscription_status']>> {
+  const rows = await db
+    .selectDistinctOn([organization_seats_purchases.organization_id], {
+      organizationId: organization_seats_purchases.organization_id,
+      subscriptionStatus: organization_seats_purchases.subscription_status,
+    })
+    .from(organization_seats_purchases)
+    .where(inArray(organization_seats_purchases.organization_id, organizationIds))
+    .orderBy(
+      asc(organization_seats_purchases.organization_id),
+      desc(organization_seats_purchases.created_at)
+    );
+
+  return new Map(rows.map(row => [row.organizationId, row.subscriptionStatus]));
 }
 
 export async function createOrganization(

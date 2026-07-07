@@ -9,7 +9,7 @@ export async function GET(): Promise<
     | {
         user: { id: string; email: string; name: string; image: string };
         organizations?: ProfileOrganization[];
-        hasPersonalOrganization: boolean;
+        hasPersonalAccount: boolean;
         selectedOrganizationId?: string;
       }
   >
@@ -17,7 +17,9 @@ export async function GET(): Promise<
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) return authFailedResponse;
 
-  const profileOrganizations = await getProfileOrganizations(user.id);
+  const profileOrganizations = await getProfileOrganizations(user.id, {
+    excludeAccessBlocked: true,
+  });
 
   return NextResponse.json({
     user: {
@@ -27,7 +29,7 @@ export async function GET(): Promise<
       image: user.google_user_image_url,
     },
     organizations: profileOrganizations.length > 0 ? profileOrganizations : undefined,
-    hasPersonalOrganization: !user.personal_account_disabled,
+    hasPersonalAccount: !user.personal_account_disabled,
     selectedOrganizationId: profileOrganizations[0]?.id,
   });
 }

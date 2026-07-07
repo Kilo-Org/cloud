@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import {
+  PERSONAL_SCOPE,
   useCanEditReviewer,
   useGitHubStatus,
   useGitLabStatus,
@@ -38,6 +39,19 @@ export function PlatformOverviewScreen({
   const toggle = useToggleReviewer(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const canEdit = useCanEditReviewer(scope);
+
+  if (platform === 'bitbucket' && scope === PERSONAL_SCOPE) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Bitbucket" eyebrow="Code Reviewer" />
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-center text-sm text-muted-foreground">
+            Bitbucket is available for organizations only.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (platform === 'bitbucket') {
     return <BitbucketOverview scope={scope} config={config} toggle={toggle} canEdit={canEdit} />;

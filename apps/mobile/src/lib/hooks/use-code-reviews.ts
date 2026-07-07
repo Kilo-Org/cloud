@@ -44,7 +44,16 @@ export function useReviewList(scope: string) {
 
 export function useReviewDetail(reviewId: string) {
   const trpc = useTRPC();
-  return useQuery(trpc.codeReviews.get.queryOptions({ reviewId }));
+  return useQuery({
+    ...trpc.codeReviews.get.queryOptions({ reviewId }),
+    refetchInterval: query => {
+      const data = query.state.data;
+      if (!data?.success) {
+        return false;
+      }
+      return ['pending', 'queued', 'running'].includes(data.review.status) ? 5000 : false;
+    },
+  });
 }
 
 function useInvalidateReviews(scope: string) {

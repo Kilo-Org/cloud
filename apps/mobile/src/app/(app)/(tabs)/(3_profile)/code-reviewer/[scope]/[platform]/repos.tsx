@@ -96,6 +96,13 @@ export default function ReposRoute() {
                 <Skeleton className="h-12 w-full rounded-lg" />
               </View>
             )}
+            {!reposLoading &&
+              platform === 'bitbucket' &&
+              bitbucketReadiness.data?.repositoryCache.status !== 'available' && (
+                <Text variant="muted" className="pt-2 text-xs">
+                  Repositories unavailable — finish Bitbucket setup on kilo.ai.
+                </Text>
+              )}
             {repoRows.map(repo => (
               <Pressable
                 key={repo.id}

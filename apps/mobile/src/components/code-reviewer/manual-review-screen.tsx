@@ -50,6 +50,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         platform,
         url,
         modelSlug: config.data.modelSlug,
+        thinkingEffort: config.data.thinkingEffort,
         instructions: instructionsRef.current.trim() || undefined,
       },
       {

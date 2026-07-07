@@ -7,7 +7,6 @@ import {
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
-  OpenRouterProviderConfig,
   GatewayRequest,
   VercelInferenceProviderConfig,
   VercelProviderConfig,
@@ -24,7 +23,6 @@ import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
@@ -70,13 +68,6 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (isFableModel(requestedModel)) {
-    console.debug(
-      "[shouldRouteToVercel] not routing to Vercel because the Fable->Opus fallback doesn't seem to work"
-    );
-    return false;
-  }
-
   if (!kiloExclusiveModel?.flags.includes('vercel-routing') && isDeepseekModel(requestedModel)) {
     // https://kilo-code.slack.com/archives/C0A4SA041DE/p1781743079721409
     console.debug(
@@ -105,14 +96,14 @@ export async function shouldRouteToVercel(
   return true;
 }
 
-function convertProviderOptions(
-  provider: OpenRouterProviderConfig | undefined
-): VercelProviderConfig | undefined {
+function convertProviderOptions(requestToMutate: GatewayRequest): VercelProviderConfig | undefined {
+  const provider = requestToMutate.body.provider;
   return {
     gateway: {
       only: provider?.only?.map(p => openRouterToVercelInferenceProviderId(p)),
       order: provider?.order?.map(p => openRouterToVercelInferenceProviderId(p)),
       zeroDataRetention: provider?.zdr,
+      models: requestToMutate.body.models,
     },
   };
 }
@@ -198,10 +189,11 @@ export function applyVercelSettings(
       gateway: {
         only: Object.keys(byokProviders),
         byok: byokProviders,
+        models: requestToMutate.body.models,
       },
     };
   } else {
-    requestToMutate.body.providerOptions = convertProviderOptions(requestToMutate.body.provider);
+    requestToMutate.body.providerOptions = convertProviderOptions(requestToMutate);
   }
 
   if (requestToMutate.body.providerOptions) {

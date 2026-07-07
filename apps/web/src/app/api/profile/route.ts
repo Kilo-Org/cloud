@@ -9,17 +9,13 @@ export async function GET(): Promise<
     | {
         user: { id: string; email: string; name: string; image: string };
         organizations?: ProfileOrganization[];
-        hasPersonalAccount: boolean;
-        selectedOrganizationId?: string;
       }
   >
 > {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (authFailedResponse) return authFailedResponse;
 
-  const profileOrganizations = await getProfileOrganizations(user.id, {
-    excludeAccessBlocked: true,
-  });
+  const profileOrganizations = await getProfileOrganizations(user.id);
 
   return NextResponse.json({
     user: {
@@ -29,7 +25,5 @@ export async function GET(): Promise<
       image: user.google_user_image_url,
     },
     organizations: profileOrganizations.length > 0 ? profileOrganizations : undefined,
-    hasPersonalAccount: !user.personal_account_disabled,
-    selectedOrganizationId: profileOrganizations[0]?.id,
   });
 }

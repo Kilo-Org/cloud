@@ -5,7 +5,6 @@ import {
   organization_invitations,
   organization_memberships,
   organization_membership_removals,
-  organization_seats_purchases,
   organization_user_limits,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -35,8 +34,6 @@ describe('Organizations', () => {
     await db.delete(organization_memberships);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_membership_removals);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
-    await db.delete(organization_seats_purchases);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
   });
@@ -227,55 +224,6 @@ describe('Organizations', () => {
         expect.arrayContaining([childOne.id, childTwo.id, unrelated.id])
       );
       expect(result.map(organization => organization.id)).not.toContain(parent.id);
-    });
-
-    test('excludeAccessBlocked omits a hard-expired trial org with no active subscription', async () => {
-      const user = await insertTestUser();
-      const activeTrial = await createOrganization('Active Trial Org', user.id);
-      const blocked = await createOrganization('Access Blocked Org', user.id);
-      await db
-        .update(organizations)
-        .set({ free_trial_end_at: '2020-01-01T00:00:00.000Z' })
-        .where(eq(organizations.id, blocked.id));
-
-      const result = await getProfileOrganizations(user.id, { excludeAccessBlocked: true });
-
-      expect(result.map(organization => organization.id)).toEqual([activeTrial.id]);
-    });
-
-    test('excludeAccessBlocked keeps a hard-expired trial org with an active seat purchase', async () => {
-      const user = await insertTestUser();
-      const subscribed = await createOrganization('Subscribed Org', user.id);
-      await db
-        .update(organizations)
-        .set({ free_trial_end_at: '2020-01-01T00:00:00.000Z' })
-        .where(eq(organizations.id, subscribed.id));
-      await db.insert(organization_seats_purchases).values({
-        subscription_stripe_id: 'sub_profile_active',
-        organization_id: subscribed.id,
-        seat_count: 5,
-        amount_usd: 50.0,
-        starts_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        subscription_status: 'active',
-      });
-
-      const result = await getProfileOrganizations(user.id, { excludeAccessBlocked: true });
-
-      expect(result.map(organization => organization.id)).toEqual([subscribed.id]);
-    });
-
-    test('includes hard-expired trial organizations by default', async () => {
-      const user = await insertTestUser();
-      const blocked = await createOrganization('Access Blocked Org', user.id);
-      await db
-        .update(organizations)
-        .set({ free_trial_end_at: '2020-01-01T00:00:00.000Z' })
-        .where(eq(organizations.id, blocked.id));
-
-      const result = await getProfileOrganizations(user.id);
-
-      expect(result.map(organization => organization.id)).toEqual([blocked.id]);
     });
   });
 

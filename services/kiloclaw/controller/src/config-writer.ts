@@ -169,6 +169,37 @@ export function sanitizeLegacyStreamChatConfig(config: ConfigObject): void {
   }
 }
 
+// The externalized kilocode-provider plugin path is only valid on openclaw
+// >= 2026.6.9, where the Dockerfile installs the plugin on disk. On older
+// openclaw versions (still selectable at provision time) the provider is
+// in-core and the path does not exist; a persisted plugins.load.paths entry
+// pointing at the missing plugin fails openclaw config validation — and
+// therefore `openclaw doctor` — which aborts bootstrap into degraded mode and
+// prevents the gateway from starting. Prune it so the persisted config is valid
+// for the openclaw version actually running. No-op on 2026.6.9+ images (the
+// plugin exists; generateBaseConfig (re)adds the path).
+export function pruneUninstalledKilocodeProviderPath(
+  config: ConfigObject,
+  existsSync: (path: string) => boolean
+): void {
+  if (existsSync(KILOCODE_PROVIDER_PLUGIN_PATH)) {
+    return;
+  }
+  if (
+    config.plugins &&
+    typeof config.plugins === 'object' &&
+    !Array.isArray(config.plugins) &&
+    config.plugins.load &&
+    typeof config.plugins.load === 'object' &&
+    !Array.isArray(config.plugins.load) &&
+    Array.isArray(config.plugins.load.paths)
+  ) {
+    config.plugins.load.paths = config.plugins.load.paths.filter(
+      (pluginPath: unknown) => pluginPath !== KILOCODE_PROVIDER_PLUGIN_PATH
+    );
+  }
+}
+
 const INBOUND_EMAIL_HOOK_ID = 'cloudflare-email-inbound';
 const DEFAULT_HOOK_SESSION_KEY_PREFIX = 'hook:';
 const INBOUND_EMAIL_SESSION_KEY_PREFIX = 'inbound-email:';
@@ -422,27 +453,21 @@ export function generateBaseConfig(
   // (#93470). On 2026.6.9+ the Dockerfile installs it at
   // KILOCODE_PROVIDER_PLUGIN_PATH and it must be loaded explicitly via
   // plugins.load.paths. On older openclaw versions — still selectable at
-  // provision time — the provider is bundled in-core and no plugin file exists;
-  // referencing a missing plugin path fails openclaw config validation, which
-  // fails `openclaw doctor` and prevents the gateway from ever starting.
+  // provision time — the provider is in-core and no plugin file exists, so add
+  // the path only when the plugin is present.
   //
-  // Gate on the plugin actually being present so both cases are correct, and
-  // actively prune a stale path that an instance may have inherited in its
-  // persisted openclaw.json from a newer image (downgrade / reprovision onto an
-  // older openclaw). generateBaseConfig runs on every boot, so this converges
-  // existing instances on their next restart.
-  const pluginPaths = config.plugins.load.paths as string[];
+  // The stale-path removal for the downgrade/reprovision case runs BEFORE doctor
+  // in bootstrap (pruneUninstalledKilocodeProviderPath), because doctor
+  // validates the persisted config first and a missing plugin path fails
+  // validation. This else-branch is the steady-state guard on the post-doctor
+  // config rewrite.
   if (deps.existsSync(KILOCODE_PROVIDER_PLUGIN_PATH)) {
+    const pluginPaths = config.plugins.load.paths as string[];
     if (!pluginPaths.includes(KILOCODE_PROVIDER_PLUGIN_PATH)) {
       pluginPaths.push(KILOCODE_PROVIDER_PLUGIN_PATH);
     }
-  } else if (pluginPaths.includes(KILOCODE_PROVIDER_PLUGIN_PATH)) {
-    config.plugins.load.paths = pluginPaths.filter(
-      (pluginPath: unknown) => pluginPath !== KILOCODE_PROVIDER_PLUGIN_PATH
-    );
-    console.log(
-      'Removed kilocode-provider plugin path: plugin not installed on this openclaw version (pre-2026.6.9); provider is in-core'
-    );
+  } else {
+    pruneUninstalledKilocodeProviderPath(config, deps.existsSync);
   }
   if (
     Array.isArray(config.plugins.allow) &&

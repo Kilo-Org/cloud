@@ -1167,6 +1167,60 @@ describe('runOnboardOrDoctor', () => {
     expect(preDoctorConfig.plugins?.entries).not.toHaveProperty('openclaw-channel-streamchat');
   });
 
+  it('removes a stale kilocode-provider plugin path before running doctor when the plugin is not installed', () => {
+    // Regression for the downgrade/reprovision case: an instance whose persisted
+    // config carries the externalized-provider path is moved onto a pre-2026.6.9
+    // openclaw where the plugin is absent (existsSync default returns false for
+    // the path). doctor validates the persisted config first, so the stale path
+    // must be pruned BEFORE doctor or doctor fails and bootstrap aborts into
+    // degraded mode — the exact failure this branch fixes.
+    const harness = fakeDeps();
+    harness.setConfigExists(true);
+    (harness.deps.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
+      JSON.stringify({
+        plugins: {
+          load: {
+            paths: [
+              '/usr/local/lib/node_modules/@openclaw/kilocode-provider',
+              '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer',
+            ],
+          },
+        },
+      })
+    );
+
+    const env: Record<string, string | undefined> = {
+      KILOCODE_API_KEY: 'test-key',
+      OPENCLAW_GATEWAY_TOKEN: 'test-token',
+      AUTO_APPROVE_DEVICES: 'true',
+    };
+
+    runOnboardOrDoctor(env, harness.deps);
+
+    const doctorCallIndex = (
+      harness.deps.execFileSync as ReturnType<typeof vi.fn>
+    ).mock.calls.findIndex(([_cmd, args]) => Array.isArray(args) && args.includes('doctor'));
+    expect(doctorCallIndex).not.toBe(-1);
+    const doctorCallOrder = (harness.deps.execFileSync as ReturnType<typeof vi.fn>).mock
+      .invocationCallOrder[doctorCallIndex];
+
+    const preDoctorWriteIndex = (
+      harness.deps.writeFileSync as ReturnType<typeof vi.fn>
+    ).mock.invocationCallOrder.findIndex(order => order < doctorCallOrder);
+    expect(preDoctorWriteIndex).not.toBe(-1);
+
+    const preDoctorConfig = JSON.parse(harness.writeCalls[preDoctorWriteIndex].data) as {
+      plugins?: { load?: { paths?: string[] } };
+    };
+    expect(preDoctorConfig.plugins?.load?.paths).not.toContain(
+      '/usr/local/lib/node_modules/@openclaw/kilocode-provider'
+    );
+    // Unrelated plugin paths survive the prune.
+    expect(preDoctorConfig.plugins?.load?.paths).toContain(
+      '/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer'
+    );
+  });
+
   it('back-fills hooks.allowRequestSessionKey on existing configs before doctor', () => {
     const harness = fakeDeps();
     harness.setConfigExists(true);

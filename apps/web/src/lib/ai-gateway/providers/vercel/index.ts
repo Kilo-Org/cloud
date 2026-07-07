@@ -204,4 +204,5 @@ export function applyVercelSettings(
   }
 
   delete requestToMutate.body.provider;
+  delete requestToMutate.body.models;
 }

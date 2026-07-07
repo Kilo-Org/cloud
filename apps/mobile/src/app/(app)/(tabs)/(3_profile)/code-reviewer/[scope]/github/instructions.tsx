@@ -23,6 +23,7 @@ export default function InstructionsRoute() {
         className="flex-1 px-6"
         contentContainerClassName="pt-4 pb-8"
         automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
       >
         <Animated.View layout={LinearTransition} className="gap-4">
           {data == null && (

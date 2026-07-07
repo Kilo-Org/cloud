@@ -164,14 +164,26 @@ async function getOrganizationByActiveSlug(slug: string, organizationId: string)
   return existingOrganization ?? null;
 }
 
-async function assertActiveSlugAvailable(slug: string, organizationId: string) {
-  const existingOrganization = await getOrganizationByActiveSlug(slug, organizationId);
-  if (existingOrganization) {
-    throw new TRPCError({
-      code: 'CONFLICT',
-      message: 'Requested slug is not available',
-    });
+function getDatabaseErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  if ('code' in error) {
+    const code = Reflect.get(error, 'code');
+    if (typeof code === 'string') return code;
   }
+
+  if (!('cause' in error)) return null;
+  return getDatabaseErrorCode(Reflect.get(error, 'cause'));
+}
+
+function isUniqueConstraintViolation(error: unknown): boolean {
+  return getDatabaseErrorCode(error) === '23505';
+}
+
+function throwSlugUnavailableConflict(): never {
+  throw new TRPCError({
+    code: 'CONFLICT',
+    message: 'Requested slug is not available',
+  });
 }
 
 const MAX_ORGANIZATIONS_PER_USER = 5;
@@ -556,13 +568,19 @@ export const organizationsRouter = createTRPCRouter({
       });
     }
 
-    await assertActiveSlugAvailable(opts.input.slug, opts.input.organizationId);
-
-    const [updatedOrganization] = await db
-      .update(organizations)
-      .set({ slug: opts.input.slug })
-      .where(and(eq(organizations.id, opts.input.organizationId), isNull(organizations.deleted_at)))
-      .returning({ id: organizations.id });
+    let updatedOrganization: { id: string } | undefined;
+    try {
+      [updatedOrganization] = await db
+        .update(organizations)
+        .set({ slug: opts.input.slug })
+        .where(
+          and(eq(organizations.id, opts.input.organizationId), isNull(organizations.deleted_at))
+        )
+        .returning({ id: organizations.id });
+    } catch (error) {
+      if (isUniqueConstraintViolation(error)) throwSlugUnavailableConflict();
+      throw error;
+    }
 
     if (!updatedOrganization) {
       throw new TRPCError({

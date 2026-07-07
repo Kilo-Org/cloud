@@ -785,7 +785,7 @@ describe('organizations trpc router', () => {
       ).rejects.toThrow('You do not have access to this organization');
     });
 
-    it('rejects unavailable slugs', async () => {
+    it('converts unique constraint slug conflicts into a friendly error', async () => {
       const caller = await createCallerForUser(regularUser.id);
 
       await expect(

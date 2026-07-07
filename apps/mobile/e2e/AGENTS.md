@@ -66,7 +66,7 @@ KILO_API_URL=http://localhost:3000 \
 KILO_SESSION_INGEST_URL=http://localhost:8800 \
 KILO_AUTH_CONTENT='{"kilo":{"type":"api","key":"<token>"}}' \
 KILO_REMOTE=1 \
-./node_modules/.bin/kilo
+/tmp/kilo-cli/node_modules/.bin/kilo
 ```
 
 - `KILO_REMOTE=1` enables remote at startup; mid-session, toggle via the TUI palette (ctrl+p → "Toggle remote").

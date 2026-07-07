@@ -150,10 +150,17 @@ export const PublicInvitedOrganizationMemberSchema = InvitedOrganizationMemberSc
   inviteToken: true,
   inviteId: true,
   inviteUrl: true,
+  dailyUsageLimitUsd: true,
+  currentDailyUsageUsd: true,
+});
+
+export const PublicActiveOrganizationMemberSchema = ActiveOrganizationMemberSchema.omit({
+  dailyUsageLimitUsd: true,
+  currentDailyUsageUsd: true,
 });
 
 export const PublicOrganizationMemberSchema = z.discriminatedUnion('status', [
-  ActiveOrganizationMemberSchema,
+  PublicActiveOrganizationMemberSchema,
   PublicInvitedOrganizationMemberSchema,
 ]);
 

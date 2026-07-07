@@ -81,6 +81,9 @@ describe('organizations members trpc router', () => {
       const result = await memberCaller.organizations.members.listPublic({
         organizationId: testOrganization.id,
       });
+      const activeMember = result.find(
+        member => member.status === 'active' && member.id === regularUser.id
+      );
       const invitedMember = result.find(member => member.status === 'invited');
 
       expect(result).toEqual(
@@ -100,9 +103,14 @@ describe('organizations members trpc router', () => {
         ])
       );
       expect(invitedMember).toBeDefined();
+      expect(activeMember).toBeDefined();
+      expect(activeMember).not.toHaveProperty('dailyUsageLimitUsd');
+      expect(activeMember).not.toHaveProperty('currentDailyUsageUsd');
       expect(invitedMember).not.toHaveProperty('inviteToken');
       expect(invitedMember).not.toHaveProperty('inviteId');
       expect(invitedMember).not.toHaveProperty('inviteUrl');
+      expect(invitedMember).not.toHaveProperty('dailyUsageLimitUsd');
+      expect(invitedMember).not.toHaveProperty('currentDailyUsageUsd');
     });
   });
 

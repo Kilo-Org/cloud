@@ -121,6 +121,8 @@ describe('generateTrpcOpenApiDocument', () => {
     );
     expect(JSON.stringify(dataSchema)).not.toContain('inviteToken');
     expect(JSON.stringify(dataSchema)).not.toContain('inviteUrl');
+    expect(JSON.stringify(dataSchema)).not.toContain('dailyUsageLimitUsd');
+    expect(JSON.stringify(dataSchema)).not.toContain('currentDailyUsageUsd');
     expect(notFoundSchema).toMatchObject({
       type: 'object',
       required: ['error'],

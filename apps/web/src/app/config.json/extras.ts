@@ -117,5 +117,15 @@ export const kiloExtras = {
       default: true,
       type: 'boolean',
     },
+    swe_pruner: {
+      description:
+        'Enable SWE-Pruner: task-aware pruning of large read/grep tool outputs guided by a focus question provided by the agent (default: false)',
+      type: 'boolean',
+    },
+    swe_pruner_model: {
+      description:
+        'Model used by SWE-Pruner to skim tool outputs, in "provider/model" format (default: the configured small model)',
+      type: 'string',
+    },
   },
 } as const;

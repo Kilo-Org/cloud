@@ -121,6 +121,8 @@ describe('kilo config.json schema merge', () => {
       expect.objectContaining({ type: 'boolean' })
     );
     expect(exp.properties.openTelemetry).toBeDefined();
+    expect(exp.properties.swe_pruner).toEqual(expect.objectContaining({ type: 'boolean' }));
+    expect(exp.properties.swe_pruner_model).toEqual(expect.objectContaining({ type: 'string' }));
     expect(exp.properties.batch_tool).toBeDefined(); // upstream key preserved
   });
 

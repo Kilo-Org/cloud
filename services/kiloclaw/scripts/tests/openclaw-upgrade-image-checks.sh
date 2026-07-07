@@ -88,6 +88,10 @@ except Exception:
 #   ok               -> doctor accepted the config (all plugin paths resolved)
 #   plugin-path-error-> a plugins.load.paths entry did not exist in the image
 #   doctor-error     -> doctor failed for some other reason
+#
+# $cfg is interpolated into a single-quoted `printf '%s' '$cfg'` inside sh -c, so
+# it MUST stay a script-internal JSON literal with no single quotes and never
+# take arbitrary/external input; a single quote in $cfg would break the quoting.
 doctor_plugin_result() {
   local cfg="$1"
   local out rc
@@ -330,9 +334,11 @@ check "plugin-load set mirrors config-writer.ts (no drift)" "" "$uncovered"
 
 # Assert the plugin-load set resolves in THIS image. The externalized provider
 # path is emitted by the controller only when the plugin is installed
-# (>= 2026.6.9); mirror that off the same signal the pin check used ($kcp_version)
-# so the assertion is correct across the whole selectable-version matrix, not
-# just the latest pin.
+# (>= 2026.6.9); mirror that off whether the built candidate image actually has
+# the plugin ($kcp_version, read from that image), so the assertion matches
+# whichever openclaw version is currently pinned in the Dockerfile. This script
+# validates the one pinned version it built; to cover an older selectable
+# version, rebuild with that pin (IMAGE=... BUILD=true) and re-run.
 positive_paths="\"$customizer_path\",\"$morning_briefing_path\",\"$kilo_chat_path\""
 if [ -n "$kcp_version" ]; then
   positive_paths="$positive_paths,\"$kilocode_provider_path\""

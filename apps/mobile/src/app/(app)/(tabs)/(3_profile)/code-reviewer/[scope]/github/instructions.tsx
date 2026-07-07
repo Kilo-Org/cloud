@@ -9,12 +9,53 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
 
+// Mounted only once `data != null`, so useRef(initial) captures the real
+// loaded value instead of the pre-fetch default.
+function InstructionsEditor({
+  initial,
+  save,
+  onSaved,
+}: Readonly<{
+  initial: string;
+  save: ReturnType<typeof useSaveReviewConfig>;
+  onSaved: () => void;
+}>) {
+  const valueRef = useRef(initial);
+
+  return (
+    <Animated.View entering={FadeIn.duration(200)} className="gap-4">
+      <TextInput
+        className="h-32 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+        multiline
+        textAlignVertical="top"
+        placeholder="e.g. Enforce our error-handling conventions…"
+        defaultValue={initial}
+        onChangeText={text => {
+          valueRef.current = text;
+        }}
+      />
+      <Button
+        disabled={save.isPending}
+        onPress={() => {
+          save.mutate(
+            { customInstructions: valueRef.current.trim() },
+            {
+              onSuccess: onSaved,
+            }
+          );
+        }}
+      >
+        <Text>Save</Text>
+      </Button>
+    </Animated.View>
+  );
+}
+
 export default function InstructionsRoute() {
   const { scope } = useLocalSearchParams<{ scope: string }>();
   const router = useRouter();
   const { data } = useReviewConfig(scope);
   const save = useSaveReviewConfig(scope);
-  const valueRef = useRef(data?.customInstructions ?? '');
 
   return (
     <View className="flex-1 bg-background">
@@ -34,33 +75,13 @@ export default function InstructionsRoute() {
           )}
 
           {data != null && (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-4">
-              <TextInput
-                className="h-32 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
-                multiline
-                textAlignVertical="top"
-                placeholder="e.g. Enforce our error-handling conventions…"
-                defaultValue={data.customInstructions ?? ''}
-                onChangeText={text => {
-                  valueRef.current = text;
-                }}
-              />
-              <Button
-                disabled={save.isPending}
-                onPress={() => {
-                  save.mutate(
-                    { customInstructions: valueRef.current.trim() },
-                    {
-                      onSuccess: () => {
-                        router.back();
-                      },
-                    }
-                  );
-                }}
-              >
-                <Text>Save</Text>
-              </Button>
-            </Animated.View>
+            <InstructionsEditor
+              initial={data.customInstructions ?? ''}
+              save={save}
+              onSaved={() => {
+                router.back();
+              }}
+            />
           )}
         </Animated.View>
       </ScrollView>

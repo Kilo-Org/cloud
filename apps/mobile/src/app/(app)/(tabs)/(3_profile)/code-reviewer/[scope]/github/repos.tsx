@@ -9,6 +9,7 @@ import { Text } from '@/components/ui/text';
 import {
   useGitHubRepositories,
   useReviewConfig,
+  useReviewConfigCacheReader,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -18,6 +19,7 @@ export default function ReposRoute() {
   const colors = useThemeColors();
   const { data } = useReviewConfig(scope);
   const save = useSaveReviewConfig(scope);
+  const readConfig = useReviewConfigCacheReader(scope);
   const mode = data?.repositorySelectionMode ?? 'all';
   const repos = useGitHubRepositories(scope, mode === 'selected');
   const selectedIds = data?.selectedRepositoryIds ?? [];
@@ -29,9 +31,13 @@ export default function ReposRoute() {
 
   const toggleRepo = (id: number) => {
     void Haptics.selectionAsync();
-    const next = selectedIds.includes(id)
-      ? selectedIds.filter(existing => existing !== id)
-      : [...selectedIds, id];
+    // Read the cache at call time, not the render-time snapshot above, so
+    // two rapid taps each build the next array from the latest committed
+    // selection instead of dropping one another.
+    const current = readConfig()?.selectedRepositoryIds ?? [];
+    const next = current.includes(id)
+      ? current.filter(existing => existing !== id)
+      : [...current, id];
     save.mutate({ selectedRepositoryIds: next });
   };
 

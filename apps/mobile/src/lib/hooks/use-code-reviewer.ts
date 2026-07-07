@@ -79,6 +79,26 @@ function useReviewConfigQueryKey(scope: string) {
       });
 }
 
+// Reads the cached config at call time rather than render time, so two
+// rapid toggles each compute their "next selection" from the latest
+// committed state instead of the same stale render snapshot.
+export function useReviewConfigCacheReader(scope: string) {
+  const queryClient = useQueryClient();
+  const queryKey = useReviewConfigQueryKey(scope);
+  return () => queryClient.getQueryData<ReviewConfigData>(queryKey);
+}
+
+function pick<K extends keyof ReviewConfigData>(
+  config: ReviewConfigData,
+  keys: readonly K[]
+): Pick<ReviewConfigData, K> {
+  const result: Partial<ReviewConfigData> = {};
+  for (const key of keys) {
+    result[key] = config[key];
+  }
+  return result as Pick<ReviewConfigData, K>;
+}
+
 export function useToggleReviewer(scope: string) {
   const queryClient = useQueryClient();
   const queryKey = useReviewConfigQueryKey(scope);
@@ -105,7 +125,9 @@ export function useToggleReviewer(scope: string) {
       return { previous };
     },
     onError: (error, _vars, context) => {
-      queryClient.setQueryData<ReviewConfigData>(queryKey, context?.previous);
+      queryClient.setQueryData<ReviewConfigData>(queryKey, old =>
+        old && context?.previous ? { ...old, isEnabled: context.previous.isEnabled } : old
+      );
       toast.error(error.message);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -142,10 +164,16 @@ export function useSaveReviewConfig(scope: string) {
       queryClient.setQueryData<ReviewConfigData>(queryKey, old =>
         old ? { ...old, ...patch } : old
       );
-      return { previous };
+      return { previous, patch };
     },
     onError: (error, _patch, context) => {
-      queryClient.setQueryData<ReviewConfigData>(queryKey, context?.previous);
+      if (context?.previous) {
+        const keys = Object.keys(context.patch) as (keyof ConfigPatch)[];
+        const restoredFields = pick(context.previous, keys);
+        queryClient.setQueryData<ReviewConfigData>(queryKey, old =>
+          old ? { ...old, ...restoredFields } : old
+        );
+      }
       toast.error(error.message);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -163,5 +191,5 @@ export function useCanEditReviewer(scope: string) {
     return true;
   }
   const role = orgs?.find(org => org.organizationId === scope)?.role;
-  return role !== 'member';
+  return role === 'owner' || role === 'billing_manager';
 }

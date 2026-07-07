@@ -94,11 +94,18 @@ export function ScopeOverviewScreen({ scope }: Readonly<{ scope: string }>) {
 
           {!isLoading && !connected && (
             <Animated.View entering={FadeIn.duration(200)}>
-              <GitHubConnectCard
-                scope={scope}
-                // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-                onConnected={() => status.refetch()}
-              />
+              {canEdit ? (
+                <GitHubConnectCard
+                  scope={scope}
+                  // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+                  onConnected={() => status.refetch()}
+                />
+              ) : (
+                <Text className="text-center text-xs text-muted-foreground">
+                  GitHub isn't connected. Only organization owners and billing managers can connect
+                  it.
+                </Text>
+              )}
             </Animated.View>
           )}
 

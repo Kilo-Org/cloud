@@ -6,7 +6,11 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { FOCUS_AREAS } from '@/lib/code-reviewer-config';
-import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import {
+  useReviewConfig,
+  useReviewConfigCacheReader,
+  useSaveReviewConfig,
+} from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function FocusAreasRoute() {
@@ -14,13 +18,18 @@ export default function FocusAreasRoute() {
   const colors = useThemeColors();
   const { data } = useReviewConfig(scope);
   const save = useSaveReviewConfig(scope);
+  const readConfig = useReviewConfigCacheReader(scope);
   const selected = data?.focusAreas ?? [];
 
   const toggleArea = (area: string) => {
     void Haptics.selectionAsync();
-    const next = selected.includes(area)
-      ? selected.filter(item => item !== area)
-      : [...selected, area];
+    // Read the cache at call time, not the render-time snapshot above, so
+    // two rapid taps each build the next array from the latest committed
+    // selection instead of dropping one another.
+    const current = readConfig()?.focusAreas ?? [];
+    const next = current.includes(area)
+      ? current.filter(item => item !== area)
+      : [...current, area];
     save.mutate({ focusAreas: next });
   };
 

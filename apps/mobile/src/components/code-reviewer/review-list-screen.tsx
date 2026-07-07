@@ -33,7 +33,7 @@ function reviewTime(review: Review): Date {
 
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
-  const { data, isLoading, refetch } = useReviewList(scope);
+  const { data, isLoading, isError, error, refetch } = useReviewList(scope);
 
   return (
     <View className="flex-1 bg-background">
@@ -46,6 +46,17 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
               <Skeleton className="h-20 w-full rounded-lg" />
               <Skeleton className="h-20 w-full rounded-lg" />
             </Animated.View>
+          )}
+
+          {!isLoading && isError && (
+            <Pressable
+              className="rounded-lg bg-secondary p-3 active:opacity-70"
+              onPress={() => {
+                void refetch();
+              }}
+            >
+              <Text className="text-sm text-destructive">{error.message}. Tap to retry.</Text>
+            </Pressable>
           )}
 
           {!isLoading && data && !data.success && (

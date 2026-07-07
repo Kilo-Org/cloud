@@ -46,9 +46,27 @@ export function ReviewDetailScreen({
   scope,
   reviewId,
 }: Readonly<{ scope: string; reviewId: string }>) {
-  const { data, isLoading, refetch } = useReviewDetail(reviewId);
+  const { data, isLoading, isError, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
+
+  if (isError) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Review" />
+        <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+          <Pressable
+            className="rounded-lg bg-secondary p-3 active:opacity-70"
+            onPress={() => {
+              void refetch();
+            }}
+          >
+            <Text className="text-sm text-destructive">{error.message}. Tap to retry.</Text>
+          </Pressable>
+        </ScrollView>
+      </View>
+    );
+  }
 
   if (isLoading || !data) {
     return (
@@ -140,8 +158,14 @@ export function ReviewDetailScreen({
               disabled={cancelReview.isPending}
               onPress={() => {
                 confirmCancel(() => {
-                  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                  cancelReview.mutate({ reviewId });
+                  cancelReview.mutate(
+                    { reviewId },
+                    {
+                      onSuccess: () => {
+                        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                      },
+                    }
+                  );
                 });
               }}
             >
@@ -155,8 +179,14 @@ export function ReviewDetailScreen({
               disabled={retriggerReview.isPending}
               onPress={() => {
                 confirmRetry(() => {
-                  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  retriggerReview.mutate({ reviewId });
+                  retriggerReview.mutate(
+                    { reviewId },
+                    {
+                      onSuccess: () => {
+                        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      },
+                    }
+                  );
                 });
               }}
             >

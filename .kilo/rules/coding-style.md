@@ -5,9 +5,11 @@
 - KISS: Be wary of over-abstracting code. Do report and ask about violations of DRY, but don't prematurely generalize.
 - If trivial, avoid TS classes; use e.g. closures instead
 - STRONGLY AVOID coding patterns that cannot be statically checked:
-  - AVOID typescript's "as" operator
-  - AVOID typescript's null-forgiving "!"
-  - INSTEAD TRY where possible typescript's "satisfies", or leverage flow-sensitive typing.
+  - Use `as` casts sparingly, but do not ban them outright. Prefer `satisfies`, discriminated unions, generics, or flow-sensitive narrowing when TypeScript can be made to understand the type naturally.
+  - A targeted `as` cast is acceptable when code is at a known boundary where TypeScript has lost information that the surrounding control flow guarantees. For example, inside a platform switch, casting `message` to `Message<SlackEvent>` or `Message<GitHubRawMessage>` is preferable to adding generic `Record<string, unknown>` property helpers just to read known adapter fields.
+  - Avoid broad casts that hide real uncertainty, especially `as any`, double casts through `unknown`, or casting external/untrusted data without validation. Use runtime validation when the data shape is genuinely unknown, user-controlled, persisted, or coming from an API contract we do not own.
+  - `as` casts are explicitly permitted inside test files (e.g. `*.test.ts`, `*.spec.ts`, files under `__tests__/`, and other test fixtures/helpers) — they are commonly needed for fixture construction, narrowing partial mocks, and exercising error paths. Production code conventions still apply to non-test code imported by tests.
+  - AVOID typescript's null-forgiving "!"; prefer explicit checks or flow-sensitive typing.
 
 - Prefer clear NAMES (for e.g. variables, functions and tests) over COMMENTS.
 - ONLY add comments about things that are NOT OBVIOUS in context.

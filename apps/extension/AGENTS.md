@@ -83,7 +83,6 @@ Use a narrower subset only when the change is clearly isolated, and say what was
 
 ## Code Style
 
-- Prefer `type` over `interface` in new code unless an existing file already uses interface-heavy browser API shapes.
-- Avoid `as any`, broad casts, and non-null assertions in production code. Validate extension/browser API responses at the boundary.
+- Prefer `type` over `interface` in new code, unless an existing file already uses interface-heavy browser API shapes — validate extension/browser API responses at the boundary rather than casting them.
 - Do not log tokens, auth headers, cookies, or gateway request bodies that may contain user content.
 - Keep helpers boring and local until behavior is shared by real callers.

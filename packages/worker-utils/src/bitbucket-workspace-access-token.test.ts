@@ -4,9 +4,11 @@ import {
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_ENVELOPE_SCHEME,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_INVALIDATION_REASONS,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_PROVIDER_CREDENTIAL_TYPE,
+  BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_SCOPE_LABELS,
   BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_EFFECTIVE_SCOPES,
   buildBitbucketOrganizationCredentialLockKey,
   buildBitbucketWorkspaceAccessTokenAad,
+  getMissingBitbucketWorkspaceAccessTokenScopes,
   getUnexpectedBitbucketWorkspaceAccessTokenScopes,
   hasBitbucketAccessTokenFamilyPrefix,
   hasRequiredBitbucketWorkspaceAccessTokenScopes,
@@ -82,20 +84,33 @@ describe('Bitbucket Workspace Access Token contract', () => {
     expect(
       getUnexpectedBitbucketWorkspaceAccessTokenScopes([
         'account',
+        'project',
         'repository',
         'repository:write',
         'pullrequest',
+        'pullrequest:write',
         'webhook',
         'repository:admin',
         'pipeline:write',
       ])
-    ).toEqual(['pipeline:write', 'repository:admin']);
+    ).toEqual(['pipeline:write', 'project', 'repository:admin']);
   });
 
   it('requires effective scopes without rejecting additional observed evidence', () => {
+    expect(BITBUCKET_WORKSPACE_ACCESS_TOKEN_REQUIRED_SCOPE_LABELS).toEqual({
+      account: 'Account Read',
+      repository: 'Repository Read',
+      'repository:write': 'Repository Write',
+      pullrequest: 'Pull request Read',
+      webhook: 'Webhooks Read and Write',
+    });
     expect(hasRequiredBitbucketWorkspaceAccessTokenScopes(['account', 'repository:write'])).toBe(
       false
     );
+    expect(getMissingBitbucketWorkspaceAccessTokenScopes(['account', 'repository:write'])).toEqual([
+      'pullrequest',
+      'webhook',
+    ]);
     expect(
       hasRequiredBitbucketWorkspaceAccessTokenScopes(['account', 'repository:write', 'webhook'])
     ).toBe(false);
@@ -114,6 +129,18 @@ describe('Bitbucket Workspace Access Token contract', () => {
     );
     expect(observedScopes).toEqual(['account', 'pullrequest', 'repository:write', 'webhook']);
     expect(hasRequiredBitbucketWorkspaceAccessTokenScopes(observedScopes)).toBe(true);
+    expect(getMissingBitbucketWorkspaceAccessTokenScopes(observedScopes)).toEqual([]);
+    expect(
+      hasRequiredBitbucketWorkspaceAccessTokenScopes(['account', 'pullrequest:write', 'webhook'])
+    ).toBe(true);
+    expect(
+      getMissingBitbucketWorkspaceAccessTokenScopes(['account', 'pullrequest:write', 'webhook'])
+    ).toEqual([]);
+    expect(getMissingBitbucketWorkspaceAccessTokenScopes(['account', 'project'])).toEqual([
+      'repository:write',
+      'pullrequest',
+      'webhook',
+    ]);
 
     expect(hasRequiredBitbucketWorkspaceAccessTokenScopes(['account', 'repository'])).toBe(false);
     expect(

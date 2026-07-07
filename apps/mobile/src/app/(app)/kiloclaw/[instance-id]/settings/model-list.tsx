@@ -83,11 +83,17 @@ export default function ModelListScreen() {
             <Text className="text-xs text-muted-foreground">{item.id}</Text>
           </View>
           {item.supportsVision && <Eye size={14} color={colors.mutedForeground} />}
-          {selected && <Check size={16} color="#3b82f6" />}
+          {selected && <Check size={16} color={colors.primary} />}
         </Pressable>
       );
     },
-    [currentModel, handleSelect, mutations.updateModel.isPending, colors.mutedForeground]
+    [
+      currentModel,
+      handleSelect,
+      mutations.updateModel.isPending,
+      colors.mutedForeground,
+      colors.primary,
+    ]
   );
 
   const sections = [

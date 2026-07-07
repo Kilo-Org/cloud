@@ -1,9 +1,11 @@
 import 'server-only';
 import {
+  GatewayAuthorizationRequestStatus,
   GatewayAuthMode,
   GatewayPendingProviderAuthorizationStatus,
   GatewaySecretKind,
   ProviderAuthorizationServerMetadataSchema,
+  ProviderGrantBundleSchema,
   ProviderTokenResponseSchema,
   GatewayExecutionContextSchema,
   GatewayOwnerScope,
@@ -14,19 +16,22 @@ import { decryptKeyedEnvelope, encryptKeyedEnvelope } from '@kilocode/encryption
 import {
   mcp_gateway_authorization_requests,
   mcp_gateway_config_secrets,
+  mcp_gateway_oauth_grants,
   mcp_gateway_pending_provider_authorizations,
 } from '@kilocode/db/schema';
 import type {
   mcp_gateway_connection_instances,
   mcp_gateway_provider_grants,
 } from '@kilocode/db/schema';
-import { and, eq, gt, sql } from 'drizzle-orm';
+import { MCPGatewayOAuthGrantStatus } from '@kilocode/db/schema-types';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { GatewayExecutionContext, ScopedConnectRoute } from '@kilocode/mcp-gateway';
 import type { GatewayAppConfig } from './config';
 import type { GatewayRepository, ResolvedGatewayRoute } from './repository';
 import type { GatewayRouteService } from './route-service';
 import type { GatewayGrantService } from './grant-service';
+import type { GatewayOAuthGrantService } from './oauth-grant-service';
 import { configSecretAad, expiresAtIso, hashToken, pkceChallenge, randomToken } from './crypto';
 import { validatePublicHttpsDestination } from './discovery-service';
 import { createAuditService } from './audit-service';
@@ -77,7 +82,7 @@ type ResolvedProviderOAuthConfig = {
 type ProviderCallbackResult = {
   pending: typeof mcp_gateway_pending_provider_authorizations.$inferSelect;
   authorizationRequest: typeof mcp_gateway_authorization_requests.$inferSelect | null;
-  grant: typeof mcp_gateway_provider_grants.$inferSelect;
+  grant: typeof mcp_gateway_provider_grants.$inferSelect | null;
   instance: typeof mcp_gateway_connection_instances.$inferSelect;
   resolved: ResolvedGatewayRoute;
   route: ScopedConnectRoute;
@@ -134,6 +139,7 @@ export function createProviderOAuthService(params: {
   repository: GatewayRepository;
   routeService: GatewayRouteService;
   grantService: GatewayGrantService;
+  oauthGrantService: GatewayOAuthGrantService;
   config: GatewayAppConfig;
   fetchImpl?: typeof fetch;
 }) {
@@ -327,6 +333,7 @@ export function createProviderOAuthService(params: {
         state_hash: hashToken(state),
         authorization_request_id:
           paramsInput.authorizationRequest?.authorization_request_id ?? null,
+        oauth_grant_id: paramsInput.authorizationRequest?.oauth_grant_id ?? null,
         config_id: paramsInput.resolved.config.config_id,
         instance_id: paramsInput.instanceId,
         owner_scope: paramsInput.resolved.config.owner_scope,
@@ -428,6 +435,12 @@ export function createProviderOAuthService(params: {
       )
       .returning();
     if (pending) {
+      if (pending.oauth_grant_id) {
+        await params.oauthGrantService.revokeGrantIds(
+          [pending.oauth_grant_id],
+          'provider_authorization_failed'
+        );
+      }
       const resolved = await params.repository.findActiveRouteByRoute({
         ownerScope: pending.owner_scope,
         ownerId: pending.owner_id,
@@ -553,6 +566,24 @@ export function createProviderOAuthService(params: {
         400
       );
     }
+    if (pending.oauth_grant_id) {
+      const [oauthGrant] = await params.repository.database
+        .select()
+        .from(mcp_gateway_oauth_grants)
+        .where(
+          and(
+            eq(mcp_gateway_oauth_grants.oauth_grant_id, pending.oauth_grant_id),
+            eq(mcp_gateway_oauth_grants.kilo_user_id, pending.kilo_user_id),
+            eq(mcp_gateway_oauth_grants.instance_id, pending.instance_id),
+            eq(mcp_gateway_oauth_grants.grant_status, MCPGatewayOAuthGrantStatus.Pending),
+            isNull(mcp_gateway_oauth_grants.revoked_at)
+          )
+        )
+        .limit(1);
+      if (!oauthGrant || authorizationRequest?.oauth_grant_id !== oauthGrant.oauth_grant_id) {
+        throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
+      }
+    }
     await validatePublicHttpsDestination(state.tokenEndpoint);
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -585,16 +616,71 @@ export function createProviderOAuthService(params: {
     const expiresAt = tokenResponse.expires_in
       ? new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString()
       : null;
+    if (pending.oauth_grant_id) {
+      const [oauthGrant] = await params.repository.database
+        .select({ grantId: mcp_gateway_oauth_grants.oauth_grant_id })
+        .from(mcp_gateway_oauth_grants)
+        .where(
+          and(
+            eq(mcp_gateway_oauth_grants.oauth_grant_id, pending.oauth_grant_id),
+            eq(mcp_gateway_oauth_grants.kilo_user_id, pending.kilo_user_id),
+            eq(mcp_gateway_oauth_grants.instance_id, pending.instance_id),
+            eq(mcp_gateway_oauth_grants.config_version, pending.config_version),
+            eq(mcp_gateway_oauth_grants.grant_status, MCPGatewayOAuthGrantStatus.Pending),
+            isNull(mcp_gateway_oauth_grants.revoked_at)
+          )
+        )
+        .limit(1);
+      if (!oauthGrant) {
+        throw createGatewayError(GatewayErrorCode.InvalidGrant, 'OAuth grant is unavailable', 400);
+      }
+      const [freshAuthorizationRequest] = authorizationRequest
+        ? await params.repository.database
+            .select({
+              authorizationRequestId: mcp_gateway_authorization_requests.authorization_request_id,
+            })
+            .from(mcp_gateway_authorization_requests)
+            .where(
+              and(
+                eq(
+                  mcp_gateway_authorization_requests.authorization_request_id,
+                  authorizationRequest.authorization_request_id
+                ),
+                eq(mcp_gateway_authorization_requests.oauth_grant_id, pending.oauth_grant_id),
+                eq(
+                  mcp_gateway_authorization_requests.request_status,
+                  GatewayAuthorizationRequestStatus.Pending
+                ),
+                gt(mcp_gateway_authorization_requests.expires_at, sql`NOW()`)
+              )
+            )
+            .limit(1)
+        : [null];
+      if (authorizationRequest && !freshAuthorizationRequest) {
+        await params.oauthGrantService.revokeGrantIds(
+          [pending.oauth_grant_id],
+          'authorization_request_unavailable'
+        );
+        throw createGatewayError(
+          GatewayErrorCode.InvalidGrant,
+          'Authorization request is no longer available',
+          400
+        );
+      }
+    }
+    const providerGrantBundle = ProviderGrantBundleSchema.parse({
+      accessToken: tokenResponse.access_token,
+      refreshToken: tokenResponse.refresh_token,
+      expiresAt,
+      scope: tokenResponse.scope ?? providerScopes?.join(' '),
+      tokenType,
+    });
     const grant = await params.grantService.replaceGrant({
       instanceId: instance.instance_id,
-      bundle: {
-        accessToken: tokenResponse.access_token,
-        refreshToken: tokenResponse.refresh_token,
-        expiresAt,
-        scope: tokenResponse.scope ?? providerScopes?.join(' '),
-        tokenType,
-      },
+      bundle: providerGrantBundle,
       providerSubject: null,
+      oauthGrantId: pending.oauth_grant_id ?? null,
+      requirePendingOAuthGrant: Boolean(pending.oauth_grant_id),
     });
     await params.repository.database
       .update(mcp_gateway_pending_provider_authorizations)
@@ -613,6 +699,7 @@ export function createProviderOAuthService(params: {
       configId: resolved.config.config_id,
       connectResourceId: resolved.route.connect_resource_id,
       instanceId: instance.instance_id,
+      oauthGrantId: pending.oauth_grant_id ?? null,
       eventType: 'provider_authorization_completed',
       outcome: 'success',
     });
@@ -626,7 +713,15 @@ export function createProviderOAuthService(params: {
             `/cloud/mcp-gateway/${resolved.config.config_id}`,
             params.config.appBaseUrl
           ).toString();
-    return { pending, authorizationRequest, grant, instance, resolved, route, completionUrl };
+    return {
+      pending,
+      authorizationRequest,
+      grant,
+      instance,
+      resolved,
+      route,
+      completionUrl,
+    };
   }
 
   return {

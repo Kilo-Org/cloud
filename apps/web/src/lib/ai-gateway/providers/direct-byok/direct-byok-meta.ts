@@ -9,6 +9,7 @@ export const DIRECT_BYOK_PROVIDERS_META = {
   'kimi-coding': 'Kimi Code',
   'inceptron-byok': 'Inceptron BYOK',
   martian: 'Martian',
+  'morph-byok': 'Morph BYOK',
   neuralwatt: 'Neuralwatt',
   'ollama-cloud': 'Ollama Cloud',
   'opencode-go': 'OpenCode Go',

@@ -38,10 +38,11 @@ function makeSnapshot(
   messages: Array<{
     role: string;
     parts: Array<{ type: string; text?: string; id?: string }>;
-  }>
+  }>,
+  info: SessionSnapshot['info'] = {}
 ): SessionSnapshot {
   return {
-    info: {},
+    info,
     messages: messages.map((m, i) => ({
       info: { id: `msg_${i}`, role: m.role },
       parts: m.parts.map((p, j) => ({
@@ -64,10 +65,19 @@ describe('fetchSessionSnapshot', () => {
     mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
-  it('returns parsed snapshot on 200 response', async () => {
-    const snapshot = makeSnapshot([
-      { role: 'assistant', parts: [{ type: 'text', text: 'hello' }] },
-    ]);
+  it('returns parsed snapshot with session model metadata on 200 response', async () => {
+    const snapshot = makeSnapshot(
+      [{ role: 'assistant', parts: [{ type: 'text', text: 'hello' }] }],
+      {
+        id: 'ses_abc123',
+        title: 'Remote session',
+        model: {
+          providerID: 'anthropic',
+          id: 'claude-sonnet-4',
+          variant: 'thinking',
+        },
+      }
+    );
 
     mockFetch.mockResolvedValue({
       ok: true,
@@ -84,6 +94,23 @@ describe('fetchSessionSnapshot', () => {
         headers: { Authorization: 'Bearer mock-jwt-token' },
       })
     );
+  });
+
+  it('validates session model metadata', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          info: {
+            id: 'ses_abc123',
+            model: { providerID: 'anthropic', id: 42, variant: 'thinking' },
+          },
+          messages: [],
+        }),
+    });
+
+    await expect(fetchSessionSnapshot('ses_abc123', 'user_123')).rejects.toThrow();
   });
 
   it('returns null on 404', async () => {

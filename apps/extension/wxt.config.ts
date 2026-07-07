@@ -15,7 +15,7 @@ export default defineConfig({
         id: 'kilo-extension@kilocode.ai',
       },
     },
-    description: 'Kilo browser extension.',
+    description: 'Side-panel AI chat agent. Use open-weight or frontier models.',
     host_permissions: [
       '<all_urls>',
       'file:///*',
@@ -23,14 +23,35 @@ export default defineConfig({
       'http://127.0.0.1/*',
       'http://localhost/*',
     ],
-    name: 'Kilo Extension',
+    name: 'Kilo Code',
     permissions:
       browser === 'firefox'
-        ? ['scripting', 'storage', 'tabs']
-        : ['debugger', 'scripting', 'storage'],
+        ? ['identity', 'scripting', 'storage', 'tabs']
+        : ['debugger', 'identity', 'scripting', 'storage'],
   }),
   modules: ['@wxt-dev/module-react'],
   vite: () => ({
     plugins: [tailwindcss()],
   }),
+  zip: {
+    includeSources: [
+      'package.json',
+      'pnpm-lock.yaml',
+      'pnpm-workspace.yaml',
+      'patches/**',
+      'apps/extension/AGENTS.md',
+      'apps/extension/SOURCE_CODE_REVIEW.md',
+      'apps/extension/package.json',
+      'apps/extension/playwright.config.ts',
+      'apps/extension/tsconfig.json',
+      'apps/extension/vitest.config.ts',
+      'apps/extension/wxt.config.ts',
+      'apps/extension/entrypoints/**',
+      'apps/extension/public/**',
+      'apps/extension/scripts/**',
+      'apps/extension/src/**',
+      'apps/extension/tests/e2e/**',
+    ],
+    sourcesRoot: '../..',
+  },
 });

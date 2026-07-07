@@ -337,7 +337,9 @@ platform.use('*', async (c, next) => {
  * from context without falling back to raw unvalidated query params.
  */
 function setValidatedQueryUserId(c: Context<AppEnv>): string | null {
-  const parsed = UserIdRequestSchema.safeParse({ userId: c.req.query('userId') });
+  const parsed = UserIdRequestSchema.safeParse({
+    userId: c.req.query('userId'),
+  });
   if (!parsed.success) {
     return null;
   }
@@ -450,7 +452,11 @@ async function withResolvedDORetry<TResult>(
  * failure surfaces to the caller, who retries explicitly once state has settled
  * and the typed outcome is accurate. Reads keep the default retry.
  */
-const NO_DO_RETRY: DORetryConfig = { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 };
+const NO_DO_RETRY: DORetryConfig = {
+  maxAttempts: 1,
+  baseBackoffMs: 0,
+  maxBackoffMs: 0,
+};
 
 type ProvisionedInstanceRecord = {
   id: string;
@@ -1052,7 +1058,10 @@ function sanitizeError(err: unknown, operation: string): { message: string; stat
 
   // Allow known-safe messages through
   if (SAFE_ERROR_PREFIXES.some(prefix => normalized.startsWith(prefix))) {
-    return { message: normalized, status: correctLostStatus(normalized, status) };
+    return {
+      message: normalized,
+      status: correctLostStatus(normalized, status),
+    };
   }
 
   return { message: `${operation} failed`, status };
@@ -1118,7 +1127,11 @@ function sanitizeFileTreeRpcLimitError(message: string): {
 }
 
 function isSafeOpenclawConfigCode(code: string): boolean {
-  return OPENCLAW_CONFIG_ERROR_CODES.has(code) || code.startsWith('openclaw_import_');
+  return (
+    OPENCLAW_CONFIG_ERROR_CODES.has(code) ||
+    code.startsWith('openclaw_import_') ||
+    code.startsWith('openclaw_export_')
+  );
 }
 
 function sanitizeOpenclawConfigError(
@@ -1203,7 +1216,11 @@ function reconstructAgentError(
   if (code && AGENT_CONFIG_ERROR_CODES.has(code)) {
     return { message, status, code };
   }
-  console.error(`[platform] ${operation} returned error envelope:`, { status, code, message });
+  console.error(`[platform] ${operation} returned error envelope:`, {
+    status,
+    code,
+    message,
+  });
   return { message: `${operation} failed`, status, ...(code ? { code } : {}) };
 }
 
@@ -1225,7 +1242,13 @@ async function parseBody<T extends z.ZodTypeAny>(
   const parsed = schema.safeParse(body);
   if (!parsed.success) {
     return {
-      error: c.json({ error: 'Invalid request', details: parsed.error.flatten().fieldErrors }, 400),
+      error: c.json(
+        {
+          error: 'Invalid request',
+          details: parsed.error.flatten().fieldErrors,
+        },
+        400
+      ),
     };
   }
 
@@ -3594,6 +3617,12 @@ const OpenclawWorkspaceImportSchema = z.object({
     .max(500),
 });
 
+const OpenclawWorkspaceExportSchema = z.object({
+  userId: z.string().min(1),
+  format: z.enum(['tar.gz', 'zip']),
+  password: z.string().min(1).max(256).optional(),
+});
+
 // POST /api/platform/files/write
 platform.post('/files/write', async c => {
   const result = await parseBody(c, WriteFileSchema);
@@ -3701,6 +3730,72 @@ platform.post('/files/import-openclaw-workspace', async c => {
     const { message, status, code } = sanitizeOpenclawConfigError(
       err,
       'files/import-openclaw-workspace'
+    );
+    return jsonError(message, status, code);
+  }
+});
+
+// POST /api/platform/files/export-openclaw-workspace
+// Returns a binary archive of the OpenClaw workspace (not JSON). The optional
+// passphrase rides in the POST body (never the URL) and is used transiently by
+// the controller to AES-encrypt a zip; it is never stored or logged.
+platform.post('/files/export-openclaw-workspace', async c => {
+  const result = await parseBody(c, OpenclawWorkspaceExportSchema);
+  if ('error' in result) return result.error;
+
+  const iidResult = parseInstanceIdQuery(c);
+  if ('error' in iidResult) return iidResult.error;
+
+  const { userId, format, password } = result.data;
+
+  // Encryption is zip-only (defense-in-depth; the controller also enforces this).
+  if (password && format !== 'zip') {
+    return jsonError(
+      'Encryption is only supported for zip exports',
+      400,
+      'openclaw_export_encryption_unsupported'
+    );
+  }
+
+  try {
+    const status = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.getStatus(),
+      'getStatus'
+    );
+
+    if (status.status !== 'running') {
+      return jsonError('Instance is not running', 503, 'instance_not_running');
+    }
+
+    const exportResult = await withResolvedDORetry(
+      c.env,
+      userId,
+      iidResult.instanceId,
+      stub => stub.exportOpenclawWorkspace({ format, password }),
+      'exportOpenclawWorkspace'
+    );
+    if (!exportResult) {
+      return jsonError(
+        'OpenClaw export not available (controller too old)',
+        404,
+        'controller_route_unavailable'
+      );
+    }
+
+    return c.body(exportResult.bytes, 200, {
+      'Content-Type': exportResult.contentType,
+      'Content-Disposition': `attachment; filename="openclaw-workspace-export.${format}"`,
+      'X-Openclaw-Export-File-Count': String(exportResult.fileCount),
+      'X-Openclaw-Export-Total-Bytes': String(exportResult.totalBytes),
+      'X-Openclaw-Export-Skipped': String(exportResult.skipped),
+    });
+  } catch (err) {
+    const { message, status, code } = sanitizeOpenclawConfigError(
+      err,
+      'files/export-openclaw-workspace'
     );
     return jsonError(message, status, code);
   }
@@ -4168,7 +4263,10 @@ platform.post('/destroy', async c => {
         );
         if (instanceId) {
           await registryStub.destroyInstance(registryKey, instanceId);
-          console.log('[platform] Registry entry destroyed:', { registryKey, instanceId });
+          console.log('[platform] Registry entry destroyed:', {
+            registryKey,
+            instanceId,
+          });
         } else {
           // Legacy destroy (no instanceId): find the registry entry by the
           // original legacy DO key recovered from sandboxId/Postgres state.
@@ -4292,7 +4390,12 @@ function inboundEmailLogContext(delivery: InboundEmailDelivery) {
 
 async function resolveInboundEmailDoKey(
   env: AppEnv['Bindings'],
-  instance: { id: string; userId: string; sandboxId: string; orgId: string | null }
+  instance: {
+    id: string;
+    userId: string;
+    sandboxId: string;
+    orgId: string | null;
+  }
 ): Promise<string> {
   const ownerKey = instance.orgId ? `org:${instance.orgId}` : `user:${instance.userId}`;
   try {
@@ -4847,7 +4950,10 @@ platform.get('/admin/orphan-volume-scan', async c => {
     return c.json({ error: 'FLY_API_TOKEN is not configured' }, 503);
   }
 
-  const flyApp = await resolveOrphanVolumeFlyAppName(c.env, { userId, sandboxId });
+  const flyApp = await resolveOrphanVolumeFlyAppName(c.env, {
+    userId,
+    sandboxId,
+  });
   const expectedVolumeName = volumeNameFromSandboxId(sandboxId);
 
   // Fetch the volume list and the DO debug state concurrently. Either can fail
@@ -4993,7 +5099,9 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   // Fly-side name guard and the DO-side guard both anchor to one instance.
   if (instance.userId !== userId || instance.sandboxId !== sandboxId) {
     return c.json(
-      { error: 'Instance identity mismatch: userId/sandboxId do not match instanceId' },
+      {
+        error: 'Instance identity mismatch: userId/sandboxId do not match instanceId',
+      },
       409
     );
   }
@@ -5028,7 +5136,9 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   }
   if (pendingDestructionContextKeys.has(contextKey)) {
     return c.json(
-      { error: 'A billing destruction deadline is still pending; volume preserved' },
+      {
+        error: 'A billing destruction deadline is still pending; volume preserved',
+      },
       409
     );
   }
@@ -5071,7 +5181,9 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   //    already reaping it.
   if (volume.state !== 'created' && volume.state !== 'detached') {
     return c.json(
-      { error: `Volume is in state "${volume.state}"; only created/detached volumes are reapable` },
+      {
+        error: `Volume is in state "${volume.state}"; only created/detached volumes are reapable`,
+      },
       409
     );
   }
@@ -5097,7 +5209,9 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   } catch (err) {
     const { message } = sanitizeError(err, 'orphan-volume-destroy getDebugState');
     return c.json(
-      { error: `Could not confirm Durable Object state; refusing to destroy (${message})` },
+      {
+        error: `Could not confirm Durable Object state; refusing to destroy (${message})`,
+      },
       502
     );
   }
@@ -5127,7 +5241,13 @@ platform.post('/admin/orphan-volume-destroy', async c => {
       console.log(
         `[platform] orphan-volume-destroy: volume already gone app=${flyApp} volume=${volumeId}`
       );
-      return c.json({ ok: true, flyApp, volumeId, volumeName: volume.name, alreadyGone: true });
+      return c.json({
+        ok: true,
+        flyApp,
+        volumeId,
+        volumeName: volume.name,
+        alreadyGone: true,
+      });
     }
     const { message, status } = sanitizeError(err, 'orphan-volume-destroy deleteVolume');
     return jsonError(message, status);
@@ -5136,7 +5256,13 @@ platform.post('/admin/orphan-volume-destroy', async c => {
   console.log(
     `[platform] orphan-volume-destroy ok: app=${flyApp} volume=${volumeId} name=${volume.name}`
   );
-  return c.json({ ok: true, flyApp, volumeId, volumeName: volume.name, alreadyGone: false });
+  return c.json({
+    ok: true,
+    flyApp,
+    volumeId,
+    volumeName: volume.name,
+    alreadyGone: false,
+  });
 });
 
 // POST /api/platform/resize-machine
@@ -5660,7 +5786,11 @@ platform.put('/regions', async c => {
 platform.get('/providers/rollout', async c => {
   try {
     const { config, source } = await readProviderRolloutConfig(c.env.KV_CLAW_CACHE);
-    return c.json({ rollout: config, availability: providerRolloutAvailability(), source });
+    return c.json({
+      rollout: config,
+      availability: providerRolloutAvailability(),
+      source,
+    });
   } catch (err) {
     console.error('[platform] Failed to read provider rollout config:', err);
     return c.json({ error: 'Failed to read provider rollout config' }, 500);
@@ -5675,7 +5805,11 @@ platform.put('/providers/rollout', async c => {
 
   try {
     await writeProviderRolloutConfig(c.env.KV_CLAW_CACHE, result.data);
-    return c.json({ ok: true, rollout: result.data, availability: providerRolloutAvailability() });
+    return c.json({
+      ok: true,
+      rollout: result.data,
+      availability: providerRolloutAvailability(),
+    });
   } catch (err) {
     console.error('[platform] Failed to write provider rollout config:', err);
     return c.json({ error: 'Failed to write provider rollout config' }, 500);
@@ -5803,7 +5937,10 @@ platform.post('/extend-volume', async c => {
   try {
     const resp = await fetch(url, {
       method: 'PUT',
-      headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ size_gb: targetSizeGb }),
     });
 

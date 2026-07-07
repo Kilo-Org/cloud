@@ -4,7 +4,8 @@ export type SafeToolName =
   | 'get_element_details'
   | 'get_page_snapshot'
   | 'get_viewport_screenshot';
-export type AgentToolName = 'eval' | SafeToolName;
+export type RemoteMcpAgentToolName = `mcp_${string}`;
+export type AgentToolName = 'eval' | RemoteMcpAgentToolName | SafeToolName;
 
 export type AgentConversationEvent =
   | {
@@ -40,6 +41,17 @@ export type AgentConversationEvent =
       readonly type: 'tool-call';
     }
   | {
+      readonly arguments: Record<string, unknown>;
+      readonly id: string;
+      readonly name: RemoteMcpAgentToolName;
+      readonly providerToolCallId?: string;
+      readonly reasoningDetails?: readonly unknown[];
+      readonly remoteToolName: string;
+      readonly serverId: string;
+      readonly serverName: string;
+      readonly type: 'tool-call';
+    }
+  | {
       readonly error?: string;
       readonly id: string;
       readonly ok: boolean;
@@ -50,6 +62,10 @@ export type AgentConversationEvent =
 
 type MessageEvent = Extract<AgentConversationEvent, { readonly type: 'message' }>;
 type EvalToolCallEvent = Extract<AgentConversationEvent, { readonly name: 'eval' }>;
+export type RemoteMcpToolCallEvent = Extract<
+  AgentConversationEvent,
+  { readonly name: RemoteMcpAgentToolName }
+>;
 type SafeToolCallEvent = Extract<AgentConversationEvent, { readonly name: SafeToolName }>;
 type ToolResultEvent = Extract<AgentConversationEvent, { readonly type: 'tool-result' }>;
 
@@ -77,6 +93,15 @@ interface CreateSafeToolCallOptions {
   readonly query?: string;
   readonly snapshotId?: string;
   readonly tabId: number;
+}
+
+interface CreateRemoteMcpToolCallOptions {
+  readonly arguments: Record<string, unknown>;
+  readonly name: RemoteMcpAgentToolName;
+  readonly providerToolCallId?: string;
+  readonly remoteToolName: string;
+  readonly serverId: string;
+  readonly serverName: string;
 }
 
 interface CreateToolResultOptions {
@@ -147,6 +172,24 @@ export const createSafeToolCall = ({
   ...(query === undefined ? {} : { query }),
   ...(snapshotId === undefined ? {} : { snapshotId }),
   tabId,
+  type: 'tool-call',
+});
+
+export const createRemoteMcpToolCall = ({
+  arguments: toolArguments,
+  name,
+  providerToolCallId,
+  remoteToolName,
+  serverId,
+  serverName,
+}: CreateRemoteMcpToolCallOptions): RemoteMcpToolCallEvent => ({
+  arguments: toolArguments,
+  id: createEventId(),
+  name,
+  ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+  remoteToolName,
+  serverId,
+  serverName,
   type: 'tool-call',
 });
 

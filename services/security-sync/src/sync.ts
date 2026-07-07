@@ -668,6 +668,24 @@ async function upsertSecurityFinding(
   const ownerOrganizationId = isOrgOwner(owner) ? owner.organizationId : null;
   const ownerUserId = isOrgOwner(owner) ? null : owner.userId;
 
+  // Only rewrite an existing finding when the source data actually changed. Re-syncing an
+  // unchanged finding otherwise rewrote the row on every run (bumping last_synced_at/
+  // updated_at), which — multiplied by ~13 indexes and the TOASTed raw_data column —
+  // produced large amounts of WAL for findings that had not changed.
+  //
+  // Every stored column is derived from the Dependabot alert (see parseDependabotAlert),
+  // and GitHub only advances the alert's updated_at on real changes, so comparing the
+  // stored raw_data (jsonb, order-independent) detects any source-driven change in one
+  // check. sla_due_at is the only value we compute ourselves, so it is compared separately
+  // to catch SLA-policy changes. When neither differs the DO UPDATE matches no row and the
+  // fallback SELECT below returns the existing finding with wasInserted=false and no
+  // status/severity delta, so notifications and audit events behave exactly as they did for
+  // an unchanged re-sync.
+  const materialChangePredicate = sql`(
+        ${security_findings.raw_data} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.raw_data.name)}
+        OR ${security_findings.sla_due_at} IS DISTINCT FROM EXCLUDED.${sql.identifier(security_findings.sla_due_at.name)}
+      )`;
+
   const result = await db.execute<Record<string, unknown>>(sql`
     WITH existing_match AS (
       SELECT ${security_findings.id} AS id,
@@ -773,7 +791,7 @@ async function upsertSecurityFinding(
         ${sql.identifier(security_findings.dependency_scope.name)} = EXCLUDED.${sql.identifier(security_findings.dependency_scope.name)},
         ${sql.identifier(security_findings.last_synced_at.name)} = now(),
         ${sql.identifier(security_findings.updated_at.name)} = now()
-      WHERE EXISTS (SELECT 1 FROM existing_match)
+      WHERE EXISTS (SELECT 1 FROM existing_match) AND ${materialChangePredicate}
       RETURNING
         ${security_findings.id} AS id,
         (xmax = 0) AS was_inserted,

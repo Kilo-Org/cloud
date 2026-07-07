@@ -8,7 +8,6 @@
     "preinstall": "npx only-allow pnpm",
     "container:prepare": "node scripts/prepare-container.mjs",
     "deploy:prod": "pnpm container:prepare && wrangler deploy --env=\"\" --outdir dist --var SENTRY_RELEASE:$(sentry-cli releases propose-version)",
-    "postdeploy:prod": "pnpm sentry:sourcemaps",
     "deploy:dev": "pnpm container:prepare && wrangler deploy --env dev",
     "sentry:sourcemaps": "_SENTRY_RELEASE=$(sentry-cli releases propose-version) && sentry-cli releases new $_SENTRY_RELEASE --org=kilo-code --project=gastown-service && sentry-cli sourcemaps upload --org=kilo-code --project=gastown-service --release=$_SENTRY_RELEASE --strip-prefix 'dist/..' dist",
     "dev": "pnpm container:prepare && wrangler dev --env dev",

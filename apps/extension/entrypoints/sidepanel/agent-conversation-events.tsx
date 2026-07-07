@@ -1,10 +1,14 @@
 import type { JSX } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import type {
   AgentConversationEvent,
   GroupedConversationItem,
 } from '@/src/shared/agent-conversation';
 import { getViewportScreenshotDataUrl } from '@/src/shared/agent-tool-output';
+
+// Hoisted so the array reference is stable (react-perf) across renders.
+const remarkPlugins = [remarkGfm];
 
 const formatToolValue = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -48,7 +52,7 @@ const MessageEvent = ({
         }
       >
         <div className="agent-message-markdown">
-          <ReactMarkdown>{event.text}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={remarkPlugins}>{event.text}</ReactMarkdown>
         </div>
       </div>
     </div>
@@ -65,7 +69,7 @@ const ThinkingEvent = ({
       thinking
     </summary>
     <div className="agent-message-markdown mt-2 text-xs leading-5 text-zinc-400">
-      <ReactMarkdown>{event.text}</ReactMarkdown>
+      <ReactMarkdown remarkPlugins={remarkPlugins}>{event.text}</ReactMarkdown>
     </div>
   </details>
 );
@@ -100,13 +104,21 @@ const ToolExchangeEvent = ({
         <span className={titleClassName}>
           {item.toolCall.name} {isSuccessful ? 'completed' : 'failed'}
         </span>
-        <span className={tabClassName}>tab {item.toolCall.tabId}</span>
+        <span className={tabClassName}>
+          {'serverName' in item.toolCall ? item.toolCall.serverName : `tab ${item.toolCall.tabId}`}
+        </span>
       </summary>
       <div className="mt-2 grid min-w-0 gap-2">
         {item.toolCall.name === 'eval' ? (
           <div className="min-w-0">
             <p className={codeLabelClassName}>Code</p>
             <pre className={codeBlockClassName}>{item.toolCall.code}</pre>
+          </div>
+        ) : null}
+        {'arguments' in item.toolCall ? (
+          <div className="min-w-0">
+            <p className={codeLabelClassName}>Arguments</p>
+            <pre className={codeBlockClassName}>{formatToolValue(item.toolCall.arguments)}</pre>
           </div>
         ) : null}
         <div className="min-w-0">

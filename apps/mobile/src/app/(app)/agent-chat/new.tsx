@@ -1,8 +1,10 @@
+/* eslint-disable max-lines -- New-session screen bundles closely related prompt/toolbar/repository concerns in a single component to keep navigation props colocated. */
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   type LayoutChangeEvent,
   Platform,
+  Pressable,
   ScrollView,
   TextInput,
   type TextStyle,
@@ -13,9 +15,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generateMessageId } from 'cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
-import { ExternalLink, RefreshCw } from 'lucide-react-native';
+import { ExternalLink, Paperclip, RefreshCw } from 'lucide-react-native';
 import { toast } from 'sonner-native';
 
+import { AttachmentPreviewStrip } from '@/components/agents/attachment-preview-strip';
+import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { RepoSelector } from '@/components/agents/repo-selector';
@@ -28,16 +32,26 @@ import {
   getGitHubIntegrationUrl,
   shouldShowGitHubIntegrationPrompt,
 } from '@/lib/agent-github-integration';
+import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
+import {
+  type AgentAttachmentWire,
+  useAgentAttachmentUpload,
+} from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useAutoSelectModel } from '@/lib/hooks/use-auto-select-model';
+import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
+import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 const PROMPT_INPUT_DEFAULT_LINES = 3;
 const PROMPT_INPUT_MAX_LINES = 6;
 const PROMPT_INPUT_LINE_HEIGHT = 24;
-const PROMPT_INPUT_VERTICAL_PADDING = 32;
-const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 32;
+// Must mirror the TextInput's actual padding: py-2 (16 total) and px-2 on
+// iOS (16 total) / the 24pt-per-side Android inset (48 total).
+const PROMPT_INPUT_VERTICAL_PADDING = 16;
+const PROMPT_INPUT_HORIZONTAL_PADDING = Platform.OS === 'android' ? 48 : 16;
 const PROMPT_INPUT_ANDROID_HORIZONTAL_INSET = 24;
 const PROMPT_INPUT_MIN_HEIGHT =
   PROMPT_INPUT_LINE_HEIGHT * PROMPT_INPUT_DEFAULT_LINES + PROMPT_INPUT_VERTICAL_PADDING;
@@ -66,7 +80,6 @@ export default function NewSessionScreen() {
 
   // Prompt ref (uncontrolled TextInput on iOS)
   const promptRef = useRef('');
-  const [hasPrompt, setHasPrompt] = useState(false);
   const [promptInputWidth, setPromptInputWidth] = useState(0);
   const promptMeasure = useTextHeight({
     minHeight: PROMPT_INPUT_MIN_HEIGHT,
@@ -79,16 +92,17 @@ export default function NewSessionScreen() {
 
   // ── Models ───────────────────────────────────────────────────────
   const { models } = useAvailableModels(organizationId);
+  const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
+  const { saveModel } = usePersistedAgentModel();
+  const autoSelected = useAutoSelectModel(models, organizationId);
+  const attachments = useAgentAttachmentUpload({ organizationId });
 
-  // Auto-select first model when models load
-  const hasAutoSelectedModel = useRef(false);
-  if (models.length > 0 && !model && !hasAutoSelectedModel.current) {
-    const firstModel = models[0];
-    if (firstModel) {
-      hasAutoSelectedModel.current = true;
-      setModel(firstModel.id);
-      setVariant(firstModel.variants[0] ?? '');
-    }
+  // Apply auto-selected model when the user hasn't picked one yet.
+  const hasAppliedAutoSelection = useRef(false);
+  if (!hasAppliedAutoSelection.current && autoSelected.model && !model) {
+    hasAppliedAutoSelection.current = true;
+    setModel(autoSelected.model);
+    setVariant(autoSelected.variant);
   }
 
   // ── Repositories ─────────────────────────────────────────────────
@@ -126,10 +140,15 @@ export default function NewSessionScreen() {
   }, [repoData]);
 
   // ── Handlers ─────────────────────────────────────────────────────
-  const handleModelSelect = useCallback((modelId: string, newVariant: string) => {
-    setModel(modelId);
-    setVariant(newVariant);
-  }, []);
+  const handleModelSelect = useCallback(
+    (modelId: string, newVariant: string) => {
+      setModel(modelId);
+      setVariant(newVariant);
+      saveModel(organizationId, { model: modelId, variant: newVariant });
+      persistServerLastSelected({ model: modelId, ...(newVariant ? { variant: newVariant } : {}) });
+    },
+    [organizationId, saveModel, persistServerLastSelected]
+  );
 
   const handleOpenGitHubIntegration = useCallback(async () => {
     try {
@@ -142,7 +161,25 @@ export default function NewSessionScreen() {
 
   const handleCreate = useCallback(async () => {
     const prompt = promptRef.current.trim();
-    if (!prompt || !selectedRepo || !model) {
+    // The backend requires a non-empty prompt even when attachments are present.
+    if (!prompt) {
+      toast.error('Enter a prompt first.');
+      return;
+    }
+    if (!selectedRepo) {
+      toast.error('Select a repository first.');
+      return;
+    }
+    if (!model) {
+      toast.error('Select a model first.');
+      return;
+    }
+    if (attachments.isUploading) {
+      toast.error('Wait for attachments to finish uploading.');
+      return;
+    }
+    if (prompt.startsWith('/') && attachments.attachments.length > 0) {
+      toast.error('Attachments cannot be sent with slash commands.');
       return;
     }
 
@@ -150,7 +187,17 @@ export default function NewSessionScreen() {
 
     try {
       const initialMessageId = generateMessageId();
-      const baseInput = {
+      const baseInput: {
+        prompt: string;
+        initialMessageId: string;
+        mode: AgentMode;
+        model: string;
+        variant: string | undefined;
+        githubRepo: string;
+        autoCommit: boolean;
+        autoInitiate: boolean;
+        attachments?: AgentAttachmentWire;
+      } = {
         prompt,
         initialMessageId,
         mode,
@@ -160,6 +207,10 @@ export default function NewSessionScreen() {
         autoCommit: true,
         autoInitiate: true,
       };
+      const wireAttachments = attachments.toWirePayload();
+      if (wireAttachments) {
+        baseInput.attachments = wireAttachments;
+      }
 
       const result = organizationId
         ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
@@ -173,10 +224,6 @@ export default function NewSessionScreen() {
       const path = organizationId
         ? `/(app)/agent-chat/${result.kiloSessionId}?organizationId=${organizationId}`
         : `/(app)/agent-chat/${result.kiloSessionId}`;
-      // router.replace() crashes on Android Fabric (react-native-screens
-      // "addViewAt: View already has a parent"). Work around it by pushing
-      // first, then removing this screen from the stack on the next frame
-      // so the back button goes straight to the session list.
       router.push(path as Href);
       requestAnimationFrame(() => {
         navigation.dispatch(state => {
@@ -193,9 +240,23 @@ export default function NewSessionScreen() {
     } finally {
       setIsCreating(false);
     }
-  }, [selectedRepo, model, mode, variant, organizationId, queryClient, trpc, router, navigation]);
+  }, [
+    selectedRepo,
+    model,
+    mode,
+    variant,
+    organizationId,
+    queryClient,
+    trpc,
+    router,
+    navigation,
+    attachments,
+  ]);
 
-  const canStart = hasPrompt && selectedRepo.length > 0 && model.length > 0 && !isCreating;
+  const { addCandidates } = attachments;
+  const handleAddAttachment = useCallback(async () => {
+    addCandidates(await pickAgentAttachments());
+  }, [addCandidates]);
 
   function handlePromptInputLayout(event: LayoutChangeEvent) {
     const nextWidth = Math.max(Math.round(event.nativeEvent.layout.width), 0);
@@ -213,29 +274,48 @@ export default function NewSessionScreen() {
         automaticallyAdjustKeyboardInsets
       >
         <View className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm shadow-black/5">
-          {promptMeasure.measureElement}
-          <TextInput
-            placeholder="What would you like to work on?"
-            placeholderTextColor={colors.mutedForeground}
-            multiline
-            className="px-4 py-4 text-base leading-6 text-foreground"
-            style={[
-              promptInputStyle,
-              { height: promptMeasure.height },
-              Platform.OS === 'android'
-                ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
-                : undefined,
-            ]}
-            onChangeText={text => {
-              promptRef.current = text;
-              promptMeasure.setText(text);
-              setHasPrompt(text.trim().length > 0);
+          <AttachmentPreviewStrip
+            attachments={attachments.attachments}
+            onRemove={id => {
+              attachments.removeAttachment(id);
             }}
-            onLayout={handlePromptInputLayout}
-            scrollEnabled={promptMeasure.height >= PROMPT_INPUT_MAX_HEIGHT}
-            editable={!isCreating}
-            autoFocus
           />
+          <View className="flex-row items-end px-2 pt-2">
+            <Pressable
+              onPress={() => {
+                void handleAddAttachment();
+              }}
+              disabled={isCreating || attachments.attachments.length >= AGENT_ATTACHMENT_MAX_FILES}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              className="h-9 w-9 items-center justify-center rounded-full active:opacity-70"
+              accessibilityRole="button"
+              accessibilityLabel="Add attachment"
+            >
+              <Paperclip size={18} color={colors.mutedForeground} />
+            </Pressable>
+            {promptMeasure.measureElement}
+            <TextInput
+              placeholder="What would you like to work on?"
+              placeholderTextColor={colors.mutedForeground}
+              multiline
+              className="flex-1 px-2 py-2 text-base leading-6 text-foreground"
+              style={[
+                promptInputStyle,
+                { height: promptMeasure.height },
+                Platform.OS === 'android'
+                  ? { paddingHorizontal: PROMPT_INPUT_ANDROID_HORIZONTAL_INSET }
+                  : undefined,
+              ]}
+              onChangeText={text => {
+                promptRef.current = text;
+                promptMeasure.setText(text);
+              }}
+              onLayout={handlePromptInputLayout}
+              scrollEnabled={promptMeasure.height >= PROMPT_INPUT_MAX_HEIGHT}
+              editable={!isCreating}
+              autoFocus
+            />
+          </View>
           <ChatToolbar
             mode={mode}
             onModeChange={setMode}
@@ -299,7 +379,7 @@ export default function NewSessionScreen() {
         <Button
           size="lg"
           className="mt-6"
-          disabled={!canStart}
+          disabled={isCreating}
           onPress={() => {
             void handleCreate();
           }}

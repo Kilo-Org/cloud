@@ -1,6 +1,7 @@
 import { test, expect, describe, afterEach, beforeEach } from '@jest/globals';
 import { mockOpenRouterModels, createMockResponse } from './helpers/openrouter-models.helper';
 import { GET } from '../app/api/openrouter/models/route';
+import { GET as gatewayV1ModelsGET } from '../app/api/gateway/v1/models/route';
 import { NextRequest } from 'next/server';
 
 jest.mock('@/lib/user/server', () => ({
@@ -113,6 +114,12 @@ describe('GET /api/openrouter/models', () => {
 
     expect(response.status).toBe(200);
     expect(model.terminalBench).toEqual({ overallScore: 0.551, avgAttemptCostUsd: 53.37 });
+  });
+});
+
+describe('GET /api/gateway/v1/models', () => {
+  test('uses the OpenRouter models handler', () => {
+    expect(gatewayV1ModelsGET).toBe(GET);
   });
 });
 

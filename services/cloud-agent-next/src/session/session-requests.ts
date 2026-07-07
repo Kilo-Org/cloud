@@ -32,6 +32,7 @@ export type SessionRepositoryRequest =
       url: string;
       workspaceUuid: string;
       repositoryUuid: string;
+      bitbucketIntegrationId?: string;
       branch?: string;
     }
   | {

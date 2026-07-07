@@ -20,9 +20,13 @@ import {
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { APP_URL } from '@/lib/constants';
-import { getGitHubAppCredentials } from '@/lib/integrations/platforms/github/app-selector';
+import {
+  getGitHubAppCredentials,
+  getGitHubAppTypeForOrganization,
+} from '@/lib/integrations/platforms/github/app-selector';
 import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
   disconnectGitHubUserAuthorization,
   getGitHubUserAuthorizationStatus,
@@ -75,6 +79,13 @@ export const githubAppsRouter = createTRPCRouter({
     return { success: true };
   }),
 
+  getAppType: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
+    if (input?.organizationId) {
+      await ensureOrganizationAccess(ctx, input.organizationId);
+    }
+    return getGitHubAppTypeForOrganization(input?.organizationId ?? null);
+  }),
+
   // Get GitHub App installation status
   getInstallation: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
@@ -93,7 +104,7 @@ export const githubAppsRouter = createTRPCRouter({
     const metadata = integration.metadata as Record<string, unknown> | null;
     const pendingApproval = metadata?.pending_approval as Record<string, unknown> | undefined;
     const status = (pendingApproval?.status as string) || null;
-    const isInstalled = integration.integration_status === 'active';
+    const isInstalled = isPlatformIntegrationHealthy(integration);
 
     return {
       installed: isInstalled,

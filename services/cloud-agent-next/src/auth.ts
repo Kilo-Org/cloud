@@ -13,9 +13,28 @@ type StreamTicketPayload = {
   nonce?: string;
 };
 
+export type SecretBinding = string | { get(): Promise<string> };
+
+export async function resolveSecret(
+  secret: SecretBinding | null | undefined
+): Promise<string | null> {
+  if (!secret) {
+    return null;
+  }
+  if (typeof secret === 'string') {
+    return secret;
+  }
+
+  try {
+    return await secret.get();
+  } catch {
+    return null;
+  }
+}
+
 export async function validateKiloToken(
   authHeader: string | null,
-  secret: string
+  secret: string | null | undefined
 ): Promise<
   | { success: true; userId: string; token: string; botId?: string }
   | { success: false; error: string }
@@ -40,10 +59,13 @@ export async function validateKiloToken(
 
 export function validateStreamTicket(
   ticket: string | null,
-  secret: string
+  secret: string | null | undefined
 ): { success: true; payload: StreamTicketPayload } | { success: false; error: string } {
   if (!ticket) {
     return { success: false, error: 'Missing stream ticket' };
+  }
+  if (!secret) {
+    return { success: false, error: 'NEXTAUTH_SECRET is not configured on the worker' };
   }
 
   try {

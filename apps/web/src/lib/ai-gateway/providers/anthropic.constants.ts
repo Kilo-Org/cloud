@@ -3,7 +3,7 @@ import type {
   PricingTiers,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
-export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-4.6';
+export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-5';
 export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-4.8';
 export const CLAUDE_HAIKU_CURRENT_MODEL_ID = 'anthropic/claude-haiku-4.5';
 export const CLAUDE_FABLE_CURRENT_MODEL_ID = 'anthropic/claude-fable-5';
@@ -122,14 +122,6 @@ export const claude_sonnet_clawsetup_model: KiloExclusiveModel = {
 
 export function isClaudeModel(requestedModel: string) {
   return requestedModel.includes('claude');
-}
-
-export function isHaikuModel(requestedModel: string) {
-  return requestedModel.includes('haiku');
-}
-
-export function isOpusModel(requestedModel: string) {
-  return requestedModel.includes('opus');
 }
 
 export function isFableModel(requestedModel: string) {

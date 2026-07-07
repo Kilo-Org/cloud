@@ -1,4 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Agent-chat-panel transitively imports the WXT '#imports' virtual module; stub it so the graph loads under vitest.
+// eslint-disable-next-line vitest/prefer-import-in-mock, jest/no-untyped-mock-factory
+vi.mock('#imports', () => ({
+  browser: { runtime: { sendMessage: vi.fn() } },
+  storage: { getItem: vi.fn(), setItem: vi.fn() },
+}));
+
+// eslint-disable-next-line import/first
 import { formatSelectedTabSystemEnvironment } from './agent-chat-panel';
 
 describe('selected tab context formatting', () => {

@@ -21,8 +21,12 @@ import { WrapperError } from '../kilo/wrapper-client.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { withTimeout } from '@kilocode/worker-utils';
 import { logSandboxOperationTimeout } from '../sandbox-timeout-logging.js';
-import { withPreparationInfrastructureRecovery } from '../sandbox-recovery.js';
+import {
+  getPreparationInfrastructureFailure,
+  withPreparationInfrastructureRecovery,
+} from '../sandbox-recovery.js';
 import type { AgentSandbox, WrapperInstanceLease } from '../agent-sandbox/protocol.js';
+import { isCodeReviewEphemeralSandboxId } from '../code-review-ephemeral-sandbox.js';
 
 /** Maximum time allowed for complete wrapper readiness, including Kilo startup. */
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
@@ -140,6 +144,7 @@ export class ExecutionOrchestrator {
         ...(options?.leasedInstance ? { leasedInstance: options.leasedInstance } : {}),
       });
     } catch (error) {
+      await this.destroyEphemeralSandboxAfterPreAcceptanceFailure(sandbox, plan, error);
       if (error instanceof ExecutionError) throw error;
       if (error instanceof WrapperError && error.code === 'WRAPPER_FINALIZING') throw error;
       throw ExecutionError.wrapperStartFailed(
@@ -196,6 +201,7 @@ export class ExecutionOrchestrator {
       logger.info('ExecutionOrchestrator wrapper execution started successfully');
       return { kiloSessionId };
     } catch (error) {
+      await this.destroyEphemeralSandboxAfterPreAcceptanceFailure(sandbox, plan, error);
       logger
         .withFields({
           sessionId,
@@ -233,5 +239,26 @@ export class ExecutionOrchestrator {
     return plan.workspace.metadata.identity?.createdOnPlatform === 'code-review'
       ? CODE_REVIEW_DISABLED_TOOLS
       : undefined;
+  }
+
+  private async destroyEphemeralSandboxAfterPreAcceptanceFailure(
+    sandbox: AgentSandbox,
+    plan: FencedWrapperDispatchRequest | FencedLegacyExecutionRequest,
+    error: unknown
+  ): Promise<void> {
+    if (!isCodeReviewEphemeralSandboxId(plan.workspace.sandboxId)) return;
+    if (getPreparationInfrastructureFailure(error)) return;
+    try {
+      await sandbox.delete('recovery');
+    } catch (destroyError) {
+      logger
+        .withFields({
+          sessionId: plan.scope.sessionId,
+          messageId: plan.turn.messageId,
+          originalError: error instanceof Error ? error.message : String(error),
+          destroyError: destroyError instanceof Error ? destroyError.message : String(destroyError),
+        })
+        .warn('Failed to destroy ephemeral Code Reviewer sandbox after pre-acceptance failure');
+    }
   }
 }

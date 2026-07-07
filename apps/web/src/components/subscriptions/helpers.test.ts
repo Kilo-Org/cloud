@@ -24,6 +24,8 @@ describe('Coding Plan subscription helpers', () => {
 
   it('formats prices and billing charges in USD', () => {
     expect(formatCodingPlanPrice(20, 30, 'minimax-token-plan-plus')).toBe('$20 /month');
+    expect(formatCodingPlanPrice(50, 30, 'minimax-token-plan-max')).toBe('$50 /month');
+    expect(formatCodingPlanPrice(120, 30, 'minimax-token-plan-ultra')).toBe('$120 /month');
     expect(formatCodingPlanPrice(20, 30)).toBe('$20 / 30 days');
     expect(formatCodingPlanPrice(12.5, 14)).toBe('$12.50 / 14 days');
     expect(formatCodingPlanBillingAmount(20_000_000)).toBe('$20');

@@ -28,11 +28,17 @@ type UseOrganizationModelsReturn = {
  * If organizationId is provided, the models API applies org access policy.
  *
  * @param organizationId - Optional organization ID to filter models for
+ * @param enabled - Whether the Gateway model catalog should be fetched
  */
-export function useOrganizationModels(organizationId?: string): UseOrganizationModelsReturn {
+export function useOrganizationModels(
+  organizationId?: string,
+  enabled = true
+): UseOrganizationModelsReturn {
   // Fetch models for the model selector
-  const { data: openRouterModels, isLoading: isLoadingOpenRouter } =
-    useModelSelectorList(organizationId);
+  const { data: openRouterModels, isLoading: isLoadingOpenRouter } = useModelSelectorList(
+    organizationId,
+    enabled
+  );
 
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
@@ -57,7 +63,7 @@ export function useOrganizationModels(organizationId?: string): UseOrganizationM
 
   return {
     modelOptions,
-    isLoadingModels: isLoadingOpenRouter,
+    isLoadingModels: enabled && isLoadingOpenRouter,
     contextLengthByModelId,
     defaultModel: defaultsData?.defaultModel,
   };

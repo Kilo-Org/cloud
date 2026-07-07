@@ -58,7 +58,10 @@ describe('kilo config.json schema merge', () => {
   });
 
   test('terminal_command_display is an enum of expanded/collapsed', () => {
-    const tcd = props.terminal_command_display as { type: string; enum: string[] };
+    const tcd = props.terminal_command_display as {
+      type: string;
+      enum: string[];
+    };
     expect(tcd.type).toBe('string');
     expect(tcd.enum).toEqual(['expanded', 'collapsed']);
   });
@@ -91,7 +94,9 @@ describe('kilo config.json schema merge', () => {
 
   test('adds notebook permission keys without dropping upstream', () => {
     const defs = out.$defs as Record<string, unknown>;
-    const permissionConfig = defs.PermissionConfig as { anyOf: Array<Record<string, unknown>> };
+    const permissionConfig = defs.PermissionConfig as {
+      anyOf: Array<Record<string, unknown>>;
+    };
     const permissionObject = permissionConfig.anyOf.find(variant => variant.type === 'object') as {
       properties: Record<string, unknown>;
     };
@@ -111,6 +116,7 @@ describe('kilo config.json schema merge', () => {
   test('adds kilo experimental keys without dropping upstream', () => {
     const exp = props.experimental as { properties: Record<string, unknown> };
     expect(exp.properties.codebase_search).toBeDefined();
+    expect(exp.properties.agent_requirements).toEqual(expect.objectContaining({ type: 'boolean' }));
     expect(exp.properties.native_notebook_tools).toEqual(
       expect.objectContaining({ type: 'boolean' })
     );

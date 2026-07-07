@@ -20,6 +20,12 @@
 # TUNNEL_KILOCLAW_HOSTNAME=  # claw-dev.yourdomain.com -> localhost:8795
 # TUNNEL_KILOCHAT_HOSTNAME=  # chat-dev.yourdomain.com -> localhost:8808
 #
+# Bitbucket Code Reviewer webhook tunnel. Defaults to TUNNEL_NAME/TUNNEL_CONFIG
+# and TUNNEL_APP_HOSTNAME because webhooks point at the Next.js app.
+# BITBUCKET_CODE_REVIEW_TUNNEL_NAME=
+# BITBUCKET_CODE_REVIEW_TUNNEL_CONFIG=
+# BITBUCKET_CODE_REVIEW_WEBHOOK_HOSTNAME=
+#
 # When true (default), named tunnel mode also writes .env.local values:
 # APP_URL_OVERRIDE, NEXTAUTH_URL, and KILOCLAW_API_URL.
 # TUNNEL_UPDATE_APP_ENV=true

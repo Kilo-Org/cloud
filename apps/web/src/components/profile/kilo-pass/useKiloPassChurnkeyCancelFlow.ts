@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { showCancelFlow } from '@/lib/churnkey/loader';
+import { useConfirm } from '@/components/ui/confirm';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 
 import { createKiloPassChurnkeyCancelFlow } from './kiloPassChurnkeyCancelFlow';
@@ -48,6 +49,7 @@ export function useKiloPassChurnkeyCancelFlow(params: UseKiloPassChurnkeyCancelF
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const sharedCancelFlow = useContext(KiloPassChurnkeyCancelFlowContext);
   const [localIsOpeningCancelFlow, setLocalIsOpeningCancelFlow] = useState(false);
   const [localCoordinator] = useState(() => createKiloPassChurnkeyCancelFlow());
@@ -75,13 +77,22 @@ export function useKiloPassChurnkeyCancelFlow(params: UseKiloPassChurnkeyCancelF
           queryKey: trpc.kiloPass.getScheduledChange.queryKey(),
         }),
       fallbackCancelSubscription,
-      confirmFallbackCancel: message => window.confirm(message),
+      confirmFallbackCancel: () =>
+        confirm({
+          title: 'Cancel your Kilo Pass subscription?',
+          description:
+            'The cancellation flow could not load, so this cancels the subscription directly.',
+          confirmLabel: 'Cancel subscription',
+          cancelLabel: 'Keep subscription',
+          destructive: true,
+        }),
       notifyCancellationScheduled: () => toast('Cancellation scheduled'),
       notifyError: message => toast.error(message),
       onBeforeOpen,
       onInFlightChange: setIsOpeningCancelFlow,
     });
   }, [
+    confirm,
     coordinator,
     fallbackCancelSubscription,
     onBeforeOpen,

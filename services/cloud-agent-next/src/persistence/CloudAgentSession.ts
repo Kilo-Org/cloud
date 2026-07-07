@@ -84,7 +84,7 @@ import type { Env as WorkerEnv, SandboxId } from '../types.js';
 import { deriveSharedSandboxId, generateSandboxId } from '../sandbox-id.js';
 import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
 
-import { validateStreamTicket } from '../auth.js';
+import { resolveSecret, validateStreamTicket } from '../auth.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
 import {
@@ -148,6 +148,10 @@ import type {
   WrapperStopReason,
   WrapperStopTarget,
 } from '../agent-sandbox/protocol.js';
+import {
+  CODE_REVIEW_EPHEMERAL_SANDBOX_DESTROY_DELAY_MS,
+  isCodeReviewEphemeralSandboxId,
+} from '../code-review-ephemeral-sandbox.js';
 
 // ---------------------------------------------------------------------------
 // Alarm Constants
@@ -164,6 +168,8 @@ const EVENT_RETENTION_MS = Limits.SESSION_TTL_MS;
 /** Storage key for tracking last activity timestamp */
 const LAST_ACTIVITY_KEY = 'last_activity';
 const EXPLICIT_DELETION_PENDING_KEY = 'explicit_deletion_pending';
+const EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY = 'ephemeral_sandbox_destroy_after';
+const EPHEMERAL_SANDBOX_DESTROYED_AT_KEY = 'ephemeral_sandbox_destroyed_at';
 
 /** Kilo server idle timeout: 15 minutes */
 const KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT = 15 * 60 * 1000;
@@ -232,6 +238,7 @@ type GroupedRegisterSessionInput = {
         url: string;
         workspaceUuid: string;
         repositoryUuid: string;
+        bitbucketIntegrationId?: string;
         branch?: string;
       }
     | {
@@ -254,6 +261,47 @@ type CreateSessionWithInitialAdmissionInput = Omit<GroupedRegisterSessionInput, 
     initialTurn: AcceptedExecutionTurn;
   };
 };
+
+function repositoryMetadataFromRegistrationInput(
+  repository: GroupedRegisterSessionInput['repository']
+): SessionMetadata['repository'] | undefined {
+  if (!repository) return undefined;
+
+  switch (repository.type) {
+    case 'github':
+      return {
+        type: 'github',
+        repo: repository.repo,
+        upstreamBranch: repository.branch,
+      };
+    case 'gitlab':
+      return {
+        type: 'gitlab',
+        url: repository.url,
+        platform: 'gitlab',
+        upstreamBranch: repository.branch,
+      };
+    case 'bitbucket':
+      return {
+        type: 'bitbucket',
+        url: repository.url,
+        platform: 'bitbucket',
+        workspaceUuid: repository.workspaceUuid,
+        repositoryUuid: repository.repositoryUuid,
+        bitbucketIntegrationId: repository.bitbucketIntegrationId,
+        upstreamBranch: repository.branch,
+      };
+    case 'git':
+      return {
+        type: 'git',
+        url: repository.url,
+        token: repository.token,
+        upstreamBranch: repository.branch,
+      };
+  }
+
+  throw new Error('repository.type must be github, gitlab, bitbucket, or git');
+}
 
 function isSameAcceptedInitialTurn(
   metadata: SessionMetadata,
@@ -293,6 +341,47 @@ async function validateSharedSandboxRouteAssignment(workspace: {
   }
 }
 
+function isSameRegistrationRepository(
+  metadata: SessionMetadata,
+  input: CreateSessionWithInitialAdmissionInput
+): boolean {
+  const stored = metadata.repository;
+  const submitted = input.repository;
+  if (!stored || !submitted) return stored === undefined && submitted === undefined;
+  if (stored.type !== submitted.type) return false;
+
+  switch (submitted.type) {
+    case 'github':
+      return (
+        stored.type === 'github' &&
+        stored.repo === submitted.repo &&
+        stored.upstreamBranch === submitted.branch
+      );
+    case 'gitlab':
+      return (
+        stored.type === 'gitlab' &&
+        stored.url === submitted.url &&
+        stored.upstreamBranch === submitted.branch
+      );
+    case 'git':
+      return (
+        stored.type === 'git' &&
+        stored.url === submitted.url &&
+        stored.token === submitted.token &&
+        stored.upstreamBranch === submitted.branch
+      );
+    case 'bitbucket':
+      return (
+        stored.type === 'bitbucket' &&
+        stored.url === submitted.url &&
+        stored.workspaceUuid === submitted.workspaceUuid &&
+        stored.repositoryUuid === submitted.repositoryUuid &&
+        stored.bitbucketIntegrationId === submitted.bitbucketIntegrationId &&
+        stored.upstreamBranch === submitted.branch
+      );
+  }
+}
+
 function isSameInitialAdmissionConfiguration(
   metadata: SessionMetadata,
   input: CreateSessionWithInitialAdmissionInput
@@ -302,6 +391,8 @@ function isSameInitialAdmissionConfiguration(
     metadata.identity.userId === input.identity.userId &&
     metadata.identity.orgId === input.identity.orgId &&
     metadata.identity.botId === input.identity.botId &&
+    metadata.identity.createdOnPlatform === input.identity.createdOnPlatform &&
+    isSameRegistrationRepository(metadata, input) &&
     metadata.workspace?.sandboxId === input.workspace?.sandboxId &&
     JSON.stringify(metadata.workspace?.sandboxRoute) ===
       JSON.stringify(input.workspace?.sandboxRoute) &&
@@ -330,6 +421,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     reason: WrapperStopReason;
   }) => Promise<StopWrappersResult>;
   private sandboxSessionDeleter?: (reason: 'explicit' | 'retention-expired') => Promise<void>;
+  private ephemeralSandboxDestroyer?: () => Promise<void>;
   private sharedSandboxFailoverRecorder?: (routeKey: SandboxId) => Promise<void>;
   private agentRuntime?: AgentRuntime;
   private messageSettlementOutbox?: MessageSettlementOutbox;
@@ -640,7 +732,10 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         metadata.identity.orgId,
         metadata.identity.userId,
         metadata.identity.sessionId,
-        metadata.identity.botId
+        metadata.identity.botId,
+        {
+          createdOnPlatform: metadata.identity.createdOnPlatform,
+        }
       ));
 
     return {
@@ -716,6 +811,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         updateUpstreamBranch: (branch: string) => this.updateUpstreamBranch(branch),
         setAvailableCommands: (commands: SlashCommandInfo[]) => this.setAvailableCommands(commands),
         wrapperSupervisor: this.getWrapperSupervisor(),
+        handleWrapperTerminalEvent: params => this.handleWrapperTerminalEvent(params),
         keepContainerAlive: () => {
           void this.keepContainerAlive();
         },
@@ -782,7 +878,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         return new Response('Missing cloudAgentSessionId', { status: 400 });
       }
 
-      const authResult = validateStreamTicket(ticket, this.env.NEXTAUTH_SECRET);
+      const nextAuthSecret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+      const authResult = validateStreamTicket(ticket, nextAuthSecret);
       if (!authResult.success) {
         return new Response(authResult.error, { status: 401 });
       }
@@ -1654,10 +1751,97 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return (await this.ctx.storage.get<boolean>(EXPLICIT_DELETION_PENDING_KEY)) === true;
   }
 
+  async isSandboxCleanupScheduled(): Promise<boolean> {
+    const metadata = await this.getMetadata();
+    if (!metadata || !isCodeReviewEphemeralSandboxId(metadata.workspace?.sandboxId)) return false;
+    const destroyAfter = await this.ctx.storage.get<number>(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
+    if (destroyAfter !== undefined) return true;
+    return (await this.ctx.storage.get<number>(EPHEMERAL_SANDBOX_DESTROYED_AT_KEY)) !== undefined;
+  }
+
+  private async scheduleEphemeralSandboxDestroy(delayMs: number): Promise<void> {
+    const existing = await this.ctx.storage.get<number>(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
+    if (existing !== undefined) {
+      logger
+        .withFields({ sessionId: this.sessionId, destroyAfter: existing })
+        .info('Ephemeral sandbox destroy already scheduled; re-arming alarm');
+      await this.scheduleAlarmAtOrBefore(existing);
+      return;
+    }
+    const destroyAfter = Date.now() + delayMs;
+    logger
+      .withFields({ sessionId: this.sessionId, delayMs, destroyAfter })
+      .info('Scheduling ephemeral sandbox destroy');
+    await this.ctx.storage.put(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY, destroyAfter);
+    await this.scheduleAlarmAtOrBefore(destroyAfter);
+  }
+
+  private async destroyEphemeralSandboxIfReady(now: number): Promise<void> {
+    const destroyAfter = await this.ctx.storage.get<number>(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
+    if (destroyAfter === undefined) return;
+    if (now < destroyAfter) {
+      logger
+        .withFields({ sessionId: this.sessionId, now, destroyAfter })
+        .debug('Ephemeral sandbox destroy not yet due');
+      return;
+    }
+    const metadata = await this.getMetadata();
+    if (!metadata || !isCodeReviewEphemeralSandboxId(metadata.workspace?.sandboxId)) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          hasMetadata: metadata !== null,
+          sandboxId: metadata?.workspace?.sandboxId,
+        })
+        .warn('Skipping ephemeral sandbox destroy: metadata missing or sandbox is not ephemeral');
+      await this.ctx.storage.delete(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
+      return;
+    }
+
+    logger
+      .withFields({
+        sessionId: this.sessionId,
+        sandboxId: metadata.workspace?.sandboxId,
+        now,
+        destroyAfter,
+        overdueMs: now - destroyAfter,
+        usingCustomDestroyer: this.ephemeralSandboxDestroyer !== undefined,
+      })
+      .info('Destroying ephemeral sandbox');
+
+    try {
+      if (this.ephemeralSandboxDestroyer) {
+        await this.ephemeralSandboxDestroyer();
+      } else {
+        await createAgentSandbox(this.env, metadata).delete('recovery');
+      }
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          sandboxId: metadata.workspace?.sandboxId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        })
+        .error('Ephemeral sandbox destroy failed');
+      throw error;
+    }
+
+    logger
+      .withFields({ sessionId: this.sessionId, sandboxId: metadata.workspace?.sandboxId })
+      .info('Ephemeral sandbox destroyed successfully');
+    await this.ctx.storage.delete(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
+    await this.ctx.storage.put(EPHEMERAL_SANDBOX_DESTROYED_AT_KEY, Date.now());
+  }
+
   private async deletionPendingAdmissionFailure(): Promise<SessionMessageAdmissionResult | null> {
-    return (await this.isExplicitDeletionPending())
-      ? { success: false, code: 'NOT_FOUND', error: 'Session deletion is pending' }
-      : null;
+    if (await this.isExplicitDeletionPending()) {
+      return { success: false, code: 'NOT_FOUND', error: 'Session deletion is pending' };
+    }
+    if (await this.isSandboxCleanupScheduled()) {
+      return { success: false, code: 'BAD_REQUEST', error: 'Session sandbox cleanup is scheduled' };
+    }
+    return null;
   }
 
   /**
@@ -1691,37 +1875,15 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
 
     const now = Date.now();
-    const repository: SessionMetadata['repository'] =
-      input.repository?.type === 'github'
-        ? {
-            type: 'github',
-            repo: input.repository.repo,
-            upstreamBranch: input.repository.branch,
-          }
-        : input.repository?.type === 'gitlab'
-          ? {
-              type: 'gitlab',
-              url: input.repository.url,
-              platform: 'gitlab',
-              upstreamBranch: input.repository.branch,
-            }
-          : input.repository?.type === 'bitbucket'
-            ? {
-                type: 'bitbucket',
-                url: input.repository.url,
-                platform: 'bitbucket',
-                workspaceUuid: input.repository.workspaceUuid,
-                repositoryUuid: input.repository.repositoryUuid,
-                upstreamBranch: input.repository.branch,
-              }
-            : input.repository?.type === 'git'
-              ? {
-                  type: 'git',
-                  url: input.repository.url,
-                  token: input.repository.token,
-                  upstreamBranch: input.repository.branch,
-                }
-              : undefined;
+    let repository: SessionMetadata['repository'];
+    try {
+      repository = repositoryMetadataFromRegistrationInput(input.repository);
+    } catch (error) {
+      return {
+        success: false,
+        error: `Invalid metadata: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
 
     const metadata: SessionMetadata = {
       metadataSchemaVersion: 2,
@@ -2080,6 +2242,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       }
 
       await this.getWrapperSupervisor().runMaintenance(now);
+      await this.destroyEphemeralSandboxIfReady(now);
 
       try {
         await this.getMessageSettlementOutbox().repairTerminalEffects();
@@ -2638,6 +2801,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       deadlines.push(nextCallbackDeadline);
     }
 
+    const ephemeralSandboxDestroyAfter = await this.ctx.storage.get<number>(
+      EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY
+    );
+    if (ephemeralSandboxDestroyAfter !== undefined) {
+      deadlines.push(ephemeralSandboxDestroyAfter);
+    }
+
     return deadlines;
   }
 
@@ -3080,5 +3250,22 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async handleWrapperTerminalEvent(params: WrapperTerminalEvent): Promise<void> {
     await this.resolveSessionId();
     await this.getWrapperSupervisor().onTerminalEvent(params);
+    const metadata = await this.getMetadata();
+    if (!metadata) return;
+    if (!isCodeReviewEphemeralSandboxId(metadata.workspace?.sandboxId)) return;
+    logger
+      .withFields({
+        sessionId: this.sessionId,
+        sandboxId: metadata.workspace?.sandboxId,
+        status: params.status,
+        wrapperRunId: params.wrapperRunId,
+      })
+      .info(
+        'Wrapper terminal event on ephemeral code-review sandbox; forcing stop and scheduling destroy'
+      );
+    await this.getWrapperSupervisor().requestPhysicalWrapperStop('terminal-ended', {
+      kind: 'session',
+    });
+    await this.scheduleEphemeralSandboxDestroy(CODE_REVIEW_EPHEMERAL_SANDBOX_DESTROY_DELAY_MS);
   }
 }

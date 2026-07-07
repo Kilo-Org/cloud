@@ -9,6 +9,9 @@ import { z } from 'zod';
 export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('heartbeat'),
+    // Absent on CLI builds older than the protocolVersion field itself — treat
+    // a missing value as a legacy CLI with no negotiated wire protocol.
+    protocolVersion: z.string().optional(),
     sessions: z.array(
       z.object({
         id: z.string(),

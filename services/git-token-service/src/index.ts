@@ -4,6 +4,11 @@ import {
   extractBearerToken,
   verifyKiloToken,
 } from '@kilocode/worker-utils';
+import {
+  BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE,
+  BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 import { WorkerEntrypoint } from 'cloudflare:workers';
 import { GitHubTokenService, type GitHubAppType } from './github-token-service.js';
 import { GitLabLookupService, type GitLabLookupSuccess } from './gitlab-lookup-service.js';
@@ -50,6 +55,23 @@ import {
   type GetBitbucketTokenParams,
   type GetBitbucketTokenResult,
 } from './bitbucket-runtime-token-resolver.js';
+import {
+  BitbucketCodeReviewService,
+  BitbucketDeleteWebhookRequestSchema,
+  BitbucketEnsureWebhookRequestSchema,
+  BitbucketPullRequestRequestSchema,
+} from './bitbucket-code-review-service.js';
+import {
+  KiloSessionCapabilityCodec,
+  KiloSessionCapabilityError,
+  type KiloSessionCapabilityFailureReason,
+  type KiloSessionCapabilitySubject,
+} from './kilo-session-capability.js';
+import {
+  areValidKiloCapabilityTargets,
+  classifyKiloCapabilityRequest,
+  type KiloCapabilityRouteClass,
+} from './kilo-capability-policy.js';
 
 export type GetTokenForRepoParams = {
   githubRepo: string;
@@ -166,7 +188,13 @@ export type IssueGitLabSessionCapabilitySuccess = {
 export type IssueGitLabSessionCapabilityResult =
   | IssueGitLabSessionCapabilitySuccess
   | GetGitLabTokenFailure
-  | { success: false; reason: GitLabCloneUrlFailureReason | 'capability_configuration_error' };
+  | {
+      success: false;
+      reason:
+        | GitLabCloneUrlFailureReason
+        | 'integration_identity_missing'
+        | 'capability_configuration_error';
+    };
 export type RedeemGitLabSessionCapabilityParams = {
   capability: string;
   outboundContainerId?: string;
@@ -191,8 +219,47 @@ export type RedeemGitLabSessionCapabilityResult =
     }
   | { success: false; reason: RedeemGitLabSessionCapabilityFailureReason };
 
+export type IssueKiloSessionCapabilityParams = KiloSessionCapabilitySubject;
+export type IssueKiloSessionCapabilityResult =
+  | { success: true; capability: string }
+  | { success: false; reason: KiloSessionCapabilityFailureReason | 'invalid_targets' };
+
+export type RedeemKiloSessionCapabilityParams = {
+  capability: string;
+  outboundContainerId: string;
+  requestUrl: string;
+};
+export type RedeemKiloSessionCapabilityFailureReason =
+  | KiloSessionCapabilityFailureReason
+  | 'container_mismatch'
+  | 'invalid_upstream_url'
+  | 'upstream_not_allowed';
+export type RedeemKiloSessionCapabilityResult =
+  | { success: true; authorization: string; routeClass: KiloCapabilityRouteClass }
+  | { success: false; reason: RedeemKiloSessionCapabilityFailureReason };
+
 const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
 const BITBUCKET_REPOSITORIES_PATH = '/internal/bitbucket/repositories';
+const BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH = '/internal/bitbucket/code-review/pull-request';
+const BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH = '/internal/bitbucket/code-review/webhooks/ensure';
+const BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_PATH = '/internal/bitbucket/code-review/webhooks/delete';
+const INTERNAL_REQUEST_MAX_BYTES = 16_000;
+
+const BitbucketPullRequestHttpRequestSchema = BitbucketPullRequestRequestSchema.omit({
+  owner: true,
+});
+const BitbucketEnsureWebhookHttpRequestSchema = BitbucketEnsureWebhookRequestSchema.omit({
+  owner: true,
+});
+const BitbucketDeleteWebhookHttpRequestSchema = BitbucketDeleteWebhookRequestSchema.omit({
+  owner: true,
+});
+
+const bitbucketCodeReviewAudiences = new Map([
+  [BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH, BITBUCKET_CODE_REVIEW_PULL_REQUEST_AUDIENCE],
+  [BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH, BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_AUDIENCE],
+  [BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_PATH, BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_AUDIENCE],
+]);
 
 type ServiceHttpEnv = CloudflareEnv & {
   NEXTAUTH_SECRET: SecretsStoreSecret | string;
@@ -202,7 +269,72 @@ async function resolveSecret(secret: SecretsStoreSecret | string): Promise<strin
   return typeof secret === 'string' ? secret : secret.get();
 }
 
+async function readBoundedInternalJsonRequest(request: Request): Promise<unknown> {
+  const contentType = request.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
+  if (contentType !== 'application/json' || !request.body) throw new Error('invalid_request');
+
+  const contentLength = request.headers.get('Content-Length');
+  if (contentLength) {
+    if (!/^[0-9]+$/.test(contentLength) || Number(contentLength) > INTERNAL_REQUEST_MAX_BYTES) {
+      throw new Error('invalid_request');
+    }
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      if (!(chunk.value instanceof Uint8Array)) throw new Error('invalid_request');
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > INTERNAL_REQUEST_MAX_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The request remains rejected when cancellation itself fails.
+        }
+        throw new Error('invalid_request');
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body));
+  } catch {
+    throw new Error('invalid_request');
+  }
+}
+
 function validateGitHubCapabilityUpstream(
+  requestUrl: string
+): RedeemGitHubSessionCapabilityFailureReason | null {
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return 'invalid_upstream_url';
+  }
+  if (url.protocol !== 'https:') return 'invalid_upstream_url';
+  if (url.username || url.password || url.hash) return 'invalid_upstream_url';
+  if (url.port !== '') return 'upstream_host_not_allowed';
+  if (!['api.github.com', 'uploads.github.com', 'github.com'].includes(url.hostname)) {
+    return 'upstream_host_not_allowed';
+  }
+  return null;
+}
+
+function validateLegacyGitHubCapabilityUpstream(
   requestMethod: string,
   requestUrl: string,
   repository: { owner: string; repo: string }
@@ -268,7 +400,75 @@ function validateGitHubCapabilityUpstream(
   return 'invalid_upstream_request';
 }
 
+function isGitLabGitAuthPath(pathname: string): boolean {
+  return /\.git\/(?:info\/refs|git-upload-pack|git-receive-pack|info\/lfs\/(?:objects\/batch|locks(?:\/verify|\/[^/]+\/unlock)?))$/.test(
+    pathname
+  );
+}
+
+function decodeGitLabPathname(pathname: string): string | null {
+  let decoded = pathname;
+  for (let depth = 0; depth < 4; depth++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      return null;
+    }
+    if (next === decoded) return decoded;
+    decoded = next;
+  }
+  return null;
+}
+
 function validateGitLabCapabilityUpstream(
+  requestUrl: string,
+  instanceOrigin: string
+): { failure: RedeemGitLabSessionCapabilityFailureReason | null; authSurface: 'git' | 'api' } {
+  if (/%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  }
+  const base = parseGitLabBaseUrl(instanceOrigin);
+  if (!base) return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  let url: URL;
+  try {
+    url = new URL(requestUrl);
+  } catch {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.hash) {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  }
+  if (url.origin !== base.origin) {
+    return { failure: 'upstream_origin_not_allowed', authSurface: 'git' };
+  }
+  const decodedPathname = decodeGitLabPathname(url.pathname);
+  if (
+    decodedPathname === null ||
+    decodedPathname.includes('\\') ||
+    /(?:^|\/)\.{1,2}(?:\/|$)/.test(decodedPathname)
+  ) {
+    return { failure: 'invalid_upstream_url', authSurface: 'git' };
+  }
+  if (
+    base.basePath !== '' &&
+    url.pathname !== base.basePath &&
+    !url.pathname.startsWith(`${base.basePath}/`)
+  ) {
+    return { failure: 'upstream_origin_not_allowed', authSurface: 'git' };
+  }
+  const apiV4Prefix = `${base.basePath}/api/v4`;
+  const authSurface =
+    !isGitLabGitAuthPath(url.pathname) &&
+    (url.pathname === apiV4Prefix ||
+      url.pathname.startsWith(`${apiV4Prefix}/`) ||
+      url.pathname === `${base.basePath}/api/graphql`)
+      ? 'api'
+      : 'git';
+  return { failure: null, authSurface };
+}
+
+function validateLegacyGitLabCapabilityUpstream(
   requestMethod: string,
   requestUrl: string,
   session: {
@@ -604,11 +804,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'container_mismatch' };
     }
 
-    const upstreamFailure = validateGitHubCapabilityUpstream(
-      params.requestMethod,
-      params.requestUrl,
-      claims
-    );
+    const upstreamFailure =
+      claims.version === 2
+        ? validateGitHubCapabilityUpstream(params.requestUrl)
+        : validateLegacyGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
     if (upstreamFailure) return { success: false, reason: upstreamFailure };
 
     const authParams = {
@@ -761,7 +960,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     const repository = parseGitLabCloneUrl(params.gitUrl, instanceOrigin);
     if (!repository.success) return repository;
     const identity = this.getGitLabSessionIdentity(integration);
-    if (!identity) return { success: false, reason: 'no_token' };
+    if (!identity) return { success: false, reason: 'integration_identity_missing' };
 
     let capability: string;
     try {
@@ -814,11 +1013,10 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'container_mismatch' };
     }
 
-    const upstream = validateGitLabCapabilityUpstream(
-      params.requestMethod,
-      params.requestUrl,
-      claims
-    );
+    const upstream =
+      claims.version === 2
+        ? validateGitLabCapabilityUpstream(params.requestUrl, claims.instanceOrigin)
+        : validateLegacyGitLabCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
     if (upstream.failure) return { success: false, reason: upstream.failure };
     const context = {
       userId: claims.userId,
@@ -875,6 +1073,59 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return { success: true, headers: { authorization: `Bearer ${token}` } };
   }
 
+  async issueKiloSessionCapability(
+    params: IssueKiloSessionCapabilityParams
+  ): Promise<IssueKiloSessionCapabilityResult> {
+    if (!areValidKiloCapabilityTargets(params.targets)) {
+      return { success: false, reason: 'invalid_targets' };
+    }
+
+    try {
+      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const capability = new KiloSessionCapabilityCodec(encryptionKey).issue(params);
+      return { success: true, capability };
+    } catch (error) {
+      if (error instanceof KiloSessionCapabilityError) {
+        return { success: false, reason: error.reason };
+      }
+      return { success: false, reason: 'capability_configuration_error' };
+    }
+  }
+
+  async redeemKiloSessionCapability(
+    params: RedeemKiloSessionCapabilityParams
+  ): Promise<RedeemKiloSessionCapabilityResult> {
+    let claims;
+    try {
+      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      claims = new KiloSessionCapabilityCodec(encryptionKey).decode(params.capability);
+    } catch (error) {
+      if (error instanceof KiloSessionCapabilityError) {
+        return { success: false, reason: error.reason };
+      }
+      return { success: false, reason: 'capability_configuration_error' };
+    }
+
+    if (claims.outboundContainerId !== params.outboundContainerId) {
+      return { success: false, reason: 'container_mismatch' };
+    }
+
+    const classification = classifyKiloCapabilityRequest(
+      params.requestUrl,
+      claims.targets,
+      claims.kiloSessionId
+    );
+    if (!classification.success) {
+      return { success: false, reason: classification.reason };
+    }
+
+    return {
+      success: true,
+      authorization: `Bearer ${claims.userToken}`,
+      routeClass: classification.routeClass,
+    };
+  }
+
   private getGitLabAuthType(integration: GitLabLookupSuccess): GitLabAuthType | null {
     if (integration.metadata.auth_type) return integration.metadata.auth_type;
     if (integration.integrationType === 'oauth' || integration.integrationType === 'pat') {
@@ -892,7 +1143,12 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 export default {
   async fetch(request: Request, env: ServiceHttpEnv): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname !== DISCONNECT_PATH && url.pathname !== BITBUCKET_REPOSITORIES_PATH) {
+    const codeReviewAudience = bitbucketCodeReviewAudiences.get(url.pathname);
+    if (
+      url.pathname !== DISCONNECT_PATH &&
+      url.pathname !== BITBUCKET_REPOSITORIES_PATH &&
+      !codeReviewAudience
+    ) {
       return new Response(null, { status: 404 });
     }
     if (request.method !== 'POST') return new Response(null, { status: 405 });
@@ -910,13 +1166,11 @@ export default {
 
     let authorization: Awaited<ReturnType<typeof verifyKiloToken>>;
     try {
-      authorization = await verifyKiloToken(
-        token,
-        secret,
+      const audience =
         url.pathname === BITBUCKET_REPOSITORIES_PATH
-          ? { audience: BITBUCKET_REPOSITORY_LIST_AUDIENCE }
-          : undefined
-      );
+          ? BITBUCKET_REPOSITORY_LIST_AUDIENCE
+          : codeReviewAudience;
+      authorization = await verifyKiloToken(token, secret, audience ? { audience } : undefined);
     } catch {
       return Response.json({ error: 'unauthorized' }, { status: 401 });
     }
@@ -933,6 +1187,53 @@ export default {
         return Response.json(result);
       } catch {
         return Response.json({ status: 'temporarily_unavailable' });
+      }
+    }
+
+    if (codeReviewAudience) {
+      if (!authorization.organizationId) {
+        return Response.json({ error: 'organization_required' }, { status: 403 });
+      }
+      let body: unknown;
+      try {
+        body = await readBoundedInternalJsonRequest(request);
+      } catch {
+        return Response.json({ success: false, reason: 'invalid_request' }, { status: 400 });
+      }
+      const owner = {
+        userId: authorization.kiloUserId,
+        orgId: authorization.organizationId,
+      };
+      const service = new BitbucketCodeReviewService(env);
+
+      try {
+        switch (url.pathname) {
+          case BITBUCKET_CODE_REVIEW_PULL_REQUEST_PATH: {
+            const parsed = BitbucketPullRequestHttpRequestSchema.safeParse(body);
+            if (!parsed.success) {
+              return Response.json({ success: false, reason: 'invalid_request' }, { status: 400 });
+            }
+            return Response.json(await service.getPullRequest({ owner, ...parsed.data }));
+          }
+          case BITBUCKET_CODE_REVIEW_WEBHOOK_ENSURE_PATH: {
+            const parsed = BitbucketEnsureWebhookHttpRequestSchema.safeParse(body);
+            if (!parsed.success) {
+              return Response.json({ success: false, reason: 'invalid_request' }, { status: 400 });
+            }
+            return Response.json(await service.ensureWorkspaceWebhook({ owner, ...parsed.data }));
+          }
+          case BITBUCKET_CODE_REVIEW_WEBHOOK_DELETE_PATH: {
+            const parsed = BitbucketDeleteWebhookHttpRequestSchema.safeParse(body);
+            if (!parsed.success) {
+              return Response.json({ success: false, reason: 'invalid_request' }, { status: 400 });
+            }
+            return Response.json(await service.deleteWorkspaceWebhooks({ owner, ...parsed.data }));
+          }
+          default:
+            return new Response(null, { status: 404 });
+        }
+      } catch {
+        return Response.json({ success: false, reason: 'temporarily_unavailable' });
       }
     }
 

@@ -23,8 +23,10 @@ import type { MCPGatewayEnv } from '../types';
 import { verifyGatewayToken } from '../lib/jwt';
 import {
   recordRuntimeAudit,
+  resolveActiveOAuthGrant,
   resolveActiveRoute,
   resolveRuntimeState,
+  touchOAuthGrantUsage,
 } from '../db/runtime-repository';
 import { resolveProviderAuthorization } from '../lib/provider-refresh';
 import { loadStaticHeaders } from '../lib/credentials';
@@ -43,6 +45,7 @@ type RuntimePhase =
   | 'load_route'
   | 'load_jwt_keyset'
   | 'verify_token'
+  | 'load_oauth_grant'
   | 'load_runtime_state'
   | 'load_static_headers'
   | 'load_provider_authorization'
@@ -209,6 +212,33 @@ async function handleConnect(
     const activeRoute = await resolveActiveRoute({ env: c.env, route });
     if (!activeRoute) {
       return c.json({ error: 'not_found' }, 404);
+    }
+    if (claims.token_source === 'oauth_client') {
+      phase = 'load_oauth_grant';
+      const oauthGrant = await resolveActiveOAuthGrant({
+        env: c.env,
+        grantId: claims.oauth_grant_id,
+        clientId: claims.client_id,
+        userId: claims.sub,
+        instanceId: claims.instance_id,
+        connectResourceId: activeRoute.route.connect_resource_id,
+        configVersion: claims.config_version,
+        executionContext: claims.execution_context,
+        scopes: parseScopeString(claims.scope),
+      });
+      if (!oauthGrant) {
+        return forbiddenResponse(c);
+      }
+      const touchPromise = touchOAuthGrantUsage({
+        env: c.env,
+        grantId: oauthGrant.oauth_grant_id,
+      }).catch(() => {});
+      try {
+        c.executionCtx.waitUntil(touchPromise);
+      } catch {
+        // c.executionCtx is unavailable in unit tests; the promise is already attached
+        // a no-op rejection handler so leaving it floating is safe.
+      }
     }
     phase = 'load_runtime_state';
     let resolution = await resolveRuntimeState({ env: c.env, route, userId: claims.sub });

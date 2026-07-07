@@ -62,7 +62,7 @@ export type ReviewConfigFormProps = {
   gitlabStatusData?: GitLabStatusData;
 };
 
-const FOCUS_AREAS = [
+export const FOCUS_AREAS = [
   { id: 'security', label: 'Security vulnerabilities', description: 'SQL injection, XSS, etc.' },
   { id: 'performance', label: 'Performance issues', description: 'N+1 queries, inefficient loops' },
   { id: 'bugs', label: 'Bug detection', description: 'Logic errors, edge cases' },
@@ -71,7 +71,7 @@ const FOCUS_AREAS = [
   { id: 'documentation', label: 'Documentation', description: 'Missing comments, unclear APIs' },
 ] as const;
 
-const REVIEW_STYLES = [
+export const REVIEW_STYLES = [
   {
     value: 'strict',
     label: 'Strict',
@@ -110,18 +110,22 @@ export function ReviewConfigForm({
     : '/code-reviews/review-md';
 
   // Fetch current config
+  const organizationConfigQuery = useQuery({
+    ...trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
+      organizationId: organizationId ?? '',
+      platform,
+    }),
+    enabled: Boolean(organizationId),
+  });
+  const personalConfigQuery = useQuery({
+    ...trpc.personalReviewAgent.getReviewConfig.queryOptions({ platform }),
+    enabled: !organizationId,
+  });
   const {
     data: configData,
     isLoading,
     refetch,
-  } = useQuery(
-    organizationId
-      ? trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
-          organizationId,
-          platform,
-        })
-      : trpc.personalReviewAgent.getReviewConfig.queryOptions({ platform })
-  );
+  } = organizationId ? organizationConfigQuery : personalConfigQuery;
 
   // Fetch repositories based on platform (cached by default)
   const {
@@ -322,7 +326,11 @@ export function ReviewConfigForm({
       // For GitLab, default to 'selected' mode since 'all' is not supported
       const repoMode = configData.repositorySelectionMode || 'all';
       setRepositorySelectionMode(isGitLab ? 'selected' : repoMode);
-      setSelectedRepositoryIds(configData.selectedRepositoryIds || []);
+      setSelectedRepositoryIds(
+        configData.selectedRepositoryIds.filter(
+          (repositoryId): repositoryId is number => typeof repositoryId === 'number'
+        )
+      );
       setUseReviewMd(!(configData.disableReviewMd ?? false));
     }
   }, [configData, isGitLab]);

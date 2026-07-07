@@ -173,6 +173,97 @@ export async function callGatewayController<T>(
   return parsed.data;
 }
 
+export type OpenclawWorkspaceExportResult = {
+  bytes: ArrayBuffer;
+  contentType: string;
+  fileCount: number;
+  totalBytes: number;
+  skipped: number;
+};
+
+/**
+ * Call a gateway controller endpoint that returns a BINARY body (not JSON).
+ * Mirrors callGatewayController's auth + error handling, but returns the raw
+ * bytes plus the X-Openclaw-Export-* metadata headers. The returned ArrayBuffer
+ * crosses the Durable Object RPC boundary (32 MiB cap) — the controller bounds
+ * the archive well under that.
+ */
+async function callGatewayControllerBinary(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  path: string,
+  jsonBody: unknown,
+  options?: { timeoutMs?: number }
+): Promise<OpenclawWorkspaceExportResult> {
+  const { routingTarget, sandboxId } = await requireGatewayControllerContext(state, env);
+
+  if (!env.GATEWAY_TOKEN_SECRET) {
+    throw new GatewayControllerError(503, 'GATEWAY_TOKEN_SECRET is not configured');
+  }
+
+  const gatewayToken = await deriveGatewayToken(sandboxId, env.GATEWAY_TOKEN_SECRET);
+  const url = `${routingTarget.origin}${path}`;
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${gatewayToken}`,
+    Accept: 'application/octet-stream',
+    'Content-Type': 'application/json',
+    ...routingTarget.headers,
+  };
+
+  let response: Response;
+  const timeoutMs = options?.timeoutMs ?? 60_000;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(jsonBody),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new GatewayControllerError(503, `Gateway controller request failed: ${message}`);
+  }
+
+  if (!response.ok) {
+    const rawBody = await response.text();
+    let body: unknown = null;
+    if (rawBody.length > 0) {
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        body = { error: rawBody };
+      }
+    }
+    const bodyObj =
+      typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
+    const errorCode = typeof bodyObj.code === 'string' ? bodyObj.code : undefined;
+    let errorMessage = `Gateway controller request failed (${response.status})`;
+    if (typeof bodyObj.error === 'string') {
+      errorMessage = bodyObj.error;
+    } else if (typeof bodyObj.message === 'string') {
+      errorMessage = bodyObj.message;
+    }
+    throw new GatewayControllerError(response.status, errorMessage, errorCode);
+  }
+
+  const bytes = await response.arrayBuffer();
+  const contentType = response.headers.get('content-type') ?? 'application/octet-stream';
+  const toInt = (name: string): number => {
+    const raw = response.headers.get(name);
+    const parsedValue = raw ? Number.parseInt(raw, 10) : 0;
+    return Number.isFinite(parsedValue) && parsedValue >= 0 ? parsedValue : 0;
+  };
+
+  return {
+    bytes,
+    contentType,
+    fileCount: toInt('x-openclaw-export-file-count'),
+    totalBytes: toInt('x-openclaw-export-total-bytes'),
+    skipped: toInt('x-openclaw-export-skipped'),
+  };
+}
+
 // ──────────────────────────────────────────────────────────────────────
 // Convenience wrappers for specific gateway controller endpoints
 // ──────────────────────────────────────────────────────────────────────
@@ -380,7 +471,13 @@ async function callAgentEndpoint<T>(fn: () => Promise<T>): Promise<T | AgentConf
     return await fn();
   } catch (error) {
     if (error instanceof GatewayControllerError) {
-      return { agentError: { status: error.status, code: error.code, message: error.message } };
+      return {
+        agentError: {
+          status: error.status,
+          code: error.code,
+          message: error.message,
+        },
+      };
     }
     throw error;
   }
@@ -650,7 +747,12 @@ const FileNodeSchema: z.ZodType<{
   name: string;
   path: string;
   type: 'file' | 'directory';
-  children?: { name: string; path: string; type: 'file' | 'directory'; children?: unknown[] }[];
+  children?: {
+    name: string;
+    path: string;
+    type: 'file' | 'directory';
+    children?: unknown[];
+  }[];
 }> = z.lazy(() =>
   z.object({
     name: z.string(),
@@ -765,6 +867,25 @@ export async function importOpenclawWorkspace(
       'POST',
       OpenclawWorkspaceImportResponseSchema,
       { files }
+    );
+  } catch (error) {
+    if (isErrorUnknownRoute(error)) return null;
+    throw error;
+  }
+}
+
+export async function exportOpenclawWorkspace(
+  state: InstanceMutableState,
+  env: KiloClawEnv,
+  request: { format: 'tar.gz' | 'zip'; password?: string }
+): Promise<OpenclawWorkspaceExportResult | null> {
+  try {
+    return await callGatewayControllerBinary(
+      state,
+      env,
+      '/_kilo/files/export-openclaw-workspace',
+      request,
+      { timeoutMs: 60_000 }
     );
   } catch (error) {
     if (isErrorUnknownRoute(error)) return null;

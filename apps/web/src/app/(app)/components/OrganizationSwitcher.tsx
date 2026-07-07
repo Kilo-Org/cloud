@@ -33,15 +33,20 @@ type OrganizationSwitcherViewProps = {
 };
 
 const triggerClassName =
-  'h-auto min-h-12 w-full justify-between rounded-lg border border-border bg-transparent px-3 py-1.5 text-left hover:border-border-strong hover:bg-sidebar-accent hover:text-sidebar-accent-foreground';
+  'h-auto min-h-12 w-full justify-between gap-2 rounded-lg border border-border bg-transparent px-3 py-1.5 text-left hover:border-border-strong hover:bg-sidebar-accent hover:text-sidebar-accent-foreground';
 
 const menuItemClassName =
   'flex min-h-12 cursor-pointer items-center rounded-md border border-transparent px-3 py-1.5 hover:border-border hover:bg-accent hover:text-accent-foreground';
 
 const selectedMenuItemClassName = 'border-border bg-surface-selected text-foreground';
 
-const switcherTitleClassName = 'text-foreground text-sm leading-4 font-semibold';
-const switcherSubtitleClassName = 'text-muted-foreground text-xs leading-4';
+const switcherTextClassName = 'flex min-w-0 flex-1 flex-col items-start gap-0.5';
+const switcherRowClassName = 'flex w-full min-w-0 items-center justify-between gap-2';
+const switcherTitleClassName =
+  'text-foreground max-w-full truncate text-sm leading-4 font-semibold';
+const switcherSubtitleClassName = 'text-muted-foreground max-w-full truncate text-xs leading-4';
+const switcherIconClassName = 'text-muted-foreground h-4 w-4 shrink-0';
+const selectedIconClassName = 'text-primary h-4 w-4 shrink-0';
 
 export default function OrganizationSwitcher({ organizationId = null }: OrganizationSwitcherProps) {
   const trpc = useTRPC();
@@ -102,11 +107,11 @@ export function OrganizationSwitcherView({
     return (
       <div>
         <Button variant="ghost" disabled className={triggerClassName}>
-          <div className="flex flex-col items-start gap-0.5">
+          <div className={switcherTextClassName}>
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-4 w-16" />
           </div>
-          <ChevronDown className="text-muted-foreground h-4 w-4" />
+          <ChevronDown className={switcherIconClassName} />
         </Button>
       </div>
     );
@@ -122,7 +127,7 @@ export function OrganizationSwitcherView({
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className={triggerClassName}>
-            <div className="flex flex-col items-start gap-0.5">
+            <div className={switcherTextClassName}>
               <div className={switcherTitleClassName}>
                 {currentOrg ? currentOrg.organizationName : 'Personal'}
               </div>
@@ -130,7 +135,7 @@ export function OrganizationSwitcherView({
                 {currentOrg ? getRoleLabel(currentOrg.role) : 'Personal Workspace'}
               </div>
             </div>
-            <ChevronDown className="text-muted-foreground h-4 w-4" />
+            <ChevronDown className={switcherIconClassName} />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -148,13 +153,13 @@ export function OrganizationSwitcherView({
                 organizationId === org.organizationId && selectedMenuItemClassName
               )}
             >
-              <div className="flex w-full items-center justify-between">
-                <div className="flex-1">
+              <div className={switcherRowClassName}>
+                <div className={switcherTextClassName}>
                   <div className={switcherTitleClassName}>{org.organizationName}</div>
                   <div className={switcherSubtitleClassName}>{getRoleLabel(org.role)}</div>
                 </div>
                 {organizationId === org.organizationId && (
-                  <Check className="text-primary ml-2 h-4 w-4" />
+                  <Check className={selectedIconClassName} />
                 )}
               </div>
             </DropdownMenuItem>
@@ -168,12 +173,12 @@ export function OrganizationSwitcherView({
             onClick={() => onOrganizationSwitch(null)}
             className={cn(menuItemClassName, !organizationId && selectedMenuItemClassName)}
           >
-            <div className="flex w-full items-center justify-between">
-              <div className="flex-1">
+            <div className={switcherRowClassName}>
+              <div className={switcherTextClassName}>
                 <div className={switcherTitleClassName}>Personal</div>
                 <div className={switcherSubtitleClassName}>Personal Workspace</div>
               </div>
-              {!organizationId && <Check className="text-primary ml-2 h-4 w-4" />}
+              {!organizationId && <Check className={selectedIconClassName} />}
             </div>
           </DropdownMenuItem>
         </DropdownMenuContent>

@@ -3,7 +3,8 @@ export type KiloGatewayToolName =
   | 'find_in_page'
   | 'get_element_details'
   | 'get_page_snapshot'
-  | 'get_viewport_screenshot';
+  | 'get_viewport_screenshot'
+  | `mcp_${string}`;
 
 export type KiloGatewayChatContentPart =
   | {
@@ -54,4 +55,7 @@ export interface KiloGatewayChatCompletion {
   readonly reasoning?: string;
   readonly reasoningDetails?: readonly unknown[];
   readonly toolCalls: KiloGatewayToolCallRequest[];
+  readonly usage?: {
+    readonly promptTokens: number;
+  };
 }

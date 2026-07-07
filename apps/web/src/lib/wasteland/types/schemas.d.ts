@@ -131,6 +131,17 @@ export declare const WantedBoardRowOutput: z.ZodObject<
   },
   z.core.$strip
 >;
+export declare const WantedBoardCountsOutput: z.ZodObject<
+  {
+    open: z.ZodNumber;
+    claimed: z.ZodNumber;
+    in_review: z.ZodNumber;
+    completed: z.ZodNumber;
+    validated: z.ZodNumber;
+    withdrawn: z.ZodNumber;
+  },
+  z.core.$strip
+>;
 export declare const MergePullOutput: z.ZodObject<
   {
     pull_id: z.ZodString;
@@ -465,6 +476,20 @@ export declare const RpcWantedBoardRowOutput: z.ZodPipe<
       sandbox_min_tier: z.ZodDefault<z.ZodNullable<z.ZodString>>;
       created_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
       updated_at: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    },
+    z.core.$strip
+  >
+>;
+export declare const RpcWantedBoardCountsOutput: z.ZodPipe<
+  z.ZodAny,
+  z.ZodObject<
+    {
+      open: z.ZodNumber;
+      claimed: z.ZodNumber;
+      in_review: z.ZodNumber;
+      completed: z.ZodNumber;
+      validated: z.ZodNumber;
+      withdrawn: z.ZodNumber;
     },
     z.core.$strip
   >

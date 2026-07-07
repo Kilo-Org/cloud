@@ -1,7 +1,7 @@
 const CALLBACK_TOKEN_HEX_PATTERN = /^[0-9a-f]{64}$/;
 
 export type CallbackTokenParams = {
-  secret: string;
+  secret: string | null | undefined;
   scope: string;
   resourceParts: readonly string[];
 };
@@ -35,11 +35,20 @@ function equalLengthStringsMatch(expected: string, actual: string): boolean {
   return mismatch === 0;
 }
 
+function hasCallbackTokenSecret(secret: string | null | undefined): secret is string {
+  return typeof secret === 'string' && secret.trim().length > 0;
+}
+
 export async function deriveCallbackToken(params: CallbackTokenParams): Promise<string> {
+  const secret = params.secret;
+  if (!hasCallbackTokenSecret(secret)) {
+    throw new Error('Callback token secret must be configured and non-empty');
+  }
+
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
-    encoder.encode(params.secret),
+    encoder.encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign']
@@ -57,6 +66,9 @@ export async function deriveCallbackToken(params: CallbackTokenParams): Promise<
 
 export async function verifyCallbackToken(params: VerifyCallbackTokenParams): Promise<boolean> {
   if (!params.token || !CALLBACK_TOKEN_HEX_PATTERN.test(params.token)) {
+    return false;
+  }
+  if (!hasCallbackTokenSecret(params.secret)) {
     return false;
   }
 

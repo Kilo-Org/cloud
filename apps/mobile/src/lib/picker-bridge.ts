@@ -1,12 +1,38 @@
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
+
+export type ModelPickerSelection = {
+  option: SessionModelOption;
+  variant: string;
+};
+
+export type ModelPickerSelectionScope = {
+  sessionId: string;
+  ownerConnectionId: string | null;
+  protocol: 'unknown' | 'legacy' | 'v1';
+  catalogGenerationIdentity: object | null;
+};
 
 type ModelPickerBridge = {
-  options: ModelOption[];
+  options: SessionModelOption[];
   currentValue: string;
   currentVariant: string;
-  onSelect: (id: string, variant: string) => void;
+  selectionScope: ModelPickerSelectionScope;
+  isSelectionCurrent: (scope: ModelPickerSelectionScope) => boolean;
+  onSelect: (selection: ModelPickerSelection) => void;
 };
+
+export function areModelPickerSelectionScopesEqual(
+  left: ModelPickerSelectionScope,
+  right: ModelPickerSelectionScope
+): boolean {
+  return (
+    left.sessionId === right.sessionId &&
+    left.ownerConnectionId === right.ownerConnectionId &&
+    left.protocol === right.protocol &&
+    left.catalogGenerationIdentity === right.catalogGenerationIdentity
+  );
+}
 
 type ModePickerBridge = {
   currentValue: AgentMode;
@@ -27,6 +53,40 @@ type RepoPickerBridge = {
 let modelBridge: ModelPickerBridge | null = null;
 let modeBridge: ModePickerBridge | null = null;
 let repoBridge: RepoPickerBridge | null = null;
+
+export function resolveModelPickerSelection(
+  bridge: ModelPickerBridge,
+  value: string,
+  variant: string
+): ModelPickerSelection | null {
+  const option = bridge.options.find(candidate => candidate.id === value);
+  if (!option) {
+    return null;
+  }
+
+  return {
+    option,
+    variant: option.variants.includes(variant) ? variant : (option.variants[0] ?? ''),
+  };
+}
+
+export function commitModelPickerSelection(
+  bridge: ModelPickerBridge,
+  value: string,
+  variant: string
+): boolean {
+  if (!bridge.isSelectionCurrent(bridge.selectionScope)) {
+    return false;
+  }
+
+  const selection = resolveModelPickerSelection(bridge, value, variant);
+  if (!selection) {
+    return false;
+  }
+
+  bridge.onSelect(selection);
+  return true;
+}
 
 export function setModelPickerBridge(bridge: ModelPickerBridge) {
   modelBridge = bridge;

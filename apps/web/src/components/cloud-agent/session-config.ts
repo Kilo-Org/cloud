@@ -51,7 +51,7 @@ export type BuildSessionConfigOptions = {
  * Build a SessionConfig with clear precedence order.
  *
  * Precedence for mode/model:
- *   1. resumeConfig (from ResumeConfigModal or CLI resume flow)
+ *   1. resumeConfig (from the CLI resume flow)
  *   2. dbSession (last_mode/last_model from database)
  *   3. defaults (defaultMode/defaultModel or 'code'/'')
  *

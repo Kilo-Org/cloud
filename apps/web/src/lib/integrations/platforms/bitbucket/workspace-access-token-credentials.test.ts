@@ -121,25 +121,28 @@ function mockSuccessfulProviderValidation(
         options.scopeHeader
       )
     )
-    .mockResolvedValueOnce(authenticatedJson({ pagelen: 1, values: [] }))
+    .mockResolvedValueOnce(authenticatedJson({ pagelen: 1, values: [] }, options.scopeHeader))
     .mockImplementationOnce(async () => {
       await options.beforeRepositoriesResponse?.();
-      return authenticatedJson({
-        pagelen: 50,
-        values: options.emptyRepositories
-          ? []
-          : [
-              {
-                uuid: `{${repositoryUuid}}`,
-                name: repositoryName,
-                slug: repositorySlug,
-                full_name: `acme/${repositorySlug}`,
-                is_private: true,
-                workspace: { uuid: `{${WORKSPACE_UUID}}`, slug: 'acme' },
-                mainbranch: { name: 'main' },
-              },
-            ],
-      });
+      return authenticatedJson(
+        {
+          pagelen: 50,
+          values: options.emptyRepositories
+            ? []
+            : [
+                {
+                  uuid: `{${repositoryUuid}}`,
+                  name: repositoryName,
+                  slug: repositorySlug,
+                  full_name: `acme/${repositorySlug}`,
+                  is_private: true,
+                  workspace: { uuid: `{${WORKSPACE_UUID}}`, slug: 'acme' },
+                  mainbranch: { name: 'main' },
+                },
+              ],
+        },
+        options.scopeHeader
+      );
     });
 }
 

@@ -57,6 +57,40 @@ const streamResponse = (chunks: string[]): Response => {
 };
 
 describe('agent LLM turn runner core', () => {
+  it('forwards completion usage to onUsage', async () => {
+    const usageCalls: unknown[] = [];
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"content":"Done."}}]}\n\n',
+        'data: {"choices":[],"usage":{"completion_tokens":5,"prompt_tokens":999,"total_tokens":1004}}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await runLlmTurn({
+      apiBaseUrl: 'https://app.kilo.ai',
+      appendEvents: () => {},
+      conversationEvents: [createUserMessage('Hello')],
+      executeToolCall: () => Promise.resolve({ ok: true, value: { text: '' } }),
+      failureMessage: String,
+      fetch,
+      maxToolRounds: 4,
+      model: 'anthropic/claude-sonnet-4',
+      noResponseMessage: 'No response.',
+      onUsage: usage => usageCalls.push(usage),
+      signal: undefined,
+      toToolCallEvents: () => [],
+      token: 'token-1',
+      tooManyToolRoundsMessage: 'Too many rounds.',
+      tools: [],
+      updateAssistantMessage: () => {},
+      updateThinkingBlock: () => {},
+    });
+
+    expect(usageCalls).toContainEqual({
+      promptTokens: 999,
+    });
+  });
+
   it('streams, runs tools, and continues with tool results', async () => {
     const appendedEvents: AgentConversationEvent[] = [];
     const updatedMessages: string[] = [];

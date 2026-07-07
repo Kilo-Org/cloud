@@ -63,7 +63,7 @@ describe('createSafeProcessDiagnostic', () => {
       stdoutTruncated: true,
     });
 
-    expect(detail).toBe('termination nonzero exit, exit code 2, elapsed 42ms, output truncated');
+    expect(detail).toBe('termination nonzero exit, exit code 2, output truncated');
     for (const sensitiveValue of sensitiveValues) expect(detail).not.toContain(sensitiveValue);
   });
 
@@ -78,7 +78,7 @@ describe('createSafeProcessDiagnostic', () => {
     },
     {
       result: { stdout: '', stderr: '', exitCode: 0, elapsedMs: 7 },
-      expected: 'termination completed, elapsed 7ms',
+      expected: 'termination completed',
     },
   ])('reports structured termination metadata', ({ result, expected }) => {
     expect(createSafeProcessDiagnostic(result)).toBe(expected);

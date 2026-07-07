@@ -7,8 +7,13 @@ import {
   GatewayErrorCode,
 } from '@kilocode/mcp-gateway';
 import { decryptKeyedEnvelope, encryptKeyedEnvelope } from '@kilocode/encryption';
-import { mcp_gateway_connection_instances, mcp_gateway_provider_grants } from '@kilocode/db/schema';
-import { and, eq, sql } from 'drizzle-orm';
+import {
+  mcp_gateway_connection_instances,
+  mcp_gateway_oauth_grants,
+  mcp_gateway_provider_grants,
+} from '@kilocode/db/schema';
+import { MCPGatewayOAuthGrantStatus } from '@kilocode/db/schema-types';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { GatewayAppConfig } from './config';
 import type { GatewayRepository } from './repository';
 import { nowIso, providerGrantAad } from './crypto';
@@ -53,6 +58,8 @@ export function createGrantService(params: {
     instanceId: string;
     bundle: unknown;
     providerSubject?: string | null;
+    oauthGrantId?: string | null;
+    requirePendingOAuthGrant?: boolean;
   }) {
     const encryptedGrant = encryptGrant(paramsInput.bundle, paramsInput.instanceId);
     return await params.repository.database.transaction(async tx => {
@@ -71,6 +78,31 @@ export function createGrantService(params: {
           'Connection instance is unavailable',
           403
         );
+      }
+      if (paramsInput.oauthGrantId) {
+        const allowedStatuses = paramsInput.requirePendingOAuthGrant
+          ? [MCPGatewayOAuthGrantStatus.Pending, MCPGatewayOAuthGrantStatus.Active]
+          : [MCPGatewayOAuthGrantStatus.Active];
+        const [oauthGrant] = await tx
+          .select({ grantId: mcp_gateway_oauth_grants.oauth_grant_id })
+          .from(mcp_gateway_oauth_grants)
+          .where(
+            and(
+              eq(mcp_gateway_oauth_grants.oauth_grant_id, paramsInput.oauthGrantId),
+              eq(mcp_gateway_oauth_grants.instance_id, paramsInput.instanceId),
+              inArray(mcp_gateway_oauth_grants.grant_status, allowedStatuses),
+              isNull(mcp_gateway_oauth_grants.revoked_at)
+            )
+          )
+          .limit(1)
+          .for('update');
+        if (!oauthGrant) {
+          throw createGatewayError(
+            GatewayErrorCode.InvalidGrant,
+            'OAuth grant is unavailable',
+            400
+          );
+        }
       }
       const [latestGrant] = await tx
         .select()

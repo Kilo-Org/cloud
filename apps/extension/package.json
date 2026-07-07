@@ -1,8 +1,8 @@
 {
   "name": "kilo-extension",
-  "description": "Kilo browser extension.",
+  "description": "Side-panel AI chat agent. Use open-weight or frontier models.",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.1",
   "type": "module",
   "scripts": {
     "dev": "wxt --port 3001",
@@ -29,12 +29,16 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-virtual": "^3.14.3",
+    "jotai": "2.18.1",
+    "jotai-family": "1.0.2",
     "lucide-react": "0.552.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -1,6 +1,7 @@
 import { configureCloudAgentSdkRuntime, resetCloudAgentSdkRuntime } from './runtime';
 import {
   createUserWebConnection,
+  UserWebCommandError,
   VIEWER_PING_INTERVAL_MS,
   VIEWER_PONG_TIMEOUT_MS,
 } from './user-web-connection';
@@ -1071,6 +1072,143 @@ describe('createUserWebConnection', () => {
     inbound({ type: 'response', id: 'uuid-3', result: { sequence: 2 } });
     await expect(second).resolves.toEqual({ sequence: 2 });
     expect(sockets[0].close).toHaveBeenCalledTimes(1);
+    client.destroy();
+  });
+
+  it('sends the expected owner connection id when provided', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommand(
+      'ses-1',
+      'list_models',
+      { protocolVersion: 1 },
+      'cli-owner-1'
+    );
+    await Promise.resolve();
+
+    expect(sockets[0].send).toHaveBeenCalledWith(
+      JSON.stringify({
+        type: 'command',
+        id: 'uuid-2',
+        command: 'list_models',
+        sessionId: 'ses-1',
+        connectionId: 'cli-owner-1',
+        data: { protocolVersion: 1 },
+      })
+    );
+    inbound({ type: 'response', id: 'uuid-2', result: { protocolVersion: 1 } });
+    await expect(promise).resolves.toEqual({ protocolVersion: 1 });
+    client.destroy();
+  });
+
+  it('preserves strict structured relay errors as typed command errors', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommand('ses-1', 'send_message', {});
+    await Promise.resolve();
+    inbound({
+      type: 'response',
+      id: 'uuid-2',
+      error: {
+        source: 'relay',
+        code: 'SESSION_OWNER_CHANGED',
+        message: 'Session owner changed',
+      },
+    });
+
+    await expect(promise).rejects.toEqual(
+      expect.objectContaining({
+        name: 'UserWebCommandError',
+        code: 'SESSION_OWNER_CHANGED',
+        message: 'Session owner changed',
+      })
+    );
+    await expect(promise).rejects.toBeInstanceOf(UserWebCommandError);
+    client.destroy();
+  });
+
+  it('keeps sanitized CLI error envelopes generic', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommand('ses-1', 'send_message', {});
+    await Promise.resolve();
+    inbound({
+      type: 'response',
+      id: 'uuid-2',
+      error: { source: 'cli', message: 'Command failed' },
+    });
+
+    await expect(promise).rejects.toEqual(
+      expect.objectContaining({ name: 'Error', message: 'Command failed' })
+    );
+    await expect(promise).rejects.not.toBeInstanceOf(UserWebCommandError);
+    client.destroy();
+  });
+
+  it('keeps relay envelopes with extra fields generic', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommand('ses-1', 'send_message', {});
+    await Promise.resolve();
+    inbound({
+      type: 'response',
+      id: 'uuid-2',
+      error: {
+        source: 'relay',
+        code: 'SESSION_OWNER_CHANGED',
+        message: 'Session owner changed',
+        ownerConnectionId: 'private-owner',
+      },
+    });
+
+    await expect(promise).rejects.toEqual(
+      expect.objectContaining({ name: 'Error', message: 'Command failed' })
+    );
+    await expect(promise).rejects.not.toBeInstanceOf(UserWebCommandError);
+    client.destroy();
+  });
+
+  it('keeps malformed relay error objects generic', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommand('ses-1', 'send_message', {});
+    await Promise.resolve();
+    inbound({
+      type: 'response',
+      id: 'uuid-2',
+      error: { source: 'relay', code: 'UNTRUSTED_CODE', message: { raw: 'internal details' } },
+    });
+
+    await expect(promise).rejects.toEqual(
+      expect.objectContaining({ name: 'Error', message: 'Command failed' })
+    );
+    await expect(promise).rejects.not.toBeInstanceOf(UserWebCommandError);
+    client.destroy();
+  });
+
+  it('preserves CLI string errors', async () => {
+    const client = createUserWebConnection({ websocketUrl: WS_URL, getAuthToken: () => 'token' });
+    client.connect();
+    open();
+
+    const promise = client.sendCommand('ses-1', 'send_message', {});
+    await Promise.resolve();
+    inbound({ type: 'response', id: 'uuid-2', error: 'CLI disconnected' });
+
+    await expect(promise).rejects.toEqual(
+      expect.objectContaining({ name: 'Error', message: 'CLI disconnected' })
+    );
+    await expect(promise).rejects.not.toBeInstanceOf(UserWebCommandError);
     client.destroy();
   });
 

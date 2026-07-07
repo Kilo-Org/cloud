@@ -1,7 +1,10 @@
 /* eslint-disable max-lines */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { fetchKiloGatewayChatCompletionStream } from './kilo-api-client';
+import {
+  fetchKiloGatewayChatCompletionStream,
+  parseKiloGatewayChatCompletionStream,
+} from './kilo-api-client';
 import type { FetchLike } from './auth';
 
 const jsonRequestBodySchema = z.record(z.string(), z.unknown());
@@ -114,6 +117,34 @@ describe('kilo gateway chat stream client', () => {
           arguments: {},
           id: 'call_snapshot_1',
           name: 'get_page_snapshot',
+        },
+      ],
+    });
+  });
+
+  it('streams remote MCP tool call deltas', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_mcp_1","type":"function","function":{"name":"mcp_fixture-mcp_get_weather","arguments":"{\\"city\\":\\"Skopje\\"}"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'What is the weather?', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: { city: 'Skopje' },
+          id: 'call_mcp_1',
+          name: 'mcp_fixture-mcp_get_weather',
         },
       ],
     });
@@ -461,5 +492,19 @@ describe('kilo gateway chat stream client', () => {
     });
 
     expect(seenBody).not.toHaveProperty('reasoning');
+  });
+
+  it('extracts usage from the trailing usage chunk', () => {
+    const sse = [
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+      'data: {"choices":[],"usage":{"prompt_tokens":1200,"completion_tokens":34,"total_tokens":1234}}\n\n',
+      'data: [DONE]\n\n',
+    ].join('');
+
+    const completion = parseKiloGatewayChatCompletionStream(sse, () => {});
+
+    expect(completion.usage).toStrictEqual({
+      promptTokens: 1200,
+    });
   });
 });

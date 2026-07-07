@@ -210,6 +210,7 @@ export async function createOrganization(
           enable_usage_limits: false,
           // all new orgs will have code indexing enabled by default
           code_indexing_enabled: true,
+          ...(plan === 'enterprise' ? { recommendations_digest_enabled: true } : {}),
         },
         ...(company_domain ? { company_domain } : {}),
         ...(plan ? { plan } : {}),
@@ -830,10 +831,10 @@ export async function updateOrganizationSettings(
   return settings;
 }
 
-// Atomically toggle the recommendations-digest flag inside the settings JSONB
+// Atomically update the recommendations-digest flag inside the settings JSONB
 // without a read-modify-write of the whole object, so a concurrent settings
-// mutation can't clobber other fields. Enabling sets the single key; disabling
-// removes it (we never persist `false`). Returns the fresh settings.
+// mutation can't clobber other fields. Persist false to distinguish an explicit
+// opt-out from an organization that has never initialized this preference.
 export async function setOrganizationRecommendationsDigestEnabled(
   organizationId: Organization['id'],
   enabled: boolean
@@ -841,9 +842,11 @@ export async function setOrganizationRecommendationsDigestEnabled(
   const [row] = await db
     .update(organizations)
     .set({
-      settings: enabled
-        ? sql`jsonb_set(COALESCE(${organizations.settings}, '{}'::jsonb), '{recommendations_digest_enabled}', 'true'::jsonb)`
-        : sql`COALESCE(${organizations.settings}, '{}'::jsonb) - 'recommendations_digest_enabled'`,
+      settings: sql`jsonb_set(
+        COALESCE(${organizations.settings}, '{}'::jsonb),
+        '{recommendations_digest_enabled}',
+        ${JSON.stringify(enabled)}::jsonb
+      )`,
     })
     .where(eq(organizations.id, organizationId))
     .returning({ settings: organizations.settings });

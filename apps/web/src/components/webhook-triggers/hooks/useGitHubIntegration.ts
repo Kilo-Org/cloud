@@ -10,11 +10,11 @@ export function useGitHubIntegration(organizationId?: string) {
 
   const query = useQuery(
     organizationId
-      ? trpc.organizations.cloudAgent.listGitHubRepositories.queryOptions({
+      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
           organizationId,
           forceRefresh: false,
         })
-      : trpc.cloudAgent.listGitHubRepositories.queryOptions({
+      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({
           forceRefresh: false,
         })
   );

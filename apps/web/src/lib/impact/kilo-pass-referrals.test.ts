@@ -661,11 +661,9 @@ describe('Kilo Pass Impact referral conversions', () => {
     expect(await db.select().from(impact_referral_rewards)).toHaveLength(0);
   });
 
-  test('renewal, prior subscription, deleted tombstone, and self-referral do not grant rewards', async () => {
-    const cases = ['renewal', 'prior_subscription', 'deleted_tombstone', 'self_referral'] as const;
-
-    for (const scenario of cases) {
-      await cleanupDbForTest();
+  test.each(['renewal', 'prior_subscription', 'deleted_tombstone', 'self_referral'] as const)(
+    '%s does not grant referral rewards',
+    async scenario => {
       const referrer = await insertTestUser({ created_at: '2025-12-01T00:00:00.000Z' });
       const referee =
         scenario === 'self_referral'
@@ -696,11 +694,11 @@ describe('Kilo Pass Impact referral conversions', () => {
 
       const disposition = await processInvoice({ refereeId: referee.id, subscriptionId });
       const rewards = await db.select().from(impact_referral_rewards);
-      expect({ scenario, rewardCount: rewards.length }).toEqual({ scenario, rewardCount: 0 });
+      expect(rewards).toHaveLength(0);
       expect(disposition.winningTouchType).toBe(ImpactReferralWinningTouchType.Referral);
       expect(disposition.disqualificationReason).toMatch(/^referral_/);
     }
-  });
+  );
 
   test('referrer cap limits only referrer reward and invoice retry is idempotent', async () => {
     const referrer = await insertTestUser({ created_at: '2025-12-01T00:00:00.000Z' });

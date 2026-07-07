@@ -10,6 +10,17 @@ import {
   stringFormParams,
 } from '@/lib/mcp-gateway/oauth-request-params';
 
+const tokenResponseHeaders = {
+  'Cache-Control': 'no-store',
+  Pragma: 'no-cache',
+};
+
+export function withTokenResponseHeaders(response: NextResponse) {
+  response.headers.set('Cache-Control', tokenResponseHeaders['Cache-Control']);
+  response.headers.set('Pragma', tokenResponseHeaders.Pragma);
+  return response;
+}
+
 const tokenSingletonParams = [
   'grant_type',
   'code',
@@ -24,12 +35,16 @@ const tokenSingletonParams = [
 async function exchangeToken(request: NextRequest, route?: ScopedConnectRoute) {
   const form = await readFormData(request);
   if (hasDuplicateSingletonParams(form, tokenSingletonParams)) {
-    return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+    return withTokenResponseHeaders(
+      NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+    );
   }
   const raw = stringFormParams(form, tokenSingletonParams);
   const parsed = OAuthTokenRequestSchema.safeParse(raw);
   if (!parsed.success) {
-    return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
+    return withTokenResponseHeaders(
+      NextResponse.json({ error: 'invalid_request' }, { status: 400 })
+    );
   }
   const services = createGatewayServices();
   const result = await services.tokenService.exchangeToken({
@@ -37,14 +52,14 @@ async function exchangeToken(request: NextRequest, route?: ScopedConnectRoute) {
     headers: request.headers,
     route,
   });
-  return NextResponse.json(result);
+  return withTokenResponseHeaders(NextResponse.json(result));
 }
 
 export async function POST(request: NextRequest) {
   try {
     return await exchangeToken(request);
   } catch (error) {
-    return gatewayErrorResponse(error);
+    return withTokenResponseHeaders(gatewayErrorResponse(error));
   }
 }
 

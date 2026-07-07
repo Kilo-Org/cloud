@@ -13,7 +13,9 @@ import {
 import type { CloudAgentStreamTicket, CloudAgentStreamTicketResult } from './transport';
 
 export type ConnectionConfig = {
-  websocketUrl: string;
+  /** Static URL, or a builder re-evaluated on every (re)connect attempt so
+   * the caller can vary query params (e.g. a replay cursor). */
+  websocketUrl: string | (() => string);
   ticket: CloudAgentStreamTicketResult;
   onEvent: (event: CloudAgentEvent) => void;
   onConnected: () => void;
@@ -88,7 +90,9 @@ export function createConnection(config: ConnectionConfig): Connection {
     lifecycleHooks: config.lifecycleHooks,
     websocketHeaders: config.websocketHeaders,
     buildUrl: () => {
-      const url = new URL(config.websocketUrl);
+      const url = new URL(
+        typeof config.websocketUrl === 'function' ? config.websocketUrl() : config.websocketUrl
+      );
       url.searchParams.set('ticket', currentTicket.ticket);
       return url.toString();
     },

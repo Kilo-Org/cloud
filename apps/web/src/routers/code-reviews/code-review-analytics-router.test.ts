@@ -1,5 +1,5 @@
 import { db } from '@/lib/drizzle';
-import { kilocode_users, organizations } from '@kilocode/db/schema';
+import { kilocode_users, organizations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
 import { finalizeCompletedCodeReviewWithAnalytics } from '@/lib/code-reviews/analytics/db';
@@ -39,6 +39,8 @@ describe('Code Reviewer analytics router', () => {
   let memberId: string;
   let outsiderId: string;
   let organizationId: string;
+  let organizationIntegrationId: string;
+  let outsiderIntegrationId: string;
 
   beforeAll(async () => {
     const owner = await insertTestUser();
@@ -55,6 +57,36 @@ describe('Code Reviewer analytics router', () => {
     memberId = member.id;
     outsiderId = outsider.id;
     organizationId = organization.id;
+    const [organizationIntegration, outsiderIntegration] = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_organization_id: organizationId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `analytics-org-${crypto.randomUUID()}`,
+          platform_account_id: 'analytics-org',
+          platform_account_login: 'analytics-org',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+        {
+          owned_by_user_id: outsiderId,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: `analytics-user-${crypto.randomUUID()}`,
+          platform_account_id: 'analytics-user',
+          platform_account_login: 'analytics-user',
+          repository_access: 'all',
+          integration_status: 'active',
+        },
+      ])
+      .returning({ id: platform_integrations.id });
+    if (!organizationIntegration || !outsiderIntegration) {
+      throw new Error('Expected analytics review integrations');
+    }
+    organizationIntegrationId = organizationIntegration.id;
+    outsiderIntegrationId = outsiderIntegration.id;
     await addUserToOrganization(organizationId, memberId, 'member');
     await setReviewAnalyticsEnabled({
       owner: { type: 'org', id: organizationId },
@@ -81,8 +113,11 @@ describe('Code Reviewer analytics router', () => {
       | { type: 'org'; id: string; userId: string }
       | { type: 'user'; id: string; userId: string };
   }) {
+    const owner = input.owner ?? { type: 'org' as const, id: organizationId, userId: ownerId };
     const reviewId = await createCodeReview({
-      owner: input.owner ?? { type: 'org', id: organizationId, userId: ownerId },
+      owner,
+      platformIntegrationId:
+        owner.type === 'org' ? organizationIntegrationId : outsiderIntegrationId,
       repoFullName: input.repository,
       prNumber: input.prNumber,
       prUrl: `https://github.com/${input.repository}/pull/${input.prNumber}`,
@@ -117,6 +152,7 @@ describe('Code Reviewer analytics router', () => {
     const completedAt = new Date();
     const reviewId = await createCodeReview({
       owner: { type: 'org', id: organizationId, userId: ownerId },
+      platformIntegrationId: organizationIntegrationId,
       repoFullName: repository,
       prNumber: 1,
       prUrl: `https://github.com/${repository}/pull/1`,

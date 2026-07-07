@@ -1166,6 +1166,8 @@ export type GitLabMergeRequest = {
   title: string;
   description: string | null;
   state: 'opened' | 'closed' | 'merged' | 'locked';
+  draft?: boolean;
+  work_in_progress?: boolean;
   source_branch: string;
   target_branch: string;
   sha: string;
@@ -1181,6 +1183,37 @@ export type GitLabMergeRequest = {
     name: string;
   };
 };
+
+export async function fetchGitLabMergeRequest(params: {
+  accessToken: string;
+  projectId: string | number;
+  mrIid: number;
+  instanceUrl?: string;
+}): Promise<GitLabMergeRequest> {
+  const encodedProjectId =
+    typeof params.projectId === 'string' ? encodeURIComponent(params.projectId) : params.projectId;
+  const instanceUrl = params.instanceUrl ?? DEFAULT_GITLAB_URL;
+
+  const response = await fetchGitLab(
+    buildGitLabUrl(
+      instanceUrl,
+      `/api/v4/projects/${encodedProjectId}/merge_requests/${params.mrIid}`
+    ),
+    {
+      headers: {
+        Authorization: `Bearer ${params.accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
+    throw new Error(`GitLab MR fetch failed: ${response.status}`);
+  }
+
+  return (await response.json()) as GitLabMergeRequest;
+}
 
 /**
  * Finds an existing Kilo review note on a GitLab MR

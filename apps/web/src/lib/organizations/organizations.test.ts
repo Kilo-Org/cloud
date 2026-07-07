@@ -38,6 +38,30 @@ describe('Organizations', () => {
     await db.delete(organizations);
   });
 
+  describe('createOrganization', () => {
+    test('enables recommendations digest for new enterprise organizations only', async () => {
+      const user = await insertTestUser();
+
+      const enterprise = await createOrganization(
+        'Enterprise with recommendations',
+        user.id,
+        true,
+        undefined,
+        'enterprise'
+      );
+      const teams = await createOrganization(
+        'Teams without recommendations',
+        user.id,
+        true,
+        undefined,
+        'teams'
+      );
+
+      expect(enterprise.settings.recommendations_digest_enabled).toBe(true);
+      expect(teams.settings.recommendations_digest_enabled).toBeUndefined();
+    });
+  });
+
   describe('getUserOrganizationsWithSeats', () => {
     test('should return empty array when user has no organizations', async () => {
       const user = await insertTestUser();

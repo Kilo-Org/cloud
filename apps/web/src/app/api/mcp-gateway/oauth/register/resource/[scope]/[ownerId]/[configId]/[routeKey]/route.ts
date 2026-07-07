@@ -14,9 +14,9 @@ export async function POST(
 ) {
   try {
     const services = createGatewayServices();
+    await services.clientService.consumeRegistrationRateLimit(request.headers);
     const route = parseScopedRouteParams(await params);
     await services.routeService.resolveRouteParams(route);
-    await services.clientService.consumeRegistrationRateLimit(request.headers);
     const body = await readBoundedJsonBody(request);
     const registration = await services.clientService.registerClient({
       metadata: body,

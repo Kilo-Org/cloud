@@ -35,11 +35,14 @@ function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePa
   if (payload.type === 'prompt') {
     if (!payload.mode) throw new Error('Cloud Agent mode is required');
     if (!payload.model) throw new Error('Cloud Agent model is required');
+    if (payload.model.providerID !== 'kilo') {
+      throw new Error('Cloud Agent only supports Kilo models');
+    }
     return {
       type: 'prompt',
       prompt: payload.prompt,
       mode: payload.mode,
-      model: payload.model,
+      model: payload.model.modelID,
       variant: payload.variant,
     };
   }
@@ -130,13 +133,15 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           trpcClient.cliSessionsV2.get.query({ session_id: id }),
           trpcClient.cliSessionsV2.getSessionMessages.query({ session_id: id }),
         ]);
+        // Zod .passthrough() adds index signatures that TS can't prove assignable to strict types.
+        // The tRPC/Zod layer has already validated the shape, so these casts are safe at this boundary.
+        const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']>;
         return {
           info: {
-            id: sessionData.session_id,
-            parentID: sessionData.parent_session_id ?? undefined,
+            id: snapshotInfo.id ?? sessionData.session_id,
+            parentID: snapshotInfo.parentID ?? sessionData.parent_session_id ?? undefined,
+            ...(snapshotInfo.model ? { model: snapshotInfo.model } : {}),
           },
-          // Zod .passthrough() adds index signatures that TS can't prove assignable to strict types.
-          // The tRPC/Zod layer has already validated the shape, so this cast is safe at this boundary.
           messages: messagesResult.messages as SessionSnapshot['messages'],
         };
       },
@@ -149,13 +154,11 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
 
       api: {
         send: async input => {
-          const normalizedPayload = normalizeTransportPayload(input.payload);
-
           if (organizationId) {
             return trpcClient.organizations.cloudAgentNext.sendMessage.mutate(
               {
                 cloudAgentSessionId: input.sessionId,
-                payload: normalizedPayload,
+                payload: input.payload,
                 autoCommit: true,
                 organizationId,
                 messageId: input.messageId,
@@ -167,7 +170,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
           return trpcClient.cloudAgentNext.sendMessage.mutate(
             {
               cloudAgentSessionId: input.sessionId,
-              payload: normalizedPayload,
+              payload: input.payload,
               autoCommit: true,
               messageId: input.messageId,
               attachments: input.attachments ?? input.images,

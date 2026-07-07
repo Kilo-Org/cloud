@@ -30,14 +30,6 @@ jest.mock('@/lib/r2/cli-sessions', () => ({
   }),
 }));
 
-const deleteCloudAgentSessionMock = jest.fn().mockResolvedValue({ success: true });
-
-jest.mock('@/lib/cloud-agent/cloud-agent-client', () => ({
-  createCloudAgentClient: jest.fn(() => ({
-    deleteSession: deleteCloudAgentSessionMock,
-  })),
-}));
-
 jest.mock('@/lib/config.server', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
   return {
@@ -72,10 +64,6 @@ describe('cli-sessions-router', () => {
       })
       .returning();
     testOrganization = org;
-  });
-
-  beforeEach(() => {
-    deleteCloudAgentSessionMock.mockClear();
   });
 
   describe('list procedure', () => {
@@ -1323,18 +1311,50 @@ describe('cli-sessions-router', () => {
       expect(sessions).toHaveLength(0);
     });
 
-    it('should attempt to delete linked cloud-agent session when present', async () => {
+    it('should delete a historical cloud-agent session locally without contacting its worker', async () => {
       const caller = await createCallerForUser(regularUser.id);
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      const fetchSpy = jest.spyOn(global, 'fetch');
 
       await db
         .update(cliSessions)
         .set({ cloud_agent_session_id: 'agent_test_session' })
         .where(eq(cliSessions.session_id, deleteSessionId));
 
-      await caller.cliSessions.delete({ session_id: deleteSessionId });
+      const result = await caller.cliSessions.delete({ session_id: deleteSessionId });
 
-      expect(deleteCloudAgentSessionMock).toHaveBeenCalledWith('agent_test_session');
-      expect(deleteCloudAgentSessionMock).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: true, session_id: deleteSessionId });
+      expect(deleteBlobs).toHaveBeenCalledWith(deleteSessionId, [
+        { folderName: 'sessions', filename: 'api_conversation_history' },
+        { folderName: 'sessions', filename: 'task_metadata' },
+        { folderName: 'sessions', filename: 'ui_messages' },
+        { folderName: 'sessions', filename: 'git_state' },
+      ]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      const sessions = await db
+        .select()
+        .from(cliSessions)
+        .where(eq(cliSessions.session_id, deleteSessionId));
+      expect(sessions).toHaveLength(0);
+
+      fetchSpy.mockRestore();
+    });
+
+    it('should preserve the database row when blob deletion fails', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(deleteBlobs).mockRejectedValueOnce(new Error('R2 deletion failed'));
+
+      await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).rejects.toThrow(
+        'R2 deletion failed'
+      );
+
+      const sessions = await db
+        .select()
+        .from(cliSessions)
+        .where(eq(cliSessions.session_id, deleteSessionId));
+      expect(sessions).toHaveLength(1);
     });
 
     it('should throw NOT_FOUND when deleting other user session', async () => {

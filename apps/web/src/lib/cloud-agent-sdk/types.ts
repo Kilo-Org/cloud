@@ -40,10 +40,15 @@ export type ProcessedMessage = {
   parts: Part[];
 };
 
-/** Minimal session identity — only the fields the SDK actually reads. */
+/** Minimal session metadata — only the fields the SDK actually reads. */
 export type SessionInfo = {
   id: string;
   parentID?: string;
+  model?: {
+    providerID: string;
+    id: string;
+    variant?: string;
+  };
 };
 
 export type SessionPhase =

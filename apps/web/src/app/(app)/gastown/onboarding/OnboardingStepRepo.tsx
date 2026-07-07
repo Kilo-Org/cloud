@@ -28,7 +28,7 @@ export function OnboardingStepRepo() {
           organizationId: orgId,
           forceRefresh: false,
         })
-      : mainTrpc.cloudAgent.listGitHubRepositories.queryOptions({ forceRefresh: false })),
+      : mainTrpc.cloudAgentNext.listGitHubRepositories.queryOptions({ forceRefresh: false })),
   });
 
   const gitlabReposQuery = useQuery({
@@ -37,7 +37,7 @@ export function OnboardingStepRepo() {
           organizationId: orgId,
           forceRefresh: false,
         })
-      : mainTrpc.cloudAgent.listGitLabRepositories.queryOptions({ forceRefresh: false })),
+      : mainTrpc.cloudAgentNext.listGitLabRepositories.queryOptions({ forceRefresh: false })),
   });
 
   const unifiedRepositories = useMemo<RepositoryOption[]>(() => {

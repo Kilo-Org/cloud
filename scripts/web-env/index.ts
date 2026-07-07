@@ -204,7 +204,7 @@ async function main(): Promise<void> {
     }
     if (vaultId) {
       console.log('Updating 1Password Production copy...');
-      setVaultValue(vaultId, options.name, values.production);
+      await setVaultValue(vaultId, options.name, values.production);
     }
 
     console.log('\nDone. Rerun the same command if a provider failed partway through.');

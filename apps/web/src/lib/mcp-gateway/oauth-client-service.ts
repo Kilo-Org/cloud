@@ -12,6 +12,7 @@ import type { OAuthClientMetadata } from '@kilocode/mcp-gateway';
 import { mcp_gateway_oauth_clients, mcp_gateway_rate_limit_windows } from '@kilocode/db/schema';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { GatewayRepository } from './repository';
+import type { GatewayOAuthGrantService } from './oauth-grant-service';
 import { expiresAtIso, floorToMinuteIso, hashToken, hmacValue, randomToken } from './crypto';
 import type { GatewayAppConfig } from './config';
 
@@ -26,6 +27,11 @@ export type GatewayOAuthClientRegistration = {
   declaredScopes: string[];
 };
 
+function isAdditiveSuperset(previous: readonly string[], next: readonly string[]): boolean {
+  const nextSet = new Set(next);
+  return previous.every(value => nextSet.has(value));
+}
+
 function clientIp(headers: Headers): string {
   // apps/web is deployed behind Vercel, which overwrites this header at the edge.
   // Do not trust generic forwarded headers for an unauthenticated public rate limit.
@@ -37,6 +43,7 @@ function clientIp(headers: Headers): string {
 export function createOAuthClientService(params: {
   repository: GatewayRepository;
   config: GatewayAppConfig;
+  oauthGrantService?: GatewayOAuthGrantService;
 }) {
   async function consumeRegistrationRateLimit(headers: Headers): Promise<void> {
     const ipHash = hmacValue(clientIp(headers), params.config.rateLimitSecret);
@@ -183,37 +190,85 @@ export function createOAuthClientService(params: {
         400
       );
     }
-    const existing = await findClientById(input.clientId);
-    if (!existing) return null;
-    if (existing.token_endpoint_auth_method !== metadata.data.token_endpoint_auth_method) {
-      throw createGatewayError(
-        GatewayErrorCode.InvalidClientMetadata,
-        'Token endpoint authentication method cannot be changed after registration',
-        400
+    const declaredScopes = validateDeclaredScopes(metadata.data.scope);
+    return await params.repository.database.transaction(async tx => {
+      const [existing] = await tx
+        .select()
+        .from(mcp_gateway_oauth_clients)
+        .where(
+          and(
+            eq(mcp_gateway_oauth_clients.client_id, input.clientId),
+            isNull(mcp_gateway_oauth_clients.deleted_at)
+          )
+        )
+        .limit(1)
+        .for('update');
+      if (!existing) return null;
+      if (existing.token_endpoint_auth_method !== metadata.data.token_endpoint_auth_method) {
+        throw createGatewayError(
+          GatewayErrorCode.InvalidClientMetadata,
+          'Token endpoint authentication method cannot be changed after registration',
+          400
+        );
+      }
+      const redirectUrisShrank = !isAdditiveSuperset(
+        existing.redirect_uris,
+        metadata.data.redirect_uris
       );
-    }
-    const rows = await params.repository.database
-      .update(mcp_gateway_oauth_clients)
-      .set({
-        client_name: metadata.data.client_name ?? null,
-        token_endpoint_auth_method: metadata.data.token_endpoint_auth_method,
-        redirect_uris: metadata.data.redirect_uris,
-        grant_types: metadata.data.grant_types,
-        response_types: metadata.data.response_types,
-        declared_scopes: validateDeclaredScopes(metadata.data.scope),
-      })
-      .where(eq(mcp_gateway_oauth_clients.client_id, input.clientId))
-      .returning();
-    return rows[0] ?? null;
+      const grantTypesShrank = !isAdditiveSuperset(existing.grant_types, metadata.data.grant_types);
+      const refreshTokenCapabilityChanged =
+        existing.grant_types.includes('refresh_token') !==
+        metadata.data.grant_types.includes('refresh_token');
+      const responseTypesShrank = !isAdditiveSuperset(
+        existing.response_types,
+        metadata.data.response_types
+      );
+      const scopesShrank = !isAdditiveSuperset(existing.declared_scopes, declaredScopes);
+      const isMaterialChange =
+        redirectUrisShrank ||
+        refreshTokenCapabilityChanged ||
+        grantTypesShrank ||
+        responseTypesShrank ||
+        scopesShrank;
+      const [updated] = await tx
+        .update(mcp_gateway_oauth_clients)
+        .set({
+          client_name: metadata.data.client_name ?? null,
+          token_endpoint_auth_method: metadata.data.token_endpoint_auth_method,
+          redirect_uris: metadata.data.redirect_uris,
+          grant_types: metadata.data.grant_types,
+          response_types: metadata.data.response_types,
+          declared_scopes: declaredScopes,
+        })
+        .where(eq(mcp_gateway_oauth_clients.client_id, input.clientId))
+        .returning();
+      if (updated && isMaterialChange && params.oauthGrantService) {
+        await params.oauthGrantService.revokeByClientIdWithTx(
+          tx,
+          updated.oauth_client_id,
+          'oauth_client_metadata_changed'
+        );
+      }
+      return updated ?? null;
+    });
   }
 
   async function deleteClient(clientId: string) {
-    const rows = await params.repository.database
-      .update(mcp_gateway_oauth_clients)
-      .set({ deleted_at: new Date().toISOString() })
-      .where(eq(mcp_gateway_oauth_clients.client_id, clientId))
-      .returning();
-    return rows[0] ?? null;
+    return await params.repository.database.transaction(async tx => {
+      const [client] = await tx
+        .update(mcp_gateway_oauth_clients)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(mcp_gateway_oauth_clients.client_id, clientId))
+        .returning();
+      if (client && params.oauthGrantService) {
+        await params.oauthGrantService.revokeByClientIdWithTx(
+          tx,
+          client.oauth_client_id,
+          'oauth_client_deleted'
+        );
+      }
+      return client ?? null;
+    });
   }
 
   return {

@@ -9,7 +9,7 @@ import {
 export const GatewayScopeSchema = z.enum(GatewaySupportedScopes);
 export const GatewayScopeListSchema = z.array(GatewayScopeSchema);
 
-export const GatewayTokenClaimsSchema = z.object({
+const GatewayTokenBaseClaimsSchema = z.object({
   iss: z.string().url(),
   sub: z.string().min(1),
   aud: z.string().url(),
@@ -26,16 +26,38 @@ export const GatewayTokenClaimsSchema = z.object({
   config_version: z.number().int().positive(),
 });
 
+const GatewayOAuthTokenClaimsSchema = GatewayTokenBaseClaimsSchema.extend({
+  token_source: z.literal('oauth_client'),
+  oauth_grant_id: z.string().uuid(),
+  client_id: z.string().min(1),
+});
+
+const GatewayDerivedTokenClaimsSchema = GatewayTokenBaseClaimsSchema.extend({
+  token_source: z.literal('derived_connect'),
+  oauth_grant_id: z.never().optional(),
+  client_id: z.never().optional(),
+});
+
+export const GatewayTokenClaimsSchema = z.discriminatedUnion('token_source', [
+  GatewayOAuthTokenClaimsSchema,
+  GatewayDerivedTokenClaimsSchema,
+]);
+
 export type GatewayTokenClaims = z.infer<typeof GatewayTokenClaimsSchema>;
 
-export const GatewayTokenMintInputSchema = GatewayTokenClaimsSchema.omit({
+const omittedMintClaims = {
   iss: true,
   aud: true,
   exp: true,
   iat: true,
   scope: true,
   MCPID: true,
-});
+} as const;
+
+export const GatewayTokenMintInputSchema = z.discriminatedUnion('token_source', [
+  GatewayOAuthTokenClaimsSchema.omit(omittedMintClaims),
+  GatewayDerivedTokenClaimsSchema.omit(omittedMintClaims),
+]);
 
 export type GatewayTokenMintInput = z.infer<typeof GatewayTokenMintInputSchema>;
 

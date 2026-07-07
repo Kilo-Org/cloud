@@ -57,10 +57,8 @@ export function ConfigureRow({
         <Icon size={16} color={iconColor} />
       </View>
       <View className="flex-1">
-        <Text className="text-[14px] font-medium text-foreground">{title}</Text>
-        {subtitle ? (
-          <Text className="mt-0.5 text-[11.5px] text-muted-foreground">{subtitle}</Text>
-        ) : null}
+        <Text className="text-sm font-medium text-foreground">{title}</Text>
+        {subtitle ? <Text className="mt-0.5 text-xs text-muted-foreground">{subtitle}</Text> : null}
       </View>
       {trailing ?? <ChevronRight size={14} color={colors.mutedForeground} />}
     </View>

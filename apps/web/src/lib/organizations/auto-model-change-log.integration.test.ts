@@ -164,6 +164,66 @@ describe('logAutoModelChangesForAllOrgs', () => {
     expect(logs).toHaveLength(0);
   });
 
+  test('does not write audit logs for enterprise orgs without model restrictions', async () => {
+    const owner = await insertTestUser();
+    const enterpriseOrg = await createTestOrganization('Unrestricted Enterprise Org', owner.id, 0);
+
+    const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+
+    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+
+    expect(result.orgCount).toBe(0);
+
+    const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
+    expect(logs).toHaveLength(0);
+  });
+
+  test('does not write audit logs for soft-deleted enterprise orgs', async () => {
+    const owner = await insertTestUser();
+    const enterpriseOrg = await createTestOrganization('Deleted Enterprise Org', owner.id, 0, {
+      provider_allow_list: ['z-ai'],
+    });
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, enterpriseOrg.id));
+
+    const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+
+    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+
+    expect(result.orgCount).toBe(0);
+
+    const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
+    expect(logs).toHaveLength(0);
+  });
+
+  test('does not write audit logs for hard-expired enterprise orgs without entitlement', async () => {
+    const owner = await insertTestUser();
+    const enterpriseOrg = await createTestOrganization('Expired Enterprise Org', owner.id, 0, {
+      provider_allow_list: ['z-ai'],
+    });
+    await db
+      .update(organizations)
+      .set({
+        free_trial_end_at: '2020-01-01T00:00:00.000Z',
+        require_seats: true,
+      })
+      .where(eq(organizations.id, enterpriseOrg.id));
+
+    const oldSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5'] }]);
+    const newSnapshot = buildSnapshot([{ slug: 'z-ai', models: ['z-ai/glm-5', 'z-ai/glm-5.1'] }]);
+
+    const result = await logAutoModelChangesForAllOrgs(oldSnapshot, newSnapshot);
+
+    expect(result.orgCount).toBe(0);
+
+    const logs = await fetchAutoChangeLogs(enterpriseOrg.id);
+    expect(logs).toHaveLength(0);
+  });
+
   test('skips enterprise orgs whose effective availability did not change', async () => {
     const owner = await insertTestUser();
     const restrictedOrg = await createTestOrganization('Restricted to openai only', owner.id, 0, {

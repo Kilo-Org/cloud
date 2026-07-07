@@ -1118,6 +1118,9 @@ export type CodeReviewFindingSecurityClass =
 
 // --- CodeReviewAgentConfig ---
 
+export const CODE_REVIEW_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
+export type CodeReviewPlatform = (typeof CODE_REVIEW_PLATFORMS)[number];
+
 export const ManuallyAddedRepositorySchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -1141,7 +1144,7 @@ export const CodeReviewAgentConfigSchema = z.object({
     .nullable()
     .optional(),
   repository_selection_mode: z.enum(['all', 'selected']).optional(),
-  selected_repository_ids: z.array(z.number()).optional(),
+  selected_repository_ids: z.array(z.union([z.number(), z.string()])).optional(),
   // Manually added repositories (for GitLab where pagination limits results)
   manually_added_repositories: z.array(ManuallyAddedRepositorySchema).optional(),
   disable_review_md: z.boolean().optional(),
@@ -1157,6 +1160,16 @@ export const CodeReviewAgentConfigSchema = z.object({
 });
 
 export type CodeReviewAgentConfig = z.infer<typeof CodeReviewAgentConfigSchema>;
+
+export const ManualCodeReviewConfigSchema = z
+  .object({
+    agentConfig: CodeReviewAgentConfigSchema,
+    instructions: z.string().max(4_000).nullable(),
+    outputMode: z.enum(['provider', 'kilo']),
+  })
+  .strict();
+
+export type ManualCodeReviewConfig = z.infer<typeof ManualCodeReviewConfigSchema>;
 
 // --- Security types ---
 
@@ -1697,6 +1710,15 @@ export const MCPGatewayProviderGrantStatus = {
 
 export type MCPGatewayProviderGrantStatus =
   (typeof MCPGatewayProviderGrantStatus)[keyof typeof MCPGatewayProviderGrantStatus];
+
+export const MCPGatewayOAuthGrantStatus = {
+  Pending: 'pending',
+  Active: 'active',
+  Revoked: 'revoked',
+} as const;
+
+export type MCPGatewayOAuthGrantStatus =
+  (typeof MCPGatewayOAuthGrantStatus)[keyof typeof MCPGatewayOAuthGrantStatus];
 
 export const MCPGatewaySecretKind = {
   StaticProviderCredentials: 'static_provider_credentials',

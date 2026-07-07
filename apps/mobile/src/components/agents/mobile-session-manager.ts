@@ -38,12 +38,15 @@ function normalizeTransportPayload(payload: TransportSendPayload): SendMessagePa
     if (!payload.model) {
       throw new Error('Model is required');
     }
+    if (payload.model.providerID !== 'kilo') {
+      throw new Error('Cloud Agent only supports Kilo models');
+    }
 
     return {
       type: 'prompt',
       prompt: payload.prompt,
       mode: normalizeAgentMode(payload.mode),
-      model: payload.model,
+      model: payload.model.modelID,
       variant: payload.variant,
     };
   }
@@ -125,10 +128,12 @@ export function createMobileAgentSessionManager({
         trpcClient.cliSessionsV2.get.query({ session_id: id }),
         trpcClient.cliSessionsV2.getSessionMessages.query({ session_id: id }),
       ]);
+      const snapshotInfo = messagesResult.info as Partial<SessionSnapshot['info']>;
       return {
         info: {
-          id: sessionData.session_id,
-          parentID: sessionData.parent_session_id ?? undefined,
+          id: snapshotInfo.id ?? sessionData.session_id,
+          parentID: snapshotInfo.parentID ?? sessionData.parent_session_id ?? undefined,
+          ...(snapshotInfo.model ? { model: snapshotInfo.model } : {}),
         },
         messages: messagesResult.messages as SessionSnapshot['messages'],
       };
@@ -136,12 +141,12 @@ export function createMobileAgentSessionManager({
     api: {
       send: async input => {
         await withCloudAgentDiagnostics('send', organizationId, async () => {
-          const payload = normalizeTransportPayload(input.payload);
           const baseInput = {
             cloudAgentSessionId: input.sessionId as string,
-            payload,
+            payload: input.payload,
             autoCommit: true,
             messageId: input.messageId,
+            ...(input.attachments ? { attachments: input.attachments } : {}),
           };
           if (organizationId) {
             await trpcClient.organizations.cloudAgentNext.sendMessage.mutate(

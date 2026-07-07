@@ -81,14 +81,20 @@ export async function getDirectByokModel(requestedModel: string): Promise<{
   provider: DirectByokProvider | null;
   model: DirectByokModel | null;
 }> {
-  for (const provider of DIRECT_BYOK_PROVIDERS) {
-    const model = (await provider.models()).find(
-      model => formatDirectByokModelId(provider, model) === requestedModel
-    );
-    if (model) {
-      return { provider, model };
-    }
+  const provider = DIRECT_BYOK_PROVIDERS.find(provider =>
+    requestedModel.startsWith(`${provider.id}/`)
+  );
+  if (!provider) {
+    return { provider: null, model: null };
   }
+
+  const model = (await provider.models()).find(
+    model => formatDirectByokModelId(provider, model) === requestedModel
+  );
+  if (model) {
+    return { provider, model };
+  }
+
   return { provider: null, model: null };
 }
 

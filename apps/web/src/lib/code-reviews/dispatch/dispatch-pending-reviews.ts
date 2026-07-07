@@ -33,12 +33,13 @@ import {
 import { captureException } from '@sentry/nextjs';
 import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
 import { codeReviewWorkerClient } from '../client/code-review-worker-client';
-import type { CodeReviewPlatform } from '../core/schemas';
+import { CodeReviewPlatformSchema, type CodeReviewPlatform } from '../core/schemas';
 import { appendCodeReviewAnalyticsPromptAppendix } from '../analytics/contracts';
 import { getReviewAnalyticsEnabledFromConfig } from '../analytics/settings';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { APP_URL } from '@/lib/constants';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason,
@@ -62,6 +63,7 @@ import {
   staleRunningCodeReviewCutoffSql,
   type PendingCodeReviewCreatedAtWindow,
 } from './dispatch-constants';
+import { getManualCodeReviewConfig, shouldPublishCodeReviewToProvider } from '../manual-config';
 
 export type DispatchResult = {
   dispatched: number;
@@ -114,12 +116,18 @@ function parseTerminalReason(reason?: string): CodeReviewTerminalReason | undefi
   return CODE_REVIEW_TERMINAL_REASONS.find(candidate => candidate === reason);
 }
 
+function parseCodeReviewPlatform(platform: string): CodeReviewPlatform {
+  return CodeReviewPlatformSchema.parse(platform);
+}
+
 async function finalizeActionRequiredGateCheck(
   review: CloudAgentCodeReview,
   reason: CodeReviewActionRequiredReason
 ): Promise<void> {
-  const platform: CodeReviewPlatform = review.platform === 'gitlab' ? 'gitlab' : 'github';
-  if (platform !== 'github' || !review.check_run_id || !review.platform_integration_id) return;
+  if (!shouldPublishCodeReviewToProvider(review)) return;
+  const platform = parseCodeReviewPlatform(review.platform);
+  if (platform !== PLATFORM.GITHUB || !review.check_run_id || !review.platform_integration_id)
+    return;
 
   const integration = await getIntegrationById(review.platform_integration_id);
   if (!integration?.platform_installation_id) return;
@@ -307,9 +315,11 @@ export async function tryDispatchPendingReviews(
         const actionRequiredReason = getActionRequiredReasonFromError(error);
         const actionRequiredStateAlreadyPresent =
           error instanceof CodeReviewActionRequiredDispatchError;
+        const manualConfig = getManualCodeReviewConfig(reservation.review);
+        const isManualReview = manualConfig !== null;
 
         if (actionRequiredReason) {
-          if (!actionRequiredStateAlreadyPresent) {
+          if (!actionRequiredStateAlreadyPresent && !isManualReview) {
             logExceptInTest(
               '[tryDispatchPendingReviews] Disabling Code Reviewer after action-required failure',
               {
@@ -322,7 +332,7 @@ export async function tryDispatchPendingReviews(
             try {
               await disableCodeReviewForActionRequiredFailure({
                 owner,
-                platform: reservation.review.platform === 'gitlab' ? 'gitlab' : 'github',
+                platform: parseCodeReviewPlatform(reservation.review.platform),
                 reviewId: reservation.review.id,
                 reason: actionRequiredReason,
                 errorMessage,
@@ -384,16 +394,18 @@ export async function tryDispatchPendingReviews(
             continue;
           }
 
-          try {
-            await finalizeActionRequiredGateCheck(reservation.review, actionRequiredReason);
-          } catch (updateError) {
-            errorExceptInTest(
-              '[tryDispatchPendingReviews] Failed to finalize action-required check run',
-              {
-                reviewId: reservation.review.id,
-                updateError,
-              }
-            );
+          if (!isManualReview) {
+            try {
+              await finalizeActionRequiredGateCheck(reservation.review, actionRequiredReason);
+            } catch (updateError) {
+              errorExceptInTest(
+                '[tryDispatchPendingReviews] Failed to finalize action-required check run',
+                {
+                  reviewId: reservation.review.id,
+                  updateError,
+                }
+              );
+            }
           }
 
           continue;
@@ -446,7 +458,8 @@ export async function tryDispatchPendingReviews(
 
 async function dispatchReservedReview(reservation: ReservedReview, owner: Owner): Promise<boolean> {
   const { review, dispatchReservationId } = reservation;
-  const platform: CodeReviewPlatform = review.platform === 'gitlab' ? 'gitlab' : 'github';
+  const platform = parseCodeReviewPlatform(review.platform);
+  const manualConfig = getManualCodeReviewConfig(review);
 
   logExceptInTest('[dispatchReview] Dispatching review', {
     reviewId: review.id,
@@ -461,21 +474,30 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     return false;
   }
 
-  const agentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
+  let agentConfig: Parameters<typeof prepareReviewPayload>[0]['agentConfig'];
 
-  if (!agentConfig) {
-    throw new Error(
-      `Agent config not found for owner ${owner.type}:${owner.id} on platform ${platform}`
-    );
-  }
+  if (manualConfig) {
+    agentConfig = { config: manualConfig.agentConfig };
+  } else {
+    const persistedAgentConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
+    if (!persistedAgentConfig) {
+      throw new Error(
+        `Agent config not found for owner ${owner.type}:${owner.id} on platform ${platform}`
+      );
+    }
 
-  const actionRequiredState = getCodeReviewActionRequiredState(agentConfig);
-  if (actionRequiredState) {
-    throw new CodeReviewActionRequiredDispatchError(actionRequiredState.reason);
-  }
+    const actionRequiredState = getCodeReviewActionRequiredState(persistedAgentConfig);
+    if (actionRequiredState) {
+      throw new CodeReviewActionRequiredDispatchError(actionRequiredState.reason);
+    }
 
-  if (!agentConfig.is_enabled) {
-    throw new Error(`Code Reviewer is disabled for owner ${owner.type}:${owner.id} on ${platform}`);
+    if (!persistedAgentConfig.is_enabled) {
+      throw new Error(
+        `Code Reviewer is disabled for owner ${owner.type}:${owner.id} on ${platform}`
+      );
+    }
+
+    agentConfig = persistedAgentConfig;
   }
 
   const payload = await prepareReviewPayload({
@@ -485,11 +507,13 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     platform,
   });
   const analyticsPrompt =
-    owner.type === 'org'
+    owner.type === 'org' && manualConfig?.outputMode !== 'kilo' && platform !== PLATFORM.BITBUCKET
       ? appendCodeReviewAnalyticsPromptAppendix(payload.sessionInput.prompt)
       : null;
   const shouldEnrollAnalytics =
     owner.type === 'org' &&
+    manualConfig?.outputMode !== 'kilo' &&
+    platform !== PLATFORM.BITBUCKET &&
     getReviewAnalyticsEnabledFromConfig(agentConfig.config) &&
     analyticsPrompt !== null;
 
@@ -500,10 +524,11 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     return false;
   }
 
-  const agentVersion = 'v2';
   const attempt = await ensureCurrentCodeReviewAttemptFromReview(review, shouldEnrollAnalytics);
   const analyticsEnabledAtDispatch =
-    owner.type === 'org' && attempt.analytics_enabled_at_dispatch === true;
+    owner.type === 'org' &&
+    platform !== PLATFORM.BITBUCKET &&
+    attempt.analytics_enabled_at_dispatch === true;
 
   let dispatchPayload = payload;
   if (analyticsEnabledAtDispatch) {
@@ -551,7 +576,6 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       ...dispatchPayload,
       attemptId: attempt.id,
       skipBalanceCheck: true,
-      agentVersion,
     });
   } catch (dispatchError) {
     errorExceptInTest('[dispatchReview] Worker dispatch failed, leaving review queued', {
@@ -568,7 +592,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
   try {
     await db
       .update(cloud_agent_code_reviews)
-      .set({ agent_version: agentVersion })
+      .set({ agent_version: 'v2' })
       .where(eq(cloud_agent_code_reviews.id, review.id));
   } catch (error) {
     errorExceptInTest('[dispatchReview] Failed to persist agent version after dispatch', {
@@ -577,7 +601,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     });
     captureException(error, {
       tags: { operation: 'dispatch-review-record-agent-version' },
-      extra: { reviewId: review.id, owner, agentVersion },
+      extra: { reviewId: review.id, owner },
     });
   }
 
@@ -623,11 +647,11 @@ async function handleAmbiguousDispatchFailure(
       ? workerTerminalReason
       : classifiedReason;
 
-    if (actionRequiredReason) {
+    if (actionRequiredReason && getManualCodeReviewConfig(review) === null) {
       try {
         await disableCodeReviewForActionRequiredFailure({
           owner,
-          platform: review.platform === 'gitlab' ? 'gitlab' : 'github',
+          platform: parseCodeReviewPlatform(review.platform),
           reviewId: review.id,
           reason: actionRequiredReason,
           errorMessage: workerStatus.errorMessage ?? actionRequiredReason,

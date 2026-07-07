@@ -51,6 +51,7 @@ import {
   fetchExpiringTransactionsForOrganization,
   computeNextExpirationAmount,
   processOrganizationExpirations,
+  closeOutExpiringOrganizationCredits,
 } from '@/lib/creditExpiration';
 import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
@@ -729,17 +730,30 @@ export const organizationAdminRouter = createTRPCRouter({
           });
         }
 
-        await tx.insert(credit_transactions).values({
-          kilo_user_id: user.id,
-          created_by_kilo_user_id: user.id,
-          is_free: true,
-          amount_microdollars: -currentBalance,
-          description: description?.trim() || 'Admin credit nullification',
-          credit_category: 'organization_custom',
-          expiry_date: null,
-          organization_id: organizationId,
-          original_baseline_microdollars_used: lockedOrg.microdollars_used,
-        });
+        // Close out any still-open expiring grants first, so their expiry claim
+        // can never be counted again (e.g. by the Balance page's "credits
+        // expiring soon" total) once this organization's credits are re-granted
+        // later with a different expiration date.
+        const closedOutExpiring = await closeOutExpiringOrganizationCredits(
+          organizationId,
+          lockedOrg.microdollars_used,
+          tx
+        );
+        const remainingToOffset = Math.max(0, currentBalance + closedOutExpiring);
+
+        if (remainingToOffset > 0) {
+          await tx.insert(credit_transactions).values({
+            kilo_user_id: user.id,
+            created_by_kilo_user_id: user.id,
+            is_free: true,
+            amount_microdollars: -remainingToOffset,
+            description: description?.trim() || 'Admin credit nullification',
+            credit_category: 'organization_custom',
+            expiry_date: null,
+            organization_id: organizationId,
+            original_baseline_microdollars_used: lockedOrg.microdollars_used,
+          });
+        }
 
         await tx
           .update(organizations)

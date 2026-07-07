@@ -304,7 +304,7 @@ const getPngDimensions = (dataUrl: string): { height: number; width: number } | 
   }
 };
 
-// Ponytail: one global capture lock since captureVisibleTab grabs whichever tab is active in a window, so the activate/capture/restore window must not interleave (screenshots are rare; key per-window only if throughput matters).
+// One global capture lock since captureVisibleTab grabs whichever tab is active in a window, so the activate/capture/restore window must not interleave (screenshots are rare; key per-window only if throughput matters).
 const ignoreSettled = (): void => {};
 // eslint-disable-next-line promise/prefer-await-to-then
 let screenshotCaptureChain: Promise<unknown> = Promise.resolve();

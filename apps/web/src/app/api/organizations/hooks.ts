@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { Organization } from '@kilocode/db/schema';
-import type { OrgTrialStatus, TimePeriod } from '@/lib/organizations/organization-types';
+import type { OrgTrialStatus } from '@/lib/organizations/organization-types';
 import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
 import { z } from 'zod';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
@@ -89,42 +89,6 @@ export const useInvalidateAllOrganizationData = () => {
   };
 };
 
-export function useOrganizationUsageDetails(
-  organizationId: string,
-  timePeriod: string = 'week',
-  userFilter: string = 'all',
-  groupByModel: boolean = false
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.usageDetails.get.queryOptions({
-      organizationId,
-      period: timePeriod as 'week' | 'month' | 'year' | 'all',
-      userFilter: userFilter as 'all' | 'me',
-      groupByModel,
-    })
-  );
-}
-
-export function useOrganizationUsageTimeseries(
-  organizationId: string,
-  startDate: string,
-  endDate: string,
-  options?: { enabled?: boolean }
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.usageDetails.getTimeSeries.queryOptions(
-      {
-        organizationId,
-        startDate,
-        endDate,
-      },
-      options
-    )
-  );
-}
-
 export function useOrganizationCreditTransactions(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.creditTransactions.queryOptions({ organizationId }));
@@ -133,19 +97,6 @@ export function useOrganizationCreditTransactions(organizationId: string) {
 export function useOrganizationUsageStats(organizationId: string) {
   const trpc = useTRPC();
   return useQuery(trpc.organizations.usageStats.queryOptions({ organizationId }));
-}
-
-export function useOrganizationAutocompleteMetrics(
-  organizationId: string,
-  period: TimePeriod = 'month'
-) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.usageDetails.getAutocomplete.queryOptions({
-      organizationId,
-      period,
-    })
-  );
 }
 
 export function useOrganizationInvoices(organizationId: string, timePeriod: string = 'year') {

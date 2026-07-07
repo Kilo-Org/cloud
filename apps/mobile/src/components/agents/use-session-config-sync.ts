@@ -1,8 +1,9 @@
+import { type ResolvedSession } from 'cloud-agent-sdk';
 import { useEffect, useState } from 'react';
 
 import { normalizeAgentMode } from '@/components/agents/mode-options';
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 type SessionConfigSnapshot = {
   mode?: string | null;
@@ -10,11 +11,16 @@ type SessionConfigSnapshot = {
   variant?: string | null;
 };
 
-type UseSessionConfigSyncOptions = {
+type ResolveSessionConfigSelectionOptions = {
+  activeSessionType: ResolvedSession['type'] | null;
   fetchedData: SessionConfigSnapshot | null;
   sessionConfig: SessionConfigSnapshot | null | undefined;
-  modelOptions: ModelOption[];
+  modelOptions: SessionModelOption[];
+  selectedModel: string;
+  selectedVariant: string;
 };
+
+type UseSessionConfigSyncOptions = ResolveSessionConfigSelectionOptions;
 
 type UseSessionConfigSyncResult = {
   currentMode: AgentMode;
@@ -25,55 +31,94 @@ type UseSessionConfigSyncResult = {
   setCurrentVariant: (variant: string) => void;
 };
 
-// Keeps the composer's mode/model/variant in sync with the session's
-// fetched data and the SDK session config (which is updated from assistant
-// messages during snapshot replay). For sessions without a configured model
-// (e.g. remote CLI sessions), auto-selects the first available model.
-export function useSessionConfigSync({
+export function resolveSessionConfigSelection({
+  activeSessionType,
   fetchedData,
   sessionConfig,
   modelOptions,
+  selectedModel,
+  selectedVariant,
+}: ResolveSessionConfigSelectionOptions): { model: string; variant: string } {
+  if (activeSessionType === 'remote') {
+    return { model: selectedModel, variant: selectedVariant };
+  }
+
+  const configuredModel = sessionConfig?.model ?? fetchedData?.model ?? '';
+  if (configuredModel) {
+    return {
+      model: configuredModel,
+      variant: sessionConfig?.variant ?? fetchedData?.variant ?? '',
+    };
+  }
+
+  if (activeSessionType !== 'cloud-agent' || fetchedData === null) {
+    return { model: '', variant: '' };
+  }
+
+  const firstModel = modelOptions[0];
+  return firstModel
+    ? { model: firstModel.id, variant: firstModel.variants[0] ?? '' }
+    : { model: '', variant: '' };
+}
+
+export function useSessionConfigSync({
+  activeSessionType,
+  fetchedData,
+  sessionConfig,
+  modelOptions,
+  selectedModel,
+  selectedVariant,
 }: UseSessionConfigSyncOptions): UseSessionConfigSyncResult {
+  const initialSelection = resolveSessionConfigSelection({
+    activeSessionType,
+    fetchedData,
+    sessionConfig,
+    modelOptions,
+    selectedModel,
+    selectedVariant,
+  });
   const [currentMode, setCurrentMode] = useState<AgentMode>(() =>
     normalizeAgentMode(fetchedData?.mode)
   );
-  const [currentModel, setCurrentModel] = useState<string>(fetchedData?.model ?? '');
-  const [currentVariant, setCurrentVariant] = useState<string>(fetchedData?.variant ?? '');
+  const [currentModel, setCurrentModel] = useState(initialSelection.model);
+  const [currentVariant, setCurrentVariant] = useState(initialSelection.variant);
 
   useEffect(() => {
     const mode = sessionConfig?.mode ?? fetchedData?.mode;
     if (mode) {
       setCurrentMode(normalizeAgentMode(mode));
     }
-
-    const model = sessionConfig?.model ?? fetchedData?.model;
-    if (model) {
-      setCurrentModel(model);
-    }
-
-    const variant = sessionConfig?.variant ?? fetchedData?.variant;
-    if (variant) {
-      setCurrentVariant(variant);
-    }
-  }, [
-    sessionConfig?.mode,
-    sessionConfig?.model,
-    sessionConfig?.variant,
-    fetchedData?.mode,
-    fetchedData?.model,
-    fetchedData?.variant,
-  ]);
+  }, [sessionConfig?.mode, fetchedData?.mode]);
 
   useEffect(() => {
-    if (currentModel || modelOptions.length === 0 || fetchedData === null) {
+    const selection = resolveSessionConfigSelection({
+      activeSessionType,
+      fetchedData,
+      sessionConfig,
+      modelOptions,
+      selectedModel,
+      selectedVariant,
+    });
+    const isAutoSelectingFirstModel =
+      activeSessionType === 'cloud-agent' &&
+      fetchedData !== null &&
+      !sessionConfig?.model &&
+      !fetchedData.model &&
+      selection.model === modelOptions[0]?.id;
+    if (isAutoSelectingFirstModel && currentModel) {
       return;
     }
-    const firstModel = modelOptions[0];
-    if (firstModel) {
-      setCurrentModel(firstModel.id);
-      setCurrentVariant(firstModel.variants[0] ?? '');
-    }
-  }, [currentModel, modelOptions, fetchedData]);
+    setCurrentModel(selection.model);
+    setCurrentVariant(selection.variant);
+  }, [
+    activeSessionType,
+    sessionConfig,
+    fetchedData,
+    modelOptions,
+    selectedModel,
+    selectedVariant,
+    currentModel,
+  ]);
 
   return {
     currentMode,

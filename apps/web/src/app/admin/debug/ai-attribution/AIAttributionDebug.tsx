@@ -9,6 +9,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm';
 import { Loader2, Search, Plus, Minus, CheckCircle, XCircle, Clock, Trash2 } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
@@ -17,6 +18,7 @@ import { ProjectCombobox, FilePathCombobox, BranchCombobox } from './CodeIndexin
 
 export function AIAttributionDebug() {
   const trpc = useTRPC();
+  const confirm = useConfirm();
   const [organizationId, setOrganizationId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [filePath, setFilePath] = useState('');
@@ -44,11 +46,14 @@ export function AIAttributionDebug() {
     })
   );
 
-  const handleDeleteAttribution = (attributionId: number) => {
+  const handleDeleteAttribution = async (attributionId: number) => {
     if (
-      window.confirm(
-        `Are you sure you want to delete attribution #${attributionId}? This will also delete all associated lines added/removed records.`
-      )
+      await confirm({
+        title: `Delete attribution #${attributionId}?`,
+        description: 'This also deletes all associated lines added/removed records.',
+        confirmLabel: 'Delete attribution',
+        destructive: true,
+      })
     ) {
       deleteAttributionMutation.mutate({
         organization_id: organizationId,

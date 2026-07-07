@@ -17,6 +17,7 @@ type MobileToolbarPopoverProps = {
   onModeChange?: (mode: AgentMode) => void;
   model?: string;
   modelOptions: ModelOption[];
+  pinnedModelOption?: ModelOption;
   onModelChange?: (model: string) => void;
   isLoadingModels?: boolean;
   variant?: string;
@@ -38,6 +39,7 @@ export function MobileToolbarPopover({
   onModeChange,
   model,
   modelOptions,
+  pinnedModelOption,
   onModelChange,
   isLoadingModels,
   variant,
@@ -53,7 +55,7 @@ export function MobileToolbarPopover({
 }: MobileToolbarPopoverProps) {
   const [open, setOpen] = useState(false);
 
-  const selectedModel = modelOptions.find(m => m.id === model);
+  const selectedModel = [pinnedModelOption, ...modelOptions].find(m => m?.id === model);
   const displayName = selectedModel
     ? formatShortModelDisplayName(selectedModel.name)
     : 'Select model';
@@ -99,6 +101,7 @@ export function MobileToolbarPopover({
             ) : (
               <ModelCombobox
                 models={modelOptions}
+                pinnedModel={pinnedModelOption}
                 value={model}
                 onValueChange={onModelChange}
                 isLoading={isLoadingModels}

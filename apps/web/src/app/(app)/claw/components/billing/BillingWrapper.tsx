@@ -51,6 +51,9 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
   const [showPlanDialog, setShowPlanDialog] = useState(false);
 
   const reactivate = useMutation(trpc.kiloclaw.reactivateSubscriptionAtInstance.mutationOptions());
+  const reprovisionAndEnrollWithCredits = useMutation(
+    trpc.kiloclaw.reprovisionAndEnrollWithCredits.mutationOptions()
+  );
   const billingPortal = useMutation(trpc.kiloclaw.getCustomerPortalUrl.mutationOptions());
   const destroy = useMutation(
     trpc.kiloclaw.destroy.mutationOptions({
@@ -120,6 +123,35 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
     );
   }
 
+  function handleReprovisionCredits() {
+    if (reprovisionAndEnrollWithCredits.isPending) return;
+    reprovisionAndEnrollWithCredits.mutate(
+      { plan: 'standard' },
+      {
+        onSuccess: result => {
+          void Promise.all([
+            queryClient.invalidateQueries({ queryKey: trpc.kiloclaw.getStatus.queryKey() }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getActivePersonalBillingStatus.queryKey(),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.getPersonalBillingSummary.queryKey(),
+            }),
+            queryClient.invalidateQueries({
+              queryKey: trpc.kiloclaw.listPersonalSubscriptions.queryKey(),
+            }),
+          ]);
+          if (result.status === 'activated') {
+            toast.success('KiloClaw activated with credits');
+          } else {
+            toast.error(result.message ?? 'KiloClaw was reprovisioned but activation needs retry.');
+          }
+        },
+        onError: err => toast.error(err.message),
+      }
+    );
+  }
+
   return (
     <>
       {/* Banner — or earlybird card in the banner position */}
@@ -144,6 +176,7 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
         reason={lockReason}
         billing={billing}
         onSubscribeClick={handleSubscribe}
+        onReprovisionCreditsClick={handleReprovisionCredits}
         onUpdatePaymentClick={handleUpdatePayment}
         onDestroyClick={() =>
           destroy.mutate(undefined, {
@@ -152,6 +185,7 @@ export function BillingWrapper({ children, hideBanners }: BillingWrapperProps) {
           })
         }
         isDestroying={destroy.isPending}
+        isReprovisioning={reprovisionAndEnrollWithCredits.isPending}
       />
 
       {/* Dashboard content */}

@@ -76,6 +76,67 @@ describe('cli-sessions-v2-router', () => {
     testOrganization = org;
   });
 
+  describe('getSessionMessages', () => {
+    const sessionId = 'ses_snapshot_metadata_test_1234';
+    let fetchSpy: jest.SpyInstance;
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+      });
+      fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            info: {
+              id: sessionId,
+              model: {
+                providerID: 'anthropic',
+                id: 'claude-sonnet-4',
+                variant: 'thinking',
+              },
+            },
+            messages: [{ info: { id: 'msg_1', role: 'user' }, parts: [] }],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+    });
+
+    afterEach(async () => {
+      fetchSpy.mockRestore();
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns validated snapshot info together with messages', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      const result = await caller.cliSessionsV2.getSessionMessages({ session_id: sessionId });
+
+      expect(result).toEqual({
+        info: {
+          id: sessionId,
+          model: {
+            providerID: 'anthropic',
+            id: 'claude-sonnet-4',
+            variant: 'thinking',
+          },
+        },
+        messages: [{ info: { id: 'msg_1', role: 'user' }, parts: [] }],
+      });
+    });
+
+    it('does not fetch a snapshot for a session owned by another user', async () => {
+      const caller = await createCallerForUser(otherUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessages({ session_id: sessionId })
+      ).rejects.toThrow('Session not found');
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+  });
+
   describe('shareForWebhookTrigger', () => {
     let triggerId: string;
     let profileId: string;

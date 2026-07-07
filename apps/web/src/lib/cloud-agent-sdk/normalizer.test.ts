@@ -447,6 +447,45 @@ describe('normalize', () => {
       });
     });
 
+    it('preserves session model identity from session.created', () => {
+      const result = normalize(
+        createRaw('session.created', {
+          info: {
+            id: 'ses-1',
+            model: {
+              providerID: 'custom-provider',
+              id: 'deployment/model.v1',
+              variant: 'thinking',
+            },
+          },
+        })
+      );
+
+      expect(result).toEqual({
+        type: 'session.created',
+        info: {
+          id: 'ses-1',
+          parentID: undefined,
+          model: {
+            providerID: 'custom-provider',
+            id: 'deployment/model.v1',
+            variant: 'thinking',
+          },
+        },
+      });
+    });
+
+    it('omits malformed session model metadata without dropping the event', () => {
+      const result = normalizeCliEvent('session.created', {
+        info: { id: 'ses-1', model: { providerID: 'openai', id: 42 } },
+      });
+
+      expect(result).toEqual({
+        type: 'session.created',
+        info: { id: 'ses-1', parentID: undefined },
+      });
+    });
+
     it('returns null when info is missing', () => {
       expect(normalize(createRaw('session.created', {}))).toBeNull();
     });
@@ -464,6 +503,24 @@ describe('normalize', () => {
       expect(result).toEqual({
         type: 'session.updated',
         info: { id: 'ses-1', parentID: undefined },
+      });
+    });
+
+    it('preserves session model identity from session.updated', () => {
+      const result = normalizeCliEvent('session.updated', {
+        info: {
+          id: 'ses-1',
+          model: { providerID: 'openai', id: 'gpt-5.1' },
+        },
+      });
+
+      expect(result).toEqual({
+        type: 'session.updated',
+        info: {
+          id: 'ses-1',
+          parentID: undefined,
+          model: { providerID: 'openai', id: 'gpt-5.1' },
+        },
       });
     });
 

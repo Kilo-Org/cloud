@@ -11,6 +11,7 @@ import { eq, and, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import { fetchExpiringTransactionsForOrganization } from '@/lib/creditExpiration';
 import type { User, Organization } from '@kilocode/db/schema';
 
 jest.mock('@/lib/organizations/organization-billing', () => ({
@@ -703,6 +704,92 @@ describe('organization admin router', () => {
         .where(eq(organizations.id, testOrganization.id));
 
       expect(updatedOrg.microdollars_balance).toBe(0);
+    });
+  });
+
+  // Regression for the "credits expiring soon" total keeping stale/removed
+  // grants: an admin nullifies credits, then re-grants credits with a new
+  // expiration date. The Balance page's expiring-soon total must reflect
+  // only the current, still-open grant — not the nullified one on top of it.
+  describe('nullifyCredits then re-grant — expiring credits total', () => {
+    beforeEach(async () => {
+      await db
+        .update(organizations)
+        .set({
+          total_microdollars_acquired: 0,
+          microdollars_used: 0,
+          microdollars_balance: 0,
+          next_credit_expiration_at: null,
+        })
+        .where(eq(organizations.id, testOrganization.id));
+
+      await db
+        .delete(credit_transactions)
+        .where(eq(credit_transactions.organization_id, testOrganization.id));
+    });
+
+    it('does not double-count a nullified grant after re-granting with a new expiry', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      // 1. Grant $100 expiring in the future.
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 100,
+        expiry_date: '2030-01-01T00:00:00.000Z',
+      });
+
+      // 2. Remove (nullify) all credits.
+      await caller.organizations.admin.nullifyCredits({
+        organizationId: testOrganization.id,
+      });
+
+      // 3. Re-add $40 with a different expiration date.
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 40,
+        expiry_date: '2030-06-01T00:00:00.000Z',
+      });
+
+      const creditBlocks = await caller.organizations.getCreditBlocks({
+        organizationId: testOrganization.id,
+      });
+
+      const expiringTotal = creditBlocks.creditBlocks
+        .filter(block => block.expiry_date !== null)
+        .reduce((sum, block) => sum + block.balance_mUsd, 0);
+
+      // Only the $40 re-grant should count as expiring soon; the nullified
+      // $100 grant must not still be summed in on top of it.
+      expect(expiringTotal).toBe(40_000_000);
+      expect(creditBlocks.totalBalance_mUsd).toBe(40_000_000);
+    });
+
+    it('closes out multiple still-open grants on nullification', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 60,
+        expiry_date: '2030-01-01T00:00:00.000Z',
+      });
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 30,
+        expiry_date: '2030-02-01T00:00:00.000Z',
+      });
+
+      await caller.organizations.admin.nullifyCredits({
+        organizationId: testOrganization.id,
+      });
+
+      const expiring = await fetchExpiringTransactionsForOrganization(testOrganization.id);
+      expect(expiring).toHaveLength(0);
+
+      const creditBlocks = await caller.organizations.getCreditBlocks({
+        organizationId: testOrganization.id,
+      });
+      expect(creditBlocks.totalBalance_mUsd).toBe(0);
+      expect(creditBlocks.creditBlocks).toHaveLength(0);
     });
   });
 

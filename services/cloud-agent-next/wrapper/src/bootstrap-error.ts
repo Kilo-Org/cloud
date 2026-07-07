@@ -1,6 +1,9 @@
 import type { WorkspaceFailureSubtype } from '../../src/shared/wrapper-bootstrap.js';
 
-export type WrapperBootstrapErrorCode = 'WORKSPACE_SETUP_FAILED' | 'KILO_SERVER_FAILED';
+export type WrapperBootstrapErrorCode =
+  | 'WORKSPACE_RECONCILIATION_FAILED'
+  | 'WORKSPACE_SETUP_FAILED'
+  | 'KILO_SERVER_FAILED';
 
 export class WrapperBootstrapError extends Error {
   readonly code: WrapperBootstrapErrorCode;

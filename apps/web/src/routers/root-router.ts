@@ -9,7 +9,6 @@ import { codeIndexingRouter } from '@/routers/code-indexing/code-indexing-router
 import { deploymentsRouter } from '@/routers/deployments-router';
 import { cliSessionsRouter } from '@/routers/cli-sessions-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';
-import { cloudAgentRouter } from '@/routers/cloud-agent-router';
 import { cloudAgentNextRouter } from '@/routers/cloud-agent-next-router';
 import { githubAppsRouter } from '@/routers/github-apps-router';
 import { gitlabRouter } from '@/routers/gitlab-router';
@@ -44,6 +43,8 @@ import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
+import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
+import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -61,7 +62,6 @@ export const rootRouter = createTRPCRouter({
   linear: linearRouter,
   dolthub: dolthubRouter,
   discord: discordRouter,
-  cloudAgent: cloudAgentRouter,
   cloudAgentNext: cloudAgentNextRouter,
   codeReviews: codeReviewRouter,
   reviewMemory: reviewMemoryRouter,
@@ -89,6 +89,8 @@ export const rootRouter = createTRPCRouter({
   activeSessions: activeSessionsRouter,
   usageAnalytics: usageAnalyticsRouter,
   mcpGateway: mcpGatewayRouter,
+  mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,
+  modelPreferences: modelPreferencesRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

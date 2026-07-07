@@ -18,11 +18,18 @@ jest.mock('@/lib/cost-insights/posthog-tracking', () => ({
   trackCostInsightsUiInteraction: jest.fn(),
 }));
 
+jest.mock('@/lib/posthog-feature-flags', () => ({
+  isReleaseToggleEnabled: jest.fn(async () => true),
+}));
+
 const trackingMock: {
   trackCostInsightsAlertAction: jest.Mock;
   trackCostInsightsSuggestionAction: jest.Mock;
   trackCostInsightsUiInteraction: jest.Mock;
 } = jest.requireMock('@/lib/cost-insights/posthog-tracking');
+const featureFlagMock: {
+  isReleaseToggleEnabled: jest.Mock;
+} = jest.requireMock('@/lib/posthog-feature-flags');
 
 let createCallerForUser: typeof CreateCallerForUser;
 
@@ -35,10 +42,12 @@ describe('Organization Cost Insights tracking', () => {
     trackingMock.trackCostInsightsAlertAction.mockClear();
     trackingMock.trackCostInsightsSuggestionAction.mockClear();
     trackingMock.trackCostInsightsUiInteraction.mockClear();
+    featureFlagMock.isReleaseToggleEnabled.mockReset();
+    featureFlagMock.isReleaseToggleEnabled.mockImplementation(async () => true);
   });
 
-  it('attributes UI interactions to the acting admin organization owner', async () => {
-    const owner = await insertTestUser({ is_admin: true });
+  it('attributes UI interactions to the acting enabled organization owner', async () => {
+    const owner = await insertTestUser();
     const organization = await createOrganization('Cost Insights Tracking Org', owner.id);
     const caller = await createCallerForUser(owner.id);
 
@@ -63,11 +72,15 @@ describe('Organization Cost Insights tracking', () => {
         filter: 'alerts',
       }
     );
+    expect(featureFlagMock.isReleaseToggleEnabled).toHaveBeenCalledWith(
+      'cost-insights',
+      organization.id
+    );
   });
 
-  it('allows admin billing managers to track suggestion CTA engagement', async () => {
+  it('allows enabled billing managers to track suggestion CTA engagement', async () => {
     const owner = await insertTestUser();
-    const billingManager = await insertTestUser({ is_admin: true });
+    const billingManager = await insertTestUser();
     const organization = await createOrganization('Cost Insights Billing Org', owner.id);
     await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
     const caller = await createCallerForUser(billingManager.id);
@@ -91,7 +104,7 @@ describe('Organization Cost Insights tracking', () => {
   });
 
   it('acknowledges only the displayed organization alert event', async () => {
-    const owner = await insertTestUser({ is_admin: true });
+    const owner = await insertTestUser();
     const organization = await createOrganization('Cost Insights Review Org', owner.id);
     const [alertEvent] = await db
       .insert(cost_insight_events)
@@ -136,35 +149,33 @@ describe('Organization Cost Insights tracking', () => {
     expect(trackingMock.trackCostInsightsAlertAction).toHaveBeenCalledTimes(1);
   });
 
-  it('limits notification access to admin owners and billing managers', async () => {
+  it('limits notification access to owners and billing managers', async () => {
     const owner = await insertTestUser();
-    const adminBillingManager = await insertTestUser({ is_admin: true });
-    const nonAdminBillingManager = await insertTestUser();
-    const adminMember = await insertTestUser({ is_admin: true });
+    const billingManager = await insertTestUser();
+    const member = await insertTestUser();
     const adminPersonalOwner = await insertTestUser({ is_admin: true });
     const organization = await createOrganization('Cost Insights Notification Org', owner.id);
-    await addUserToOrganization(organization.id, adminBillingManager.id, 'billing_manager');
-    await addUserToOrganization(organization.id, nonAdminBillingManager.id, 'billing_manager');
-    await addUserToOrganization(organization.id, adminMember.id, 'member');
+    await addUserToOrganization(organization.id, billingManager.id, 'billing_manager');
+    await addUserToOrganization(organization.id, member.id, 'member');
 
     await expect(
       listCostInsightNotificationRecipientUserIds(db, {
         type: 'organization',
         id: organization.id,
       })
-    ).resolves.toEqual([adminBillingManager.id]);
+    ).resolves.toEqual([billingManager.id, owner.id].sort());
     await expect(
       hasCurrentCostInsightAccess(
         db,
         { type: 'organization', id: organization.id },
-        adminBillingManager.id
+        billingManager.id
       )
     ).resolves.toBe(true);
     await expect(
       hasCurrentCostInsightAccess(db, { type: 'organization', id: organization.id }, owner.id)
-    ).resolves.toBe(false);
+    ).resolves.toBe(true);
     await expect(
-      hasCurrentCostInsightAccess(db, { type: 'organization', id: organization.id }, adminMember.id)
+      hasCurrentCostInsightAccess(db, { type: 'organization', id: organization.id }, member.id)
     ).resolves.toBe(false);
     await expect(
       listCostInsightNotificationRecipientUserIds(db, { type: 'user', id: owner.id })
@@ -177,9 +188,10 @@ describe('Organization Cost Insights tracking', () => {
     ).resolves.toEqual([adminPersonalOwner.id]);
   });
 
-  it('rejects every Cost Insights procedure for non-admin organization owners', async () => {
+  it('rejects every Cost Insights procedure when the organization flag is disabled', async () => {
+    featureFlagMock.isReleaseToggleEnabled.mockImplementation(async () => false);
     const owner = await insertTestUser();
-    const organization = await createOrganization('Cost Insights Non-Admin Org', owner.id);
+    const organization = await createOrganization('Cost Insights Disabled Org', owner.id);
     const caller = await createCallerForUser(owner.id);
     const organizationId = organization.id;
     const calls = [
@@ -229,10 +241,29 @@ describe('Organization Cost Insights tracking', () => {
     for (const call of calls) {
       await expect(call()).rejects.toMatchObject({
         code: 'FORBIDDEN',
-        message: 'Admin access required',
+        message: 'Cost Insights is not enabled for this organization.',
       });
     }
     expect(trackingMock.trackCostInsightsUiInteraction).not.toHaveBeenCalled();
     expect(trackingMock.trackCostInsightsSuggestionAction).not.toHaveBeenCalled();
+  });
+
+  it('rejects enabled organization members without owner or billing manager role', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const organization = await createOrganization('Cost Insights Member Org', owner.id);
+    await addUserToOrganization(organization.id, member.id, 'member');
+    const caller = await createCallerForUser(member.id);
+
+    await expect(
+      caller.organizations.costInsights.getDashboard({ organizationId: organization.id })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Only an organization owner or billing manager can access Cost Insights.',
+    });
+    await expect(
+      caller.organizations.costInsights.getAccessState({ organizationId: organization.id })
+    ).resolves.toEqual({ enabled: false });
+    expect(featureFlagMock.isReleaseToggleEnabled).not.toHaveBeenCalled();
   });
 });

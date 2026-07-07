@@ -461,12 +461,10 @@ export async function listCostInsightNotificationRecipientUserIds(
   const rows = await database
     .select({ userId: organization_memberships.kilo_user_id })
     .from(organization_memberships)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
     .where(
       and(
         eq(organization_memberships.organization_id, owner.id),
-        inArray(organization_memberships.role, ['owner', 'billing_manager']),
-        eq(kilocode_users.is_admin, true)
+        inArray(organization_memberships.role, ['owner', 'billing_manager'])
       )
     )
     .orderBy(organization_memberships.kilo_user_id);
@@ -1056,13 +1054,11 @@ export async function hasCurrentCostInsightAccess(
   const [row] = await database
     .select({ id: organization_memberships.id })
     .from(organization_memberships)
-    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
     .where(
       and(
         eq(organization_memberships.organization_id, owner.id),
         eq(organization_memberships.kilo_user_id, userId),
-        inArray(organization_memberships.role, ['owner', 'billing_manager']),
-        eq(kilocode_users.is_admin, true)
+        inArray(organization_memberships.role, ['owner', 'billing_manager'])
       )
     )
     .limit(1);

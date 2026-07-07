@@ -3,7 +3,9 @@ import { and, eq } from 'drizzle-orm';
 
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { adminProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
+import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
 import {
   buildCostInsightsDashboardData,
   buildCostInsightsEventHistoryData,
@@ -23,6 +25,12 @@ import {
 } from '@/lib/cost-insights/posthog-tracking';
 import { OrganizationIdInputSchema } from './utils';
 import { costInsightsRouterInternals } from '../cost-insights-router';
+
+const COST_INSIGHTS_FEATURE_FLAG = 'cost-insights';
+
+function hasCostInsightsRole(role: OrganizationRole | null): role is 'owner' | 'billing_manager' {
+  return role === 'owner' || role === 'billing_manager';
+}
 
 async function getDirectCostInsightsRole(organizationId: string, userId: string) {
   const [membership] = await db
@@ -52,11 +60,17 @@ async function getOrganizationName(organizationId: string): Promise<string> {
 async function resolveOrgReadContext(ctx: TRPCContext, organizationId: string) {
   const name = await getOrganizationName(organizationId);
   const directRole = await getDirectCostInsightsRole(organizationId, ctx.user.id);
-  const canManage = directRole === 'owner' || directRole === 'billing_manager';
+  if (!hasCostInsightsRole(directRole)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Only an organization owner or billing manager can access Cost Insights.',
+    });
+  }
+  await ensureOrganizationCostInsightsEnabled(organizationId);
   return {
     name,
-    authorizedRole: canManage ? directRole : 'admin',
-    readOnly: !canManage,
+    authorizedRole: directRole,
+    readOnly: false,
   } as const;
 }
 
@@ -76,17 +90,37 @@ function organizationTrackingContext(
 
 async function ensureOrgManageAccess(ctx: TRPCContext, organizationId: string) {
   const directRole = await getDirectCostInsightsRole(organizationId, ctx.user.id);
-  if (directRole !== 'owner' && directRole !== 'billing_manager') {
+  if (!hasCostInsightsRole(directRole)) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Only an organization owner or billing manager can change Cost Insights.',
     });
   }
+  await ensureOrganizationCostInsightsEnabled(organizationId);
   return directRole;
 }
 
+async function ensureOrganizationCostInsightsEnabled(organizationId: string) {
+  const enabled = await isReleaseToggleEnabled(COST_INSIGHTS_FEATURE_FLAG, organizationId);
+  if (!enabled) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Cost Insights is not enabled for this organization.',
+    });
+  }
+}
+
 export const organizationCostInsightsRouter = createTRPCRouter({
-  trackUiInteraction: adminProcedure
+  getAccessState: baseProcedure.input(OrganizationIdInputSchema).query(async ({ ctx, input }) => {
+    const directRole = await getDirectCostInsightsRole(input.organizationId, ctx.user.id);
+    if (!hasCostInsightsRole(directRole)) {
+      return { enabled: false };
+    }
+    return {
+      enabled: await isReleaseToggleEnabled(COST_INSIGHTS_FEATURE_FLAG, input.organizationId),
+    };
+  }),
+  trackUiInteraction: baseProcedure
     .input(costInsightsRouterInternals.OrganizationCostInsightsUiInteractionSchema)
     .mutation(async ({ ctx, input }) => {
       const access = await resolveOrgReadContext(ctx, input.organizationId);
@@ -96,7 +130,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
       );
       return { success: true };
     }),
-  trackSuggestionCta: adminProcedure
+  trackSuggestionCta: baseProcedure
     .input(costInsightsRouterInternals.OrganizationCostInsightsSuggestionCtaSchema)
     .mutation(async ({ ctx, input }) => {
       const role = await ensureOrgManageAccess(ctx, input.organizationId);
@@ -108,7 +142,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
       });
       return { success: true };
     }),
-  getDashboard: adminProcedure.input(OrganizationIdInputSchema).query(async ({ ctx, input }) => {
+  getDashboard: baseProcedure.input(OrganizationIdInputSchema).query(async ({ ctx, input }) => {
     const access = await resolveOrgReadContext(ctx, input.organizationId);
     return await buildCostInsightsDashboardData({
       database: db,
@@ -120,7 +154,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
       },
     });
   }),
-  getSettings: adminProcedure.input(OrganizationIdInputSchema).query(async ({ ctx, input }) => {
+  getSettings: baseProcedure.input(OrganizationIdInputSchema).query(async ({ ctx, input }) => {
     const access = await resolveOrgReadContext(ctx, input.organizationId);
     return await buildCostInsightsSettingsData({
       database: db,
@@ -133,7 +167,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
       readOnly: access.readOnly,
     });
   }),
-  listEvents: adminProcedure
+  listEvents: baseProcedure
     .input(
       OrganizationIdInputSchema.merge(costInsightsRouterInternals.CostInsightEventHistorySchema)
     )
@@ -147,7 +181,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
         pageSize: input.pageSize,
       });
     }),
-  getAttentionState: adminProcedure
+  getAttentionState: baseProcedure
     .input(OrganizationIdInputSchema)
     .query(async ({ ctx, input }) => {
       await resolveOrgReadContext(ctx, input.organizationId);
@@ -160,7 +194,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
         reviewItemCount,
       };
     }),
-  updateSettings: adminProcedure
+  updateSettings: baseProcedure
     .input(
       OrganizationIdInputSchema.merge(costInsightsRouterInternals.UpdateCostInsightsSettingsSchema)
     )
@@ -173,7 +207,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
         input,
       });
     }),
-  acknowledgeAlert: adminProcedure
+  acknowledgeAlert: baseProcedure
     .input(
       OrganizationIdInputSchema.merge(costInsightsRouterInternals.AcknowledgeCostInsightAlertSchema)
     )
@@ -194,7 +228,7 @@ export const organizationCostInsightsRouter = createTRPCRouter({
       }
       return { success: true };
     }),
-  dismissSuggestion: adminProcedure
+  dismissSuggestion: baseProcedure
     .input(
       OrganizationIdInputSchema.merge(
         costInsightsRouterInternals.DismissCostInsightSuggestionSchema

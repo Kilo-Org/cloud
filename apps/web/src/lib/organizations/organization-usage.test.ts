@@ -1,4 +1,6 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
+import { after } from 'next/server';
+import { sendBalanceAlertEmail } from '@/lib/email';
 import { db } from '@/lib/drizzle';
 import { organizations, organization_user_usage } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -13,9 +15,16 @@ import {
 import {
   getBalanceForOrganizationUser,
   ingestOrganizationTokenUsage,
+  mutateOrganizationUsage,
+  scheduleOrganizationLowBalanceAlert,
   updateOrganizationUserLimit,
 } from './organization-usage';
 import { createOrganizationUsage } from '@/tests/helpers/microdollar-usage.helper';
+
+jest.mock('@/lib/email', () => ({
+  ...jest.requireActual('@/lib/email'),
+  sendBalanceAlertEmail: jest.fn().mockResolvedValue(undefined),
+}));
 
 // Mock next/server's after function which requires request context
 jest.mock('next/server', () => {
@@ -30,6 +39,7 @@ jest.mock('next/server', () => {
 
 describe('Organization Usage Functions', () => {
   afterEach(async () => {
+    jest.clearAllMocks();
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
   });
@@ -165,6 +175,35 @@ describe('Organization Usage Functions', () => {
       // Verify balance unchanged
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
       expect(result.balance).toBe(0.04); // 40000 microdollars = 0.04 USD (unchanged)
+    });
+
+    test('separates low-balance mutation from exactly-once post-commit scheduling', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Balance Alert Org', user.id, 50_000, {
+        minimum_balance: 0.04,
+        minimum_balance_alert_email: ['billing@example.com'],
+      });
+      const usage = await createOrganizationUsage(20_000, user.id, organization.id);
+
+      const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
+
+      expect(result).toEqual({
+        crossedMinimumBalance: true,
+        recipients: ['billing@example.com'],
+        minimumBalanceMicrodollars: 40_000,
+      });
+      expect(jest.mocked(after)).not.toHaveBeenCalled();
+      expect(jest.mocked(sendBalanceAlertEmail)).not.toHaveBeenCalled();
+
+      scheduleOrganizationLowBalanceAlert(organization.id, result);
+
+      expect(jest.mocked(after)).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledTimes(1);
+      expect(jest.mocked(sendBalanceAlertEmail)).toHaveBeenCalledWith({
+        organizationId: organization.id,
+        minimum_balance: 0.04,
+        to: ['billing@example.com'],
+      });
     });
 
     test('should handle large cost usage', async () => {

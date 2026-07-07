@@ -58,6 +58,7 @@ export const subjects = {
   securityFindingNew: 'Kilo Security Agent: New finding',
   securityFindingSlaWarning: 'Kilo Security Agent: SLA warning',
   securityFindingSlaBreach: 'Kilo Security Agent: SLA breached',
+  costInsightSpendAlert: 'Kilo Cost Insights: Spend Alert',
   recommendationsDigest: 'Kilo: Your weekly recommendations',
 } as const;
 
@@ -257,6 +258,31 @@ export async function sendCodeReviewDisabledEmail(
       reason: props.reason,
       recovery_url: props.recoveryUrl,
       recovery_label: props.recoveryLabel,
+    },
+  });
+}
+
+export async function sendCostInsightSpendAlertEmail(
+  to: string,
+  props: {
+    ownerLabel: string;
+    alertTitle: string;
+    alertDescription: string;
+    primaryAmountLabel: string;
+    secondaryAmountLabel: string;
+    reviewUrl: string;
+  }
+): Promise<SendResult> {
+  return send({
+    to,
+    templateName: 'costInsightSpendAlert',
+    templateVars: {
+      owner_label: props.ownerLabel,
+      alert_title: props.alertTitle,
+      alert_description: props.alertDescription,
+      primary_amount_label: props.primaryAmountLabel,
+      secondary_amount_label: props.secondaryAmountLabel,
+      review_url: props.reviewUrl,
     },
   });
 }

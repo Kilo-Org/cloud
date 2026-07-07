@@ -1,13 +1,13 @@
-type AppsFlyerConsentState = {
+type AnalyticsConsentState = {
   readonly hasToken: boolean;
   readonly consentChecked: boolean;
   readonly needsConsent: boolean;
 };
 
-export function shouldStartAppsFlyer({
+export function shouldStartAnalytics({
   hasToken,
   consentChecked,
   needsConsent,
-}: AppsFlyerConsentState): boolean {
+}: AnalyticsConsentState): boolean {
   return hasToken && consentChecked && !needsConsent;
 }

@@ -99,4 +99,5 @@ Every template must include this branding footer below the content table:
 | `securityFindingNew.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `action_url`, `manage_notifications_url`, `year` | — |
 | `securityFindingSlaWarning.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `sla_deadline`, `action_url`, `manage_notifications_url`, `year` | — |
 | `securityFindingSlaBreach.html` | `severity`, `repository_name`, `finding_title`, `finding_description`, `finding_details`, `sla_deadline`, `action_url`, `manage_notifications_url`, `year` | — |
+| `costInsightSpendAlert.html` | `owner_label`, `alert_title`, `alert_description`, `primary_amount_label`, `secondary_amount_label`, `review_url`, `year` | — |
 | `recommendationsDigest.html` | `organization_name`, `adopted_summary`, `open_count`, `recommendations_section`, `dashboard_url`, `year` | — |

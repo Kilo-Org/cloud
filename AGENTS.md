@@ -21,14 +21,15 @@ scripts/          CI and one-off scripts
 
 ## Domain Context
 
-Before changing domain behavior, read `CONTEXT.md`.
-Use canonical terms from `CONTEXT.md` in code, docs, task descriptions, tests, and agent outputs.
-Do not introduce synonyms for existing concepts unless updating `CONTEXT.md` first.
-Do not duplicate the full context contract inside `AGENTS.md`.
+`CONTEXT.md` is the domain-language and ownership contract for the **Code Reviewer** and **Security Agent** domains only (review execution/analytics, Security Findings, Security Sync, notifications, remediation, and their email delivery — mainly `apps/web/src/lib/{code-reviews,security-agent}/`, `services/security-sync/`). It does not cover other areas of the monorepo.
+
+When working in those domains, read `CONTEXT.md` first and use its canonical terms in code, docs, task descriptions, tests, and agent outputs. Do not introduce synonyms for its concepts without updating `CONTEXT.md` first, and do not duplicate the full contract inside `AGENTS.md`.
 
 ## Verification
 
-After making changes, verify your work with the narrowest relevant checks. Avoid running the full `pnpm typecheck` by default; it is slow enough to make development environments unusable. Prefer targeted package checks or `scripts/typecheck-all.sh --changes-only`, and mention in your final response when the full typecheck was skipped for this reason. Run the full suite when appropriate. **Always run `pnpm format` before committing** — CI will reject unformatted code.
+Verify your work with the narrowest relevant checks. Prefer targeted package checks or `scripts/typecheck-all.sh --changes-only`.
+
+**Always run `pnpm format` before committing**
 
 | Command | What it checks |
 |---|---|
@@ -38,39 +39,13 @@ After making changes, verify your work with the narrowest relevant checks. Avoid
 | `pnpm validate` | All three above in sequence |
 | `pnpm format` | Auto-format with oxfmt |
 
-Target a specific test file: `pnpm test -- <path>`. Run tests for a specific service: `pnpm --filter <package> test`.
-
 **Before running tests**, ensure the test database is running. If there is no active Postgres instance, run `pnpm test:db` first — this starts the Postgres container and applies migrations. You can check whether Postgres is already running with `docker compose -f dev/docker-compose.yml ps postgres`.
-
-## apps/web UI Work
-
-When editing UI files in `apps/web` — React components, pages, layouts, or styles (`.tsx`/`.css`) — use the `kilo-design` skill.
-
-## Coding Standards
-
-- Prefer `type` over `interface`.
-- Use `as` casts sparingly, but do not ban them outright. Prefer `satisfies`, discriminated unions, generics, or flow-sensitive narrowing when TypeScript can be made to understand the type naturally.
-- A targeted `as` cast is acceptable when code is at a known boundary where TypeScript has lost information that the surrounding control flow guarantees. For example, inside a platform switch, casting `message` to `Message<SlackEvent>` or `Message<GitHubRawMessage>` is preferable to adding generic `Record<string, unknown>` property helpers just to read known adapter fields.
-- Avoid broad casts that hide real uncertainty, especially `as any`, double casts through `unknown`, or casting external/untrusted data without validation. Use runtime validation when the data shape is genuinely unknown, user-controlled, persisted, or coming from an API contract we do not own.
-- The above restrictions on `as` do not apply inside test files (e.g. `*.test.ts`, `*.spec.ts`, files under `__tests__/`, and other test fixtures/helpers). `as` casts are explicitly permitted in tests, where they are commonly needed for fixture construction, narrowing partial mocks, and exercising error paths. Production code conventions still apply to non-test code imported by tests.
-- Avoid `!` non-null assertions; prefer explicit checks or flow-sensitive typing.
-- Avoid mocks in tests; assert on results or check the database for side effects.
-- Prefer clear names over comments. Only comment things not obvious in context.
-- When the linter flags an unused variable, investigate the root cause — do not blindly prefix with `_`.
-- Use existing dependencies before implementing custom solutions. Check `package.json` for what's available.
 
 ## Timestamp Serialization
 
 - Drizzle/Postgres `timestamp({ withTimezone: true, mode: 'string' })` rows may surface timestamp text like `2026-04-29 01:16:12.945+00`, which strict ISO validators such as `z.string().datetime()` reject.
 - Before putting DB-backed timestamp strings into HTTP bodies, queue messages, or other strict JSON contracts, normalize them to UTC ISO with an existing domain serializer or `new Date(value).toISOString()`. Do not forward raw DB timestamp text across contract boundaries.
 - Keep strict validators unless the receiving contract intentionally accepts a broader format. Add regression fixtures using production-shape Postgres timestamp text when fixing or extending these paths.
-
-## Workers & Durable Objects
-
-- Do not cache database clients, pools, or other transport-owning/request-context-bound SDK objects in module scope for Cloudflare Workers or Durable Objects. Workers reuse isolates across requests, Durable Object classes in the same Worker can share module memory across object instances, and stale module-scope I/O state can cause cross-context runtime failures.
-- Create external database clients through approved per-use helpers such as `getWorkerDb(...)`; let Hyperdrive own pooling. Only cache pure data or context-independent values in module scope.
-- Durable Object instance fields are valid for object-local state created from constructor inputs, such as SQLite/Drizzle wrappers over `state.storage`.
-- If optimization appears to require module-scope client caching, stop and document why lifetime, transport ownership, binding freshness, and Cloudflare runtime behavior make it safe before implementing it.
 
 ## Database Migrations
 
@@ -81,78 +56,14 @@ Schema is in `packages/db/src/schema.ts`. Migrations live in `packages/db/src/mi
 - **After a rebase that conflicts on migration files:** delete all migration files, snapshots, and journal entries that were added on the branch, then re-run `pnpm drizzle generate` to regenerate a clean migration from the current schema diff. Re-append any backfill SQL afterward.
 - Prefer a single migration per feature branch when the code has not yet been deployed to production. If multiple migrations accumulated during development, squash them by deleting all branch-local migrations and regenerating.
 
-## GDPR & PII
-
-When adding PII (email, name, IP address, etc.) to the database — whether as a new table or a new column — you **must** also update the GDPR soft delete flow in `softDeleteUser` (`apps/web/src/lib/user/index.ts`) and add a corresponding test in `apps/web/src/lib/user/index.test.ts`.
-
 ## Logging & Sensitive Data
 
 Never log tokens, credentials, auth headers, cookies, or webhook secrets. Use `redactSensitiveHeaders` from `@kilocode/worker-utils/redact-headers` when headers must be stored or logged. Do not enable `sendDefaultPii` or `attachRpcInput` in Sentry config.
 
-## Plans
-
-When writing implementation plans, always save them to the `.plans/` directory at the repo root. This is the designated location for all planning documents — do not place them elsewhere in the repo.
-
-## Git Safety
-
-- **Never** use `--force`, `--no-verify`, or any other flag that bypasses git hooks or safety checks without explicit user approval.
-- If a hook or check fails, diagnose the issue and either fix it or ask the user how to proceed — do not silently skip it.
-
-## Pull Requests
-
-### Titles
-
-- Format: `type(scope): <description>` (e.g., `feat(auth): add SSO login`)
-- Common types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `style`, `perf`
-- Imperative mood, under 72 characters, no trailing period.
-
-### Descriptions
-
-Follow the PR template in `.github/pull_request_template.md`. Every description must include four sections in order:
-
-1. **`## Summary`** — What changed and why. Outcome-focused, call out architectural changes.
-2. **`## Verification`** — Manual verification only. Do not list automated checks such as `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm validate`, CI, or formatting commands here.
-3. **`## Visual Changes`** — Before/after screenshots, or `N/A`.
-4. **`## Reviewer Notes`** — Risk areas, tricky logic, rollout notes, or `N/A`.
-
-Do not leave HTML comments from the template. Review all commits on the branch when writing the summary.
-
-### Workflow
-
-- Create PRs as **ready for review** by default. Only use `--draft` if explicitly requested.
-- When assigning PRs or issues, resolve the GitHub username with `gh api user --jq '.login'`. Never guess usernames.
-
-## Specs
-
-Business-rule specs live in `.specs/`. Before making **any** changes to a domain covered by a spec — including bug fixes, new features, refactors, or reviews — you **must** first read the relevant spec.
-
-| Spec | Governs |
-|---|---|
-| `.specs/kiloclaw-billing.md` | KiloClaw billing, pricing, invoicing, usage metering, payment flows |
-| `.specs/kiloclaw-billing-lifecycle.md` | KiloClaw billing lifecycle — credit-renewal orchestration safety |
-| `.specs/kiloclaw-composio.md` | KiloClaw Composio credential provisioning, injection, and sharing |
-| `.specs/kiloclaw-controller.md` | KiloClaw controller/machine lifecycle, bootstrap, Docker image |
-| `.specs/kiloclaw-datamodel.md` | KiloClaw data model — instance/subscription tables, invariants |
-| `.specs/model-experiments.md` | Model experiment routing, bucketing, lifecycle, prompt retention, and reporting rules |
-| `.specs/security-agent.md` | Security Agent Auto Remediation and finding/SLA notification guarantees |
-| `.specs/subscription-center.md` | Subscription Center ownership, states, and user-facing behavior |
-| `.specs/team-enterprise-seat-billing.md` | Team and Enterprise seat billing, subscription management |
-| `.specs/impact-affiliate-tracking.md` | Impact.com affiliate conversion tracking |
-| `.specs/impact-referrals.md` | Impact.com Advocate referral programs for KiloClaw and Kilo Pass |
-
-## Markdown Tables
-
-Use compact, non-padded markdown tables to avoid merge conflicts. Prettier is configured to skip `*.md` files so it won't re-pad tables.
-
-**Rules:**
-- Separator rows: use `|---|---|` (no spaces around `---`, colons allowed for alignment: `:---`, `---:`, `:---:`)
-- Content rows: single space of padding only — `| value |`, not `|  value  |`
-
-**Enforcement:**
-- `script/check-md-table-padding.ts` checks all tracked `*.md` files
-- CI runs this check on every PR that touches markdown files
-- To auto-fix: `bun run script/check-md-table-padding.ts --fix`
-
 ## Stripe Subscription Schedules
 
 When using `subscriptionSchedules.create()` with `from_subscription`, Stripe prohibits setting `metadata` in the same call (it copies metadata from the subscription automatically). Set custom metadata (e.g., `origin` tags) in the subsequent `subscriptionSchedules.update()` call instead.
+
+## Git Safety
+- **Never** use `--force`, `--no-verify`, or any other flag that bypasses git hooks or safety checks without explicit user approval.
+- If a hook or check fails, diagnose the issue and either fix it or ask the user how to proceed — do not silently skip it.

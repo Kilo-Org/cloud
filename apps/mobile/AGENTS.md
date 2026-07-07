@@ -103,7 +103,6 @@ rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
 ## Code Style
 
 - Expo Router requires default exports in `src/app/` — this is the only place default exports are allowed.
-- Prefer `type` over `interface`.
 - Import `View`, `Text`, `ScrollView`, `Pressable`, `TextInput` from `react-native` — NativeWind's Metro plugin rewrites these imports to add `className` support automatically.
 - Import `Image` from `@/components/ui/image` (a `styled` wrapper around `expo-image`). Lint enforces this.
 - For UI components (Button, Text with variants, Card, etc.), import from `@/components/ui/<component>`. These are from react-native-reusables (shadcn/ui for RN).

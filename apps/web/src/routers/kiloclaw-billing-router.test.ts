@@ -45,6 +45,7 @@ import {
 } from '@/lib/kilo-pass/enums';
 import { differenceInCalendarMonths } from 'date-fns';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
+import type { CaptureCostInsightSpendInput } from '@kilocode/db/cost-insights-rollups';
 
 (kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
   LEGACY_KILOCLAW_PRICE_VERSION;
@@ -61,6 +62,18 @@ type KiloclawInternalClientMockShape = {
 jest.setTimeout(15_000);
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
+
+jest.mock('@kilocode/db/cost-insights-rollups', () => ({
+  captureCostInsightSpend: jest.fn(async () => undefined),
+  COST_INSIGHT_DRIVER_FALLBACK: 'other',
+  COST_INSIGHT_KILOCLAW_PRODUCT_KEY: 'kiloclaw-hosting',
+}));
+
+const captureCostInsightSpendMock = jest.requireMock<{
+  captureCostInsightSpend: jest.Mock<
+    (tx: unknown, input: CaptureCostInsightSpendInput) => Promise<void>
+  >;
+}>('@kilocode/db/cost-insights-rollups').captureCostInsightSpend;
 
 jest.mock('@/lib/stripe-client', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
@@ -292,6 +305,7 @@ beforeEach(async () => {
   kiloclawInternalClientMock.__destroyMock.mockResolvedValue(undefined);
   kiloclawInternalClientMock.__startAsyncMock.mockReset();
   kiloclawInternalClientMock.__startAsyncMock.mockResolvedValue(undefined);
+  captureCostInsightSpendMock.mockClear();
   posthogCaptureMock.mockReset();
 
   // Default mock returns for live-fetch calls
@@ -7044,6 +7058,22 @@ describe('enrollWithCredits', () => {
     expect(deduction).toBeDefined();
     expect(deduction!.amount_microdollars).toBe(-4_000_000);
     expect(deduction!.credit_category).toContain('kiloclaw-subscription:');
+    expect(captureCostInsightSpendMock).toHaveBeenCalledWith(expect.anything(), {
+      owner: { type: 'user', id: user.id },
+      actorUserId: user.id,
+      occurredAt: expect.any(String),
+      amountMicrodollars: 4_000_000,
+      category: 'scheduled',
+      source: 'kiloclaw',
+      productKey: 'kiloclaw-hosting',
+      featureKey: 'enrollment',
+      modelOrPlanKey: 'standard',
+      providerKey: 'other',
+    });
+    const captureInput = captureCostInsightSpendMock.mock.calls[0]?.[1] as
+      | { occurredAt: string }
+      | undefined;
+    expect(new Date(deduction!.created_at).toISOString()).toBe(captureInput?.occurredAt);
 
     // Verify credit spend recorded at intro amount
     const [updatedUser] = await db
@@ -7347,6 +7377,36 @@ describe('enrollWithCredits', () => {
     await expect(caller.kiloclaw.enrollWithCredits({ plan: 'commit' })).rejects.toThrow(
       'Insufficient credit balance'
     );
+  });
+
+  it('rolls back credit enrollment when scheduled-spend capture fails', async () => {
+    await createCreditEnrollmentAnchor(user.id);
+    await giveUserCredits(user.id, 50_000_000);
+    captureCostInsightSpendMock.mockImplementationOnce(async () => {
+      throw new Error('rollup unavailable');
+    });
+
+    const caller = await createCallerForUser(user.id);
+    await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
+      'rollup unavailable'
+    );
+
+    const [subscription] = await db
+      .select()
+      .from(kiloclaw_subscriptions)
+      .where(eq(kiloclaw_subscriptions.user_id, user.id));
+    const [updatedUser] = await db
+      .select({ used: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    const transactions = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+
+    expect(subscription.status).toBe('trialing');
+    expect(updatedUser.used).toBe(0);
+    expect(transactions).toHaveLength(0);
   });
 
   it('rejects enrollment when subscription is active', async () => {
@@ -8194,6 +8254,7 @@ describe('enrollWithCredits', () => {
     await expect(caller.kiloclaw.enrollWithCredits({ plan: 'standard' })).rejects.toThrow(
       'Enrollment already processed for this billing period'
     );
+    expect(captureCostInsightSpendMock).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -49,6 +49,14 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/cost-insights-hourly",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/cost-insights-retention",
+      "schedule": "15 3 * * *"
+    },
+    {
       "path": "/api/cron/db-pool-metrics",
       "schedule": "* * * * *"
     },

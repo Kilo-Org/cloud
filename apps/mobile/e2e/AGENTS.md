@@ -13,6 +13,7 @@ pnpm dev:start --no-attach mobile cloud-agent-next kiloclaw
 - Starts everything in a tmux session named `kilo-dev-<checkout-dir>`: Expo dev server (:8081), Next.js (:3000), Postgres (:5432), session-ingest (:8800), cloud-agent-next, kiloclaw (+ its tunnel and notifications). Dependencies start automatically.
 - `--no-attach` skips the interactive tmux dashboard — required for agents.
 - Verify with `pnpm dev:status`. Stop with `pnpm dev:stop`.
+- Run DB migrations (`pnpm drizzle migrate` from the repo root) before testing. A local Postgres that's behind on migrations causes seemingly random 500s from the backend (e.g. every authenticated tRPC call failing with "column ... does not exist").
 - Read a service's logs from its tmux window:
 
 ```bash
@@ -93,3 +94,7 @@ Gotchas:
 - Cold relaunch (`simctl terminate` + `launch`, or `launchApp` with `clearState: false`) restores navigation state — the app reopens on the last screen. Navigate back explicitly before testing a flow that assumes a starting screen.
 - `simctl io recordVideo` is flaky (1-frame videos after first use). For capturing transitions, loop `simctl io screenshot` in the background (~7.5 fps) and assemble with ffmpeg.
 - Re-inspect the screen after every UI change; element ids/text from a stale inspect will miss.
+
+## 5. Cleaning up
+
+When the e2e test is done, clean up everything you started: kill any CLI sessions and tmux windows/sessions you created, stop background log streams or screenshot loops, and remove scratch installs (e.g. `/tmp/kilo-cli`). Leave the user's own dev services (`kilo-dev-*` session) running — only tear down what you started yourself.

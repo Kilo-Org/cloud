@@ -9,6 +9,7 @@ import {
   useState,
 } from 'react';
 
+import { resetAnalyticsUser } from '@/lib/analytics/posthog';
 import { trackEvent } from '@/lib/appsflyer';
 import { queryClient } from '@/lib/query-client';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
@@ -67,6 +68,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
     await clearLastActiveInstance();
     clearAgentModelPreference();
     clearReasoningPreference();
+    resetAnalyticsUser();
     queryClient.clear();
     setToken(undefined);
   }, []);

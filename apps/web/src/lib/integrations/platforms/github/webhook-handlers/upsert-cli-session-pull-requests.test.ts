@@ -644,6 +644,76 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     expect(rows[0].pr_head_sha).toBe('sha-203-reopen');
   });
 
+  it('heals pr_state from closed -> open on synchronize when the reopened webhook was missed', async () => {
+    const branch = 'feature/missed-reopen-then-sync';
+    await seedSession({ branch, owner: testOwner });
+
+    // PR gets closed.
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 210,
+        state: 'closed',
+        merged: false,
+        headRef: branch,
+        headSha: 'sha-210',
+      }),
+      testOwner
+    );
+
+    // The `reopened` webhook for this PR is never delivered (missed/deduped),
+    // but new commits are pushed to the now-actually-open PR, so GitHub
+    // delivers a `synchronize` event carrying a new head sha and the PR's
+    // real current state (open).
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'synchronize',
+        prNumber: 210,
+        state: 'open',
+        headRef: branch,
+        headSha: 'sha-210-new-commit',
+      }),
+      testOwner
+    );
+
+    const rows = await readUserRow({ userId: testUserId, branch });
+    expect(rows[0].pr_state).toBe('open');
+    expect(rows[0].pr_head_sha).toBe('sha-210-new-commit');
+  });
+
+  it('does not heal pr_state from closed -> open on a stale synchronize redelivery with the same head sha', async () => {
+    const branch = 'feature/stale-sync-same-sha';
+    await seedSession({ branch, owner: testOwner });
+
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'closed',
+        prNumber: 211,
+        state: 'closed',
+        merged: false,
+        headRef: branch,
+        headSha: 'sha-211',
+      }),
+      testOwner
+    );
+
+    // A redelivered/duplicate `synchronize` event for the same commit is not
+    // evidence of a new push, so pr_state stays closed.
+    await upsertCliSessionPullRequestsFromWebhook(
+      makePayload({
+        action: 'synchronize',
+        prNumber: 211,
+        state: 'open',
+        headRef: branch,
+        headSha: 'sha-211',
+      }),
+      testOwner
+    );
+
+    const rows = await readUserRow({ userId: testUserId, branch });
+    expect(rows[0].pr_state).toBe('closed');
+  });
+
   it('does not regress pr_state from merged -> closed on stale closed-unmerged redelivery', async () => {
     const branch = 'feature/monotonic-merged-closed';
     await seedSession({ branch, owner: testOwner });

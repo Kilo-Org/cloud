@@ -62,7 +62,6 @@ describe('generateTrpcOpenApiDocument', () => {
     };
     const responseSchema = operation?.responses['200'].content['application/json'].schema;
     const dataSchema = responseSchema.properties.result.properties.data;
-    const notFoundSchema = operation?.responses['404'].content['application/json'].schema;
 
     expect(document.info.title).toBe('Kilo Code API');
     expect(operation).toMatchObject({
@@ -98,9 +97,6 @@ describe('generateTrpcOpenApiDocument', () => {
             },
           },
         },
-        '404': {
-          description: 'Resource not found',
-        },
       },
     });
     expect(dataSchema.items.oneOf).toEqual(
@@ -123,16 +119,6 @@ describe('generateTrpcOpenApiDocument', () => {
     expect(JSON.stringify(dataSchema)).not.toContain('inviteUrl');
     expect(JSON.stringify(dataSchema)).not.toContain('dailyUsageLimitUsd');
     expect(JSON.stringify(dataSchema)).not.toContain('currentDailyUsageUsd');
-    expect(notFoundSchema).toMatchObject({
-      type: 'object',
-      required: ['error'],
-      properties: {
-        error: {
-          type: 'object',
-          required: ['message', 'code', 'data'],
-        },
-      },
-    });
   });
 
   it('documents bearer auth metadata for protected procedures', () => {

@@ -131,7 +131,7 @@ This pattern blocks API endpoints from running for external contributors who don
 
 ### Runtime Guidelines
 
-- Durable Object calls should be retried using `withDORetry` in `src/utils/do-retry.ts`
+- Durable Object calls should be retried using `withDORetry` (this service's logger-bound wrapper is `src/utils/do-retry.ts`). See the `durable-objects` skill (`references/repo-conventions.md`) for the shared `withDORetry` pattern used across services.
 - Execute commands inside a session context (use `session.exec(...)`, not `sandbox.exec(...)`)
 
 ### Testing Standards

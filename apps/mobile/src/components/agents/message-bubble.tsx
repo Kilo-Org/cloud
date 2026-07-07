@@ -58,7 +58,9 @@ export function MessageBubble({
         accessibilityHint="Long press to copy message text"
       >
         <Bubble side="user">
-          {textContent ? <MarkdownText value={textContent} variant="user" /> : null}
+          {textContent ? (
+            <MarkdownText value={textContent} variant="user" selectable={false} />
+          ) : null}
           {fileParts.map(part => (
             <FilePartRenderer key={part.id} part={part} />
           ))}

@@ -20,6 +20,10 @@ Follow the official Expo guide to set up the development environment: https://do
 
 The dev server (`pnpm start`) is always started by the user — do not start it yourself.
 
+## E2E Flow Testing
+
+To verify a flow end-to-end (local backend + app on a simulator, driven via the Maestro MCP), see [e2e/AGENTS.md](e2e/AGENTS.md). It covers starting the local backend, running the Kilo CLI against it, and getting the Maestro MCP set up.
+
 ## Tmux Services
 
 The user typically has a `tmux` session running with all backend services and the Expo dev server in separate windows (e.g., `kilo-chat`, `kiloclaw`, `nextjs`, `postgres`, `redis`, etc.). When debugging mobile issues that touch the backend, inspect the relevant window's logs to confirm what the server actually received:
@@ -99,7 +103,6 @@ rm -rf "$TMPDIR/metro-cache" "$TMPDIR"/metro-file-map-*
 ## Code Style
 
 - Expo Router requires default exports in `src/app/` — this is the only place default exports are allowed.
-- Prefer `type` over `interface`.
 - Import `View`, `Text`, `ScrollView`, `Pressable`, `TextInput` from `react-native` — NativeWind's Metro plugin rewrites these imports to add `className` support automatically.
 - Import `Image` from `@/components/ui/image` (a `styled` wrapper around `expo-image`). Lint enforces this.
 - For UI components (Button, Text with variants, Card, etc.), import from `@/components/ui/<component>`. These are from react-native-reusables (shadcn/ui for RN).

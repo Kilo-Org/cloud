@@ -60,6 +60,7 @@ mkdir -p /tmp/workers-types-latest && \
 | Queues & Workflows | Move async/background work off the critical path |
 | Service bindings | Use service bindings for Worker-to-Worker calls — not public HTTP |
 | Hyperdrive | Always use Hyperdrive for external PostgreSQL/MySQL connections |
+| Repo: DB client lifecycle | Never cache DB clients/pools in module scope (Worker or DO); use `getWorkerDb(...)` per use. DO instance fields are fine for object-local state. See `references/rules.md` |
 
 ### Observability
 

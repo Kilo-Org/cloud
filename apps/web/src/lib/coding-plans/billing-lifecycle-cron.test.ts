@@ -1,5 +1,6 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { eq } from 'drizzle-orm';
+import type { CaptureCostInsightSpendInput } from '@kilocode/db/cost-insights-rollups';
 
 import { runCodingPlanBillingLifecycleCron } from '@/lib/coding-plans/billing-lifecycle-cron';
 import { subscribeToCodingPlan, uploadKeysToInventory } from '@/lib/coding-plans';
@@ -12,6 +13,8 @@ import {
   coding_plan_key_inventory,
   coding_plan_subscriptions,
   coding_plan_terms,
+  cost_insight_owner_hour_driver_buckets,
+  cost_insight_owner_hour_totals,
   credit_transactions,
   kilocode_users,
 } from '@kilocode/db/schema';
@@ -19,6 +22,14 @@ import {
 jest.mock('@/lib/autoTopUp', () => ({
   maybePerformAutoTopUp: jest.fn(async () => undefined),
 }));
+jest.mock('@kilocode/db/cost-insights-rollups', () => ({
+  captureCostInsightSpend: jest.fn(async () => undefined),
+  COST_INSIGHT_CODING_PLAN_PRODUCT_KEY: 'coding-plan',
+}));
+
+const captureCostInsightSpendMock = jest.requireMock<{
+  captureCostInsightSpend: jest.Mock<Promise<void>, [unknown, CaptureCostInsightSpendInput]>;
+}>('@kilocode/db/cost-insights-rollups').captureCostInsightSpend;
 
 const PLAN_ID = 'minimax-token-plan-plus';
 const MAX_PLAN_ID = 'minimax-token-plan-max';
@@ -54,6 +65,9 @@ async function createSubscription(
 
 afterEach(async () => {
   jest.mocked(maybePerformAutoTopUp).mockClear();
+  captureCostInsightSpendMock.mockClear();
+  await db.delete(cost_insight_owner_hour_driver_buckets);
+  await db.delete(cost_insight_owner_hour_totals);
   await db.delete(coding_plan_terms);
   await db.delete(coding_plan_subscriptions);
   await db.delete(byok_api_keys);
@@ -64,7 +78,8 @@ afterEach(async () => {
 
 describe('Coding Plan billing lifecycle cron', () => {
   it('renews atomically with a charged term and retains assigned access', async () => {
-    const { subscriptionId } = await createSubscription(COST_MICRODOLLARS * 2);
+    const { user, subscriptionId } = await createSubscription(COST_MICRODOLLARS * 2);
+    captureCostInsightSpendMock.mockClear();
 
     const summary = await runCodingPlanBillingLifecycleCron(db);
     const [subscription] = await db
@@ -80,7 +95,10 @@ describe('Coding Plan billing lifecycle cron', () => {
       .from(coding_plan_key_inventory)
       .where(eq(coding_plan_key_inventory.id, subscription.key_inventory_id!));
     const renewalTransaction = await db
-      .select({ description: credit_transactions.description })
+      .select({
+        description: credit_transactions.description,
+        createdAt: credit_transactions.created_at,
+      })
       .from(credit_transactions)
       .where(eq(credit_transactions.description, 'Coding plan renewal: MiniMax Token Plan Plus'));
 
@@ -88,8 +106,27 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.status).toBe('active');
     expect(terms.map(term => term.kind)).toEqual(['activation', 'renewal']);
     expect(renewalTransaction).toEqual([
-      { description: 'Coding plan renewal: MiniMax Token Plan Plus' },
+      {
+        description: 'Coding plan renewal: MiniMax Token Plan Plus',
+        createdAt: expect.any(String),
+      },
     ]);
+    expect(captureCostInsightSpendMock).toHaveBeenCalledWith(expect.anything(), {
+      owner: { type: 'user', id: user.id },
+      actorUserId: user.id,
+      occurredAt: expect.any(String),
+      amountMicrodollars: COST_MICRODOLLARS,
+      category: 'scheduled',
+      source: 'coding_plan',
+      productKey: 'coding-plan',
+      featureKey: 'renewal',
+      modelOrPlanKey: PLAN_ID,
+      providerKey: 'minimax',
+    });
+    const captureInput = captureCostInsightSpendMock.mock.calls[0]?.[1] as
+      | { occurredAt: string }
+      | undefined;
+    expect(new Date(renewalTransaction[0].createdAt).toISOString()).toBe(captureInput?.occurredAt);
     expect(credential.status).toBe('assigned');
   });
 
@@ -122,6 +159,34 @@ describe('Coding Plan billing lifecycle cron', () => {
         description: 'Coding plan renewal: MiniMax Token Plan Max',
       },
     ]);
+  });
+
+  it('rolls back renewal when scheduled-spend capture fails', async () => {
+    const { user, subscriptionId } = await createSubscription(COST_MICRODOLLARS * 2);
+    captureCostInsightSpendMock.mockClear();
+    captureCostInsightSpendMock.mockImplementationOnce(async () => {
+      throw new Error('rollup unavailable');
+    });
+
+    const summary = await runCodingPlanBillingLifecycleCron(db);
+    const [updatedUser] = await db
+      .select({ used: kilocode_users.microdollars_used })
+      .from(kilocode_users)
+      .where(eq(kilocode_users.id, user.id));
+    const terms = await db
+      .select()
+      .from(coding_plan_terms)
+      .where(eq(coding_plan_terms.subscription_id, subscriptionId));
+    const renewalTransactions = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.description, 'Coding plan renewal: MiniMax Token Plan Plus'));
+
+    expect(summary.errors).toBe(1);
+    expect(summary.renewals).toBe(0);
+    expect(updatedUser.used).toBe(COST_MICRODOLLARS);
+    expect(terms.map(term => term.kind)).toEqual(['activation']);
+    expect(renewalTransactions).toHaveLength(0);
   });
 
   it('renews after the subscriber deletes the installed MiniMax BYOK key', async () => {

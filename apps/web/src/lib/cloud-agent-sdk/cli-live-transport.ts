@@ -3,17 +3,34 @@
  * one remote CLI session into normalized transport events and commands.
  */
 import { normalizeCliEvent, isChatEvent } from './normalizer';
-import { cliConnectionDataSchema, heartbeatDataSchema, sessionsListDataSchema } from './schemas';
-import type { TransportFactory, TransportSendPayload, TransportSink } from './transport';
+import {
+  cliConnectionDataSchema,
+  heartbeatDataSchema,
+  remoteModelCatalogV1Schema,
+  sessionsListDataSchema,
+} from './schemas';
+import type { RemoteModelState } from './remote-model-catalog';
+import type { TransportFactory, TransportSendInput, TransportSink } from './transport';
 import type { KiloSessionId, SessionSnapshot } from './types';
-import type { UserWebCliEvent, UserWebConnection } from './user-web-connection';
+import {
+  UserWebCommandError,
+  type UserWebCliEvent,
+  type UserWebConnection,
+} from './user-web-connection';
 
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
   userWebConnection: UserWebConnection;
   fetchSnapshot?: (kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>;
   onError?: (message: string) => void;
+  onRemoteModelStateChange?: (state: RemoteModelState) => void;
+  onCapabilityChange?: () => void;
 };
+
+// How long after a reconnect to re-fetch the snapshot a second time. Covers
+// the session store's persistence lag behind the live stream; bump if holes
+// still appear after long backgrounding.
+const RECONNECT_RESYNC_DELAY_MS = 5000;
 
 function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactory {
   return (sink: TransportSink) => {
@@ -21,6 +38,139 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     let cleanup: (() => void) | null = null;
     let sessionStopped = false;
     let ownerConnectionId: string | null = null;
+    let lastForwardedHeartbeatStatus: string | null = null;
+    let catalogRequestGeneration = 0;
+    let catalogRequestInFlight: { ownerConnectionId: string; generation: number } | null = null;
+    let remoteModelState: RemoteModelState = {
+      ownerConnectionId: null,
+      protocol: 'unknown',
+      refresh: 'idle',
+    };
+
+    function publishRemoteModelState(next: RemoteModelState): void {
+      remoteModelState = next;
+      config.onRemoteModelStateChange?.(next);
+    }
+
+    function setOwnerConnectionId(nextOwnerConnectionId: string | null): void {
+      if (ownerConnectionId === nextOwnerConnectionId) return;
+
+      ownerConnectionId = nextOwnerConnectionId;
+      catalogRequestGeneration += 1;
+      catalogRequestInFlight = null;
+      publishRemoteModelState({
+        ownerConnectionId: nextOwnerConnectionId,
+        protocol: 'unknown',
+        refresh: nextOwnerConnectionId ? 'loading' : 'idle',
+      });
+      config.onCapabilityChange?.();
+
+      if (nextOwnerConnectionId) discoverModels(nextOwnerConnectionId);
+    }
+
+    function handleCatalogFailure(
+      error: unknown,
+      expectedOwnerConnectionId: string,
+      expectedGeneration: number,
+      expectedRequestGeneration: number
+    ): void {
+      if (
+        expectedGeneration !== generation ||
+        expectedRequestGeneration !== catalogRequestGeneration ||
+        ownerConnectionId !== expectedOwnerConnectionId
+      ) {
+        return;
+      }
+
+      if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
+        setOwnerConnectionId(null);
+        return;
+      }
+
+      if (error instanceof Error && error.message.includes('unknown command')) {
+        publishRemoteModelState({
+          ownerConnectionId: expectedOwnerConnectionId,
+          protocol: 'legacy',
+          refresh: 'idle',
+        });
+        return;
+      }
+
+      publishRemoteModelState({
+        ownerConnectionId: expectedOwnerConnectionId,
+        protocol: remoteModelState.protocol,
+        ...(remoteModelState.catalog ? { catalog: remoteModelState.catalog } : {}),
+        refresh: 'error',
+        error: error instanceof Error ? error.message : 'Failed to discover remote models',
+      });
+    }
+
+    function discoverModels(expectedOwnerConnectionId: string): void {
+      if (catalogRequestInFlight?.ownerConnectionId === expectedOwnerConnectionId) return;
+
+      catalogRequestGeneration += 1;
+      const expectedRequestGeneration = catalogRequestGeneration;
+      const expectedGeneration = generation;
+      catalogRequestInFlight = {
+        ownerConnectionId: expectedOwnerConnectionId,
+        generation: expectedRequestGeneration,
+      };
+      publishRemoteModelState({
+        ownerConnectionId: expectedOwnerConnectionId,
+        protocol: remoteModelState.protocol,
+        ...(remoteModelState.catalog ? { catalog: remoteModelState.catalog } : {}),
+        refresh: 'loading',
+      });
+
+      void config.userWebConnection
+        .sendCommand(
+          config.kiloSessionId,
+          'list_models',
+          { protocolVersion: 1 },
+          expectedOwnerConnectionId
+        )
+        .then(
+          result => {
+            if (
+              expectedGeneration !== generation ||
+              expectedRequestGeneration !== catalogRequestGeneration ||
+              ownerConnectionId !== expectedOwnerConnectionId
+            ) {
+              return;
+            }
+
+            const parsed = remoteModelCatalogV1Schema.safeParse(result);
+            if (!parsed.success) {
+              handleCatalogFailure(
+                new Error('Invalid remote model catalog'),
+                expectedOwnerConnectionId,
+                expectedGeneration,
+                expectedRequestGeneration
+              );
+              return;
+            }
+
+            publishRemoteModelState({
+              ownerConnectionId: expectedOwnerConnectionId,
+              protocol: 'v1',
+              catalog: parsed.data,
+              refresh: 'idle',
+            });
+          },
+          error =>
+            handleCatalogFailure(
+              error,
+              expectedOwnerConnectionId,
+              expectedGeneration,
+              expectedRequestGeneration
+            )
+        )
+        .finally(() => {
+          if (catalogRequestInFlight?.generation === expectedRequestGeneration) {
+            catalogRequestInFlight = null;
+          }
+        });
+    }
 
     function replaySnapshot(snapshot: SessionSnapshot): void {
       sink.onServiceEvent({ type: 'session.created', info: snapshot.info });
@@ -56,12 +206,32 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       if (sessionStopped) return;
       sink.onServiceEvent({ type: 'stopped', reason: 'disconnected' });
       sessionStopped = true;
+      // The disconnected state is only cleared by a session.status event, so
+      // the next post-reconnect heartbeat must always forward one — even when
+      // the CLI comes back with the same status it had before the drop.
+      lastForwardedHeartbeatStatus = null;
+    }
+
+    // Heartbeats carry the CLI's current per-session status. Forwarding it
+    // re-derives activity after a reconnect: a terminal `session.status: idle`
+    // fired while the socket was dead is never replayed, which otherwise
+    // leaves the UI stuck on a busy indicator forever.
+    function forwardHeartbeatStatus(status: string): void {
+      if (status !== 'idle' && status !== 'busy') return;
+      if (status === lastForwardedHeartbeatStatus) return;
+      lastForwardedHeartbeatStatus = status;
+      sink.onServiceEvent({
+        type: 'session.status',
+        sessionId: config.kiloSessionId,
+        status: { type: status },
+      });
     }
 
     function handleSystemMessage(event: string, data: unknown): void {
       if (event === 'cli.disconnected') {
         const parsed = cliConnectionDataSchema.safeParse(data);
         if (parsed.success && ownerConnectionId === parsed.data.connectionId) {
+          setOwnerConnectionId(null);
           stopForDisconnectedSession();
         }
         return;
@@ -73,11 +243,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
         const session = parsed.data.sessions.find(item => item.id === config.kiloSessionId);
         if (session) {
-          ownerConnectionId = session.connectionId;
+          setOwnerConnectionId(session.connectionId);
           sessionStopped = false;
+          forwardHeartbeatStatus(session.status);
           return;
         }
 
+        setOwnerConnectionId(null);
         stopForDisconnectedSession();
         return;
       }
@@ -88,19 +260,86 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
         const session = parsed.data.sessions.find(item => item.id === config.kiloSessionId);
         if (session) {
-          ownerConnectionId = parsed.data.connectionId;
+          setOwnerConnectionId(parsed.data.connectionId);
           sessionStopped = false;
+          forwardHeartbeatStatus(session.status);
           return;
         }
 
         if (ownerConnectionId === parsed.data.connectionId) {
+          setOwnerConnectionId(null);
           stopForDisconnectedSession();
         }
       }
     }
 
-    function sendCommand(command: string, data: unknown): Promise<unknown> {
-      return config.userWebConnection.sendCommand(config.kiloSessionId, command, data);
+    async function sendCommand(command: string, data: unknown): Promise<unknown> {
+      const expectedOwnerConnectionId = ownerConnectionId;
+      if (!expectedOwnerConnectionId) throw new Error('Remote session has no connected owner');
+
+      try {
+        return await config.userWebConnection.sendCommand(
+          config.kiloSessionId,
+          command,
+          data,
+          expectedOwnerConnectionId
+        );
+      } catch (error) {
+        if (error instanceof UserWebCommandError && error.code === 'SESSION_OWNER_CHANGED') {
+          setOwnerConnectionId(null);
+        }
+        throw error;
+      }
+    }
+
+    function getRemoteModelFields(input: TransportSendInput):
+      | { kind: 'none' }
+      | {
+          kind: 'structured';
+          model: { providerID: string; modelID: string };
+          variant?: string;
+        }
+      | { kind: 'legacy'; model: string; variant?: string } {
+      const override = input.remoteModelOverride;
+      if (!override) return { kind: 'none' };
+
+      if (remoteModelState.protocol === 'v1' && override.source === 'cli-catalog') {
+        const provider = remoteModelState.catalog?.providers.find(
+          item => item.id === override.selection.model.providerID
+        );
+        const model = provider?.models.find(item => item.id === override.selection.model.modelID);
+        if (!model) {
+          throw new Error('Selected remote model is not available in the current CLI catalog');
+        }
+
+        const variant = override.selection.variant;
+        if (variant && !model.variants.includes(variant)) {
+          throw new Error(
+            'Selected remote model variant is not available in the current CLI catalog'
+          );
+        }
+        return {
+          kind: 'structured',
+          model: override.selection.model,
+          ...(variant ? { variant } : {}),
+        };
+      }
+
+      if (
+        remoteModelState.protocol === 'legacy' &&
+        override.source === 'legacy-gateway' &&
+        override.selection.model.providerID === 'kilo'
+      ) {
+        return {
+          kind: 'legacy',
+          model: override.selection.model.modelID,
+          ...(override.selection.variant ? { variant: override.selection.variant } : {}),
+        };
+      }
+
+      throw new Error(
+        'Selected remote model override is incompatible with the connected CLI model protocol'
+      );
     }
 
     function releaseConnection(): void {
@@ -115,6 +354,16 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         releaseConnection();
         sessionStopped = false;
         ownerConnectionId = null;
+        lastForwardedHeartbeatStatus = null;
+        catalogRequestGeneration += 1;
+        catalogRequestInFlight = null;
+        publishRemoteModelState({
+          ownerConnectionId: null,
+          protocol: 'unknown',
+          refresh: 'idle',
+        });
+        config.onCapabilityChange?.();
+        let resyncTimer: ReturnType<typeof setTimeout> | null = null;
 
         let bufferedCliEvents: UserWebCliEvent[] | null = [];
         let bufferedEventsFromSupersededSnapshot: UserWebCliEvent[] = [];
@@ -126,6 +375,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           for (const msg of events ?? []) {
             handleEventMessage(msg.sessionId, msg.parentSessionId, msg.event, msg.data);
           }
+          sink.onReplayComplete?.();
         };
 
         const replayCurrentSnapshot = (reportError: boolean): void => {
@@ -182,7 +432,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         replayCurrentSnapshot(true);
         const offCli = config.userWebConnection.onCliEvent(config.kiloSessionId, msg => {
           const normalized = normalizeCliEvent(msg.event, msg.data);
-          if (normalized && isChatEvent(normalized) && bufferedCliEvents !== null) {
+          const shouldBufferForSnapshot =
+            normalized &&
+            (isChatEvent(normalized) ||
+              normalized.type === 'session.created' ||
+              normalized.type === 'session.updated');
+          if (shouldBufferForSnapshot && bufferedCliEvents !== null) {
             bufferedCliEvents.push(msg);
             return;
           }
@@ -193,6 +448,16 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
         const offReconnect = config.userWebConnection.onReconnect(() => {
           replayCurrentSnapshot(false);
+          // The snapshot store lags the live stream, and the CLI only forwards
+          // events "from now" after a resubscribe — parts finalized while the
+          // socket was dead are in neither. One delayed re-sync picks them up
+          // once persistence catches up.
+          if (resyncTimer) clearTimeout(resyncTimer);
+          resyncTimer = setTimeout(() => {
+            resyncTimer = null;
+            replayCurrentSnapshot(false);
+          }, RECONNECT_RESYNC_DELAY_MS);
+          if (ownerConnectionId) discoverModels(ownerConnectionId);
         });
         const releaseSubscription = config.userWebConnection.subscribeToCliSession(
           config.kiloSessionId
@@ -201,6 +466,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         cleanup = () => {
           if (released) return;
           released = true;
+          if (resyncTimer) clearTimeout(resyncTimer);
           offCli();
           offSystem();
           offReconnect();
@@ -208,19 +474,28 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         };
       },
 
-      send: (input: { payload: TransportSendPayload }) => {
+      canSend: () => ownerConnectionId !== null,
+      retryRemoteModels: () => {
+        if (ownerConnectionId) discoverModels(ownerConnectionId);
+      },
+      send: async (input: TransportSendInput) => {
         if (input.payload.type === 'command') {
           return Promise.reject(
             new Error('Slash commands are not supported on the CLI live transport yet')
           );
         }
         const payload = input.payload;
+        const remoteModel = getRemoteModelFields(input);
         return sendCommand('send_message', {
           sessionID: config.kiloSessionId,
           parts: [{ type: 'text', text: payload.prompt }],
           ...(payload.mode ? { agent: payload.mode } : {}),
-          ...(payload.model ? { model: payload.model } : {}),
-          ...(payload.variant ? { variant: payload.variant } : {}),
+          ...(remoteModel.kind === 'none'
+            ? {}
+            : {
+                model: remoteModel.model,
+                ...(remoteModel.variant ? { variant: remoteModel.variant } : {}),
+              }),
         });
       },
       interrupt: () => sendCommand('interrupt', {}),
@@ -250,11 +525,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
 
       disconnect() {
         generation += 1;
+        setOwnerConnectionId(null);
         releaseConnection();
       },
 
       destroy() {
         generation += 1;
+        setOwnerConnectionId(null);
         releaseConnection();
       },
     };

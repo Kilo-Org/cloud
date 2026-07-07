@@ -25,6 +25,11 @@ import {
 } from '@kilocode/db';
 import { classifyOrganizationEntitlement } from '@kilocode/organization-entitlement';
 import {
+  captureCostInsightSpend,
+  COST_INSIGHT_DRIVER_FALLBACK,
+  COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
+} from '@kilocode/db/cost-insights-rollups';
+import {
   listOrganizationTrialExpiryEnforcementCandidates,
   type OrganizationTrialExpiryCandidateRow,
 } from '@kilocode/db/kiloclaw-organization-trial-expiry-candidates';
@@ -2024,6 +2029,7 @@ async function processCreditRenewalRow(
       const newPeriodEnd = addMonths(new Date(renewalAt), periodMonths).toISOString();
       const wasPastDue = current.status === 'past_due';
       const beforeSubscription = await getSubscriptionById(tx, current.id);
+      const occurredAt = new Date().toISOString();
       const deductionResult = await tx
         .insert(credit_transactions)
         .values({
@@ -2035,6 +2041,7 @@ async function processCreditRenewalRow(
           credit_category: deductionCategory,
           check_category_uniqueness: true,
           original_baseline_microdollars_used: current.microdollars_used,
+          created_at: occurredAt,
         })
         .onConflictDoNothing();
 
@@ -2098,6 +2105,19 @@ async function processCreditRenewalRow(
           newPeriodEnd,
         } satisfies CreditRenewalTransactionOutcome;
       }
+
+      await captureCostInsightSpend(tx, {
+        owner: { type: 'user', id: userId },
+        actorUserId: userId,
+        occurredAt,
+        amountMicrodollars: costMicrodollars,
+        category: 'scheduled',
+        source: 'kiloclaw',
+        productKey: COST_INSIGHT_KILOCLAW_PRODUCT_KEY,
+        featureKey: 'renewal',
+        modelOrPlanKey: effectivePlan,
+        providerKey: COST_INSIGHT_DRIVER_FALLBACK,
+      });
 
       await tx
         .update(kilocode_users)

@@ -10,11 +10,10 @@ type AgentSessionFilters = {
 
 type FiltersUpdater = AgentSessionFilters | ((prev: AgentSessionFilters) => AgentSessionFilters);
 type StringArrayUpdater = string[] | ((prev: string[]) => string[]);
-const DEFAULT_PLATFORM_FILTER = ['cloud-agent'];
 
 function createDefaultFilters(): AgentSessionFilters {
   return {
-    platformFilter: [...DEFAULT_PLATFORM_FILTER],
+    platformFilter: [],
     projectFilter: [],
   };
 }

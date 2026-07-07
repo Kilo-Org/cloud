@@ -11,7 +11,15 @@ import { createCloudAgentSession } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import type { AssistantMessage, UserMessage } from '@/types/opencode.gen';
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
-import type { CloudStatus, MessageDeliveryState, ResolvedSession, SessionActivity } from './types';
+import type {
+  CloudStatus,
+  MessageDeliveryState,
+  ResolvedSession,
+  SessionActivity,
+  SessionInfo,
+} from './types';
+import type { RemoteModelState } from './remote-model-catalog';
+import type { NormalizedEvent } from './normalizer';
 
 // ---------------------------------------------------------------------------
 // Mock createCloudAgentSession — prevents real WebSocket connections
@@ -28,6 +36,7 @@ const mockSession = {
   respondToPermission: jest.fn(),
   acceptSuggestion: jest.fn(),
   dismissSuggestion: jest.fn(),
+  retryRemoteModels: jest.fn(),
   canSend: true,
   canInterrupt: true,
   state: {
@@ -48,7 +57,10 @@ const mockSession = {
 };
 
 const mockSessionCallbacks: {
-  onSessionCreated?: (info: { id: string; parentID: string | null }) => void;
+  onSessionCreated?: (info: SessionInfo) => void;
+  onSessionUpdated?: (info: SessionInfo) => void;
+  onReplayComplete?: () => void;
+
   onQuestionAsked?: (...args: unknown[]) => void;
   onQuestionResolved?: (...args: unknown[]) => void;
   onPermissionAsked?: (...args: unknown[]) => void;
@@ -56,6 +68,9 @@ const mockSessionCallbacks: {
   onSuggestionAsked?: (...args: unknown[]) => void;
   onSuggestionResolved?: (...args: unknown[]) => void;
   onResolved?: (resolved: ResolvedSession) => void;
+  onRemoteModelStateChange?: (state: RemoteModelState) => void;
+  onTransportCapabilityChange?: () => void;
+  onEvent?: (event: NormalizedEvent) => void;
   onMessageQueued?: (messageId: string) => void;
   onMessageCompleted?: (messageId: string) => void;
   onMessageFailed?: (
@@ -72,7 +87,10 @@ jest.mock('./session', () => ({
     (sessionConfig: {
       kiloSessionId: string;
       storage: JotaiSessionStorage;
-      onSessionCreated?: (info: { id: string; parentID: string | null }) => void;
+      onSessionCreated?: (info: SessionInfo) => void;
+      onSessionUpdated?: (info: SessionInfo) => void;
+      onReplayComplete?: () => void;
+
       onQuestionAsked?: (...args: unknown[]) => void;
       onQuestionResolved?: (...args: unknown[]) => void;
       onPermissionAsked?: (...args: unknown[]) => void;
@@ -80,6 +98,9 @@ jest.mock('./session', () => ({
       onSuggestionAsked?: (...args: unknown[]) => void;
       onSuggestionResolved?: (...args: unknown[]) => void;
       onResolved?: (resolved: ResolvedSession) => void;
+      onRemoteModelStateChange?: (state: RemoteModelState) => void;
+      onTransportCapabilityChange?: () => void;
+      onEvent?: (event: NormalizedEvent) => void;
       onMessageQueued?: (messageId: string) => void;
       onMessageCompleted?: (messageId: string) => void;
       onMessageFailed?: (
@@ -99,9 +120,11 @@ jest.mock('./session', () => ({
           kiloSessionId: kiloId(sessionConfig.kiloSessionId),
           cloudAgentSessionId: cloudAgentId('agent-1'),
         });
-        sessionConfig.onSessionCreated?.({ id: sessionConfig.kiloSessionId, parentID: null });
+        sessionConfig.onSessionCreated?.({ id: sessionConfig.kiloSessionId });
       });
       mockSessionCallbacks.onSessionCreated = sessionConfig.onSessionCreated;
+      mockSessionCallbacks.onSessionUpdated = sessionConfig.onSessionUpdated;
+      mockSessionCallbacks.onReplayComplete = sessionConfig.onReplayComplete;
       mockSessionCallbacks.onQuestionAsked = sessionConfig.onQuestionAsked;
       mockSessionCallbacks.onQuestionResolved = sessionConfig.onQuestionResolved;
       mockSessionCallbacks.onPermissionAsked = sessionConfig.onPermissionAsked;
@@ -109,6 +132,9 @@ jest.mock('./session', () => ({
       mockSessionCallbacks.onSuggestionAsked = sessionConfig.onSuggestionAsked;
       mockSessionCallbacks.onSuggestionResolved = sessionConfig.onSuggestionResolved;
       mockSessionCallbacks.onResolved = sessionConfig.onResolved;
+      mockSessionCallbacks.onRemoteModelStateChange = sessionConfig.onRemoteModelStateChange;
+      mockSessionCallbacks.onTransportCapabilityChange = sessionConfig.onTransportCapabilityChange;
+      mockSessionCallbacks.onEvent = sessionConfig.onEvent;
       mockSessionCallbacks.onMessageQueued = sessionConfig.onMessageQueued;
       mockSessionCallbacks.onMessageCompleted = sessionConfig.onMessageCompleted;
       mockSessionCallbacks.onMessageFailed = sessionConfig.onMessageFailed;
@@ -140,6 +166,26 @@ const defaultFetchedSession = {
   initialMessageId: 'msg_0123456789abcdefghijklmnop',
   associatedPr: null,
 } satisfies FetchedSessionData;
+
+const remoteCatalog = {
+  protocolVersion: 1,
+  providers: [
+    {
+      id: 'anthropic',
+      name: 'Anthropic',
+      models: [
+        {
+          id: 'claude-sonnet-4',
+          name: 'Claude Sonnet 4',
+          variants: ['high'],
+          capabilities: { attachment: true, reasoning: true },
+          limits: { context: 200_000, output: 64_000 },
+        },
+      ],
+    },
+  ],
+  truncated: false,
+} satisfies NonNullable<RemoteModelState['catalog']>;
 
 function createMockConfig(overrides: Partial<SessionManagerConfig> = {}): SessionManagerConfig {
   return {
@@ -276,7 +322,11 @@ describe('createSessionManager', () => {
     mockSessionCallbacks.onPermissionAsked = undefined;
     mockSessionCallbacks.onPermissionResolved = undefined;
     mockSessionCallbacks.onSessionCreated = undefined;
+    mockSessionCallbacks.onSessionUpdated = undefined;
     mockSessionCallbacks.onResolved = undefined;
+    mockSessionCallbacks.onRemoteModelStateChange = undefined;
+    mockSessionCallbacks.onTransportCapabilityChange = undefined;
+    mockSessionCallbacks.onEvent = undefined;
     mockSessionCallbacks.onMessageQueued = undefined;
     mockSessionCallbacks.onMessageCompleted = undefined;
     mockSessionCallbacks.onMessageFailed = undefined;
@@ -526,6 +576,632 @@ describe('createSessionManager', () => {
       ).toBeNull();
     });
 
+    it('exposes active session type and remote model state from the live transport', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue(config.store, mgr.atoms.activeSessionType)).toBe('cloud-agent');
+
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      const remoteState = {
+        ownerConnectionId: 'owner',
+        protocol: 'v1',
+        catalog: {
+          protocolVersion: 1,
+          providers: [],
+          currentModel: {
+            model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+            variant: 'high',
+          },
+          defaultModel: { providerID: 'kilo', modelID: 'kilo-auto' },
+          truncated: false,
+        },
+        refresh: 'idle',
+      } satisfies RemoteModelState;
+      mockSessionCallbacks.onRemoteModelStateChange?.(remoteState);
+
+      expect(atomValue(config.store, mgr.atoms.activeSessionType)).toBe('remote');
+      expect(atomValue(config.store, mgr.atoms.remoteModelState)).toEqual(remoteState);
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual(
+        remoteState.catalog.currentModel
+      );
+    });
+
+    it('replaces a catalog-derived observation when the session owner changes', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: {
+          protocolVersion: 1,
+          providers: [],
+          currentModel: { model: { providerID: 'provider-a', modelID: 'model-a' } },
+          truncated: false,
+        },
+        refresh: 'idle',
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'provider-a', modelID: 'model-a' },
+      });
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-b',
+        protocol: 'unknown',
+        refresh: 'loading',
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toBeNull();
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-b',
+        protocol: 'v1',
+        catalog: {
+          protocolVersion: 1,
+          providers: [],
+          currentModel: { model: { providerID: 'provider-b', modelID: 'model-b' } },
+          truncated: false,
+        },
+        refresh: 'idle',
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'provider-b', modelID: 'model-b' },
+      });
+    });
+
+    it('recomputes remote send capability without marking a disconnected owner read-only', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSession.canSend = false;
+      mockSessionCallbacks.onTransportCapabilityChange?.();
+      expect(atomValue(config.store, mgr.atoms.canSend)).toBe(false);
+      expect(atomValue(config.store, mgr.atoms.isReadOnly)).toBe(false);
+
+      mockSession.canSend = true;
+      mockSessionCallbacks.onTransportCapabilityChange?.();
+      expect(atomValue(config.store, mgr.atoms.canSend)).toBe(true);
+    });
+
+    it('delegates remote model retries to the active session', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mgr.retryRemoteModels();
+
+      expect(mockSession.retryRemoteModels).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps session metadata authoritative over replayed root message models', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onSessionCreated?.({
+        id: 'ses-1',
+        model: { providerID: 'openai', id: 'gpt-5', variant: 'high' },
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'openai', modelID: 'gpt-5' },
+        variant: 'high',
+      });
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: stubUserMessage({
+          id: 'msg-root',
+          sessionID: 'ses-1',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'max',
+        }),
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'openai', modelID: 'gpt-5' },
+        variant: 'high',
+      });
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-assistant', 'ses-1', {
+          providerID: 'custom-provider',
+          modelID: 'custom/model',
+          variant: 'fast',
+        }).info,
+      });
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'openai', modelID: 'gpt-5' },
+        variant: 'high',
+      });
+    });
+
+    it('lets a live message override a session-set model once replay has finished', async () => {
+      // Regression test: `session.updated` can report a stale/default model
+      // that never changes for a per-request override (the wrapper sends the
+      // override straight through without persisting it to the session), so
+      // once we're live, a message's own reported model must win.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onSessionCreated?.({
+        id: 'ses-1',
+        model: { providerID: 'openai', id: 'gpt-5', variant: 'high' },
+      });
+      mockSessionCallbacks.onReplayComplete?.();
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: stubUserMessage({
+          id: 'msg-live',
+          sessionID: 'ses-1',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        }),
+      });
+
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+      });
+    });
+
+    it('uses a replayed root message model when session metadata has no model', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toBeNull();
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: stubUserMessage({
+          id: 'msg-root',
+          sessionID: 'ses-1',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        }),
+      });
+
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        variant: 'high',
+      });
+    });
+
+    it('keeps session metadata above the catalog current model', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onSessionCreated?.({
+        id: 'ses-1',
+        model: { providerID: 'openai', id: 'gpt-5', variant: 'high' },
+      });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: {
+          ...remoteCatalog,
+          currentModel: {
+            model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          },
+          defaultModel: { providerID: 'kilo', modelID: 'kilo-auto' },
+        },
+        refresh: 'idle',
+      });
+
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'openai', modelID: 'gpt-5' },
+        variant: 'high',
+      });
+    });
+
+    it('keeps a message-observed model when the catalog current model arrives afterward', async () => {
+      // Snapshot replay and catalog discovery are two independent async
+      // round-trips racing on first load. A session with history should
+      // land on the model its last message actually used, not whichever of
+      // the two requests happened to finish last.
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-history', 'ses-1', {
+          providerID: 'kilo',
+          modelID: 'anthropic/claude-sonnet-4',
+        }).info,
+      });
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: {
+          ...remoteCatalog,
+          currentModel: { model: { providerID: 'openai', modelID: 'gpt-5' } },
+        },
+        refresh: 'idle',
+      });
+
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
+      });
+    });
+
+    it('applies a live session.updated model while retaining the explicit override', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const override = {
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      } as const;
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mockSessionCallbacks.onSessionCreated?.({
+        id: 'ses-1',
+        model: { providerID: 'openai', id: 'gpt-5' },
+      });
+      mgr.setRemoteModelOverride(override);
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-history', 'ses-1', {
+          providerID: 'historical-provider',
+          modelID: 'historical-model',
+        }).info,
+      });
+      mockSessionCallbacks.onSessionUpdated?.({
+        id: 'ses-1',
+        model: { providerID: 'anthropic', id: 'claude-sonnet-4', variant: 'high' },
+      });
+
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        variant: 'high',
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(override);
+    });
+
+    it('keeps an explicit override through a still-replaying observation, but clears it on owner change', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const catalog = {
+        protocolVersion: 1,
+        providers: [],
+        truncated: false,
+      } satisfies NonNullable<RemoteModelState['catalog']>;
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog,
+        refresh: 'idle',
+      });
+      const override = {
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      } as const;
+      mgr.setRemoteModelOverride(override);
+
+      // onReplayComplete hasn't fired yet, so this message is still treated
+      // as replayed history and must not clear the override (see the
+      // dedicated "live" divergence test below for the post-replay case).
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-assistant', 'ses-1', {
+          providerID: 'openai',
+          modelID: 'gpt-5',
+        }).info,
+      });
+
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'openai', modelID: 'gpt-5' },
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(override);
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-b',
+        protocol: 'unknown',
+        refresh: 'loading',
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.remoteModelState)).toEqual({
+        ownerConnectionId: 'owner-b',
+        protocol: 'unknown',
+        refresh: 'loading',
+      });
+    });
+
+    it('clears a stale override once a live message shows the CLI actually used a different model', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: { model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
+      });
+
+      // Initial connect has finished replaying whatever history existed.
+      mockSessionCallbacks.onReplayComplete?.();
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-live', 'ses-1', {
+          providerID: 'openai',
+          modelID: 'gpt-5',
+        }).info,
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'openai', modelID: 'gpt-5' },
+      });
+    });
+
+    it('clears a stale override once a live message runs the same model on a different variant', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+      mockSessionCallbacks.onReplayComplete?.();
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-live', 'ses-1', {
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+        }).info,
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+      });
+    });
+
+    it('keeps an override whose model and variant a live message echoes back', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      const override = {
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      } as const;
+      mgr.setRemoteModelOverride(override);
+      mockSessionCallbacks.onReplayComplete?.();
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-live', 'ses-1', {
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+          variant: 'high',
+        }).info,
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(override);
+    });
+
+    it('keeps a fresh override intact through a reconnect that replays pre-override history', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mockSessionCallbacks.onReplayComplete?.();
+
+      const override = {
+        source: 'cli-catalog',
+        selection: { model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
+      } as const;
+      mgr.setRemoteModelOverride(override);
+
+      // A reconnect starts a fresh replay before the override was ever used.
+      mockSessionCallbacks.onSessionCreated?.({ id: 'ses-1' });
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-old', 'ses-1', {
+          providerID: 'openai',
+          modelID: 'gpt-5',
+        }).info,
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(override);
+
+      mockSessionCallbacks.onReplayComplete?.();
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(override);
+    });
+
+    it('clears an explicit override when the same owner changes to an incompatible protocol', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'legacy',
+        refresh: 'idle',
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
+    });
+
+    it('clears an explicit override when a same-owner catalog no longer contains its model', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: {
+          ...remoteCatalog,
+          providers: [{ ...remoteCatalog.providers[0], models: [] }],
+        },
+        refresh: 'idle',
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
+    });
+
+    it('keeps a same-owner v1 model override but drops a removed variant', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: {
+          ...remoteCatalog,
+          providers: [
+            {
+              ...remoteCatalog.providers[0],
+              models: [{ ...remoteCatalog.providers[0].models[0], variants: [] }],
+            },
+          ],
+        },
+        refresh: 'idle',
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual({
+        source: 'cli-catalog',
+        selection: { model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' } },
+      });
+    });
+
+    it('clears remote model state and override immediately when switching sessions', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'legacy',
+        refresh: 'idle',
+      });
+      mgr.setRemoteModelOverride({
+        source: 'legacy-gateway',
+        selection: { model: { providerID: 'kilo', modelID: 'kilo-auto' } },
+      });
+
+      const switching = mgr.switchSession(kiloId('ses-2'));
+      expect(atomValue(config.store, mgr.atoms.remoteModelState)).toEqual({
+        ownerConnectionId: null,
+        protocol: 'unknown',
+        refresh: 'idle',
+      });
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
+      await switching;
+    });
+
     it('allows attachments only for a resolved Cloud Agent session', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -663,7 +1339,7 @@ describe('createSessionManager', () => {
           type: 'prompt',
           prompt: 'Queue this follow-up',
           mode: 'code',
-          model: 'claude-3-5-sonnet',
+          model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
         },
         images: undefined,
       });
@@ -683,7 +1359,73 @@ describe('createSessionManager', () => {
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+          model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
+        },
+        images: undefined,
+      });
+    });
+
+    it('sends only the explicit remote override and omits stale session model fields after clear', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      const override = {
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      } as const;
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mgr.setRemoteModelOverride(override);
+      mockSession.send.mockResolvedValue(undefined);
+
+      await mgr.send({
+        payload: {
+          type: 'prompt',
+          prompt: 'with override',
+          mode: 'code',
+          model: 'stale-session-model',
+          variant: 'stale-session-variant',
+        },
+      });
+
+      expect(mockSession.send).toHaveBeenLastCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'prompt',
+          prompt: 'with override',
+          mode: 'code',
+          model: override.selection.model,
+          variant: 'high',
+        },
+        remoteModelOverride: override,
+        images: undefined,
+      });
+
+      mgr.setRemoteModelOverride(null);
+      await mgr.send({
+        payload: {
+          type: 'prompt',
+          prompt: 'without override',
+          mode: 'code',
+          model: 'stale-session-model',
+          variant: 'stale-session-variant',
+        },
+      });
+
+      expect(mockSession.send).toHaveBeenLastCalledWith({
+        messageId: expect.stringMatching(/^msg_/),
+        payload: {
+          type: 'prompt',
+          prompt: 'without override',
+          mode: 'code',
+        },
         images: undefined,
       });
     });
@@ -702,7 +1444,8 @@ describe('createSessionManager', () => {
 
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        payload: { type: 'prompt', prompt: 'Hello', mode: 'code' },
+        images: undefined,
       });
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(0);
     });
@@ -881,7 +1624,7 @@ describe('createSessionManager', () => {
           type: 'prompt',
           prompt: 'Hello',
           mode: 'code',
-          model: 'claude-3-5-sonnet',
+          model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
           variant: 'high',
         },
         images: undefined,
@@ -904,7 +1647,12 @@ describe('createSessionManager', () => {
       expect(accepted).toBe(true);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+          model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
+        },
         images,
       });
     });
@@ -928,7 +1676,12 @@ describe('createSessionManager', () => {
       expect(accepted).toBe(true);
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+          model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
+        },
         attachments,
         images: undefined,
       });
@@ -999,7 +1752,13 @@ describe('createSessionManager', () => {
 
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
-        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
+        payload: {
+          type: 'prompt',
+          prompt: 'Hello',
+          mode: 'code',
+          model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
+        },
+        images: undefined,
       });
     });
 
@@ -1038,7 +1797,7 @@ describe('createSessionManager', () => {
         if (!storage) throw new Error('expected session storage');
         storage.upsertMessage(rootMessage.info);
         storage.upsertMessage(childMessage.info);
-        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root', parentID: null });
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
       });
 
       await mgr.switchSession(kiloId('ses-root'));
@@ -1059,7 +1818,7 @@ describe('createSessionManager', () => {
       const childMessage = createStoredMessage('msg-child', 'child-2', 'assistant');
 
       mockSession.connect.mockImplementation(() => {
-        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-active', parentID: null });
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-active' });
       });
 
       await mgr.switchSession(kiloId('ses-active'));
@@ -1082,7 +1841,7 @@ describe('createSessionManager', () => {
       const childOneSecond = createStoredMessage('msg-child-1b', 'child-1', 'user');
 
       mockSession.connect.mockImplementation(() => {
-        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root', parentID: null });
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
       });
 
       await mgr.switchSession(kiloId('ses-root'));
@@ -1696,7 +2455,7 @@ describe('createSessionManager', () => {
       // Simulate a session.created event that reports a different root
       // session ID than the one switchSession was called with.
       const realRootId = 'ses-real-root';
-      mockSessionCallbacks.onSessionCreated?.({ id: realRootId, parentID: null });
+      mockSessionCallbacks.onSessionCreated?.({ id: realRootId });
 
       if (!latestStorage) throw new Error('expected session storage');
       const rootMessage = createStoredMessage('msg-1', realRootId, 'assistant');
@@ -2377,6 +3136,7 @@ describe('isReadOnly during connecting phase', () => {
     mockSession.storage = latestStorage;
     latestStorage = null;
     mockSessionCallbacks.onSessionCreated = undefined;
+    mockSessionCallbacks.onSessionUpdated = undefined;
     mockSessionCallbacks.onQuestionAsked = undefined;
     mockSessionCallbacks.onQuestionResolved = undefined;
     mockSessionCallbacks.onPermissionAsked = undefined;
@@ -2449,6 +3209,7 @@ describe('isReadOnly during connecting phase', () => {
     expect(atomValue<boolean>(config.store, mgr.atoms.isReadOnly)).toBe(false);
 
     // Transport resolves but canSend stays false (read-only session)
+    mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
     mockSession.state.getActivity.mockReturnValue({ type: 'idle' as const });
     subscriberCallbackRef.current?.();
 

@@ -152,10 +152,16 @@ export function ChildSessionSection({
           <Text className="text-sm text-foreground" numberOfLines={1}>
             {subtitle}
           </Text>
-          {currentTool ? (
-            <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-              <Text className="text-xs text-agent-sky">{currentTool.tool}</Text>
-              {currentTool.context ? ` ${currentTool.context}` : ''}
+          {isRunning ? (
+            <Text className="text-xs leading-4 text-muted-foreground" numberOfLines={1}>
+              {currentTool ? (
+                <>
+                  <Text className="text-xs leading-4 text-agent-sky">{currentTool.tool}</Text>
+                  {currentTool.context ? ` ${currentTool.context}` : ''}
+                </>
+              ) : (
+                ' '
+              )}
             </Text>
           ) : null}
         </View>

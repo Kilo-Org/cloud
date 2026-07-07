@@ -607,7 +607,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     (!autoModel && isForbiddenFreeModel(effectiveModelIdLowerCased))
   ) {
     console.warn(`User requested forbidden free model ${effectiveModelIdLowerCased}; rejecting.`);
-    return forbiddenFreeModelResponse(fraudHeaders);
+    return forbiddenFreeModelResponse();
   }
 
   let classifyResult = shouldBlockOnClassify ? await awaitClassifyAbuse(classifyPromise) : null;

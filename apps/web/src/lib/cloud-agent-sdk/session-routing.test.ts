@@ -231,6 +231,7 @@ describe('session transport routing', () => {
         },
         releaseRetain,
         offSystemEvent,
+        subscribeRelease,
       };
     }
 
@@ -265,7 +266,11 @@ describe('session transport routing', () => {
       await Promise.resolve(); // fetchSnapshot resolves
 
       expect(resolveSession).toHaveBeenCalledTimes(1);
-      expect(fake.connection.retain).toHaveBeenCalledTimes(1);
+      // The watcher subscribes (not just retains) so the server pushes
+      // heartbeats/list re-sends for the watched session to this socket.
+      expect(fake.connection.subscribeToCliSession).toHaveBeenCalledTimes(1);
+      expect(fake.connection.subscribeToCliSession).toHaveBeenCalledWith(SES_ID);
+      expect(fake.connection.retain).not.toHaveBeenCalled();
       expect(session.storage.getMessageIds()).toContain('msg-1');
 
       // A heartbeat for a different session must not trigger a re-resolve.
@@ -283,10 +288,10 @@ describe('session transport routing', () => {
       await Promise.resolve(); // second resolveSession resolves
 
       expect(resolveSession).toHaveBeenCalledTimes(2);
-      expect(fake.connection.subscribeToCliSession).toHaveBeenCalledWith(SES_ID);
-      // Watcher is disarmed once the upgrade kicks off.
+      // Watcher is disarmed once the upgrade kicks off: its listener and
+      // subscription are both released.
       expect(fake.offSystemEvent).toHaveBeenCalledTimes(1);
-      expect(fake.releaseRetain).toHaveBeenCalledTimes(1);
+      expect(fake.subscribeRelease).toHaveBeenCalledTimes(1);
 
       session.destroy();
     });
@@ -314,7 +319,7 @@ describe('session transport routing', () => {
 
       session.destroy();
       expect(fake.offSystemEvent).toHaveBeenCalledTimes(1);
-      expect(fake.releaseRetain).toHaveBeenCalledTimes(1);
+      expect(fake.subscribeRelease).toHaveBeenCalledTimes(1);
 
       fake.emitSystemEvent('sessions.heartbeat', {
         connectionId: 'conn-1',

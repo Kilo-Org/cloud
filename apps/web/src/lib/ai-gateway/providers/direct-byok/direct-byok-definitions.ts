@@ -1,4 +1,5 @@
 import type { DirectByokProvider } from './types';
+import alibabaTokenPlan from './alibaba-token-plan';
 import byteplusCoding from './byteplus-coding';
 import chutesByok from './chutes-byok';
 import crofai from './crofai';
@@ -16,6 +17,7 @@ import xiaomiTokenPlanSgp from './xiaomi-token-plan-sgp';
 import zaiCoding from './zai-coding';
 
 export default [
+  alibabaTokenPlan,
   byteplusCoding,
   chutesByok,
   crofai,

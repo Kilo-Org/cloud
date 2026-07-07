@@ -1,6 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { toast } from 'sonner-native';
+
+import { captureEvent, SESSION_VIEWED_EVENT } from '@/lib/analytics/posthog';
 
 import { ChatSandboxRouteMounts } from '@/components/kilo-chat/chat-sandbox-route-mounts';
 import { ConversationScreen } from '@/components/kilo-chat/conversation-screen';
@@ -25,6 +27,15 @@ export default function ChatConversationRoute() {
     detail: conversationDetail,
     routeSandboxId: sandboxId,
   });
+
+  const viewTrackedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!conversationDetail.data || viewTrackedRef.current === conversationId) {
+      return;
+    }
+    viewTrackedRef.current = conversationId;
+    captureEvent(SESSION_VIEWED_EVENT, { surface: 'claw' });
+  }, [conversationDetail.data, conversationId]);
 
   useEffect(() => {
     if (conversationDetail.isError) {

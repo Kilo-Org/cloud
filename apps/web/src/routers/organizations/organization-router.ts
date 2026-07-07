@@ -76,6 +76,7 @@ import {
 import { organizationSlugContainsReservedSubstring } from '@/lib/organizations/organization-slug';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import { organizationFundsRouter } from '@/routers/organizations/organization-funds-router';
+import { organizationCostInsightsRouter } from '@/routers/organizations/organization-cost-insights-router';
 
 const OrganizationUpdateSchema = OrganizationIdInputSchema.extend({
   name: OrganizationNameSchema,
@@ -224,6 +225,7 @@ export const organizationsRouter = createTRPCRouter({
   kiloclaw: organizationKiloclawRouter,
   bitbucket: organizationBitbucketRouter,
   funds: organizationFundsRouter,
+  costInsights: organizationCostInsightsRouter,
 
   resolveRouteIdentifier: baseProcedure
     .input(z.object({ routeIdentifier: z.string().min(1) }))

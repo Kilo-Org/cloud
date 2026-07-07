@@ -12,6 +12,9 @@ export default defineConfig({
       'cloud-agent-sdk/cli-model': fileURLToPath(
         new URL('../../apps/web/src/lib/cloud-agent-sdk/cli-model.ts', import.meta.url)
       ),
+      'cloud-agent-sdk/remote-model-order': fileURLToPath(
+        new URL('../../apps/web/src/lib/cloud-agent-sdk/remote-model-order.ts', import.meta.url)
+      ),
       'cloud-agent-sdk': fileURLToPath(
         new URL('../../apps/web/src/lib/cloud-agent-sdk/index.ts', import.meta.url)
       ),

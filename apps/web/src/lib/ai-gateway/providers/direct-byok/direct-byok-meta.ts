@@ -2,6 +2,7 @@ import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/provide
 
 // Client-safe display names for direct BYOK providers.
 export const DIRECT_BYOK_PROVIDERS_META = {
+  'alibaba-token-plan': 'Alibaba Token Plan (Singapore)',
   'byteplus-coding': 'BytePlus Coding Plan',
   'chutes-byok': 'Chutes BYOK',
   crofai: 'CrofAI',

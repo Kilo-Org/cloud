@@ -111,7 +111,11 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
 export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
   const provider = ModelsDevProviderSchema.parse(entry);
   return Object.values(provider.models)
-    .filter(model => model.status !== 'deprecated')
+    .filter(
+      model =>
+        model.status !== 'deprecated' &&
+        (!model.modalities?.output || model.modalities.output.includes('text'))
+    )
     .map(model => ({
       id: model.id,
       name: shortenDisplayName(model.name),
@@ -189,6 +193,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Morph BYOK',
     url: 'https://www.morphllm.com/api/models/json',
   }),
+  modelsDevFetcher('alibaba-token-plan', 'alibaba-token-plan'),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud'),
   modelsDevFetcher('opencode-go', 'opencode-go'),

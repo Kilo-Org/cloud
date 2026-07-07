@@ -3,6 +3,7 @@
  * wire data and typed internal code. Validates shape via Zod schemas then uses
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
+import { z } from 'zod';
 import type { Part, SessionStatus, QuestionInfo, Message } from '@/types/opencode.gen';
 import type { SessionInfo, CloudStatus, SuggestionAction, SlashCommandInfo } from './types';
 import {
@@ -177,6 +178,21 @@ function extractErrorMessage(rawError: unknown): string {
   return 'Unknown error';
 }
 
+const sessionModelSchema = z.object({
+  providerID: z.string(),
+  id: z.string(),
+  variant: z.string().optional(),
+});
+
+function normalizeSessionInfo(rawInfo: { id: string; [key: string]: unknown }): SessionInfo {
+  const model = sessionModelSchema.safeParse(rawInfo.model);
+  return {
+    id: rawInfo.id,
+    parentID: rawInfo.parentID != null ? String(rawInfo.parentID) : undefined,
+    ...(model.success ? { model: model.data } : {}),
+  };
+}
+
 function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent | null {
   switch (eventType) {
     case 'message.updated': {
@@ -231,10 +247,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       const rawCreated = r.data.info;
       return {
         type: 'session.created',
-        info: {
-          id: rawCreated.id,
-          parentID: rawCreated.parentID != null ? String(rawCreated.parentID) : undefined,
-        },
+        info: normalizeSessionInfo(rawCreated),
       };
     }
 
@@ -244,10 +257,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       const rawUpdated = r.data.info;
       return {
         type: 'session.updated',
-        info: {
-          id: rawUpdated.id,
-          parentID: rawUpdated.parentID != null ? String(rawUpdated.parentID) : undefined,
-        },
+        info: normalizeSessionInfo(rawUpdated),
       };
     }
 

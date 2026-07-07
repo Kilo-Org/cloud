@@ -392,12 +392,17 @@ describe('CloudAgentTransport lifecycle', () => {
 });
 
 describe('CloudAgentTransport command delegation', () => {
-  it('send() delegates to api.send with bound sessionId', () => {
+  it('converts a Kilo model ref before delegating to api.send', async () => {
     const api = createMockApi();
     const { transport } = createTransportWithSinks(undefined, undefined, api);
 
-    void transport.send!({
-      payload: { type: 'prompt', prompt: 'hello', mode: 'code', model: 'gpt-4' },
+    await transport.send!({
+      payload: {
+        type: 'prompt',
+        prompt: 'hello',
+        mode: 'code',
+        model: { providerID: 'kilo', modelID: 'gpt-4' },
+      },
     });
 
     expect(api.send).toHaveBeenCalledWith({
@@ -408,7 +413,26 @@ describe('CloudAgentTransport command delegation', () => {
     transport.destroy();
   });
 
-  it('send() delegates canonical document attachments to api.send', () => {
+  it('rejects a non-Kilo model ref before calling the Cloud Agent API', async () => {
+    const api = createMockApi();
+    const { transport } = createTransportWithSinks(undefined, undefined, api);
+
+    await expect(
+      transport.send!({
+        payload: {
+          type: 'prompt',
+          prompt: 'hello',
+          mode: 'code',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+        },
+      })
+    ).rejects.toThrow('Cloud Agent only supports Kilo models');
+    expect(api.send).not.toHaveBeenCalled();
+
+    transport.destroy();
+  });
+
+  it('converts Kilo model refs while preserving canonical document attachments', async () => {
     const api = createMockApi();
     const { transport } = createTransportWithSinks(undefined, undefined, api);
     const attachments = {
@@ -416,8 +440,13 @@ describe('CloudAgentTransport command delegation', () => {
       files: ['87654321-4321-4321-8321-cba987654321.pdf'],
     };
 
-    void transport.send!({
-      payload: { type: 'prompt', prompt: 'read it', mode: 'code', model: 'gpt-4' },
+    await transport.send!({
+      payload: {
+        type: 'prompt',
+        prompt: 'read it',
+        mode: 'code',
+        model: { providerID: 'kilo', modelID: 'gpt-4' },
+      },
       attachments,
     });
 
@@ -528,8 +557,23 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
     ws.onmessage?.({ data: JSON.stringify(event) } as MessageEvent);
   }
 
+  /** Kilocode event with the eventId: 0 sentinel — never advances the replay cursor. */
+  function sentinelStatus(): CloudAgentEvent {
+    return {
+      eventId: 0,
+      executionId: null,
+      sessionId: 'ses-1',
+      streamEventType: 'kilocode',
+      timestamp: new Date().toISOString(),
+      data: {
+        type: 'session.status',
+        properties: { sessionID: 'ses-1', status: { type: 'busy' } },
+      },
+    };
+  }
+
   /** Establish connection, simulate close + reconnect, return the new WS mock. */
-  async function simulateReconnect(): Promise<MockWebSocket> {
+  async function simulateReconnect(establishEvent?: CloudAgentEvent): Promise<MockWebSocket> {
     mockWs.onclose?.({ code: 1006, reason: '', wasClean: false } as CloseEvent);
 
     jest.advanceTimersByTime(2000);
@@ -540,13 +584,13 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
     newMockWs.onopen?.(new Event('open'));
     sendRawOn(
       newMockWs,
-      kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } })
+      establishEvent ?? kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } })
     );
 
     return newMockWs;
   }
 
-  it('refetches snapshot on reconnect and replays events into sinks', async () => {
+  it('resumes from the replay cursor on reconnect instead of refetching the snapshot', async () => {
     jest.useFakeTimers();
     try {
       const { transport, serviceEvents, fetchSnapshot } = createTransportWithControllableSnapshot();
@@ -556,20 +600,29 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
 
       expect(fetchSnapshot).toHaveBeenCalledTimes(1);
 
-      // Establish connection in base-connection by sending a valid event
-      sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+      // Establish connection with a persisted event — its id becomes the cursor.
+      const establish = kilocode('session.status', {
+        sessionID: 'ses-1',
+        status: { type: 'busy' },
+      });
+      sendRaw(establish);
 
       const serviceCountBefore = serviceEvents.length;
 
       const newMockWs = await simulateReconnect();
       await flushMicrotasks();
 
-      expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+      // The socket replays missed events itself via fromId — no snapshot
+      // refetch, and no snapshot-driven session.created.
+      expect(fetchSnapshot).toHaveBeenCalledTimes(1);
+      const reconnectUrl = String(webSocketConstructor.mock.calls.at(-1)?.[0]);
+      expect(reconnectUrl).toContain(`fromId=${establish.eventId}`);
+      expect(reconnectUrl).not.toContain('replay=false');
 
       const replayedCreated = serviceEvents
         .slice(serviceCountBefore)
         .filter(e => e.type === 'session.created');
-      expect(replayedCreated).toHaveLength(1);
+      expect(replayedCreated).toHaveLength(0);
 
       transport.destroy();
       newMockWs.onclose?.({ code: 1000, reason: '', wasClean: true } as CloseEvent);
@@ -578,7 +631,7 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
     }
   });
 
-  it('replayed snapshot with messages upserts into sinks correctly', async () => {
+  it('refetches the snapshot on reconnect when no replay cursor exists and upserts it', async () => {
     jest.useFakeTimers();
     try {
       const snapshotWithMessages = makeSnapshot({ id: 'ses-1' }, [
@@ -613,10 +666,11 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
       expect(chatEvents.filter(e => e.type === 'message.updated')).toHaveLength(1);
       expect(chatEvents.filter(e => e.type === 'message.part.updated')).toHaveLength(1);
 
-      // Establish connection
-      sendRaw(kilocode('session.status', { sessionID: 'ses-1', status: { type: 'busy' } }));
+      // Establish connection with sentinel events only — no replay cursor, so
+      // reconnect falls back to the snapshot refetch.
+      sendRaw(sentinelStatus());
 
-      const newMockWs = await simulateReconnect();
+      const newMockWs = await simulateReconnect(sentinelStatus());
       await flushMicrotasks();
 
       expect(fetchSnapshot).toHaveBeenCalledTimes(2);

@@ -11,6 +11,8 @@ import {
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner-native';
 
+import { captureEvent, MESSAGE_SENT_EVENT } from '@/lib/analytics/posthog';
+
 import { resolveMobileMessageInputAvailability } from '../bot-send-state';
 import { type MessageInputSubmitControls } from '../message-input-state';
 import {
@@ -147,6 +149,7 @@ export function useConversationMessageController({
             if (controls?.clearDraft() ?? false) {
               setReplyingTo(null);
             }
+            captureEvent(MESSAGE_SENT_EVENT, { surface: 'claw' });
             void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
           onError: err => {

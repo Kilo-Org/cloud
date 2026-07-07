@@ -1,5 +1,9 @@
 import { describe, test, expect } from '@jest/globals';
-import { getKiloCodeVersionNumber, getXKiloCodeVersionNumber } from './userAgent';
+import {
+  getKiloCodeVersionNumber,
+  getXKiloCodeVersionNumber,
+  isLegacyKiloExtensionNotificationsUserAgent,
+} from './userAgent';
 
 describe('getKiloCodeVersionNumber', () => {
   test('returns undefined for non-Kilo-Code user agents', () => {
@@ -49,5 +53,23 @@ describe('getKiloCodeVersionNumber', () => {
   test('parses versions with pre-release tags followed by suffix', () => {
     expect(getKiloCodeVersionNumber('Kilo-Code/4.82.0-beta (Mac OS X)')).toBeCloseTo(4.082, 10);
     expect(getXKiloCodeVersionNumber('4.65.3-alpha.1 extra-info')).toBeCloseTo(4.065003, 10);
+  });
+});
+
+describe('isLegacyKiloExtensionNotificationsUserAgent', () => {
+  test('matches the legacy extension axios User-Agent', () => {
+    expect(isLegacyKiloExtensionNotificationsUserAgent('axios/1.7.2')).toBe(true);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('axios/0.27.2')).toBe(true);
+  });
+
+  test('does not match current extension, CLI, bot, or missing User-Agents', () => {
+    expect(isLegacyKiloExtensionNotificationsUserAgent(null)).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent(undefined)).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('opencode-kilo-provider/7.1.0')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('opencode-kilo-provider')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('Kilo-Code/5.1.0')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('Mozilla/5.0 Test Browser')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('my-axios/1.0.0')).toBe(false);
   });
 });

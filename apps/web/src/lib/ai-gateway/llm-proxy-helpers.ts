@@ -28,12 +28,7 @@ import type {
   OpenRouterProviderConfig,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  type FraudDetectionHeaders,
-  getFraudDetectionHeaders,
-  isRooCodeBasedClient,
-  toMicrodollars,
-} from '@/lib/utils';
+import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
@@ -282,19 +277,12 @@ export function modelNotAllowedResponse() {
   );
 }
 
-export function forbiddenFreeModelResponse(header: FraudDetectionHeaders) {
-  const errorType = ProxyErrorType.discontinued_free_model;
-  if (isRooCodeBasedClient(header)) {
-    // https://github.com/Kilo-Org/kilocode/blob/50d6bd482bec6fae7d1c80b14ffb064de3761507/src/shared/kilocode/errorUtils.ts#L13
-    const error = `The alpha period for this model has ended.`;
-    return NextResponse.json(
-      { error: error, error_type: errorType, message: error },
-      { status: 404 }
-    );
-  } else {
-    const error = `The free period of this model ended. Please use ${KILO_AUTO_BALANCED_MODEL.id} for affordable inference or ${KILO_AUTO_FREE_MODEL.id} for limited free inference.`;
-    return NextResponse.json({ error, error_type: errorType, message: error }, { status: 404 });
-  }
+export function forbiddenFreeModelResponse() {
+  const error = `The free period of this model ended. Please use ${KILO_AUTO_BALANCED_MODEL.id} for affordable inference or ${KILO_AUTO_FREE_MODEL.id} for limited free inference.`;
+  return NextResponse.json(
+    { error, error_type: ProxyErrorType.discontinued_free_model, message: error },
+    { status: 404 }
+  );
 }
 
 export function modelDoesNotExistResponse() {

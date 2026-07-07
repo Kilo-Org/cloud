@@ -27,7 +27,7 @@ import {
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateApiToken, generateInternalServiceToken } from '@/lib/tokens';
 import {
-  fetchSessionMessages,
+  fetchSessionSnapshot,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
 } from '@/lib/session-ingest-client';
@@ -689,7 +689,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     }),
 
   /**
-   * Get messages for a V2 session from the session ingest worker.
+   * Get snapshot metadata and messages for a V2 session from the session ingest worker.
    */
   getSessionMessages: baseProcedure
     .input(z.object({ session_id: sessionIdField }))
@@ -697,8 +697,8 @@ export const cliSessionsV2Router = createTRPCRouter({
       await getSessionWithAccessCheck(input.session_id, ctx);
 
       try {
-        const messages = await fetchSessionMessages(input.session_id, ctx.user);
-        return { messages: messages ?? [] };
+        const snapshot = await fetchSessionSnapshot(input.session_id, ctx.user.id);
+        return snapshot ?? { info: {}, messages: [] };
       } catch (error) {
         console.error(
           `Failed to fetch messages for session ${input.session_id}:`,

@@ -33,6 +33,7 @@ import {
   Gift,
   ChevronLeft,
   ChevronRight,
+  ChartLine,
 } from 'lucide-react';
 import HeaderLogo from '@/components/HeaderLogo';
 import OrganizationSwitcher from './OrganizationSwitcher';
@@ -48,6 +49,10 @@ import { useTRPC } from '@/lib/trpc/utils';
 
 const SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS = 5 * 60_000;
 
+function formatReviewItemBadge(count: number | undefined): string | undefined {
+  return count && count > 0 ? count.toLocaleString('en-US') : undefined;
+}
+
 export default function PersonalAppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const trpc = useTRPC();
   const { data: user, isLoading } = useUser();
@@ -58,6 +63,12 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       staleTime: SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS,
     })
   );
+  const { data: costInsightsAttention } = useQuery({
+    ...trpc.costInsights.getAttentionState.queryOptions(),
+    enabled: Boolean(user?.is_admin),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
 
   // Feature flags
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
@@ -70,6 +81,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     title: string;
     icon: React.ElementType;
     url: string;
+    badge?: string;
     className?: string;
   }> = [
     {
@@ -87,6 +99,16 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       icon: ChartColumnIncreasing,
       url: '/usage',
     },
+    ...(user?.is_admin
+      ? [
+          {
+            title: 'Cost Insights',
+            icon: ChartLine,
+            url: '/cost-insights',
+            badge: formatReviewItemBadge(costInsightsAttention?.reviewItemCount),
+          },
+        ]
+      : []),
   ];
 
   // KiloClaw group
@@ -227,7 +249,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     title: string;
     icon: React.ElementType;
     url: string;
-    badge?: string;
     className?: string;
   }> = [
     {

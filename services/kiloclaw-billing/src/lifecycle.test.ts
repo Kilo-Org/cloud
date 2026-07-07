@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as DbModule from '@kilocode/db';
 
 const {
+  mockCaptureCostInsightSpend,
   mockFindLatestPreCutoffUserCommitSwitchQualification,
   mockGetWorkerDb,
   mockGetMissingSnowflakeConfig,
   mockQueryKiloclawActiveUserIds,
 } = vi.hoisted(() => ({
+  mockCaptureCostInsightSpend: vi.fn<(tx: unknown, input: { occurredAt: string }) => Promise<void>>(
+    async () => undefined
+  ),
   mockFindLatestPreCutoffUserCommitSwitchQualification: vi.fn<
     () => Promise<DbModule.KiloClawCommitSwitchQualification | null>
   >(async () => null),
@@ -24,6 +28,12 @@ vi.mock('@kilocode/db', async importOriginal => {
     getWorkerDb: mockGetWorkerDb,
   };
 });
+
+vi.mock('@kilocode/db/cost-insights-rollups', () => ({
+  captureCostInsightSpend: mockCaptureCostInsightSpend,
+  COST_INSIGHT_DRIVER_FALLBACK: 'other',
+  COST_INSIGHT_KILOCLAW_PRODUCT_KEY: 'kiloclaw-hosting',
+}));
 
 vi.mock('./snowflake.js', () => ({
   getMissingSnowflakeConfig: mockGetMissingSnowflakeConfig,
@@ -1434,6 +1444,7 @@ describe('credit renewal fanout queue processing', () => {
       })
     );
     expect(duplicateResult.credit_renewals_skipped_duplicate).toBe(1);
+    expect(mockCaptureCostInsightSpend).not.toHaveBeenCalled();
     expect(staleResult.credit_renewals).toBe(0);
     expect(staleResult.credit_renewals_past_due).toBe(0);
     expect(staleResult.errors).toBe(0);
@@ -1570,6 +1581,28 @@ describe('credit renewal fanout queue processing', () => {
     expect(updates).toHaveLength(0);
     expect(selectBuilders[0]?.limit).toHaveBeenCalledTimes(1);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('does not mutate balance or subscription when scheduled-spend capture fails', async () => {
+    const row = creditRenewalRow();
+    const { db, txInserts, txUpdates } = createMockDb([[row], [row]]);
+    mockGetWorkerDb.mockReturnValue(db);
+    mockCaptureCostInsightSpend.mockRejectedValueOnce(new Error('rollup unavailable'));
+
+    await expect(
+      processCreditRenewalItem(
+        createEnvWithQueueMocks(vi.fn()).env,
+        creditRenewalItemMessage({ renewalBoundary: '2026-06-01T00:00:00.000Z' }),
+        1
+      )
+    ).rejects.toThrow('rollup unavailable');
+
+    expect(txInserts).toEqual([
+      expect.objectContaining({
+        credit_category: 'kiloclaw-subscription:22222222-2222-4222-8222-222222222222:2026-06',
+      }),
+    ]);
+    expect(txUpdates).toHaveLength(0);
   });
 
   it('resolves a terminal failure when an operator retry finalizes an expected past-due outcome', async () => {
@@ -5954,6 +5987,23 @@ describe('credit renewal sweep affiliate tracking', () => {
         }),
       ])
     );
+    expect(mockCaptureCostInsightSpend).toHaveBeenCalledWith(expect.anything(), {
+      owner: { type: 'user', id: 'user-1' },
+      actorUserId: 'user-1',
+      occurredAt: expect.any(String),
+      amountMicrodollars: 9_000_000,
+      category: 'scheduled',
+      source: 'kiloclaw',
+      productKey: 'kiloclaw-hosting',
+      featureKey: 'renewal',
+      modelOrPlanKey: 'standard',
+      providerKey: 'other',
+    });
+    const captureInput = mockCaptureCostInsightSpend.mock.calls[0]?.[1] as
+      | { occurredAt: string }
+      | undefined;
+    const deduction = txInserts.find(insert => insert.amount_microdollars === -9_000_000);
+    expect(deduction?.created_at).toBe(captureInput?.occurredAt);
 
     const saleCall = fetch.mock.calls
       .map(

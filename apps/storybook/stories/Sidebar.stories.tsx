@@ -6,6 +6,7 @@ import {
   Building2,
   Cable,
   ChartColumnIncreasing,
+  ChartLine,
   ChevronLeft,
   ChevronRight,
   Cloud,
@@ -110,6 +111,11 @@ const dashboardItems: SidebarStoryItem[] = [
     title: 'Usage',
     icon: ChartColumnIncreasing,
     url: '/usage',
+  },
+  {
+    title: 'Cost Insights',
+    icon: ChartLine,
+    url: '/cost-insights',
   },
 ];
 

@@ -1,15 +1,20 @@
-import { db } from '@/lib/drizzle';
-import {
-  exa_monthly_usage,
-  exa_usage_log,
-  kilocode_users,
-  type MicrodollarUsage,
-  type User,
-} from '@kilocode/db/schema';
-import { ABUSE_CLASSIFICATION } from '@kilocode/db/schema-types';
+import { randomUUID } from 'node:crypto';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
+import {
+  mutateOrganizationUsage,
+  scheduleOrganizationLowBalanceAlert,
+} from '@/lib/organizations/organization-usage';
+import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
+import {
+  captureCostInsightSpend,
+  COST_INSIGHT_DRIVER_FALLBACK,
+  COST_INSIGHT_EXA_PRODUCT_KEY,
+} from '@kilocode/db/cost-insights-rollups';
+import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
+import { getExaCostInsightFeatureKey } from '@/lib/exa-paths';
 
 export type ExaMonthlyUsageResult = {
   /** Total spend in microdollars for the current month. */
@@ -61,10 +66,8 @@ export async function getExaMonthlyUsage(
 }
 
 /**
- * Records a single Exa request:
- * 1. Upserts exa_monthly_usage counter (atomic increment).
- * 2. Appends to exa_usage_log (audit trail).
- * 3. If chargedToBalance, deducts from the user's (or org's) Kilo credit balance.
+ * Records the source row, monthly counter, charged owner mutation, and Cost Insights
+ * rollup atomically. Low-balance notification scheduling happens only after commit.
  */
 export async function recordExaUsage(params: {
   userId: string;
@@ -87,38 +90,65 @@ export async function recordExaUsage(params: {
     type,
   } = params;
   const chargedAmount = chargedToBalance ? costMicrodollars : 0;
+  const sourceId = randomUUID();
+  const occurredAt = new Date().toISOString();
 
-  // 1. Append to the usage log first. This is the source of truth for balance
-  // recomputation, so it must succeed before we touch any counters. If this
-  // fails (e.g. missing partition), nothing else is modified and recompute
-  // can still reconcile from the log rows that do exist.
-  await db.insert(exa_usage_log).values({
-    kilo_user_id: userId,
-    organization_id: organizationId ?? null,
-    path,
-    cost_microdollars: costMicrodollars,
-    charged_to_balance: chargedToBalance,
-    feature_id: featureId ?? null,
-    type: type ?? null,
+  const organizationUsage = await db.transaction(async tx => {
+    await tx.insert(exa_usage_log).values({
+      id: sourceId,
+      kilo_user_id: userId,
+      organization_id: organizationId ?? null,
+      path,
+      cost_microdollars: costMicrodollars,
+      charged_to_balance: chargedToBalance,
+      feature_id: featureId ?? null,
+      type: type ?? null,
+      created_at: occurredAt,
+    });
+
+    await upsertMonthlyCounter(tx, {
+      userId,
+      organizationId,
+      occurredAt,
+      costMicrodollars,
+      chargedAmount,
+      freeAllowanceMicrodollars,
+    });
+
+    if (!chargedToBalance || costMicrodollars <= 0) return null;
+
+    const result = await deductFromBalance(tx, {
+      userId,
+      organizationId,
+      occurredAt,
+      costMicrodollars,
+    });
+
+    await captureCostInsightSpend(tx, {
+      owner: organizationId
+        ? { type: 'organization', id: organizationId }
+        : { type: 'user', id: userId },
+      actorUserId: userId,
+      occurredAt,
+      amountMicrodollars: costMicrodollars,
+      category: 'variable',
+      source: 'other',
+      productKey: COST_INSIGHT_EXA_PRODUCT_KEY,
+      featureKey: getExaCostInsightFeatureKey(path),
+      modelOrPlanKey: COST_INSIGHT_DRIVER_FALLBACK,
+      providerKey: COST_INSIGHT_EXA_PRODUCT_KEY,
+    });
+
+    return result;
   });
 
-  // 2. Upsert the monthly counter (atomic increment).
-  // free_allowance_microdollars is set on INSERT (first request of the month)
-  // but NOT updated on conflict — the first-of-month value is locked in.
-  // Two partial unique indexes exist: one for personal (org IS NULL) and one
-  // for org usage (org IS NOT NULL), so the upsert must target the right one.
-  await upsertMonthlyCounter({
-    userId,
-    organizationId,
-    costMicrodollars,
-    chargedAmount,
-    freeAllowanceMicrodollars,
-  });
-
-  // 3. If over the free tier, deduct from the Kilo credit balance.
-  // If this fails, the log row exists so recompute can recover.
+  if (organizationId && organizationUsage) {
+    scheduleOrganizationLowBalanceAlert(organizationId, organizationUsage);
+  }
   if (chargedToBalance && costMicrodollars > 0) {
-    await deductFromBalance(userId, organizationId, costMicrodollars, path);
+    scheduleCostInsightEvaluationAfterSpend(
+      organizationId ? { type: 'organization', id: organizationId } : { type: 'user', id: userId }
+    );
   }
 }
 
@@ -126,15 +156,25 @@ export async function recordExaUsage(params: {
  * Upserts the monthly counter row, targeting the correct partial unique index
  * based on whether the request is personal (no org) or org-scoped.
  */
-async function upsertMonthlyCounter(params: {
-  userId: string;
-  organizationId: string | undefined;
-  costMicrodollars: number;
-  chargedAmount: number;
-  freeAllowanceMicrodollars: number;
-}): Promise<void> {
-  const { userId, organizationId, costMicrodollars, chargedAmount, freeAllowanceMicrodollars } =
-    params;
+async function upsertMonthlyCounter(
+  tx: DrizzleTransaction,
+  params: {
+    userId: string;
+    organizationId: string | undefined;
+    occurredAt: string;
+    costMicrodollars: number;
+    chargedAmount: number;
+    freeAllowanceMicrodollars: number;
+  }
+): Promise<void> {
+  const {
+    userId,
+    organizationId,
+    occurredAt,
+    costMicrodollars,
+    chargedAmount,
+    freeAllowanceMicrodollars,
+  } = params;
 
   const doUpdateSet = sql`
     total_cost_microdollars = ${exa_monthly_usage.total_cost_microdollars} + ${costMicrodollars},
@@ -144,12 +184,12 @@ async function upsertMonthlyCounter(params: {
   `;
 
   if (organizationId) {
-    await db.execute(sql`
+    await tx.execute(sql`
       INSERT INTO ${exa_monthly_usage} (
         kilo_user_id, organization_id, month,
         total_cost_microdollars, total_charged_microdollars, request_count, free_allowance_microdollars
       ) VALUES (
-        ${userId}, ${organizationId}, date_trunc('month', now())::date,
+        ${userId}, ${organizationId}, date_trunc('month', ${occurredAt}::timestamptz AT TIME ZONE 'UTC')::date,
         ${costMicrodollars}, ${chargedAmount}, 1, ${freeAllowanceMicrodollars}
       )
       ON CONFLICT (kilo_user_id, organization_id, month)
@@ -157,12 +197,12 @@ async function upsertMonthlyCounter(params: {
       DO UPDATE SET ${doUpdateSet}
     `);
   } else {
-    await db.execute(sql`
+    await tx.execute(sql`
       INSERT INTO ${exa_monthly_usage} (
         kilo_user_id, month,
         total_cost_microdollars, total_charged_microdollars, request_count, free_allowance_microdollars
       ) VALUES (
-        ${userId}, date_trunc('month', now())::date,
+        ${userId}, date_trunc('month', ${occurredAt}::timestamptz AT TIME ZONE 'UTC')::date,
         ${costMicrodollars}, ${chargedAmount}, 1, ${freeAllowanceMicrodollars}
       )
       ON CONFLICT (kilo_user_id, month)
@@ -172,51 +212,30 @@ async function upsertMonthlyCounter(params: {
   }
 }
 
-/**
- * Deducts Exa overage cost from the user's personal balance or their org's balance.
- * Personal: increments kilocode_users.microdollars_used.
- * Org: delegates to ingestOrganizationTokenUsage which handles org balance + daily limits + alerts.
- */
 async function deductFromBalance(
-  userId: string,
-  organizationId: string | undefined,
-  costMicrodollars: number,
-  path: string
-): Promise<void> {
-  if (organizationId) {
-    // Org billing: reuse the existing org billing pipeline which handles
-    // balance updates, per-user daily tracking, and low-balance alerts.
-    const usageRecord = {
-      id: crypto.randomUUID(),
-      kilo_user_id: userId,
-      cost: costMicrodollars,
-      organization_id: organizationId,
-      input_tokens: 0,
-      output_tokens: 0,
-      cache_write_tokens: 0,
-      cache_hit_tokens: 0,
-      created_at: new Date().toISOString(),
-      provider: 'exa',
-      model: path,
-      requested_model: null,
-      cache_discount: null,
-      has_error: false,
-      abuse_classification: ABUSE_CLASSIFICATION.NOT_CLASSIFIED,
-      inference_provider: null,
-      project_id: null,
-    } satisfies MicrodollarUsage;
-
-    await ingestOrganizationTokenUsage(usageRecord);
-  } else {
-    // Personal billing: directly increment the user's usage counter.
-    // WARNING: Do NOT also insert into microdollar_usage here. Recompute
-    // (recomputeUserBalances) already picks up personal Exa charges from
-    // exa_usage_log. Adding a microdollar_usage row would double-count.
-    await db
-      .update(kilocode_users)
-      .set({
-        microdollars_used: sql`${kilocode_users.microdollars_used} + ${costMicrodollars}`,
-      })
-      .where(eq(kilocode_users.id, userId));
+  tx: DrizzleTransaction,
+  params: {
+    userId: string;
+    organizationId: string | undefined;
+    occurredAt: string;
+    costMicrodollars: number;
   }
+): Promise<OrganizationUsageMutationResult | null> {
+  const { userId, organizationId, occurredAt, costMicrodollars } = params;
+  if (organizationId) {
+    return mutateOrganizationUsage(tx, {
+      kilo_user_id: userId,
+      organization_id: organizationId,
+      cost: costMicrodollars,
+      created_at: occurredAt,
+    });
+  }
+
+  await tx
+    .update(kilocode_users)
+    .set({
+      microdollars_used: sql`${kilocode_users.microdollars_used} + ${costMicrodollars}`,
+    })
+    .where(eq(kilocode_users.id, userId));
+  return null;
 }

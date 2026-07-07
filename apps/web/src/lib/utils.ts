@@ -40,10 +40,6 @@ export function isRooCodeBasedClient(headers: FraudDetectionHeaders) {
   return !!headers.http_user_agent?.startsWith('Kilo-Code/');
 }
 
-export function isOpenCodeBasedClient(headers: FraudDetectionHeaders) {
-  return !!headers.http_user_agent?.startsWith('opencode-kilo-provider');
-}
-
 export function getInitials(user: User) {
   if (!user) {
     return '';

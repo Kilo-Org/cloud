@@ -7,7 +7,7 @@ export default async function UsagePage() {
 
   return (
     <Suspense>
-      <UsageAnalyticsDashboard context="personal" organizationId={null} title="Usage" />
+      <UsageAnalyticsDashboard context="personal" title="Usage" />
     </Suspense>
   );
 }

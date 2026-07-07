@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { sortRemoteModelCatalogProviders } from './remote-model-order';
 
 // ---------------------------------------------------------------------------
 // Wire-level envelope
@@ -84,6 +85,262 @@ export const permissionPayloadSchema = z
   })
   .passthrough();
 export type PermissionState = z.infer<typeof permissionPayloadSchema>;
+
+// ---------------------------------------------------------------------------
+// Remote CLI model catalog
+// ---------------------------------------------------------------------------
+
+export const REMOTE_MODEL_MAX_PROVIDERS = 64;
+export const REMOTE_MODEL_MAX_MODELS_PER_PROVIDER = 512;
+export const REMOTE_MODEL_MAX_MODELS_TOTAL = 2_048;
+export const REMOTE_MODEL_MAX_VARIANTS_PER_MODEL = 32;
+export const REMOTE_MODEL_MAX_VARIANTS_TOTAL = 8_192;
+export const REMOTE_MODEL_IDENTITY_MAX_LENGTH = 255;
+export const REMOTE_MODEL_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
+
+const remoteModelIdentitySchema = z.string().min(1).max(REMOTE_MODEL_IDENTITY_MAX_LENGTH);
+const remoteModelDisplayNameSchema = z.string().max(REMOTE_MODEL_IDENTITY_MAX_LENGTH);
+
+export const modelRefSchema = z
+  .object({
+    providerID: remoteModelIdentitySchema,
+    modelID: remoteModelIdentitySchema,
+  })
+  .strict();
+export type ModelRef = z.infer<typeof modelRefSchema>;
+
+export const modelSelectionSchema = z
+  .object({
+    model: modelRefSchema,
+    variant: remoteModelIdentitySchema.optional(),
+  })
+  .strict();
+export type ModelSelection = z.infer<typeof modelSelectionSchema>;
+
+const emptyRemoteModelRecordSchema = z.object({}).strict();
+const remoteModelModalitiesSchema = z
+  .object({
+    text: z.boolean(),
+    audio: z.boolean(),
+    image: z.boolean(),
+    video: z.boolean(),
+    pdf: z.boolean(),
+  })
+  .strict();
+const remoteSdkModelSchema = z
+  .object({
+    id: remoteModelIdentitySchema,
+    providerID: remoteModelIdentitySchema,
+    api: z
+      .object({
+        id: remoteModelIdentitySchema,
+        url: z.literal(''),
+        npm: z.literal(''),
+      })
+      .strict(),
+    name: remoteModelDisplayNameSchema,
+    capabilities: z
+      .object({
+        temperature: z.boolean(),
+        reasoning: z.boolean(),
+        attachment: z.boolean(),
+        toolcall: z.boolean(),
+        input: remoteModelModalitiesSchema,
+        output: remoteModelModalitiesSchema,
+        interleaved: z.union([
+          z.boolean(),
+          z.object({ field: z.enum(['reasoning_content', 'reasoning_details']) }).strict(),
+        ]),
+      })
+      .strict(),
+    cost: z
+      .object({
+        input: z.literal(0),
+        output: z.literal(0),
+        cache: z.object({ read: z.literal(0), write: z.literal(0) }).strict(),
+      })
+      .strict(),
+    limit: z
+      .object({
+        context: z.number().finite().nonnegative(),
+        input: z.number().finite().nonnegative().optional(),
+        output: z.number().finite().nonnegative(),
+      })
+      .strict(),
+    status: z.enum(['alpha', 'beta', 'deprecated', 'active']),
+    options: emptyRemoteModelRecordSchema,
+    headers: emptyRemoteModelRecordSchema,
+    release_date: z.literal(''),
+    recommendedIndex: z.number().finite().optional(),
+    isFree: z.boolean().optional(),
+    mayTrainOnYourPrompts: z.boolean().optional(),
+    hasUserByokAvailable: z.boolean().optional(),
+    variants: z.record(remoteModelIdentitySchema, emptyRemoteModelRecordSchema).optional(),
+  })
+  .strict();
+const remoteSdkProviderSchema = z
+  .object({
+    id: remoteModelIdentitySchema,
+    name: remoteModelDisplayNameSchema,
+    source: z.enum(['env', 'config', 'custom', 'api']),
+    env: z.array(z.never()).max(0),
+    options: emptyRemoteModelRecordSchema,
+    models: z.record(remoteModelIdentitySchema, remoteSdkModelSchema),
+  })
+  .strict();
+
+export const remoteModelCatalogWireV1Schema = z
+  .object({
+    all: z.array(remoteSdkProviderSchema).max(REMOTE_MODEL_MAX_PROVIDERS),
+    default: z.record(remoteModelIdentitySchema, remoteModelIdentitySchema),
+    connected: z.array(remoteModelIdentitySchema).max(REMOTE_MODEL_MAX_PROVIDERS),
+    failed: z.array(remoteModelIdentitySchema).max(REMOTE_MODEL_MAX_PROVIDERS),
+    protocolVersion: z.literal(1),
+    currentModel: modelSelectionSchema.optional(),
+    defaultModel: modelRefSchema.optional(),
+    truncated: z.boolean(),
+  })
+  .strict()
+  .superRefine((catalog, context) => {
+    let modelCount = 0;
+    let variantCount = 0;
+    const providers = new Map(catalog.all.map(provider => [provider.id, provider]));
+    if (providers.size !== catalog.all.length) {
+      context.addIssue({ code: 'custom', message: 'Provider ID must be unique', path: ['all'] });
+    }
+    if (new Set(catalog.connected).size !== catalog.connected.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Connected provider ID must be unique',
+        path: ['connected'],
+      });
+    }
+    for (const [providerIndex, provider] of catalog.all.entries()) {
+      const models = Object.entries(provider.models);
+      modelCount += models.length;
+      if (models.length > REMOTE_MODEL_MAX_MODELS_PER_PROVIDER) {
+        context.addIssue({
+          code: 'custom',
+          message: `Provider cannot contain more than ${REMOTE_MODEL_MAX_MODELS_PER_PROVIDER} models`,
+          path: ['all', providerIndex, 'models'],
+        });
+      }
+      for (const [modelKey, model] of models) {
+        if (
+          modelKey !== model.id ||
+          model.providerID !== provider.id ||
+          model.api.id !== model.id
+        ) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Model record identity must match its provider and record key',
+            path: ['all', providerIndex, 'models', modelKey],
+          });
+        }
+        const variants = Object.keys(model.variants ?? {});
+        variantCount += variants.length;
+        if (variants.length > REMOTE_MODEL_MAX_VARIANTS_PER_MODEL) {
+          context.addIssue({
+            code: 'custom',
+            message: `Model cannot contain more than ${REMOTE_MODEL_MAX_VARIANTS_PER_MODEL} variants`,
+            path: ['all', providerIndex, 'models', modelKey, 'variants'],
+          });
+        }
+      }
+    }
+    for (const providerId of catalog.connected) {
+      if (!providers.has(providerId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Connected provider must exist in all',
+          path: ['connected'],
+        });
+      }
+    }
+    for (const [providerId, modelId] of Object.entries(catalog.default)) {
+      const provider = providers.get(providerId);
+      if (!provider || !Object.hasOwn(provider.models, modelId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Default model must exist in all',
+          path: ['default', providerId],
+        });
+      }
+    }
+    if (modelCount > REMOTE_MODEL_MAX_MODELS_TOTAL) {
+      context.addIssue({
+        code: 'custom',
+        message: `Catalog cannot contain more than ${REMOTE_MODEL_MAX_MODELS_TOTAL} models`,
+        path: ['all'],
+      });
+    }
+    if (variantCount > REMOTE_MODEL_MAX_VARIANTS_TOTAL) {
+      context.addIssue({
+        code: 'custom',
+        message: `Catalog cannot contain more than ${REMOTE_MODEL_MAX_VARIANTS_TOTAL} variants`,
+        path: ['all'],
+      });
+    }
+    const serializedBytes = new TextEncoder().encode(JSON.stringify(catalog)).byteLength;
+    if (serializedBytes > REMOTE_MODEL_CATALOG_MAX_SERIALIZED_BYTES) {
+      context.addIssue({
+        code: 'custom',
+        message: `Catalog cannot exceed ${REMOTE_MODEL_CATALOG_MAX_SERIALIZED_BYTES} serialized bytes`,
+      });
+    }
+  });
+export type RemoteModelCatalogWireV1 = z.input<typeof remoteModelCatalogWireV1Schema>;
+
+export const remoteModelCatalogV1Schema = remoteModelCatalogWireV1Schema.transform(catalog => {
+  const connected = new Set(catalog.connected);
+  return {
+    protocolVersion: 1 as const,
+    providers: sortRemoteModelCatalogProviders(
+      catalog.all
+        .filter(provider => connected.has(provider.id))
+        .map(provider => ({
+          id: provider.id,
+          ...(provider.name ? { name: provider.name } : {}),
+          models: Object.values(provider.models).map(model => ({
+            id: model.id,
+            ...(model.name ? { name: model.name } : {}),
+            ...(model.recommendedIndex !== undefined
+              ? { recommendedIndex: model.recommendedIndex }
+              : {}),
+            ...(model.isFree !== undefined ? { isFree: model.isFree } : {}),
+            ...(model.mayTrainOnYourPrompts !== undefined
+              ? { mayTrainOnYourPrompts: model.mayTrainOnYourPrompts }
+              : {}),
+            ...(model.hasUserByokAvailable !== undefined
+              ? { hasUserByokAvailable: model.hasUserByokAvailable }
+              : {}),
+            variants: Object.keys(model.variants ?? {}),
+            capabilities: {
+              attachment: model.capabilities.attachment,
+              reasoning: model.capabilities.reasoning,
+            },
+            limits: {
+              context: model.limit.context,
+              output: model.limit.output,
+            },
+          })),
+        }))
+    ),
+    ...(catalog.currentModel ? { currentModel: catalog.currentModel } : {}),
+    ...(catalog.defaultModel ? { defaultModel: catalog.defaultModel } : {}),
+    truncated: catalog.truncated,
+  };
+});
+export type RemoteModelCatalogV1 = z.output<typeof remoteModelCatalogV1Schema>;
+
+export const userWebCommandErrorDataSchema = z
+  .object({
+    source: z.literal('relay'),
+    code: z.string(),
+    message: z.string(),
+  })
+  .strict();
+export type UserWebCommandErrorData = z.infer<typeof userWebCommandErrorDataSchema>;
 
 // ---------------------------------------------------------------------------
 // WebSocket inbound message (CLI live transport)

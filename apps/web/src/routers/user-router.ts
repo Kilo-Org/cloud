@@ -333,7 +333,7 @@ async function enrichDeductionsWithInstanceNames(
 export const userRouter = createTRPCRouter({
   // Account linking routes
   getMe: baseProcedure.query(async ({ ctx }) => {
-    return successResult({ id: ctx.user.id });
+    return successResult({ id: ctx.user.id, email: ctx.user.google_user_email });
   }),
 
   getAuthProviders: baseProcedure.query(async ({ ctx }) => {

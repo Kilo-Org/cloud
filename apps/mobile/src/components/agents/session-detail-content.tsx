@@ -1,8 +1,7 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines -- Session orchestration and its render paths are kept together. */
 import { type CloudStatus, type KiloSessionId, type StoredMessage } from 'cloud-agent-sdk';
-import { CLI_MODEL_ID, cliModelLabel } from 'cloud-agent-sdk/cli-model';
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -10,6 +9,7 @@ import { toast } from 'sonner-native';
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
+import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
@@ -27,11 +27,27 @@ import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import {
+  type AnalyticsSurface,
+  captureEvent,
+  MESSAGE_SENT_EVENT,
+  SESSION_VIEWED_EVENT,
+} from '@/lib/analytics/posthog';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
 import { useReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
+import {
+  createRemoteModelOverride,
+  revalidateLegacyGatewayOverride,
+  useSessionModelOptions,
+} from '@/lib/hooks/use-session-model-options';
+import {
+  areModelPickerSelectionScopesEqual,
+  type ModelPickerSelection,
+  type ModelPickerSelectionScope,
+} from '@/lib/picker-bridge';
 
 type SessionDetailContentProps = {
   sessionId: KiloSessionId;
@@ -61,7 +77,10 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
-  const sessionType = useAtomValue(manager.atoms.sessionType);
+  const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
+  const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
+  const observedModel = useAtomValue(manager.atoms.observedModel);
+  const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
 
   const { isConnected } = useAppLifecycle();
   const { bottom } = useSafeAreaInsets();
@@ -76,25 +95,43 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
 
   const organizationId = fetchedData?.organizationId ?? undefined;
 
-  const { models: modelOptions } = useAvailableModels(organizationId);
   const { saveModel: savePersistedModel } = usePersistedAgentModel();
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { defaultExpanded: reasoningDefaultExpanded } = useReasoningPreference();
-  const isRemote = sessionType === 'remote';
-  const composerModelOptions = useMemo(
-    () =>
-      isRemote
-        ? [
-            {
-              id: CLI_MODEL_ID,
-              name: cliModelLabel(sessionConfig),
-              variants: [],
-              isPreferred: false,
-            },
-            ...modelOptions,
-          ]
-        : modelOptions,
-    [isRemote, modelOptions, sessionConfig]
+  const { models: gatewayModels, isLoading: gatewayModelsLoading } =
+    useAvailableModels(organizationId);
+  const sessionModels = useSessionModelOptions({
+    activeSessionType,
+    remoteModelState,
+    observedModel,
+    remoteModelOverride,
+    gatewayModels,
+    gatewayModelsLoading,
+    organizationId,
+  });
+  const modelOptions = sessionModels.options;
+  const catalogGenerationIdentity =
+    remoteModelState.protocol === 'v1' ? (remoteModelState.catalog ?? null) : gatewayModels;
+  const modelPickerSelectionScope = useMemo<ModelPickerSelectionScope>(
+    () => ({
+      sessionId,
+      ownerConnectionId: remoteModelState.ownerConnectionId,
+      protocol: remoteModelState.protocol,
+      catalogGenerationIdentity,
+    }),
+    [
+      catalogGenerationIdentity,
+      remoteModelState.ownerConnectionId,
+      remoteModelState.protocol,
+      sessionId,
+    ]
+  );
+  const liveModelPickerSelectionScopeRef = useRef(modelPickerSelectionScope);
+  liveModelPickerSelectionScopeRef.current = modelPickerSelectionScope;
+  const isModelPickerSelectionCurrent = useCallback(
+    (selectionScope: ModelPickerSelectionScope) =>
+      areModelPickerSelectionScopesEqual(liveModelPickerSelectionScopeRef.current, selectionScope),
+    []
   );
 
   const {
@@ -105,10 +142,12 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     setCurrentModel,
     setCurrentVariant,
   } = useSessionConfigSync({
+    activeSessionType,
     fetchedData,
     sessionConfig,
-    modelOptions: composerModelOptions,
-    isRemote,
+    modelOptions,
+    selectedModel: sessionModels.selectedValue,
+    selectedVariant: sessionModels.selectedVariant,
   });
 
   const {
@@ -122,9 +161,47 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     handleMomentumScrollEnd,
   } = useSessionAutoScroll<StoredMessage>({ itemCount: messages.length, resetKey: sessionId });
 
+  const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
+    ? 'cloud-agent'
+    : 'remote-session';
+
+  const viewTrackedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
+      return;
+    }
+    viewTrackedRef.current = sessionId;
+    captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface });
+  }, [fetchedData, sessionId, analyticsSurface]);
+
   useEffect(() => {
     void manager.switchSession(sessionId);
   }, [sessionId, manager]);
+
+  useEffect(() => {
+    if (
+      activeSessionType !== 'remote' ||
+      remoteModelState.protocol !== 'legacy' ||
+      fetchedData?.kiloSessionId !== sessionId ||
+      gatewayModelsLoading
+    ) {
+      return;
+    }
+
+    const revalidatedOverride = revalidateLegacyGatewayOverride(remoteModelOverride, gatewayModels);
+    if (revalidatedOverride !== remoteModelOverride) {
+      manager.setRemoteModelOverride(revalidatedOverride);
+    }
+  }, [
+    activeSessionType,
+    fetchedData?.kiloSessionId,
+    gatewayModels,
+    gatewayModelsLoading,
+    manager,
+    remoteModelOverride,
+    remoteModelState.protocol,
+    sessionId,
+  ]);
 
   const lastAssistantIndex = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -155,6 +232,42 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
       toast.error('Failed to stop execution');
     }
   }, [manager]);
+
+  const handleModelSelect = useCallback(
+    (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
+      if (activeSessionType === 'remote') {
+        const selectedOption = pickerSelection?.option;
+        const selectedRef = selectedOption?.modelRef;
+        const option = selectedRef
+          ? modelOptions.find(
+              candidate =>
+                candidate.overrideSource === selectedOption.overrideSource &&
+                candidate.modelRef?.providerID === selectedRef.providerID &&
+                candidate.modelRef.modelID === selectedRef.modelID
+            )
+          : modelOptions.find(candidate => candidate.id === value);
+        if (option) {
+          manager.setRemoteModelOverride(createRemoteModelOverride(option, variant));
+        }
+        return;
+      }
+
+      setCurrentModel(value);
+      setCurrentVariant(variant);
+      savePersistedModel(organizationId, { model: value, variant });
+      persistServerLastSelected({ model: value, ...(variant ? { variant } : {}) });
+    },
+    [
+      activeSessionType,
+      manager,
+      modelOptions,
+      organizationId,
+      persistServerLastSelected,
+      savePersistedModel,
+      setCurrentModel,
+      setCurrentVariant,
+    ]
+  );
 
   const shouldShowLoading =
     isLoading ||
@@ -195,22 +308,30 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
         return;
       }
       try {
-        const isCliModel = currentModel === CLI_MODEL_ID;
         await manager.send({
           payload: {
             type: 'prompt',
             prompt: text,
             mode: currentMode,
-            model: isCliModel ? '' : currentModel,
-            variant: isCliModel ? undefined : currentVariant || undefined,
+            model: currentModel,
+            variant: currentVariant || undefined,
           },
-          ...(attachments ? { attachments } : {}),
+          ...(supportsAttachments && attachments ? { attachments } : {}),
         });
+        captureEvent(MESSAGE_SENT_EVENT, { surface: analyticsSurface });
       } catch {
         toast.error('Failed to send message. Please try again.');
       }
     },
-    [manager, currentMode, currentModel, currentVariant, requiresModel]
+    [
+      manager,
+      currentMode,
+      currentModel,
+      currentVariant,
+      requiresModel,
+      supportsAttachments,
+      analyticsSurface,
+    ]
   );
 
   return (
@@ -278,33 +399,28 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
               </Text>
             </View>
           ) : (
-            <ChatComposer
-              onSend={handleSend}
-              onStop={handleStop}
-              disabled={isComposerDisabled}
-              isStreaming={isStreaming}
-              placeholder={composerPlaceholder}
-              mode={currentMode}
-              onModeChange={setCurrentMode}
-              model={currentModel}
-              variant={currentVariant}
-              modelOptions={composerModelOptions}
-              onModelSelect={(modelId, newVariant) => {
-                setCurrentModel(modelId);
-                setCurrentVariant(newVariant);
-                // The remote-session CLI pseudo-model is not a real model;
-                // persisting it would clobber the real preference.
-                if (modelId !== CLI_MODEL_ID) {
-                  savePersistedModel(organizationId, { model: modelId, variant: newVariant });
-                  persistServerLastSelected({
-                    model: modelId,
-                    ...(newVariant ? { variant: newVariant } : {}),
-                  });
-                }
-              }}
-              organizationId={organizationId}
-              attachmentsEnabled={supportsAttachments}
-            />
+            <>
+              <ModelPickerSelectionScopeProvider
+                selectionScope={modelPickerSelectionScope}
+                isSelectionCurrent={isModelPickerSelectionCurrent}
+              >
+                <ChatComposer
+                  onSend={handleSend}
+                  onStop={handleStop}
+                  disabled={isComposerDisabled}
+                  isStreaming={isStreaming}
+                  placeholder={composerPlaceholder}
+                  mode={currentMode}
+                  onModeChange={setCurrentMode}
+                  model={currentModel}
+                  variant={currentVariant}
+                  modelOptions={modelOptions}
+                  onModelSelect={handleModelSelect}
+                  organizationId={organizationId}
+                  attachmentsEnabled={supportsAttachments}
+                />
+              </ModelPickerSelectionScopeProvider>
+            </>
           ))}
       </>
     );

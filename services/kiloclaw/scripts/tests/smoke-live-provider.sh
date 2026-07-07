@@ -42,6 +42,15 @@ Options:
 Optional version assertions:
   EXPECTED_VERSION_AFTER   Expected OpenClaw version for the candidate/final image.
   EXPECTED_VERSION_BEFORE  Expected OpenClaw version for --upgrade baseline image.
+
+Optional GitHub gh-auth persistence check (assert_github_gh_auth):
+  GITHUB_SMOKE_TOKEN       Disposable GitHub PAT. When set, the smoke boots with
+                           GitHub configured and asserts gh auth still works with
+                           GITHUB_TOKEN/GH_TOKEN stripped from the exec env
+                           (i.e. from the persisted credential store, matching
+                           how the agent actually runs). Skipped when unset.
+  GITHUB_SMOKE_USERNAME    GitHub username (default: kilo-smoke).
+  GITHUB_SMOKE_EMAIL       GitHub email (default: kilo-smoke@example.com).
 EOF
 }
 
@@ -120,6 +129,12 @@ start_container() {
   )
   if [ -n "${KILOCODE_ORGANIZATION_ID:-}" ]; then
     docker_env+=(-e KILOCODE_ORGANIZATION_ID)
+  fi
+  # Optional GitHub credential for the gh-auth persistence check (assert_github_gh_auth).
+  if [ -n "${GITHUB_SMOKE_TOKEN:-}" ]; then
+    docker_env+=(-e GITHUB_TOKEN="$GITHUB_SMOKE_TOKEN")
+    docker_env+=(-e GITHUB_USERNAME="${GITHUB_SMOKE_USERNAME:-kilo-smoke}")
+    docker_env+=(-e GITHUB_EMAIL="${GITHUB_SMOKE_EMAIL:-kilo-smoke@example.com}")
   fi
   CID=$(docker run -d --rm \
     -p "127.0.0.1:${PORT}:18789" \
@@ -396,6 +411,38 @@ else:
   check "kilocode native vision capability (post-#4054-revert)" "image-capable" "$result"
 }
 
+# Verifies the agent can still use GitHub after bootstrap even though OpenClaw
+# strips GITHUB_TOKEN/GH_TOKEN from the agent's tool-exec environment
+# (host-env-security policy). The controller must persist credentials to gh's
+# on-disk store (~/.config/gh/hosts.yml on the /root volume); if it relied only
+# on the inherited env var, `gh`/`git` would be unauthenticated in the agent's
+# stripped shell — the exact regression that silently broke live instances.
+#
+# Gated on GITHUB_SMOKE_TOKEN (a disposable PAT + matching username/email) since
+# it needs a real GitHub credential to complete `gh auth login`.
+assert_github_gh_auth() {
+  if [ -z "${GITHUB_SMOKE_TOKEN:-}" ]; then
+    echo "SKIP: GitHub gh-auth check (set GITHUB_SMOKE_TOKEN to enable)"
+    return 0
+  fi
+
+  # 1) Bootstrap must have written gh's credential store to the volume.
+  if docker exec "$CID" sh -c '[ -f /root/.config/gh/hosts.yml ]'; then
+    check "gh credentials persisted to hosts.yml" "1" "1"
+  else
+    check "gh credentials persisted to hosts.yml" "1" "0"
+  fi
+
+  # 2) The decisive check: gh must authenticate with the token vars stripped
+  #    from the environment — reproducing the agent's real exec context. This
+  #    fails if the controller never persisted creds (env-conflict regression).
+  if docker exec "$CID" env -u GITHUB_TOKEN -u GH_TOKEN gh auth status >/dev/null 2>&1; then
+    check "gh auth status ok with token env stripped" "1" "1"
+  else
+    check "gh auth status ok with token env stripped" "1" "0"
+  fi
+}
+
 run_phase() {
   local label="$1"
   local image="$2"
@@ -429,6 +476,7 @@ run_phase() {
     assert_kilocode_vision_capability
   fi
   assert_exec_approvals_seeded "$CID"
+  assert_github_gh_auth
   echo
   echo "--- live Auto Free agent turn ---"
   assert_live_agent_turn

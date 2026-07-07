@@ -12,9 +12,14 @@ import {
   validateMiniMaxCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
 import { getCodingPlanPrice, type CodingPlanId } from '@/lib/coding-plans/pricing';
+import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 import { db } from '@/lib/drizzle';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
 import { sentryLogger } from '@/lib/utils.server';
+import {
+  captureCostInsightSpend,
+  COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
+} from '@kilocode/db/cost-insights-rollups';
 import {
   byok_api_keys,
   coding_plan_availability_intents,
@@ -172,6 +177,19 @@ export async function subscribeToCodingPlan(
       credit_category: `coding-plan:${plan.planId}:${requestKey}`,
       check_category_uniqueness: true,
       original_baseline_microdollars_used: lockedUser.microdollars_used,
+      created_at: periodStartIso,
+    });
+    await captureCostInsightSpend(tx, {
+      owner: { type: 'user', id: userId },
+      actorUserId: userId,
+      occurredAt: periodStartIso,
+      amountMicrodollars: plan.costMicrodollars,
+      category: 'scheduled',
+      source: 'coding_plan',
+      productKey: COST_INSIGHT_CODING_PLAN_PRODUCT_KEY,
+      featureKey: 'activation',
+      modelOrPlanKey: plan.planId,
+      providerKey: plan.providerId,
     });
 
     const { rows: inventoryRows } = await tx.execute<{
@@ -255,6 +273,7 @@ export async function subscribeToCodingPlan(
 
   if (outcome.charged) {
     await evaluateUsageBonus(userId);
+    scheduleCostInsightEvaluationAfterSpend({ type: 'user', id: userId });
   }
   logInfo('Coding plan purchase processed', {
     user_id: userId,

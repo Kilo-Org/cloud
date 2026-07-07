@@ -8,6 +8,7 @@ type UseCurrentUserIdOptions = {
 
 export function useCurrentUserId(options: UseCurrentUserIdOptions = {}): {
   userId: string | undefined;
+  email: string | undefined;
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
@@ -20,6 +21,7 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}): {
 
   return {
     userId: data?.id,
+    email: data?.email,
     isLoading,
     isError,
     refetch: () => {

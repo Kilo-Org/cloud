@@ -664,12 +664,14 @@ export function configureGitHub(env: EnvLike, deps: BootstrapDeps = defaultDeps)
     delete ghEnv.GITHUB_TOKEN;
     delete ghEnv.GH_TOKEN;
 
+    let loginSucceeded = false;
     try {
       deps.execFileSync('gh', ['auth', 'login', '--with-token'], {
         input: env.GITHUB_TOKEN,
         stdio: 'pipe',
         env: ghEnv,
       });
+      loginSucceeded = true;
       console.log('gh CLI authenticated');
     } catch (err) {
       // gh's stderr on the env-conflict path carries no secret, but scrub the
@@ -679,16 +681,20 @@ export function configureGitHub(env: EnvLike, deps: BootstrapDeps = defaultDeps)
       );
     }
 
-    // Separate try/catch: `gh auth login` already wrote hosts.yml, so if
-    // setup-git fails (e.g. git missing from PATH, or a credential-helper
-    // conflict) `gh` still works. Report it as its own failure rather than
-    // mislabeling it a login failure or discarding the login-success log.
-    try {
-      deps.execFileSync('gh', ['auth', 'setup-git'], { stdio: 'pipe', env: ghEnv });
-    } catch (err) {
-      console.warn(
-        `WARNING: gh auth setup-git failed: ${describeExecFailure(err, [env.GITHUB_TOKEN, env.GH_TOKEN])}`
-      );
+    // Only wire git's credential helper once login actually stored a
+    // credential. Separate try/catch so a setup-git failure (git missing from
+    // PATH, credential-helper conflict) after a successful login is reported as
+    // its own distinct failure — not mislabeled a login failure and not
+    // discarding the login-success log. Skipped entirely when login failed, so
+    // a single root-cause warning is emitted instead of two for one problem.
+    if (loginSucceeded) {
+      try {
+        deps.execFileSync('gh', ['auth', 'setup-git'], { stdio: 'pipe', env: ghEnv });
+      } catch (err) {
+        console.warn(
+          `WARNING: gh auth setup-git failed: ${describeExecFailure(err, [env.GITHUB_TOKEN, env.GH_TOKEN])}`
+        );
+      }
     }
 
     if (env.GITHUB_USERNAME) {

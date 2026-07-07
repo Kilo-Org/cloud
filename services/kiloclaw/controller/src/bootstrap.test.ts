@@ -621,8 +621,8 @@ describe('configureGitHub', () => {
     warnSpy.mockRestore();
   });
 
-  it('surfaces gh stderr on failure with the token scrubbed', () => {
-    const { deps, setExecBehavior } = fakeDeps();
+  it('surfaces gh stderr on failure with the token scrubbed and skips setup-git', () => {
+    const { deps, execCalls, setExecBehavior } = fakeDeps();
     setExecBehavior((cmd, args) => {
       if (cmd === 'gh' && args.includes('login')) {
         const err = new Error('Command failed') as Error & { stderr?: string };
@@ -640,6 +640,10 @@ describe('configureGitHub', () => {
     expect(logged).toContain('gh auth login failed');
     expect(logged).toContain('is invalid or expired'); // diagnostic surfaced
     expect(logged).not.toContain('ghp_token123'); // secret scrubbed
+    // When login fails, setup-git must NOT run — otherwise a second,
+    // differently-labeled warning would surface for the same root cause.
+    expect(execCalls.some(c => c.cmd === 'gh' && c.args.includes('setup-git'))).toBe(false);
+    expect(logged).not.toContain('setup-git failed');
 
     warnSpy.mockRestore();
   });

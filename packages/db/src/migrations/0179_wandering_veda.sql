@@ -254,7 +254,6 @@ CREATE TABLE "cost_insight_rollup_degraded_intervals" (
 	CONSTRAINT "cost_insight_degraded_intervals_reason_check" CHECK ("cost_insight_rollup_degraded_intervals"."reason" IN ('capture_bypass', 'reconciliation_mismatch', 'late_source_data'))
 );
 --> statement-breakpoint
-ALTER TABLE "kilocode_users" ADD COLUMN "personal_account_disabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "cost_insight_active_suggestions" ADD CONSTRAINT "cost_insight_active_suggestions_owned_by_user_id_kilocode_users_id_fk" FOREIGN KEY ("owned_by_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "cost_insight_active_suggestions" ADD CONSTRAINT "cost_insight_active_suggestions_owned_by_organization_id_organizations_id_fk" FOREIGN KEY ("owned_by_organization_id") REFERENCES "public"."organizations"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
 ALTER TABLE "cost_insight_active_suggestions" ADD CONSTRAINT "cost_insight_active_suggestions_dismissed_by_user_id_kilocode_users_id_fk" FOREIGN KEY ("dismissed_by_user_id") REFERENCES "public"."kilocode_users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

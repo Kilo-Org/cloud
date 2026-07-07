@@ -10,4 +10,5 @@ export const ENV_KEYS = {
   kiloChatUrl: 'KILO_CHAT_URL',
   eventServiceUrl: 'EVENT_SERVICE_URL',
   notificationsUrl: 'NOTIFICATIONS_URL',
+  posthogApiKey: 'POSTHOG_API_KEY',
 };

@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldStartAppsFlyer } from './appsflyer-consent';
+import { shouldStartAnalytics } from './analytics-consent';
 
-describe('AppsFlyer consent gate', () => {
+describe('Analytics consent gate', () => {
   it('does not start before consent is checked and accepted', () => {
     expect(
-      shouldStartAppsFlyer({
+      shouldStartAnalytics({
         hasToken: true,
         consentChecked: false,
         needsConsent: false,
       })
     ).toBe(false);
     expect(
-      shouldStartAppsFlyer({
+      shouldStartAnalytics({
         hasToken: true,
         consentChecked: true,
         needsConsent: true,
@@ -22,14 +22,14 @@ describe('AppsFlyer consent gate', () => {
 
   it('starts only for signed-in users with accepted consent', () => {
     expect(
-      shouldStartAppsFlyer({
+      shouldStartAnalytics({
         hasToken: false,
         consentChecked: true,
         needsConsent: false,
       })
     ).toBe(false);
     expect(
-      shouldStartAppsFlyer({
+      shouldStartAnalytics({
         hasToken: true,
         consentChecked: true,
         needsConsent: false,

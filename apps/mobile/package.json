@@ -70,6 +70,7 @@
     "jotai": "2.18.1",
     "lucide-react-native": "1.7.0",
     "nativewind": "5.0.0-preview.3",
+    "posthog-react-native": "^4.54.3",
     "react": "19.2.0",
     "react-native": "0.83.6",
     "react-native-appsflyer": "6.17.9",

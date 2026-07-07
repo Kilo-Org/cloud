@@ -27,6 +27,12 @@ import { WorkingIndicator } from '@/components/agents/working-indicator';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { type AgentAttachmentWire } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import {
+  type AnalyticsSurface,
+  captureEvent,
+  MESSAGE_SENT_EVENT,
+  SESSION_VIEWED_EVENT,
+} from '@/lib/analytics/posthog';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
@@ -154,6 +160,19 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
     handleMomentumScrollBegin,
     handleMomentumScrollEnd,
   } = useSessionAutoScroll<StoredMessage>({ itemCount: messages.length, resetKey: sessionId });
+
+  const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
+    ? 'cloud-agent'
+    : 'remote-session';
+
+  const viewTrackedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (fetchedData?.kiloSessionId !== sessionId || viewTrackedRef.current === sessionId) {
+      return;
+    }
+    viewTrackedRef.current = sessionId;
+    captureEvent(SESSION_VIEWED_EVENT, { surface: analyticsSurface });
+  }, [fetchedData, sessionId, analyticsSurface]);
 
   useEffect(() => {
     void manager.switchSession(sessionId);
@@ -299,11 +318,20 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
           },
           ...(supportsAttachments && attachments ? { attachments } : {}),
         });
+        captureEvent(MESSAGE_SENT_EVENT, { surface: analyticsSurface });
       } catch {
         toast.error('Failed to send message. Please try again.');
       }
     },
-    [manager, currentMode, currentModel, currentVariant, requiresModel, supportsAttachments]
+    [
+      manager,
+      currentMode,
+      currentModel,
+      currentVariant,
+      requiresModel,
+      supportsAttachments,
+      analyticsSurface,
+    ]
   );
 
   return (

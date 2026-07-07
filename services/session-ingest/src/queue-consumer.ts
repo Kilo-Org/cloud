@@ -1,4 +1,4 @@
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, type SQL } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
 import { Tokenizer, TokenParser, TokenType } from '@streamparser/json';
@@ -14,7 +14,7 @@ import {
   notifyUserSessionEvent,
   type SessionEventDbRow,
 } from './session-events';
-import { SessionStatusSchema, type SessionStatus } from './types/user-connection-protocol';
+import { SessionStatusSchema } from './types/user-connection-protocol';
 
 export interface IngestQueueMessage {
   r2Key: string;
@@ -400,10 +400,6 @@ function createIngestChunker(
 }
 
 type WorkerDb = ReturnType<typeof getWorkerDb>;
-// A single connection within a `db.transaction(...)` call, used so the three
-// metadata/parent/status writes below commit or roll back together while each
-// remains one round trip (no separate SELECT ... FOR UPDATE round trip).
-type WorkerTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 
 type SessionMetadataUpdates = Partial<
   Pick<
@@ -411,20 +407,6 @@ type SessionMetadataUpdates = Partial<
     'title' | 'created_on_platform' | 'organization_id' | 'git_url' | 'git_branch'
   >
 >;
-
-const sessionEventReturningColumns = {
-  session_id: cli_sessions_v2.session_id,
-  created_at: cli_sessions_v2.created_at,
-  updated_at: cli_sessions_v2.updated_at,
-  title: cli_sessions_v2.title,
-  created_on_platform: cli_sessions_v2.created_on_platform,
-  organization_id: cli_sessions_v2.organization_id,
-  git_url: cli_sessions_v2.git_url,
-  git_branch: cli_sessions_v2.git_branch,
-  parent_session_id: cli_sessions_v2.parent_session_id,
-  status: cli_sessions_v2.status,
-  status_updated_at: cli_sessions_v2.status_updated_at,
-};
 
 /**
  * Build the `cli_sessions_v2` partial update from a set of metadata changes.
@@ -459,130 +441,133 @@ export function computeSessionMetadataUpdates(
   return updates;
 }
 
-async function updateSessionMetadata(
-  tx: WorkerTransaction,
-  kiloUserId: string,
-  sessionId: string,
-  updates: SessionMetadataUpdates
-): Promise<SessionEventDbRow | null> {
-  if (Object.keys(updates).length === 0) return null;
-
-  const [row] = await tx
-    .update(cli_sessions_v2)
-    .set(updates)
-    .where(
-      and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-    )
-    .returning(sessionEventReturningColumns);
-  return row ?? null;
-}
-
-async function updateSessionParent(
-  tx: WorkerTransaction,
+/**
+ * Resolve the `parent_session_id` we should persist, if any.
+ *
+ * Returns `apply: false` when there is no parent write to make — the ingest
+ * carried no parentId, it pointed at the session itself, or it named a parent
+ * that doesn't exist for this user (the self-referential FK would otherwise
+ * reject the write). The existence probe is a plain unlocked read, so it never
+ * extends the row-lock critical section of `persistSessionChanges`.
+ */
+async function resolveParentUpdate(
+  db: WorkerDb,
   kiloUserId: string,
   sessionId: string,
   parentSessionId: string | null | undefined
-): Promise<SessionEventDbRow | null> {
-  if (parentSessionId === undefined) return null;
+): Promise<{ apply: false } | { apply: true; value: string | null }> {
+  if (parentSessionId === undefined) return { apply: false };
+  if (parentSessionId === null) return { apply: true, value: null };
+  if (parentSessionId === sessionId) return { apply: false };
 
-  if (parentSessionId && parentSessionId !== sessionId) {
-    const parentRows = await tx
-      .select({ session_id: cli_sessions_v2.session_id })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, parentSessionId),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-        )
+  const parentRows = await db
+    .select({ session_id: cli_sessions_v2.session_id })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.session_id, parentSessionId),
+        eq(cli_sessions_v2.kilo_user_id, kiloUserId)
       )
-      .limit(1);
+    )
+    .limit(1);
 
-    if (!parentRows[0]) return null;
-
-    const [row] = await tx
-      .update(cli_sessions_v2)
-      .set({ parent_session_id: parentSessionId })
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, sessionId),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-          sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
-        )
-      )
-      .returning(sessionEventReturningColumns);
-    return row ?? null;
-  }
-
-  if (parentSessionId === null) {
-    const [row] = await tx
-      .update(cli_sessions_v2)
-      .set({ parent_session_id: null })
-      .where(
-        and(
-          eq(cli_sessions_v2.session_id, sessionId),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-          sql`${cli_sessions_v2.parent_session_id} IS DISTINCT FROM ${parentSessionId}`
-        )
-      )
-      .returning(sessionEventReturningColumns);
-    return row ?? null;
-  }
-
-  return null;
+  return parentRows[0] ? { apply: true, value: parentSessionId } : { apply: false };
 }
 
-type StatusTransitionRow = SessionEventDbRow & {
+type ParentUpdate = { apply: false } | { apply: true; value: string | null };
+
+type SessionChangeRow = SessionEventDbRow & {
   previous_status: string | null;
+  previous_parent_session_id: string | null;
 };
 
-async function updateSessionStatus(
-  tx: WorkerTransaction,
+/**
+ * Persist metadata, parent, and status changes for one session in a single
+ * atomic statement, returning the updated row (with the pre-update status and
+ * parent captured under the lock) or `null` when nothing actually changed.
+ *
+ * Everything is one `UPDATE ... RETURNING` guarded by a `SELECT ... FOR UPDATE`
+ * CTE. Because it is a single statement it is inherently atomic — a failure in
+ * any part rolls back the whole write, so Postgres can never be left with a
+ * torn subset of the change — while the row lock is held for exactly one round
+ * trip, never across a parent lookup, a second write, or a final read. Fields
+ * are only assigned when the ingest reported them, and the change guard skips
+ * the write entirely for a pure no-op (e.g. a re-sent identical status), so no
+ * lock is taken and no timestamp is bumped in that case.
+ */
+async function persistSessionChanges(
+  db: WorkerDb,
   kiloUserId: string,
   sessionId: string,
+  updates: SessionMetadataUpdates,
+  parent: ParentUpdate,
   status: string | null | undefined
-): Promise<{ session: SessionEventDbRow; previousStatus: SessionStatus | null } | null> {
-  if (status === undefined) return null;
+): Promise<SessionChangeRow | null> {
+  const assignments: SQL[] = [sql`updated_at = now()`];
+  const changeGuards: SQL[] = [];
 
-  const { rows } = await tx.execute<StatusTransitionRow>(sql`
+  if ('title' in updates) assignments.push(sql`title = ${updates.title ?? null}`);
+  if ('created_on_platform' in updates) {
+    assignments.push(sql`created_on_platform = ${updates.created_on_platform ?? null}`);
+  }
+  if ('organization_id' in updates) {
+    assignments.push(sql`organization_id = ${updates.organization_id ?? null}::uuid`);
+  }
+  if ('git_url' in updates) assignments.push(sql`git_url = ${updates.git_url ?? null}`);
+  if ('git_branch' in updates) assignments.push(sql`git_branch = ${updates.git_branch ?? null}`);
+
+  // A metadata field only reaches here after the DO diff-detected a real change,
+  // so any present field means we must write and emit `session.updated`.
+  if (Object.keys(updates).length > 0) changeGuards.push(sql`true`);
+
+  if (parent.apply) {
+    assignments.push(sql`parent_session_id = ${parent.value}`);
+    changeGuards.push(sql`locked.previous_parent_session_id IS DISTINCT FROM ${parent.value}`);
+  }
+
+  if (status !== undefined) {
+    assignments.push(sql`status = ${status}`);
+    assignments.push(
+      sql`status_updated_at = CASE WHEN locked.previous_status IS DISTINCT FROM ${status} THEN now() ELSE cli_sessions_v2.status_updated_at END`
+    );
+    changeGuards.push(sql`locked.previous_status IS DISTINCT FROM ${status}`);
+  }
+
+  if (changeGuards.length === 0) return null;
+
+  const { rows } = await db.execute<SessionChangeRow>(sql`
     WITH locked AS (
-      SELECT status AS previous_status
+      SELECT
+        status AS previous_status,
+        parent_session_id AS previous_parent_session_id
       FROM cli_sessions_v2
       WHERE session_id = ${sessionId}
         AND kilo_user_id = ${kiloUserId}
       FOR UPDATE
-    ), updated AS (
-      UPDATE cli_sessions_v2
-      SET
-        status = ${status},
-        status_updated_at = now(),
-        updated_at = now()
-      FROM locked
-      WHERE cli_sessions_v2.session_id = ${sessionId}
-        AND cli_sessions_v2.kilo_user_id = ${kiloUserId}
-        AND locked.previous_status IS DISTINCT FROM ${status}
-      RETURNING
-        cli_sessions_v2.session_id,
-        cli_sessions_v2.created_at,
-        cli_sessions_v2.updated_at,
-        cli_sessions_v2.title,
-        cli_sessions_v2.created_on_platform,
-        cli_sessions_v2.organization_id,
-        cli_sessions_v2.git_url,
-        cli_sessions_v2.git_branch,
-        cli_sessions_v2.parent_session_id,
-        cli_sessions_v2.status,
-        cli_sessions_v2.status_updated_at,
-        (SELECT previous_status FROM locked) AS previous_status
     )
-    SELECT * FROM updated
+    UPDATE cli_sessions_v2
+    SET ${sql.join(assignments, sql`, `)}
+    FROM locked
+    WHERE cli_sessions_v2.session_id = ${sessionId}
+      AND cli_sessions_v2.kilo_user_id = ${kiloUserId}
+      AND (${sql.join(changeGuards, sql` OR `)})
+    RETURNING
+      cli_sessions_v2.session_id,
+      cli_sessions_v2.created_at,
+      cli_sessions_v2.updated_at,
+      cli_sessions_v2.title,
+      cli_sessions_v2.created_on_platform,
+      cli_sessions_v2.organization_id,
+      cli_sessions_v2.git_url,
+      cli_sessions_v2.git_branch,
+      cli_sessions_v2.parent_session_id,
+      cli_sessions_v2.status,
+      cli_sessions_v2.status_updated_at,
+      locked.previous_status,
+      locked.previous_parent_session_id
   `);
-  const row = rows[0];
-  if (!row) return null;
 
-  return {
-    session: row,
-    previousStatus: SessionStatusSchema.nullable().parse(row.previous_status),
-  };
+  return rows[0] ?? null;
 }
 
 async function applyMetadataChanges(
@@ -600,39 +585,22 @@ async function applyMetadataChanges(
   const parentSessionId = mergedChanges.has('parentId')
     ? (mergedChanges.get('parentId') ?? null)
     : undefined;
-  // All three writes run in one transaction so a failure partway through (e.g. the
-  // status update) rolls back the metadata/parent updates too. The queue consumer
-  // only re-emits metadata changes that differ from the DO's last-sent value, so a
-  // partial commit here could never be repaired by a retry. Each write remains a
-  // single statement, so the status CTE's row lock is still held for only that one
-  // round trip, not across the whole transaction.
-  const { notificationRow, changedNonStatus, statusChange } = await db.transaction(async tx => {
-    let notificationRow = await updateSessionMetadata(tx, kiloUserId, sessionId, updates);
-    let changedNonStatus = !!notificationRow;
 
-    const parentUpdateRow = await updateSessionParent(tx, kiloUserId, sessionId, parentSessionId);
-    if (parentUpdateRow) {
-      changedNonStatus = true;
-      notificationRow = parentUpdateRow;
-    }
+  // Validate the parent (an unlocked read) before the write, then persist
+  // metadata, parent, and status together in one atomic statement — see
+  // `persistSessionChanges` for why one statement satisfies both atomicity and
+  // minimal lock-hold.
+  const parent = await resolveParentUpdate(db, kiloUserId, sessionId, parentSessionId);
+  const row = await persistSessionChanges(db, kiloUserId, sessionId, updates, parent, status);
+  if (!row) return;
 
-    const statusChange = await updateSessionStatus(tx, kiloUserId, sessionId, status);
-    if (statusChange) notificationRow = statusChange.session;
+  const session = mapSessionEventRow(row);
+  const changedStatus = status !== undefined && row.previous_status !== row.status;
+  const changedNonStatus =
+    Object.keys(updates).length > 0 ||
+    (parent.apply && row.previous_parent_session_id !== row.parent_session_id);
 
-    return { notificationRow, changedNonStatus, statusChange };
-  });
-
-  const notification = notificationRow
-    ? {
-        changedNonStatus,
-        changedStatus: !!statusChange,
-        previousStatus: statusChange?.previousStatus ?? null,
-        session: mapSessionEventRow(notificationRow),
-      }
-    : null;
-  if (!notification) return;
-
-  if (notification.changedNonStatus) {
+  if (changedNonStatus) {
     notifyUserSessionEvent(
       env,
       kiloUserId,
@@ -640,14 +608,14 @@ async function applyMetadataChanges(
         type: 'session.updated',
         data: {
           source: 'v2',
-          session: notification.session,
-          changedAt: notification.session.updatedAt,
+          session,
+          changedAt: session.updatedAt,
         },
       },
       ctx
     );
   }
-  if (notification.changedStatus) {
+  if (changedStatus) {
     notifyUserSessionEvent(
       env,
       kiloUserId,
@@ -655,11 +623,11 @@ async function applyMetadataChanges(
         type: 'session.status.updated',
         data: {
           source: 'v2',
-          session: notification.session,
-          previousStatus: notification.previousStatus,
-          status: notification.session.status,
-          statusUpdatedAt: notification.session.statusUpdatedAt,
-          changedAt: notification.session.updatedAt,
+          session,
+          previousStatus: SessionStatusSchema.nullable().parse(row.previous_status),
+          status: session.status,
+          statusUpdatedAt: session.statusUpdatedAt,
+          changedAt: session.updatedAt,
         },
       },
       ctx

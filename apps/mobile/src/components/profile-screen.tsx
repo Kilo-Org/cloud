@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
-import { KeyRound, Lock, LogOut, Trash2 } from 'lucide-react-native';
+import { KeyRound, LifeBuoy, Lock, LogOut, Trash2 } from 'lucide-react-native';
 import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import { NotificationsCard } from '@/components/notifications-card';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { ScreenHeader } from '@/components/screen-header';
+import { useSupportChat } from '@/components/support-chat';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -40,6 +41,7 @@ export function ProfileScreen() {
     ...trpc.organizations.list.queryOptions(),
     enabled: isAuthenticated,
   });
+  const { available: supportAvailable, state: supportState, openSupportChat } = useSupportChat();
 
   const { bottom } = useSafeAreaInsets();
 
@@ -154,6 +156,24 @@ export function ProfileScreen() {
 
         {/* Actions */}
         <View className="mt-6 gap-3">
+          {supportAvailable && (
+            <Button
+              variant="ghost"
+              className="flex-row gap-2"
+              onPress={() => {
+                // The chat renders as a root-level overlay, which native modals
+                // (like this profile screen) would cover — dismiss first.
+                openSupportChat();
+                router.back();
+              }}
+              disabled={supportState === 'loading'}
+              accessibilityLabel="Support"
+            >
+              <LifeBuoy size={16} color={colors.mutedForeground} />
+              <Text className="text-muted-foreground">Support</Text>
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             className="flex-row gap-2"

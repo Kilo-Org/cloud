@@ -273,6 +273,9 @@ importers:
       '@kilocode/trpc':
         specifier: workspace:*
         version: link:../../packages/trpc
+      '@pylon/react-native-chat':
+        specifier: file:vendor/pylon-react-native-chat-0.1.0.tgz
+        version: file:apps/mobile/vendor/pylon-react-native-chat-0.1.0.tgz(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       '@react-native-community/netinfo':
         specifier: 11.5.2
         version: 11.5.2(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
@@ -6774,6 +6777,13 @@ packages:
 
   '@protobufjs/utf8@1.1.1':
     resolution: {integrity: sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==}
+
+  '@pylon/react-native-chat@file:apps/mobile/vendor/pylon-react-native-chat-0.1.0.tgz':
+    resolution: {integrity: sha512-afsl88ER3PryqN11E/rO3SmcS1kMjEjwtIE7kTbLwW8T35dfk5rTavsteqwNen7++DA5C9dXiF/ifQcb5l4REg==, tarball: file:apps/mobile/vendor/pylon-react-native-chat-0.1.0.tgz}
+    version: 0.1.0
+    peerDependencies:
+      react: '>=18.0.0'
+      react-native: '>=0.73.0'
 
   '@qdrant/js-client-rest@1.17.0':
     resolution: {integrity: sha512-aZFQeirWVqWAa1a8vJ957LMzcXkFHGbsoRhzc8AkGfg6V0jtK8PlG8/eyyc2xhYsR961FDDx1Tx6nyE0K7lS+A==}
@@ -19545,7 +19555,7 @@ snapshots:
       cjs-module-lexer: 1.2.3
       esbuild: 0.27.4
       miniflare: 4.20260603.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
       wrangler: 4.98.0(@cloudflare/workers-types@4.20260605.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       zod: 3.25.76
     transitivePeerDependencies:
@@ -22680,6 +22690,11 @@ snapshots:
 
   '@protobufjs/utf8@1.1.1': {}
 
+  '@pylon/react-native-chat@file:apps/mobile/vendor/pylon-react-native-chat-0.1.0.tgz(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)':
+    dependencies:
+      react: 19.2.0
+      react-native: 0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
+
   '@qdrant/js-client-rest@1.17.0(typescript@5.9.3)':
     dependencies:
       '@qdrant/openapi-typescript-fetch': 1.2.6
@@ -24131,7 +24146,7 @@ snapshots:
       - supports-color
       - webpack
 
-  '@sentry/node-core@10.43.0(@opentelemetry/api@1.9.0)(@opentelemetry/context-async-hooks@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/instrumentation@0.211.0(@opentelemetry/api@1.9.1))(@opentelemetry/resources@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)':
+  '@sentry/node-core@10.43.0(@opentelemetry/api@1.9.0)(@opentelemetry/context-async-hooks@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/instrumentation@0.211.0(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)':
     dependencies:
       '@sentry/core': 10.43.0
       '@sentry/opentelemetry': 10.43.0(@opentelemetry/api@1.9.0)(@opentelemetry/context-async-hooks@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)
@@ -24140,7 +24155,7 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/context-async-hooks': 2.6.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/core': 2.6.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/instrumentation': 0.211.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/instrumentation': 0.211.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.6.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 2.6.0(@opentelemetry/api@1.9.1)
       '@opentelemetry/semantic-conventions': 1.40.0
@@ -24179,7 +24194,7 @@ snapshots:
       '@opentelemetry/semantic-conventions': 1.40.0
       '@prisma/instrumentation': 7.2.0(@opentelemetry/api@1.9.0)
       '@sentry/core': 10.43.0
-      '@sentry/node-core': 10.43.0(@opentelemetry/api@1.9.0)(@opentelemetry/context-async-hooks@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/instrumentation@0.211.0(@opentelemetry/api@1.9.1))(@opentelemetry/resources@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)
+      '@sentry/node-core': 10.43.0(@opentelemetry/api@1.9.0)(@opentelemetry/context-async-hooks@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/instrumentation@0.211.0(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)
       '@sentry/opentelemetry': 10.43.0(@opentelemetry/api@1.9.0)(@opentelemetry/context-async-hooks@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/core@2.6.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.6.0(@opentelemetry/api@1.9.1))(@opentelemetry/semantic-conventions@1.40.0)
       import-in-the-middle: 2.0.6
     transitivePeerDependencies:
@@ -25979,7 +25994,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.0.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
   '@vitest/expect@3.2.4':
     dependencies:
@@ -26057,7 +26072,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
+      vitest: 4.1.6(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.6)(@vitest/ui@4.1.6)(esbuild@0.27.4)(jiti@2.7.0)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.4)
 
   '@vitest/utils@3.2.4':
     dependencies:

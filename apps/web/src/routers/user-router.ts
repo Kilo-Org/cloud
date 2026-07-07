@@ -39,7 +39,6 @@ import { resolveStripeReceiptUrl } from '@/lib/credits';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
-import { getPylonIdentity } from '@/lib/pylon-identity';
 
 const ACCOUNT_DELETION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 const CREDIT_PURCHASE_HISTORY_PAGE_SIZE = 25;
@@ -335,10 +334,6 @@ export const userRouter = createTRPCRouter({
   // Account linking routes
   getMe: baseProcedure.query(async ({ ctx }) => {
     return successResult({ id: ctx.user.id, email: ctx.user.google_user_email });
-  }),
-
-  getPylonIdentity: baseProcedure.query(({ ctx }) => {
-    return successResult({ identity: getPylonIdentity(ctx.user) });
   }),
 
   getAuthProviders: baseProcedure.query(async ({ ctx }) => {

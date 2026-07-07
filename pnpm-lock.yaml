@@ -273,9 +273,6 @@ importers:
       '@kilocode/trpc':
         specifier: workspace:*
         version: link:../../packages/trpc
-      '@pylon/react-native-chat':
-        specifier: file:vendor/pylon-react-native-chat
-        version: file:apps/mobile/vendor/pylon-react-native-chat(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
       '@react-native-community/netinfo':
         specifier: 11.5.2
         version: 11.5.2(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)
@@ -6786,12 +6783,6 @@ packages:
 
   '@protobufjs/utf8@1.1.1':
     resolution: {integrity: sha512-oOAWABowe8EAbMyWKM0tYDKi8Yaox52D+HWZhAIJqQXbqe0xI/GV7FhLWqlEKreMkfDjshR5FKgi3mnle0h6Eg==}
-
-  '@pylon/react-native-chat@file:apps/mobile/vendor/pylon-react-native-chat':
-    resolution: {directory: apps/mobile/vendor/pylon-react-native-chat, type: directory}
-    peerDependencies:
-      react: '>=18.0.0'
-      react-native: '>=0.73.0'
 
   '@qdrant/js-client-rest@1.17.0':
     resolution: {integrity: sha512-aZFQeirWVqWAa1a8vJ957LMzcXkFHGbsoRhzc8AkGfg6V0jtK8PlG8/eyyc2xhYsR961FDDx1Tx6nyE0K7lS+A==}
@@ -22747,11 +22738,6 @@ snapshots:
   '@protobufjs/pool@1.1.0': {}
 
   '@protobufjs/utf8@1.1.1': {}
-
-  '@pylon/react-native-chat@file:apps/mobile/vendor/pylon-react-native-chat(react-native@0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6))(react@19.2.0)':
-    dependencies:
-      react: 19.2.0
-      react-native: 0.83.6(@babel/core@7.29.0)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.0)(utf-8-validate@6.0.6)
 
   '@qdrant/js-client-rest@1.17.0(typescript@5.9.3)':
     dependencies:

@@ -3,7 +3,6 @@ import { type Href, useRouter } from 'expo-router';
 import {
   FileSliders,
   FolderGit2,
-  Gauge,
   MessageSquareText,
   ScrollText,
   ShieldCheck,
@@ -11,45 +10,38 @@ import {
 import { ScrollView, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
-import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
-import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
+import { BitbucketConnectForm } from '@/components/code-reviewer/bitbucket-connect-form';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import {
-  useCanEditReviewer,
-  useGitHubStatus,
-  useGitLabStatus,
-  useReviewConfig,
-  useSaveReviewConfig,
-  useToggleReviewer,
+  useBitbucketReadiness,
+  type useReviewConfig,
+  type useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
 
-export function PlatformOverviewScreen({
+const capabilities = PLATFORM_CAPABILITIES.bitbucket;
+
+export function BitbucketOverview({
   scope,
-  platform,
-}: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
+  config,
+  toggle,
+  canEdit,
+}: Readonly<{
+  scope: string;
+  config: ReturnType<typeof useReviewConfig>;
+  toggle: ReturnType<typeof useToggleReviewer>;
+  canEdit: boolean;
+}>) {
   const router = useRouter();
-  const githubStatus = useGitHubStatus(scope);
-  const gitlabStatus = useGitLabStatus(scope);
-  const config = useReviewConfig(scope, platform);
-  const toggle = useToggleReviewer(scope, platform);
-  const save = useSaveReviewConfig(scope, platform);
-  const canEdit = useCanEditReviewer(scope);
-
-  if (platform === 'bitbucket') {
-    return <BitbucketOverview scope={scope} config={config} toggle={toggle} canEdit={canEdit} />;
-  }
-
-  const capabilities = PLATFORM_CAPABILITIES[platform];
-  const status = platform === 'gitlab' ? gitlabStatus : githubStatus;
-  const isLoading = status.isLoading || config.isLoading;
-  const connected = status.data?.connected === true;
+  const readiness = useBitbucketReadiness(scope);
+  const isLoading = readiness.isLoading || config.isLoading;
+  const connected = readiness.data?.connected === true;
 
   const pushField = (field: string) => {
-    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}/${field}` as Href);
+    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/bitbucket/${field}` as Href);
   };
 
   const rows =
@@ -76,31 +68,22 @@ export function PlatformOverviewScreen({
             subtitle: config.data.customInstructions ? 'Set' : 'None',
           },
           { field: 'model', icon: FileSliders, title: 'Model', subtitle: config.data.modelSlug },
-          ...(capabilities.gateRow
-            ? [
-                {
-                  field: 'gate',
-                  icon: Gauge,
-                  title: 'Merge Gate',
-                  subtitle: config.data.gateThreshold,
-                },
-              ]
-            : []),
           {
             field: 'repos',
             icon: FolderGit2,
             title: 'Repositories',
-            subtitle:
-              capabilities.selectionModePicker && config.data.repositorySelectionMode === 'all'
-                ? 'All repositories'
-                : `${config.data.selectedRepositoryIds.length} selected`,
+            subtitle: `${config.data.selectedRepositoryIds.length} selected`,
           },
         ];
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={capabilities.label} eyebrow="Code Reviewer" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <ScrollView
+        className="flex-1 px-6"
+        contentContainerClassName="pt-4 pb-8"
+        keyboardShouldPersistTaps="handled"
+      >
         <Animated.View layout={LinearTransition}>
           {isLoading && (
             <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
@@ -112,16 +95,11 @@ export function PlatformOverviewScreen({
           {!isLoading && !connected && (
             <Animated.View entering={FadeIn.duration(200)}>
               {canEdit ? (
-                <ProviderConnectCard
-                  scope={scope}
-                  platform={platform}
-                  // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-                  onConnected={() => status.refetch()}
-                />
+                <BitbucketConnectForm scope={scope} />
               ) : (
                 <Text className="text-center text-xs text-muted-foreground">
-                  {capabilities.label} isn't connected. Only organization owners and billing
-                  managers can connect it.
+                  Bitbucket isn't connected. Only organization owners and billing managers can
+                  connect it.
                 </Text>
               )}
             </Animated.View>
@@ -129,11 +107,17 @@ export function PlatformOverviewScreen({
 
           {!isLoading && connected && config.data != null && rows != null && (
             <Animated.View entering={FadeIn.duration(200)} className="gap-6">
+              {readiness.data?.ready === false && (
+                <Text className="text-center text-xs text-muted-foreground">
+                  Setup incomplete — finish configuration on kilo.ai
+                </Text>
+              )}
+
               <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
                 <View className="flex-1 pr-3">
                   <Text className="text-sm font-medium">Automatic reviews</Text>
                   <Text variant="muted" className="text-xs">
-                    {status.data?.integration?.accountLogin ?? ''}
+                    {readiness.data?.workspace?.slug ?? ''}
                   </Text>
                 </View>
                 <Switch
@@ -164,25 +148,6 @@ export function PlatformOverviewScreen({
                   />
                 ))}
               </View>
-
-              {capabilities.reviewMd && (
-                <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-                  <View className="flex-1 pr-3">
-                    <Text className="text-sm font-medium">Follow REVIEW.md</Text>
-                    <Text variant="muted" className="text-xs">
-                      Honor per-repo REVIEW.md instruction files
-                    </Text>
-                  </View>
-                  <Switch
-                    value={!config.data.disableReviewMd}
-                    disabled={!canEdit || save.isPending}
-                    onValueChange={value => {
-                      void Haptics.selectionAsync();
-                      save.mutate({ disableReviewMd: !value });
-                    }}
-                  />
-                </View>
-              )}
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">

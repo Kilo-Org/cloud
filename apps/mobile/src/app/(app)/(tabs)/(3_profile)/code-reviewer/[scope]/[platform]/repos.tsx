@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { asReviewerPlatform, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import {
+  useBitbucketReadiness,
   useGitHubRepositories,
   useGitLabRepositories,
   useReviewConfig,
@@ -30,7 +31,21 @@ export default function ReposRoute() {
   const mode = data?.repositorySelectionMode ?? 'all';
   const githubRepos = useGitHubRepositories(scope, platform === 'github' && mode === 'selected');
   const gitlabRepos = useGitLabRepositories(scope, platform === 'gitlab');
-  const repos = platform === 'gitlab' ? gitlabRepos : githubRepos;
+  const bitbucketReadiness = useBitbucketReadiness(scope);
+  const bitbucketRepos =
+    bitbucketReadiness.data?.repositoryCache.status === 'available'
+      ? bitbucketReadiness.data.repositoryCache.repositories.map(repo => ({
+          id: repo.id,
+          fullName: repo.fullName,
+          private: repo.private,
+        }))
+      : [];
+  const reposByPlatform = {
+    github: { isLoading: githubRepos.isLoading, rows: githubRepos.data?.repositories ?? [] },
+    gitlab: { isLoading: gitlabRepos.isLoading, rows: gitlabRepos.data?.repositories ?? [] },
+    bitbucket: { isLoading: bitbucketReadiness.isLoading, rows: bitbucketRepos },
+  };
+  const { isLoading: reposLoading, rows: repoRows } = reposByPlatform[platform];
   const selectedIds = data?.selectedRepositoryIds ?? [];
 
   const setMode = (nextMode: 'all' | 'selected') => {
@@ -38,7 +53,7 @@ export default function ReposRoute() {
     save.mutate({ repositorySelectionMode: nextMode });
   };
 
-  const toggleRepo = (id: number) => {
+  const toggleRepo = (id: number | string) => {
     void Haptics.selectionAsync();
     // Read the cache at call time, not the render-time snapshot above, so
     // two rapid taps each build the next array from the latest committed
@@ -75,13 +90,13 @@ export default function ReposRoute() {
             <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
               Repositories
             </Text>
-            {repos.isLoading && (
+            {reposLoading && (
               <View className="gap-3 pt-2">
                 <Skeleton className="h-12 w-full rounded-lg" />
                 <Skeleton className="h-12 w-full rounded-lg" />
               </View>
             )}
-            {repos.data?.repositories.map(repo => (
+            {repoRows.map(repo => (
               <Pressable
                 key={repo.id}
                 className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"

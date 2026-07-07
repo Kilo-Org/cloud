@@ -6,7 +6,7 @@ This spec defines business rules and invariants for Cost Insights, Spend Alerts,
 
 ## Status
 
-Draft -- created 2026-06-24. Updated 2026-06-24 to remove spend-blocking controls. Updated 2026-06-25 to rename the feature from Spend Insights to Cost Insights and add Cost Suggestions. Updated 2026-06-26 to require local-time UI timestamps, make Spend Anomaly Alerts opt-out by default, add independent rolling 7-day and rolling 30-day spend thresholds, and limit initial access to Kilo platform admins. Updated 2026-07-03 to render the 7-day spend-over-time evidence chart in daily buckets instead of hourly for readability; hourly owner-hour rollups and anomaly detection remain unchanged. Updated 2026-07-07 to allow post-commit best-effort Cost Insights rollup capture for high-volume request-metered spend paths, preserving billing availability while relying on source-of-truth usage rows for repair/backfill.
+Draft -- created 2026-06-24. Updated 2026-06-24 to remove spend-blocking controls. Updated 2026-06-25 to rename the feature from Spend Insights to Cost Insights and add Cost Suggestions. Updated 2026-06-26 to require local-time UI timestamps, make Spend Anomaly Alerts opt-out by default, add independent rolling 7-day and rolling 30-day spend thresholds, and limit initial personal access to Kilo platform admins. Updated 2026-07-03 to render the 7-day spend-over-time evidence chart in daily buckets instead of hourly for readability; hourly owner-hour rollups and anomaly detection remain unchanged. Updated 2026-07-07 to allow post-commit best-effort Cost Insights rollup capture for high-volume request-metered spend paths, preserving billing availability while relying on source-of-truth usage rows for repair/backfill, and to gate organization Cost Insights by direct owner/billing-manager role plus organization release toggle instead of global admin status.
 
 ## Conventions
 
@@ -44,22 +44,24 @@ Cost Insights does not replace low-balance alerts, auto-top-up setup, existing o
 2. Spend Alerts MUST evaluate Credit spend at the Spend owner boundary, not per product by default.
 3. All Credit spend charged to a Spend owner MUST count toward that owner's Spend Alert evaluation.
 4. Spend Alerts MUST remain inactive until a Spend owner explicitly enables them.
-5. During initial rollout, Cost Insights v1 MUST be available only to users whose current Kilo platform user record has `is_admin` set to `true`; this access restriction MUST NOT depend on a release-toggle gate.
-6. First enabling Spend Alerts MUST immediately evaluate every enabled alert sub-option: current anomaly state plus each configured rolling 24-hour, rolling 7-day, and rolling 30-day threshold window.
-7. First enabling Spend Alerts MAY create alert email and banner when current spend already crosses enabled controls.
-8. Disabling Spend Alerts MUST keep the owner config row disabled rather than deleting it.
-9. Re-enabling Spend Alerts MUST reuse existing saved settings unless an authorized manager changes them.
-10. Re-enabling Spend Alerts MUST immediately evaluate every enabled alert sub-option using current spend, including all three configured threshold windows.
-11. While Spend Alerts are disabled, settings changes MUST save only and MUST NOT evaluate controls, create Cost Insight Events, or send emails.
+5. During initial rollout, personal Cost Insights v1 MUST be available only to users whose current Kilo platform user record has `is_admin` set to `true`; this personal access restriction MUST NOT depend on a release-toggle gate.
+6. During initial rollout, organization Cost Insights v1 MUST be available only to direct organization owners and billing managers when the organization's `cost-insights` release toggle is enabled.
+7. First enabling Spend Alerts MUST immediately evaluate every enabled alert sub-option: current anomaly state plus each configured rolling 24-hour, rolling 7-day, and rolling 30-day threshold window.
+8. First enabling Spend Alerts MAY create alert email and banner when current spend already crosses enabled controls.
+9. Disabling Spend Alerts MUST keep the owner config row disabled rather than deleting it.
+10. Re-enabling Spend Alerts MUST reuse existing saved settings unless an authorized manager changes them.
+11. Re-enabling Spend Alerts MUST immediately evaluate every enabled alert sub-option using current spend, including all three configured threshold windows.
+12. While Spend Alerts are disabled, settings changes MUST save only and MUST NOT evaluate controls, create Cost Insight Events, or send emails.
 
 ### Authorization
 
 1. Personal Spend Alerts MUST be visible and manageable only when the personal user is a Kilo platform admin.
-2. Organization Cost Insights MUST be visible only to Kilo platform admins.
-3. Users whose current Kilo platform user record does not have `is_admin` set to `true` MUST NOT view personal or organization Cost Insights dashboards or settings, including through direct route or API access.
-4. Cost Insights navigation and attention queries MUST be hidden from non-admin users.
-5. Kilo platform admins MAY inspect organization Spend Alerts according to existing administrative access patterns.
-6. Kilo platform admins MUST NOT disable organization Spend Alerts or change customer Spend Alert settings in v1 unless they also have owner or billing-manager authority for that owner.
+2. Organization Cost Insights MUST be visible and manageable only to direct organization owners and billing managers while the organization's `cost-insights` release toggle is enabled.
+3. Users whose current Kilo platform user record does not have `is_admin` set to `true` MUST NOT view personal Cost Insights dashboards or settings, including through direct route or API access.
+4. Users without direct owner or billing-manager membership in an organization MUST NOT view that organization's Cost Insights dashboards or settings, including through direct route or API access.
+5. Organization Cost Insights navigation and attention queries MUST be hidden from users who are not direct organization owners or billing managers, and from all users while the organization's `cost-insights` release toggle is disabled.
+6. Kilo platform admins MAY inspect organization Spend Alerts according to existing administrative access patterns only when they also have owner or billing-manager authority for that owner in v1.
+7. Kilo platform admins MUST NOT disable organization Spend Alerts or change customer Spend Alert settings in v1 unless they also have owner or billing-manager authority for that owner.
 
 ### Routes
 
@@ -67,9 +69,11 @@ Cost Insights does not replace low-balance alerts, auto-top-up setup, existing o
 2. Personal Cost Insights settings MUST be served at `/cost-insights/config`.
 3. Organization Cost Insights dashboard MUST be served at `/organizations/[id]/cost-insights`.
 4. Organization Cost Insights settings MUST be served at `/organizations/[id]/cost-insights/config`.
-5. Cost Insights MUST appear directly below Usage in personal and organization sidebars for Kilo platform admins only.
-6. Cost Insights sidebar item MUST show attention state when owner has an unreviewed Spend Alert or active Cost Suggestion.
-7. Cost Insights routes MUST require current Kilo platform admin authorization and MUST NOT require a feature flag in v1.
+5. Personal Cost Insights MUST appear directly below Usage in the personal sidebar for Kilo platform admins only.
+6. Organization Cost Insights MUST appear directly below Usage in organization sidebars for direct organization owners and billing managers only while the organization's `cost-insights` release toggle is enabled.
+7. Cost Insights sidebar item MUST show attention state when owner has an unreviewed Spend Alert or active Cost Suggestion.
+8. Personal Cost Insights routes MUST require current Kilo platform admin authorization and MUST NOT require a feature flag in v1.
+9. Organization Cost Insights routes MUST require direct organization owner or billing-manager authorization and the organization's `cost-insights` release toggle in v1.
 
 ### Dashboard and Settings
 
@@ -183,7 +187,7 @@ Cost Insights does not replace low-balance alerts, auto-top-up setup, existing o
 1. Spend Alerts v1 MUST send email and show owner-scoped in-app banner until alert acknowledgment.
 2. Spend Alerts v1 MUST NOT send mobile or push notifications.
 3. Personal Spend Alerts MUST be sent to the personal user's email only while that user is a Kilo platform admin.
-4. Organization Spend Alerts MUST be sent only to active organization owners and billing managers who are also Kilo platform admins.
+4. Organization Spend Alerts MUST be sent only to active organization owners and billing managers while the organization's `cost-insights` release toggle is enabled.
 5. Spend Alert emails MUST link to Cost Insights dashboard review context.
 6. Spend Alerts MUST store owner-scoped Cost Insight Events separately from per-recipient notification delivery rows.
 7. Per-recipient notification delivery rows MAY be retried without creating duplicate owner-scoped Cost Insight Events.

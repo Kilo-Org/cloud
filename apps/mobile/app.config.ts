@@ -66,6 +66,7 @@ const config: ExpoConfig = {
     'expo-image',
     'expo-font',
     'expo-secure-store',
+    'expo-sharing',
     [
       'expo-notifications',
       {

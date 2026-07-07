@@ -2,8 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
 import { KeyRound, LifeBuoy, Lock, LogOut, Trash2 } from 'lucide-react-native';
-import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -11,13 +10,15 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 import { NotificationsCard } from '@/components/notifications-card';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { ScreenHeader } from '@/components/screen-header';
-import { SupportChatOverlay, useSupportChatAvailable } from '@/components/support-chat';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
+
+const SUPPORT_EMAIL = 'hi@kilo.ai';
 
 function providerIcon(_provider: string) {
   return KeyRound;
@@ -42,10 +43,25 @@ export function ProfileScreen() {
     ...trpc.organizations.list.queryOptions(),
     enabled: isAuthenticated,
   });
-  const supportAvailable = useSupportChatAvailable();
-  const [supportOpen, setSupportOpen] = useState(false);
+
+  const { userId } = useCurrentUserId({ enabled: isAuthenticated });
 
   const { bottom } = useSafeAreaInsets();
+
+  const openSupportEmail = async () => {
+    const envDetails = [
+      `User ID: ${userId ?? 'unknown'}`,
+      `App version: ${Application.nativeApplicationVersion} (${Application.nativeBuildVersion})`,
+      `OS: ${Platform.OS} ${Platform.Version}`,
+    ].join('\n');
+    const body = `\n\n---\n${envDetails}`;
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('mobile app feedback')}&body=${encodeURIComponent(body)}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      toast.error(`No email app available. You can reach us at ${SUPPORT_EMAIL}`);
+    }
+  };
 
   const deleteAccount = useMutation(
     trpc.user.requestAccountDeletion.mutationOptions({
@@ -158,20 +174,17 @@ export function ProfileScreen() {
 
         {/* Actions */}
         <View className="mt-6 gap-3">
-          {supportAvailable && (
-            <Button
-              variant="ghost"
-              className="flex-row gap-2"
-              onPress={() => {
-                setSupportOpen(true);
-              }}
-              disabled={supportOpen}
-              accessibilityLabel="Support"
-            >
-              <LifeBuoy size={16} color={colors.mutedForeground} />
-              <Text className="text-muted-foreground">Support</Text>
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            className="flex-row gap-2"
+            onPress={() => {
+              void openSupportEmail();
+            }}
+            accessibilityLabel="Support"
+          >
+            <LifeBuoy size={16} color={colors.mutedForeground} />
+            <Text className="text-muted-foreground">Support</Text>
+          </Button>
 
           <Button
             variant="ghost"
@@ -209,14 +222,6 @@ export function ProfileScreen() {
           </Text>
         </View>
       </ScrollView>
-
-      {supportOpen && (
-        <SupportChatOverlay
-          onClose={() => {
-            setSupportOpen(false);
-          }}
-        />
-      )}
     </View>
   );
 }

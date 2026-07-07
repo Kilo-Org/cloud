@@ -66,6 +66,54 @@ describe('organizations members trpc router', () => {
     await addUserToOrganization(testOrganization.id, billingManagerUser.id, 'billing_manager');
   });
 
+  describe('listPublic procedure', () => {
+    it('returns members without private invite fields', async () => {
+      const ownerCaller = await createCallerForUser(regularUser.id);
+      const memberCaller = await createCallerForUser(memberUser.id);
+      const invitedEmail = `${crypto.randomUUID()}@public-list-invite.example.com`;
+
+      await ownerCaller.organizations.members.invite({
+        organizationId: testOrganization.id,
+        email: invitedEmail,
+        role: 'member',
+      });
+
+      const result = await memberCaller.organizations.members.listPublic({
+        organizationId: testOrganization.id,
+      });
+      const activeMember = result.find(
+        member => member.status === 'active' && member.id === regularUser.id
+      );
+      const invitedMember = result.find(member => member.status === 'invited');
+
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: regularUser.id,
+            name: 'Regular Members User',
+            email: 'regular-members@example.com',
+            role: 'owner',
+            status: 'active',
+          }),
+          expect.objectContaining({
+            email: invitedEmail,
+            role: 'member',
+            status: 'invited',
+          }),
+        ])
+      );
+      expect(invitedMember).toBeDefined();
+      expect(activeMember).toBeDefined();
+      expect(activeMember).not.toHaveProperty('dailyUsageLimitUsd');
+      expect(activeMember).not.toHaveProperty('currentDailyUsageUsd');
+      expect(invitedMember).not.toHaveProperty('inviteToken');
+      expect(invitedMember).not.toHaveProperty('inviteId');
+      expect(invitedMember).not.toHaveProperty('inviteUrl');
+      expect(invitedMember).not.toHaveProperty('dailyUsageLimitUsd');
+      expect(invitedMember).not.toHaveProperty('currentDailyUsageUsd');
+    });
+  });
+
   describe('update procedure', () => {
     it('should update member role for organization owner', async () => {
       const caller = await createCallerForUser(regularUser.id);

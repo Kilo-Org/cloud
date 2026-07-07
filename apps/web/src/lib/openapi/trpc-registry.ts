@@ -1,5 +1,6 @@
 import type { inferRouterInputs } from '@trpc/server';
-import type * as z from 'zod';
+import * as z from 'zod';
+import { PublicOrganizationMembersSchema } from '@/lib/organizations/organization-types';
 import type { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 import {
   BreakdownInputSchema,
@@ -12,12 +13,17 @@ import {
   UsageAnalyticsFiltersSchema,
 } from '@/routers/usage-analytics-schemas';
 
+const OrganizationMembersInputSchema = z.object({
+  organizationId: z.uuid(),
+});
+
 export type TrpcOpenApiProcedure = {
   procedurePath: string;
   method: 'get' | 'post';
   tags: string[];
   summary: string;
   description?: string;
+  errorResponses?: Partial<Record<'404', string>>;
   input: z.ZodType;
   output: z.ZodType;
 };
@@ -78,4 +84,14 @@ export const publicTrpcOpenApiProcedures = [
     input: TableInputSchema,
     output: TableOutputSchema,
   }),
-];
+  {
+    procedurePath: 'organizations.members.listPublic',
+    method: 'get',
+    tags: ['Organizations'],
+    summary: 'Return organization members',
+    description:
+      'Returns active and invited members for an organization the authenticated user can access. Invite tokens and invite URLs are omitted from the response.',
+    input: OrganizationMembersInputSchema,
+    output: PublicOrganizationMembersSchema,
+  },
+] satisfies TrpcOpenApiProcedure[];

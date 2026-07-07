@@ -13,21 +13,38 @@ import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage
 import { readDb } from '@/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
+import { EXA_ALLOWED_PATHS, isExaAllowedPath } from '@/lib/exa-paths';
+import { z } from 'zod';
 
 const EXA_BASE_URL = 'https://api.exa.ai';
-
-const ALLOWED_PATHS = new Set(['/search', '/contents', '/findSimilar', '/answer', '/context']);
+const MICRODOLLARS_PER_DOLLAR = 1_000_000;
+const ExaCostResponseSchema = z.object({
+  costDollars: z
+    .object({
+      total: z.number().finite().optional(),
+    })
+    .optional(),
+});
 
 function extractExaPath(url: URL): string | null {
   const prefix = '/api/exa';
   if (!url.pathname.startsWith(prefix)) return null;
   const path = url.pathname.slice(prefix.length);
-  return ALLOWED_PATHS.has(path) ? path : null;
+  return isExaAllowedPath(path) ? path : null;
 }
 
-function extractCostDollars(responseBody: unknown): number | undefined {
-  const body = responseBody as { costDollars?: { total?: number } } | null;
-  return body?.costDollars?.total;
+function extractCostMicrodollars(responseBody: unknown): number | undefined {
+  const costDollars = ExaCostResponseSchema.parse(responseBody).costDollars?.total;
+  if (costDollars === undefined || costDollars === 0) return undefined;
+  if (costDollars < 0) {
+    throw new Error('Exa response costDollars.total must be positive.');
+  }
+
+  const costMicrodollars = Math.round(costDollars * MICRODOLLARS_PER_DOLLAR);
+  if (!Number.isSafeInteger(costMicrodollars) || costMicrodollars <= 0) {
+    throw new Error('Exa response cost must convert to a positive safe integer.');
+  }
+  return costMicrodollars;
 }
 
 export async function POST(request: NextRequest) {
@@ -40,7 +57,7 @@ export async function POST(request: NextRequest) {
   const exaPath = extractExaPath(url);
   if (!exaPath) {
     return NextResponse.json(
-      { error: `Invalid path. Allowed: ${[...ALLOWED_PATHS].join(', ')}` },
+      { error: `Invalid path. Allowed: ${EXA_ALLOWED_PATHS.join(', ')}` },
       { status: 400 }
     );
   }
@@ -109,20 +126,19 @@ export async function POST(request: NextRequest) {
 
     try {
       const body: unknown = await cloned.json();
-      const costDollars = extractCostDollars(body);
-      if (costDollars !== undefined && costDollars > 0) {
-        const costMicrodollars = Math.round(costDollars * 1_000_000);
-        await recordExaUsage({
-          userId: user.id,
-          organizationId,
-          path: exaPath,
-          costMicrodollars,
-          chargedToBalance: isPaidRequest,
-          freeAllowanceMicrodollars: allowance,
-          featureId,
-          type,
-        });
-      }
+      const costMicrodollars = extractCostMicrodollars(body);
+      if (costMicrodollars === undefined) return;
+
+      await recordExaUsage({
+        userId: user.id,
+        organizationId,
+        path: exaPath,
+        costMicrodollars,
+        chargedToBalance: isPaidRequest,
+        freeAllowanceMicrodollars: allowance,
+        featureId,
+        type,
+      });
     } catch (error) {
       captureException(error, {
         tags: {

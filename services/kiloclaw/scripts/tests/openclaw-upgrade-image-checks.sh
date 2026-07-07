@@ -13,8 +13,11 @@ set -euo pipefail
 # bundle-patch guards still match — they `exit 1` on mismatch), checks the
 # version, the applied patches, the bundled plugins, runs `openclaw config
 # validate` against representative app-written config shapes (the validator runs
-# without starting the gateway, so no key is needed), and runs a full grype CVE
-# scan of the image (base OS + Go + npm, unfiltered).
+# without starting the gateway, so no key is needed), runs `openclaw doctor`
+# against the controller's plugin-load set to prove every plugins.load.paths
+# entry actually resolves in the image (config validate is schema-only and does
+# not — this is the check that catches a controller/runtime plugin-path skew),
+# and runs a full grype CVE scan of the image (base OS + Go + npm, unfiltered).
 #
 # Run the credentialed live smoke (openclaw-upgrade-smoke.sh) next; this script
 # prints exactly what that still covers.
@@ -72,6 +75,35 @@ except Exception:
     print("error")
 ')
   check "$label" "$expect" "$res"
+}
+
+# Runs `openclaw doctor` (keyless) against a config and classifies the result by
+# whether the plugin paths in plugins.load.paths RESOLVE in the image. This is a
+# deeper check than validate_fixture: `openclaw config validate` is schema-only
+# and returns valid for a plugins.load.paths entry that does not exist on disk,
+# whereas doctor — the exact command the controller runs at boot — fails with
+# "plugin path not found". That failure is what bricks an instance (config
+# validation fails -> doctor fails -> gateway never starts), so it is the failure
+# this check exists to catch.
+#   ok               -> doctor accepted the config (all plugin paths resolved)
+#   plugin-path-error-> a plugins.load.paths entry did not exist in the image
+#   doctor-error     -> doctor failed for some other reason
+#
+# $cfg is interpolated into a single-quoted `printf '%s' '$cfg'` inside sh -c, so
+# it MUST stay a script-internal JSON literal with no single quotes and never
+# take arbitrary/external input; a single quote in $cfg would break the quoting.
+doctor_plugin_result() {
+  local cfg="$1"
+  local out rc
+  out=$(docker run --rm -e OPENCLAW_CONFIG_PATH=/tmp/cfg.json "$IMAGE" \
+    sh -c "printf '%s' '$cfg' > /tmp/cfg.json && openclaw doctor --fix --non-interactive" 2>&1) && rc=0 || rc=$?
+  if printf '%s' "$out" | grep -qi "plugin path not found"; then
+    echo "plugin-path-error"
+  elif [ "$rc" -eq 0 ]; then
+    echo "ok"
+  else
+    echo "doctor-error"
+  fi
 }
 
 # Full CVE scan of the built image with grype. Nothing is filtered or scoped:
@@ -255,6 +287,69 @@ validate_fixture "agent-defaults model+fallbacks shape validates" \
 validate_fixture "validator still rejects a malformed config (self-check)" \
   '{"agents":{"defaults":{"model":{"primary":123}}}}' \
   "invalid"
+
+# ── Keyless plugin-load resolution (doctor, no gateway) ──────────────────────
+# Regression guard for the class of bug where the controller writes a
+# plugins.load.paths entry that the bundled openclaw does not ship — e.g. the
+# externalized @openclaw/kilocode-provider (openclaw #93470), which broke every
+# instance provisioned on a pre-2026.6.9 image. config validate above is
+# schema-only and cannot catch this; doctor resolves the paths and fails on a
+# missing one, exactly as it does at boot.
+#
+# The plugin-load set config-writer.ts emits into plugins.load.paths. Kept
+# explicit (readable + lets us model the conditional provider path below), but
+# guarded against drift right after, so a newly added path can't silently slip
+# the doctor assertion.
+customizer_path="/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer"
+morning_briefing_path="/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing"
+kilo_chat_path="/usr/local/lib/node_modules/@kiloclaw/kilo-chat"
+kilocode_provider_path="/usr/local/lib/node_modules/@openclaw/kilocode-provider"
+known_plugin_paths="$customizer_path $morning_briefing_path $kilo_chat_path $kilocode_provider_path"
+
+# Drift guard: derive the controller's emitted set mechanically (like
+# extract_pinned_version reads the Dockerfile) and fail if any non-LEGACY
+# *_PLUGIN_PATH in config-writer.ts is not covered above. Without this, adding a
+# fifth plugin path to config-writer.ts and forgetting it here would leave the
+# doctor check silently under-testing the exact bricking class it guards.
+# LEGACY_* constants are pruned (removed), never loaded, so they are excluded.
+uncovered=$(python3 - "$REPO_ROOT/services/kiloclaw/controller/src/config-writer.ts" "$known_plugin_paths" <<'PY'
+import re
+import sys
+
+src = open(sys.argv[1]).read()
+known = set(sys.argv[2].split())
+missing = []
+for m in re.finditer(r"const\s+(\w*_PLUGIN_PATH)\s*=\s*'([^']+)'", src):
+    name, path = m.group(1), m.group(2)
+    if name.startswith("LEGACY_"):
+        continue
+    if not path.startswith("/usr/local/lib/node_modules/"):
+        continue
+    if path not in known:
+        missing.append(path)
+print(",".join(sorted(set(missing))))
+PY
+)
+check "plugin-load set mirrors config-writer.ts (no drift)" "" "$uncovered"
+
+# Assert the plugin-load set resolves in THIS image. The externalized provider
+# path is emitted by the controller only when the plugin is installed
+# (>= 2026.6.9); mirror that off whether the built candidate image actually has
+# the plugin ($kcp_version, read from that image), so the assertion matches
+# whichever openclaw version is currently pinned in the Dockerfile. This script
+# validates the one pinned version it built; to cover an older selectable
+# version, rebuild with that pin (IMAGE=... BUILD=true) and re-run.
+positive_paths="\"$customizer_path\",\"$morning_briefing_path\",\"$kilo_chat_path\""
+if [ -n "$kcp_version" ]; then
+  positive_paths="$positive_paths,\"$kilocode_provider_path\""
+fi
+check "controller plugin-load set resolves in image (doctor)" \
+  "ok" \
+  "$(doctor_plugin_result "{\"plugins\":{\"load\":{\"paths\":[$positive_paths]}}}")"
+# Self-check: a missing plugin path MUST be rejected, or the check above is inert.
+check "doctor rejects a missing plugin path (self-check)" \
+  "plugin-path-error" \
+  "$(doctor_plugin_result '{"plugins":{"load":{"paths":["/usr/local/lib/node_modules/@openclaw/this-plugin-does-not-exist"]}}}')"
 
 # ── Image CVE scan (grype) ───────────────────────────────────────────────────
 scan_image_cves

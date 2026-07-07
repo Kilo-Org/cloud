@@ -19,7 +19,12 @@ import { hasPaymentMethod } from '@/lib/admin-utils-serverside';
 import type { SQL } from 'drizzle-orm';
 import { eq, sql } from 'drizzle-orm';
 import { sentryRootSpan } from '../getRootSpan';
-import { ingestOrganizationTokenUsage } from '@/lib/organizations/organization-usage';
+import {
+  mutateOrganizationUsage,
+  scheduleOrganizationLowBalanceAlert,
+} from '@/lib/organizations/organization-usage';
+import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
+import type { DrizzleTransaction } from '@/lib/drizzle';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import {
   findKiloExclusiveModel,
@@ -69,6 +74,12 @@ import {
   type KiloExclusiveModel,
 } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
+import { captureCostInsightSpend } from '@kilocode/db/cost-insights-rollups';
+import {
+  getAiGatewayCostInsightFeatureKey,
+  getAiGatewayCostInsightProductKey,
+} from '@/lib/cost-insights/canonical-sources';
+import { scheduleCostInsightEvaluationAfterSpend } from '@/lib/cost-insights/evaluation';
 
 const posthogClient = PostHogClient();
 
@@ -305,7 +316,6 @@ async function saveUsageRelatedData(
       isFirst
     );
   }
-  await ingestOrganizationTokenUsage(coreUsageFields);
   return inserted;
 }
 
@@ -410,6 +420,82 @@ ${metaDataKindName}_cte AS (
   SELECT ${metaDataKindName}_id FROM ${metaDataKindName}_ins
 )`;
 
+type UsageStatementExecutor = Pick<DrizzleTransaction, 'execute'>;
+
+type UsageStatementResult = UsageRecordInsertResult & {
+  kiloPassThreshold: number | null;
+};
+
+type UsageTransactionResult = {
+  inserted: UsageStatementResult;
+  organizationUsage: OrganizationUsageMutationResult | null;
+};
+
+async function insertUsageTransaction(
+  coreUsageFields: MicrodollarUsage,
+  metadataFields: UsageMetaData
+): Promise<UsageTransactionResult> {
+  return db.transaction(async tx => {
+    const inserted = await insertUsageAndMetadataWithBalanceUpdate(
+      tx,
+      coreUsageFields,
+      metadataFields
+    );
+    const organizationUsage = coreUsageFields.organization_id
+      ? await mutateOrganizationUsage(tx, coreUsageFields)
+      : null;
+
+    if (coreUsageFields.cost > 0) {
+      await captureCostInsightSpend(tx, {
+        owner: coreUsageFields.organization_id
+          ? { type: 'organization', id: coreUsageFields.organization_id }
+          : { type: 'user', id: coreUsageFields.kilo_user_id },
+        actorUserId: coreUsageFields.kilo_user_id,
+        occurredAt: coreUsageFields.created_at,
+        amountMicrodollars: coreUsageFields.cost,
+        category: 'variable',
+        source: 'ai_gateway',
+        productKey: getAiGatewayCostInsightProductKey(metadataFields.feature),
+        featureKey: getAiGatewayCostInsightFeatureKey(metadataFields.api_kind),
+        modelOrPlanKey: coreUsageFields.requested_model || coreUsageFields.model || 'other',
+        providerKey: coreUsageFields.inference_provider || coreUsageFields.provider || 'other',
+      });
+    }
+
+    return { inserted, organizationUsage };
+  });
+}
+
+function scheduleKiloPassBonusIfNeeded(
+  usage: MicrodollarUsage,
+  result: UsageStatementResult
+): void {
+  if (result.newMicrodollarsUsed === null) return;
+  const effectiveKiloPassThreshold = getEffectiveKiloPassThreshold(result.kiloPassThreshold);
+  if (
+    effectiveKiloPassThreshold === null ||
+    result.newMicrodollarsUsed < effectiveKiloPassThreshold
+  ) {
+    return;
+  }
+
+  void maybeIssueKiloPassBonusFromUsageThreshold({
+    kiloUserId: usage.kilo_user_id,
+    nowIso: usage.created_at,
+  }).catch(async error => {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await appendKiloPassAuditLog(db, {
+      action: KiloPassAuditLogAction.BonusCreditsIssued,
+      result: KiloPassAuditLogResult.Failed,
+      kiloUserId: usage.kilo_user_id,
+      payload: {
+        source: 'usage_threshold',
+        error: errorMessage,
+      },
+    });
+  });
+}
+
 export async function insertUsageRecord(
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
@@ -424,8 +510,9 @@ export async function insertUsageRecord(
         let attempt = 0;
         while (true) {
           try {
-            //this can fail if new deduplicated values are inserted simultaneously
-            return await insertUsageAndMetadataWithBalanceUpdate(coreUsageFields, metadataFields);
+            // This can fail if new deduplicated values are inserted simultaneously.
+            // Every retry opens a fresh transaction for source, charge, and rollups.
+            return await insertUsageTransaction(coreUsageFields, metadataFields);
           } catch (error) {
             if (attempt >= 2) throw error;
             sentryLogger('insertUsageRecord', 'warning')(
@@ -438,21 +525,46 @@ export async function insertUsageRecord(
         }
       }
     );
-    return result;
+
+    if (coreUsageFields.organization_id && result.organizationUsage) {
+      scheduleOrganizationLowBalanceAlert(
+        coreUsageFields.organization_id,
+        result.organizationUsage
+      );
+    }
+    if (coreUsageFields.cost > 0) {
+      scheduleCostInsightEvaluationAfterSpend(
+        coreUsageFields.organization_id
+          ? { type: 'organization', id: coreUsageFields.organization_id }
+          : { type: 'user', id: coreUsageFields.kilo_user_id }
+      );
+    }
+    scheduleKiloPassBonusIfNeeded(coreUsageFields, result.inserted);
+    return {
+      usageId: result.inserted.usageId,
+      createdAt: result.inserted.createdAt,
+      newMicrodollarsUsed: result.inserted.newMicrodollarsUsed,
+    };
   } catch (error) {
     console.error('insertUsageRecord failed', error);
     captureException(error, {
-      tags: { source: 'insertUsageRecord' },
-      extra: { coreUsageFields, metadataFields },
+      tags: {
+        source: 'insertUsageRecord',
+        spendCategory: 'variable',
+        spendSource: 'ai_gateway',
+        ownerType: coreUsageFields.organization_id ? 'organization' : 'user',
+      },
+      extra: { sourceRecordId: coreUsageFields.id },
     });
     return null;
   }
 }
 
 async function insertUsageAndMetadataWithBalanceUpdate(
+  executor: UsageStatementExecutor,
   coreUsageFields: MicrodollarUsage,
   metadataFields: UsageMetaData
-): Promise<UsageRecordInsertResult> {
+): Promise<UsageStatementResult> {
   // Pick the matching partial unique index for the daily-rollup upsert. The
   // microdollar_usage_daily table has two partial unique indexes; the upsert
   // must target the one corresponding to this row's scope.
@@ -463,7 +575,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
 
   // Use a single SQL statement with CTEs to insert usage, upsert all lookup values, metadata, and update user balance in one roundtrip
   // This ensures atomicity: microdollar_usage insert and kilocode_users.microdollars_used update happen together
-  const result = await db.execute<{
+  const result = await executor.execute<{
     usage_id: string;
     usage_created_at: string;
     new_microdollars_used: number | null;
@@ -647,33 +759,11 @@ async function insertUsageAndMetadataWithBalanceUpdate(
   const kiloPassThreshold =
     inserted.kilo_pass_threshold == null ? null : Number(inserted.kilo_pass_threshold);
 
-  if (newMicrodollarsUsed !== null) {
-    const effectiveKiloPassThreshold = getEffectiveKiloPassThreshold(kiloPassThreshold);
-
-    if (effectiveKiloPassThreshold !== null && newMicrodollarsUsed >= effectiveKiloPassThreshold) {
-      // Trigger this async to avoid blocking
-      void maybeIssueKiloPassBonusFromUsageThreshold({
-        kiloUserId: coreUsageFields.kilo_user_id,
-        nowIso: coreUsageFields.created_at,
-      }).catch(async error => {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        await appendKiloPassAuditLog(db, {
-          action: KiloPassAuditLogAction.BonusCreditsIssued,
-          result: KiloPassAuditLogResult.Failed,
-          kiloUserId: coreUsageFields.kilo_user_id,
-          payload: {
-            source: 'usage_threshold',
-            error: errorMessage,
-          },
-        });
-      });
-    }
-  }
-
   return {
     usageId: inserted.usage_id,
     createdAt: inserted.usage_created_at,
     newMicrodollarsUsed,
+    kiloPassThreshold,
   };
 }
 

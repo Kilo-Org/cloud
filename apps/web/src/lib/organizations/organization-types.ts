@@ -21,6 +21,8 @@ import type { OrganizationRole, OrganizationPlan } from './organization-base-typ
 import { OrganizationPlanSchema, OrganizationSettingsSchema } from './organization-base-types';
 import { OpenCodeSettingsSchema } from '@kilocode/db/schema-types';
 
+export const OrganizationRoleSchema = z.enum(['owner', 'member', 'billing_manager']);
+
 // API-facing billing cycle values: 'monthly' | 'annual'
 // The DB stores 'yearly' instead of 'annual'; Stripe uses 'year'/'month'.
 export const BillingCycleSchema = z.enum(['monthly', 'annual']);
@@ -90,6 +92,18 @@ export type UserOrganizationWithSeats = {
   };
 };
 
+export const InvitedOrganizationMemberSchema = z.object({
+  email: z.string(),
+  role: OrganizationRoleSchema,
+  inviteDate: z.string().nullable(),
+  inviteToken: z.string(),
+  inviteId: z.string(),
+  status: z.literal('invited'),
+  inviteUrl: z.string(),
+  dailyUsageLimitUsd: z.number().nullable(),
+  currentDailyUsageUsd: z.number().nullable(),
+});
+
 type InvitedMember = {
   email: string;
   role: OrganizationRole;
@@ -101,6 +115,17 @@ type InvitedMember = {
   dailyUsageLimitUsd: number | null;
   currentDailyUsageUsd: number | null;
 };
+
+export const ActiveOrganizationMemberSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  role: OrganizationRoleSchema,
+  status: z.literal('active'),
+  inviteDate: z.string().nullable(),
+  dailyUsageLimitUsd: z.number().nullable(),
+  currentDailyUsageUsd: z.number().nullable(),
+});
 
 type ActiveMember = {
   id: string;
@@ -115,6 +140,35 @@ type ActiveMember = {
 };
 
 export type OrganizationMember = InvitedMember | ActiveMember;
+
+export const OrganizationMemberSchema = z.discriminatedUnion('status', [
+  ActiveOrganizationMemberSchema,
+  InvitedOrganizationMemberSchema,
+]);
+
+export const PublicInvitedOrganizationMemberSchema = InvitedOrganizationMemberSchema.omit({
+  inviteToken: true,
+  inviteId: true,
+  inviteUrl: true,
+  dailyUsageLimitUsd: true,
+  currentDailyUsageUsd: true,
+});
+
+export const PublicActiveOrganizationMemberSchema = ActiveOrganizationMemberSchema.omit({
+  dailyUsageLimitUsd: true,
+  currentDailyUsageUsd: true,
+});
+
+export const PublicOrganizationMemberSchema = z.discriminatedUnion('status', [
+  PublicActiveOrganizationMemberSchema,
+  PublicInvitedOrganizationMemberSchema,
+]);
+
+export const PublicOrganizationMembersSchema = z.array(PublicOrganizationMemberSchema);
+
+export const OrganizationWithMembersSchema = OrganizationSchema.extend({
+  members: z.array(OrganizationMemberSchema),
+});
 
 export type ChildOrganizationSummary = {
   id: string;

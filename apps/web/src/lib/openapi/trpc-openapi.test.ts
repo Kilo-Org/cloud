@@ -41,7 +41,7 @@ async function callVerificationProcedure(path: string, input?: unknown): Promise
 }
 
 describe('generateTrpcOpenApiDocument', () => {
-  it('documents only the allowlisted tRPC procedures', () => {
+  it('documents only the allowlisted API paths', () => {
     const document = generateTrpcOpenApiDocument();
 
     expect(Object.keys(document.paths).sort()).toEqual(
@@ -53,6 +53,72 @@ describe('generateTrpcOpenApiDocument', () => {
       tags: ['Usage Analytics'],
     });
     expect(document.paths).not.toHaveProperty('/api/trpc/admin');
+  });
+
+  it('generates the tRPC organization members endpoint', () => {
+    const document = generateTrpcOpenApiDocument();
+    const operation = document.paths['/api/trpc/organizations.members.listPublic']?.get as {
+      responses: Record<string, { content: Record<string, { schema: Record<string, any> }> }>;
+    };
+    const responseSchema = operation?.responses['200'].content['application/json'].schema;
+    const dataSchema = responseSchema.properties.result.properties.data;
+
+    expect(document.info.title).toBe('Kilo Code API');
+    expect(operation).toMatchObject({
+      operationId: 'organizations_members_listPublic',
+      summary: 'Return organization members',
+      tags: ['Organizations'],
+      parameters: [
+        {
+          name: 'input',
+          in: 'query',
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['organizationId'],
+                properties: {
+                  organizationId: { type: 'string', format: 'uuid' },
+                },
+              },
+            },
+          },
+        },
+      ],
+      responses: {
+        '200': {
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['result'],
+              },
+            },
+          },
+        },
+      },
+    });
+    expect(dataSchema.items.oneOf).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          required: expect.arrayContaining(['id', 'name', 'email', 'status']),
+          properties: expect.objectContaining({
+            status: { type: 'string', const: 'active' },
+          }),
+        }),
+        expect.objectContaining({
+          required: expect.arrayContaining(['email', 'status']),
+          properties: expect.objectContaining({
+            status: { type: 'string', const: 'invited' },
+          }),
+        }),
+      ])
+    );
+    expect(JSON.stringify(dataSchema)).not.toContain('inviteToken');
+    expect(JSON.stringify(dataSchema)).not.toContain('inviteUrl');
+    expect(JSON.stringify(dataSchema)).not.toContain('dailyUsageLimitUsd');
+    expect(JSON.stringify(dataSchema)).not.toContain('currentDailyUsageUsd');
   });
 
   it('documents bearer auth metadata for protected procedures', () => {

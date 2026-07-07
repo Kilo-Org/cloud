@@ -83,6 +83,13 @@ function requestShapeForProcedure(procedure: TrpcOpenApiProcedure) {
 }
 
 function operationForProcedure(procedure: TrpcOpenApiProcedure) {
+  const routeSpecificErrorResponses = Object.fromEntries(
+    Object.entries(procedure.errorResponses ?? {}).map(([status, description]) => [
+      status,
+      errorResponse(description),
+    ])
+  );
+
   return {
     operationId: procedure.procedurePath.replaceAll('.', '_'),
     tags: procedure.tags,
@@ -102,6 +109,7 @@ function operationForProcedure(procedure: TrpcOpenApiProcedure) {
       '400': errorResponse('Invalid request'),
       '401': errorResponse('Authentication required'),
       '403': errorResponse('Access denied'),
+      ...routeSpecificErrorResponses,
       '500': errorResponse('Unexpected server error'),
     },
   };
@@ -123,7 +131,7 @@ export function generateTrpcOpenApiDocument(): OpenApiDocument {
   return {
     openapi: '3.1.0',
     info: {
-      title: 'Kilo Code tRPC API',
+      title: 'Kilo Code API',
       version: '1.0.0',
     },
     servers: [{ url: '/' }],

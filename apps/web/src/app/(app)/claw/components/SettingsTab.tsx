@@ -2478,7 +2478,7 @@ export function SettingsTab({
       />
 
       {/* ── Webhook Integration ── */}
-      <WebhookIntegrationSection />
+      {!organizationId && <WebhookIntegrationSection />}
 
       {/* ── Messaging Channels ── */}
       <div>

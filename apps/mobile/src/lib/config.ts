@@ -22,5 +22,4 @@ export const SESSION_INGEST_WS_URL: string = required('sessionIngestWsUrl');
 export const KILO_CHAT_URL: string = required('kiloChatUrl');
 export const EVENT_SERVICE_URL: string = required('eventServiceUrl');
 export const NOTIFICATIONS_URL: string = required('notificationsUrl');
-export const PYLON_APP_ID: string = required('pylonAppId');
 export const POSTHOG_API_KEY: string = required('posthogApiKey');

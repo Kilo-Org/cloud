@@ -43,6 +43,7 @@ import { unifiedSessionsRouter } from '@/routers/unified-sessions-router';
 import { activeSessionsRouter } from '@/routers/active-sessions-router';
 import { usageAnalyticsRouter } from '@/routers/usage-analytics-router';
 import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
+import { costInsightsRouter } from '@/routers/cost-insights-router';
 import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 export const rootRouter = createTRPCRouter({
@@ -90,6 +91,7 @@ export const rootRouter = createTRPCRouter({
   usageAnalytics: usageAnalyticsRouter,
   mcpGateway: mcpGatewayRouter,
   mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,
+  costInsights: costInsightsRouter,
   modelPreferences: modelPreferencesRouter,
 });
 // export type definition of API

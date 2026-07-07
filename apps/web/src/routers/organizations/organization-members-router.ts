@@ -3,6 +3,7 @@ import {
   removeUserFromOrganization,
   addUserToOrganization,
   getOrganizationById,
+  getOrganizationMembers,
   inviteUserToOrganization,
   getAcceptInviteUrl,
 } from '@/lib/organizations/organizations';
@@ -19,6 +20,7 @@ import {
   ensureOrganizationAccess,
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
+  organizationMemberProcedure,
   organizationOwnerMutationProcedure,
 } from '@/routers/organizations/utils';
 import { sendOrganizationInviteEmail } from '@/lib/email';
@@ -31,6 +33,7 @@ import { successResult } from '@/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { revokeGatewayStateForOrganizationMember } from '@/lib/mcp-gateway/lifecycle-service';
+import { PublicOrganizationMembersSchema } from '@/lib/organizations/organization-types';
 
 const MAX_DAILY_LIMIT_USD = 2000;
 
@@ -77,6 +80,13 @@ async function getDirectOrganizationRole(
 }
 
 export const organizationsMembersRouter = createTRPCRouter({
+  listPublic: organizationMemberProcedure
+    .input(OrganizationIdInputSchema)
+    .output(PublicOrganizationMembersSchema)
+    .query(async ({ input }) => {
+      return await getOrganizationMembers(input.organizationId);
+    }),
+
   update: organizationOwnerMutationProcedure
     .input(UpdateMemberSchema)
     .mutation(async ({ input, ctx }) => {

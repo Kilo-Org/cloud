@@ -10,6 +10,7 @@ import {
 } from '@/lib/exa-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { captureException } from '@sentry/nextjs';
 
 // Capture promises scheduled via next/server `after` so tests can await them.
 let afterCallbacks: (() => Promise<void>)[] = [];
@@ -37,12 +38,14 @@ jest.mock('@/lib/config.server', () => ({
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/exa-usage');
 jest.mock('@/lib/organizations/organization-usage');
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetExaMonthlyUsage = jest.mocked(getExaMonthlyUsage);
 const mockedGetExaFreeAllowanceMicrodollars = jest.mocked(getExaFreeAllowanceMicrodollars);
 const mockedRecordExaUsage = jest.mocked(recordExaUsage);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
+const mockedCaptureException = jest.mocked(captureException);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -399,6 +402,7 @@ describe('POST /api/exa/[...path]', () => {
       await flushAfterCallbacks();
 
       expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+      expect(mockedCaptureException).not.toHaveBeenCalled();
     });
 
     it('does not record cost when costDollars is zero', async () => {
@@ -412,6 +416,40 @@ describe('POST /api/exa/[...path]', () => {
       await flushAfterCallbacks();
 
       expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+      expect(mockedCaptureException).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['nonnumeric', '0.007'],
+      ['negative', -0.007],
+      ['too small to represent in microdollars', 0.0000001],
+      ['too large to represent safely in microdollars', 10_000_000_000],
+    ])('captures and ignores %s costDollars totals', async (_description, total) => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(makeUpstreamResponse({ results: [], costDollars: { total } }));
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await expect(flushAfterCallbacks()).resolves.toBeUndefined();
+
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
+    });
+
+    it('captures and ignores non-finite costDollars totals', async () => {
+      setUserAuth();
+      mockedFetch.mockResolvedValue(
+        new Response('{"results":[],"costDollars":{"total":1e400}}', {
+          headers: { 'content-type': 'application/json' },
+        })
+      );
+
+      const { POST } = await import('./route');
+      await POST(makeRequest('/search') as never);
+      await expect(flushAfterCallbacks()).resolves.toBeUndefined();
+
+      expect(mockedRecordExaUsage).not.toHaveBeenCalled();
+      expect(mockedCaptureException).toHaveBeenCalledTimes(1);
     });
 
     it('passes featureId from header and type from body to recordExaUsage', async () => {

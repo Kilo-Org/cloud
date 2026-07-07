@@ -48,6 +48,7 @@ export default function SidebarMenuList({
         <SidebarMenu>
           {items.map(item => {
             const itemUrl = item.url;
+            const isNumericBadge = item.badge ? /^\d[\d,]*$/.test(item.badge) : false;
             const matchesPrefix = itemUrl
               ? pathname === itemUrl || pathname.startsWith(itemUrl + '/')
               : false;
@@ -75,12 +76,17 @@ export default function SidebarMenuList({
                   <span>{item.title}</span>
                 )}
                 {item.suffixIcon && <item.suffixIcon className="ml-auto h-4 w-4" />}
+                {isNumericBadge && item.badge && (
+                  <span className="sr-only">
+                    {item.badge} {item.badge === '1' ? 'item needs' : 'items need'} review
+                  </span>
+                )}
               </>
             );
             const buttonClassName = cn(
               'flex items-center gap-3 transition-colors',
               item.subtitle && 'h-12 py-2',
-              item.badge && 'pr-14',
+              item.badge && (isNumericBadge ? 'pr-10' : 'pr-14'),
               item.className
             );
 
@@ -114,7 +120,15 @@ export default function SidebarMenuList({
                   </SidebarMenuButton>
                 )}
                 {item.badge && (
-                  <SidebarMenuBadge className="bg-brand-primary text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-[active=true]/menu-button:text-primary-foreground right-4 !top-1/2 h-4 min-w-0 !-translate-y-1/2 rounded-full px-1.5 text-[10px] font-bold tracking-wide uppercase ring-1 ring-brand-primary/30">
+                  <SidebarMenuBadge
+                    aria-hidden={isNumericBadge ? true : undefined}
+                    className={cn(
+                      'bg-brand-primary text-primary-foreground peer-hover/menu-button:text-primary-foreground peer-data-[active=true]/menu-button:text-primary-foreground right-4 !top-1/2 !-translate-y-1/2 rounded-full ring-1 ring-brand-primary/30',
+                      isNumericBadge
+                        ? 'font-mono h-5 min-w-5 px-1.5 text-[11px] font-semibold tabular-nums'
+                        : 'h-4 min-w-0 px-1.5 text-[10px] font-bold tracking-wide uppercase'
+                    )}
+                  >
                     {item.badge}
                   </SidebarMenuBadge>
                 )}

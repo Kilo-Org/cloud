@@ -85,6 +85,13 @@ import {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
+  CostInsightSpendCategory,
+  CostInsightSpendSource,
+  CostInsightRollupDegradedReason,
+  CostInsightEventType,
+  CostInsightAlertKind,
+  CostInsightSuggestionKind,
+  CostInsightNotificationStatus,
   CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
   CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
   CodeReviewAnalyticsCaptureStatus,
@@ -237,6 +244,13 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
+  CostInsightSpendCategory,
+  CostInsightSpendSource,
+  CostInsightRollupDegradedReason,
+  CostInsightEventType,
+  CostInsightAlertKind,
+  CostInsightSuggestionKind,
+  CostInsightNotificationStatus,
   CodeReviewAnalyticsCaptureStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
@@ -2673,6 +2687,844 @@ export const organizations = pgTable(
 );
 
 export type Organization = typeof organizations.$inferSelect;
+
+export const cost_insight_owner_hour_totals = pgTable(
+  'cost_insight_owner_hour_totals',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    spend_category: text().$type<CostInsightSpendCategory>().notNull(),
+    total_microdollars: bigint({ mode: 'number' }).notNull(),
+    spend_record_count: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_owner_hour_totals_user')
+      .on(table.owned_by_user_id, table.hour_start, table.spend_category)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_owner_hour_totals_org')
+      .on(table.owned_by_organization_id, table.hour_start, table.spend_category)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_owner_hour_totals_hour').on(table.hour_start),
+    check(
+      'cost_insight_owner_hour_totals_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_hour_check',
+      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
+    ),
+    enumCheck(
+      'cost_insight_owner_hour_totals_category_check',
+      table.spend_category,
+      CostInsightSpendCategory
+    ),
+    check(
+      'cost_insight_owner_hour_totals_amount_positive_check',
+      sql`${table.total_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_amount_safe_check',
+      sql`${table.total_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_count_positive_check',
+      sql`${table.spend_record_count} > 0`
+    ),
+    check(
+      'cost_insight_owner_hour_totals_count_safe_check',
+      sql`${table.spend_record_count} <= 9007199254740991`
+    ),
+  ]
+);
+
+export type CostInsightOwnerHourTotal = typeof cost_insight_owner_hour_totals.$inferSelect;
+
+export const cost_insight_owner_hour_driver_buckets = pgTable(
+  'cost_insight_owner_hour_driver_buckets',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    hour_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    spend_category: text().$type<CostInsightSpendCategory>().notNull(),
+    driver_key: text().notNull(),
+    source: text().$type<CostInsightSpendSource>().notNull(),
+    product_key: text().notNull(),
+    feature_key: text().notNull(),
+    model_or_plan_key: text().notNull(),
+    provider_key: text().notNull(),
+    actor_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onUpdate: 'cascade' }),
+    total_microdollars: bigint({ mode: 'number' }).notNull(),
+    spend_record_count: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_driver_buckets_user')
+      .on(table.owned_by_user_id, table.hour_start, table.spend_category, table.driver_key)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_driver_buckets_org')
+      .on(table.owned_by_organization_id, table.hour_start, table.spend_category, table.driver_key)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_driver_buckets_hour').on(table.hour_start),
+    check(
+      'cost_insight_driver_buckets_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_driver_buckets_hour_check',
+      sql`${table.hour_start} = date_trunc('hour', ${table.hour_start}, 'UTC')`
+    ),
+    enumCheck(
+      'cost_insight_driver_buckets_category_check',
+      table.spend_category,
+      CostInsightSpendCategory
+    ),
+    enumCheck('cost_insight_driver_buckets_source_check', table.source, CostInsightSpendSource),
+    check(
+      'cost_insight_driver_buckets_driver_key_check',
+      sql`${table.driver_key} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      'cost_insight_driver_buckets_product_key_check',
+      sql`char_length(${table.product_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_feature_key_check',
+      sql`char_length(${table.feature_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_model_key_check',
+      sql`char_length(${table.model_or_plan_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_provider_key_check',
+      sql`char_length(${table.provider_key}) BETWEEN 1 AND 128`
+    ),
+    check(
+      'cost_insight_driver_buckets_amount_positive_check',
+      sql`${table.total_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_driver_buckets_amount_safe_check',
+      sql`${table.total_microdollars} <= 9007199254740991`
+    ),
+    check('cost_insight_driver_buckets_count_positive_check', sql`${table.spend_record_count} > 0`),
+    check(
+      'cost_insight_driver_buckets_count_safe_check',
+      sql`${table.spend_record_count} <= 9007199254740991`
+    ),
+  ]
+);
+
+export type CostInsightOwnerHourDriverBucket =
+  typeof cost_insight_owner_hour_driver_buckets.$inferSelect;
+
+export const cost_insight_evaluation_dirty_owners = pgTable(
+  'cost_insight_evaluation_dirty_owners',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    generation: bigint({ mode: 'number' })
+      .default(sql`'1'`)
+      .notNull(),
+    dirty_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claim_token: uuid(),
+    attempt_count: integer().default(0).notNull(),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_evaluation_dirty_owners_user')
+      .on(table.owned_by_user_id)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_evaluation_dirty_owners_org')
+      .on(table.owned_by_organization_id)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_evaluation_dirty_owners_claim').on(
+      table.next_attempt_at,
+      table.claimed_at,
+      table.dirty_at,
+      table.id
+    ),
+    check(
+      'cost_insight_evaluation_dirty_owners_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_evaluation_dirty_owners_generation_check',
+      sql`${table.generation} > 0 AND ${table.generation} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_evaluation_dirty_owners_attempt_count_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    check(
+      'cost_insight_evaluation_dirty_owners_claim_token_check',
+      sql`(${table.claimed_at} IS NULL AND ${table.claim_token} IS NULL) OR (${table.claimed_at} IS NOT NULL AND ${table.claim_token} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CostInsightEvaluationDirtyOwner =
+  typeof cost_insight_evaluation_dirty_owners.$inferSelect;
+
+export const cost_insight_hourly_sweep_checkpoints = pgTable(
+  'cost_insight_hourly_sweep_checkpoints',
+  {
+    job_name: text().primaryKey().notNull(),
+    cycle_id: uuid(),
+    cycle_as_of: timestamp({ withTimezone: true, mode: 'string' }),
+    cohort_created_before: timestamp({ withTimezone: true, mode: 'string' }),
+    cursor_owner_type: text().$type<'user' | 'organization'>(),
+    cursor_owner_id: text(),
+    lease_token: uuid(),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }),
+    started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check('cost_insight_hourly_sweep_job_name_check', sql`${table.job_name} <> ''`),
+    check(
+      'cost_insight_hourly_sweep_cursor_owner_type_check',
+      sql`${table.cursor_owner_type} IS NULL OR ${table.cursor_owner_type} IN ('user', 'organization')`
+    ),
+    check(
+      'cost_insight_hourly_sweep_cursor_check',
+      sql`(${table.cursor_owner_type} IS NULL AND ${table.cursor_owner_id} IS NULL) OR (${table.cursor_owner_type} IS NOT NULL AND ${table.cursor_owner_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_hourly_sweep_lease_check',
+      sql`(${table.lease_token} IS NULL AND ${table.lease_expires_at} IS NULL) OR (${table.lease_token} IS NOT NULL AND ${table.lease_expires_at} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_hourly_sweep_cycle_check',
+      sql`(${table.cycle_id} IS NULL AND ${table.cycle_as_of} IS NULL AND ${table.cohort_created_before} IS NULL AND ${table.started_at} IS NULL) OR (${table.cycle_id} IS NOT NULL AND ${table.cycle_as_of} IS NOT NULL AND ${table.cohort_created_before} IS NOT NULL AND ${table.started_at} IS NOT NULL)`
+    ),
+  ]
+);
+
+export type CostInsightHourlySweepCheckpoint =
+  typeof cost_insight_hourly_sweep_checkpoints.$inferSelect;
+
+export const cost_insight_rollup_coverage = pgTable(
+  'cost_insight_rollup_coverage',
+  {
+    rollup_version: smallint().primaryKey().notNull(),
+    live_capture_start_hour: timestamp({ withTimezone: true, mode: 'string' }),
+    coverage_start_hour: timestamp({ withTimezone: true, mode: 'string' }),
+    last_reconciled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    check('cost_insight_rollup_coverage_version_check', sql`${table.rollup_version} > 0`),
+    check(
+      'cost_insight_rollup_coverage_live_hour_check',
+      sql`${table.live_capture_start_hour} IS NULL OR ${table.live_capture_start_hour} = date_trunc('hour', ${table.live_capture_start_hour}, 'UTC')`
+    ),
+    check(
+      'cost_insight_rollup_coverage_start_hour_check',
+      sql`${table.coverage_start_hour} IS NULL OR ${table.coverage_start_hour} = date_trunc('hour', ${table.coverage_start_hour}, 'UTC')`
+    ),
+    check(
+      'cost_insight_rollup_coverage_range_check',
+      sql`${table.coverage_start_hour} IS NULL OR (${table.live_capture_start_hour} IS NOT NULL AND ${table.coverage_start_hour} <= ${table.live_capture_start_hour})`
+    ),
+  ]
+);
+
+export type CostInsightRollupCoverage = typeof cost_insight_rollup_coverage.$inferSelect;
+
+export const cost_insight_rollup_degraded_intervals = pgTable(
+  'cost_insight_rollup_degraded_intervals',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    start_hour: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    end_hour_exclusive: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    source: text().$type<CostInsightSpendSource>(),
+    reason: text().$type<CostInsightRollupDegradedReason>().notNull(),
+    detected_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    resolved_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_cost_insight_degraded_intervals_unresolved')
+      .on(table.start_hour, table.end_hour_exclusive)
+      .where(isNull(table.resolved_at)),
+    check(
+      'cost_insight_degraded_intervals_start_hour_check',
+      sql`${table.start_hour} = date_trunc('hour', ${table.start_hour}, 'UTC')`
+    ),
+    check(
+      'cost_insight_degraded_intervals_end_hour_check',
+      sql`${table.end_hour_exclusive} = date_trunc('hour', ${table.end_hour_exclusive}, 'UTC')`
+    ),
+    check(
+      'cost_insight_degraded_intervals_range_check',
+      sql`${table.end_hour_exclusive} > ${table.start_hour}`
+    ),
+    check(
+      'cost_insight_degraded_intervals_resolution_check',
+      sql`${table.resolved_at} IS NULL OR ${table.resolved_at} >= ${table.detected_at}`
+    ),
+    enumCheck('cost_insight_degraded_intervals_source_check', table.source, CostInsightSpendSource),
+    enumCheck(
+      'cost_insight_degraded_intervals_reason_check',
+      table.reason,
+      CostInsightRollupDegradedReason
+    ),
+  ]
+);
+
+export type CostInsightRollupDegradedInterval =
+  typeof cost_insight_rollup_degraded_intervals.$inferSelect;
+
+const CostInsightSafeIntegerSchema = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+const CostInsightPositiveSafeIntegerSchema = z
+  .number()
+  .int()
+  .positive()
+  .max(Number.MAX_SAFE_INTEGER);
+const CostInsightTimestampSchema = z.string().refine(value => Number.isFinite(Date.parse(value)), {
+  message: 'Expected parseable timestamp.',
+});
+const CostInsightDriverDimensionSchema = z.string().min(1).max(128);
+
+export const CostInsightEventSnapshotSchema = z.object({
+  thresholdMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  thresholdWindow: z.enum(['rolling_24h', 'rolling_7d', 'rolling_30d']).optional(),
+  rolling24HourMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  rolling7DayMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  rolling30DayMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  currentHourVariableMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  anomalyBaselineMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  anomalyThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable().optional(),
+  topDrivers: z
+    .array(
+      z.object({
+        spendCategory: z.enum(['variable', 'scheduled']),
+        source: z.enum(['ai_gateway', 'kiloclaw', 'coding_plan', 'other']),
+        productKey: CostInsightDriverDimensionSchema,
+        featureKey: CostInsightDriverDimensionSchema,
+        modelOrPlanKey: CostInsightDriverDimensionSchema,
+        providerKey: CostInsightDriverDimensionSchema,
+        actorUserId: z.string().min(1).nullable(),
+        totalMicrodollars: CostInsightPositiveSafeIntegerSchema,
+        spendRecordCount: CostInsightPositiveSafeIntegerSchema,
+      })
+    )
+    .max(5)
+    .optional(),
+  topDriversWindow: z
+    .object({
+      startInclusive: CostInsightTimestampSchema,
+      endExclusive: CostInsightTimestampSchema,
+      spendCategory: z.enum(['variable', 'scheduled']).optional(),
+    })
+    .refine(value => Date.parse(value.endExclusive) > Date.parse(value.startInclusive), {
+      message: 'Expected topDriversWindow endExclusive to be after startInclusive.',
+    })
+    .optional(),
+  changedFields: z.record(z.string(), z.object({ old: z.unknown(), new: z.unknown() })).optional(),
+  settings: z
+    .object({
+      spendAlertsEnabled: z.boolean(),
+      anomalyAlertsEnabled: z.boolean(),
+      costSuggestionsEnabled: z.boolean(),
+      spendThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
+      spend7DayThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
+      spend30DayThresholdMicrodollars: CostInsightSafeIntegerSchema.nullable(),
+    })
+    .optional(),
+  suggestion: z
+    .object({
+      suggestionKey: z.string().regex(/^[0-9a-f]{64}$/),
+      evidenceWindowStart: CostInsightTimestampSchema,
+      evidenceWindowEnd: CostInsightTimestampSchema,
+      observedMicrodollars: CostInsightPositiveSafeIntegerSchema,
+      ctaHref: z.string().min(1),
+    })
+    .refine(value => Date.parse(value.evidenceWindowEnd) > Date.parse(value.evidenceWindowStart), {
+      message: 'Expected suggestion evidence window end to be after start.',
+    })
+    .optional(),
+});
+
+export type CostInsightEventSnapshot = z.infer<typeof CostInsightEventSnapshotSchema>;
+
+export const cost_insight_owner_configs = pgTable(
+  'cost_insight_owner_configs',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    spend_alerts_enabled: boolean().default(false).notNull(),
+    anomaly_alerts_enabled: boolean().default(true).notNull(),
+    cost_suggestions_enabled: boolean().default(true).notNull(),
+    spend_threshold_microdollars: bigint({ mode: 'number' }),
+    spend_7_day_threshold_microdollars: bigint({ mode: 'number' }),
+    spend_30_day_threshold_microdollars: bigint({ mode: 'number' }),
+    spend_alerts_enabled_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_owner_configs_user')
+      .on(table.owned_by_user_id)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_owner_configs_org')
+      .on(table.owned_by_organization_id)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_owner_configs_evaluation')
+      .on(table.updated_at, table.id)
+      .where(sql`${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE`),
+    index('IDX_cost_insight_owner_configs_user_active')
+      .on(table.owned_by_user_id)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND (${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE)`
+      ),
+    index('IDX_cost_insight_owner_configs_org_active')
+      .on(table.owned_by_organization_id)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND (${table.spend_alerts_enabled} = TRUE OR ${table.cost_suggestions_enabled} = TRUE)`
+      ),
+    check(
+      'cost_insight_owner_configs_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_owner_configs_threshold_positive_check',
+      sql`${table.spend_threshold_microdollars} IS NULL OR ${table.spend_threshold_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_configs_threshold_safe_check',
+      sql`${table.spend_threshold_microdollars} IS NULL OR ${table.spend_threshold_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_configs_7_day_threshold_positive_check',
+      sql`${table.spend_7_day_threshold_microdollars} IS NULL OR ${table.spend_7_day_threshold_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_configs_7_day_threshold_safe_check',
+      sql`${table.spend_7_day_threshold_microdollars} IS NULL OR ${table.spend_7_day_threshold_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_configs_30_day_threshold_positive_check',
+      sql`${table.spend_30_day_threshold_microdollars} IS NULL OR ${table.spend_30_day_threshold_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_owner_configs_30_day_threshold_safe_check',
+      sql`${table.spend_30_day_threshold_microdollars} IS NULL OR ${table.spend_30_day_threshold_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_owner_configs_enabled_at_check',
+      sql`${table.spend_alerts_enabled} = TRUE OR ${table.spend_alerts_enabled_at} IS NULL`
+    ),
+  ]
+);
+
+export type CostInsightOwnerConfig = typeof cost_insight_owner_configs.$inferSelect;
+export type NewCostInsightOwnerConfig = typeof cost_insight_owner_configs.$inferInsert;
+
+export const cost_insight_active_suggestions = pgTable(
+  'cost_insight_active_suggestions',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    suggestion_kind: text().$type<CostInsightSuggestionKind>().notNull(),
+    suggestion_key: text().notNull(),
+    title: text().notNull(),
+    description: text().notNull(),
+    cta_label: text().notNull(),
+    cta_href: text().notNull(),
+    evidence_window_start: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    evidence_window_end: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    observed_microdollars: bigint({ mode: 'number' }).notNull(),
+    benefit_label: text().notNull(),
+    benefit_detail: text().notNull(),
+    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    dismissed_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_active_suggestions_user_key')
+      .on(table.owned_by_user_id, table.suggestion_key)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_active_suggestions_org_key')
+      .on(table.owned_by_organization_id, table.suggestion_key)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_active_suggestions_user_active')
+      .on(table.owned_by_user_id, table.created_at.desc())
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.dismissed_at} IS NULL`),
+    index('IDX_cost_insight_active_suggestions_org_active')
+      .on(table.owned_by_organization_id, table.created_at.desc())
+      .where(sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.dismissed_at} IS NULL`),
+    check(
+      'cost_insight_active_suggestions_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    enumCheck(
+      'cost_insight_active_suggestions_kind_check',
+      table.suggestion_kind,
+      CostInsightSuggestionKind
+    ),
+    check(
+      'cost_insight_active_suggestions_key_check',
+      sql`${table.suggestion_key} ~ '^[0-9a-f]{64}$'`
+    ),
+    check(
+      'cost_insight_active_suggestions_window_check',
+      sql`${table.evidence_window_end} > ${table.evidence_window_start}`
+    ),
+    check(
+      'cost_insight_active_suggestions_observed_positive_check',
+      sql`${table.observed_microdollars} > 0`
+    ),
+    check(
+      'cost_insight_active_suggestions_observed_safe_check',
+      sql`${table.observed_microdollars} <= 9007199254740991`
+    ),
+    check(
+      'cost_insight_active_suggestions_dismissed_by_check',
+      sql`${table.dismissed_at} IS NOT NULL OR ${table.dismissed_by_user_id} IS NULL`
+    ),
+  ]
+);
+
+export type CostInsightActiveSuggestion = typeof cost_insight_active_suggestions.$inferSelect;
+export type NewCostInsightActiveSuggestion = typeof cost_insight_active_suggestions.$inferInsert;
+
+export const cost_insight_events = pgTable(
+  'cost_insight_events',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    event_type: text().$type<CostInsightEventType>().notNull(),
+    alert_kind: text().$type<CostInsightAlertKind>(),
+    suggestion_kind: text().$type<CostInsightSuggestionKind>(),
+    active_suggestion_id: uuid().references(() => cost_insight_active_suggestions.id, {
+      onDelete: 'set null',
+    }),
+    actor_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
+    title: text().notNull(),
+    description: text().notNull(),
+    snapshot: jsonb().$type<CostInsightEventSnapshot>().default({}).notNull(),
+    dedupe_key: text(),
+    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_cost_insight_events_user_occurred').on(
+      table.owned_by_user_id,
+      table.occurred_at.desc(),
+      table.id
+    ),
+    index('IDX_cost_insight_events_org_occurred').on(
+      table.owned_by_organization_id,
+      table.occurred_at.desc(),
+      table.id
+    ),
+    index('IDX_cost_insight_events_occurred').on(table.occurred_at),
+    uniqueIndex('UQ_cost_insight_events_user_dedupe')
+      .on(table.owned_by_user_id, table.dedupe_key)
+      .where(sql`${table.owned_by_user_id} IS NOT NULL AND ${table.dedupe_key} IS NOT NULL`),
+    uniqueIndex('UQ_cost_insight_events_org_dedupe')
+      .on(table.owned_by_organization_id, table.dedupe_key)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.dedupe_key} IS NOT NULL`
+      ),
+    check(
+      'cost_insight_events_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    enumCheck('cost_insight_events_type_check', table.event_type, CostInsightEventType),
+    enumCheck('cost_insight_events_alert_kind_check', table.alert_kind, CostInsightAlertKind),
+    enumCheck(
+      'cost_insight_events_suggestion_kind_check',
+      table.suggestion_kind,
+      CostInsightSuggestionKind
+    ),
+    check(
+      'cost_insight_events_alert_kind_presence_check',
+      sql`(${table.event_type} IN ('anomaly_alert', 'threshold_crossed', 'alert_reviewed') AND ${table.alert_kind} IS NOT NULL) OR (${table.event_type} NOT IN ('anomaly_alert', 'threshold_crossed', 'alert_reviewed') AND ${table.alert_kind} IS NULL)`
+    ),
+    check(
+      'cost_insight_events_suggestion_kind_presence_check',
+      sql`(${table.event_type} IN ('suggestion_created', 'suggestion_dismissed') AND ${table.suggestion_kind} IS NOT NULL) OR (${table.event_type} NOT IN ('suggestion_created', 'suggestion_dismissed') AND ${table.suggestion_kind} IS NULL)`
+    ),
+  ]
+);
+
+export type CostInsightEvent = typeof cost_insight_events.$inferSelect;
+export type NewCostInsightEvent = typeof cost_insight_events.$inferInsert;
+
+export const cost_insight_owner_states = pgTable(
+  'cost_insight_owner_states',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    owned_by_user_id: text().references(() => kilocode_users.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    owned_by_organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    last_evaluated_at: timestamp({ withTimezone: true, mode: 'string' }),
+    active_anomaly_event_id: uuid().references(() => cost_insight_events.id, {
+      onDelete: 'set null',
+    }),
+    active_anomaly_episode_id: uuid(),
+    active_anomaly_hour_start: timestamp({ withTimezone: true, mode: 'string' }),
+    active_anomaly_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
+    active_anomaly_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    threshold_crossing_active: boolean().default(false).notNull(),
+    active_threshold_event_id: uuid().references(() => cost_insight_events.id, {
+      onDelete: 'set null',
+    }),
+    active_threshold_episode_id: uuid(),
+    threshold_crossing_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    active_threshold_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
+    threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_7_day_threshold_crossing_active: boolean().default(false).notNull(),
+    active_rolling_7_day_threshold_event_id: uuid().references(() => cost_insight_events.id, {
+      onDelete: 'set null',
+    }),
+    active_rolling_7_day_threshold_episode_id: uuid(),
+    rolling_7_day_threshold_crossing_started_at: timestamp({
+      withTimezone: true,
+      mode: 'string',
+    }),
+    active_rolling_7_day_threshold_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
+    rolling_7_day_threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_7_day_threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_30_day_threshold_crossing_active: boolean().default(false).notNull(),
+    active_rolling_30_day_threshold_event_id: uuid().references(() => cost_insight_events.id, {
+      onDelete: 'set null',
+    }),
+    active_rolling_30_day_threshold_episode_id: uuid(),
+    rolling_30_day_threshold_crossing_started_at: timestamp({
+      withTimezone: true,
+      mode: 'string',
+    }),
+    active_rolling_30_day_threshold_snapshot: jsonb().$type<CostInsightEventSnapshot>(),
+    rolling_30_day_threshold_reviewed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    rolling_30_day_threshold_recovered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_owner_states_user')
+      .on(table.owned_by_user_id)
+      .where(isNull(table.owned_by_organization_id)),
+    uniqueIndex('UQ_cost_insight_owner_states_org')
+      .on(table.owned_by_organization_id)
+      .where(isNull(table.owned_by_user_id)),
+    index('IDX_cost_insight_owner_states_unreviewed_user')
+      .on(table.owned_by_user_id, table.updated_at)
+      .where(
+        sql`${table.owned_by_user_id} IS NOT NULL AND ((${table.active_anomaly_episode_id} IS NOT NULL AND ${table.active_anomaly_reviewed_at} IS NULL) OR (${table.active_threshold_episode_id} IS NOT NULL AND ${table.threshold_reviewed_at} IS NULL) OR (${table.active_rolling_7_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL) OR (${table.active_rolling_30_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL))`
+      ),
+    index('IDX_cost_insight_owner_states_unreviewed_org')
+      .on(table.owned_by_organization_id, table.updated_at)
+      .where(
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ((${table.active_anomaly_episode_id} IS NOT NULL AND ${table.active_anomaly_reviewed_at} IS NULL) OR (${table.active_threshold_episode_id} IS NOT NULL AND ${table.threshold_reviewed_at} IS NULL) OR (${table.active_rolling_7_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL) OR (${table.active_rolling_30_day_threshold_episode_id} IS NOT NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL))`
+      ),
+    check(
+      'cost_insight_owner_states_owner_check',
+      sql`(${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)`
+    ),
+    check(
+      'cost_insight_owner_states_anomaly_hour_check',
+      sql`${table.active_anomaly_hour_start} IS NULL OR ${table.active_anomaly_hour_start} = date_trunc('hour', ${table.active_anomaly_hour_start}, 'UTC')`
+    ),
+    check(
+      'cost_insight_owner_states_threshold_active_check',
+      sql`${table.threshold_crossing_active} = TRUE OR (${table.active_threshold_event_id} IS NULL AND ${table.active_threshold_episode_id} IS NULL AND ${table.threshold_crossing_started_at} IS NULL AND ${table.active_threshold_snapshot} IS NULL AND ${table.threshold_reviewed_at} IS NULL)`
+    ),
+    check(
+      'cost_insight_owner_states_7_day_threshold_active_check',
+      sql`${table.rolling_7_day_threshold_crossing_active} = TRUE OR (${table.active_rolling_7_day_threshold_event_id} IS NULL AND ${table.active_rolling_7_day_threshold_episode_id} IS NULL AND ${table.rolling_7_day_threshold_crossing_started_at} IS NULL AND ${table.active_rolling_7_day_threshold_snapshot} IS NULL AND ${table.rolling_7_day_threshold_reviewed_at} IS NULL)`
+    ),
+    check(
+      'cost_insight_owner_states_30_day_threshold_active_check',
+      sql`${table.rolling_30_day_threshold_crossing_active} = TRUE OR (${table.active_rolling_30_day_threshold_event_id} IS NULL AND ${table.active_rolling_30_day_threshold_episode_id} IS NULL AND ${table.rolling_30_day_threshold_crossing_started_at} IS NULL AND ${table.active_rolling_30_day_threshold_snapshot} IS NULL AND ${table.rolling_30_day_threshold_reviewed_at} IS NULL)`
+    ),
+  ]
+);
+
+export type CostInsightOwnerState = typeof cost_insight_owner_states.$inferSelect;
+export type NewCostInsightOwnerState = typeof cost_insight_owner_states.$inferInsert;
+
+export const cost_insight_notification_deliveries = pgTable(
+  'cost_insight_notification_deliveries',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    event_id: uuid()
+      .notNull()
+      .references(() => cost_insight_events.id, { onDelete: 'cascade' }),
+    recipient_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    channel: text().default('email').notNull(),
+    status: text().$type<CostInsightNotificationStatus>().default('pending').notNull(),
+    attempt_count: integer().default(0).notNull(),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    failed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error_redacted: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_cost_insight_notification_deliveries_event_recipient_channel').on(
+      table.event_id,
+      table.recipient_user_id,
+      table.channel
+    ),
+    index('IDX_cost_insight_notification_deliveries_claim').on(
+      table.status,
+      table.next_attempt_at,
+      table.id
+    ),
+    index('IDX_cost_insight_notification_deliveries_event').on(table.event_id),
+    check('cost_insight_notification_deliveries_channel_check', sql`${table.channel} = 'email'`),
+    enumCheck(
+      'cost_insight_notification_deliveries_status_check',
+      table.status,
+      CostInsightNotificationStatus
+    ),
+    check(
+      'cost_insight_notification_deliveries_attempt_count_check',
+      sql`${table.attempt_count} >= 0`
+    ),
+    check(
+      'cost_insight_notification_deliveries_terminal_check',
+      sql`(${table.status} = 'sent' AND ${table.sent_at} IS NOT NULL) OR (${table.status} <> 'sent' AND ${table.sent_at} IS NULL)`
+    ),
+    check(
+      'cost_insight_notification_deliveries_failure_check',
+      sql`(${table.status} = 'failed' AND ${table.failed_at} IS NOT NULL) OR (${table.status} <> 'failed' AND ${table.failed_at} IS NULL)`
+    ),
+  ]
+);
+
+export type CostInsightNotificationDelivery =
+  typeof cost_insight_notification_deliveries.$inferSelect;
+export type NewCostInsightNotificationDelivery =
+  typeof cost_insight_notification_deliveries.$inferInsert;
 
 export const organization_memberships = pgTable(
   'organization_memberships',

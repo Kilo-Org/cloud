@@ -16,6 +16,7 @@ import { execFileSync as nodeExecFileSync } from 'node:child_process';
 import {
   generateBaseConfig,
   ensureInboundEmailHookFlags,
+  pruneUninstalledKilocodeProviderPath,
   sanitizeLegacyStreamChatConfig,
   writeBaseConfig,
   writeMcporterConfig,
@@ -825,6 +826,16 @@ function sanitizeExistingConfigBeforeDoctor(deps: BootstrapDeps): void {
   sanitizeLegacyStreamChatConfig(parsed);
   let snapshot = JSON.stringify(parsed);
   if (snapshot !== initial) applied.push('streamChat');
+
+  // Prune a stale kilocode-provider plugin path when the running openclaw does
+  // not ship the externalized plugin (< 2026.6.9). Must run BEFORE doctor:
+  // doctor validates the persisted config and a missing plugin path fails
+  // validation, aborting bootstrap into degraded mode before generateBaseConfig
+  // (the steady-state guard) can rewrite the config.
+  pruneUninstalledKilocodeProviderPath(parsed, deps.existsSync);
+  const afterKilocode = JSON.stringify(parsed);
+  if (afterKilocode !== snapshot) applied.push('kilocodeProviderPath');
+  snapshot = afterKilocode;
 
   ensureInboundEmailHookFlags(parsed);
   const final = JSON.stringify(parsed);

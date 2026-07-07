@@ -2658,7 +2658,7 @@ export const organizations = pgTable(
     plan: text().$type<OrganizationPlan>().notNull().default('teams'),
     free_trial_end_at: timestamp({ withTimezone: true, mode: 'string' }),
     company_domain: text(),
-    slug: text().unique(),
+    slug: text(),
   },
   table => [
     check('organizations_name_not_empty_check', sql`length(trim(${table.name})) > 0`),
@@ -2670,6 +2670,7 @@ export const organizations = pgTable(
       'organizations_not_parented_by_self_check',
       sql`${table.parent_organization_id} IS NULL OR ${table.parent_organization_id} <> ${table.id}`
     ),
+    uniqueIndex('organizations_slug_unique').on(table.slug),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
     index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
   ]

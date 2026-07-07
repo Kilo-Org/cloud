@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
-import { KeyRound, LifeBuoy, Lock, LogOut, Trash2 } from 'lucide-react-native';
+import { GitPullRequest, KeyRound, LifeBuoy, Lock, LogOut, Trash2 } from 'lucide-react-native';
 import { Alert, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import { NotificationsCard } from '@/components/notifications-card';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -120,6 +121,22 @@ export function ProfileScreen() {
       >
         {/* Credits */}
         <CreditsCard orgs={orgs} enabled={isAuthenticated} />
+
+        {/* Code Reviewer */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Agents
+          </Text>
+          <ConfigureRow
+            icon={GitPullRequest}
+            title="Code Reviewer"
+            subtitle="Automatic PR reviews"
+            last
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/code-reviewer' as Href);
+            }}
+          />
+        </View>
 
         {/* Linked accounts */}
         <Animated.View className="mt-6 gap-3" layout={LinearTransition}>

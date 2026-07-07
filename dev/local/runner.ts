@@ -14,6 +14,7 @@ import {
   breakPane,
   countPanes,
   findServicePane,
+  paneHasRunningChild,
   selectPane,
   setPaneTitle,
   setMainLeftLayout,
@@ -277,24 +278,103 @@ export function showGroupInTmux(
   }
 }
 
-export function restartServiceInTmux(sessionName: string, serviceName: string): void {
+export type RestartOutcome =
+  // Relaunch command sent to the service's (now idle) shell.
+  | 'relaunched'
+  // Pane closed with the process; the service window was recreated.
+  | 'recreated'
+  // Old process refused to die within the deadline; nothing relaunched.
+  | 'gave-up'
+  // No pane for this service (not running), or infra service.
+  | 'not-running'
+  // A newer restart of the same service took over this poll.
+  | 'superseded';
+
+// In-flight restart polls keyed by `session:service`. A repeated restart
+// (e.g. a second keypress in the dashboard) must cancel the previous poll:
+// two concurrent polls would each relaunch, and the slower one would treat
+// the freshly started service as "still shutting down" and interrupt it.
+const inFlightRestarts = new Map<string, () => void>();
+
+export function restartServiceInTmux(
+  sessionName: string,
+  serviceName: string
+): Promise<RestartOutcome> {
   const svc = getService(serviceName);
-  if (svc.type === 'infra') return;
+  if (svc.type === 'infra') return Promise.resolve('not-running');
   const cmd = buildStartCommand(serviceName);
-  // Find the service wherever it lives (own window or joined into window 0)
+  // Find the service wherever it lives (own window or joined into window 0).
+  // Bail before touching the in-flight map: if the pane is already gone, a
+  // previous restart's poll may be mid-recreate and must not be cancelled.
   const pane = findServicePane(sessionName, serviceName);
-  if (!pane) return;
+  if (!pane) return Promise.resolve('not-running');
+  const restartKey = `${sessionName}:${serviceName}`;
+  inFlightRestarts.get(restartKey)?.();
   sendInterrupt(sessionName, pane.windowIndex, pane.paneIndex);
-  setTimeout(() => {
-    const currentPane = findServicePane(sessionName, serviceName);
-    if (!currentPane) return;
-    try {
-      sendKeys(sessionName, currentPane.windowIndex, cmd, currentPane.paneIndex);
-    } catch {
-      // The dashboard may have moved or closed the pane after we resolved it.
-      // Keep the TUI alive; the next explicit restart/view action can retry.
-    }
-  }, 1000);
+  // Poll until the old process is actually gone before relaunching. A fixed
+  // delay is not enough: slow-shutdown services (wrangler with containers
+  // takes 10s+ on SIGINT) are still in the foreground when the relaunch
+  // keystrokes arrive, which feeds the command into the dying process's
+  // stdin instead of the shell and leaves the service stopped.
+  const POLL_MS = 500;
+  const ESCALATE_AT_MS = 15_000; // second SIGINT for shutdowns stuck on children
+  const GIVE_UP_AT_MS = 60_000;
+  return new Promise<RestartOutcome>(resolve => {
+    let elapsed = 0;
+    let escalated = false;
+    const settle = (outcome: RestartOutcome) => {
+      clearInterval(timer);
+      if (inFlightRestarts.get(restartKey) === cancel) inFlightRestarts.delete(restartKey);
+      resolve(outcome);
+    };
+    const cancel = () => settle('superseded');
+    inFlightRestarts.set(restartKey, cancel);
+    const timer = setInterval(() => {
+      elapsed += POLL_MS;
+      const currentPane = findServicePane(sessionName, serviceName);
+      if (!currentPane) {
+        // The pane can close together with the process (SIGINT kills the
+        // non-interactive wrapper shell before its `exec $SHELL` runs, and
+        // tmux closes a pane when its process exits). Recreate the service
+        // window instead of leaving the service stopped after reporting
+        // "Restarted"; the new window inherits the tmux session environment.
+        try {
+          startServiceInTmux(sessionName, serviceName);
+          settle('recreated');
+        } catch {
+          // Same policy as below: keep the TUI alive; the next explicit
+          // restart/view action can retry.
+          settle('gave-up');
+        }
+        return;
+      }
+      if (paneHasRunningChild(sessionName, currentPane)) {
+        if (elapsed >= GIVE_UP_AT_MS) {
+          // Refuses to die — typing into it would only feed its stdin.
+          settle('gave-up');
+        } else if (!escalated && elapsed >= ESCALATE_AT_MS) {
+          // Mirror a human's second ctrl-c: wrangler and friends force-quit
+          // on a repeated interrupt when a graceful shutdown hangs.
+          escalated = true;
+          try {
+            sendInterrupt(sessionName, currentPane.windowIndex, currentPane.paneIndex);
+          } catch {
+            // Pane may vanish between the check and the signal; next tick
+            // handles it via the recreate branch.
+          }
+        }
+        return;
+      }
+      try {
+        sendKeys(sessionName, currentPane.windowIndex, cmd, currentPane.paneIndex);
+        settle('relaunched');
+      } catch {
+        // The dashboard may have moved or closed the pane after we resolved it.
+        // Keep the TUI alive; the next explicit restart/view action can retry.
+        settle('gave-up');
+      }
+    }, POLL_MS);
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 /* eslint-disable id-length, import/no-nodejs-modules, max-lines, no-await-in-loop, promise/avoid-new, promise/no-callback-in-promise, promise/prefer-await-to-callbacks */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { dirname, resolve as resolvePath } from 'node:path';
@@ -11,7 +12,13 @@ import firefox from 'selenium-webdriver/firefox';
 import { z } from 'zod';
 
 const extensionRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), '../..');
-const firefoxZipPath = resolvePath(extensionRoot, '.output/kilo-extension-0.0.0-firefox.zip');
+const packageManifest = z
+  .object({ version: z.string().min(1) })
+  .parse(JSON.parse(readFileSync(resolvePath(extensionRoot, 'package.json'), 'utf8')));
+const firefoxZipPath = resolvePath(
+  extensionRoot,
+  `.output/kilo-extension-${packageManifest.version}-firefox.zip`
+);
 const waitMs = 15_000;
 
 const chromeWorkflowNames = [
@@ -472,7 +479,7 @@ const waitForTextGone = async (driver: WebDriver, text: string): Promise<void> =
 
 const findManifestUrl = async (driver: WebDriver): Promise<string> => {
   await driver.get('about:debugging#/runtime/this-firefox');
-  await waitForText(driver, 'Kilo Extension');
+  await waitForText(driver, 'Kilo Code');
 
   const bodyText = await getBodyText(driver);
   const manifestMatch = /Manifest URL\s+(moz-extension:\/\/\S+\/manifest\.json)/u.exec(bodyText);
@@ -1391,6 +1398,7 @@ const scenarios: FirefoxScenario[] = [
                 throw new Error('Agent conversation pane was not found.');
               }
 
+              conversation.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 4000 }));
               conversation.scrollTop = conversation.scrollHeight;
               conversation.dispatchEvent(new Event('scroll', { bubbles: true }));
             });

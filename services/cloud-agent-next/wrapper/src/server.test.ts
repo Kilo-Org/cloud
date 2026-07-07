@@ -10,6 +10,7 @@ import {
   type WrapperServer,
 } from './server';
 import type { WrapperKiloClient, WrapperPty, WrapperPtySize } from './kilo-api';
+import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
 
 type PtyCall = {
   cwd: string;
@@ -121,7 +122,7 @@ describe('session readiness errors', () => {
           code: 'WORKSPACE_SETUP_FAILED',
           subtype: 'git_clone_timeout',
           message: 'Repository clone timed out',
-          detail: 'termination timeout, elapsed 120000ms, output truncated',
+          detail: 'termination timeout, output truncated',
           retryable: true,
         },
       }),
@@ -156,7 +157,7 @@ describe('session readiness errors', () => {
       error: 'WORKSPACE_SETUP_FAILED',
       subtype: 'git_clone_timeout',
       message: 'Repository clone timed out',
-      detail: 'termination timeout, elapsed 120000ms, output truncated',
+      detail: 'termination timeout, output truncated',
       retryable: true,
     });
     expect(fetchHandler).toBeDefined();
@@ -179,7 +180,7 @@ describe('wrapper health', () => {
 });
 
 describe('wrapper PTY routes', () => {
-  it('creates a workspace PTY and applies the requested size', async () => {
+  it('creates a workspace PTY with the stable pnpm store and applies the requested size', async () => {
     const { fetchHandler, ptyCalls, resizeCalls } = createTestFetch();
 
     const response = await fetchHandler(
@@ -206,6 +207,7 @@ describe('wrapper PTY routes', () => {
         env: {
           PROMPT_COMMAND: "PS1='\\n\\W\\n\\$ '",
           PS1: '\\n\\W\\n\\$ ',
+          [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
         },
       },
     ]);

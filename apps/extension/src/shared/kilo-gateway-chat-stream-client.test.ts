@@ -122,6 +122,34 @@ describe('kilo gateway chat stream client', () => {
     });
   });
 
+  it('streams remote MCP tool call deltas', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_mcp_1","type":"function","function":{"name":"mcp_fixture-mcp_get_weather","arguments":"{\\"city\\":\\"Skopje\\"}"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'What is the weather?', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [],
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: { city: 'Skopje' },
+          id: 'call_mcp_1',
+          name: 'mcp_fixture-mcp_get_weather',
+        },
+      ],
+    });
+  });
+
   it('streams viewport screenshot tool call deltas', async () => {
     const fetch: FetchLike = () =>
       streamResponse([

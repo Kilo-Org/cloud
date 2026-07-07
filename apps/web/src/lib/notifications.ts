@@ -33,11 +33,39 @@ export type KiloNotification = {
   showIn?: ('extension' | 'extension-native' | 'cli')[];
   // ISO 8601 timestamp after which this notification should no longer be shown
   expiresAt?: string;
+  // When true, only show to the legacy ("Roo-based") Kilo Code extension, identified by
+  // its axios User-Agent. Used to target end-of-life notices at legacy-extension users.
+  showOnlyOnLegacyExtension?: boolean;
 };
+
+/**
+ * Decide whether a legacy-targeted notification should be shown to a client.
+ * Notifications flagged showOnlyOnLegacyExtension are shown only when the request
+ * came from the legacy extension (detected via its axios User-Agent).
+ */
+export function passesLegacyExtensionGate(
+  notification: Pick<KiloNotification, 'showOnlyOnLegacyExtension'>,
+  isLegacyExtension: boolean
+): boolean {
+  if (!notification.showOnlyOnLegacyExtension) return true;
+  return isLegacyExtension;
+}
 
 const normalUnconditionalNotifications: KiloNotification[] = [
   //If you need to check or personalize the notification, see examples at the bottom of this file
   //if you just want a simple straightforward global message, add it here.
+  {
+    id: 'legacy-upgrade-june-2026',
+    title: 'Kilo Code 5.x: End of Life July 31, 2026',
+    message:
+      'Kilo Code extension version 5.x reaches end of life on July 31, 2026. After that date, it will no longer receive updates, bug fixes, or security patches. Upgrade to the latest version for continued support.',
+    action: {
+      actionText: 'See End of Life Notice',
+      actionURL: 'https://github.com/Kilo-Org/kilocode-legacy#legacy-ide-extensions-end-of-life',
+    },
+    showIn: ['extension'],
+    showOnlyOnLegacyExtension: true,
+  },
   {
     id: 'star-giveaway-june-2026',
     title: 'GitHub Star Giveaway',
@@ -113,7 +141,10 @@ const normalUnconditionalNotifications: KiloNotification[] = [
   },
 ];
 
-export async function generateUserNotifications(user: User): Promise<KiloNotification[]> {
+export async function generateUserNotifications(
+  user: User,
+  { isLegacyExtension = false }: { isLegacyExtension?: boolean } = {}
+): Promise<KiloNotification[]> {
   // Pre-fetch shared data once to avoid duplicate DB queries across generators.
   // This eliminates ~5 redundant queries per request (2× userHasOrganizations,
   // 3× getUserOrganizationsWithSeats, 2× getBalanceForUser → 1+1 queries).
@@ -147,9 +178,11 @@ export async function generateUserNotifications(user: User): Promise<KiloNotific
   ).flat();
 
   const now = new Date();
-  return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications].filter(
-    n => !n.expiresAt || new Date(n.expiresAt) > now
-  );
+  return [...resolvedConditionalNotifications, ...normalUnconditionalNotifications].filter(n => {
+    if (n.expiresAt && new Date(n.expiresAt) <= now) return false;
+    if (!passesLegacyExtensionGate(n, isLegacyExtension)) return false;
+    return true;
+  });
 }
 
 async function generateLowCreditNotification(

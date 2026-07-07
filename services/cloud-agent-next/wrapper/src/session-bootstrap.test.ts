@@ -6,6 +6,8 @@ import path from 'node:path';
 import {
   materializePromptAttachments,
   prepareWrapperBootstrapWorkspace,
+  RestoredWorkspaceReconciliationError,
+  workspaceBootstrapErrorCode,
   type WrapperBootstrapDeps,
 } from './session-bootstrap';
 import type {
@@ -13,6 +15,7 @@ import type {
   WrapperSessionReadyRequest,
 } from '../../src/shared/wrapper-bootstrap';
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
+import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
 
 function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyRequest> = {}) {
   const request: WrapperSessionReadyRequest = {
@@ -38,6 +41,7 @@ function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyReque
       env: {
         HOME: path.join(tmpDir, 'home'),
         KILOCODE_TOKEN: 'kilo-token',
+        [PNPM_STORE_ENV_VAR]: PNPM_STORE_DIR,
       },
       setupCommands: ['pnpm install'],
       runtimeSkills: [{ name: 'test-skill', rawMarkdown: '# Test Skill' }],
@@ -75,6 +79,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       HOME: process.env.HOME,
       KILOCODE_TOKEN: process.env.KILOCODE_TOKEN,
       GH_TOKEN: process.env.GH_TOKEN,
+      [PNPM_STORE_ENV_VAR]: process.env[PNPM_STORE_ENV_VAR],
     };
   });
 
@@ -738,7 +743,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     });
     expect(setupError.message).toBe('Setup command 1 failed');
     expect(setupError).toMatchObject({
-      detail: 'termination nonzero exit, exit code 1, elapsed 17ms, output truncated',
+      detail: 'termination nonzero exit, exit code 1, output truncated',
     });
     const projectedError = JSON.stringify(setupError);
     for (const sensitiveValue of [
@@ -1100,6 +1105,132 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       ['config', 'user.name', 'octocat'],
       ['config', 'user.email', '1+octocat@users.noreply.github.com'],
     ]);
+  });
+
+  it('reconciles a same-commit restored workspace before running every setup command', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.branchName = 'session/new';
+    request.workspace.upstreamBranch = 'feature/source';
+    request.workspace.restoredFromBackup = true;
+    request.materialized.setupCommands = ['prepare one', 'prepare two'];
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+    const events: string[] = [];
+
+    await prepareWrapperBootstrapWorkspace(request, undefined, {
+      git: async args => {
+        events.push(`git:${args.join(' ')}`);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      runProcess: async (command, args) => {
+        events.push(`process:${command} ${args.join(' ')}`);
+        expect(process.env.HOME).toBe(request.workspace.sessionHome);
+        expect(process.env.KILOCODE_TOKEN).toBe('kilo-token');
+        expect(process.env[PNPM_STORE_ENV_VAR]).toBe(PNPM_STORE_DIR);
+        expect(
+          fs.existsSync(path.join(request.workspace.sessionHome, '.local/share/kilo/auth.json'))
+        ).toBe(true);
+        expect(
+          fs.existsSync(path.join(request.workspace.sessionHome, '.kilocode/rules/cloud-agent.md'))
+        ).toBe(true);
+        expect(
+          fs.existsSync(
+            path.join(request.workspace.sessionHome, '.kilocode/skills/test-skill/SKILL.md')
+          )
+        ).toBe(true);
+        return { stdout: '', stderr: '', exitCode: 0 };
+      },
+      restoreSession: async () => ({
+        ok: true,
+        downloaded: false,
+        imported: true,
+        diffs: { applied: 0, skipped: 0, total: 0 },
+      }),
+    });
+
+    expect(events).toContain(
+      'git:remote set-url origin https://x-access-token:gh-token@github.com/acme/repo.git'
+    );
+    const fetchIndex = events.indexOf('git:fetch origin feature/source');
+    const checkoutIndex = events.indexOf('git:checkout -B session/new FETCH_HEAD');
+    const firstSetupIndex = events.indexOf('process:sh -lc prepare one');
+    expect(fetchIndex).toBeGreaterThan(-1);
+    expect(checkoutIndex).toBeGreaterThan(fetchIndex);
+    expect(firstSetupIndex).toBeGreaterThan(checkoutIndex);
+    expect(events.filter(event => event.startsWith('process:'))).toEqual([
+      'process:sh -lc prepare one',
+      'process:sh -lc prepare two',
+    ]);
+  });
+
+  it('keeps restored workspace setup failures as ordinary setup failures', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.restoredFromBackup = true;
+    await fsp.mkdir(path.join(request.workspace.workspacePath, '.git'), { recursive: true });
+
+    let setupError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args.join(' ') === 'ls-remote --symref origin HEAD') {
+            return { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '', exitCode: 0 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        runProcess: async () => ({ stdout: '', stderr: 'install failed', exitCode: 17 }),
+        restoreSession: async () => ({
+          ok: true,
+          downloaded: false,
+          imported: true,
+          diffs: { applied: 0, skipped: 0, total: 0 },
+        }),
+      });
+    } catch (error) {
+      setupError = error;
+    }
+
+    expect(setupError).toBeInstanceOf(Error);
+    expect(setupError).not.toBeInstanceOf(RestoredWorkspaceReconciliationError);
+    expect(workspaceBootstrapErrorCode(setupError)).toBe('WORKSPACE_SETUP_FAILED');
+    expect((setupError as Error).message).toContain('Setup command 1 failed');
+  });
+
+  it('classifies restored workspace reconciliation failures before setup', async () => {
+    const request = makeRequest(tmpDir);
+    request.workspace.restoredFromBackup = true;
+    await createCompleteGitWorkspace(request.workspace.workspacePath);
+    let setupRan = false;
+
+    let reconciliationError: unknown;
+    try {
+      await prepareWrapperBootstrapWorkspace(request, undefined, {
+        git: async args => {
+          if (args.join(' ') === 'ls-remote --symref origin HEAD') {
+            return { stdout: 'ref: refs/heads/main\tHEAD\n', stderr: '', exitCode: 0 };
+          }
+          if (args.join(' ') === 'fetch origin main') {
+            return { stdout: '', stderr: 'remote unavailable', exitCode: 1 };
+          }
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+        runProcess: async () => {
+          setupRan = true;
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+      });
+    } catch (error) {
+      reconciliationError = error;
+    }
+
+    expect(reconciliationError).toBeInstanceOf(RestoredWorkspaceReconciliationError);
+    expect(workspaceBootstrapErrorCode(reconciliationError)).toBe(
+      'WORKSPACE_RECONCILIATION_FAILED'
+    );
+    expect((reconciliationError as Error).message).toBe(
+      'Failed to fetch authoritative remote state'
+    );
+    expect(setupRan).toBe(false);
+    expect(fs.existsSync(request.workspace.workspacePath)).toBe(false);
+    expect(fs.existsSync(request.workspace.sessionHome)).toBe(false);
   });
 
   it('appends downloaded attachments to existing prompt parts', async () => {

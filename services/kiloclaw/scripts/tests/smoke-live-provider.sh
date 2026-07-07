@@ -42,6 +42,15 @@ Options:
 Optional version assertions:
   EXPECTED_VERSION_AFTER   Expected OpenClaw version for the candidate/final image.
   EXPECTED_VERSION_BEFORE  Expected OpenClaw version for --upgrade baseline image.
+
+Optional GitHub gh-auth persistence check (assert_github_gh_auth):
+  GITHUB_SMOKE_TOKEN       Disposable GitHub PAT. When set, the smoke boots with
+                           GitHub configured and asserts gh auth still works with
+                           GITHUB_TOKEN/GH_TOKEN stripped from the exec env
+                           (i.e. from the persisted credential store, matching
+                           how the agent actually runs). Skipped when unset.
+  GITHUB_SMOKE_USERNAME    GitHub username (default: kilo-smoke).
+  GITHUB_SMOKE_EMAIL       GitHub email (default: kilo-smoke@example.com).
 EOF
 }
 
@@ -120,6 +129,12 @@ start_container() {
   )
   if [ -n "${KILOCODE_ORGANIZATION_ID:-}" ]; then
     docker_env+=(-e KILOCODE_ORGANIZATION_ID)
+  fi
+  # Optional GitHub credential for the gh-auth persistence check (assert_github_gh_auth).
+  if [ -n "${GITHUB_SMOKE_TOKEN:-}" ]; then
+    docker_env+=(-e GITHUB_TOKEN="$GITHUB_SMOKE_TOKEN")
+    docker_env+=(-e GITHUB_USERNAME="${GITHUB_SMOKE_USERNAME:-kilo-smoke}")
+    docker_env+=(-e GITHUB_EMAIL="${GITHUB_SMOKE_EMAIL:-kilo-smoke@example.com}")
   fi
   CID=$(docker run -d --rm \
     -p "127.0.0.1:${PORT}:18789" \
@@ -260,11 +275,13 @@ print(json.dumps({
 PY
   )
 
+  # openclaw writes the --json payload to stdout and logs to stderr; drop stderr
+  # (it can contain provider/credential detail) so the parsed value is pure JSON.
   if ! output=$(docker exec "$CID" openclaw gateway call agent \
     --params "$params" \
     --expect-final \
     --timeout 240000 \
-    --json 2>&1); then
+    --json 2>/dev/null); then
     check "live Auto Free agent turn" "nonce returned" "command failed"
     echo "  Gateway output suppressed because provider errors can contain live credentials."
     return
@@ -288,6 +305,141 @@ print("nonce returned")
     check "live Auto Free agent turn" "nonce returned" "unexpected response"
     echo "  details: $parsed"
     echo "  Gateway output suppressed because provider responses can contain sensitive data."
+  fi
+}
+
+assert_kilocode_provider_loaded() {
+  # Guards Fix 1 (openclaw #93470): the kilocode provider was externalized out of
+  # openclaw core into @openclaw/kilocode-provider, installed by the Dockerfile and
+  # wired in via plugins.load.paths by config-writer. The keyless image-check only
+  # proves the package is installed; this proves it is actually present in the
+  # RUNNING config and loaded by the gateway — i.e. model routing won't silently die.
+  # Guard the read: if openclaw.json is missing/unreadable/invalid (the very
+  # regression this guards), the embedded python exits non-zero. Testing it in an
+  # `if` keeps `set -e` from aborting the whole run so it fails cleanly here.
+  local path_present
+  if ! path_present=$(docker exec -i "$CID" python3 - <<'PY'
+import json
+from pathlib import Path
+doc = json.loads(Path('/root/.openclaw/openclaw.json').read_text())
+paths = (((doc.get('plugins') or {}).get('load') or {}).get('paths') or [])
+print('yes' if '/usr/local/lib/node_modules/@openclaw/kilocode-provider' in paths else 'no')
+PY
+  ); then
+    path_present="config unreadable"
+  fi
+  check "kilocode provider on plugins.load.paths" "yes" "$path_present"
+
+  # And confirm the gateway actually loaded it (openclaw writes JSON to stdout,
+  # logs to stderr which we drop). Capture the inspect output first so a non-zero
+  # exit (e.g. the provider missing — the very case this guards) surfaces as a
+  # clean FAIL instead of aborting the whole run under `set -euo pipefail`.
+  local raw
+  local status
+  if ! raw=$(docker exec "$CID" openclaw plugins inspect kilocode --json 2>/dev/null); then
+    check "kilocode provider plugin loaded" "loaded" "inspect failed"
+    return
+  fi
+  status=$(python3 -c 'import json,sys
+try:
+    print((json.load(sys.stdin).get("plugin") or {}).get("status") or "missing")
+except Exception:
+    print("unparseable")' <<< "$raw")
+  check "kilocode provider plugin loaded" "loaded" "$status"
+}
+
+assert_kilocode_vision_capability() {
+  # Regression guard for the removed model-catalog-refresh workaround (was cloud
+  # #4054). That workaround wrote the gateway catalog into
+  # models.providers.kilocode.models so the image-capability gate saw vision
+  # modalities, because OpenClaw <2026.6.9 could skip runtime discovery for a
+  # refreshable catalog (openclaw #93775). openclaw #93786 (in 2026.6.9) fixes
+  # that, so on the candidate the kilocode catalog must advertise image input
+  # from NATIVE discovery alone. An "available" kilocode model with image input
+  # proves discovery repopulated capability metadata without the workaround.
+  local output
+  local result="pending"
+
+  for _ in $(seq 1 60); do
+    output=$(docker exec "$CID" openclaw models list --provider kilocode --all --json 2>/dev/null || true)
+    result=$(python3 -c '
+import json, sys
+
+# openclaw writes the --json catalog to stdout and logs to stderr (dropped via
+# 2>/dev/null above), so stdout is pure JSON. The `docker exec ... || true` above
+# can still yield empty/non-JSON output while the catalog is warming up, so treat
+# that as a retriable "no-catalog" (exit 0) rather than letting json.load raise
+# and abort the whole poll under `set -euo pipefail`.
+raw = sys.stdin.read().strip()
+if not raw:
+    print("no-catalog"); raise SystemExit(0)
+try:
+    data = json.loads(raw)
+except json.JSONDecodeError:
+    print("no-catalog"); raise SystemExit(0)
+models = data.get("models", data) if isinstance(data, dict) else data
+if not isinstance(models, list):
+    print("no-catalog"); raise SystemExit(0)
+
+def is_kilocode(m):
+    return str(m.get("key", "")).startswith("kilocode/") or m.get("provider") == "kilocode"
+
+def has_image(m):
+    inp = m.get("input")
+    if isinstance(inp, str):
+        return "image" in inp
+    if isinstance(inp, (list, tuple)):
+        return "image" in inp
+    return False
+
+kc = [m for m in models if isinstance(m, dict) and is_kilocode(m)]
+if any(has_image(m) and m.get("available") is True for m in kc):
+    print("image-capable")
+elif any(has_image(m) for m in kc):
+    print("image-capable-unavailable")
+elif kc:
+    print("text-only")
+else:
+    print("no-kilocode-models")
+' <<< "$output")
+    if [ "$result" = "image-capable" ]; then
+      break
+    fi
+    sleep 1
+  done
+
+  check "kilocode native vision capability (post-#4054-revert)" "image-capable" "$result"
+}
+
+# Verifies the agent can still use GitHub after bootstrap even though OpenClaw
+# strips GITHUB_TOKEN/GH_TOKEN from the agent's tool-exec environment
+# (host-env-security policy). The controller must persist credentials to gh's
+# on-disk store (~/.config/gh/hosts.yml on the /root volume); if it relied only
+# on the inherited env var, `gh`/`git` would be unauthenticated in the agent's
+# stripped shell — the exact regression that silently broke live instances.
+#
+# Gated on GITHUB_SMOKE_TOKEN (a disposable PAT + matching username/email) since
+# it needs a real GitHub credential to complete `gh auth login`.
+assert_github_gh_auth() {
+  if [ -z "${GITHUB_SMOKE_TOKEN:-}" ]; then
+    echo "SKIP: GitHub gh-auth check (set GITHUB_SMOKE_TOKEN to enable)"
+    return 0
+  fi
+
+  # 1) Bootstrap must have written gh's credential store to the volume.
+  if docker exec "$CID" sh -c '[ -f /root/.config/gh/hosts.yml ]'; then
+    check "gh credentials persisted to hosts.yml" "1" "1"
+  else
+    check "gh credentials persisted to hosts.yml" "1" "0"
+  fi
+
+  # 2) The decisive check: gh must authenticate with the token vars stripped
+  #    from the environment — reproducing the agent's real exec context. This
+  #    fails if the controller never persisted creds (env-conflict regression).
+  if docker exec "$CID" env -u GITHUB_TOKEN -u GH_TOKEN gh auth status >/dev/null 2>&1; then
+    check "gh auth status ok with token env stripped" "1" "1"
+  else
+    check "gh auth status ok with token env stripped" "1" "0"
   fi
 }
 
@@ -316,8 +468,15 @@ run_phase() {
     assert_app_config_patch "$CID" "$PORT" "$TOKEN"
     assert_app_config_agent_defaults "$CID" "$PORT" "$TOKEN"
     assert_app_config_agents_crud "$CID" "$PORT" "$TOKEN"
+    # Candidate only: confirm the externalized kilocode provider is wired into the
+    # running config and loaded by the gateway (model routing depends on it).
+    assert_kilocode_provider_loaded
+    # Candidate only: prove the removed #4054 catalog-refresh workaround is no
+    # longer needed — native discovery must supply kilocode image capability.
+    assert_kilocode_vision_capability
   fi
   assert_exec_approvals_seeded "$CID"
+  assert_github_gh_auth
   echo
   echo "--- live Auto Free agent turn ---"
   assert_live_agent_turn

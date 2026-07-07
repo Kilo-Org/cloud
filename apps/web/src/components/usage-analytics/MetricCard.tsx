@@ -3,7 +3,7 @@ import type { ReactNode, ComponentType } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { BackgroundChart } from '@/components/organizations/usage-details/BackgroundChart';
+import { BackgroundChart } from './BackgroundChart';
 
 type MetricCardProps = {
   title: string;

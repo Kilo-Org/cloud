@@ -158,16 +158,33 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
       return;
     }
 
+    /*
+     * A downward user gesture arms a re-follow: handleScroll completes it once
+     * that gesture actually reaches the bottom. Requiring recorded intent is
+     * what stops the virtualizer's post-scroll-up re-measurement — which
+     * teleports scrollTop straight back to the bottom — from re-arming on its own.
+     */
+    let sawDownwardIntent = false;
     const handleWheel = (event: WheelEvent): void => {
-      if (event.deltaY < 0 && isScrollable(element)) {
+      if (!isScrollable(element)) {
+        return;
+      }
+
+      if (event.deltaY < 0) {
         releaseToManualScroll();
+      } else if (event.deltaY > 0) {
+        sawDownwardIntent = true;
       }
     };
     const handleKeyDown = (event: KeyboardEvent): void => {
-      const isUpwardKey = event.key === 'ArrowUp' || event.key === 'PageUp' || event.key === 'Home';
+      if (!isScrollable(element)) {
+        return;
+      }
 
-      if (isUpwardKey && isScrollable(element)) {
+      if (event.key === 'ArrowUp' || event.key === 'PageUp' || event.key === 'Home') {
         releaseToManualScroll();
+      } else if (event.key === 'ArrowDown' || event.key === 'PageDown' || event.key === 'End') {
+        sawDownwardIntent = true;
       }
     };
     let touchStartY = 0;
@@ -177,9 +194,15 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
     const handleTouchMove = (event: TouchEvent): void => {
       const currentY = event.touches[0]?.clientY ?? 0;
 
-      // A downward finger drag scrolls the content upward.
-      if (currentY > touchStartY + 2 && isScrollable(element)) {
+      if (!isScrollable(element)) {
+        return;
+      }
+
+      // A downward finger drag scrolls the content upward, an upward drag downward.
+      if (currentY > touchStartY + 2) {
         releaseToManualScroll();
+      } else if (currentY < touchStartY - 2) {
+        sawDownwardIntent = true;
       }
     };
     const handleScroll = (): void => {
@@ -187,13 +210,22 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
       const previousTop = lastScrollTopRef.current;
       lastScrollTopRef.current = currentTop;
 
-      // Backstop for gestures with no input event of their own, such as dragging the scrollbar: any move above the last pinned position is the user leaving the bottom. Re-arming is left to the jump button.
+      // Backstop for gestures with no input event of their own, such as dragging the scrollbar: any move above the last pinned position is the user leaving the bottom.
       if (
         currentTop < previousTop - 1 &&
         currentTop < lastPinnedTopRef.current - 1 &&
         !isScrolledToBottom(element)
       ) {
+        sawDownwardIntent = false;
         releaseToManualScroll();
+        return;
+      }
+
+      // Re-arm once a real downward gesture (not a virtualizer teleport) reaches the bottom. Reset the pin baseline to this bottom so the next content-growth pin does not read a stale-high lastPinned and mistake the growth gap for a scroll-up.
+      if (sawDownwardIntent && isScrolledToBottom(element)) {
+        sawDownwardIntent = false;
+        lastPinnedTopRef.current = currentTop;
+        followBottomAgain();
       }
     };
 
@@ -210,7 +242,7 @@ export const ConversationList = ({ items }: { items: GroupedConversationItem[] }
       element.removeEventListener('touchmove', handleTouchMove);
       element.removeEventListener('scroll', handleScroll);
     };
-  }, [releaseToManualScroll]);
+  }, [followBottomAgain, releaseToManualScroll]);
 
   useEffect(() => cancelPin, [cancelPin]);
 

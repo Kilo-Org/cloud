@@ -1,5 +1,5 @@
 'use client';
-import { AIAdoptionChart } from '@/components/organizations/usage-details/components/AIAdoptionChart';
+import { AIAdoptionChart } from './AIAdoptionChart';
 import { useOrganizationAIAdoptionTimeseries } from '@/app/api/organizations/hooks';
 import type { DateRange } from './hooks';
 

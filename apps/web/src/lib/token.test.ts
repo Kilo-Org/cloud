@@ -52,6 +52,7 @@ const mockUser: User = {
   account_deletion_requested_at: null,
   normalized_email: null,
   email_domain: null,
+  personal_account_disabled: false,
 };
 
 describe('Token Functions', () => {

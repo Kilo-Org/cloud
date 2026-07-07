@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
-import { coding_plan_key_inventory } from '@kilocode/db/schema';
+import { coding_plan_key_inventory, coding_plan_subscriptions } from '@kilocode/db/schema';
 
 export type ManualRevocationStatus = 'revocation_pending' | 'revocation_failed';
 
@@ -19,6 +19,7 @@ export async function listManualCredentialRevocations(input: {
     upstreamPlanId: string;
     status: ManualRevocationStatus;
     revocationRequestedAt: string | null;
+    subscriptionExpiresAt: string | null;
     revokedAt: string | null;
     revocationAttemptCount: number;
     lastRevocationError: string | null;
@@ -33,12 +34,17 @@ export async function listManualCredentialRevocations(input: {
       upstreamPlanId: coding_plan_key_inventory.upstream_plan_id,
       status: coding_plan_key_inventory.status,
       revocationRequestedAt: coding_plan_key_inventory.revocation_requested_at,
+      subscriptionExpiresAt: coding_plan_subscriptions.current_period_end,
       revokedAt: coding_plan_key_inventory.revoked_at,
       revocationAttemptCount: coding_plan_key_inventory.revocation_attempt_count,
       lastRevocationError: coding_plan_key_inventory.last_revocation_error,
       updatedAt: coding_plan_key_inventory.updated_at,
     })
     .from(coding_plan_key_inventory)
+    .leftJoin(
+      coding_plan_subscriptions,
+      eq(coding_plan_subscriptions.key_inventory_id, coding_plan_key_inventory.id)
+    )
     .where(
       and(
         input.status

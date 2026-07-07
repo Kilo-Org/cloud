@@ -87,7 +87,37 @@ async function fetchModels(organizationId: string | undefined): Promise<ModelRes
   }
 }
 
-// ── Hook ─────────────────────────────────────────────────────────────
+async function fetchOrgDefaults(organizationId: string): Promise<{ defaultModel: string }> {
+  const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  const response = await fetch(`${API_BASE_URL}/api/organizations/${organizationId}/defaults`, {
+    headers: {
+      Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch org defaults: ${response.status} ${response.statusText}`);
+  }
+  return (await response.json()) as { defaultModel: string };
+}
+
+// ── Hooks ────────────────────────────────────────────────────────────
+
+export function useOrgDefaultModel(organizationId: string | undefined) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['org-default-model', organizationId] as const,
+    queryFn: async () => {
+      if (!organizationId) {
+        throw new Error('Missing organizationId');
+      }
+      const defaults = await fetchOrgDefaults(organizationId);
+      return defaults;
+    },
+    enabled: Boolean(organizationId),
+    staleTime: 60_000,
+  });
+  return { defaultModel: data?.defaultModel, isLoading };
+}
 
 export function useAvailableModels(organizationId: string | undefined) {
   const { data, isLoading } = useQuery({

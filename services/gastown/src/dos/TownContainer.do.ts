@@ -122,3 +122,13 @@ export class TownContainerDO extends Container<Env> {
 export function getTownContainerStub(env: Env, townId: string) {
   return env.TOWN_CONTAINER.get(env.TOWN_CONTAINER.idFromName(townId));
 }
+
+/**
+ * Stable Cloudflare identity of a town's container: the TownContainerDO's
+ * Durable Object id (hex). This is the id Cloudflare support correlates a
+ * container instance by, and the same value TownContainerDO logs in its
+ * onStart/onStop/onError callbacks. Deterministic from townId, no I/O.
+ */
+export function getTownContainerDoId(env: Env, townId: string): string {
+  return env.TOWN_CONTAINER.idFromName(townId).toString();
+}

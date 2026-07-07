@@ -1,7 +1,14 @@
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import { errorShapeSchema } from './schemas';
-import type { TransportSendPayload } from './transport';
+import type { SendCommandPayload, SendPromptPayload, TransportSendPayload } from './transport';
+import { modelRefsEqual } from './remote-model-catalog';
+import type {
+  ModelRef,
+  ModelSelection,
+  RemoteModelOverride,
+  RemoteModelState,
+} from './remote-model-catalog';
 import { atom } from 'jotai';
 import type { Atom, WritableAtom } from 'jotai';
 import { createCloudAgentSession } from './session';
@@ -35,12 +42,15 @@ import type { UserWebConnection } from './user-web-connection';
 import { generateMessageId } from './message-id';
 import { findLatestContextUsage } from './context-usage';
 import type { ContextUsage } from './context-usage';
+import { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 type StoredMessage = { info: MessageInfo; parts: Part[] };
+type SessionManagerPromptPayload = Omit<SendPromptPayload, 'model'> & { model?: string };
+type SessionManagerSendPayload = SessionManagerPromptPayload | SendCommandPayload;
 type SessionStatusIndicator = {
   type: 'error' | 'warning' | 'info' | 'progress';
   message: string;
@@ -51,11 +61,13 @@ type SessionConfig = {
   repository: string;
   mode: string;
   model: string;
+  providerID?: string | null;
   variant?: string | null;
   /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
 };
 type ActiveSessionType = ResolvedSession['type'];
+type ObservedModelSource = 'session' | 'message' | 'catalog';
 type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
 type StandalonePermission = {
   requestId: string;
@@ -80,6 +92,12 @@ type ChildSessionHydrationState =
 const IDLE_CHILD_SESSION_HYDRATION_STATE = {
   status: 'idle',
 } satisfies ChildSessionHydrationState;
+
+const EMPTY_REMOTE_MODEL_STATE = {
+  ownerConnectionId: null,
+  protocol: 'unknown',
+  refresh: 'idle',
+} satisfies RemoteModelState;
 
 type AssociatedPrData = {
   url: string;
@@ -163,6 +181,10 @@ type SessionManagerAtoms = {
   isReadOnly: W<boolean>;
   /** Active resolved transport can deliver canonical Cloud Agent attachments. */
   supportsAttachments: W<boolean>;
+  activeSessionType: W<ActiveSessionType | null>;
+  remoteModelState: W<RemoteModelState>;
+  observedModel: W<ModelSelection | null>;
+  remoteModelOverride: W<RemoteModelOverride | null>;
   canSend: W<boolean>;
   canInterrupt: W<boolean>;
   statusIndicator: W<SessionStatusIndicator | null>;
@@ -177,6 +199,7 @@ type SessionManagerAtoms = {
   agentStatus: W<AgentStatus>;
   cloudStatus: W<CloudStatus | null>;
   sessionConfig: W<SessionConfig | null>;
+  sessionType: W<ActiveSessionType | null>;
   chatUI: W<{ shouldAutoScroll: boolean }>;
   permission: W<PermissionState | null>;
   suggestion: W<SuggestionState | null>;
@@ -198,10 +221,12 @@ type SessionManager = {
   switchSession(kiloSessionId: KiloSessionId): Promise<void>;
   hydrateChildSession(childSessionId: KiloSessionId): Promise<void>;
   send(input: {
-    payload: TransportSendPayload;
+    payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
     images?: Images;
   }): Promise<boolean>;
+  setRemoteModelOverride(override: RemoteModelOverride | null): void;
+  retryRemoteModels(): void;
   interrupt(): Promise<void>;
   answerQuestion(requestId: string, answers: string[][]): Promise<void>;
   rejectQuestion(requestId: string): Promise<void>;
@@ -306,6 +331,16 @@ function indicatorForStatus(s: AgentStatus): SessionStatusIndicator | null {
   return null;
 }
 
+function toModelSelection(model: ModelRef, variant?: string): ModelSelection {
+  return { model, ...(variant ? { variant } : {}) };
+}
+
+function modelSelectionsEqual(a: ModelSelection | null, b: ModelSelection | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return modelRefsEqual(a.model, b.model) && a.variant === b.variant;
+}
+
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
@@ -322,6 +357,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const isLoadingAtom = atom(false);
   const isReadOnlyAtom = atom(false);
   const supportsAttachmentsAtom = atom(false);
+  const activeSessionTypeAtom = atom<ActiveSessionType | null>(null);
+  const remoteModelStateAtom = atom<RemoteModelState>(EMPTY_REMOTE_MODEL_STATE);
+  const observedModelAtom = atom<ModelSelection | null>(null);
+  const remoteModelOverrideAtom = atom<RemoteModelOverride | null>(null);
   const canSendAtom = atom(false);
   const canInterruptAtom = atom(false);
   const statusIndicatorAtom = atom<SessionStatusIndicator | null>(null);
@@ -333,6 +372,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const agentStatusAtom = atom<AgentStatus>({ type: 'idle' });
   const cloudStatusAtom = atom<CloudStatus | null>(null);
   const sessionConfigAtom = atom<SessionConfig | null>(null);
+  const sessionTypeAtom = atom<ActiveSessionType | null>(null);
   const chatUIAtom = atom<{ shouldAutoScroll: boolean }>({ shouldAutoScroll: true });
   const activeQuestionAtom = atom<StandaloneQuestion | null>(null);
   const permissionAtom = atom<PermissionState | null>(null);
@@ -407,6 +447,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   let switchGeneration = 0;
   let currentSession: CloudAgentSession | null = null;
   let activeSessionType: ActiveSessionType | null = null;
+  let observedModelSource: ObservedModelSource | null = null;
+  // True while a connect/reconnect cycle is still replaying its message
+  // history; false once live events are flowing. See clearOverrideIfDiverged.
+  let remoteHistoryReplaying = true;
   let stateUnsub: (() => void) | null = null;
   let indicatorTimer: ReturnType<typeof setTimeout> | null = null;
   let childSessionHydrationGeneration = 0;
@@ -432,6 +476,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(isLoadingAtom, false);
     store.set(isReadOnlyAtom, false);
     store.set(supportsAttachmentsAtom, false);
+    store.set(activeSessionTypeAtom, null);
+    store.set(remoteModelStateAtom, EMPTY_REMOTE_MODEL_STATE);
+    store.set(observedModelAtom, null);
+    observedModelSource = null;
+    remoteHistoryReplaying = true;
+    store.set(remoteModelOverrideAtom, null);
     store.set(canSendAtom, false);
     store.set(canInterruptAtom, false);
     store.set(statusIndicatorAtom, null);
@@ -443,6 +493,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(agentStatusAtom, { type: 'idle' });
     store.set(cloudStatusAtom, null);
     store.set(sessionConfigAtom, null);
+    store.set(sessionTypeAtom, null);
     store.set(activeQuestionAtom, null);
     store.set(permissionAtom, null);
     store.set(activePermissionAtom, null);
@@ -527,6 +578,85 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  function updateCapabilityAtoms(session: CloudAgentSession): void {
+    const cloudStatus = store.get(cloudStatusAtom);
+    const cloudReady = cloudStatus === null || cloudStatus.type === 'ready';
+    store.set(canSendAtom, session.canSend && cloudReady);
+    store.set(canInterruptAtom, session.canInterrupt);
+  }
+
+  function updateObservedModel(model: ModelSelection, source: ObservedModelSource): void {
+    observedModelSource = source;
+    // Only churn the atom when the selection actually changes: the incoming
+    // object is freshly built on every message.updated, so a reference check
+    // never holds and would needlessly rebuild the whole model-options list.
+    if (!modelSelectionsEqual(store.get(observedModelAtom), model)) {
+      store.set(observedModelAtom, model);
+    }
+  }
+
+  // A web-picked override should stop applying once we see live proof the
+  // CLI actually ran a message on a different model or variant — otherwise
+  // the picker gets stuck showing a choice that's no longer what's being
+  // sent, and `send()` keeps re-applying a stale variant. Gated on
+  // `remoteHistoryReplaying` so a reconnect's replayed history (which can
+  // predate the override) can't wipe a selection that just hasn't been used
+  // yet.
+  function clearOverrideIfDiverged(model: ModelSelection): void {
+    if (remoteHistoryReplaying) return;
+    const override = store.get(remoteModelOverrideAtom);
+    if (override && !modelSelectionsEqual(override.selection, model)) {
+      store.set(remoteModelOverrideAtom, null);
+    }
+  }
+
+  function handleRemoteModelStateChange(state: RemoteModelState): void {
+    const previousOwnerConnectionId = store.get(remoteModelStateAtom).ownerConnectionId;
+    store.set(remoteModelStateAtom, state);
+
+    if (previousOwnerConnectionId !== state.ownerConnectionId) {
+      store.set(remoteModelOverrideAtom, null);
+      if (observedModelSource === 'catalog') {
+        observedModelSource = null;
+        store.set(observedModelAtom, null);
+      }
+    } else {
+      const override = store.get(remoteModelOverrideAtom);
+      const sourceMatchesProtocol =
+        (state.protocol === 'v1' && override?.source === 'cli-catalog') ||
+        (state.protocol === 'legacy' && override?.source === 'legacy-gateway');
+      const provider = state.catalog?.providers.find(
+        item => item.id === override?.selection.model.providerID
+      );
+      const catalogModel = provider?.models.find(
+        item => item.id === override?.selection.model.modelID
+      );
+      const modelMatchesProtocol =
+        state.protocol === 'v1'
+          ? catalogModel !== undefined
+          : state.protocol === 'legacy' && override?.selection.model.providerID === 'kilo';
+      if (override && (!sourceMatchesProtocol || !modelMatchesProtocol)) {
+        store.set(remoteModelOverrideAtom, null);
+      } else if (
+        override?.source === 'cli-catalog' &&
+        override.selection.variant &&
+        catalogModel &&
+        !catalogModel.variants.includes(override.selection.variant)
+      ) {
+        store.set(remoteModelOverrideAtom, {
+          source: 'cli-catalog',
+          selection: { model: override.selection.model },
+        });
+      }
+    }
+    if (
+      (observedModelSource === null || observedModelSource === 'catalog') &&
+      state.catalog?.currentModel
+    ) {
+      updateObservedModel(state.catalog.currentModel, 'catalog');
+    }
+  }
+
   function subscribeToServiceState(
     session: CloudAgentSession,
     opts?: { onFirstActivity?: () => void }
@@ -563,16 +693,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(sessionInfoAtom, session.state.getSessionInfo());
       store.set(pendingMessagesAtom, new Map(session.state.getPendingMessages()));
 
-      // canSend factors in cloud status: preparing/finalizing blocks input
-      const cloudReady = cs === null || cs.type === 'ready';
       // Only update read-only state after the transport has been resolved.
       // During the 'connecting' phase the transport is null so canSend is
       // always false, which would briefly flash a "read-only" banner.
       if (act.type !== 'connecting') {
-        store.set(isReadOnlyAtom, !session.canSend);
+        store.set(
+          isReadOnlyAtom,
+          activeSessionType === null ? !session.canSend : activeSessionType === 'read-only'
+        );
       }
-      store.set(canSendAtom, session.canSend && cloudReady);
-      store.set(canInterruptAtom, session.canInterrupt);
+      updateCapabilityAtoms(session);
 
       if (previousStatus.type === 'disconnected' && st.type !== 'disconnected') {
         store.set(errorAtom, null);
@@ -662,6 +792,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       repository: data.repository ?? '',
       mode: data.mode ?? '',
       model: data.model ?? '',
+      providerID: null,
       variant: data.variant ?? null,
       runtimeAgents: data.runtimeAgents,
     });
@@ -689,6 +820,31 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           // cast cloudAgentSessionId (the createAndStart path).
           store.set(rootSessionIdAtom, info.id);
           store.set(isLoadingAtom, false);
+          // A fresh replay is starting (initial connect or a reconnect);
+          // onReplayComplete flips this back off once it's done.
+          remoteHistoryReplaying = true;
+          if (info.model) {
+            updateObservedModel(
+              toModelSelection(
+                { providerID: info.model.providerID, modelID: info.model.id },
+                info.model.variant
+              ),
+              'session'
+            );
+          }
+        }
+      },
+
+      onSessionUpdated: info => {
+        const rootSessionId = store.get(rootSessionIdAtom);
+        if (rootSessionId === info.id && info.model) {
+          updateObservedModel(
+            toModelSelection(
+              { providerID: info.model.providerID, modelID: info.model.id },
+              info.model.variant
+            ),
+            'session'
+          );
         }
       },
       onQuestionAsked: (requestId, questions) => {
@@ -724,8 +880,19 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onResolved: resolved => {
         activeSessionType = resolved.type;
+        store.set(sessionTypeAtom, resolved.type);
+        store.set(activeSessionTypeAtom, resolved.type);
         store.set(supportsAttachmentsAtom, resolved.type === 'cloud-agent');
+        updateCapabilityAtoms(session);
       },
+      onRemoteModelStateChange: handleRemoteModelStateChange,
+      onTransportCapabilityChange: () => {
+        if (currentSession === session) updateCapabilityAtoms(session);
+      },
+      onReplayComplete: () => {
+        remoteHistoryReplaying = false;
+      },
+
       onBranchChanged: branch => {
         const currentFetched = store.get(fetchedSessionDataAtom);
         if (currentFetched) {
@@ -749,9 +916,38 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           store.set(availableCommandsAtom, event.commands);
           return;
         }
-        if (event.type === 'message.updated' && event.info.role === 'assistant') {
+        if (event.type === 'message.updated') {
           const rootSessionId = store.get(rootSessionIdAtom);
           if (rootSessionId !== null && event.info.sessionID !== rootSessionId) return;
+
+          // A live message always wins: it's the freshest, most specific proof
+          // of what model actually ran for this turn, more reliable than
+          // `session.updated` (which can lag behind or never fire for a
+          // per-request override that doesn't change the session's persisted
+          // default). During the initial replay, only suppress this when
+          // `session.created` already claimed a value for this connect cycle
+          // — its snapshot-time value is fresher than an older replayed
+          // message, but if it never had a model to begin with there's
+          // nothing fresher to protect.
+          const canApplyMessageObservation =
+            !remoteHistoryReplaying || observedModelSource !== 'session';
+          if (event.info.role === 'user') {
+            if (canApplyMessageObservation) {
+              const selection = toModelSelection(event.info.model, event.info.variant);
+              updateObservedModel(selection, 'message');
+              clearOverrideIfDiverged(selection);
+            }
+            return;
+          }
+
+          if (canApplyMessageObservation) {
+            const selection = toModelSelection(
+              { providerID: event.info.providerID, modelID: event.info.modelID },
+              event.info.variant
+            );
+            updateObservedModel(selection, 'message');
+            clearOverrideIfDiverged(selection);
+          }
 
           // `info.agent` is the agent slug (e.g. 'code', 'e-code'); `info.mode`
           // is the visibility ('primary'|'subagent'|'all') and must not be used
@@ -760,12 +956,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           if (
             currentConfig &&
             (currentConfig.model !== event.info.modelID ||
+              currentConfig.providerID !== event.info.providerID ||
               currentConfig.mode !== event.info.agent ||
               currentConfig.variant !== (event.info.variant ?? null))
           ) {
             store.set(sessionConfigAtom, {
               ...currentConfig,
               model: event.info.modelID,
+              providerID: event.info.providerID,
               mode: event.info.agent,
               variant: event.info.variant ?? null,
             });
@@ -793,7 +991,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   async function send(input: {
-    payload: TransportSendPayload;
+    payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
     images?: Images;
   }): Promise<boolean> {
@@ -812,6 +1010,35 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       input.payload.type === 'command'
         ? `/${input.payload.command}${input.payload.arguments ? ` ${input.payload.arguments}` : ''}`
         : input.payload.prompt;
+    const remoteModelOverride = store.get(remoteModelOverrideAtom);
+    let transportPayload: TransportSendPayload;
+    if (input.payload.type === 'command') {
+      transportPayload = input.payload;
+    } else if (sessionType === 'remote') {
+      transportPayload = {
+        type: 'prompt',
+        prompt: input.payload.prompt,
+        ...(input.payload.mode ? { mode: input.payload.mode } : {}),
+        ...(remoteModelOverride
+          ? {
+              model: remoteModelOverride.selection.model,
+              ...(remoteModelOverride.selection.variant
+                ? { variant: remoteModelOverride.selection.variant }
+                : {}),
+            }
+          : {}),
+      };
+    } else {
+      transportPayload = {
+        type: 'prompt',
+        prompt: input.payload.prompt,
+        ...(input.payload.mode ? { mode: input.payload.mode } : {}),
+        ...(input.payload.model
+          ? { model: { providerID: 'kilo', modelID: input.payload.model } }
+          : {}),
+        ...(input.payload.model && input.payload.variant ? { variant: input.payload.variant } : {}),
+      };
+    }
 
     try {
       if (!currentSession) throw new Error('No active session');
@@ -819,11 +1046,13 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         throw new Error('Only Cloud Agent sessions support attachments');
       }
       await currentSession.send({
-        payload: input.payload,
+        payload: transportPayload,
         messageId,
         ...(input.attachments ? { attachments: input.attachments } : {}),
         images: input.images,
+        ...(sessionType === 'remote' && remoteModelOverride ? { remoteModelOverride } : {}),
       });
+
       if (sessionType === 'remote' && kiloSessionId) {
         config.onRemoteSessionMessageSent?.({ kiloSessionId });
       }
@@ -905,6 +1134,14 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     }
   }
 
+  function setRemoteModelOverride(override: RemoteModelOverride | null): void {
+    store.set(remoteModelOverrideAtom, override);
+  }
+
+  function retryRemoteModels(): void {
+    currentSession?.retryRemoteModels();
+  }
+
   function destroy(): void {
     childSessionHydrationGeneration += 1;
     childSessionHydrationRequests.clear();
@@ -926,6 +1163,8 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     switchSession,
     hydrateChildSession,
     send,
+    setRemoteModelOverride,
+    retryRemoteModels,
     interrupt,
     answerQuestion,
     rejectQuestion,
@@ -943,6 +1182,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       isLoading: isLoadingAtom,
       isReadOnly: isReadOnlyAtom,
       supportsAttachments: supportsAttachmentsAtom,
+      activeSessionType: activeSessionTypeAtom,
+      remoteModelState: remoteModelStateAtom,
+      observedModel: observedModelAtom,
+      remoteModelOverride: remoteModelOverrideAtom,
       canSend: canSendAtom,
       canInterrupt: canInterruptAtom,
       statusIndicator: statusIndicatorAtom,
@@ -954,6 +1197,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       agentStatus: agentStatusAtom,
       cloudStatus: cloudStatusAtom,
       sessionConfig: sessionConfigAtom,
+      sessionType: sessionTypeAtom,
       chatUI: chatUIAtom,
       activeQuestion: activeQuestionAtom,
       permission: permissionAtom,
@@ -975,8 +1219,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   };
 }
 
-export { createSessionManager, formatError };
+export { CLI_MODEL_ID, cliModelLabel, createSessionManager, formatError };
 export type {
+  ActiveSessionType,
   SessionManager,
   SessionManagerConfig,
   SessionManagerAtoms,

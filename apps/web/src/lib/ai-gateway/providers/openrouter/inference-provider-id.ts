@@ -95,6 +95,7 @@ export type VercelUserByokInferenceProviderId = z.infer<
 >;
 
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
+  'alibaba-token-plan',
   'byteplus-coding',
   'chutes-byok',
   'codestral',
@@ -102,6 +103,7 @@ export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'inceptron-byok',
   'kimi-coding',
   'martian',
+  'morph-byok',
   'neuralwatt',
   'ollama-cloud',
   'opencode-go',
@@ -138,12 +140,14 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.xai]: 'xai/grok-4.1-fast-non-reasoning',
   [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
+  [DirectUserByokInferenceProviderIdSchema.enum['alibaba-token-plan']]: 'deepseek-v3.2',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum['chutes-byok']]: 'Qwen/Qwen3-30B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
   [DirectUserByokInferenceProviderIdSchema.enum['inceptron-byok']]: 'moonshotai/Kimi-K2.6',
   [DirectUserByokInferenceProviderIdSchema.enum.martian]: 'google/gemini-3.5-flash',
+  [DirectUserByokInferenceProviderIdSchema.enum['morph-byok']]: 'morph-qwen35-397b',
   [DirectUserByokInferenceProviderIdSchema.enum.neuralwatt]: 'Qwen/Qwen3.5-35B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum['orcarouter']]: 'google/gemini-3.5-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['crofai']]: 'deepseek-v4-flash',

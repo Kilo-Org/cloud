@@ -9,6 +9,9 @@ export type MarkdownPalette = {
   mutedTextColor: string;
   codeBackground: string;
   borderColor: string;
+  // The bubble surface this palette's ink is designed to sit on. Needed when
+  // palette-colored content renders outside its bubble (e.g. the table modal).
+  surfaceColor: string;
 };
 
 // Derive a translucent variant of a theme token so we can tint dividers and
@@ -40,6 +43,7 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
       mutedTextColor: withAlpha(ink, 0.7),
       codeBackground: withAlpha(ink, 0.1),
       borderColor: withAlpha(ink, 0.2),
+      surfaceColor: colors.primary,
     };
   }
   if (variant === 'user') {
@@ -50,6 +54,7 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
       mutedTextColor: withAlpha(ink, 0.7),
       codeBackground: withAlpha(ink, 0.1),
       borderColor: withAlpha(ink, 0.2),
+      surfaceColor: colors.accentSoft,
     };
   }
   return {
@@ -57,6 +62,7 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
     mutedTextColor: colors.mutedForeground,
     codeBackground: colors.muted,
     borderColor: colors.border,
+    surfaceColor: colors.card,
   };
 }
 

@@ -1,9 +1,25 @@
 import type { SandboxId, Env } from './types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 
-const SHARED_SANDBOX_ID_VERSION = 'shared-v2';
+export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
+
+const SHARED_SANDBOX_ID_VERSION = 'shared-v3';
 
 type SharedSandboxPrefix = 'org' | 'usr' | 'bot' | 'ubt';
+type SandboxNamespaceEnv = Pick<
+  Env,
+  | 'Sandbox'
+  | 'SandboxContainment'
+  | 'SandboxSmall'
+  | 'SandboxSmallContainment'
+  | 'SandboxDIND'
+  | 'SandboxCodeReview'
+  | 'SandboxCodeReviewContainment'
+>;
+
+type SandboxNamespaceOptions = {
+  managedScmContainment?: boolean;
+};
 
 export type SharedSandboxRoutingTarget = {
   kind: 'shared';
@@ -38,14 +54,29 @@ function getSharedSandboxPrefix(sandboxId: SandboxId): SharedSandboxPrefix {
  * Parses a comma-separated org ID list into a set.
  * Returns an empty set when the value is falsy or blank.
  */
-function parseOrgIdList(raw: string | undefined): Set<string> {
-  if (!raw) return new Set();
-  return new Set(
-    raw
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean)
-  );
+function parseCommaSeparatedList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean);
+}
+
+export function parseOrgIdList(raw: string | undefined): Set<string> {
+  return new Set(parseCommaSeparatedList(raw));
+}
+
+/**
+ * Returns true when orgId is included in a comma-separated org ID list.
+ * - Empty/unset list → false for everyone.
+ * - '*' → true for everyone.
+ * - Comma-separated list → true only when orgId is present.
+ */
+export function isOrgInList(raw: string | undefined, orgId: string | undefined): boolean {
+  const orgs = parseOrgIdList(raw);
+  if (orgs.size === 0) return false;
+  if (orgs.has('*')) return true;
+  return orgId !== undefined && orgs.has(orgId);
 }
 
 /**
@@ -55,10 +86,29 @@ function parseOrgIdList(raw: string | undefined): Set<string> {
  * - Per-session sandboxes (ses-* prefix) use SandboxSmall
  * - All others use Sandbox
  */
-export function getSandboxNamespace(env: Env, sandboxId: string): DurableObjectNamespace<Sandbox> {
+export function getSandboxNamespace(
+  env: SandboxNamespaceEnv,
+  sandboxId: string,
+  options: SandboxNamespaceOptions = {}
+): DurableObjectNamespace<Sandbox> {
   if (sandboxId.startsWith('dind-')) return env.SandboxDIND;
-  if (sandboxId.startsWith('crv-')) return env.SandboxCodeReview;
-  return sandboxId.startsWith('ses-') ? env.SandboxSmall : env.Sandbox;
+  if (sandboxId.startsWith('crv-')) {
+    return options.managedScmContainment === true
+      ? env.SandboxCodeReviewContainment
+      : env.SandboxCodeReview;
+  }
+  if (sandboxId.startsWith('ses-')) {
+    return options.managedScmContainment === true ? env.SandboxSmallContainment : env.SandboxSmall;
+  }
+  return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
+}
+
+export function getOutboundContainerId(
+  env: SandboxNamespaceEnv,
+  sandboxId: string,
+  options: SandboxNamespaceOptions = {}
+): string {
+  return getSandboxNamespace(env, sandboxId, options).idFromName(sandboxId).toString();
 }
 
 async function hashToSandboxId(input: string, prefix: string): Promise<SandboxId> {

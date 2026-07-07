@@ -2,6 +2,7 @@ import { formatDollars, formatIsoDateString_UsaDateOnlyFormat } from '@/lib/util
 import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
 import { KiloPassCadence, type KiloPassTier } from '@/lib/kilo-pass/enums';
 import { formatKiloClawPlanPrice } from '@/app/(app)/claw/components/billing/billing-types';
+import { isMonthlyCodingPlan } from '@/lib/coding-plans/pricing';
 
 export function isKiloPassTerminal(status: string): boolean {
   return status === 'canceled' || status === 'incomplete_expired';
@@ -64,7 +65,7 @@ export function getCodingPlanPriceParts(
 
   return {
     amount,
-    cadenceLabel: planId === 'minimax-token-plan-plus' ? '/month' : `/ ${billingPeriodDays} days`,
+    cadenceLabel: isMonthlyCodingPlan(planId) ? '/month' : `/ ${billingPeriodDays} days`,
   };
 }
 

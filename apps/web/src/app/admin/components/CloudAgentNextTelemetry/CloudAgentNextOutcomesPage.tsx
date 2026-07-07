@@ -2,21 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { AlertCircle, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
   useCloudAgentNextHealthErrorSessions,
   useCloudAgentNextHealthOverview,
-  useCloudAgentNextHealthPlatforms,
   type CloudAgentNextHealthFilters,
 } from '@/app/admin/api/cloud-agent-next/hooks';
 import { CopyButton } from '@/components/admin/CopyButton';
@@ -62,50 +51,26 @@ import {
 } from '@/components/ui/table';
 
 type RangeValue = HealthPeriod;
-type HealthBucket = CloudAgentNextHealthFilters['bucket'];
 type RangeOption = {
   value: RangeValue;
   label: string;
   durationMs: number;
-  bucket: HealthBucket;
 };
 
 const RANGE_OPTIONS = [
-  { value: '1h', label: 'Last hour', durationMs: 60 * 60 * 1000, bucket: 'hour' },
-  { value: '3h', label: 'Last 3 hours', durationMs: 3 * 60 * 60 * 1000, bucket: 'hour' },
+  { value: '1h', label: 'Last hour', durationMs: 60 * 60 * 1000 },
+  { value: '3h', label: 'Last 3 hours', durationMs: 3 * 60 * 60 * 1000 },
   {
     value: '24h',
     label: 'Last 24 hours',
     durationMs: 24 * 60 * 60 * 1000,
-    bucket: 'hour',
   },
-  { value: '7d', label: 'Last 7 days', durationMs: 7 * 24 * 60 * 60 * 1000, bucket: 'hour' },
-  { value: '14d', label: 'Last 14 days', durationMs: 14 * 24 * 60 * 60 * 1000, bucket: 'day' },
-  { value: '30d', label: 'Last 30 days', durationMs: 30 * 24 * 60 * 60 * 1000, bucket: 'day' },
+  { value: '7d', label: 'Last 7 days', durationMs: 7 * 24 * 60 * 60 * 1000 },
+  { value: '14d', label: 'Last 14 days', durationMs: 14 * 24 * 60 * 60 * 1000 },
+  { value: '30d', label: 'Last 30 days', durationMs: 30 * 24 * 60 * 60 * 1000 },
 ] satisfies ReadonlyArray<RangeOption>;
 
-type HealthData = NonNullable<ReturnType<typeof useCloudAgentNextHealthOverview>['data']>;
-type SeriesPoint = HealthData['series'][number];
-type TopError = HealthData['topErrors'][number];
-type TooltipPayload = { payload: SeriesPoint };
-
 const DEFAULT_RANGE: RangeValue = DEFAULT_HEALTH_PERIOD;
-const ALL_PLATFORMS_VALUE = 'all-platforms';
-const UNKNOWN_PLATFORM_VALUE = 'unknown-platform';
-const EXACT_PLATFORM_PREFIX = 'platform:';
-
-function platformSelectionValue(platform: string): string {
-  return `${EXACT_PLATFORM_PREFIX}${platform}`;
-}
-
-function createdOnPlatformForSelection(selection: string): string | null | undefined {
-  if (selection === ALL_PLATFORMS_VALUE) return undefined;
-  if (selection === UNKNOWN_PLATFORM_VALUE) return null;
-  if (selection.startsWith(EXACT_PLATFORM_PREFIX)) {
-    return selection.slice(EXACT_PLATFORM_PREFIX.length);
-  }
-  return undefined;
-}
 
 const utcLongLabel = new Intl.DateTimeFormat('en-US', {
   timeZone: 'UTC',
@@ -115,43 +80,10 @@ const utcLongLabel = new Intl.DateTimeFormat('en-US', {
   minute: '2-digit',
   hourCycle: 'h23',
 });
-const utcShortTime = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'UTC',
-  hour: '2-digit',
-  hourCycle: 'h23',
-});
-const utcShortDay = new Intl.DateTimeFormat('en-US', {
-  timeZone: 'UTC',
-  month: 'short',
-  day: 'numeric',
-});
 
-function intervalForRange(
-  range: RangeValue,
-  platformSelection = ALL_PLATFORMS_VALUE
-): CloudAgentNextHealthFilters {
+function intervalForRange(range: RangeValue): CloudAgentNextHealthFilters {
   const selectedRange = RANGE_OPTIONS.find(option => option.value === range) ?? RANGE_OPTIONS[3];
-  const createdOnPlatform = createdOnPlatformForSelection(platformSelection);
-  return {
-    ...rollingHealthInterval(selectedRange),
-    ...(createdOnPlatform === undefined ? {} : { createdOnPlatform }),
-  };
-}
-
-function formatBucketLabel(bucketStart: string, range: RangeValue): string {
-  if (range === '1h' || range === '3h' || range === '24h') {
-    return utcShortTime.format(new Date(bucketStart));
-  }
-  return utcShortDay.format(new Date(bucketStart));
-}
-
-function bucketLabel(bucket: HealthBucket): string {
-  return bucket === 'day' ? 'Daily' : 'Hourly';
-}
-
-function formatBucketStart(bucketStart: string, bucket: HealthBucket): string {
-  const date = new Date(bucketStart);
-  return bucket === 'day' ? `${utcShortDay.format(date)} UTC` : `${utcLongLabel.format(date)} UTC`;
+  return rollingHealthInterval(selectedRange);
 }
 
 type MetricTone = 'success' | 'danger' | 'warning';
@@ -196,7 +128,6 @@ function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-6" role="status" aria-label="Loading Cloud Agent health">
       <Skeleton className="h-32 w-full" />
-      <Skeleton className="h-96 w-full" />
       <Skeleton className="h-72 w-full" />
     </div>
   );
@@ -238,106 +169,6 @@ function HealthSummary({ summary }: { summary: HealthData['summary'] }) {
           detail="Excluded from failure rate"
           tone="warning"
         />
-      </CardContent>
-    </Card>
-  );
-}
-
-function HealthTooltip({
-  active,
-  payload,
-  bucket,
-}: {
-  active?: boolean;
-  payload?: TooltipPayload[];
-  bucket: HealthBucket;
-}) {
-  const point = active ? payload?.[0]?.payload : undefined;
-  if (!point) return null;
-  return (
-    <div className="bg-popover text-popover-foreground rounded-lg border p-3 shadow-md">
-      <p className="mb-2 text-xs font-medium">{formatBucketStart(point.bucketStart, bucket)}</p>
-      <div className="grid gap-1 text-xs tabular-nums">
-        <p className="flex justify-between gap-8">
-          <span className="text-muted-foreground">Completed runs</span>
-          <span>{point.completedRuns.toLocaleString()}</span>
-        </p>
-        <p className="flex justify-between gap-8">
-          <span className="text-muted-foreground">Failed runs</span>
-          <span>{point.failedRuns.toLocaleString()}</span>
-        </p>
-        <p className="flex justify-between gap-8">
-          <span className="text-muted-foreground">Setup failures</span>
-          <span>{point.setupFailures.toLocaleString()}</span>
-        </p>
-        <p className="flex justify-between gap-8">
-          <span className="text-muted-foreground">Interrupted runs</span>
-          <span>{point.interruptedRuns.toLocaleString()}</span>
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function OutcomeTrendChart({
-  data,
-  range,
-  bucket,
-}: {
-  data: SeriesPoint[];
-  range: RangeValue;
-  bucket: HealthBucket;
-}) {
-  const label = bucketLabel(bucket);
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{label} outcomes</CardTitle>
-        <CardDescription>
-          Completed, failed, setup-failed, and interrupted events in UTC-
-          {bucket === 'day' ? 'day' : 'hour'} buckets. Edge buckets may be partial.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div
-          className="h-80 w-full"
-          role="img"
-          aria-label={`${label} Cloud Agent outcome counts during the selected period`}
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 8, right: 8, left: -8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" vertical={false} />
-              <XAxis
-                dataKey="bucketStart"
-                tickFormatter={bucketStart => formatBucketLabel(String(bucketStart), range)}
-                minTickGap={32}
-                tick={{ fontSize: 11 }}
-              />
-              <YAxis allowDecimals={false} width={46} tick={{ fontSize: 11 }} />
-              <Tooltip content={<HealthTooltip bucket={bucket} />} />
-              <Legend wrapperStyle={{ fontSize: '12px' }} />
-              <Bar
-                dataKey="completedRuns"
-                stackId="outcomes"
-                fill="var(--chart-2)"
-                name="Completed"
-              />
-              <Bar dataKey="failedRuns" stackId="outcomes" fill="var(--chart-5)" name="Failed" />
-              <Bar
-                dataKey="setupFailures"
-                stackId="outcomes"
-                fill="var(--chart-3)"
-                name="Setup failed"
-              />
-              <Bar
-                dataKey="interruptedRuns"
-                stackId="outcomes"
-                fill="var(--chart-1)"
-                name="Interrupted"
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
       </CardContent>
     </Card>
   );
@@ -525,14 +356,14 @@ function TopErrors({
   );
 }
 
+type HealthData = NonNullable<ReturnType<typeof useCloudAgentNextHealthOverview>['data']>;
+type TopError = HealthData['topErrors'][number];
+
 export default function CloudAgentNextOutcomesPage() {
   const [range, setRange] = useState<RangeValue>(DEFAULT_RANGE);
-  const [platformSelection, setPlatformSelection] = useState(ALL_PLATFORMS_VALUE);
   const [interval, setInterval] = useState(() => intervalForRange(DEFAULT_RANGE));
   const [hasLoadedPeriodPreference, setHasLoadedPeriodPreference] = useState(false);
-  const healthPlatforms = useCloudAgentNextHealthPlatforms();
   const health = useCloudAgentNextHealthOverview(interval, hasLoadedPeriodPreference);
-  const bucket = interval.bucket;
 
   useEffect(() => {
     const storedRange = getStoredHealthPeriod();
@@ -547,21 +378,14 @@ export default function CloudAgentNextOutcomesPage() {
     if (!isHealthPeriod(value)) return;
     setStoredHealthPeriod(value);
     setRange(value);
-    setInterval(intervalForRange(value, platformSelection));
-  }
-
-  function updatePlatformSelection(value: string) {
-    setPlatformSelection(value);
-    setInterval(intervalForRange(range, value));
+    setInterval(intervalForRange(value));
   }
 
   function refresh() {
-    const nextInterval = intervalForRange(range, platformSelection);
+    const nextInterval = intervalForRange(range);
     if (
       nextInterval.startDate === interval.startDate &&
-      nextInterval.endDate === interval.endDate &&
-      nextInterval.bucket === interval.bucket &&
-      nextInterval.createdOnPlatform === interval.createdOnPlatform
+      nextInterval.endDate === interval.endDate
     ) {
       void health.refetch();
       return;
@@ -587,57 +411,27 @@ export default function CloudAgentNextOutcomesPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Cloud Agent health</h1>
             <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-              Operational outcome trends from best-effort Cloud Agent reporting.
+              Operational outcomes from best-effort Cloud Agent reporting.
             </p>
           </div>
-          <div className="grid w-full gap-3 sm:grid-cols-2 md:w-auto md:min-w-[32rem]">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="cloud-agent-health-period">Period</Label>
-              <Select value={range} onValueChange={updateRange}>
-                <SelectTrigger id="cloud-agent-health-period" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {RANGE_OPTIONS.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="cloud-agent-health-platform">Created on platform</Label>
-              <Select value={platformSelection} onValueChange={updatePlatformSelection}>
-                <SelectTrigger id="cloud-agent-health-platform" className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ALL_PLATFORMS_VALUE}>All platforms</SelectItem>
-                  {healthPlatforms.isLoading && (
-                    <SelectItem value="loading-platforms" disabled>
-                      Loading platforms...
-                    </SelectItem>
-                  )}
-                  {healthPlatforms.error && (
-                    <SelectItem value="platforms-unavailable" disabled>
-                      Platforms unavailable
-                    </SelectItem>
-                  )}
-                  {healthPlatforms.data?.map(platform => (
-                    <SelectItem key={platform} value={platformSelectionValue(platform)}>
-                      <span className="font-mono text-xs">{platform}</span>
-                    </SelectItem>
-                  ))}
-                  <SelectItem value={UNKNOWN_PLATFORM_VALUE}>Unknown / unlinked</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="flex flex-col gap-2 md:w-72">
+            <Label htmlFor="cloud-agent-health-period">Period</Label>
+            <Select value={range} onValueChange={updateRange}>
+              <SelectTrigger id="cloud-agent-health-period" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {RANGE_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <p className="text-muted-foreground text-xs">
-          Reporting is best-effort, so totals can undercount execution. Periods end at refresh time;
-          edge UTC {bucket === 'day' ? 'days' : 'hours'} may be partial.
+          Reporting is best-effort, so totals can undercount execution. Periods end at refresh time.
         </p>
         {health.error && (
           <Alert variant="destructive">
@@ -656,7 +450,6 @@ export default function CloudAgentNextOutcomesPage() {
         ) : health.data ? (
           <>
             <HealthSummary summary={health.data.summary} />
-            <OutcomeTrendChart data={health.data.series} range={range} bucket={bucket} />
             <TopErrors errors={health.data.topErrors} interval={interval} />
           </>
         ) : null}

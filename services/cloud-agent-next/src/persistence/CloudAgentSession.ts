@@ -84,7 +84,7 @@ import type { Env as WorkerEnv, SandboxId } from '../types.js';
 import { deriveSharedSandboxId, generateSandboxId } from '../sandbox-id.js';
 import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
 
-import { validateStreamTicket } from '../auth.js';
+import { resolveSecret, validateStreamTicket } from '../auth.js';
 import { resolveTerminalWrapperClient, type TerminalWrapperClient } from '../terminal/access.js';
 import type { WrapperPty } from '../kilo/wrapper-client.js';
 import {
@@ -878,7 +878,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         return new Response('Missing cloudAgentSessionId', { status: 400 });
       }
 
-      const authResult = validateStreamTicket(ticket, this.env.NEXTAUTH_SECRET);
+      const nextAuthSecret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+      const authResult = validateStreamTicket(ticket, nextAuthSecret);
       if (!authResult.success) {
         return new Response(authResult.error, { status: 401 });
       }
@@ -1761,28 +1762,74 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   private async scheduleEphemeralSandboxDestroy(delayMs: number): Promise<void> {
     const existing = await this.ctx.storage.get<number>(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
     if (existing !== undefined) {
+      logger
+        .withFields({ sessionId: this.sessionId, destroyAfter: existing })
+        .info('Ephemeral sandbox destroy already scheduled; re-arming alarm');
       await this.scheduleAlarmAtOrBefore(existing);
       return;
     }
     const destroyAfter = Date.now() + delayMs;
+    logger
+      .withFields({ sessionId: this.sessionId, delayMs, destroyAfter })
+      .info('Scheduling ephemeral sandbox destroy');
     await this.ctx.storage.put(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY, destroyAfter);
     await this.scheduleAlarmAtOrBefore(destroyAfter);
   }
 
   private async destroyEphemeralSandboxIfReady(now: number): Promise<void> {
     const destroyAfter = await this.ctx.storage.get<number>(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
-    if (destroyAfter === undefined || now < destroyAfter) return;
+    if (destroyAfter === undefined) return;
+    if (now < destroyAfter) {
+      logger
+        .withFields({ sessionId: this.sessionId, now, destroyAfter })
+        .debug('Ephemeral sandbox destroy not yet due');
+      return;
+    }
     const metadata = await this.getMetadata();
     if (!metadata || !isCodeReviewEphemeralSandboxId(metadata.workspace?.sandboxId)) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          hasMetadata: metadata !== null,
+          sandboxId: metadata?.workspace?.sandboxId,
+        })
+        .warn('Skipping ephemeral sandbox destroy: metadata missing or sandbox is not ephemeral');
       await this.ctx.storage.delete(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
       return;
     }
 
-    if (this.ephemeralSandboxDestroyer) {
-      await this.ephemeralSandboxDestroyer();
-    } else {
-      await createAgentSandbox(this.env, metadata).delete('recovery');
+    logger
+      .withFields({
+        sessionId: this.sessionId,
+        sandboxId: metadata.workspace?.sandboxId,
+        now,
+        destroyAfter,
+        overdueMs: now - destroyAfter,
+        usingCustomDestroyer: this.ephemeralSandboxDestroyer !== undefined,
+      })
+      .info('Destroying ephemeral sandbox');
+
+    try {
+      if (this.ephemeralSandboxDestroyer) {
+        await this.ephemeralSandboxDestroyer();
+      } else {
+        await createAgentSandbox(this.env, metadata).delete('recovery');
+      }
+    } catch (error) {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          sandboxId: metadata.workspace?.sandboxId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        })
+        .error('Ephemeral sandbox destroy failed');
+      throw error;
     }
+
+    logger
+      .withFields({ sessionId: this.sessionId, sandboxId: metadata.workspace?.sandboxId })
+      .info('Ephemeral sandbox destroyed successfully');
     await this.ctx.storage.delete(EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY);
     await this.ctx.storage.put(EPHEMERAL_SANDBOX_DESTROYED_AT_KEY, Date.now());
   }
@@ -3206,6 +3253,16 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const metadata = await this.getMetadata();
     if (!metadata) return;
     if (!isCodeReviewEphemeralSandboxId(metadata.workspace?.sandboxId)) return;
+    logger
+      .withFields({
+        sessionId: this.sessionId,
+        sandboxId: metadata.workspace?.sandboxId,
+        status: params.status,
+        wrapperRunId: params.wrapperRunId,
+      })
+      .info(
+        'Wrapper terminal event on ephemeral code-review sandbox; forcing stop and scheduling destroy'
+      );
     await this.getWrapperSupervisor().requestPhysicalWrapperStop('terminal-ended', {
       kind: 'session',
     });

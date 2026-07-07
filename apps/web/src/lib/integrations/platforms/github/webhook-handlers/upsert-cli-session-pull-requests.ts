@@ -145,6 +145,19 @@ export async function upsertCliSessionPullRequestsFromWebhook(
     const state = derivePrState(pull_request, action);
 
     // Defense-in-depth against out-of-order webhook deliveries.
+    //
+    // `closed` must not be permanently sticky: if the `reopened` webhook that
+    // should have flipped it back to open is missed or deduplicated, a later
+    // `synchronize` delivery carrying a new head sha (i.e. new commits were
+    // actually pushed, which can only happen on a PR that is really open) is
+    // used to self-heal pr_state instead of trusting only the `reopened`
+    // action name. A `synchronize` redelivery with the *same* head sha is
+    // treated as a stale/duplicate event and does not heal the state.
+    const closedStaysStickyUnlessNewCommit =
+      action === GITHUB_ACTION.SYNCHRONIZE
+        ? sql`AND ${github_branch_pull_requests.pr_head_sha} = excluded.pr_head_sha`
+        : sql``;
+
     const prStateSet =
       action === GITHUB_ACTION.REOPENED
         ? sql`excluded.pr_state`
@@ -156,6 +169,7 @@ export async function upsertCliSessionPullRequestsFromWebhook(
             WHEN ${github_branch_pull_requests.pr_number} = excluded.pr_number
               AND ${github_branch_pull_requests.pr_state} = 'closed'
               AND excluded.pr_state IN ('open', 'draft')
+              ${closedStaysStickyUnlessNewCommit}
             THEN ${github_branch_pull_requests.pr_state}
             ELSE excluded.pr_state
           END`;

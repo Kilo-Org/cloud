@@ -12,8 +12,20 @@ import type { User } from '@kilocode/db/schema';
 
 // Mirrors SharedSessionSnapshotSchema from cloudflare-session-ingest/src/util/share-output.ts.
 // Kept in sync manually (same pattern as cloud-agent-client.ts).
+const SessionInfoSchema = z.looseObject({
+  id: z.string().optional(),
+  parentID: z.string().optional(),
+  model: z
+    .object({
+      providerID: z.string(),
+      id: z.string(),
+      variant: z.string().optional(),
+    })
+    .optional(),
+});
+
 const SessionSnapshotSchema = z.object({
-  info: z.unknown(),
+  info: SessionInfoSchema,
   messages: z.array(
     z.looseObject({
       info: z.looseObject({

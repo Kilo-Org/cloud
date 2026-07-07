@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Drawer } from 'vaul';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useGastownTRPC } from '@/lib/gastown/trpc';
 import { toast } from 'sonner';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { X, Plus, Sparkles, Loader2 } from 'lucide-react';
 
 const MDXEditorComponent = dynamic(
@@ -182,175 +182,157 @@ export function CreateBeadDrawer({ rigId, townId, isOpen, onClose }: CreateBeadD
   const allLabels = [...labels, ...aiLabels];
 
   return (
-    <Drawer.Root open={isOpen} onOpenChange={open => !open && handleClose()} direction="right">
-      <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-50 bg-black/60" />
-        <Drawer.Content
-          className="fixed top-0 right-0 bottom-0 z-50 flex w-[620px] max-w-[94vw] flex-col outline-none"
-          style={{ '--initial-transform': 'calc(100% + 8px)' } as React.CSSProperties}
-        >
-          <div className="flex h-full flex-col overflow-hidden rounded-l-2xl border-l border-white/[0.08] bg-[oklch(0.12_0_0)]">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
-              <Drawer.Title className="text-base font-semibold text-white/90">
-                New Bead
-              </Drawer.Title>
-              <button
-                onClick={handleClose}
-                className="rounded-md p-1.5 text-white/30 transition-colors hover:bg-white/5 hover:text-white/60"
-              >
-                <X className="size-4" />
-              </button>
+    <Sheet open={isOpen} onOpenChange={open => !open && handleClose()}>
+      <SheetContent side="right" className="w-[620px] max-w-[94vw] gap-0 p-0 sm:max-w-[620px]">
+        {/* Header */}
+        <SheetHeader className="border-b border-white/[0.06] px-5 py-4">
+          <SheetTitle className="text-base font-semibold text-white/90">New Bead</SheetTitle>
+        </SheetHeader>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
+            {/* Title */}
+            <div>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label className="text-xs font-medium text-white/50">Title</label>
+                {isEnriching && <Loader2 className="size-3 animate-spin text-white/30" />}
+              </div>
+              <Input
+                value={title}
+                onChange={handleTitleChange}
+                placeholder="What needs to be done?"
+                autoFocus
+                className={`border-white/[0.08] bg-black/20 text-white/90 placeholder:text-white/25 focus:border-white/20 ${isEnriching && !userEditedTitle ? 'animate-pulse' : ''}`}
+              />
             </div>
 
-            {/* Form */}
-            <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
-              <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
-                {/* Title */}
-                <div>
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <label className="text-xs font-medium text-white/50">Title</label>
-                    {isEnriching && <Loader2 className="size-3 animate-spin text-white/30" />}
-                  </div>
-                  <Input
-                    value={title}
-                    onChange={handleTitleChange}
-                    placeholder="What needs to be done?"
-                    autoFocus
-                    className={`border-white/[0.08] bg-black/20 text-white/90 placeholder:text-white/25 focus:border-white/20 ${isEnriching && !userEditedTitle ? 'animate-pulse' : ''}`}
-                  />
-                </div>
-
-                {/* Labels */}
-                <div>
-                  <div className="mb-1.5 flex items-center gap-1.5">
-                    <label className="text-xs font-medium text-white/50">Labels</label>
-                    {isEnriching && <Loader2 className="size-3 animate-spin text-white/30" />}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {/* AI-suggested labels */}
-                    {aiLabels.map(label => (
-                      <span
-                        key={`ai-${label}`}
-                        className="inline-flex items-center gap-1 rounded-md border border-[color:oklch(0.95_0.15_108_/_0.25)] bg-[color:oklch(0.95_0.15_108_/_0.08)] px-2 py-0.5 text-[11px] text-[color:oklch(0.95_0.15_108_/_0.8)]"
-                      >
-                        <Sparkles className="size-2.5" />
-                        {label}
-                        <button
-                          type="button"
-                          onClick={() => removeAiLabel(label)}
-                          className="ml-0.5 opacity-60 hover:opacity-100"
-                        >
-                          <X className="size-2.5" />
-                        </button>
-                      </span>
-                    ))}
-                    {/* Manually added labels */}
-                    {labels.map(label => (
-                      <span
-                        key={`manual-${label}`}
-                        className="inline-flex items-center gap-1 rounded-md border border-white/[0.12] bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/60"
-                      >
-                        {label}
-                        <button
-                          type="button"
-                          onClick={() => removeLabel(label)}
-                          className="ml-0.5 opacity-60 hover:opacity-100"
-                        >
-                          <X className="size-2.5" />
-                        </button>
-                      </span>
-                    ))}
-                    {/* Add label input */}
-                    {showLabelInput ? (
-                      <input
-                        autoFocus
-                        value={labelInput}
-                        onChange={e => setLabelInput(e.target.value)}
-                        onKeyDown={handleLabelKeyDown}
-                        onBlur={handleAddLabel}
-                        placeholder="label name"
-                        className="rounded-md border border-white/[0.12] bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/70 placeholder:text-white/25 outline-none focus:border-white/20"
-                        style={{ width: '80px' }}
-                      />
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setShowLabelInput(true)}
-                        className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-white/[0.1] px-2 py-0.5 text-[11px] text-white/30 transition-colors hover:border-white/20 hover:text-white/50"
-                      >
-                        <Plus className="size-2.5" />
-                        add
-                      </button>
-                    )}
-                    {allLabels.length === 0 && !showLabelInput && (
-                      <span className="text-[11px] text-white/20">No labels yet</span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Body / MDXEditor */}
-                <div className="flex-1">
-                  <label className="mb-1.5 block text-xs font-medium text-white/50">
-                    Description
-                  </label>
-                  <MDXEditorComponent
-                    value={body}
-                    onChange={setBody}
-                    placeholder="Describe the work..."
-                  />
-                </div>
+            {/* Labels */}
+            <div>
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <label className="text-xs font-medium text-white/50">Labels</label>
+                {isEnriching && <Loader2 className="size-3 animate-spin text-white/30" />}
               </div>
-
-              {/* Footer */}
-              <div className="border-t border-white/[0.06] px-5 py-4">
-                {/* Start immediately toggle */}
-                <div className="mb-4">
-                  <label className="flex cursor-pointer items-start gap-2.5">
-                    <input
-                      type="checkbox"
-                      checked={startImmediately}
-                      onChange={e => setStartImmediately(e.target.checked)}
-                      className="mt-0.5 size-4 cursor-pointer rounded border-white/20 bg-white/5 accent-[color:oklch(0.95_0.15_108)]"
-                    />
-                    <div>
-                      <span className="text-sm text-white/75">Start immediately</span>
-                      {!startImmediately && (
-                        <p className="mt-0.5 text-xs text-white/35">
-                          The mayor will be notified and can help plan this work
-                        </p>
-                      )}
-                    </div>
-                  </label>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex justify-end gap-2">
-                  <Button variant="secondary" size="md" type="button" onClick={handleClose}>
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="md"
-                    type="submit"
-                    disabled={!title.trim() || createBead.isPending}
-                    className="bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* AI-suggested labels */}
+                {aiLabels.map(label => (
+                  <span
+                    key={`ai-${label}`}
+                    className="inline-flex items-center gap-1 rounded-md border border-[color:oklch(0.95_0.15_108_/_0.25)] bg-[color:oklch(0.95_0.15_108_/_0.08)] px-2 py-0.5 text-[11px] text-[color:oklch(0.95_0.15_108_/_0.8)]"
                   >
-                    {createBead.isPending ? (
-                      <>
-                        <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      'Create'
-                    )}
-                  </Button>
-                </div>
+                    <Sparkles className="size-2.5" />
+                    {label}
+                    <button
+                      type="button"
+                      onClick={() => removeAiLabel(label)}
+                      className="ml-0.5 opacity-60 hover:opacity-100"
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </span>
+                ))}
+                {/* Manually added labels */}
+                {labels.map(label => (
+                  <span
+                    key={`manual-${label}`}
+                    className="inline-flex items-center gap-1 rounded-md border border-white/[0.12] bg-white/[0.06] px-2 py-0.5 text-[11px] text-white/60"
+                  >
+                    {label}
+                    <button
+                      type="button"
+                      onClick={() => removeLabel(label)}
+                      className="ml-0.5 opacity-60 hover:opacity-100"
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </span>
+                ))}
+                {/* Add label input */}
+                {showLabelInput ? (
+                  <input
+                    autoFocus
+                    value={labelInput}
+                    onChange={e => setLabelInput(e.target.value)}
+                    onKeyDown={handleLabelKeyDown}
+                    onBlur={handleAddLabel}
+                    placeholder="label name"
+                    className="rounded-md border border-white/[0.12] bg-white/[0.04] px-2 py-0.5 text-[11px] text-white/70 placeholder:text-white/25 outline-none focus:border-white/20"
+                    style={{ width: '80px' }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowLabelInput(true)}
+                    className="inline-flex items-center gap-0.5 rounded-md border border-dashed border-white/[0.1] px-2 py-0.5 text-[11px] text-white/30 transition-colors hover:border-white/20 hover:text-white/50"
+                  >
+                    <Plus className="size-2.5" />
+                    add
+                  </button>
+                )}
+                {allLabels.length === 0 && !showLabelInput && (
+                  <span className="text-[11px] text-white/20">No labels yet</span>
+                )}
               </div>
-            </form>
+            </div>
+
+            {/* Body / MDXEditor */}
+            <div className="flex-1">
+              <label className="mb-1.5 block text-xs font-medium text-white/50">Description</label>
+              <MDXEditorComponent
+                value={body}
+                onChange={setBody}
+                placeholder="Describe the work..."
+              />
+            </div>
           </div>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+
+          {/* Footer */}
+          <div className="border-t border-white/[0.06] px-5 py-4">
+            {/* Start immediately toggle */}
+            <div className="mb-4">
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={startImmediately}
+                  onChange={e => setStartImmediately(e.target.checked)}
+                  className="mt-0.5 size-4 cursor-pointer rounded border-white/20 bg-white/5 accent-[color:oklch(0.95_0.15_108)]"
+                />
+                <div>
+                  <span className="text-sm text-white/75">Start immediately</span>
+                  {!startImmediately && (
+                    <p className="mt-0.5 text-xs text-white/35">
+                      The mayor will be notified and can help plan this work
+                    </p>
+                  )}
+                </div>
+              </label>
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex justify-end gap-2">
+              <Button variant="secondary" size="md" type="button" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                type="submit"
+                disabled={!title.trim() || createBead.isPending}
+                className="bg-[color:oklch(95%_0.15_108_/_0.90)] text-black hover:bg-[color:oklch(95%_0.15_108_/_0.95)]"
+              >
+                {createBead.isPending ? (
+                  <>
+                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create'
+                )}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -459,6 +459,14 @@ export type ClawBillingStatus = {
       effectiveBalanceMicrodollars: number;
     }
   >;
+  creditReprovisionRecovery: {
+    eligible: boolean;
+    plan: 'standard';
+    costMicrodollars: number;
+    projectedKiloPassBonusMicrodollars: number;
+    effectiveBalanceMicrodollars: number;
+    shortfallMicrodollars: number;
+  };
   kiloPassUpsellPreview: Record<
     ClawPlan,
     Record<KiloPassUpsellCadence, Record<KiloPassUpsellTier, KiloPassUpsellActivationPreview>>

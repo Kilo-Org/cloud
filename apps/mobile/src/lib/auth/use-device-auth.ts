@@ -1,5 +1,6 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 
 import { API_BASE_URL, WEB_BASE_URL } from '@/lib/config';
 
@@ -20,6 +21,16 @@ type DeviceAuthResult = DeviceAuthState & {
 };
 
 const POLL_INTERVAL_MS = 3000;
+
+// Android has no native auth session; expo-web-browser's polyfill keeps
+// module-level state that can get stuck and reject every future call
+// (KILO-APP-22). We poll the server for approval instead of relying on a
+// redirect, so a plain browser open is all Android needs.
+async function openAuthBrowser(url: string) {
+  await (Platform.OS === 'android'
+    ? WebBrowser.openBrowserAsync(url)
+    : WebBrowser.openAuthSessionAsync(url));
+}
 
 export function useDeviceAuth(): DeviceAuthResult {
   const [state, setState] = useState<DeviceAuthState>({
@@ -59,7 +70,12 @@ export function useDeviceAuth(): DeviceAuthResult {
             case 200: {
               const data = (await response.json()) as { token: string };
               cleanup();
-              WebBrowser.dismissAuthSession();
+              // dismissAuthSession closes the iOS ASWebAuthenticationSession sheet. On
+              // Android we open a plain custom tab (no auth session) and the native module
+              // has no dismissBrowser, so calling it there is at best a no-op and can throw.
+              if (Platform.OS !== 'android') {
+                WebBrowser.dismissAuthSession();
+              }
               setState(previous => ({
                 status: 'approved',
                 code,
@@ -174,7 +190,7 @@ export function useDeviceAuth(): DeviceAuthResult {
         abortReference.current = abort;
         poll(data.code, abort);
 
-        await WebBrowser.openAuthSessionAsync(browserUrl);
+        await openAuthBrowser(browserUrl);
       } catch {
         setState({
           status: 'error',
@@ -201,7 +217,17 @@ export function useDeviceAuth(): DeviceAuthResult {
 
   const openBrowser = useCallback(async () => {
     if (state.verificationUrl) {
-      await WebBrowser.openAuthSessionAsync(state.verificationUrl);
+      try {
+        await openAuthBrowser(state.verificationUrl);
+      } catch {
+        setState(previous => ({
+          status: 'error',
+          code: previous.code,
+          token: undefined,
+          error: 'Could not open browser. Please try again.',
+          verificationUrl: previous.verificationUrl,
+        }));
+      }
     }
   }, [state.verificationUrl]);
 

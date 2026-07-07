@@ -1,4 +1,4 @@
-/* eslint-disable import/no-nodejs-modules */
+/* eslint-disable import/no-nodejs-modules, max-lines */
 import { expect, test } from '@playwright/test';
 import { rm } from 'node:fs/promises';
 import { mockKiloApi, readSidePanelScrollState } from './kilo-api-fixture';
@@ -276,6 +276,77 @@ test('the jump to latest button reactivates automatic scroll to new messages', a
     ).toBeGreaterThanOrEqual(finalScrollState.messagePaneScrollHeight - 16);
   } finally {
     releaseFirstCompletion();
+    await context.close();
+    await fixture.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
+test('scrolling back to the bottom by wheel reactivates automatic scroll', async () => {
+  const fixture = await startFixtureServer();
+  const { context, extensionId, userDataDir } = await launchExtensionContext();
+
+  try {
+    await mockKiloApi(context, {
+      firstCompletionEvents: [{ choices: [{ delta: { content: 'Reply after wheeling back.' } }] }],
+      toolNames: safeReadToolNames,
+    });
+
+    const page = await context.newPage();
+    await page.goto(fixture.url);
+
+    const sidePanel = await context.newPage();
+    await sidePanel.setViewportSize({ height: 420, width: 360 });
+    await sidePanel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
+    await seedExtensionAuth(sidePanel);
+    await setExtensionStorage(sidePanel, {
+      kiloAgentConversation: Array.from({ length: 80 }, (_value, index) => ({
+        id: `wheel-reactivation-${index}`,
+        role: 'assistant',
+        text: `Wheel reactivation content ${index}`,
+        type: 'message',
+      })),
+    });
+    await sidePanel.reload();
+
+    await expect(sidePanel.getByText('Wheel reactivation content 79')).toBeVisible();
+
+    const conversationPane = sidePanel.getByLabel('Agent conversation');
+    const bottomState = await sidePanel.evaluate(readSidePanelScrollState);
+
+    // Wheel up to release auto-scroll, then wheel back down to the bottom.
+    await conversationPane.hover();
+    await sidePanel.mouse.wheel(0, -2400);
+    await expect
+      .poll(async () => {
+        const scrollState = await sidePanel.evaluate(readSidePanelScrollState);
+
+        return scrollState.messagePaneScrollTop;
+      })
+      .toBeLessThan(bottomState.messagePaneScrollTop - 100);
+    await expect(sidePanel.getByRole('button', { name: 'Jump to latest' })).toBeVisible();
+
+    await sidePanel.mouse.wheel(0, 4000);
+
+    // The jump button hides on its own — auto-scroll re-armed without a click.
+    await expect(sidePanel.getByRole('button', { name: 'Jump to latest' })).toBeHidden();
+
+    // A new reply now follows to the bottom automatically.
+    await sidePanel.getByLabel('Message agent').fill('Reply after returning by wheel');
+    await sidePanel.getByLabel('Message agent').press('Enter');
+    await expect(sidePanel.getByText('Reply after wheeling back.')).toBeVisible();
+
+    await expect
+      .poll(async () => {
+        const scrollState = await sidePanel.evaluate(readSidePanelScrollState);
+
+        return (
+          scrollState.messagePaneScrollTop + scrollState.messagePaneClientHeight >=
+          scrollState.messagePaneScrollHeight - 16
+        );
+      })
+      .toBe(true);
+  } finally {
     await context.close();
     await fixture.close();
     await rm(userDataDir, { force: true, recursive: true });

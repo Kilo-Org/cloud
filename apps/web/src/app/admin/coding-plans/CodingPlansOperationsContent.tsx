@@ -27,13 +27,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { useTRPC } from '@/lib/trpc/utils';
 
-const PLAN_ID = 'minimax-token-plan-plus';
-
 type OperationsState = {
+  providerId: UserByokProviderId;
+  planId: CodingPlanId;
   entriesText: string;
   completeInventoryId: string | null;
   failureInventoryId: string | null;
@@ -41,6 +50,8 @@ type OperationsState = {
 };
 
 const INITIAL_OPERATIONS_STATE: OperationsState = {
+  providerId: 'minimax',
+  planId: 'minimax-token-plan-plus',
   entriesText: '',
   completeInventoryId: null,
   failureInventoryId: null,
@@ -54,7 +65,16 @@ function updateOperationsState(state: OperationsState, update: Partial<Operation
 export function CodingPlansOperationsContent() {
   const trpc = useTRPC();
   const [state, updateState] = useReducer(updateOperationsState, INITIAL_OPERATIONS_STATE);
-  const { entriesText, completeInventoryId, failureInventoryId, failureReason } = state;
+  const {
+    providerId,
+    planId,
+    entriesText,
+    completeInventoryId,
+    failureInventoryId,
+    failureReason,
+  } = state;
+  const setProviderId = (providerId: UserByokProviderId) => updateState({ providerId });
+  const setPlanId = (planId: CodingPlanId) => updateState({ planId });
   const setEntriesText = (entriesText: string) => updateState({ entriesText });
   const setCompleteInventoryId = (completeInventoryId: string | null) =>
     updateState({ completeInventoryId });
@@ -64,6 +84,7 @@ export function CodingPlansOperationsContent() {
 
   const countsQuery = useQuery(trpc.codingPlans.adminKeyInventory.queryOptions({}));
   const queueQuery = useQuery(trpc.codingPlans.adminRevocationQueue.queryOptions({}));
+  const catalogQuery = useQuery(trpc.codingPlans.catalog.queryOptions());
 
   const refreshOperations = async () => {
     await Promise.all([countsQuery.refetch(), queueQuery.refetch()]);
@@ -118,6 +139,21 @@ export function CodingPlansOperationsContent() {
     .filter(entry => entry.length > 0);
   const workItems = queueQuery.data ?? [];
   const inventoryCounts = countsQuery.data ?? [];
+  const catalog = catalogQuery.data ?? [];
+  const providerOptions = Array.from(
+    new Map(
+      catalog.map(plan => [
+        plan.providerId,
+        { providerId: plan.providerId, providerName: plan.providerName },
+      ])
+    ).values()
+  );
+  const selectedProviderId = providerOptions.some(option => option.providerId === providerId)
+    ? providerId
+    : (providerOptions[0]?.providerId ?? providerId);
+  const planOptions = catalog.filter(plan => plan.providerId === selectedProviderId);
+  const selectedPlan = planOptions.find(plan => plan.planId === planId) ?? planOptions[0] ?? null;
+  const selectedPlanId = selectedPlan?.planId ?? planId;
   const totalCredentialCount = inventoryCounts.reduce((total, item) => total + item.count, 0);
   const countCredentialsByStatus = (status: string) =>
     inventoryCounts.reduce((total, item) => total + (item.status === status ? item.count : 0), 0);
@@ -150,7 +186,7 @@ export function CodingPlansOperationsContent() {
         <div className="space-y-2">
           <h2 className="text-2xl font-bold">Coding plans operations</h2>
           <p className="text-muted-foreground max-w-4xl text-sm">
-            Manage validated Token Plan Plus inventory and manual MiniMax credential revocation.
+            Manage validated MiniMax Coding Plan inventory and manual credential revocation.
           </p>
         </div>
         <Button variant="secondary" asChild>
@@ -171,10 +207,22 @@ export function CodingPlansOperationsContent() {
         isError={countsQuery.isError}
       />
 
+      <InventoryCountsTable
+        items={inventoryCounts}
+        isLoading={countsQuery.isLoading}
+        isError={countsQuery.isError}
+      />
+
       <OperationsTabs
         workItems={workItems}
         queueLoading={queueQuery.isLoading}
         queueError={queueQuery.isError}
+        providerOptions={providerOptions}
+        planOptions={planOptions}
+        selectedProviderId={selectedProviderId}
+        selectedPlanId={selectedPlanId}
+        catalogLoading={catalogQuery.isLoading}
+        catalogError={catalogQuery.isError}
         entriesText={entriesText}
         submittedEntries={submittedEntries}
         uploadPending={uploadMutation.isPending}
@@ -183,8 +231,20 @@ export function CodingPlansOperationsContent() {
         onComplete={setCompleteInventoryId}
         onFailure={setFailureInventoryId}
         onRequeue={inventoryKeyId => requeueMutation.mutate({ inventoryKeyId })}
+        onProviderChange={value => setProviderId(value as UserByokProviderId)}
+        onPlanChange={value => setPlanId(value as CodingPlanId)}
         onEntriesTextChange={setEntriesText}
-        onUpload={() => uploadMutation.mutate({ planId: PLAN_ID, entries: submittedEntries })}
+        onUpload={() => {
+          if (!selectedPlan) {
+            return;
+          }
+
+          uploadMutation.mutate({
+            providerId: selectedProviderId as UserByokProviderId,
+            planId: selectedPlanId as CodingPlanId,
+            entries: submittedEntries,
+          });
+        }}
       />
 
       <OperationsDialogs
@@ -209,12 +269,21 @@ type InventorySummaryItem = {
   detail: string;
 };
 
+type InventoryCountItem = {
+  providerId: string;
+  planId: string;
+  status: string;
+  count: number;
+};
+
 type RevocationWorkItem = {
   inventoryKeyId: string;
+  providerId: string;
   planId: string;
   upstreamPlanId: string;
   status: string;
   revocationRequestedAt: string | null;
+  subscriptionExpiresAt: string | null;
   revocationAttemptCount: number;
   lastRevocationError: string | null;
 };
@@ -249,10 +318,79 @@ function InventorySummaryCards({
   );
 }
 
+function InventoryCountsTable({
+  items,
+  isLoading,
+  isError,
+}: {
+  items: InventoryCountItem[];
+  isLoading: boolean;
+  isError: boolean;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Inventory counts</CardTitle>
+        <CardDescription>
+          Credential inventory grouped by provider, plan, and status.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Provider</TableHead>
+                <TableHead>Plan</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Count</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isError ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-24 text-center text-red-300">
+                    Unable to load inventory counts.
+                  </TableCell>
+                </TableRow>
+              ) : items.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-muted-foreground h-24 text-center">
+                    {isLoading ? 'Loading inventory counts...' : 'No inventory recorded.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                items.map(item => (
+                  <TableRow key={`${item.providerId}:${item.planId}:${item.status}`}>
+                    <TableCell className="font-mono text-xs">{item.providerId}</TableCell>
+                    <TableCell className="font-mono text-xs">{item.planId}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{formatStatus(item.status)}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {item.count}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function OperationsTabs({
   workItems,
   queueLoading,
   queueError,
+  providerOptions,
+  planOptions,
+  selectedProviderId,
+  selectedPlanId,
+  catalogLoading,
+  catalogError,
   entriesText,
   submittedEntries,
   uploadPending,
@@ -261,12 +399,20 @@ function OperationsTabs({
   onComplete,
   onFailure,
   onRequeue,
+  onProviderChange,
+  onPlanChange,
   onEntriesTextChange,
   onUpload,
 }: {
   workItems: RevocationWorkItem[];
   queueLoading: boolean;
   queueError: boolean;
+  providerOptions: { providerId: string; providerName: string }[];
+  planOptions: { planId: string; name: string }[];
+  selectedProviderId: string;
+  selectedPlanId: string;
+  catalogLoading: boolean;
+  catalogError: boolean;
   entriesText: string;
   submittedEntries: string[];
   uploadPending: boolean;
@@ -275,9 +421,13 @@ function OperationsTabs({
   onComplete: (inventoryKeyId: string) => void;
   onFailure: (inventoryKeyId: string) => void;
   onRequeue: (inventoryKeyId: string) => void;
+  onProviderChange: (providerId: string) => void;
+  onPlanChange: (planId: string) => void;
   onEntriesTextChange: (entriesText: string) => void;
   onUpload: () => void;
 }) {
+  const hasSelectedPlan = planOptions.some(plan => plan.planId === selectedPlanId);
+
   return (
     <Tabs defaultValue="revocation-queue" className="space-y-4">
       <TabsList className="h-auto w-full flex-col items-stretch justify-start gap-1 rounded-xl p-1 sm:w-fit sm:flex-row sm:items-center">
@@ -305,9 +455,11 @@ function OperationsTabs({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Inventory item</TableHead>
-                    <TableHead>MiniMax plan ID</TableHead>
+                    <TableHead>Provider / plan</TableHead>
+                    <TableHead>Upstream plan ID</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Requested</TableHead>
+                    <TableHead>Subscription expires</TableHead>
                     <TableHead className="text-right">Attempts</TableHead>
                     <TableHead>Latest failure</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -316,13 +468,13 @@ function OperationsTabs({
                 <TableBody>
                   {queueError ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="h-24 text-center text-red-300">
+                      <TableCell colSpan={9} className="h-24 text-center text-red-300">
                         Unable to load manual revocation work. Refresh to retry.
                       </TableCell>
                     </TableRow>
                   ) : workItems.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-muted-foreground h-24 text-center">
+                      <TableCell colSpan={9} className="text-muted-foreground h-24 text-center">
                         {queueLoading ? 'Loading manual work...' : 'No revocation work pending.'}
                       </TableCell>
                     </TableRow>
@@ -330,7 +482,10 @@ function OperationsTabs({
                     workItems.map(item => (
                       <TableRow key={item.inventoryKeyId}>
                         <TableCell className="min-w-56 font-mono text-xs">
-                          <div>{item.inventoryKeyId}</div>
+                          {item.inventoryKeyId}
+                        </TableCell>
+                        <TableCell className="min-w-56 font-mono text-xs">
+                          <div>{item.providerId}</div>
                           <div className="text-muted-foreground mt-1">{item.planId}</div>
                         </TableCell>
                         <TableCell className="min-w-44 font-mono text-xs">
@@ -350,6 +505,9 @@ function OperationsTabs({
                         </TableCell>
                         <TableCell className="whitespace-nowrap font-mono text-xs">
                           {formatTimestamp(item.revocationRequestedAt)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap font-mono text-xs">
+                          {formatTimestamp(item.subscriptionExpiresAt)}
                         </TableCell>
                         <TableCell className="text-right font-mono tabular-nums">
                           {item.revocationAttemptCount}
@@ -400,18 +558,65 @@ function OperationsTabs({
           <CardHeader>
             <CardTitle>Upload validated inventory</CardTitle>
             <CardDescription>
-              Enter one MiniMax credential and plan ID pair per line. Each credential is tested
-              through ordinary MiniMax routing before encrypted storage as available inventory.
+              Choose the BYOK provider ID and Kilo plan for this batch. Enter one API key and
+              upstream plan ID pair per line.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {catalogError ? (
+              <Alert variant="warning">
+                <AlertDescription>
+                  Unable to load the Coding Plan catalog. Refresh before uploading inventory.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="coding-plan-provider">Provider</Label>
+                <Select
+                  value={selectedProviderId}
+                  onValueChange={onProviderChange}
+                  disabled={catalogLoading || providerOptions.length === 0 || uploadPending}
+                >
+                  <SelectTrigger id="coding-plan-provider">
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {providerOptions.map(provider => (
+                      <SelectItem key={provider.providerId} value={provider.providerId}>
+                        {provider.providerId} ({provider.providerName})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="coding-plan-plan">Plan</Label>
+                <Select
+                  value={selectedPlanId}
+                  onValueChange={onPlanChange}
+                  disabled={catalogLoading || planOptions.length === 0 || uploadPending}
+                >
+                  <SelectTrigger id="coding-plan-plan">
+                    <SelectValue placeholder="Select plan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {planOptions.map(plan => (
+                      <SelectItem key={plan.planId} value={plan.planId}>
+                        {plan.name} ({plan.planId})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="coding-plan-entries">MiniMax credentials and plan IDs</Label>
+              <Label htmlFor="coding-plan-entries">API keys and upstream plan IDs</Label>
               <Textarea
                 id="coding-plan-entries"
                 value={entriesText}
                 onChange={event => onEntriesTextChange(event.target.value)}
-                placeholder="<api key>::<plan id>"
+                placeholder="<api key>::<upstream plan id>"
                 className="min-h-28 font-mono"
                 autoComplete="off"
               />
@@ -425,7 +630,7 @@ function OperationsTabs({
             </Alert>
             <Button
               onClick={onUpload}
-              disabled={submittedEntries.length === 0 || uploadPending}
+              disabled={!hasSelectedPlan || submittedEntries.length === 0 || uploadPending}
               aria-busy={uploadPending}
             >
               <Upload className="size-4" />

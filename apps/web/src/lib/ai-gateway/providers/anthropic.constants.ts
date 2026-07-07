@@ -124,14 +124,6 @@ export function isClaudeModel(requestedModel: string) {
   return requestedModel.includes('claude');
 }
 
-export function isHaikuModel(requestedModel: string) {
-  return requestedModel.includes('haiku');
-}
-
-export function isOpusModel(requestedModel: string) {
-  return requestedModel.includes('opus');
-}
-
 export function isFableModel(requestedModel: string) {
   return requestedModel.includes('claude-fable');
 }

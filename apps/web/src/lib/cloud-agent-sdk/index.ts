@@ -1,5 +1,8 @@
-export { createSessionManager, formatError as formatSessionError } from './session-manager';
+export { formatError as formatSessionError } from './session-manager';
+export { createSessionManager } from './session-manager';
+export { CLI_MODEL_ID, cliModelLabel } from './cli-model';
 export type {
+  ActiveSessionType,
   SessionManager,
   SessionManagerConfig,
   SessionManagerAtoms,
@@ -59,7 +62,7 @@ export type { CliHistoricalTransportConfig } from './cli-historical-transport';
 export { createCliLiveTransport } from './cli-live-transport';
 export type { CliLiveTransportConfig } from './cli-live-transport';
 
-export { createUserWebConnection } from './user-web-connection';
+export { createUserWebConnection, UserWebCommandError } from './user-web-connection';
 export type {
   UserWebConnection,
   UserWebConnectionConfig,
@@ -69,6 +72,33 @@ export type {
   UserWebCliEvent,
   UserWebSystemEvent,
 } from './user-web-connection';
+
+export {
+  REMOTE_MODEL_IDENTITY_MAX_LENGTH,
+  REMOTE_MODEL_MAX_MODELS_PER_PROVIDER,
+  REMOTE_MODEL_MAX_MODELS_TOTAL,
+  REMOTE_MODEL_MAX_PROVIDERS,
+  REMOTE_MODEL_MAX_VARIANTS_PER_MODEL,
+  REMOTE_MODEL_MAX_VARIANTS_TOTAL,
+  createModelRefKeyMap,
+  getRemoteModelRecommendedRank,
+  isRemoteModelRecommended,
+  modelRefSchema,
+  modelRefsEqual,
+  modelSelectionSchema,
+  remoteModelCatalogV1Schema,
+  remoteModelCatalogWireV1Schema,
+  sortRemoteModelCatalogProviders,
+} from './remote-model-catalog';
+export type {
+  ModelRef,
+  ModelRefKeyMap,
+  ModelSelection,
+  RemoteModelCatalogV1,
+  RemoteModelCatalogWireV1,
+  RemoteModelOverride,
+  RemoteModelState,
+} from './remote-model-catalog';
 
 export type {
   CloudAgentApi,

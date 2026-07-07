@@ -10,7 +10,9 @@ import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import type { Images } from '@/lib/images-schema';
 import type { NormalizedEvent } from './normalizer';
 import type { SuggestionAction } from './types';
+import type { RemoteModelOverride, RemoteModelState } from './remote-model-catalog';
 import { createChatProcessor } from './chat-processor';
+import { heartbeatDataSchema, sessionsListDataSchema } from './schemas';
 import { createServiceState } from './service-state';
 import type { ServiceState } from './service-state';
 import { createCloudAgentTransport } from './cloud-agent-transport';
@@ -63,8 +65,11 @@ type CloudAgentSessionConfig = {
   onSuggestionResolved?: (requestId: string) => void;
   onBranchChanged?: (branch: string) => void;
   onResolved?: (resolved: ResolvedSession) => void;
+  onRemoteModelStateChange?: (state: RemoteModelState) => void;
+  onTransportCapabilityChange?: () => void;
   onSessionCreated?: (info: SessionInfo) => void;
   onSessionUpdated?: (info: SessionInfo) => void;
+  onReplayComplete?: () => void;
   onEvent?: (event: NormalizedEvent) => void;
   onMessageQueued?: (messageId: string) => void;
   onMessageCompleted?: (messageId: string) => void;
@@ -79,6 +84,7 @@ type CloudAgentSessionSendInput = {
   messageId?: string;
   attachments?: CloudAgentAttachments;
   images?: Images;
+  remoteModelOverride?: RemoteModelOverride;
 };
 
 type CloudAgentSessionAnswerInput = {
@@ -127,7 +133,7 @@ type CloudAgentSession = {
   state: ServiceState;
 
   // Commands
-  send: (payload: CloudAgentSessionSendInput) => unknown | Promise<unknown>;
+  send: (input: CloudAgentSessionSendInput) => unknown | Promise<unknown>;
   interrupt: () => unknown | Promise<unknown>;
   answer: (payload: CloudAgentSessionAnswerInput) => unknown | Promise<unknown>;
   reject: (payload: CloudAgentSessionRejectInput) => unknown | Promise<unknown>;
@@ -138,6 +144,7 @@ type CloudAgentSession = {
   dismissSuggestion: (
     payload: CloudAgentSessionDismissSuggestionInput
   ) => unknown | Promise<unknown>;
+  retryRemoteModels: () => void;
 
   // Capability checks
   canSend: boolean;
@@ -173,6 +180,48 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
   let transport: Transport | null = null;
   let connectGeneration = 0;
+  let disarmUpgradeWatcher: (() => void) | null = null;
+
+  // A session resolves to 'read-only' when the CLI hasn't (yet) reported it as
+  // active — but that signal is eventually consistent: enabling remote on the
+  // CLI takes a connect + heartbeat round-trip to register. Without this
+  // watcher, opening the session inside that window pins it to the static
+  // historical snapshot forever. Watch the user-web connection for the session
+  // showing up in a CLI heartbeat/list and re-resolve to upgrade to live.
+  function armUpgradeWatcher(): void {
+    const connection = config.transport.userWebConnection;
+    if (!connection) return;
+
+    // Subscribe (not just retain) while watching: the server only pushes
+    // sessions.heartbeat and subscribe-triggered sessions.list re-sends to
+    // sockets subscribed to the session, so a bare retain never sees the
+    // upgrade trigger. Subscribing also retains the socket.
+    const release = connection.subscribeToCliSession(config.kiloSessionId);
+    const off = connection.onSystemEvent(({ event, data }) => {
+      if (event !== 'sessions.list' && event !== 'sessions.heartbeat') return;
+      const schema = event === 'sessions.list' ? sessionsListDataSchema : heartbeatDataSchema;
+      const parsed = schema.safeParse(data);
+      if (!parsed.success) return;
+      if (!parsed.data.sessions.some(session => session.id === config.kiloSessionId)) return;
+      connectInternal();
+    });
+    disarmUpgradeWatcher = () => {
+      off();
+      release();
+    };
+  }
+
+  function connectInternal(): void {
+    disarmUpgradeWatcher?.();
+    disarmUpgradeWatcher = null;
+    if (transport) {
+      transport.destroy();
+      transport = null;
+    }
+    connectGeneration += 1;
+    serviceState.setActivity({ type: 'connecting' });
+    void resolveAndConnect(connectGeneration);
+  }
 
   const sink: TransportSink = {
     onChatEvent(event) {
@@ -193,6 +242,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
       config.onEvent?.(event);
     },
+    onReplayComplete: () => config.onReplayComplete?.(),
   };
 
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {
@@ -208,6 +258,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
           userWebConnection: config.transport.userWebConnection,
           fetchSnapshot: config.transport.fetchSnapshot,
           onError: config.onError,
+          onRemoteModelStateChange: config.onRemoteModelStateChange,
+          onCapabilityChange: config.onTransportCapabilityChange,
         });
       }
       case 'cloud-agent': {
@@ -291,17 +343,23 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
 
     transport = factory(sink);
     transport.connect();
+
+    if (resolved.type === 'read-only') {
+      armUpgradeWatcher();
+    }
   }
+
+  const send = (input: CloudAgentSessionSendInput): unknown | Promise<unknown> => {
+    if (!transport?.send) {
+      throw new Error('CloudAgentSession transport.send is not configured');
+    }
+    return transport.send(input);
+  };
 
   return {
     storage,
     state: serviceState,
-    send: payload => {
-      if (!transport?.send) {
-        throw new Error('CloudAgentSession transport.send is not configured');
-      }
-      return transport.send(payload);
-    },
+    send,
     interrupt: () => {
       if (!transport?.interrupt) {
         throw new Error('CloudAgentSession transport.interrupt is not configured');
@@ -360,22 +418,21 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
       return result;
     },
+    retryRemoteModels() {
+      transport?.retryRemoteModels?.();
+    },
     get canSend() {
-      return transport?.send !== undefined;
+      return transport?.send !== undefined && (transport.canSend?.() ?? true);
     },
     get canInterrupt() {
       return transport?.interrupt !== undefined;
     },
     connect() {
-      if (transport) {
-        transport.destroy();
-        transport = null;
-      }
-      connectGeneration += 1;
-      serviceState.setActivity({ type: 'connecting' });
-      void resolveAndConnect(connectGeneration);
+      connectInternal();
     },
     disconnect() {
+      disarmUpgradeWatcher?.();
+      disarmUpgradeWatcher = null;
       connectGeneration += 1;
       if (transport) {
         transport.disconnect();
@@ -383,6 +440,8 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       }
     },
     destroy() {
+      disarmUpgradeWatcher?.();
+      disarmUpgradeWatcher = null;
       connectGeneration += 1;
       if (transport) {
         transport.destroy();

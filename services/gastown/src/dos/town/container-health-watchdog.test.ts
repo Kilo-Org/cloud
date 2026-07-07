@@ -10,6 +10,7 @@ import {
   type ContainerHealthLogData,
   type ContainerHealthPingOutcome,
   type ContainerHealthWatchdogDeps,
+  type ContainerRecoveryPathHint,
 } from './container-health-watchdog';
 import type { GastownEventData } from '../../util/analytics.util';
 
@@ -54,11 +55,13 @@ function makeDeps(
   const events: GastownEventData[] = [];
   const logs: ContainerHealthLogData[] = [];
   const destroyFn = vi.fn().mockResolvedValue(undefined);
+  let recoveryPathHint: ContainerRecoveryPathHint | undefined;
   let outcome: ContainerHealthPingOutcome = failedOutcome();
   let currentTime = CONTAINER_HEALTH_COLD_START_GRACE_MS + 1;
 
   return {
     townId: 'town-1',
+    containerDoId: 'container-do-abc',
     get outcome() {
       return outcome;
     },
@@ -103,6 +106,23 @@ function makeDeps(
     },
     deleteAutoRestartExhaustedWindowStart: () =>
       Promise.resolve(store.delete(CONTAINER_HEALTH_STORAGE_KEYS.autoRestartExhaustedWindowStart)),
+    getUnhealthyEpisodeStartedAt: () =>
+      Promise.resolve(store.get(CONTAINER_HEALTH_STORAGE_KEYS.unhealthyEpisodeStartedAt)),
+    setUnhealthyEpisodeStartedAt: value => {
+      store.set(CONTAINER_HEALTH_STORAGE_KEYS.unhealthyEpisodeStartedAt, value);
+      return Promise.resolve();
+    },
+    deleteUnhealthyEpisodeStartedAt: () =>
+      Promise.resolve(store.delete(CONTAINER_HEALTH_STORAGE_KEYS.unhealthyEpisodeStartedAt)),
+    getRecoveryPathHint: () => Promise.resolve(recoveryPathHint),
+    setRecoveryPathHint: value => {
+      recoveryPathHint = value;
+      return Promise.resolve();
+    },
+    deleteRecoveryPathHint: () => {
+      recoveryPathHint = undefined;
+      return Promise.resolve(true);
+    },
     getContainerStub:
       overrides.getContainerStub ??
       (() => ({
@@ -164,9 +184,14 @@ describe('recoverContainerIfWedged', () => {
     expect(deps._events[0]).toMatchObject({
       event: 'container.auto_restart',
       townId: 'town-1',
+      containerId: 'container-do-abc',
       reason: 'health_ping_timeout',
       value: CONTAINER_HEALTH_FAILURE_THRESHOLD,
     });
+    // The Cloudflare container id is stamped on both sinks for support debugging.
+    expect(deps._logs).toContainEqual(
+      expect.objectContaining({ event: 'container.auto_restart', containerId: 'container-do-abc' })
+    );
     expect(deps._store.get(CONTAINER_HEALTH_STORAGE_KEYS.consecutiveHealthFailures)).toBe(0);
   });
 
@@ -290,5 +315,113 @@ describe('recoverContainerIfWedged', () => {
       error: 'destroy failed',
     });
     expect(deps._store.has(CONTAINER_HEALTH_STORAGE_KEYS.lastAutoRestartAt)).toBe(false);
+  });
+
+  it('emits health_recovered with recoveredAfter=auto_restart after a restart heals', async () => {
+    const deps = makeDeps();
+    await triggerRestartReadyFailure(deps, CONTAINER_HEALTH_COLD_START_GRACE_MS + 1);
+    expect(deps._destroyFn).toHaveBeenCalledTimes(1);
+
+    deps._setOutcome(successOutcome());
+    deps._setNow(CONTAINER_HEALTH_COLD_START_GRACE_MS + 10_000);
+    await recoverContainerIfWedged(deps);
+
+    const recovered = deps._events.find(e => e.event === 'container.health_recovered');
+    // consecutiveFailures is 0 here: the auto_restart reset the streak counter,
+    // and the very next ping succeeded — the post-last-restart streak semantic.
+    expect(recovered).toMatchObject({
+      event: 'container.health_recovered',
+      townId: 'town-1',
+      reason: 'auto_restart',
+      value: 0,
+    });
+    expect(recovered?.durationMs ?? 0).toBeGreaterThan(0);
+    expect(deps._logs).toContainEqual(
+      expect.objectContaining({ event: 'container.health_recovered', reason: 'auto_restart' })
+    );
+    // Episode markers cleared so a subsequent success does not re-emit recovery.
+    expect(deps._store.has(CONTAINER_HEALTH_STORAGE_KEYS.unhealthyEpisodeStartedAt)).toBe(false);
+    await recoverContainerIfWedged(deps);
+    expect(deps._events.filter(e => e.event === 'container.health_recovered')).toHaveLength(1);
+  });
+
+  it('emits health_recovered with recoveredAfter=self for sub-threshold flapping', async () => {
+    const deps = makeDeps();
+    deps._setNow(1_000);
+    await recoverContainerIfWedged(deps);
+    deps._setNow(2_000);
+    await recoverContainerIfWedged(deps);
+
+    deps._setOutcome(successOutcome());
+    deps._setNow(5_000);
+    await recoverContainerIfWedged(deps);
+
+    expect(deps._destroyFn).not.toHaveBeenCalled();
+    expect(deps._events).toContainEqual(
+      expect.objectContaining({
+        event: 'container.health_recovered',
+        reason: 'self',
+        value: 2,
+        durationMs: 4_000,
+      })
+    );
+  });
+
+  it('emits health_recovered with recoveredAfter=cold_start_grace when only a grace-skip occurred', async () => {
+    const deps = makeDeps();
+    deps._setNow(1_000);
+    await recoverContainerIfWedged(deps);
+    deps._setNow(2_000);
+    await recoverContainerIfWedged(deps);
+    deps._setNow(3_000);
+    await recoverContainerIfWedged(deps);
+
+    expect(deps._destroyFn).not.toHaveBeenCalled();
+    expect(deps._logs).toContainEqual(
+      expect.objectContaining({
+        event: 'container.auto_restart_skipped',
+        reason: 'cold_start_grace',
+      })
+    );
+
+    deps._setOutcome(successOutcome());
+    deps._setNow(10_000);
+    await recoverContainerIfWedged(deps);
+
+    expect(deps._events).toContainEqual(
+      expect.objectContaining({
+        event: 'container.health_recovered',
+        reason: 'cold_start_grace',
+        value: CONTAINER_HEALTH_FAILURE_THRESHOLD,
+        durationMs: 9_000,
+      })
+    );
+  });
+
+  it('does not emit health_recovered on a clean success with no prior episode', async () => {
+    const deps = makeDeps();
+    deps._setOutcome(successOutcome());
+    deps._setNow(1_000);
+    await recoverContainerIfWedged(deps);
+
+    expect(deps._events).toHaveLength(0);
+    expect(deps._logs).toHaveLength(0);
+  });
+
+  it('writes container.health_watchdog_error to AE and Logpush when the watchdog throws', async () => {
+    const deps = makeDeps({
+      isDraining: () => {
+        throw new Error('boom');
+      },
+    });
+
+    await triggerRestartReadyFailure(deps, CONTAINER_HEALTH_COLD_START_GRACE_MS + 1);
+
+    expect(deps._events).toContainEqual(
+      expect.objectContaining({ event: 'container.health_watchdog_error', error: 'boom' })
+    );
+    expect(deps._logs).toContainEqual(
+      expect.objectContaining({ event: 'container.health_watchdog_error', error: 'boom' })
+    );
   });
 });

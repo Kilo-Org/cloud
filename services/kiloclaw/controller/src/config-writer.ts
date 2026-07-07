@@ -83,6 +83,12 @@ const LEGACY_STREAM_CHAT_PLUGIN_PATH =
   '/usr/local/lib/node_modules/@wunderchat/openclaw-channel-streamchat';
 const KILO_CHAT_PLUGIN_ID = 'kilo-chat';
 const KILO_CHAT_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
+// KiloCode provider was externalized from openclaw core into a standalone plugin
+// (openclaw #93470, 2026.6.9). It is installed globally by the Dockerfile and must
+// be loaded explicitly — an explicit `models.providers.kilocode` entry alone no
+// longer loads it now that it is not bundled.
+const KILOCODE_PROVIDER_PLUGIN_ID = 'kilocode';
+const KILOCODE_PROVIDER_PLUGIN_PATH = '/usr/local/lib/node_modules/@openclaw/kilocode-provider';
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
 
 type KiloExaSearchMode = 'kilo-proxy' | 'disabled';
@@ -284,10 +290,12 @@ export function generateBaseConfig(
     );
   }
 
-  // KiloCode provider entry. The bundled openclaw kilocode plugin only loads
-  // when an explicit `models.providers.kilocode` entry exists in the config —
-  // without it, the plugin's catalog hook never runs and live gateway model
-  // discovery never populates `kilo-auto/*` and the rest of the dynamic
+  // KiloCode provider entry. The kilocode provider is an external plugin
+  // (openclaw #93470) — it is installed by the Dockerfile and loaded via
+  // `plugins.load.paths` (see KILOCODE_PROVIDER_PLUGIN_PATH above). It still only
+  // activates when an explicit `models.providers.kilocode` entry exists in the
+  // config — without it, the plugin's catalog hook never runs and live gateway
+  // model discovery never populates `kilo-auto/*` and the rest of the dynamic
   // catalog. So we always include this entry (production baseUrl, empty
   // `models` so live discovery owns the catalog).
   //
@@ -406,6 +414,17 @@ export function generateBaseConfig(
     : [];
   if (!(config.plugins.load.paths as string[]).includes(KILOCLAW_CUSTOMIZER_PLUGIN_PATH)) {
     (config.plugins.load.paths as string[]).push(KILOCLAW_CUSTOMIZER_PLUGIN_PATH);
+  }
+  // KiloCode provider is now an external plugin (openclaw #93470); load it explicitly
+  // so model routing through the Kilo Gateway continues to work.
+  if (!(config.plugins.load.paths as string[]).includes(KILOCODE_PROVIDER_PLUGIN_PATH)) {
+    (config.plugins.load.paths as string[]).push(KILOCODE_PROVIDER_PLUGIN_PATH);
+  }
+  if (
+    Array.isArray(config.plugins.allow) &&
+    !config.plugins.allow.includes(KILOCODE_PROVIDER_PLUGIN_ID)
+  ) {
+    config.plugins.allow.push(KILOCODE_PROVIDER_PLUGIN_ID);
   }
   if (
     Array.isArray(config.plugins.allow) &&

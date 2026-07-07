@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, lazy, Suspense } from 'react';
-import { createPortal } from 'react-dom';
+import { lazy, Suspense } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 const LazyPicker = lazy(async () => {
   const [{ default: data }, { default: Picker }] = await Promise.all([
@@ -15,67 +15,61 @@ const LazyPicker = lazy(async () => {
   };
 });
 
-/** Approximate height of the emoji-mart picker. */
-const PICKER_HEIGHT = 435;
+/**
+ * The emoji-mart picker panel without any positioning concerns. Render it
+ * inside a Popover (see EmojiPicker) or any other anchored surface.
+ */
+export function EmojiMartPanel({ onSelect }: { onSelect: (emoji: string) => void }) {
+  return (
+    <Suspense
+      fallback={<div className="bg-muted rounded-lg p-8 text-center text-sm">Loading&hellip;</div>}
+    >
+      <LazyPicker
+        onEmojiSelect={(emoji: { native: string }) => {
+          onSelect(emoji.native);
+        }}
+        // Intentionally hardcoded to "dark" — the chat UI is dark-themed and
+        // "auto" causes a jarring white picker when the OS is in light mode.
+        theme="dark"
+        previewPosition="none"
+        skinTonePosition="none"
+        maxFrequentRows={1}
+      />
+    </Suspense>
+  );
+}
 
 type EmojiPickerProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSelect: (emoji: string) => void;
-  onClose: () => void;
-  /** Element to anchor the picker to. If omitted, renders inline. */
-  anchorRef?: React.RefObject<HTMLElement | null>;
+  align?: 'start' | 'center' | 'end';
+  /** The trigger element (e.g. an add-reaction button). */
+  children: React.ReactNode;
 };
 
-export function EmojiPicker({ onSelect, onClose, anchorRef }: EmojiPickerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [style, setStyle] = useState<React.CSSProperties | undefined>(undefined);
-
-  useEffect(() => {
-    if (!anchorRef?.current) return;
-    const rect = anchorRef.current.getBoundingClientRect();
-    const spaceAbove = rect.top;
-    const placeAbove = spaceAbove >= PICKER_HEIGHT + 8;
-
-    setStyle({
-      position: 'fixed',
-      left: Math.max(8, Math.min(rect.left, window.innerWidth - 360)),
-      ...(placeAbove
-        ? { top: rect.top - 4, transform: 'translateY(-100%)' }
-        : { top: rect.bottom + 4 }),
-    });
-  }, [anchorRef]);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
-
-  const picker = (
-    <div ref={containerRef} className="z-[100]" style={style}>
-      <Suspense
-        fallback={<div className="bg-muted rounded-lg p-8 text-center text-sm">Loading...</div>}
-      >
-        <LazyPicker
-          onEmojiSelect={(emoji: { native: string }) => {
-            onSelect(emoji.native);
+/**
+ * Full emoji picker anchored to its trigger via Radix Popover. Radix supplies
+ * collision handling, outside-click dismissal, Escape, and focus management.
+ */
+export function EmojiPicker({
+  open,
+  onOpenChange,
+  onSelect,
+  align = 'start',
+  children,
+}: EmojiPickerProps) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>{children}</PopoverTrigger>
+      <PopoverContent align={align} className="w-auto border-none bg-transparent p-0 shadow-none">
+        <EmojiMartPanel
+          onSelect={emoji => {
+            onSelect(emoji);
+            onOpenChange(false);
           }}
-          // Intentionally hardcoded to "dark" — the chat UI is dark-themed and
-          // "auto" causes a jarring white picker when the OS is in light mode.
-          theme="dark"
-          previewPosition="none"
-          skinTonePosition="none"
-          maxFrequentRows={1}
         />
-      </Suspense>
-    </div>
+      </PopoverContent>
+    </Popover>
   );
-
-  if (anchorRef) {
-    return createPortal(picker, document.body);
-  }
-  return picker;
 }

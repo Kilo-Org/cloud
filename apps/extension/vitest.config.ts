@@ -12,6 +12,6 @@ export default defineConfig({
       reporter: ['text', 'html'],
     },
     globals: false,
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'entrypoints/**/*.test.ts'],
   },
 });

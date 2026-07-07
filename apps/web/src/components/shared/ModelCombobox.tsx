@@ -13,9 +13,16 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { BookOpenCheck, ChevronsUpDown, Check, Image } from 'lucide-react';
+import { BookOpenCheck, Brain, ChevronsUpDown, Check, Image } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { preferredModels } from '@/lib/ai-gateway/models';
+import {
+  buildModelOptionGroups,
+  getModelOptionKeywords,
+  type ModelOption,
+  type ModelOptionGroup,
+} from './model-combobox-options';
+
+export type { ModelOption };
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
 import {
@@ -27,17 +34,6 @@ import {
   isFreeModelOption,
   mayTrainOnYourPrompts,
 } from '@/components/shared/free-model-data-disclosure';
-
-export type ModelOption = {
-  id: string; // e.g., "anthropic/claude-sonnet-4.5"
-  name: string; // e.g., "Claude Sonnet 4.5"
-  supportsVision?: boolean;
-  isFree?: boolean;
-  mayTrainOnYourPrompts?: boolean;
-  hasUserByokAvailable?: boolean;
-  /** Ordered list of variant key names (e.g., ["none","low","medium","high","max"]) */
-  variants?: string[];
-};
 
 export type ModelComboboxProps = {
   label?: string;
@@ -59,6 +55,8 @@ export type ModelComboboxProps = {
   className?: string;
   /** Whether the combobox is disabled */
   disabled?: boolean;
+  /** Optional model option rendered above grouped models without an id subtitle. */
+  pinnedModel?: ModelOption;
   /**
    * Render the popover as a modal layer. Required when the combobox is
    * itself inside a Radix Dialog — without this, the dialog's focus/pointer
@@ -85,6 +83,7 @@ export function ModelCombobox({
   variant = 'full',
   className,
   disabled = false,
+  pinnedModel,
   modal = false,
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
@@ -95,35 +94,13 @@ export function ModelCombobox({
     listRef.current?.scrollTo({ top: 0 });
   }, []);
 
-  // Sort models: preferred models first (in preferredModels order), then others alphabetically
-  // This must be called before any early returns to follow Rules of Hooks
-  const sortedModels = useMemo(() => {
-    const preferred: ModelOption[] = [];
-    const others: ModelOption[] = [];
+  const modelGroups = useMemo(() => buildModelOptionGroups(models), [models]);
 
-    models.forEach(model => {
-      if (preferredModels.includes(model.id)) {
-        preferred.push(model);
-      } else {
-        others.push(model);
-      }
-    });
-
-    // Sort preferred by their index in preferredModels array
-    preferred.sort((a, b) => {
-      return preferredModels.indexOf(a.id) - preferredModels.indexOf(b.id);
-    });
-
-    // Sort others alphabetically by name
-    others.sort((a, b) => a.name.localeCompare(b.name));
-
-    return { preferred, others };
-  }, [models]);
-
-  const selectedModel = models.find(model => model.id === value);
+  const selectedModel = [pinnedModel, ...models].find(model => model?.id === value);
   const isCompact = variant === 'compact';
   const showLabel = !isCompact && label;
-  const selectedCollectsData = mayTrainOnYourPrompts(selectedModel);
+  const selectedCollectsData =
+    selectedModel?.showGatewayMetadata !== false && mayTrainOnYourPrompts(selectedModel);
 
   if (isLoading) {
     if (isCompact) {
@@ -175,7 +152,7 @@ export function ModelCombobox({
     );
   }
 
-  if (!models || models.length === 0) {
+  if ((!models || models.length === 0) && !pinnedModel) {
     if (isCompact) {
       return (
         <Button
@@ -236,82 +213,24 @@ export function ModelCombobox({
             <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearchChange} />
             <CommandEmpty>{noResultsText}</CommandEmpty>
             <CommandList ref={listRef} className="max-h-64 overflow-auto">
-              {sortedModels.preferred.length > 0 && (
-                <CommandGroup heading="Recommended">
-                  {sortedModels.preferred.map(model => (
-                    <CommandItem
-                      key={model.id}
-                      value={`${model.name} ${model.id}`}
-                      keywords={[model.id, model.name]}
-                      onSelect={() => {
-                        onValueChange(model.id);
-                        setOpen(false);
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <div className="flex flex-col truncate">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate">{model.name}</span>
-                          {model.supportsVision === true && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Image className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                              </TooltipTrigger>
-                              <TooltipContent>Supports vision</TooltipContent>
-                            </Tooltip>
-                          )}
-                          <ModelMetadataBadges model={model} />
-                        </div>
-                        <span className="text-muted-foreground truncate text-xs">{model.id}</span>
-                      </div>
-                      <Check
-                        className={cn(
-                          'ml-auto h-4 w-4 shrink-0',
-                          model.id === value ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
+              {pinnedModel && (
+                <PinnedModelOption
+                  model={pinnedModel}
+                  value={value}
+                  onSelect={modelId => {
+                    onValueChange(modelId);
+                    setOpen(false);
+                  }}
+                />
               )}
-              {sortedModels.others.length > 0 && (
-                <CommandGroup heading="All Models">
-                  {sortedModels.others.map(model => (
-                    <CommandItem
-                      key={model.id}
-                      value={`${model.name} ${model.id}`}
-                      keywords={[model.id, model.name]}
-                      onSelect={() => {
-                        onValueChange(model.id);
-                        setOpen(false);
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <div className="flex flex-col truncate">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate">{model.name}</span>
-                          {model.supportsVision === true && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Image className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                              </TooltipTrigger>
-                              <TooltipContent>Supports vision</TooltipContent>
-                            </Tooltip>
-                          )}
-                          <ModelMetadataBadges model={model} />
-                        </div>
-                        <span className="text-muted-foreground truncate text-xs">{model.id}</span>
-                      </div>
-                      <Check
-                        className={cn(
-                          'ml-auto h-4 w-4 shrink-0',
-                          model.id === value ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
+              <ModelOptionGroups
+                groups={modelGroups}
+                value={value}
+                onSelect={modelId => {
+                  onValueChange(modelId);
+                  setOpen(false);
+                }}
+              />
             </CommandList>
           </Command>
         </PopoverContent>
@@ -360,88 +279,135 @@ export function ModelCombobox({
             <CommandInput placeholder={searchPlaceholder} onValueChange={handleSearchChange} />
             <CommandEmpty>{noResultsText}</CommandEmpty>
             <CommandList ref={listRef} className="max-h-64 overflow-auto">
-              {sortedModels.preferred.length > 0 && (
-                <CommandGroup heading="Recommended">
-                  {sortedModels.preferred.map(model => (
-                    <CommandItem
-                      key={model.id}
-                      value={`${model.name} ${model.id}`}
-                      keywords={[model.id, model.name]}
-                      onSelect={() => {
-                        onValueChange(model.id);
-                        setOpen(false);
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <div className="flex flex-col truncate">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate">{model.name}</span>
-                          {model.supportsVision === true && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Image className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                              </TooltipTrigger>
-                              <TooltipContent>Supports vision</TooltipContent>
-                            </Tooltip>
-                          )}
-                          <ModelMetadataBadges model={model} />
-                        </div>
-                        <span className="text-muted-foreground truncate text-xs">{model.id}</span>
-                      </div>
-                      <Check
-                        className={cn(
-                          'ml-auto h-4 w-4 shrink-0',
-                          model.id === value ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
+              {pinnedModel && (
+                <PinnedModelOption
+                  model={pinnedModel}
+                  value={value}
+                  onSelect={modelId => {
+                    onValueChange(modelId);
+                    setOpen(false);
+                  }}
+                />
               )}
-              {sortedModels.others.length > 0 && (
-                <CommandGroup heading="All Models">
-                  {sortedModels.others.map(model => (
-                    <CommandItem
-                      key={model.id}
-                      value={`${model.name} ${model.id}`}
-                      keywords={[model.id, model.name]}
-                      onSelect={() => {
-                        onValueChange(model.id);
-                        setOpen(false);
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <div className="flex flex-col truncate">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate">{model.name}</span>
-                          {model.supportsVision === true && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Image className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
-                              </TooltipTrigger>
-                              <TooltipContent>Supports vision</TooltipContent>
-                            </Tooltip>
-                          )}
-                          <ModelMetadataBadges model={model} />
-                        </div>
-                        <span className="text-muted-foreground truncate text-xs">{model.id}</span>
-                      </div>
-                      <Check
-                        className={cn(
-                          'ml-auto h-4 w-4 shrink-0',
-                          model.id === value ? 'opacity-100' : 'opacity-0'
-                        )}
-                      />
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
+              <ModelOptionGroups
+                groups={modelGroups}
+                value={value}
+                onSelect={modelId => {
+                  onValueChange(modelId);
+                  setOpen(false);
+                }}
+              />
             </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
       {!isCompact && helperText && <p className="text-muted-foreground text-xs">{helperText}</p>}
     </div>
+  );
+}
+
+function PinnedModelOption({
+  model,
+  value,
+  onSelect,
+}: {
+  model: ModelOption;
+  value?: string;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <CommandGroup>
+      <CommandItem
+        key={model.id}
+        value={`${model.name} ${model.id}`}
+        keywords={getModelOptionKeywords(model)}
+        onSelect={() => onSelect(model.id)}
+        className="flex items-center gap-2"
+      >
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate">{model.name}</span>
+            {model.showGatewayMetadata !== false && <ModelMetadataBadges model={model} />}
+          </div>
+        </div>
+        <Check
+          className={cn(
+            'ml-auto h-4 w-4 shrink-0',
+            model.id === value ? 'opacity-100' : 'opacity-0'
+          )}
+        />
+      </CommandItem>
+    </CommandGroup>
+  );
+}
+
+function ModelOptionGroups({
+  groups,
+  value,
+  onSelect,
+}: {
+  groups: ModelOptionGroup[];
+  value?: string;
+  onSelect: (value: string) => void;
+}) {
+  return groups.map(group => (
+    <CommandGroup key={group.id} heading={group.heading}>
+      {group.models.map(model => {
+        const keywords = getModelOptionKeywords(model);
+        return (
+          <CommandItem
+            key={model.id}
+            value={keywords.join(' ')}
+            keywords={keywords}
+            disabled={model.unavailable}
+            onSelect={() => onSelect(model.id)}
+            className="flex items-center gap-2"
+          >
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate">{model.name}</span>
+                {model.supportsVision === true && (
+                  <RowIconHint icon={Image} label="Supports vision" />
+                )}
+                {model.supportsReasoning === true && (
+                  <RowIconHint icon={Brain} label="Supports reasoning" />
+                )}
+                {model.showGatewayMetadata !== false && <ModelMetadataBadges model={model} />}
+                {model.unavailable && (
+                  <span className="border-border bg-muted text-muted-foreground inline-flex shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
+                    Unavailable
+                  </span>
+                )}
+              </div>
+              <span className="text-muted-foreground truncate text-xs">
+                {model.displayId ?? model.id}
+              </span>
+            </div>
+            <Check
+              className={cn(
+                'ml-auto h-4 w-4 shrink-0',
+                model.id === value ? 'opacity-100' : 'opacity-0'
+              )}
+            />
+          </CommandItem>
+        );
+      })}
+    </CommandGroup>
+  ));
+}
+
+/**
+ * Row-level icon hint used in the model list. Options can number in the
+ * hundreds (a CLI's full connected-provider catalog), and Radix's Tooltip
+ * mounts a Portal-backed component tree per instance, so using it here makes
+ * opening the list itself slow. A native `title` gives the same hover text
+ * for a single lightweight span.
+ */
+function RowIconHint({ icon: Icon, label }: { icon: typeof Image; label: string }) {
+  return (
+    <span title={label} aria-label={label} className="inline-flex shrink-0 items-center">
+      <Icon className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+    </span>
   );
 }
 
@@ -482,7 +448,15 @@ function ModelMetadataBadges({ model }: { model: ModelOption }) {
           {BYOK_MODEL_LABEL}
         </span>
       )}
-      {collectsData && <FreeModelDataIcon compact />}
+      {collectsData && (
+        <span
+          title={getFreeModelDataTooltip()}
+          aria-label={FREE_MODEL_DATA_LABEL}
+          className="inline-flex shrink-0 items-center rounded-sm text-foreground"
+        >
+          <BookOpenCheck className="h-3 w-3" />
+        </span>
+      )}
     </span>
   );
 }

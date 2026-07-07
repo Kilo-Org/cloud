@@ -58,12 +58,18 @@ export type QueueBacklogAlertPayload = {
 export type GastownHealthAlertPayload = {
   alertType: 'gastown_container_health';
   severity: 'ticket';
-  weightedFailedChecks: number;
-  affectedTownCount: number;
   windowMinutes: number;
-  crossedThresholds: Array<'failed_checks' | 'affected_towns'>;
-  failedChecksThreshold: number;
-  affectedTownsThreshold: number;
+  sustainedFailureMinutes: number;
+  // Towns whose watchdog exhausted its restart budget — confirmed wedges.
+  exhaustedTownIds: string[];
+  // Towns failing continuously past the sustained threshold with no recovery.
+  sustainedTownIds: string[];
+  // Broad "code was updated" churn is suspected; the page carries an annotation.
+  deployChurnSuspected: boolean;
+  deployChurnTownCount: number;
+  // Info-trend context (does not gate paging).
+  affectedTownCount: number;
+  weightedFailedChecks: number;
 };
 
 export type AlertPayload =
@@ -217,14 +223,32 @@ const GASTOWN_DASHBOARD_URL = 'https://ops.kiloapps.io/d/gastown-ops-1/gastown-o
 const GASTOWN_HEALTH_RUNBOOK_URL =
   'https://github.com/Kilo-Org/on-call/blob/main/runbooks/gastown-container-health-failures.md';
 
+function formatTownList(townIds: string[]): string {
+  if (townIds.length === 0) return 'none';
+  const shown = townIds.slice(0, 10).join(', ');
+  return townIds.length > 10 ? `${shown} (+${townIds.length - 10} more)` : shown;
+}
+
+function buildGastownHealthReason(alert: GastownHealthAlertPayload): string {
+  const reasons: string[] = [];
+  if (alert.exhaustedTownIds.length > 0) {
+    reasons.push(
+      `${alert.exhaustedTownIds.length} town(s) exhausted auto-restarts (confirmed wedge): ${formatTownList(alert.exhaustedTownIds)}`
+    );
+  }
+  if (alert.sustainedTownIds.length > 0) {
+    reasons.push(
+      `${alert.sustainedTownIds.length} town(s) failing >= ${alert.sustainedFailureMinutes} min with no recovery: ${formatTownList(alert.sustainedTownIds)}`
+    );
+  }
+  return reasons.length > 0 ? reasons.join('\n') : 'Container health wedge detected.';
+}
+
 function buildGastownHealthSlackBlocks(alert: GastownHealthAlertPayload): object[] {
-  const crossedThresholds = alert.crossedThresholds
-    .map(threshold =>
-      threshold === 'failed_checks'
-        ? `${alert.failedChecksThreshold.toLocaleString('en-US')} failed checks`
-        : `${alert.affectedTownsThreshold.toLocaleString('en-US')} affected towns`
-    )
-    .join(' and ');
+  const wedgeTownCount = new Set([...alert.exhaustedTownIds, ...alert.sustainedTownIds]).size;
+  const churnNote = alert.deployChurnSuspected
+    ? `\n:warning: Deploy churn suspected across ${alert.deployChurnTownCount} town(s) ("code was updated"). Deploy-caused failures are excluded; the wedges above still need attention.`
+    : '';
 
   return [
     {
@@ -238,22 +262,29 @@ function buildGastownHealthSlackBlocks(alert: GastownHealthAlertPayload): object
       type: 'section',
       fields: [
         { type: 'mrkdwn', text: `*Window:*\n${alert.windowMinutes}-minute window` },
+        { type: 'mrkdwn', text: `*Wedged towns:*\n${wedgeTownCount.toLocaleString('en-US')}` },
         {
           type: 'mrkdwn',
-          text: `*Failed checks:*\n${alert.weightedFailedChecks.toLocaleString('en-US')}`,
+          text: `*Exhausted:*\n${alert.exhaustedTownIds.length.toLocaleString('en-US')}`,
         },
         {
           type: 'mrkdwn',
-          text: `*Affected towns:*\n${alert.affectedTownCount.toLocaleString('en-US')}`,
+          text: `*Sustained:*\n${alert.sustainedTownIds.length.toLocaleString('en-US')}`,
         },
-        { type: 'mrkdwn', text: `*Threshold crossed:*\n${crossedThresholds}` },
       ],
     },
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `Investigate aggregate container health failures. Do not restart towns without active-session authorization.\n<${GASTOWN_DASHBOARD_URL}|Gastown dashboard> | <${GASTOWN_HEALTH_RUNBOOK_URL}|Container-health runbook>`,
+        text: `${buildGastownHealthReason(alert)}${churnNote}`,
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `Trend (non-paging): ${alert.weightedFailedChecks.toLocaleString('en-US')} weighted failed checks across ${alert.affectedTownCount.toLocaleString('en-US')} town(s).\nDo not restart towns without active-session authorization.\n<${GASTOWN_DASHBOARD_URL}|Gastown dashboard> | <${GASTOWN_HEALTH_RUNBOOK_URL}|Container-health runbook>`,
       },
     },
   ];

@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "start": "expo start --dev-client",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "build": "pnpx eas-cli@latest build --profile development",
     "build:ios": "pnpx eas-cli@latest build -p ios --profile development",
     "build:android": "pnpx eas-cli@latest build -p android --profile development",
@@ -28,6 +28,7 @@
     "@kilocode/kilo-chat-hooks": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/trpc": "workspace:*",
+    "@pylon/react-native-chat": "file:vendor/pylon-react-native-chat",
     "@react-native-community/netinfo": "11.5.2",
     "@rn-primitives/portal": "1.3.0",
     "@rn-primitives/slot": "1.2.0",

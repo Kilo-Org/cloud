@@ -101,32 +101,48 @@ describe('buildSlackMessage — gastown_container_health alert', () => {
   const alert: GastownHealthAlertPayload = {
     alertType: 'gastown_container_health',
     severity: 'ticket',
-    weightedFailedChecks: 36,
-    affectedTownCount: 4,
     windowMinutes: 15,
-    crossedThresholds: ['failed_checks', 'affected_towns'],
-    failedChecksThreshold: 30,
-    affectedTownsThreshold: 4,
+    sustainedFailureMinutes: 10,
+    exhaustedTownIds: ['town-a', 'town-b'],
+    sustainedTownIds: ['town-c'],
+    deployChurnSuspected: false,
+    deployChurnTownCount: 0,
+    affectedTownCount: 4,
+    weightedFailedChecks: 36,
   };
 
-  it('includes counts, crossed thresholds, and investigation guidance', () => {
-    const msg = buildSlackMessage(alert) as {
+  function renderText(payload: GastownHealthAlertPayload): string {
+    const msg = buildSlackMessage(payload) as {
       blocks: Array<{ fields?: Array<{ text: string }>; text?: { text: string } }>;
     };
-    const allText = msg.blocks.flatMap(block => [
-      block.text?.text ?? '',
-      ...(block.fields?.map(field => field.text) ?? []),
-    ]);
-    const text = allText.join('\n');
+    return msg.blocks
+      .flatMap(block => [block.text?.text ?? '', ...(block.fields?.map(field => field.text) ?? [])])
+      .join('\n');
+  }
+
+  it('names the wedged towns and keeps guidance links', () => {
+    const text = renderText(alert);
 
     expect(text).toContain('Gastown container health failures');
     expect(text).toContain('15-minute window');
+    expect(text).toContain('exhausted auto-restarts');
+    expect(text).toContain('town-a, town-b');
+    expect(text).toContain('failing >= 10 min');
+    expect(text).toContain('town-c');
     expect(text).toContain('36');
-    expect(text).toContain('4');
-    expect(text).toContain('30 failed checks');
-    expect(text).toContain('4 affected towns');
     expect(text).toContain('gastown-operations');
     expect(text).toContain('gastown-container-health-failures.md');
+  });
+
+  it('does not render a deploy-churn annotation when churn is not suspected', () => {
+    expect(renderText(alert)).not.toContain('Deploy churn suspected');
+  });
+
+  it('renders the deploy-churn annotation when churn is suspected', () => {
+    const text = renderText({ ...alert, deployChurnSuspected: true, deployChurnTownCount: 5 });
+
+    expect(text).toContain('Deploy churn suspected across 5 town(s)');
+    expect(text).toContain('code was updated');
   });
 });
 

@@ -2,6 +2,7 @@ import {
   loadOutboundMediaFromUrl,
   type OutboundMediaLoadOptions,
 } from 'openclaw/plugin-sdk/outbound-media';
+import { existsSync } from 'node:fs';
 import { basename, isAbsolute, resolve } from 'node:path';
 import type { ContentBlock, KiloChatClient } from './client.js';
 import { ATTACHMENT_MAX_BYTES } from './synced/schemas.js';
@@ -90,10 +91,31 @@ function resolveFilename(contentType: string | undefined, suggested: string | un
   return 'file.bin';
 }
 
+// The kiloclaw agent works in the process cwd (/root/clawd), but OpenClaw's
+// media workspace defaults to ~/.openclaw/workspace — a directory the agent
+// never writes to. Resolve agent-relative paths against cwd first and include
+// cwd in the allowed local roots, so files the agent generates are attachable.
+function agentWorkingDir(): string {
+  return process.cwd();
+}
+
+function hasUriScheme(raw: string): boolean {
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(raw.trim());
+}
+
+function withAgentDirRoot(
+  roots: OutboundMediaLoadOptions['mediaLocalRoots']
+): readonly string[] | 'any' {
+  if (roots === 'any') return roots;
+  return [...(roots ?? []), agentWorkingDir()];
+}
+
 function resolveLocalMediaPath(mediaUrl: string, context: OutboundMediaLoadContext): string {
+  if (isAbsolute(mediaUrl) || hasUriScheme(mediaUrl)) return mediaUrl;
+  const cwdPath = resolve(agentWorkingDir(), mediaUrl);
+  if (existsSync(cwdPath)) return cwdPath;
   const workspaceDir = context.mediaAccess?.workspaceDir;
-  if (workspaceDir && !isAbsolute(mediaUrl)) return resolve(workspaceDir, mediaUrl);
-  return mediaUrl;
+  return workspaceDir ? resolve(workspaceDir, mediaUrl) : cwdPath;
 }
 
 function inferMimeFromFilename(fileName: string | undefined): string | undefined {
@@ -118,10 +140,14 @@ export async function loadOutboundMedia(
   }
 
   const channelMediaAccess = mediaAccessForChannelRead(context.mediaAccess);
-  const loaded = await loadOutboundMediaFromUrl(mediaUrl, {
+  const localRoots = withAgentDirRoot(context.mediaLocalRoots ?? channelMediaAccess?.localRoots);
+  const loaded = await loadOutboundMediaFromUrl(resolveLocalMediaPath(mediaUrl, context), {
     maxBytes: ATTACHMENT_MAX_BYTES,
-    mediaAccess: channelMediaAccess,
-    mediaLocalRoots: context.mediaLocalRoots ?? channelMediaAccess?.localRoots,
+    mediaAccess: channelMediaAccess && {
+      ...channelMediaAccess,
+      ...(localRoots === 'any' ? {} : { localRoots: [...localRoots] }),
+    },
+    mediaLocalRoots: localRoots,
   });
   return {
     buffer: Buffer.isBuffer(loaded.buffer) ? loaded.buffer : Buffer.from(loaded.buffer),

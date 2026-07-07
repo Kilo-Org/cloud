@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import {
   createAssistantMessage,
   createEvalToolCall,
+  createRemoteMcpToolCall,
   createThinkingBlock,
   createToolResult,
   createUserMessage,
@@ -128,5 +129,28 @@ describe('agent conversation events', () => {
     );
 
     expect(nextKey).not.toBe(firstKey);
+  });
+
+  it('creates remote MCP tool-call events', () => {
+    const toolCall = createRemoteMcpToolCall({
+      arguments: { query: 'kilo' },
+      name: 'mcp_github_search_repos',
+      providerToolCallId: 'call-1',
+      remoteToolName: 'search_repos',
+      serverId: 'server-1',
+      serverName: 'GitHub',
+    });
+    const { id, ...payload } = toolCall;
+
+    expectTypeOf(id).toBeString();
+    expect(payload).toStrictEqual({
+      arguments: { query: 'kilo' },
+      name: 'mcp_github_search_repos',
+      providerToolCallId: 'call-1',
+      remoteToolName: 'search_repos',
+      serverId: 'server-1',
+      serverName: 'GitHub',
+      type: 'tool-call',
+    });
   });
 });

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 
 import { runCodingPlanBillingLifecycleCron } from '@/lib/coding-plans/billing-lifecycle-cron';
 import { subscribeToCodingPlan, uploadKeysToInventory } from '@/lib/coding-plans';
+import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
 import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -20,23 +21,30 @@ jest.mock('@/lib/autoTopUp', () => ({
 }));
 
 const PLAN_ID = 'minimax-token-plan-plus';
+const MAX_PLAN_ID = 'minimax-token-plan-max';
 const COST_MICRODOLLARS = 20_000_000;
+const MAX_COST_MICRODOLLARS = 50_000_000;
 const dueAt = new Date(Date.now() - 60_000).toISOString();
 
-async function createSubscription(balance = COST_MICRODOLLARS, autoTopUpEnabled = false) {
+async function createSubscription(
+  balance = COST_MICRODOLLARS,
+  autoTopUpEnabled = false,
+  planId: CodingPlanId = PLAN_ID
+) {
   const user = await insertTestUser({
     total_microdollars_acquired: balance,
     microdollars_used: 0,
     auto_top_up_enabled: autoTopUpEnabled,
   });
   await uploadKeysToInventory(
-    PLAN_ID,
+    'minimax',
+    planId,
     [`cron-key-${crypto.randomUUID()}::minimax-plan-${crypto.randomUUID()}`],
     {
       validateCredential: async () => true,
     }
   );
-  const created = await subscribeToCodingPlan(user.id, PLAN_ID, `activate-${crypto.randomUUID()}`);
+  const created = await subscribeToCodingPlan(user.id, planId, `activate-${crypto.randomUUID()}`);
   await db
     .update(coding_plan_subscriptions)
     .set({ current_period_end: dueAt, credit_renewal_at: dueAt })
@@ -83,6 +91,37 @@ describe('Coding Plan billing lifecycle cron', () => {
       { description: 'Coding plan renewal: MiniMax Token Plan Plus' },
     ]);
     expect(credential.status).toBe('assigned');
+  });
+
+  it('uses the subscribed MiniMax token plan name and snapshotted cost during renewal', async () => {
+    const { subscriptionId } = await createSubscription(
+      MAX_COST_MICRODOLLARS * 2,
+      false,
+      MAX_PLAN_ID
+    );
+
+    const summary = await runCodingPlanBillingLifecycleCron(db);
+    const [subscription] = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, subscriptionId));
+    const renewalTransaction = await db
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        description: credit_transactions.description,
+      })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.description, 'Coding plan renewal: MiniMax Token Plan Max'));
+
+    expect(summary.renewals).toBe(1);
+    expect(subscription.plan_id).toBe(MAX_PLAN_ID);
+    expect(subscription.cost_microdollars).toBe(MAX_COST_MICRODOLLARS);
+    expect(renewalTransaction).toEqual([
+      {
+        amountMicrodollars: -MAX_COST_MICRODOLLARS,
+        description: 'Coding plan renewal: MiniMax Token Plan Max',
+      },
+    ]);
   });
 
   it('renews after the subscriber deletes the installed MiniMax BYOK key', async () => {

@@ -20,6 +20,7 @@ const OpenAICompatibleModelsResponseSchema = z.object({
       max_model_len: z.number().optional(),
       max_output_length: z.number().optional(),
       input_modalities: z.array(ModalitySchema).optional(),
+      supported_features: z.array(z.string()).optional(),
     })
   ),
 });
@@ -89,22 +90,32 @@ function openAICompatibleFetcher(options: {
           `Failed to fetch ${options.label} models: ${response.status} ${response.statusText}`
         );
       }
-      const parsed = OpenAICompatibleModelsResponseSchema.parse(await response.json());
-      return parsed.data.map(model => ({
-        id: model.id,
-        name: shortenDisplayName(model.name),
-        context_length: model.context_length ?? model.max_model_len,
-        max_completion_tokens: model.max_output_length,
-        input_modalities: model.input_modalities,
-      }));
+      return parseOpenAICompatibleProviderModels(await response.json());
     },
   };
+}
+
+export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] {
+  const parsed = OpenAICompatibleModelsResponseSchema.parse(entry);
+  return parsed.data
+    .filter(model => !model.supported_features || model.supported_features.includes('tools'))
+    .map(model => ({
+      id: model.id,
+      name: shortenDisplayName(model.name),
+      context_length: model.context_length ?? model.max_model_len,
+      max_completion_tokens: model.max_output_length,
+      input_modalities: model.input_modalities,
+    }));
 }
 
 export function parseModelsDevProviderModels(entry: unknown): RawModel[] {
   const provider = ModelsDevProviderSchema.parse(entry);
   return Object.values(provider.models)
-    .filter(model => model.status !== 'deprecated')
+    .filter(
+      model =>
+        model.status !== 'deprecated' &&
+        (!model.modalities?.output || model.modalities.output.includes('text'))
+    )
     .map(model => ({
       id: model.id,
       name: shortenDisplayName(model.name),
@@ -177,6 +188,12 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Synthetic',
     url: 'https://api.synthetic.new/v1/models',
   }),
+  openAICompatibleFetcher({
+    providerId: 'morph-byok',
+    label: 'Morph BYOK',
+    url: 'https://www.morphllm.com/api/models/json',
+  }),
+  modelsDevFetcher('alibaba-token-plan', 'alibaba-token-plan'),
   modelsDevFetcher('zai-coding', 'zai-coding-plan'),
   modelsDevFetcher('ollama-cloud', 'ollama-cloud'),
   modelsDevFetcher('opencode-go', 'opencode-go'),

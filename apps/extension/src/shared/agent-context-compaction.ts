@@ -74,6 +74,20 @@ const stringifyToolValue = (value: unknown): string => {
   }
 };
 
+const getToolCallDetail = (
+  event: Extract<AgentConversationEvent, { readonly type: 'tool-call' }>
+): string | undefined => {
+  if (event.name === 'eval') {
+    return event.code;
+  }
+
+  if ('arguments' in event) {
+    return stringifyToolValue(event.arguments);
+  }
+
+  return event.query ?? event.elementId ?? event.snapshotId;
+};
+
 const renderEvent = (event: AgentConversationEvent): string | undefined => {
   switch (event.type) {
     case 'message': {
@@ -84,8 +98,7 @@ const renderEvent = (event: AgentConversationEvent): string | undefined => {
     }
     case 'tool-call': {
       // The tool input carries the facts the next turn needs (the eval code, the query/element).
-      const detail =
-        event.name === 'eval' ? event.code : (event.query ?? event.elementId ?? event.snapshotId);
+      const detail = getToolCallDetail(event);
 
       return detail === undefined || detail === ''
         ? `Tool call (${event.name})`

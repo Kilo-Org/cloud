@@ -101,10 +101,20 @@ replace_version() {
 apply_edits() {
   # The version string appears only in openclaw pins and notes in these files,
   # so a whole-version replace updates every occurrence with nothing to miss.
+  # NOTE: the Dockerfile also pins @openclaw/kilocode-provider@<ver> on the same
+  # install line. It is kept in lockstep with openclaw, so the whole-version
+  # replace above bumps it too — but only while the two share a version. The
+  # assertion below fails loudly if that assumption ever breaks (provider not yet
+  # published at TARGET, or pinned separately) instead of shipping a stale or
+  # nonexistent provider pin.
   replace_version "$DOCKERFILE"
   replace_version "$KILO_CHAT_PKG"
   replace_version "$MORNING_PKG"
   replace_version "$E2E_DOC"
+
+  # Explicit touchpoint: the externalized KiloCode provider pin must land on TARGET.
+  grep -qE "@openclaw/kilocode-provider@${TARGET//./\\.}(\b|[^0-9.])" "$DOCKERFILE" \
+    || die "kilocode-provider pin is not @openclaw/kilocode-provider@${TARGET} after bump; it may lag openclaw or need a separate pin — update it in $DOCKERFILE"
 
   # Bump the COPY cache-bust counter so the image layer rebuilds. Only the
   # bare-integer `RUN echo "N"` line matches, not the apt cache-bust line.

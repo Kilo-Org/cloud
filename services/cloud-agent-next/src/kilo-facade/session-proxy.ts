@@ -78,7 +78,12 @@ export async function resolveLiveWrapperTarget(params: {
       }
     ));
 
-  const sandbox = getSandbox(getSandboxNamespace(env, sandboxId), sandboxId);
+  const sandbox = getSandbox(
+    getSandboxNamespace(env, sandboxId, {
+      managedScmContainment: metadata.workspace?.managedScmContainment === true,
+    }),
+    sandboxId
+  );
   const wrapperInfo = await findWrapperForSession(sandbox, sessionId);
   if (!wrapperInfo) {
     return null;

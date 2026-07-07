@@ -277,6 +277,56 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       connection.destroy();
     });
+
+    it('reconnects immediately on resume when hidden for the full staleness window (zombie socket)', async () => {
+      const { connection, onDisconnected } = createTestConnection();
+      connection.connect();
+      connectSocket(0);
+
+      simulateVisibilityChange('hidden');
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
+
+      // Socket still reports OPEN (zombie) — resume should reconnect without
+      // waiting for another full staleness window.
+      simulateVisibilityChange('visible');
+
+      // No advanceTimersByTime here — reconnect should happen right away
+      // (refreshAndConnect resolves on a microtask when no refreshAuth is configured).
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(sockets[0].close).toHaveBeenCalled();
+      expect(onDisconnected).toHaveBeenCalled();
+      expect(sockets).toHaveLength(2);
+
+      connection.destroy();
+    });
+
+    it('preserves the passive staleness wait when hidden only briefly', () => {
+      const { connection, onDisconnected } = createTestConnection();
+      connection.connect();
+      connectSocket(0);
+
+      // Last message is already stale before hiding.
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
+
+      simulateVisibilityChange('hidden');
+      // Hidden only briefly — well under the staleness threshold.
+      jest.advanceTimersByTime(5000);
+      simulateVisibilityChange('visible');
+
+      // Not hidden long enough to skip the passive wait — timer armed, not fired yet.
+      expect(sockets).toHaveLength(1);
+
+      // Advance past the staleness timeout — the timer should still govern.
+      jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
+
+      expect(sockets[0].close).toHaveBeenCalled();
+      expect(onDisconnected).toHaveBeenCalled();
+      expect(sockets).toHaveLength(2);
+
+      connection.destroy();
+    });
   });
 
   describe('BFCache (pageshow)', () => {

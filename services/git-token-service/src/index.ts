@@ -61,6 +61,17 @@ import {
   BitbucketEnsureWebhookRequestSchema,
   BitbucketPullRequestRequestSchema,
 } from './bitbucket-code-review-service.js';
+import {
+  KiloSessionCapabilityCodec,
+  KiloSessionCapabilityError,
+  type KiloSessionCapabilityFailureReason,
+  type KiloSessionCapabilitySubject,
+} from './kilo-session-capability.js';
+import {
+  areValidKiloCapabilityTargets,
+  classifyKiloCapabilityRequest,
+  type KiloCapabilityRouteClass,
+} from './kilo-capability-policy.js';
 
 export type GetTokenForRepoParams = {
   githubRepo: string;
@@ -207,6 +218,25 @@ export type RedeemGitLabSessionCapabilityResult =
         | { authorization?: never; 'PRIVATE-TOKEN': string };
     }
   | { success: false; reason: RedeemGitLabSessionCapabilityFailureReason };
+
+export type IssueKiloSessionCapabilityParams = KiloSessionCapabilitySubject;
+export type IssueKiloSessionCapabilityResult =
+  | { success: true; capability: string }
+  | { success: false; reason: KiloSessionCapabilityFailureReason | 'invalid_targets' };
+
+export type RedeemKiloSessionCapabilityParams = {
+  capability: string;
+  outboundContainerId: string;
+  requestUrl: string;
+};
+export type RedeemKiloSessionCapabilityFailureReason =
+  | KiloSessionCapabilityFailureReason
+  | 'container_mismatch'
+  | 'invalid_upstream_url'
+  | 'upstream_not_allowed';
+export type RedeemKiloSessionCapabilityResult =
+  | { success: true; authorization: string; routeClass: KiloCapabilityRouteClass }
+  | { success: false; reason: RedeemKiloSessionCapabilityFailureReason };
 
 const DISCONNECT_PATH = '/internal/github-user-authorizations/disconnect';
 const BITBUCKET_REPOSITORIES_PATH = '/internal/bitbucket/repositories';
@@ -1041,6 +1071,59 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: true, headers: { 'PRIVATE-TOKEN': token } };
     }
     return { success: true, headers: { authorization: `Bearer ${token}` } };
+  }
+
+  async issueKiloSessionCapability(
+    params: IssueKiloSessionCapabilityParams
+  ): Promise<IssueKiloSessionCapabilityResult> {
+    if (!areValidKiloCapabilityTargets(params.targets)) {
+      return { success: false, reason: 'invalid_targets' };
+    }
+
+    try {
+      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      const capability = new KiloSessionCapabilityCodec(encryptionKey).issue(params);
+      return { success: true, capability };
+    } catch (error) {
+      if (error instanceof KiloSessionCapabilityError) {
+        return { success: false, reason: error.reason };
+      }
+      return { success: false, reason: 'capability_configuration_error' };
+    }
+  }
+
+  async redeemKiloSessionCapability(
+    params: RedeemKiloSessionCapabilityParams
+  ): Promise<RedeemKiloSessionCapabilityResult> {
+    let claims;
+    try {
+      const encryptionKey = await resolveSecret(this.env.SCM_SESSION_CAPABILITY_ENCRYPTION_KEY);
+      claims = new KiloSessionCapabilityCodec(encryptionKey).decode(params.capability);
+    } catch (error) {
+      if (error instanceof KiloSessionCapabilityError) {
+        return { success: false, reason: error.reason };
+      }
+      return { success: false, reason: 'capability_configuration_error' };
+    }
+
+    if (claims.outboundContainerId !== params.outboundContainerId) {
+      return { success: false, reason: 'container_mismatch' };
+    }
+
+    const classification = classifyKiloCapabilityRequest(
+      params.requestUrl,
+      claims.targets,
+      claims.kiloSessionId
+    );
+    if (!classification.success) {
+      return { success: false, reason: classification.reason };
+    }
+
+    return {
+      success: true,
+      authorization: `Bearer ${claims.userToken}`,
+      routeClass: classification.routeClass,
+    };
   }
 
   private getGitLabAuthType(integration: GitLabLookupSuccess): GitLabAuthType | null {

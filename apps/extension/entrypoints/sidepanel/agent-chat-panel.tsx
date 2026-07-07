@@ -1,5 +1,6 @@
 /* eslint-disable import/max-dependencies, max-lines */
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { storage } from '#imports';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import {
@@ -7,6 +8,7 @@ import {
   contextUsageAtomFamily,
   draftAtomFamily,
   evictConversationAtoms,
+  remoteMcpStoreAtom,
   runningConversationIdsAtom,
 } from './agent-chat-atoms';
 import {
@@ -49,6 +51,11 @@ import { ConversationTabs } from './conversation-tabs';
 import { MessageComposer } from './message-composer';
 import { ConversationHistoryButton } from './conversation-history-button';
 import { useGatewayModels } from './use-gateway-models';
+import { loadRemoteMcpStore } from '@/src/shared/remote-mcp-storage';
+import { buildRemoteMcpToolDefinitions } from '@/src/shared/remote-mcp-tools';
+import { connectAndPersistRemoteMcpServer } from './remote-mcp-client';
+import { toRemoteMcpToolCallEvents } from './agent-tool-call-events';
+import { executeRemoteMcpToolCall } from './agent-remote-mcp-tool-runtime';
 
 const apiBaseUrl = getKiloApiBaseUrl();
 const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =>
@@ -56,6 +63,7 @@ const fetchFromWindow = (input: string, init?: RequestInit): Promise<Response> =
 const createDefaultConversationEvents = (): AgentConversationEvent[] => [
   createAssistantMessage('Pick a tab and ask Kilo to inspect it.'),
 ];
+
 interface ConversationRunState {
   readonly abort: AbortController;
   readonly selectedTabId: number;
@@ -118,6 +126,7 @@ export const AgentChatPanel = ({
   const conversationStoreRef = useRef(conversationStore);
   const runStatesRef = useRef(new Map<string, ConversationRunState>());
   const runTokenRef = useRef(0);
+  const [remoteMcpToolWarning, setRemoteMcpToolWarning] = useState<string>();
   const { inspectableTabs, isLoadingTabs, tabDebuggerError } = useTabDebugger();
   const { modelLoadError, modelOptions, refetchModels } = useGatewayModels({
     auth,
@@ -266,6 +275,40 @@ export const AgentChatPanel = ({
     },
     []
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async (): Promise<void> => {
+      const loaded = await loadRemoteMcpStore(storage);
+      if (cancelled) {
+        return;
+      }
+      // Cached connected tools stay usable while the background refresh runs.
+      store.set(remoteMcpStoreAtom, loaded);
+
+      // Refresh enabled servers with the PLAIN global fetch (never the gateway-authed fetch — that would leak the Kilo token to a third party).
+      // Sequential by necessity: each connect can write OAuth tokens, so we must reload before merging the next server's results.
+      for (const server of loaded.servers.filter(candidate => candidate.enabled)) {
+        // eslint-disable-next-line no-await-in-loop
+        const nextServers = await connectAndPersistRemoteMcpServer({
+          fetch: globalThis.fetch,
+          server,
+          storageArea: storage,
+        });
+        if (cancelled) {
+          return;
+        }
+        if (nextServers !== undefined) {
+          store.set(remoteMcpStoreAtom, { servers: nextServers });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [store]);
 
   useEffect(() => {
     if (isLoadingTabs) {
@@ -442,6 +485,14 @@ export const AgentChatPanel = ({
       currentIds.includes(conversationId) ? currentIds : [...currentIds, conversationId]
     );
 
+    const remoteMcpServers = store.get(remoteMcpStoreAtom).servers;
+    const {
+      routes: remoteMcpRoutes,
+      tools: remoteMcpTools,
+      warning: remoteMcpWarning,
+    } = buildRemoteMcpToolDefinitions({ mode: runMode, servers: remoteMcpServers });
+    setRemoteMcpToolWarning(remoteMcpWarning);
+
     void (async (): Promise<void> => {
       try {
         const runTurn = runMode === 'dangerous' ? runDangerousLlmTurn : runSafeLlmTurn;
@@ -450,14 +501,27 @@ export const AgentChatPanel = ({
           apiBaseUrl,
           appendEvents: appendRunEvents,
           conversationEvents: conversationWithUserMessage,
+          executeRemoteMcpToolCall: event =>
+            executeRemoteMcpToolCall({
+              event,
+              // PLAIN global fetch: the MCP server is a third party and must never see the Kilo gateway token.
+              fetch: globalThis.fetch,
+              routes: remoteMcpRoutes,
+              servers: remoteMcpServers,
+              signal: abort.signal,
+              storageArea: storage,
+            }),
           fetch: fetchFromWindow,
           model: runModel,
           onUsage: updateRunUsage,
           organizationId,
+          remoteMcpTools,
           selectedTabId: runSelectedTabId,
           signal: abort.signal,
           supportsImages: runSelectedModel?.supportsImages === true,
           thinkingEffort: runThinkingEffort,
+          toRemoteMcpToolCallEvents: toolCalls =>
+            toRemoteMcpToolCallEvents(toolCalls, remoteMcpRoutes),
           token: auth.token,
           updateAssistantMessage: updateRunAssistantMessage,
           updateThinkingBlock: updateRunThinkingBlock,
@@ -669,6 +733,12 @@ export const AgentChatPanel = ({
         onSelectConversation={selectConversation}
       />
       <ConversationList items={groupedEvents} />
+
+      {remoteMcpToolWarning === undefined ? null : (
+        <p className="border-t border-amber-500/30 bg-amber-950/20 px-4 py-2 text-xs text-amber-300">
+          {remoteMcpToolWarning}
+        </p>
+      )}
 
       <MessageComposer
         activeConversationId={activeConversationId}

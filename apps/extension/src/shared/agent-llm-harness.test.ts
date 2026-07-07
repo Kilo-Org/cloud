@@ -9,6 +9,7 @@ import {
 import {
   createAssistantMessage,
   createEvalToolCall,
+  createRemoteMcpToolCall,
   createSafeToolCall,
   createThinkingBlock,
   createToolResult,
@@ -47,6 +48,34 @@ describe('agent LLM harness', () => {
       },
       type: 'function',
     });
+  });
+
+  it('tells the model remote MCP tools may be available', () => {
+    expect(EXTENSION_AGENT_SYSTEM_PROMPT).toContain(
+      'Remote MCP tools may be available by name. Use them according to their tool descriptions.'
+    );
+  });
+
+  it('serializes a remote MCP tool-call event into a gateway tool-call message', () => {
+    const toolCall = createRemoteMcpToolCall({
+      arguments: { query: 'kilo' },
+      name: 'mcp_acme_search',
+      providerToolCallId: 'call_mcp_1',
+      remoteToolName: 'search',
+      serverId: 'server-1',
+      serverName: 'Acme',
+    });
+
+    const messages = buildGatewayMessagesFromEvents([toolCall]);
+    const assistantMessage = messages.find(message => message.role === 'assistant');
+
+    expect(assistantMessage?.tool_calls).toStrictEqual([
+      {
+        function: { arguments: JSON.stringify({ query: 'kilo' }), name: 'mcp_acme_search' },
+        id: 'call_mcp_1',
+        type: 'function',
+      },
+    ]);
   });
 
   it('only exposes viewport screenshots for image-capable models', () => {

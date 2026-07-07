@@ -1,5 +1,6 @@
 import type { WrapperClient } from '../kilo/wrapper-client.js';
 import type { TerminalWrapperClient } from '../terminal/access.js';
+import type { WrapperSessionReadyRequest } from '../shared/wrapper-bootstrap.js';
 import type {
   FencedLegacyExecutionRequest,
   FencedWrapperDispatchRequest,
@@ -78,6 +79,7 @@ export type EnsureWrapperRequest = {
   prepared: {
     ready: WorkspaceReady;
     context: { workspacePath: string };
+    readyRequest?: WrapperSessionReadyRequest;
   };
   onProgress?: (step: string, message: string) => void;
 };

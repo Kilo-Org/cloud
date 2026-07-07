@@ -764,6 +764,52 @@ describe('generateBaseConfig', () => {
     expect(config.plugins.allow).toContain('kilo-chat');
   });
 
+  it('loads the externalized kilocode provider plugin via plugins.load.paths', () => {
+    const { deps } = fakeDeps();
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    // openclaw #93470 externalized the kilocode provider; it is no longer bundled
+    // and must be loaded explicitly by path or model routing breaks.
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@openclaw/kilocode-provider'
+    );
+  });
+
+  it('adds kilocode to an existing plugin allowlist that does not include it', () => {
+    // Regression guard: the append-when-missing branch for the kilocode provider.
+    // The managed-allowlist test above pre-seeds 'kilocode', so it never exercises
+    // this path; start from an allowlist WITHOUT it.
+    const existing = JSON.stringify({
+      plugins: {
+        load: { paths: [] },
+        allow: ['telegram', 'browser'],
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    expect(config.plugins.allow).toContain('kilocode');
+    expect(config.plugins.load.paths).toContain(
+      '/usr/local/lib/node_modules/@openclaw/kilocode-provider'
+    );
+  });
+
+  it('does not duplicate the kilocode provider plugin path on repeated generateBaseConfig calls', () => {
+    const providerPath = '/usr/local/lib/node_modules/@openclaw/kilocode-provider';
+    const existing = JSON.stringify({
+      plugins: {
+        load: { paths: [providerPath] },
+        allow: ['kilocode'],
+      },
+    });
+    const { deps } = fakeDeps(existing);
+    const config = generateBaseConfig(minimalEnv(), '/tmp/openclaw.json', deps);
+
+    const paths = config.plugins.load.paths as string[];
+    expect(paths.filter(p => p === providerPath)).toHaveLength(1);
+    expect((config.plugins.allow as string[]).filter(a => a === 'kilocode')).toHaveLength(1);
+  });
+
   it('configures Telegram channel', () => {
     const { deps } = fakeDeps();
     const env = { ...minimalEnv(), TELEGRAM_BOT_TOKEN: 'tg-token-123' };

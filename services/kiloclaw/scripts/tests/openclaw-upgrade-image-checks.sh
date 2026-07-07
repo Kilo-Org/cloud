@@ -202,13 +202,24 @@ version=$(docker run --rm "$IMAGE" openclaw --version 2>/dev/null \
   | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 check "openclaw version" "$EXPECTED_VERSION" "$version"
 
+# KiloCode provider was externalized to @openclaw/kilocode-provider (openclaw #93470, 2026.6.9);
+# the patched provider-models bundle is a single non-hashed file in that package.
 timeout_patch=$(docker run --rm "$IMAGE" sh -c \
-  'OC=/usr/local/lib/node_modules/openclaw/dist; F=$(grep -l KILOCODE_MODELS_URL $OC/provider-models-*.js); grep -c "DISCOVERY_TIMEOUT_MS = 60e3" "$F"' 2>/dev/null || echo 0)
+  'F=/usr/local/lib/node_modules/@openclaw/kilocode-provider/dist/provider-models.js; grep -c "DISCOVERY_TIMEOUT_MS = 60e3" "$F"' 2>/dev/null || echo 0)
 check "model-discovery timeout patch applied (60e3)" "1" "$timeout_patch"
 
 action_patch=$(docker run --rm "$IMAGE" sh -c \
   'OC=/usr/local/lib/node_modules/openclaw/dist; F=$(find $OC -name "channel-target-*.js" | head -1); grep -c "MESSAGE_ACTION_TARGET_MODE\[action\] ?? \"none\"" "$F"' 2>/dev/null || echo 0)
 check "actionRequiresTarget patch applied" "1" "$action_patch"
+
+# ── Externalized kilocode provider pin alignment ─────────────────────────────
+# The kilocode provider was externalized from openclaw core (openclaw #93470) and
+# is installed as a separate pin (@openclaw/kilocode-provider@<ver>). It is kept
+# in lockstep with the openclaw pin; assert the installed version matches so a
+# stale or drifted provider pin fails the build.
+kcp_version=$(docker run --rm "$IMAGE" \
+  node -p "require('/usr/local/lib/node_modules/@openclaw/kilocode-provider/package.json').version" 2>/dev/null || echo "")
+check "@openclaw/kilocode-provider matches openclaw pin" "$EXPECTED_VERSION" "$kcp_version"
 
 # ── Bundled plugins pin alignment ────────────────────────────────────────────
 kc_peer=$(docker run --rm "$IMAGE" \
@@ -218,6 +229,19 @@ check "kilo-chat plugin peer matches pin" "$EXPECTED_VERSION" "$kc_peer"
 mb_peer=$(docker run --rm "$IMAGE" \
   node -p "require('/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing/package.json').peerDependencies.openclaw" 2>/dev/null || echo "")
 check "morning-briefing plugin peer matches pin" "$EXPECTED_VERSION" "$mb_peer"
+
+# ── Bundled CLI tool pins ────────────────────────────────────────────────────
+# @steipete/summarize is pinned in the Dockerfile (bumped to 0.15.1 to clear
+# GHSA-8jr4-6r33-phwm et al.). Guard both that the pin installed as expected and
+# that the CLI still launches, since the smoke does not otherwise exercise it.
+# Keep EXPECTED_SUMMARIZE_VERSION in lockstep with the Dockerfile pin.
+EXPECTED_SUMMARIZE_VERSION="0.15.1"
+summarize_version=$(docker run --rm "$IMAGE" \
+  node -p "require('/usr/local/lib/node_modules/@steipete/summarize/package.json').version" 2>/dev/null || echo "")
+check "@steipete/summarize pin installed" "$EXPECTED_SUMMARIZE_VERSION" "$summarize_version"
+
+summarize_cli=$(docker run --rm "$IMAGE" sh -c 'summarize --version >/dev/null 2>&1 && echo ok || echo fail')
+check "@steipete/summarize CLI launches" "ok" "$summarize_cli"
 
 # ── Keyless config schema validation (no gateway) ────────────────────────────
 # Representative app-written shapes must still validate against the packaged

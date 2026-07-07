@@ -42,7 +42,7 @@ import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 export const PRIMARY_DEFAULT_MODEL = CLAUDE_SONNET_CURRENT_MODEL_ID;
 
 export const autoFreeModels = [
-  'poolside/laguna-m.1:free',
+  'tencent/hy3:free',
   stepfun_37_flash_free_model.status === 'public' ? stepfun_37_flash_free_model.public_id : null,
 ].filter(m => m !== null);
 

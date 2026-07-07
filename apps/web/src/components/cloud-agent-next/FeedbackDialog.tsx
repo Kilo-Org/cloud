@@ -16,6 +16,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useManager } from './CloudAgentProvider';
+import type { ResolvedSession } from '@/lib/cloud-agent-sdk';
 import type { StoredMessage } from './types';
 import { isTextPart } from './types';
 
@@ -33,6 +34,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
   const messages = useAtomValue(manager.atoms.messagesList);
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const currentSessionId = useAtomValue(manager.atoms.sessionId);
+  const activeSessionType = useAtomValue(manager.atoms.activeSessionType);
   const sessionConfig = useAtomValue(manager.atoms.sessionConfig);
 
   const trpc = useTRPC();
@@ -71,7 +73,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
       kilo_session_id: kiloSessionId ?? undefined,
       organization_id: organizationId ?? undefined,
       feedback_text: feedbackText.trim(),
-      model: sessionConfig?.model || undefined,
+      model: feedbackModelForSession(activeSessionType, sessionConfig?.model),
       repository: sessionConfig?.repository || undefined,
       is_streaming: isStreaming,
       message_count: messages.length,
@@ -82,6 +84,7 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
     currentSessionId,
     kiloSessionId,
     organizationId,
+    activeSessionType,
     sessionConfig,
     isStreaming,
     messages,
@@ -149,6 +152,13 @@ export function FeedbackDialog({ organizationId, kiloSessionId }: FeedbackDialog
       </DialogContent>
     </Dialog>
   );
+}
+
+export function feedbackModelForSession(
+  sessionType: ResolvedSession['type'] | null,
+  model: string | null | undefined
+): string | undefined {
+  return sessionType === 'cloud-agent' ? model || undefined : undefined;
 }
 
 function buildRecentMessages(

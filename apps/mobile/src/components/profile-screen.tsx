@@ -18,6 +18,8 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
+const SUPPORT_EMAIL = 'hi@kilo.ai';
+
 function providerIcon(_provider: string) {
   return KeyRound;
 }
@@ -53,11 +55,11 @@ export function ProfileScreen() {
       `OS: ${Platform.OS} ${Platform.Version}`,
     ].join('\n');
     const body = `\n\n---\n${envDetails}`;
-    const url = `mailto:hi@kilo.ai?subject=${encodeURIComponent('mobile app feedback')}&body=${encodeURIComponent(body)}`;
+    const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('mobile app feedback')}&body=${encodeURIComponent(body)}`;
     try {
       await Linking.openURL(url);
     } catch {
-      toast.error('No email app available');
+      toast.error(`No email app available. You can reach us at ${SUPPORT_EMAIL}`);
     }
   };
 

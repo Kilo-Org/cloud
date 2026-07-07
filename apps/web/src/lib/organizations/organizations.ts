@@ -17,7 +17,7 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@/lib/drizzle';
-import { and, eq, isNull, gt } from 'drizzle-orm';
+import { and, asc, eq, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import { randomUUID } from 'crypto';
 import { fromMicrodollars, getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
@@ -166,9 +166,10 @@ export async function getProfileOrganizations(userId: User['id']): Promise<Profi
       organization_memberships,
       eq(organization_memberships.organization_id, organizations.id)
     )
-    .where(
-      and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
-    );
+    .where(and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at)))
+    // Deterministic order so callers can treat the first element as a stable
+    // default selection (e.g. profile `selectedOrganizationId`).
+    .orderBy(asc(organizations.created_at), asc(organizations.id));
 
   const parentOrganizationIdsWithMembershipInAChild = new Set(
     results.flatMap(result =>

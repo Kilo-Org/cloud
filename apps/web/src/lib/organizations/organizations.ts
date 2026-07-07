@@ -1,4 +1,9 @@
-import type { User, Organization, OrganizationInvitation } from '@kilocode/db/schema';
+import type {
+  User,
+  Organization,
+  OrganizationInvitation,
+  OrganizationSeatsPurchase,
+} from '@kilocode/db/schema';
 import {
   type OrganizationRole,
   type UserOrganizationWithSeats,
@@ -11,17 +16,19 @@ import {
   organization_invitations,
   organization_membership_removals,
   organization_memberships,
+  organization_seats_purchases,
   organization_user_limits,
   organization_user_usage,
   organizations,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@/lib/drizzle';
-import { and, eq, isNull, gt } from 'drizzle-orm';
+import { and, asc, eq, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import { randomUUID } from 'crypto';
 import { fromMicrodollars, getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
+import { classifyOrganizationEntitlement } from './trial-utils';
 import { logExceptInTest } from '@/lib/utils.server';
 import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -155,20 +162,49 @@ export type ProfileOrganization = {
   role: OrganizationRole;
 };
 
-export async function getProfileOrganizations(userId: User['id']): Promise<ProfileOrganization[]> {
+export type GetProfileOrganizationsOptions = {
+  // When true, omit organizations whose free trial has hard-expired without an
+  // active entitlement (the "Access Blocked" state). These orgs are locked to
+  // read-only, so they should not be offered as selectable profile orgs.
+  excludeAccessBlocked?: boolean;
+};
+
+export async function getProfileOrganizations(
+  userId: User['id'],
+  options: GetProfileOrganizationsOptions = {}
+): Promise<ProfileOrganization[]> {
+  const { excludeAccessBlocked = false } = options;
+
+  // Only pull in each org's current subscription status when the caller needs
+  // to hide "Access Blocked" orgs. organization_seats_purchases is append-only,
+  // so the most recently created row reflects the current state. This keeps
+  // getProfileOrganizations a single query and adds no seat-purchase lookup for
+  // callers that don't opt in.
+  const latestSeatPurchaseStatus = excludeAccessBlocked
+    ? sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
+        SELECT ${organization_seats_purchases.subscription_status}
+        FROM ${organization_seats_purchases}
+        WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+        ORDER BY ${organization_seats_purchases.created_at} DESC
+        LIMIT 1
+      )`
+    : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
+
   const results = await db
     .select({
       organization: organizations,
       membership: organization_memberships,
+      latestSeatPurchaseStatus,
     })
     .from(organizations)
     .innerJoin(
       organization_memberships,
       eq(organization_memberships.organization_id, organizations.id)
     )
-    .where(
-      and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at))
-    );
+    .where(and(eq(organization_memberships.kilo_user_id, userId), isNull(organizations.deleted_at)))
+    // Deterministic order so callers can treat the first element as a stable
+    // default selection (e.g. profile `selectedOrganizationId`).
+    .orderBy(asc(organizations.created_at), asc(organizations.id));
 
   const parentOrganizationIdsWithMembershipInAChild = new Set(
     results.flatMap(result =>
@@ -176,8 +212,18 @@ export async function getProfileOrganizations(userId: User['id']): Promise<Profi
     )
   );
 
+  const now = new Date();
   return results
     .filter(result => !parentOrganizationIdsWithMembershipInAChild.has(result.organization.id))
+    .filter(result => {
+      if (!excludeAccessBlocked) return true;
+      const classification = classifyOrganizationEntitlement({
+        organization: result.organization,
+        latestSeatPurchaseStatus: result.latestSeatPurchaseStatus,
+        now,
+      });
+      return !classification.isTrialExpiredForEnforcement;
+    })
     .map(result => ({
       id: result.organization.id,
       name: result.organization.name,

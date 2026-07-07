@@ -1,0 +1,153 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner-native';
+
+import {
+  buildSaveConfigInput,
+  type ConfigPatch,
+  type ReviewConfigData,
+} from '@/lib/code-reviewer-config';
+import { trpcClient, useTRPC } from '@/lib/trpc';
+
+export const PERSONAL_SCOPE = 'personal';
+
+function isPersonal(scope: string) {
+  return scope === PERSONAL_SCOPE;
+}
+
+// Personal and org procedures resolve to nominally distinct tRPC option
+// types even when structurally identical, so we can't pick between them
+// with a ternary and spread the result — TypeScript treats the branches as
+// unrelated. Instead we always call both hooks (one disabled) and return
+// whichever is active, mirroring the pattern in use-kiloclaw-queries.ts.
+
+export function useGitHubStatus(scope: string) {
+  const trpc = useTRPC();
+  const personal = useQuery({
+    ...trpc.personalReviewAgent.getGitHubStatus.queryOptions(),
+    enabled: isPersonal(scope),
+  });
+  const org = useQuery({
+    ...trpc.organizations.reviewAgent.getGitHubStatus.queryOptions({ organizationId: scope }),
+    enabled: !isPersonal(scope),
+  });
+  return isPersonal(scope) ? personal : org;
+}
+
+export function useGitHubRepositories(scope: string, enabled: boolean) {
+  const trpc = useTRPC();
+  const personal = useQuery({
+    ...trpc.personalReviewAgent.listGitHubRepositories.queryOptions({}),
+    enabled: enabled && isPersonal(scope),
+  });
+  const org = useQuery({
+    ...trpc.organizations.reviewAgent.listGitHubRepositories.queryOptions({
+      organizationId: scope,
+    }),
+    enabled: enabled && !isPersonal(scope),
+  });
+  return isPersonal(scope) ? personal : org;
+}
+
+export function useReviewConfig(scope: string) {
+  const trpc = useTRPC();
+  const personal = useQuery({
+    ...trpc.personalReviewAgent.getReviewConfig.queryOptions({ platform: 'github' }),
+    enabled: isPersonal(scope),
+  });
+  const org = useQuery({
+    ...trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
+      organizationId: scope,
+      platform: 'github',
+    }),
+    enabled: !isPersonal(scope),
+  });
+  return isPersonal(scope) ? personal : org;
+}
+
+function useReviewConfigQueryKey(scope: string) {
+  const trpc = useTRPC();
+  return isPersonal(scope)
+    ? trpc.personalReviewAgent.getReviewConfig.queryKey({ platform: 'github' })
+    : trpc.organizations.reviewAgent.getReviewConfig.queryKey({
+        organizationId: scope,
+        platform: 'github',
+      });
+}
+
+export function useToggleReviewer(scope: string) {
+  const queryClient = useQueryClient();
+  const queryKey = useReviewConfigQueryKey(scope);
+
+  return useMutation({
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (vars: { isEnabled: boolean }) =>
+      isPersonal(scope)
+        ? trpcClient.personalReviewAgent.toggleReviewAgent.mutate({
+            platform: 'github',
+            isEnabled: vars.isEnabled,
+          })
+        : trpcClient.organizations.reviewAgent.toggleReviewAgent.mutate({
+            organizationId: scope,
+            platform: 'github',
+            isEnabled: vars.isEnabled,
+          }),
+    onMutate: async vars => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<ReviewConfigData>(queryKey);
+      queryClient.setQueryData<ReviewConfigData>(queryKey, old =>
+        old ? { ...old, isEnabled: vars.isEnabled } : old
+      );
+      return { previous };
+    },
+    onError: (error, _vars, context) => {
+      queryClient.setQueryData<ReviewConfigData>(queryKey, context?.previous);
+      toast.error(error.message);
+    },
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+  });
+}
+
+export function useSaveReviewConfig(scope: string) {
+  const queryClient = useQueryClient();
+  const queryKey = useReviewConfigQueryKey(scope);
+
+  return useMutation({
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (patch: ConfigPatch) => {
+      // The org endpoint also serves Bitbucket, whose repository IDs are
+      // strings, so its inferred output type is broader than our
+      // GitHub-only ReviewConfigData contract. We always request
+      // platform: 'github' here, which guarantees numeric IDs at runtime.
+      const config = queryClient.getQueryData<ReviewConfigData>(queryKey);
+      if (!config) {
+        throw new Error('Config not loaded yet');
+      }
+      const input = buildSaveConfigInput(config, patch);
+      return isPersonal(scope)
+        ? trpcClient.personalReviewAgent.saveReviewConfig.mutate(input)
+        : trpcClient.organizations.reviewAgent.saveReviewConfig.mutate({
+            ...input,
+            organizationId: scope,
+          });
+    },
+    onError: error => {
+      toast.error(error.message);
+    },
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    onSettled: () => queryClient.invalidateQueries({ queryKey }),
+  });
+}
+
+export function useCanEditReviewer(scope: string) {
+  const trpc = useTRPC();
+  const { data: orgs } = useQuery({
+    ...trpc.organizations.list.queryOptions(),
+    enabled: !isPersonal(scope),
+  });
+  if (isPersonal(scope)) {
+    return true;
+  }
+  const role = orgs?.find(org => org.organizationId === scope)?.role;
+  return role !== 'member';
+}

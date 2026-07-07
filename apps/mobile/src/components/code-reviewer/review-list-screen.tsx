@@ -48,7 +48,10 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             </Animated.View>
           )}
 
-          {!isLoading && isError && (
+          {/* Only a full-screen error when there's no usable data yet — a transient
+              background poll failure with stale data should keep showing that data,
+              not hide it behind a retry banner. */}
+          {!isLoading && isError && !data && (
             <Pressable
               className="rounded-lg bg-secondary p-3 active:opacity-70"
               onPress={() => {

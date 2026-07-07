@@ -87,6 +87,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 )}
                 onPress={() => {
                   void Haptics.selectionAsync();
+                  urlRef.current = '';
                   setPlatform(option);
                 }}
               >
@@ -102,6 +103,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             Pull request URL
           </Text>
           <TextInput
+            key={platform}
             className="h-12 rounded-md border border-input bg-background px-3 text-sm leading-5 text-foreground"
             placeholder={URL_PLACEHOLDER[platform]}
             placeholderTextColor={colors.mutedForeground}

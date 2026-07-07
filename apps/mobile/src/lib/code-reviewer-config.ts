@@ -79,7 +79,13 @@ export function buildSaveConfigInput(
     modelSlug: config.modelSlug,
     thinkingEffort: config.thinkingEffort,
     gateThreshold: config.gateThreshold,
-    repositorySelectionMode: config.repositorySelectionMode,
+    // GitLab and Bitbucket only support 'selected' repo mode server-side; the
+    // mode picker only exists for github, so force it here instead of relying
+    // on a config default that can still be 'all'.
+    repositorySelectionMode:
+      platform === 'gitlab' || platform === 'bitbucket'
+        ? ('selected' as const)
+        : config.repositorySelectionMode,
     selectedRepositoryIds: config.selectedRepositoryIds,
     disableReviewMd: config.disableReviewMd,
     ...(platform === 'gitlab' ? { autoConfigureWebhooks: true as const } : {}),

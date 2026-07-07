@@ -55,4 +55,14 @@ describe('buildSaveConfigInput', () => {
     expect(input.platform).toBe('bitbucket');
     expect(input.selectedRepositoryIds).toEqual(['uuid-1']);
   });
+
+  it('forces selected repository mode for gitlab even when config default is all', () => {
+    const input = buildSaveConfigInput('gitlab', config, {});
+    expect(input.repositorySelectionMode).toBe('selected');
+  });
+
+  it('forces selected repository mode for bitbucket even when config default is all', () => {
+    const input = buildSaveConfigInput('bitbucket', config, {});
+    expect(input.repositorySelectionMode).toBe('selected');
+  });
 });

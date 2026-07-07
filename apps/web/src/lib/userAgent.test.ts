@@ -2,7 +2,7 @@ import { describe, test, expect } from '@jest/globals';
 import {
   getKiloCodeVersionNumber,
   getXKiloCodeVersionNumber,
-  isLegacyKiloExtensionUserAgent,
+  isLegacyKiloExtensionNotificationsUserAgent,
 } from './userAgent';
 
 describe('getKiloCodeVersionNumber', () => {
@@ -56,20 +56,20 @@ describe('getKiloCodeVersionNumber', () => {
   });
 });
 
-describe('isLegacyKiloExtensionUserAgent', () => {
+describe('isLegacyKiloExtensionNotificationsUserAgent', () => {
   test('matches the legacy extension axios User-Agent', () => {
-    expect(isLegacyKiloExtensionUserAgent('axios/1.7.2')).toBe(true);
-    expect(isLegacyKiloExtensionUserAgent('axios/0.27.2')).toBe(true);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('axios/1.7.2')).toBe(true);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('axios/0.27.2')).toBe(true);
   });
 
   test('does not match current extension, CLI, bot, or missing User-Agents', () => {
-    expect(isLegacyKiloExtensionUserAgent(null)).toBe(false);
-    expect(isLegacyKiloExtensionUserAgent(undefined)).toBe(false);
-    expect(isLegacyKiloExtensionUserAgent('')).toBe(false);
-    expect(isLegacyKiloExtensionUserAgent('opencode-kilo-provider/7.1.0')).toBe(false);
-    expect(isLegacyKiloExtensionUserAgent('opencode-kilo-provider')).toBe(false);
-    expect(isLegacyKiloExtensionUserAgent('Kilo-Code/5.1.0')).toBe(false);
-    expect(isLegacyKiloExtensionUserAgent('Mozilla/5.0 Test Browser')).toBe(false);
-    expect(isLegacyKiloExtensionUserAgent('my-axios/1.0.0')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent(null)).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent(undefined)).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('opencode-kilo-provider/7.1.0')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('opencode-kilo-provider')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('Kilo-Code/5.1.0')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('Mozilla/5.0 Test Browser')).toBe(false);
+    expect(isLegacyKiloExtensionNotificationsUserAgent('my-axios/1.0.0')).toBe(false);
   });
 });

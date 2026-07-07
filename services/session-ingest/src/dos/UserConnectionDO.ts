@@ -805,6 +805,11 @@ export class UserConnectionDO extends DurableObject<Env> {
     return { delivered };
   }
 
+  hasActiveCliSession(sessionId: string): boolean {
+    this.ensureState();
+    return this.findCliForSession(sessionId) !== undefined;
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------

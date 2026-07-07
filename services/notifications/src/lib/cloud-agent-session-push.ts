@@ -1,4 +1,4 @@
-import { presenceContextForPlatform } from '@kilocode/event-service';
+import { presenceContextForCliSession, presenceContextForPlatform } from '@kilocode/event-service';
 import {
   sendCloudAgentSessionNotificationInputSchema,
   sendSessionReadyNotificationInputSchema,
@@ -39,7 +39,15 @@ async function dispatchSessionPush(
 ): Promise<SendCloudAgentSessionNotificationResult> {
   const session = await deps.getSession(userId, cliSessionId);
 
+  const log = (outcome: string) =>
+    console.log('Cloud agent session notification', {
+      userId,
+      cliSessionId,
+      outcome,
+    });
+
   if (!session) {
+    log('missing_session');
     return { dispatched: false, reason: 'missing_session' };
   }
 
@@ -47,6 +55,7 @@ async function dispatchSessionPush(
     session.organizationId &&
     !(await deps.hasOrganizationAccess(userId, session.organizationId))
   ) {
+    log('missing_session');
     return { dispatched: false, reason: 'missing_session' };
   }
 
@@ -66,9 +75,11 @@ async function dispatchSessionPush(
   } satisfies DispatchPushInput);
 
   if (outcome.kind === 'failed') {
+    log('dispatch_failed');
     return { dispatched: false, reason: 'dispatch_failed' };
   }
 
+  log(outcome.kind);
   return { dispatched: true };
 }
 
@@ -81,7 +92,9 @@ export async function dispatchCloudAgentSessionPush(
     parsed.userId,
     parsed.cliSessionId,
     session => ({
-      presenceContext: null,
+      presenceContext: parsed.suppressIfViewingSession
+        ? presenceContextForCliSession(parsed.cliSessionId)
+        : null,
       idempotencyKey: `cloud-agent:${parsed.cliSessionId}:${parsed.executionId}`,
       title: session.title ?? 'Agent session',
       body: parsed.body,

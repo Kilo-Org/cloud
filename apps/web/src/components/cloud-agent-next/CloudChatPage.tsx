@@ -46,6 +46,7 @@ import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { resolveContextWindow } from './model-context-lengths';
 import { useSlashCommandSets } from '@/hooks/useSlashCommandSets';
 import { useCelebrationSound } from '@/hooks/useCelebrationSound';
+import { useCliSessionPresence } from '@/hooks/useCliSessionPresence';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 
 import { SetPageTitle } from '@/components/SetPageTitle';
@@ -230,6 +231,8 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
   const remoteModelState = useAtomValue(manager.atoms.remoteModelState);
   const observedModel = useAtomValue(manager.atoms.observedModel);
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
+
+  useCliSessionPresence(fetchedSessionData?.kiloSessionId ?? null);
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 

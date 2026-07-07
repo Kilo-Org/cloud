@@ -254,6 +254,7 @@ describe('MessageSettlementOutbox', () => {
         executionId: firstMessageId,
         status: 'completed',
         body: 'Done now',
+        suppressIfViewingSession: true,
       },
     ]);
     const persisted = await getSessionMessageState(harness.storage, firstMessageId);
@@ -483,6 +484,7 @@ describe('MessageSettlementOutbox', () => {
         executionId: firstMessageId,
         status: 'failed',
         body: 'Failed: Assistant request timed out',
+        suppressIfViewingSession: true,
       },
     ]);
     expect(JSON.stringify(harness.pushJobs)).not.toContain('push-secret');

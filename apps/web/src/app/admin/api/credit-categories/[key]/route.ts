@@ -12,11 +12,14 @@ import type {
 import { toGuiCreditCategory } from '@/lib/PromoCreditCategoryConfig';
 import { promoCreditCategoriesByKey } from '@/lib/promoCreditCategories';
 import { getUserFromAuth } from '@/lib/user/server';
+import type { FailureResult } from '@/lib/maybe-result';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ key: string }> }
-): Promise<NextResponse<{ error: string } | CreditCategoryUsersApiResponse>> {
+): Promise<
+  NextResponse<FailureResult<string> | { error: string } | CreditCategoryUsersApiResponse>
+> {
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) {
     return authFailedResponse;

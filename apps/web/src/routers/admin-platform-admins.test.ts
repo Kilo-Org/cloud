@@ -271,6 +271,28 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
     expect(notes).toHaveLength(1);
   });
 
+  test('a redundant grant against an already-admin, ineligible (grandfathered) target is a no-op, not FORBIDDEN', async () => {
+    const admin = await insertQualifyingAdmin();
+    const grandfatheredTarget = await insertGrandfatheredAdmin({
+      web_session_pepper: 'before-redundant-grant-pepper',
+    });
+    const caller = await createCallerForUser(admin.id);
+
+    const result = await caller.admin.users.setPlatformAdminAccess({
+      userId: grandfatheredTarget.id,
+      isAdmin: true,
+    });
+
+    expect(result.changed).toBe(false);
+
+    const unchanged = await getUser(grandfatheredTarget.id);
+    expect(unchanged.is_admin).toBe(true);
+    expect(unchanged.web_session_pepper).toBe('before-redundant-grant-pepper');
+
+    const notes = await getUserAdminNotes(grandfatheredTarget.id);
+    expect(notes).toHaveLength(0);
+  });
+
   test('non-admin callers cannot grant', async () => {
     const nonAdmin = await insertTestUser({ is_admin: false });
     const target = await insertEligibleCandidate();

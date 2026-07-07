@@ -1585,6 +1585,16 @@ export const adminRouter = createTRPCRouter({
             throw new TRPCError({ code: 'NOT_FOUND', message: 'Target user not found' });
           }
 
+          // No-op: the target already has the requested state. Return early
+          // without rotating the session pepper or inserting a duplicate note —
+          // there is no permission change here, so there is nothing to sign out of.
+          // Checked before eligibility so a redundant "grant" against an
+          // already-admin target (e.g. a grandfathered admin outside
+          // kilocode.ai) is always a no-op, not a FORBIDDEN error.
+          if (target.is_admin === input.isAdmin) {
+            return { changed: false as const, user: toPlatformAdminUser(target) };
+          }
+
           if (input.isAdmin) {
             if (!isEligibleForPlatformAdmin(actor.google_user_email, actor.hosted_domain)) {
               throw new TRPCError({
@@ -1598,13 +1608,6 @@ export const adminRouter = createTRPCRouter({
                 message: 'Target user is not eligible for platform admin access.',
               });
             }
-          }
-
-          // No-op: the target already has the requested state. Return early
-          // without rotating the session pepper or inserting a duplicate note —
-          // there is no permission change here, so there is nothing to sign out of.
-          if (target.is_admin === input.isAdmin) {
-            return { changed: false as const, user: toPlatformAdminUser(target) };
           }
 
           const [updatedTarget] = await tx

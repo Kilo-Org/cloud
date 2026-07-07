@@ -5,7 +5,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { ArrowDown, GitBranch, Info, RefreshCw } from 'lucide-react';
+import { ArrowDown, GitBranch } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { KiloSessionId } from '@/lib/cloud-agent-sdk';
@@ -41,7 +41,6 @@ import {
   createRemoteModelOverride,
   useSessionModels,
   validateRemoteModelOverride,
-  type SessionModelNotice,
 } from './hooks/useSessionModels';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { resolveContextWindow } from './model-context-lengths';
@@ -146,41 +145,6 @@ const emptyQuestionRequestIds = new Map<string, string>();
 type CloudChatPageProps = { organizationId?: string };
 
 type TerminalStatusSummary = { status: TerminalStatus; statusText: string };
-
-function SessionModelNotices({
-  notices,
-  onRetry,
-}: {
-  notices: SessionModelNotice[];
-  onRetry: () => void;
-}) {
-  if (notices.length === 0) return null;
-
-  return (
-    <div className="space-y-1.5 px-[max(1rem,calc(50%_-_27rem))] pt-2">
-      {notices.map(notice => (
-        <div
-          key={notice.id}
-          role="status"
-          className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs"
-        >
-          <Info className="size-3.5 shrink-0" />
-          <span className="min-w-0 flex-1">{notice.message}</span>
-          {notice.retry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="text-foreground hover:bg-accent focus-visible:ring-ring inline-flex h-6 shrink-0 items-center gap-1 rounded-md px-2 font-medium focus-visible:ring-2 focus-visible:outline-none"
-            >
-              <RefreshCw className="size-3" />
-              Retry
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 function TerminalPaneSlot({
   terminalId,
@@ -515,10 +479,6 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
 
   const handleStopExecution = useCallback(() => {
     void manager.interrupt();
-  }, [manager]);
-
-  const handleRetryRemoteModels = useCallback(() => {
-    manager.retryRemoteModels();
   }, [manager]);
 
   const handleToggleSound = useCallback(() => {
@@ -908,10 +868,6 @@ export default function CloudChatPage({ organizationId }: CloudChatPageProps) {
                               </div>
                             )}
                             <div className={activeQuestion || activePermission ? 'hidden' : ''}>
-                              <SessionModelNotices
-                                notices={sessionModels.notices}
-                                onRetry={handleRetryRemoteModels}
-                              />
                               <ChatInput
                                 onSend={handleSendMessage}
                                 onSendCommand={handleSendSlashCommand}

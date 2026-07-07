@@ -338,7 +338,6 @@ describe('buildSessionModelOptions', () => {
     });
     expect(result.selectedValue).toBe(unavailableOption?.id);
     expect(result.selectedVariant).toBe('');
-    expect(result.notices.map(notice => notice.id)).toEqual(['legacy', 'unavailable']);
   });
 
   it('does not project a removed legacy Gateway override as the selected model', () => {
@@ -393,10 +392,9 @@ describe('buildSessionModelOptions', () => {
     ]);
     expect(result.options.some(option => option.id === gatewayModels[0]?.id)).toBe(false);
     expect(result.pickerDisabled).toBe(true);
-    expect(result.notices).toEqual([expect.objectContaining({ id: 'error', retry: true })]);
   });
 
-  it('retains a stale v1 catalog with truncation and local-provider notices', () => {
+  it('retains a stale v1 catalog with truncation and local-provider selection', () => {
     const result = buildSessionModelOptions({
       activeSessionType: 'remote',
       remoteModelState: {
@@ -438,12 +436,6 @@ describe('buildSessionModelOptions', () => {
 
     const cliOption = result.options.find(option => option.overrideSource === 'cli-catalog');
 
-    expect(result.notices.map(notice => notice.id)).toEqual([
-      'stale',
-      'truncated',
-      'local-provider',
-    ]);
-    expect(result.notices[2]?.message).toContain("organization's model restrictions");
     expect(createRemoteModelOverride(cliOption, 'removed')).toEqual({
       source: 'cli-catalog',
       selection: { model: { providerID: 'local-provider', modelID: 'private-model' } },

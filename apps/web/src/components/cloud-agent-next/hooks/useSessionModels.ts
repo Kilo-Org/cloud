@@ -26,12 +26,6 @@ type SessionModelSource =
   | 'remote-legacy-gateway'
   | 'remote-unavailable';
 
-type SessionModelNotice = {
-  id: 'loading' | 'legacy' | 'error' | 'stale' | 'truncated' | 'local-provider';
-  message: string;
-  retry: boolean;
-};
-
 type SessionModelOption = ModelOption & {
   displayId?: string;
   providerGroup?: { id: string; label: string };
@@ -72,7 +66,6 @@ type SessionModels = {
   availableVariants: string[];
   modelPickerDisabled: boolean;
   isLoadingModels: boolean;
-  notices: SessionModelNotice[];
   gatewayOrganizationId?: string;
 };
 
@@ -185,7 +178,6 @@ export function buildSessionModels(input: BuildSessionModelsInput): SessionModel
     availableVariants: selectedOption?.variants ?? [],
     modelPickerDisabled: false,
     isLoadingModels: input.gatewayModelsLoading,
-    notices: [],
     gatewayOrganizationId: input.gatewayOrganizationId,
   };
 }
@@ -210,20 +202,6 @@ function buildUnavailableRemoteModels(input: BuildSessionModelsInput): SessionMo
     availableVariants: [],
     modelPickerDisabled: true,
     isLoadingModels: loading,
-    notices: [
-      loading
-        ? {
-            id: 'loading',
-            message: 'Checking this CLI for available models.',
-            retry: true,
-          }
-        : {
-            id: 'error',
-            message:
-              "Models from this CLI couldn't be loaded. Sending still uses the session model.",
-            retry: true,
-          },
-    ],
     gatewayOrganizationId: input.gatewayOrganizationId,
   };
 }
@@ -260,7 +238,6 @@ function buildLegacyGatewayModels(input: BuildSessionModelsInput): SessionModels
     availableVariants: selectedOption?.variants ?? [],
     modelPickerDisabled: input.gatewayModelsLoading,
     isLoadingModels: input.gatewayModelsLoading,
-    notices: [],
     gatewayOrganizationId: input.gatewayOrganizationId,
   };
 }
@@ -315,30 +292,6 @@ function buildCliCatalogModels(input: BuildSessionModelsInput): SessionModels {
     currentSelection?.variant && selectedOption?.variants?.includes(currentSelection.variant)
       ? currentSelection.variant
       : undefined;
-  const notices: SessionModelNotice[] = [];
-  if (input.remoteModelState.refresh === 'error') {
-    notices.push({
-      id: 'stale',
-      message: 'Showing the last model catalog because refresh failed.',
-      retry: true,
-    });
-  }
-  if (catalog.truncated) {
-    notices.push({
-      id: 'truncated',
-      message: 'This CLI returned a partial model catalog. Some models or variants may be missing.',
-      retry: false,
-    });
-  }
-  if (currentSelection && currentSelection.model.providerID !== 'kilo') {
-    notices.push({
-      id: 'local-provider',
-      message: input.gatewayOrganizationId
-        ? "This model runs through your CLI provider, outside Kilo Gateway billing and this organization's model restrictions."
-        : 'This model runs through your CLI provider, outside Kilo Gateway billing.',
-      retry: false,
-    });
-  }
 
   return {
     source: 'remote-cli-catalog',
@@ -348,7 +301,6 @@ function buildCliCatalogModels(input: BuildSessionModelsInput): SessionModels {
     availableVariants: selectedOption?.variants ?? [],
     modelPickerDisabled: false,
     isLoadingModels: false,
-    notices,
     gatewayOrganizationId: input.gatewayOrganizationId,
   };
 }
@@ -419,7 +371,6 @@ export function createRemoteModelOverride(
 
 export type {
   BuildSessionModelsInput,
-  SessionModelNotice,
   SessionModelOption,
   SessionModels,
   UseSessionModelsInput,

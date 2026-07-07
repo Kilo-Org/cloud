@@ -17,12 +17,6 @@ type SessionModelSource =
   | 'remote-legacy-gateway'
   | 'remote-unavailable';
 
-export type SessionModelNotice = {
-  id: 'loading' | 'legacy' | 'error' | 'stale' | 'truncated' | 'unavailable' | 'local-provider';
-  message: string;
-  retry: boolean;
-};
-
 export type SessionModelOption = {
   id: string;
   name: string;
@@ -56,7 +50,6 @@ type SessionModelOptions = {
   selectedVariant: string;
   pickerDisabled: boolean;
   isLoading: boolean;
-  notices: SessionModelNotice[];
 };
 
 export function useSessionModelOptions({
@@ -111,7 +104,6 @@ export function buildSessionModelOptions(
     selectedVariant: '',
     pickerDisabled: false,
     isLoading: input.gatewayModelsLoading,
-    notices: [],
   };
 }
 
@@ -129,26 +121,6 @@ function buildUnavailableRemoteOptions(input: BuildSessionModelOptionsInput): Se
         unavailable: true,
       } satisfies SessionModelOption);
   const loading = input.remoteModelState.refresh === 'loading';
-  const notices: SessionModelNotice[] = [
-    loading
-      ? {
-          id: 'loading',
-          message: 'Checking this CLI for available models.',
-          retry: true,
-        }
-      : {
-          id: 'error',
-          message: "Models from this CLI couldn't be loaded. Sending still uses the session model.",
-          retry: true,
-        },
-  ];
-  if (currentSelection) {
-    notices.push({
-      id: 'unavailable',
-      message: `${currentSelection.model.modelID} is the session model. It can't be changed until this CLI's models load.`,
-      retry: false,
-    });
-  }
 
   return {
     source: 'remote-unavailable',
@@ -157,7 +129,6 @@ function buildUnavailableRemoteOptions(input: BuildSessionModelOptionsInput): Se
     selectedVariant: currentSelection?.variant ?? '',
     pickerDisabled: true,
     isLoading: loading,
-    notices,
   };
 }
 
@@ -199,12 +170,10 @@ function buildLegacyGatewayOptions(input: BuildSessionModelOptionsInput): Sessio
         option => option.modelRef && modelRefsEqual(option.modelRef, currentSelection.model)
       )
     : undefined;
-  const notices: SessionModelNotice[] = [];
 
   if (currentSelection && !selectedOption) {
     selectedOption = createUnavailableOption(currentSelection.model);
     options.unshift(selectedOption);
-    notices.push(createUnavailableNotice(currentSelection.model));
   }
 
   const selectedVariant =
@@ -219,7 +188,6 @@ function buildLegacyGatewayOptions(input: BuildSessionModelOptionsInput): Sessio
     selectedVariant,
     pickerDisabled: input.gatewayModelsLoading,
     isLoading: input.gatewayModelsLoading,
-    notices,
   };
 }
 
@@ -256,35 +224,10 @@ function buildCliCatalogOptions(input: BuildSessionModelOptionsInput): SessionMo
         option => option.modelRef && modelRefsEqual(option.modelRef, currentSelection.model)
       )
     : undefined;
-  const notices: SessionModelNotice[] = [];
 
   if (currentSelection && !selectedOption) {
     selectedOption = createUnavailableOption(currentSelection.model);
     options.unshift(selectedOption);
-    notices.push(createUnavailableNotice(currentSelection.model));
-  }
-  if (input.remoteModelState.refresh === 'error') {
-    notices.unshift({
-      id: 'stale',
-      message: 'Showing the last model catalog because refresh failed.',
-      retry: true,
-    });
-  }
-  if (catalog.truncated) {
-    notices.push({
-      id: 'truncated',
-      message: 'This CLI returned a partial model catalog. Some models or variants may be missing.',
-      retry: false,
-    });
-  }
-  if (currentSelection && currentSelection.model.providerID !== 'kilo') {
-    notices.push({
-      id: 'local-provider',
-      message: input.organizationId
-        ? "This model runs through your CLI provider, outside Kilo Gateway billing and this organization's model restrictions."
-        : 'This model runs through your CLI provider, outside Kilo Gateway billing.',
-      retry: false,
-    });
   }
 
   const selectedVariant =
@@ -299,7 +242,6 @@ function buildCliCatalogOptions(input: BuildSessionModelOptionsInput): SessionMo
     selectedVariant,
     pickerDisabled: false,
     isLoading: false,
-    notices,
   };
 }
 
@@ -314,14 +256,6 @@ function createUnavailableOption(modelRef: ModelRef): SessionModelOption {
     modelRef,
     showGatewayMetadata: false,
     unavailable: true,
-  };
-}
-
-function createUnavailableNotice(modelRef: ModelRef): SessionModelNotice {
-  return {
-    id: 'unavailable',
-    message: `${modelRef.modelID} is the session model but is not available in this catalog.`,
-    retry: false,
   };
 }
 

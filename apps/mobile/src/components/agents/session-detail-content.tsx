@@ -9,10 +9,7 @@ import { toast } from 'sonner-native';
 import { ChatComposer } from '@/components/agents/chat-composer';
 import { ConnectivityBanner } from '@/components/agents/connectivity-banner';
 import { MessageBubble } from '@/components/agents/message-bubble';
-import {
-  ModelPickerSelectionScopeProvider,
-  SessionModelNotices,
-} from '@/components/agents/model-selector';
+import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { PermissionCard } from '@/components/agents/permission-card';
 import { QuestionCard } from '@/components/agents/question-card';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
@@ -375,12 +372,6 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
             </View>
           ) : (
             <>
-              <SessionModelNotices
-                notices={sessionModels.notices}
-                onRetry={() => {
-                  manager.retryRemoteModels();
-                }}
-              />
               <ModelPickerSelectionScopeProvider
                 selectionScope={modelPickerSelectionScope}
                 isSelectionCurrent={isModelPickerSelectionCurrent}

@@ -72,7 +72,6 @@ describe('buildSessionModels', () => {
     expect(result.selectedVariant).toBe('high');
     expect(result.availableVariants).toEqual(['none', 'high']);
     expect(result.modelPickerDisabled).toBe(false);
-    expect(result.notices).toEqual([]);
     expect(result.gatewayOrganizationId).toBe('org-persisted');
   });
 
@@ -355,7 +354,6 @@ describe('buildSessionModels', () => {
 
     expect(result.source).toBe('remote-legacy-gateway');
     expect(result.gatewayOrganizationId).toBe('org-from-fetched-session');
-    expect(result.notices.map(notice => notice.id)).toEqual(['legacy']);
     expect(gatewayOption).toMatchObject({
       id: 'anthropic/claude-sonnet-4',
       modelRef: { providerID: 'kilo', modelID: 'anthropic/claude-sonnet-4' },
@@ -404,7 +402,6 @@ describe('buildSessionModels', () => {
     expect(result.modelOptions.some(option => option.id === gatewayModels[0].id)).toBe(false);
     expect(result.selectedValue).toBe(result.modelOptions[0].id);
     expect(result.modelPickerDisabled).toBe(true);
-    expect(result.notices).toEqual([expect.objectContaining({ id: 'error', retry: true })]);
   });
 
   it('keeps a stale v1 catalog with truncation and local-provider disclosure', () => {
@@ -450,12 +447,6 @@ describe('buildSessionModels', () => {
     const cliOption = result.modelOptions.find(option => option.overrideSource === 'cli-catalog');
 
     expect(result.source).toBe('remote-cli-catalog');
-    expect(result.notices.map(notice => notice.id)).toEqual([
-      'stale',
-      'truncated',
-      'local-provider',
-    ]);
-    expect(result.notices[2].message).toContain("organization's model restrictions");
     expect(createRemoteModelOverride(cliOption, 'removed-variant')).toEqual({
       source: 'cli-catalog',
       selection: {

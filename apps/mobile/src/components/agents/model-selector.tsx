@@ -1,16 +1,7 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import {
-  AlertTriangle,
-  BookOpenCheck,
-  Brain,
-  Check,
-  ChevronDown,
-  Info,
-  RefreshCw,
-  Star,
-} from 'lucide-react-native';
+import { BookOpenCheck, Brain, Check, ChevronDown, Star } from 'lucide-react-native';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
@@ -25,10 +16,7 @@ import {
   mayTrainOnYourPrompts,
 } from '@/lib/free-model-data-disclosure';
 import { type ModelOption, thinkingEffortLabel } from '@/lib/hooks/use-available-models';
-import {
-  type SessionModelNotice,
-  type SessionModelOption,
-} from '@/lib/hooks/use-session-model-options';
+import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   type ModelPickerSelection,
@@ -341,45 +329,6 @@ export function ModelPickerOptionRow({
           </ScrollView>
         </View>
       ) : null}
-    </View>
-  );
-}
-
-export function SessionModelNotices({
-  notices,
-  onRetry,
-}: Readonly<{ notices: SessionModelNotice[]; onRetry: () => void }>) {
-  const colors = useThemeColors();
-  if (notices.length === 0) {
-    return null;
-  }
-
-  return (
-    <View className="gap-1 border-t border-warn-tile-border bg-warn-tile-bg px-3 py-2">
-      {notices.map(notice => {
-        const Icon =
-          notice.id === 'legacy' || notice.id === 'local-provider' ? Info : AlertTriangle;
-        return (
-          <View key={notice.id} className="flex-row items-start gap-2">
-            <Icon size={14} color={colors.warn} />
-            <Text selectable className="flex-1 text-xs leading-4 text-foreground">
-              {notice.message}
-            </Text>
-            {notice.retry ? (
-              <Pressable
-                onPress={onRetry}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityLabel="Retry loading CLI models"
-                className="flex-row items-center gap-1 rounded-full bg-secondary px-2 py-1 active:opacity-70"
-              >
-                <RefreshCw size={12} color={colors.foreground} />
-                <Text className="text-xs font-medium text-foreground">Retry</Text>
-              </Pressable>
-            ) : null}
-          </View>
-        );
-      })}
     </View>
   );
 }

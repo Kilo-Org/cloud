@@ -6,6 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { asReviewerPlatform } from '@/lib/code-reviewer-config';
 import {
   PERSONAL_SCOPE,
   useReviewConfig,
@@ -15,10 +16,14 @@ import { thinkingEffortLabel, useAvailableModels } from '@/lib/hooks/use-availab
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function ModelRoute() {
-  const { scope } = useLocalSearchParams<{ scope: string }>();
+  const { scope, platform: rawPlatform } = useLocalSearchParams<{
+    scope: string;
+    platform: string;
+  }>();
+  const platform = asReviewerPlatform(rawPlatform);
   const colors = useThemeColors();
-  const { data } = useReviewConfig(scope, 'github');
-  const save = useSaveReviewConfig(scope, 'github');
+  const { data } = useReviewConfig(scope, platform);
+  const save = useSaveReviewConfig(scope, platform);
   const { models, isLoading } = useAvailableModels(scope === PERSONAL_SCOPE ? undefined : scope);
 
   const selectedModel = models.find(model => model.id === data?.modelSlug);

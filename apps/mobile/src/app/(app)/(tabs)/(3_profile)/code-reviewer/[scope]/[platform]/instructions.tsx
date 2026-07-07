@@ -7,6 +7,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { asReviewerPlatform } from '@/lib/code-reviewer-config';
 import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
 
 // Mounted only once `data != null`, so useRef(initial) captures the real
@@ -52,10 +53,14 @@ function InstructionsEditor({
 }
 
 export default function InstructionsRoute() {
-  const { scope } = useLocalSearchParams<{ scope: string }>();
+  const { scope, platform: rawPlatform } = useLocalSearchParams<{
+    scope: string;
+    platform: string;
+  }>();
+  const platform = asReviewerPlatform(rawPlatform);
   const router = useRouter();
-  const { data } = useReviewConfig(scope, 'github');
-  const save = useSaveReviewConfig(scope, 'github');
+  const { data } = useReviewConfig(scope, platform);
+  const save = useSaveReviewConfig(scope, platform);
 
   return (
     <View className="flex-1 bg-background">

@@ -5,7 +5,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
-import { FOCUS_AREAS } from '@/lib/code-reviewer-config';
+import { asReviewerPlatform, FOCUS_AREAS } from '@/lib/code-reviewer-config';
 import {
   useReviewConfig,
   useReviewConfigCacheReader,
@@ -14,11 +14,15 @@ import {
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function FocusAreasRoute() {
-  const { scope } = useLocalSearchParams<{ scope: string }>();
+  const { scope, platform: rawPlatform } = useLocalSearchParams<{
+    scope: string;
+    platform: string;
+  }>();
+  const platform = asReviewerPlatform(rawPlatform);
   const colors = useThemeColors();
-  const { data } = useReviewConfig(scope, 'github');
-  const save = useSaveReviewConfig(scope, 'github');
-  const readConfig = useReviewConfigCacheReader(scope, 'github');
+  const { data } = useReviewConfig(scope, platform);
+  const save = useSaveReviewConfig(scope, platform);
+  const readConfig = useReviewConfigCacheReader(scope, platform);
   const selected = data?.focusAreas ?? [];
 
   const toggleArea = (area: string) => {

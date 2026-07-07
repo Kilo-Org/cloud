@@ -6,8 +6,10 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { asReviewerPlatform, PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
 import {
   useGitHubRepositories,
+  useGitLabRepositories,
   useReviewConfig,
   useReviewConfigCacheReader,
   useSaveReviewConfig,
@@ -15,13 +17,20 @@ import {
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 export default function ReposRoute() {
-  const { scope } = useLocalSearchParams<{ scope: string }>();
+  const { scope, platform: rawPlatform } = useLocalSearchParams<{
+    scope: string;
+    platform: string;
+  }>();
+  const platform = asReviewerPlatform(rawPlatform);
   const colors = useThemeColors();
-  const { data } = useReviewConfig(scope, 'github');
-  const save = useSaveReviewConfig(scope, 'github');
-  const readConfig = useReviewConfigCacheReader(scope, 'github');
+  const { data } = useReviewConfig(scope, platform);
+  const save = useSaveReviewConfig(scope, platform);
+  const readConfig = useReviewConfigCacheReader(scope, platform);
+  const capabilities = PLATFORM_CAPABILITIES[platform];
   const mode = data?.repositorySelectionMode ?? 'all';
-  const repos = useGitHubRepositories(scope, mode === 'selected');
+  const githubRepos = useGitHubRepositories(scope, platform === 'github' && mode === 'selected');
+  const gitlabRepos = useGitLabRepositories(scope, platform === 'gitlab');
+  const repos = platform === 'gitlab' ? gitlabRepos : githubRepos;
   const selectedIds = data?.selectedRepositoryIds ?? [];
 
   const setMode = (nextMode: 'all' | 'selected') => {
@@ -45,23 +54,24 @@ export default function ReposRoute() {
     <View className="flex-1 bg-background">
       <ScreenHeader title="Repositories" />
       <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
-        {(['all', 'selected'] as const).map(option => (
-          <Pressable
-            key={option}
-            className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
-            onPress={() => {
-              setMode(option);
-            }}
-          >
-            <Text className="text-sm font-medium">
-              {option === 'all' ? 'All repositories' : 'Selected repositories'}
-            </Text>
-            {mode === option ? <Check size={18} color={colors.foreground} /> : null}
-          </Pressable>
-        ))}
+        {capabilities.selectionModePicker &&
+          (['all', 'selected'] as const).map(option => (
+            <Pressable
+              key={option}
+              className="flex-row items-center justify-between border-b-[0.5px] border-hair-soft py-3 active:opacity-70"
+              onPress={() => {
+                setMode(option);
+              }}
+            >
+              <Text className="text-sm font-medium">
+                {option === 'all' ? 'All repositories' : 'Selected repositories'}
+              </Text>
+              {mode === option ? <Check size={18} color={colors.foreground} /> : null}
+            </Pressable>
+          ))}
 
-        {mode === 'selected' && (
-          <View className="mt-6">
+        {(!capabilities.selectionModePicker || mode === 'selected') && (
+          <View className={capabilities.selectionModePicker ? 'mt-6' : undefined}>
             <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
               Repositories
             </Text>

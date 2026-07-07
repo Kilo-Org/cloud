@@ -1,7 +1,7 @@
 import { useLocalSearchParams } from 'expo-router';
 
 import { OptionList } from '@/components/code-reviewer/option-list';
-import { GATE_THRESHOLDS } from '@/lib/code-reviewer-config';
+import { asReviewerPlatform, GATE_THRESHOLDS } from '@/lib/code-reviewer-config';
 import { useReviewConfig, useSaveReviewConfig } from '@/lib/hooks/use-code-reviewer';
 
 const DESCRIPTIONS = {
@@ -12,9 +12,13 @@ const DESCRIPTIONS = {
 } as const;
 
 export default function GateThresholdRoute() {
-  const { scope } = useLocalSearchParams<{ scope: string }>();
-  const { data } = useReviewConfig(scope, 'github');
-  const save = useSaveReviewConfig(scope, 'github');
+  const { scope, platform: rawPlatform } = useLocalSearchParams<{
+    scope: string;
+    platform: string;
+  }>();
+  const platform = asReviewerPlatform(rawPlatform);
+  const { data } = useReviewConfig(scope, platform);
+  const save = useSaveReviewConfig(scope, platform);
 
   return (
     <OptionList

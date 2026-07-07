@@ -1,5 +1,9 @@
 export type ReviewerPlatform = 'github' | 'gitlab' | 'bitbucket';
 
+export function asReviewerPlatform(value: string): ReviewerPlatform {
+  return value === 'gitlab' || value === 'bitbucket' ? value : 'github';
+}
+
 export const PLATFORM_CAPABILITIES: Record<
   ReviewerPlatform,
   {

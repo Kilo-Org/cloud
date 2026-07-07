@@ -1,8 +1,8 @@
 import { useLocalSearchParams } from 'expo-router';
 
-import { ScopeOverviewScreen } from '@/components/code-reviewer/scope-overview-screen';
+import { PlatformListScreen } from '@/components/code-reviewer/platform-list-screen';
 
 export default function CodeReviewerScopeRoute() {
   const { scope } = useLocalSearchParams<{ scope: string }>();
-  return <ScopeOverviewScreen scope={scope} />;
+  return <PlatformListScreen scope={scope} />;
 }

@@ -958,6 +958,73 @@ describe('WrapperClient', () => {
       );
     });
 
+    it('passes toolCgroupEnv through to both the process env and the inlined command env', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+
+      await client.ensureRunning({
+        agentSessionId: 'test-session',
+        userId: 'test-user',
+        workspacePath: '/workspace/test',
+        toolCgroupEnv: { TOOL_CGROUP_MODE: 'enforce', TOOL_CGROUP_RESERVE_MB: '1536' },
+      });
+
+      const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
+      const command = startProcessCall[0] as string;
+      const options = startProcessCall[1] as { env?: Record<string, string> };
+      expect(command).toContain('TOOL_CGROUP_MODE=');
+      expect(command).toContain('TOOL_CGROUP_RESERVE_MB=');
+      expect(options.env).toEqual(
+        expect.objectContaining({
+          TOOL_CGROUP_MODE: 'enforce',
+          TOOL_CGROUP_RESERVE_MB: '1536',
+        })
+      );
+    });
+
+    it('filters invalid toolCgroupEnv keys before shell interpolation', async () => {
+      const session = createMockSession(createCurlError(7, 'Connection refused'));
+      (session.startProcess as ReturnType<typeof vi.fn>).mockResolvedValue({
+        id: 'mock-process-id',
+        waitForPort: vi.fn().mockResolvedValue(undefined),
+        getLogs: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
+      });
+
+      const client = new WrapperClient({ session, port: defaultPort });
+      const toolCgroupEnv: Record<string, string> = {
+        TOOL_CGROUP_MODE: 'enforce',
+        PATH: '/tmp/pwned',
+        'BAD;touch /tmp/pwned': 'x',
+      };
+
+      await client.ensureRunning({
+        agentSessionId: 'test-session',
+        userId: 'test-user',
+        workspacePath: '/workspace/test',
+        toolCgroupEnv,
+      });
+
+      const startProcessCall = (session.startProcess as ReturnType<typeof vi.fn>).mock.calls[0];
+      const command = startProcessCall[0] as string;
+      const options = startProcessCall[1] as { env?: Record<string, string> };
+      expect(command).toContain('TOOL_CGROUP_MODE=');
+      expect(command).not.toContain('/tmp/pwned');
+      expect(command).not.toContain('BAD;touch');
+      expect(options.env).toEqual(
+        expect.objectContaining({
+          TOOL_CGROUP_MODE: 'enforce',
+        })
+      );
+      expect(options.env).not.toHaveProperty('PATH');
+      expect(options.env).not.toHaveProperty('BAD;touch /tmp/pwned');
+    });
+
     it('throws WrapperNotReadyError after exhausting all retry attempts', async () => {
       // Health check fails (not running)
       const session = createMockSession(createCurlError(7, 'Connection refused'));

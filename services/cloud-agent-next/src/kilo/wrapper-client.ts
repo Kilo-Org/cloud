@@ -32,6 +32,7 @@ import {
   type WrapperSessionReadyRequest,
   type WrapperSessionReadySuccessResponse,
 } from '../shared/wrapper-bootstrap.js';
+import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../shared/tool-cgroup-env.js';
 import { parseWrapperSessionReadyErrorResponse } from './wrapper-ready-error.js';
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,12 @@ export type EnsureRunningOptions = {
    * and its HTTP port is reached via the publish set up by `devcontainer up`.
    */
   devcontainer?: DevContainerHandle;
+  /**
+   * `TOOL_CGROUP_*` knobs for the wrapper's memory cgroup partition, already
+   * gated per-org by the caller (`TOOL_CGROUP_ORG_IDS`). Only defined keys are
+   * included — see MEMORY_CGROUPS_PLAN.md (W4).
+   */
+  toolCgroupEnv?: ToolCgroupEnv;
 };
 
 export type EnsureWrapperOptions = {
@@ -80,6 +87,8 @@ export type EnsureWrapperOptions = {
   runtimeEnv?: Record<string, string | undefined>;
   /** See {@link EnsureRunningOptions.devcontainer}. */
   devcontainer?: DevContainerHandle;
+  /** See {@link EnsureRunningOptions.toolCgroupEnv}. */
+  toolCgroupEnv?: ToolCgroupEnv;
   /**
    * Force the wrapper to listen on this exact port instead of a random one.
    * Used by the devcontainer flow because the port has to be chosen *before*
@@ -95,6 +104,8 @@ export type EnsureBootstrapWrapperOptions = {
   wrapperPath?: string;
   maxWaitMs?: number;
   leasedInstance?: WrapperInstanceLease;
+  /** See {@link EnsureRunningOptions.toolCgroupEnv}. */
+  toolCgroupEnv?: ToolCgroupEnv;
 };
 
 export type SessionBinding = {
@@ -233,6 +244,7 @@ const ERROR_STATUS_CODES: Record<string, number> = {
 
 /** Max attempts for port allocation in ensureWrapper (retry with new random port on failure) */
 const MAX_PORT_ATTEMPTS = 3;
+const TOOL_CGROUP_ENV_KEY_SET = new Set<string>(TOOL_CGROUP_ENV_KEYS);
 
 function healthMatchesLease(
   health: WrapperHealthResponse,
@@ -574,6 +586,7 @@ export class WrapperClient {
       leasedInstance,
       runtimeEnv,
       devcontainer,
+      toolCgroupEnv,
     } = options;
 
     // First, try to check health
@@ -606,6 +619,9 @@ export class WrapperClient {
     // When running inside a dev container, the wrapper sees the *inner*
     // workspace path (set by `devcontainer up`'s remoteWorkspaceFolder).
     const innerWorkspacePath = devcontainer?.innerWorkspaceFolder ?? workspacePath;
+    const validToolCgroupEnv = validShellEnvEntries(toolCgroupEnv ?? {}).filter(([key]) =>
+      TOOL_CGROUP_ENV_KEY_SET.has(key)
+    );
     const wrapperEnv: Record<string, string | undefined> = {
       WRAPPER_PORT: String(this.port),
       WORKSPACE_PATH: innerWorkspacePath,
@@ -618,6 +634,7 @@ export class WrapperClient {
             WRAPPER_INSTANCE_GENERATION: String(leasedInstance.instanceGeneration),
           }
         : {}),
+      ...Object.fromEntries(validToolCgroupEnv),
     };
     const commandEnvParts = [
       `WRAPPER_PORT=${this.port}`,
@@ -632,6 +649,7 @@ export class WrapperClient {
             `WRAPPER_INSTANCE_GENERATION=${leasedInstance.instanceGeneration}`,
           ]
         : []),
+      ...validToolCgroupEnv.map(([key, value]) => `${key}=${shellQuote(value)}`),
       ...dockerEnvParts,
     ];
     const devContainerSessionHome =

@@ -67,6 +67,7 @@ import {
   WorkspaceCapacityAdmissionRejectedError,
   WorkspaceFilesystemPreparationError,
 } from '../../workspace-errors.js';
+import { TOOL_CGROUP_ENV_KEYS, type ToolCgroupEnv } from '../../shared/tool-cgroup-env.js';
 
 const PREPARE_WORKSPACE_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_STOP_OBSERVATION_DELAYS_MS = [100, 500, 1_000];
@@ -77,6 +78,21 @@ function shellQuote(value: string): string {
 
 function elapsedMs(startedAt: number): number {
   return Math.max(0, Date.now() - startedAt);
+}
+
+/**
+ * `TOOL_CGROUP_*` knobs to pass through to the wrapper, gated by
+ * `TOOL_CGROUP_ORG_IDS` (see MEMORY_CGROUPS_PLAN.md W4). Undefined when the
+ * org isn't in the rollout list, so callers can omit the field entirely.
+ */
+function buildToolCgroupEnv(env: Env, orgId: string | undefined): ToolCgroupEnv | undefined {
+  if (!isOrgInList(env.TOOL_CGROUP_ORG_IDS, orgId)) return undefined;
+  const vars: ToolCgroupEnv = {};
+  for (const key of TOOL_CGROUP_ENV_KEYS) {
+    const value = env[key];
+    if (value) vars[key] = value;
+  }
+  return vars;
 }
 
 function reportWorkspaceBackupProgress(
@@ -566,6 +582,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
           }
         );
       }
+      const toolCgroupEnv = buildToolCgroupEnv(this.env, orgId);
       let wrapper: Awaited<ReturnType<typeof WrapperClient.ensureWrapper>>;
       try {
         wrapper = await WrapperClient.ensureWrapper(sandbox, preparedWorkspace.session, {
@@ -577,6 +594,7 @@ export class CloudflareAgentSandbox implements AgentSandbox {
           devcontainer: preparedWorkspace.devcontainer,
           fixedPort: preparedWorkspace.ready.devcontainer.wrapperPort,
           ...(request.leasedInstance ? { leasedInstance: request.leasedInstance } : {}),
+          ...(toolCgroupEnv ? { toolCgroupEnv } : {}),
         });
       } catch (error) {
         throw ExecutionError.wrapperStartFailed(
@@ -621,10 +639,12 @@ export class CloudflareAgentSandbox implements AgentSandbox {
       env: {},
       cwd: '/',
     });
+    const bootstrapToolCgroupEnv = buildToolCgroupEnv(this.env, orgId);
     const wrapper = await WrapperClient.ensureBootstrapWrapper(sandbox, bootstrapSession, {
       agentSessionId: sessionId,
       userId,
       ...(request.leasedInstance ? { leasedInstance: request.leasedInstance } : {}),
+      ...(bootstrapToolCgroupEnv ? { toolCgroupEnv: bootstrapToolCgroupEnv } : {}),
     });
     if (!prepared.readyRequest) {
       return { status: 'wrapper-running' as const, client: wrapper.client };

@@ -408,6 +408,7 @@
         "PER_SESSION_SANDBOX_ORG_IDS": "*",
         "MANAGED_SCM_CONTAINMENT_ORG_IDS": "",
         "REPO_SNAPSHOT_ORG_IDS": "",
+        "TOOL_CGROUP_ORG_IDS": "",
       },
       "services": [
         {

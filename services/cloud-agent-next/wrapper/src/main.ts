@@ -2,8 +2,12 @@
  * Long-running wrapper entry point.
  *
  * The wrapper runs as a single control plane inside the sandbox container.
- * It starts the kilo server in-process via `@kilocode/sdk`'s `createKilo()`,
- * then exposes an HTTP API for the Worker to send commands.
+ * It starts the kilo server as a child process via `@kilocode/sdk`'s
+ * `createKilo()` (which spawns `kilo serve` via cross-spawn — not in-process),
+ * then exposes an HTTP API for the Worker to send commands. Because the
+ * server is a separate process, it can be OOM-killed independently of the
+ * wrapper (see `kilo-server` cgroup, `tool-cgroup.ts`); `restartKiloRuntime`
+ * in `serverDeps` recovers from that by respawning it.
  *
  * Configuration:
  * - Session-level: WRAPPER_PORT, WORKSPACE_PATH (env vars at process start)
@@ -22,6 +26,7 @@ import { bindSessionContext, createServer } from './server.js';
 import { openKiloGlobalFeed } from './global-feed.js';
 import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-feed-manager.js';
 import { logToFile } from './utils.js';
+import { startToolCgroup } from './tool-cgroup.js';
 import {
   kiloServerBootstrapError,
   kiloServerStartupError,
@@ -227,6 +232,10 @@ async function main() {
   // ---------------------------------------------------------------------------
   // Wire up components
   // ---------------------------------------------------------------------------
+  // Confine tool subprocesses to a memory-capped cgroup (best-effort; null
+  // when disabled or the cgroup fs is unavailable, e.g. in devcontainers).
+  const toolCgroup = startToolCgroup(process.env);
+
   const state = new WrapperState();
   let kiloClient: WrapperKiloClient | undefined;
   let kiloSessionId = configuredSessionId ?? '';
@@ -238,6 +247,7 @@ async function main() {
   const workspaceBootstrapController = new AbortController();
   const activeWorkspaceBootstraps = new Set<ReturnType<typeof prepareWrapperBootstrapWorkspace>>();
   const activeRuntimeStartups = new Set<Promise<void>>();
+  let inFlightRuntimeRestart: Promise<void> | undefined;
 
   const unavailableKiloClient = new Proxy(
     {},
@@ -277,6 +287,25 @@ async function main() {
     materializePromptAttachments,
     onSessionBound: (feedPolicy: SessionBoundFeedPolicy) =>
       globalFeedManager.onSessionBound(feedPolicy),
+    toolCgroupHealth: () => toolCgroup?.health() ?? null,
+    // Deduped: concurrent failed requests must share one restart rather than each
+    // respawning the kilo server and racing to mutate closeKiloServer/kiloClient.
+    restartKiloRuntime: (): Promise<void> => {
+      if (!runtimeWorkspacePath) return Promise.resolve();
+      if (inFlightRuntimeRestart) return inFlightRuntimeRestart;
+      const restart = startKiloRuntime(runtimeWorkspacePath, kiloSessionId || undefined, true);
+      inFlightRuntimeRestart = restart;
+      activeRuntimeStartups.add(restart);
+      // Rejection is surfaced via the returned `restart` (awaited by callers);
+      // this chain only clears bookkeeping and must never throw.
+      void restart
+        .catch(() => {})
+        .finally(() => {
+          inFlightRuntimeRestart = undefined;
+          activeRuntimeStartups.delete(restart);
+        });
+      return restart;
+    },
   };
 
   async function verifyExistingKiloSession(
@@ -355,7 +384,7 @@ async function main() {
     serverDeps.kiloClient = unavailableKiloClient;
 
     process.chdir(workspacePath);
-    logToFile('starting kilo server in-process via @kilocode/sdk');
+    logToFile('starting kilo server child process via @kilocode/sdk');
     let nextKiloClient: WrapperKiloClient;
     try {
       const result = await createKilo({
@@ -733,6 +762,7 @@ async function main() {
     // Stop lifecycle timers
     lifecycleManager?.stop();
     globalFeedManager.close();
+    toolCgroup?.stop();
 
     // Best-effort final log upload
     const uploader = state.logUploader;

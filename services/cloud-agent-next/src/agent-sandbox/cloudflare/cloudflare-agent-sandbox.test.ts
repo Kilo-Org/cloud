@@ -280,6 +280,63 @@ describe('CloudflareAgentSandbox', () => {
     ensureBootstrapWrapper.mockRestore();
   });
 
+  it('passes TOOL_CGROUP_* env through when the org is in TOOL_CGROUP_ORG_IDS', async () => {
+    const bootstrapSession = {};
+    const createSession = vi.fn().mockResolvedValue(bootstrapSession);
+    const ensureBootstrapWrapper = vi
+      .spyOn(WrapperClient, 'ensureBootstrapWrapper')
+      .mockResolvedValueOnce({ client: {} as WrapperClient });
+    const sandbox = new CloudflareAgentSandbox(
+      { TOOL_CGROUP_ORG_IDS: '*', TOOL_CGROUP_MODE: 'enforce' } as unknown as Env,
+      metadata(),
+      {
+        resolveSandbox: () =>
+          ({
+            exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'exists\n', stderr: '' }),
+            createSession,
+          }) as unknown as SandboxInstance,
+      }
+    );
+
+    await expect(sandbox.ensureWrapper(ensureRequest())).resolves.toMatchObject({
+      status: 'wrapper-running',
+    });
+    expect(ensureBootstrapWrapper).toHaveBeenCalledWith(expect.anything(), bootstrapSession, {
+      agentSessionId: 'agent_cloudflare',
+      userId: 'user_cloudflare',
+      toolCgroupEnv: { TOOL_CGROUP_MODE: 'enforce' },
+    });
+    ensureBootstrapWrapper.mockRestore();
+  });
+
+  it('omits toolCgroupEnv when the org is not in TOOL_CGROUP_ORG_IDS', async () => {
+    const bootstrapSession = {};
+    const createSession = vi.fn().mockResolvedValue(bootstrapSession);
+    const ensureBootstrapWrapper = vi
+      .spyOn(WrapperClient, 'ensureBootstrapWrapper')
+      .mockResolvedValueOnce({ client: {} as WrapperClient });
+    const sandbox = new CloudflareAgentSandbox(
+      { TOOL_CGROUP_ORG_IDS: 'other-org', TOOL_CGROUP_MODE: 'enforce' } as unknown as Env,
+      metadata(),
+      {
+        resolveSandbox: () =>
+          ({
+            exec: vi.fn().mockResolvedValue({ exitCode: 0, stdout: 'exists\n', stderr: '' }),
+            createSession,
+          }) as unknown as SandboxInstance,
+      }
+    );
+
+    await expect(sandbox.ensureWrapper(ensureRequest())).resolves.toMatchObject({
+      status: 'wrapper-running',
+    });
+    expect(ensureBootstrapWrapper).toHaveBeenCalledWith(expect.anything(), bootstrapSession, {
+      agentSessionId: 'agent_cloudflare',
+      userId: 'user_cloudflare',
+    });
+    ensureBootstrapWrapper.mockRestore();
+  });
+
   it('activates containment before probing a managed SCM sandbox', async () => {
     const bootstrapSession = {};
     const setOutboundHandler = vi.fn().mockResolvedValue(undefined);

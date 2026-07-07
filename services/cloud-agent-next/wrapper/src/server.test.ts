@@ -3,7 +3,9 @@ import { createServer as createNetServer } from 'node:net';
 import { WrapperState } from './state';
 import {
   bindSessionContext,
+  createCommandHandler,
   createFetchHandler,
+  createPromptHandler,
   createServer,
   createSessionReadyHandler,
   resolvePtyClientClose,
@@ -104,6 +106,165 @@ function createTestFetch(overrides?: {
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map(server => server.stop()));
+});
+
+describe('kilo server unreachable recovery', () => {
+  const sessionBinding = {
+    kiloSessionId: 'kilo_sess_test',
+    ingestUrl: 'ws://worker.test/ingest',
+    workerAuthToken: 'worker-token',
+    wrapperRunId: 'run_1',
+    wrapperGeneration: 1,
+    wrapperConnectionId: 'conn_1',
+    agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+  };
+
+  function boundState(): WrapperState {
+    const state = new WrapperState();
+    state.bindSession(sessionBinding);
+    return state;
+  }
+
+  const config = {
+    port: 5000,
+    workspacePath: '/workspace/repo',
+    version: 'test',
+    sessionId: 'kilo_sess_test',
+    agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+    userId: 'user_test',
+  };
+
+  it('restarts the runtime when a prompt fails because the kilo server is unreachable', async () => {
+    let restartCalls = 0;
+    const kiloClient = {
+      sendPromptAsync: async () => {
+        throw Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
+      },
+    } as unknown as WrapperKiloClient;
+    const handler = createPromptHandler(config, {
+      state: boundState(),
+      kiloClient,
+      openConnection: async () => {},
+      closeConnection: async () => {},
+      setAborted: () => {},
+      resetLifecycle: () => {},
+      restartKiloRuntime: async () => {
+        restartCalls += 1;
+      },
+    });
+
+    const response = await handler(
+      new Request('http://wrapper.test/job/prompt', {
+        method: 'POST',
+        body: JSON.stringify({
+          session: sessionBinding,
+          message: { id: 'msg_1', prompt: 'hello' },
+        }),
+      })
+    );
+
+    expect(response.status).toBe(500);
+    expect(restartCalls).toBe(1);
+  });
+
+  it('does not restart the runtime on an application-level prompt failure', async () => {
+    let restartCalls = 0;
+    const kiloClient = {
+      sendPromptAsync: async () => {
+        throw new Error('Async prompt for session kilo_sess_test failed: invalid model');
+      },
+    } as unknown as WrapperKiloClient;
+    const handler = createPromptHandler(config, {
+      state: boundState(),
+      kiloClient,
+      openConnection: async () => {},
+      closeConnection: async () => {},
+      setAborted: () => {},
+      resetLifecycle: () => {},
+      restartKiloRuntime: async () => {
+        restartCalls += 1;
+      },
+    });
+
+    const response = await handler(
+      new Request('http://wrapper.test/job/prompt', {
+        method: 'POST',
+        body: JSON.stringify({
+          session: sessionBinding,
+          message: { id: 'msg_2', prompt: 'hello' },
+        }),
+      })
+    );
+
+    expect(response.status).toBe(500);
+    expect(restartCalls).toBe(0);
+  });
+
+  it('restarts the runtime when a command fails because the kilo server is unreachable', async () => {
+    let restartCalls = 0;
+    const kiloClient = {
+      sendCommand: async () => {
+        throw new Error('fetch failed');
+      },
+    } as unknown as WrapperKiloClient;
+    const handler = createCommandHandler(config, {
+      state: boundState(),
+      kiloClient,
+      openConnection: async () => {},
+      closeConnection: async () => {},
+      setAborted: () => {},
+      resetLifecycle: () => {},
+      restartKiloRuntime: async () => {
+        restartCalls += 1;
+      },
+    });
+
+    const response = await handler(
+      new Request('http://wrapper.test/job/command', {
+        method: 'POST',
+        body: JSON.stringify({
+          session: sessionBinding,
+          command: 'status',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(500);
+    expect(restartCalls).toBe(1);
+  });
+
+  it('does not restart the runtime on an application-level command failure', async () => {
+    let restartCalls = 0;
+    const kiloClient = {
+      sendCommand: async () => {
+        throw new Error('Command for session kilo_sess_test failed: unknown command');
+      },
+    } as unknown as WrapperKiloClient;
+    const handler = createCommandHandler(config, {
+      state: boundState(),
+      kiloClient,
+      openConnection: async () => {},
+      closeConnection: async () => {},
+      setAborted: () => {},
+      resetLifecycle: () => {},
+      restartKiloRuntime: async () => {
+        restartCalls += 1;
+      },
+    });
+
+    const response = await handler(
+      new Request('http://wrapper.test/job/command', {
+        method: 'POST',
+        body: JSON.stringify({
+          session: sessionBinding,
+          command: 'status',
+        }),
+      })
+    );
+
+    expect(response.status).toBe(500);
+    expect(restartCalls).toBe(0);
+  });
 });
 
 describe('session readiness errors', () => {

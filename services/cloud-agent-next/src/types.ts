@@ -473,6 +473,19 @@ export type Env = {
   MANAGED_SCM_CONTAINMENT_ORG_IDS?: string;
   /** Comma-separated org IDs that receive workspace repo snapshots, or '*' for all */
   REPO_SNAPSHOT_ORG_IDS?: string;
+  /**
+   * Comma-separated org IDs that get the wrapper-side tool/server memory
+   * cgroup partition, or '*' for all. See MEMORY_CGROUPS_PLAN.md (W4).
+   */
+  TOOL_CGROUP_ORG_IDS?: string;
+  /** Passed through to the wrapper when the org is gated in by TOOL_CGROUP_ORG_IDS. See wrapper/src/tool-cgroup.ts. */
+  TOOL_CGROUP_MODE?: string;
+  TOOL_CGROUP_RESERVE_MB?: string;
+  TOOL_CGROUP_SERVER_LIMIT_MB?: string;
+  TOOL_CGROUP_SWEEP_INTERVAL_MS?: string;
+  TOOL_CGROUP_OOM_GROUP?: string;
+  TOOL_CGROUP_CPU_WEIGHT?: string;
+  TOOL_CGROUP_SERVER_CPU_WEIGHT?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

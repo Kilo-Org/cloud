@@ -29,6 +29,26 @@ function isSyntheticKiloEvent(event: KiloEvent): boolean {
   return event.type === 'server.connected' || event.type === 'server.heartbeat';
 }
 
+const UNREACHABLE_ERROR_PATTERN = /econnrefused|econnreset|fetch failed|unable to connect/i;
+
+/**
+ * True when a WrapperKiloClient call failed because the kilo server process
+ * itself is gone (crashed, OOM-killed) rather than because it returned an
+ * application-level error. Distinguishing the two matters: app-level errors
+ * (bad session id, invalid model) must not trigger a runtime restart, but a
+ * dead server should — see MEMORY_CGROUPS_PLAN.md (W5).
+ */
+export function isKiloServerUnreachableError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const cause = (error as { cause?: unknown }).cause;
+  const code =
+    (error as NodeJS.ErrnoException).code ??
+    (cause instanceof Error ? (cause as NodeJS.ErrnoException).code : undefined);
+  if (code === 'ECONNREFUSED' || code === 'ECONNRESET' || code === 'EPIPE') return true;
+  const message = `${error.message} ${cause instanceof Error ? cause.message : ''}`;
+  return UNREACHABLE_ERROR_PATTERN.test(message);
+}
+
 async function* globalFeedPayloads(
   stream: AsyncIterable<unknown>,
   workspacePath: string

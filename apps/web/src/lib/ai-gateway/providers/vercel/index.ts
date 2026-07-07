@@ -26,6 +26,7 @@ import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 
 const getVercelRoutingPercentage = createCachedFetch(
   async () => {
@@ -38,21 +39,33 @@ const getVercelRoutingPercentage = createCachedFetch(
   DEFAULT_VERCEL_PERCENTAGE
 );
 
+function hasOpenRouterExclusiveProviderOptions(request: GatewayRequest) {
+  if (request.body.provider?.data_collection === 'deny') {
+    console.debug('[hasOpenRouterExclusiveProviderOptions] has data_collection==deny');
+    return true;
+  }
+  if ((request.body.provider?.ignore?.length ?? 0) > 0) {
+    console.debug('[hasOpenRouterExclusiveProviderOptions] has ignore');
+    return true;
+  }
+  if (request.body.provider?.zdr) {
+    // there's a zeroDataRetention option on Vercel, but it works differently
+    // ZDR has to be set manually per provider
+    console.debug('[hasOpenRouterExclusiveProviderOptions] has zdr');
+    return true;
+  }
+  return false;
+}
+
 export async function shouldRouteToVercel(
   requestedModel: string,
+  kiloExclusiveModel: KiloExclusiveModel | null,
   request: GatewayRequest,
   randomSeed: string
 ) {
-  if (request.body.provider?.data_collection === 'deny') {
+  if (hasOpenRouterExclusiveProviderOptions(request)) {
     console.debug(
-      `[shouldRouteToVercel] not routing to Vercel because data_collection=deny is not supported`
-    );
-    return false;
-  }
-
-  if ((request.body.provider?.ignore?.length ?? 0) > 0) {
-    console.debug(
-      `[shouldRouteToVercel] not routing to Vercel because provider.ignore is not supported`
+      '[shouldRouteToVercel] not routing to Vercel because of unsupported provider options'
     );
     return false;
   }
@@ -64,7 +77,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  if (isDeepseekModel(requestedModel)) {
+  if (!kiloExclusiveModel?.flags.includes('vercel-routing') && isDeepseekModel(requestedModel)) {
     // https://kilo-code.slack.com/archives/C0A4SA041DE/p1781743079721409
     console.debug(
       '[shouldRouteToVercel] not routing to Vercel because some of its DeepSeek providers have tool call issues'

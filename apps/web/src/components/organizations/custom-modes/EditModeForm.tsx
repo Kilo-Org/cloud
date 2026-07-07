@@ -13,6 +13,7 @@ import { ErrorCard } from '@/components/ErrorCard';
 import { toast } from 'sonner';
 import { DEFAULT_MODES } from './default-modes';
 import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { hasActiveOrganizationModelPolicy } from '@/lib/organizations/organization-auto-model-shared';
 
 type EditModeFormProps = {
   organizationId: string;
@@ -88,13 +89,14 @@ export function EditModeForm({
       : undefined;
   const isOrganizationAutoDefaultActive =
     organizationData?.settings.default_model === ORG_AUTO_MODEL.id;
+  const hasActiveModelPolicy = hasActiveOrganizationModelPolicy(organizationData?.settings);
 
   const handleSubmit = async (formData: ModeFormData) => {
     try {
       const nextRouteModel = formData.defaultModel || undefined;
       if (defaultModeSlug && matchesBuiltInModeState(formData, defaultModeSlug)) {
         if (currentRouteModel && !canMaintainRoutedMode) {
-          toast.error('Route managers must revert a routed built-in mode.');
+          toast.error('Organization owners must revert a routed built-in mode.');
           return;
         }
         await deleteMutation.mutateAsync({
@@ -157,6 +159,7 @@ export function EditModeForm({
       isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
       isOrganizationAutoDefaultActive={isOrganizationAutoDefaultActive}
       canSetDefaultModel={canSetDefaultModel}
+      hasActiveModelPolicy={hasActiveModelPolicy}
       disableSlug={!!currentRouteModel && !canMaintainRoutedMode}
       existingModes={modesData?.modes || []}
       onCancel={onCancel}

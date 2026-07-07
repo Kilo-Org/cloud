@@ -23,7 +23,7 @@ import { getAvailableModelsForOrganization } from '@/lib/organizations/organizat
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
-import { db } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
@@ -111,6 +111,47 @@ function assertOrganizationAutoRouteCount(routes: Record<string, string>): void 
     throw new TRPCError({
       code: 'BAD_REQUEST',
       message: `Organization Auto supports at most ${MAX_ORGANIZATION_AUTO_ROUTES} routes`,
+    });
+  }
+}
+
+async function assertActiveOrganizationAutoTargetsAllowed(
+  organization: Pick<NonNullable<Awaited<ReturnType<typeof getOrganizationById>>>, 'id' | 'plan'>,
+  settings: OrganizationSettings,
+  dbClient: typeof db | DrizzleTransaction
+): Promise<void> {
+  if (settings.default_model !== ORG_AUTO_MODEL.id || !settings.org_auto_model) {
+    return;
+  }
+
+  assertOrganizationAutoRouteCount(settings.org_auto_model.routes);
+  const validationOrganization = {
+    id: organization.id,
+    plan: organization.plan,
+    settings,
+  };
+
+  for (const [slug, targetModelId] of Object.entries(settings.org_auto_model.routes)) {
+    const validation = await validateOrganizationAutoTarget(validationOrganization, targetModelId, {
+      dbClient,
+    });
+    if (validation.kind === 'error') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Cannot update model policy because active Organization Auto route "${slug}" is invalid: ${validation.message}`,
+      });
+    }
+  }
+
+  const fallbackValidation = await validateOrganizationAutoTarget(
+    validationOrganization,
+    settings.org_auto_model.fallback_model,
+    { dbClient }
+  );
+  if (fallbackValidation.kind === 'error') {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `Cannot update model policy because active Organization Auto fallback is invalid: ${fallbackValidation.message}`,
     });
   }
 }
@@ -321,7 +362,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return result;
     }),
 
-  updateAllowLists: organizationBillingMutationProcedure
+  updateAllowLists: organizationOwnerMutationProcedure
     .input(UpdateAllowListsInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -370,6 +411,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
                 settingsUpdate.default_model = undefined;
               }
             }
+            await assertActiveOrganizationAutoTargetsAllowed(organization, settingsUpdate, tx);
             return settingsUpdate;
           },
           tx
@@ -388,7 +430,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  updateDefaultModel: organizationBillingMutationProcedure
+  updateDefaultModel: organizationOwnerMutationProcedure
     .input(UpdateDefaultModelInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -458,7 +500,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  enableOrganizationAuto: organizationBillingMutationProcedure
+  enableOrganizationAuto: organizationOwnerMutationProcedure
     .input(EnableOrganizationAutoInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -552,7 +594,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  disableOrganizationAuto: organizationBillingMutationProcedure
+  disableOrganizationAuto: organizationOwnerMutationProcedure
     .input(DisableOrganizationAutoInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -608,7 +650,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  setOrganizationAutoRoute: organizationBillingMutationProcedure
+  setOrganizationAutoRoute: organizationOwnerMutationProcedure
     .input(SetOrganizationAutoRouteInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -676,7 +718,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  clearOrganizationAutoRoute: organizationBillingMutationProcedure
+  clearOrganizationAutoRoute: organizationOwnerMutationProcedure
     .input(ClearOrganizationAutoRouteInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -730,7 +772,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  setOrganizationAutoFallback: organizationBillingMutationProcedure
+  setOrganizationAutoFallback: organizationOwnerMutationProcedure
     .input(SetOrganizationAutoFallbackInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {
@@ -790,7 +832,7 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return { settings: updatedSettings };
     }),
 
-  configureOrganizationDefaultBehavior: organizationBillingMutationProcedure
+  configureOrganizationDefaultBehavior: organizationOwnerMutationProcedure
     .input(ConfigureOrganizationDefaultBehaviorInputSchema)
     .output(SettingsResponseSchema)
     .mutation(async ({ input, ctx }) => {

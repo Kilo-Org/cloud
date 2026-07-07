@@ -19,6 +19,7 @@ const mockedIsReleaseToggleEnabled = jest.mocked(
 
 let owner: User;
 let member: User;
+let billingManager: User;
 let testOrganization: Organization;
 
 describe('organization modes tRPC router', () => {
@@ -39,8 +40,15 @@ describe('organization modes tRPC router', () => {
       is_admin: false,
     });
 
+    billingManager = await insertTestUser({
+      google_user_email: 'billing-modes@example.com',
+      google_user_name: 'Billing Modes User',
+      is_admin: false,
+    });
+
     testOrganization = await createTestOrganization('Test Org for Modes', owner.id, 0, {}, false);
     await addUserToOrganization(testOrganization.id, member.id, 'member');
+    await addUserToOrganization(testOrganization.id, billingManager.id, 'billing_manager');
   });
 
   describe('create procedure', () => {
@@ -157,6 +165,19 @@ describe('organization modes tRPC router', () => {
       expect(updatedOrganization?.settings.org_auto_model?.routes['create-with-route-mode']).toBe(
         'kilo-auto/balanced'
       );
+    });
+
+    it('rejects route_model from billing managers', async () => {
+      const caller = await createCallerForUser(billingManager.id);
+
+      await expect(
+        caller.organizations.modes.create({
+          organizationId: testOrganization.id,
+          name: 'Billing Routed Mode',
+          slug: 'billing-routed-mode',
+          route_model: 'kilo-auto/balanced',
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
     });
 
     it('records a clear message when create explicitly clears an existing route', async () => {

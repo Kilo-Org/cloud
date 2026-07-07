@@ -13,6 +13,7 @@ import {
 import { getBYOKforOrganization } from '@/lib/ai-gateway/byok';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 export {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
@@ -135,6 +136,13 @@ export async function validateOrganizationAutoTarget(
     }
 
     return { kind: 'ok', modelId: normalizedModelId };
+  }
+
+  if (await isPublicIdExperimented(normalizedModelId)) {
+    return {
+      kind: 'error',
+      message: `Organization Auto route target '${targetModelId}' cannot use an active model experiment. Choose a concrete production model instead.`,
+    };
   }
 
   let models;

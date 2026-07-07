@@ -63,6 +63,7 @@ type ModeFormProps = {
   isDefaultModelConfigEnabled?: boolean;
   isOrganizationAutoDefaultActive?: boolean;
   canSetDefaultModel?: boolean;
+  hasActiveModelPolicy?: boolean;
   disableSlug?: boolean;
   existingModes?: OrganizationMode[];
   onCancel?: () => void;
@@ -112,6 +113,7 @@ export function ModeForm({
   isDefaultModelConfigEnabled = false,
   isOrganizationAutoDefaultActive = false,
   canSetDefaultModel = true,
+  hasActiveModelPolicy = false,
   disableSlug = false,
   existingModes = [],
   onCancel,
@@ -170,11 +172,11 @@ export function ModeForm({
           return false;
         }
         if (model.id.startsWith('kilo-auto/')) {
-          return isOrganizationAutoTargetModel(model.id);
+          return !hasActiveModelPolicy && isOrganizationAutoTargetModel(model.id);
         }
         return true;
       }),
-    [modelsData?.data]
+    [hasActiveModelPolicy, modelsData?.data]
   );
   const hasCurrentDefaultModelOption =
     canSetDefaultModel &&
@@ -424,7 +426,7 @@ export function ModeForm({
               {isEditingBuiltIn
                 ? 'Built-in mode slugs cannot be changed'
                 : disableSlug
-                  ? 'Route managers must rename routed modes.'
+                  ? 'Organization owners must rename routed modes.'
                   : 'Unique identifier for this mode.'}
             </p>
             {errors.slug && <p className="text-sm text-red-600">{errors.slug}</p>}

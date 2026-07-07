@@ -91,7 +91,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const { assumedRole } = useRoleTesting();
   const isKiloAdmin = assumedRole === 'KILO ADMIN';
   const currentRole = (isKiloAdmin ? 'owner' : assumedRole) ?? role;
-  const canEdit = isKiloAdmin || currentRole === 'owner' || currentRole === 'billing_manager';
+  const canEdit = isKiloAdmin || currentRole === 'owner';
 
   const updateOrganizationSettings = useUpdateOrganizationSettings();
 

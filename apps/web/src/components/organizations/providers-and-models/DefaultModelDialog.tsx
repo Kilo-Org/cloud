@@ -29,6 +29,7 @@ import {
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import {
+  hasActiveOrganizationModelPolicy,
   isOrganizationAutoTargetModel,
   ORGANIZATION_AUTO_MODEL_FLAG,
 } from '@/lib/organizations/organization-auto-model-shared';
@@ -166,6 +167,7 @@ export function DefaultModelDialog({
   const organizationAutoEnabled = organizationDefaultModel === ORG_AUTO_MODEL.id;
   const showOrganizationAutoBehavior = canConfigureOrganizationAuto || organizationAutoEnabled;
   const organizationAutoFallbackModel = organizationSettings?.org_auto_model?.fallback_model;
+  const hasActiveModelPolicy = hasActiveOrganizationModelPolicy(organizationSettings);
   const [behavior, setBehavior] = useState<DefaultBehavior>(
     organizationAutoEnabled ? 'auto' : 'specific'
   );
@@ -180,16 +182,21 @@ export function DefaultModelDialog({
     () =>
       availableModels.filter(model => {
         if (model.id.startsWith(CUSTOM_LLM_PREFIX)) return false;
-        if (model.id.startsWith('kilo-auto/')) return isOrganizationAutoTargetModel(model.id);
+        if (model.id.startsWith('kilo-auto/')) {
+          return !hasActiveModelPolicy && isOrganizationAutoTargetModel(model.id);
+        }
         return true;
       }),
-    [availableModels]
+    [availableModels, hasActiveModelPolicy]
   );
+  const defaultAutoFallback = hasActiveModelPolicy
+    ? (autoTargetModels[0]?.id ?? '')
+    : 'kilo-auto/balanced';
   const fallbackUnavailable =
     !!organizationAutoFallbackModel &&
     !autoTargetModels.some(model => model.id === organizationAutoFallbackModel);
   const effectiveFallback =
-    selectedFallbackModel || organizationAutoFallbackModel || 'kilo-auto/balanced';
+    selectedFallbackModel || organizationAutoFallbackModel || defaultAutoFallback;
   const fallbackNeedsReplacement =
     fallbackUnavailable &&
     !modelsLoading &&
@@ -212,6 +219,10 @@ export function DefaultModelDialog({
   const handleSave = async () => {
     try {
       if (behavior === 'auto') {
+        if (!effectiveFallback) {
+          toast.error('Choose an Organization Auto fallback model.');
+          return;
+        }
         await configureMutation.mutateAsync({
           organizationId,
           behavior: 'auto',
@@ -331,6 +342,12 @@ export function DefaultModelDialog({
                     until you replace it.
                   </p>
                 )}
+                {!modelsLoading && autoTargetModels.length === 0 && (
+                  <p className="text-destructive text-xs">
+                    No concrete models are available for Organization Auto under the current model
+                    policy.
+                  </p>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -397,6 +414,7 @@ export function DefaultModelDialog({
                 disabled={
                   !isDirty ||
                   configureMutation.isPending ||
+                  (behavior === 'auto' && !effectiveFallback) ||
                   (behavior === 'auto' && fallbackNeedsReplacement) ||
                   (behavior === 'specific' && !selectedModel)
                 }

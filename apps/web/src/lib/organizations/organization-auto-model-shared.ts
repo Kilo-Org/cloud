@@ -20,3 +20,11 @@ export function getOrganizationAutoRoute(
 export function isOrganizationAutoTargetModel(modelId: string): boolean {
   return (ORGANIZATION_AUTO_TARGET_MODELS as readonly string[]).includes(modelId);
 }
+
+export function hasActiveOrganizationModelPolicy(
+  settings: OrganizationSettings | undefined
+): boolean {
+  return (
+    settings?.provider_allow_list !== undefined || (settings?.model_deny_list?.length ?? 0) > 0
+  );
+}

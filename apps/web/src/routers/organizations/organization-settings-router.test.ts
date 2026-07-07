@@ -46,8 +46,13 @@ jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server
   };
 });
 
+jest.mock('@/lib/ai-gateway/experiments/membership', () => ({
+  isPublicIdExperimented: jest.fn(async () => false),
+}));
+
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
 
 function makeTestOpenRouterModel(id: string): OpenRouterModel {
   return {
@@ -64,6 +69,7 @@ function makeTestOpenRouterModel(id: string): OpenRouterModel {
 
 let owner: User;
 let member: User;
+let billingManager: User;
 let testOrganization: Organization;
 let orgWithSettings: Organization;
 let orgWithModelDenyList: Organization;
@@ -72,11 +78,16 @@ const mockedGetEnhancedOpenRouterModels =
 const mockedGetProviderSlugsForModel = getProviderSlugsForModel as unknown as jest.MockedFunction<
   typeof getProviderSlugsForModel
 >;
+const mockedIsPublicIdExperimented = isPublicIdExperimented as unknown as jest.MockedFunction<
+  typeof isPublicIdExperimented
+>;
 
 describe('organizations settings trpc router', () => {
   beforeEach(() => {
     mockedGetProviderSlugsForModel.mockReset();
     mockedGetEnhancedOpenRouterModels.mockReset();
+    mockedIsPublicIdExperimented.mockReset();
+    mockedIsPublicIdExperimented.mockResolvedValue(false);
     mockedGetEnhancedOpenRouterModels.mockResolvedValue({
       data: [
         makeTestOpenRouterModel('gpt-4'),
@@ -98,6 +109,12 @@ describe('organizations settings trpc router', () => {
     member = await insertTestUser({
       google_user_email: 'member-settings@example.com',
       google_user_name: 'Member Settings User',
+      is_admin: false,
+    });
+
+    billingManager = await insertTestUser({
+      google_user_email: 'billing-settings@example.com',
+      google_user_name: 'Billing Settings User',
       is_admin: false,
     });
 
@@ -123,6 +140,7 @@ describe('organizations settings trpc router', () => {
     );
 
     await addUserToOrganization(testOrganization.id, member.id, 'member');
+    await addUserToOrganization(testOrganization.id, billingManager.id, 'billing_manager');
     await addUserToOrganization(orgWithSettings.id, member.id, 'member');
     await addUserToOrganization(orgWithModelDenyList.id, member.id, 'member');
   });
@@ -231,6 +249,17 @@ describe('organizations settings trpc router', () => {
 
     it('should throw UNAUTHORIZED error for non-owner users', async () => {
       const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.updateAllowLists({
+          organizationId: testOrganization.id,
+          model_deny_list: ['gpt-4'],
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+    });
+
+    it('rejects billing managers changing model policy', async () => {
+      const caller = await createCallerForUser(billingManager.id);
 
       await expect(
         caller.organizations.settings.updateAllowLists({
@@ -813,18 +842,72 @@ describe('organizations settings trpc router', () => {
       expect(updatedOrg?.settings.data_collection).toBe('deny');
     });
 
-    it('keeps Organization Auto enabled when access lists change', async () => {
+    it('rejects model policy changes that would invalidate active Organization Auto', async () => {
       const caller = await createCallerForUser(owner.id);
+      const autoOrg = await createTestOrganization(
+        'Invalidated Auto Policy Org',
+        owner.id,
+        0,
+        {},
+        false
+      );
 
       await caller.organizations.settings.enableOrganizationAuto({
-        organizationId: testOrganization.id,
+        organizationId: autoOrg.id,
       });
+
+      await expect(
+        caller.organizations.settings.updateAllowLists({
+          organizationId: autoOrg.id,
+          provider_allow_list: ['anthropic'],
+        })
+      ).rejects.toThrow('active Organization Auto fallback is invalid');
+
+      const updatedOrg = await getOrganizationById(autoOrg.id);
+      expect(updatedOrg?.settings.default_model).toBe('kilo-auto/org');
+      expect(updatedOrg?.settings.provider_allow_list).toBeUndefined();
+    });
+
+    it('keeps Organization Auto enabled when policy changes preserve concrete targets', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const autoOrg = await createTestOrganization(
+        'Valid Auto Policy Org',
+        owner.id,
+        0,
+        {
+          default_model: 'kilo-auto/org',
+          org_auto_model: {
+            routes: {},
+            fallback_model: 'openai/gpt-4o',
+          },
+        },
+        false
+      );
+      mockedGetProviderSlugsForModel.mockImplementation(async modelId =>
+        modelId === 'openai/gpt-4o' ? new Set(['openai']) : new Set()
+      );
+
       const result = await caller.organizations.settings.updateAllowLists({
-        organizationId: testOrganization.id,
-        provider_allow_list: ['anthropic'],
+        organizationId: autoOrg.id,
+        provider_allow_list: ['openai'],
       });
 
       expect(result.settings.default_model).toBe('kilo-auto/org');
+      expect(result.settings.org_auto_model?.fallback_model).toBe('openai/gpt-4o');
+      expect(result.settings.provider_allow_list).toEqual(['openai']);
+    });
+
+    it('rejects active model experiment public IDs as Organization Auto targets', async () => {
+      const caller = await createCallerForUser(owner.id);
+      mockedIsPublicIdExperimented.mockImplementation(async modelId => modelId === 'openai/gpt-4o');
+
+      await expect(
+        caller.organizations.settings.setOrganizationAutoRoute({
+          organizationId: testOrganization.id,
+          mode_slug: 'code',
+          model_id: 'openai/gpt-4o',
+        })
+      ).rejects.toThrow('cannot use an active model experiment');
     });
   });
 

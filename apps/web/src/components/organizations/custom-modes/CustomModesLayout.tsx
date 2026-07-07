@@ -108,7 +108,7 @@ function ModesList({
                           disabled={lifecycleRouteLocked}
                           title={
                             lifecycleRouteLocked
-                              ? 'Route managers must revert a routed mode.'
+                              ? 'Organization owners must revert a routed mode.'
                               : undefined
                           }
                           className="text-amber-600 hover:text-amber-700"
@@ -124,7 +124,7 @@ function ModesList({
                             disabled={lifecycleRouteLocked}
                             title={
                               lifecycleRouteLocked
-                                ? 'Route managers must delete a routed mode.'
+                                ? 'Organization owners must delete a routed mode.'
                                 : undefined
                             }
                             className="text-red-400 hover:text-red-500"
@@ -209,7 +209,7 @@ export function CustomModesLayout({ organizationId, role, isGlobalAdmin }: Custo
   const isDefaultModelFeatureEnabled = useFeatureFlagEnabled(ORGANIZATION_AUTO_MODEL_FLAG);
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isDefaultModelConfigEnabled = isDevelopment || isDefaultModelFeatureEnabled === true;
-  const canMaintainRoutedMode = role === 'owner' || role === 'billing_manager' || isGlobalAdmin;
+  const canMaintainRoutedMode = role === 'owner' || isGlobalAdmin;
   const canSetDefaultModel =
     organizationData?.plan === 'enterprise' && isDefaultModelConfigEnabled && canMaintainRoutedMode;
   const isOrganizationAutoDefaultActive =

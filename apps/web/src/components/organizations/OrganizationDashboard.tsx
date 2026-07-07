@@ -154,9 +154,7 @@ export function OrganizationDashboard({
                 ) : (
                   <OrganizationProvidersAndModelsConfigurationCard
                     organizationId={organizationId}
-                    readonly={
-                      !(currentRole === 'owner' || currentRole === 'billing_manager' || isKiloAdmin)
-                    }
+                    readonly={!(currentRole === 'owner' || isKiloAdmin)}
                   />
                 )}
               </>

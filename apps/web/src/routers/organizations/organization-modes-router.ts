@@ -122,7 +122,7 @@ async function applyOrganizationAutoRouteChange(
 ): Promise<OrganizationSettings> {
   await assertOrganizationAutoWriteEnabled(ctx.user.id);
   assertOrganizationAutoEligible(organization);
-  await ensureOrganizationAccess(ctx, organization.id, ['owner', 'billing_manager']);
+  await ensureOrganizationAccess(ctx, organization.id, ['owner']);
   const orgAutoModel = getOrganizationAutoSettings(organization.settings);
   const currentRoute = orgAutoModel.routes[modeSlug];
   if (routeModel === null && !currentRoute) {
@@ -249,7 +249,7 @@ export const organizationModesRouter = createTRPCRouter({
       if (route_model !== undefined) {
         await assertOrganizationAutoWriteEnabled(ctx.user.id);
         assertOrganizationAutoEligible(organization);
-        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
       }
 
       let createdMode: OrganizationMode | null | undefined;
@@ -358,7 +358,7 @@ export const organizationModesRouter = createTRPCRouter({
       if (route_model !== undefined) {
         await assertOrganizationAutoWriteEnabled(ctx.user.id);
         assertOrganizationAutoEligible(organization);
-        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
       }
 
       const hasModeUpdates =
@@ -389,7 +389,7 @@ export const organizationModesRouter = createTRPCRouter({
             let nextSettings = lockedOrganization.settings;
 
             if (sourceHasRoute && slugChanged) {
-              await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+              await ensureOrganizationAccess(ctx, organizationId, ['owner']);
               if (hasRoute(routes, nextSlug)) {
                 throw new TRPCError({
                   code: 'CONFLICT',
@@ -501,7 +501,7 @@ export const organizationModesRouter = createTRPCRouter({
       if (route_model !== undefined) {
         await assertOrganizationAutoWriteEnabled(ctx.user.id);
         assertOrganizationAutoEligible(organization);
-        await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+        await ensureOrganizationAccess(ctx, organizationId, ['owner']);
       }
 
       const routeAuditChanges: string[] = [];
@@ -549,7 +549,7 @@ export const organizationModesRouter = createTRPCRouter({
                 );
               }
             } else if (hasExistingRoute) {
-              await ensureOrganizationAccess(ctx, organizationId, ['owner', 'billing_manager']);
+              await ensureOrganizationAccess(ctx, organizationId, ['owner']);
 
               if (!preserveBuiltInRoute) {
                 routeAuditChanges.push(

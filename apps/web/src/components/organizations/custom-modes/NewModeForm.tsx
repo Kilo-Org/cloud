@@ -13,7 +13,10 @@ import { matchesBuiltInModeState } from './EditModeForm';
 import { toast } from 'sonner';
 import { DEFAULT_MODES } from './default-modes';
 import { useMemo } from 'react';
-import { getOrganizationAutoRoute } from '@/lib/organizations/organization-auto-model-shared';
+import {
+  getOrganizationAutoRoute,
+  hasActiveOrganizationModelPolicy,
+} from '@/lib/organizations/organization-auto-model-shared';
 import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 
 type NewModeFormProps = {
@@ -51,6 +54,7 @@ export function NewModeForm({
     : undefined;
   const isOrganizationAutoDefaultActive =
     organizationData?.settings.default_model === ORG_AUTO_MODEL.id;
+  const hasActiveModelPolicy = hasActiveOrganizationModelPolicy(organizationData?.settings);
 
   // Convert default mode to the format expected by ModeForm
   const initialMode = useMemo(() => {
@@ -124,6 +128,7 @@ export function NewModeForm({
       isDefaultModelConfigEnabled={isDefaultModelConfigEnabled}
       isOrganizationAutoDefaultActive={isOrganizationAutoDefaultActive}
       canSetDefaultModel={canSetDefaultModel}
+      hasActiveModelPolicy={hasActiveModelPolicy}
       existingModes={modesData?.modes || []}
       onCancel={onCancel}
     />

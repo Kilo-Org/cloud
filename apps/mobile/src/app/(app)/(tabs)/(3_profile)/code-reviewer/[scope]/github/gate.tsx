@@ -13,8 +13,8 @@ const DESCRIPTIONS = {
 
 export default function GateThresholdRoute() {
   const { scope } = useLocalSearchParams<{ scope: string }>();
-  const { data } = useReviewConfig(scope);
-  const save = useSaveReviewConfig(scope);
+  const { data } = useReviewConfig(scope, 'github');
+  const save = useSaveReviewConfig(scope, 'github');
 
   return (
     <OptionList

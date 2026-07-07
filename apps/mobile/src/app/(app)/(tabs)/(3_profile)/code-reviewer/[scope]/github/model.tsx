@@ -17,8 +17,8 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 export default function ModelRoute() {
   const { scope } = useLocalSearchParams<{ scope: string }>();
   const colors = useThemeColors();
-  const { data } = useReviewConfig(scope);
-  const save = useSaveReviewConfig(scope);
+  const { data } = useReviewConfig(scope, 'github');
+  const save = useSaveReviewConfig(scope, 'github');
   const { models, isLoading } = useAvailableModels(scope === PERSONAL_SCOPE ? undefined : scope);
 
   const selectedModel = models.find(model => model.id === data?.modelSlug);

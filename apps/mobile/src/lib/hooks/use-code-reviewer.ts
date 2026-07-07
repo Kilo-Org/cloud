@@ -5,6 +5,7 @@ import {
   buildSaveConfigInput,
   type ConfigPatch,
   type ReviewConfigData,
+  type ReviewerPlatform,
 } from '@/lib/code-reviewer-config';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -12,6 +13,14 @@ export const PERSONAL_SCOPE = 'personal';
 
 function isPersonal(scope: string) {
   return scope === PERSONAL_SCOPE;
+}
+
+// The personal router only serves github/gitlab (bitbucket is org-only by UI
+// construction). This narrows a ReviewerPlatform down to what the personal
+// procedures accept, without an `as` cast — the 'bitbucket' branch is dead
+// whenever scope is actually personal.
+function toPersonalPlatform(platform: ReviewerPlatform): 'github' | 'gitlab' {
+  return platform === 'bitbucket' ? 'github' : platform;
 }
 
 // Personal and org procedures resolve to nominally distinct tRPC option
@@ -48,43 +57,76 @@ export function useGitHubRepositories(scope: string, enabled: boolean) {
   return isPersonal(scope) ? personal : org;
 }
 
-export function useReviewConfig(scope: string): UseQueryResult<ReviewConfigData> {
+export function useGitLabStatus(scope: string) {
   const trpc = useTRPC();
   const personal = useQuery({
-    ...trpc.personalReviewAgent.getReviewConfig.queryOptions({ platform: 'github' }),
+    ...trpc.personalReviewAgent.getGitLabStatus.queryOptions(),
+    enabled: isPersonal(scope),
+  });
+  const org = useQuery({
+    ...trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({ organizationId: scope }),
+    enabled: !isPersonal(scope),
+  });
+  return isPersonal(scope) ? personal : org;
+}
+
+export function useGitLabRepositories(scope: string, enabled: boolean) {
+  const trpc = useTRPC();
+  const personal = useQuery({
+    ...trpc.personalReviewAgent.listGitLabRepositories.queryOptions({}),
+    enabled: enabled && isPersonal(scope),
+  });
+  const org = useQuery({
+    ...trpc.organizations.reviewAgent.listGitLabRepositories.queryOptions({
+      organizationId: scope,
+    }),
+    enabled: enabled && !isPersonal(scope),
+  });
+  return isPersonal(scope) ? personal : org;
+}
+
+export function useReviewConfig(
+  scope: string,
+  platform: ReviewerPlatform
+): UseQueryResult<ReviewConfigData> {
+  const trpc = useTRPC();
+  const personal = useQuery({
+    ...trpc.personalReviewAgent.getReviewConfig.queryOptions({
+      platform: toPersonalPlatform(platform),
+    }),
     enabled: isPersonal(scope),
   });
   const org = useQuery({
     ...trpc.organizations.reviewAgent.getReviewConfig.queryOptions({
       organizationId: scope,
-      platform: 'github',
+      platform,
     }),
     enabled: !isPersonal(scope),
   });
-  // The org procedure also serves Bitbucket (string repo IDs), so its
-  // inferred type is broader than our GitHub-only ReviewConfigData
-  // contract. We always request platform: 'github' above, which
-  // guarantees this shape at runtime (same reasoning as
+  // The org procedure's inferred type carries a few org/Bitbucket-only
+  // fields (manuallyAddedRepositories, reviewMemoryEnabled, actionRequired)
+  // beyond our shared ReviewConfigData contract — a strict structural
+  // superset, so this narrowing cast is safe (same reasoning as
   // useSaveReviewConfig's getQueryData<ReviewConfigData> below).
   return (isPersonal(scope) ? personal : org) as UseQueryResult<ReviewConfigData>;
 }
 
-function useReviewConfigQueryKey(scope: string) {
+function useReviewConfigQueryKey(scope: string, platform: ReviewerPlatform) {
   const trpc = useTRPC();
   return isPersonal(scope)
-    ? trpc.personalReviewAgent.getReviewConfig.queryKey({ platform: 'github' })
+    ? trpc.personalReviewAgent.getReviewConfig.queryKey({ platform: toPersonalPlatform(platform) })
     : trpc.organizations.reviewAgent.getReviewConfig.queryKey({
         organizationId: scope,
-        platform: 'github',
+        platform,
       });
 }
 
 // Reads the cached config at call time rather than render time, so two
 // rapid toggles each compute their "next selection" from the latest
 // committed state instead of the same stale render snapshot.
-export function useReviewConfigCacheReader(scope: string) {
+export function useReviewConfigCacheReader(scope: string, platform: ReviewerPlatform) {
   const queryClient = useQueryClient();
-  const queryKey = useReviewConfigQueryKey(scope);
+  const queryKey = useReviewConfigQueryKey(scope, platform);
   return () => queryClient.getQueryData<ReviewConfigData>(queryKey);
 }
 
@@ -99,21 +141,21 @@ function pick<K extends keyof ReviewConfigData>(
   return result as Pick<ReviewConfigData, K>;
 }
 
-export function useToggleReviewer(scope: string) {
+export function useToggleReviewer(scope: string, platform: ReviewerPlatform) {
   const queryClient = useQueryClient();
-  const queryKey = useReviewConfigQueryKey(scope);
+  const queryKey = useReviewConfigQueryKey(scope, platform);
 
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: { isEnabled: boolean }) =>
       isPersonal(scope)
         ? trpcClient.personalReviewAgent.toggleReviewAgent.mutate({
-            platform: 'github',
+            platform: toPersonalPlatform(platform),
             isEnabled: vars.isEnabled,
           })
         : trpcClient.organizations.reviewAgent.toggleReviewAgent.mutate({
             organizationId: scope,
-            platform: 'github',
+            platform,
             isEnabled: vars.isEnabled,
           }),
     onMutate: async vars => {
@@ -135,28 +177,36 @@ export function useToggleReviewer(scope: string) {
   });
 }
 
-export function useSaveReviewConfig(scope: string) {
+export function useSaveReviewConfig(scope: string, platform: ReviewerPlatform) {
   const queryClient = useQueryClient();
-  const queryKey = useReviewConfigQueryKey(scope);
+  const queryKey = useReviewConfigQueryKey(scope, platform);
 
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (patch: ConfigPatch) => {
-      // The org endpoint also serves Bitbucket, whose repository IDs are
-      // strings, so its inferred output type is broader than our
-      // GitHub-only ReviewConfigData contract. We always request
-      // platform: 'github' here, which guarantees numeric IDs at runtime.
       const config = queryClient.getQueryData<ReviewConfigData>(queryKey);
       if (!config) {
         throw new Error('Config not loaded yet');
       }
-      const input = buildSaveConfigInput(config, patch);
-      return isPersonal(scope)
-        ? trpcClient.personalReviewAgent.saveReviewConfig.mutate(input)
-        : trpcClient.organizations.reviewAgent.saveReviewConfig.mutate({
-            ...input,
-            organizationId: scope,
-          });
+      const input = buildSaveConfigInput(platform, config, patch);
+      if (isPersonal(scope)) {
+        // The personal schema only accepts numeric repository IDs
+        // (bitbucket, the only string-ID platform, is org-only). Filtering
+        // keeps this a type-safe narrowing rather than a cast; the branch
+        // is only ever reached with platform !== 'bitbucket' in practice.
+        const numericSelectedRepositoryIds = input.selectedRepositoryIds.filter(
+          (id): id is number => typeof id === 'number'
+        );
+        return trpcClient.personalReviewAgent.saveReviewConfig.mutate({
+          ...input,
+          platform: toPersonalPlatform(platform),
+          selectedRepositoryIds: numericSelectedRepositoryIds,
+        });
+      }
+      return trpcClient.organizations.reviewAgent.saveReviewConfig.mutate({
+        ...input,
+        organizationId: scope,
+      });
     },
     onMutate: async patch => {
       await queryClient.cancelQueries({ queryKey });
@@ -192,4 +242,38 @@ export function useCanEditReviewer(scope: string) {
   }
   const role = orgs?.find(org => org.organizationId === scope)?.role;
   return role === 'owner' || role === 'billing_manager';
+}
+
+// Bitbucket is org-only, so unlike the GitHub/GitLab status hooks above
+// there is no personal-vs-org split here.
+export function useBitbucketReadiness(scope: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
+      organizationId: scope,
+    }),
+    enabled: !isPersonal(scope),
+  });
+}
+
+export function useConnectBitbucket(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const queryKey = trpc.organizations.reviewAgent.getBitbucketReadiness.queryKey({
+    organizationId: scope,
+  });
+
+  return useMutation({
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    mutationFn: (vars: { accessToken: string }) =>
+      trpcClient.organizations.bitbucket.connect.mutate({
+        organizationId: scope,
+        accessToken: vars.accessToken,
+      }),
+    onError: error => {
+      toast.error(error.message);
+    },
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
 }

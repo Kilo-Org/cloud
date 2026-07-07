@@ -54,8 +54,8 @@ function InstructionsEditor({
 export default function InstructionsRoute() {
   const { scope } = useLocalSearchParams<{ scope: string }>();
   const router = useRouter();
-  const { data } = useReviewConfig(scope);
-  const save = useSaveReviewConfig(scope);
+  const { data } = useReviewConfig(scope, 'github');
+  const save = useSaveReviewConfig(scope, 'github');
 
   return (
     <View className="flex-1 bg-background">

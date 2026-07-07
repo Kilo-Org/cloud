@@ -16,9 +16,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 export default function FocusAreasRoute() {
   const { scope } = useLocalSearchParams<{ scope: string }>();
   const colors = useThemeColors();
-  const { data } = useReviewConfig(scope);
-  const save = useSaveReviewConfig(scope);
-  const readConfig = useReviewConfigCacheReader(scope);
+  const { data } = useReviewConfig(scope, 'github');
+  const save = useSaveReviewConfig(scope, 'github');
+  const readConfig = useReviewConfigCacheReader(scope, 'github');
   const selected = data?.focusAreas ?? [];
 
   const toggleArea = (area: string) => {

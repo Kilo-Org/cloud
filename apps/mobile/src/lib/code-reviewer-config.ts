@@ -1,3 +1,42 @@
+export type ReviewerPlatform = 'github' | 'gitlab' | 'bitbucket';
+
+export const PLATFORM_CAPABILITIES: Record<
+  ReviewerPlatform,
+  {
+    scopes: 'all' | 'org';
+    selectionModePicker: boolean;
+    gateRow: boolean;
+    reviewMd: boolean;
+    manualReview: boolean;
+    label: string;
+  }
+> = {
+  github: {
+    scopes: 'all',
+    selectionModePicker: true,
+    gateRow: true,
+    reviewMd: true,
+    manualReview: true,
+    label: 'GitHub',
+  },
+  gitlab: {
+    scopes: 'all',
+    selectionModePicker: false,
+    gateRow: true,
+    reviewMd: true,
+    manualReview: true,
+    label: 'GitLab',
+  },
+  bitbucket: {
+    scopes: 'org',
+    selectionModePicker: false,
+    gateRow: false,
+    reviewMd: false,
+    manualReview: false,
+    label: 'Bitbucket',
+  },
+};
+
 export type ReviewConfigData = {
   isEnabled: boolean;
   reviewStyle: 'strict' | 'balanced' | 'lenient' | 'roast';
@@ -7,7 +46,7 @@ export type ReviewConfigData = {
   thinkingEffort: string | null;
   gateThreshold: 'off' | 'all' | 'warning' | 'critical';
   repositorySelectionMode: 'all' | 'selected';
-  selectedRepositoryIds: number[];
+  selectedRepositoryIds: (number | string)[];
   disableReviewMd: boolean;
 };
 
@@ -19,13 +58,17 @@ export type ConfigPatch = Partial<{
   thinkingEffort: string | null;
   gateThreshold: ReviewConfigData['gateThreshold'];
   repositorySelectionMode: ReviewConfigData['repositorySelectionMode'];
-  selectedRepositoryIds: number[];
+  selectedRepositoryIds: (number | string)[];
   disableReviewMd: boolean;
 }>;
 
-export function buildSaveConfigInput(config: ReviewConfigData, patch: ConfigPatch) {
+export function buildSaveConfigInput(
+  platform: ReviewerPlatform,
+  config: ReviewConfigData,
+  patch: ConfigPatch
+) {
   return {
-    platform: 'github' as const,
+    platform,
     reviewStyle: config.reviewStyle,
     focusAreas: config.focusAreas,
     customInstructions: config.customInstructions ?? undefined,
@@ -35,6 +78,7 @@ export function buildSaveConfigInput(config: ReviewConfigData, patch: ConfigPatc
     repositorySelectionMode: config.repositorySelectionMode,
     selectedRepositoryIds: config.selectedRepositoryIds,
     disableReviewMd: config.disableReviewMd,
+    ...(platform === 'gitlab' ? { autoConfigureWebhooks: true as const } : {}),
     ...patch,
   };
 }

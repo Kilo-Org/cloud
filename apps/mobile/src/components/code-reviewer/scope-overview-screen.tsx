@@ -27,9 +27,9 @@ import {
 export function ScopeOverviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const status = useGitHubStatus(scope);
-  const config = useReviewConfig(scope);
-  const toggle = useToggleReviewer(scope);
-  const save = useSaveReviewConfig(scope);
+  const config = useReviewConfig(scope, 'github');
+  const toggle = useToggleReviewer(scope, 'github');
+  const save = useSaveReviewConfig(scope, 'github');
   const canEdit = useCanEditReviewer(scope);
 
   const isLoading = status.isLoading || config.isLoading;

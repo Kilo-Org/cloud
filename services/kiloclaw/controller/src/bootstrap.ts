@@ -657,7 +657,10 @@ export function configureGitHub(env: EnvLike, deps: BootstrapDeps = defaultDeps)
     // child env so credentials land on disk (on the persistent /root volume)
     // and survive that stripping. `gh auth setup-git` then wires git's
     // credential helper to gh, covering both `gh` and `git`.
-    const ghEnv: NodeJS.ProcessEnv = { ...env };
+    // Cast: the worker tsconfig augments NodeJS.ProcessEnv with required
+    // provider fields (NF_*) that a spread of `env` doesn't carry at the type
+    // level; at runtime `env` is process.env, which has whatever is set.
+    const ghEnv = { ...env } as NodeJS.ProcessEnv;
     delete ghEnv.GITHUB_TOKEN;
     delete ghEnv.GH_TOKEN;
 

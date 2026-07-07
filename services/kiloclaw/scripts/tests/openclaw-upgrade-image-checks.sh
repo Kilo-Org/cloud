@@ -292,19 +292,54 @@ validate_fixture "validator still rejects a malformed config (self-check)" \
 # schema-only and cannot catch this; doctor resolves the paths and fails on a
 # missing one, exactly as it does at boot.
 #
-# Assert the plugin-load set config-writer.ts emits is loadable by THIS image.
-# The externalized provider path is emitted by the controller only when the
-# plugin is installed (>= 2026.6.9); mirror that here off the same signal the
-# pin check computed above ($kcp_version), so the assertion is correct across the
-# whole selectable-version matrix, not just the latest pin.
-# Keep the @kiloclaw/* paths in lockstep with config-writer.ts plugins.load.paths.
-controller_plugin_paths='"/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer","/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing","/usr/local/lib/node_modules/@kiloclaw/kilo-chat"'
+# The plugin-load set config-writer.ts emits into plugins.load.paths. Kept
+# explicit (readable + lets us model the conditional provider path below), but
+# guarded against drift right after, so a newly added path can't silently slip
+# the doctor assertion.
+customizer_path="/usr/local/lib/node_modules/@kiloclaw/kiloclaw-customizer"
+morning_briefing_path="/usr/local/lib/node_modules/@kiloclaw/kiloclaw-morning-briefing"
+kilo_chat_path="/usr/local/lib/node_modules/@kiloclaw/kilo-chat"
+kilocode_provider_path="/usr/local/lib/node_modules/@openclaw/kilocode-provider"
+known_plugin_paths="$customizer_path $morning_briefing_path $kilo_chat_path $kilocode_provider_path"
+
+# Drift guard: derive the controller's emitted set mechanically (like
+# extract_pinned_version reads the Dockerfile) and fail if any non-LEGACY
+# *_PLUGIN_PATH in config-writer.ts is not covered above. Without this, adding a
+# fifth plugin path to config-writer.ts and forgetting it here would leave the
+# doctor check silently under-testing the exact bricking class it guards.
+# LEGACY_* constants are pruned (removed), never loaded, so they are excluded.
+uncovered=$(python3 - "$REPO_ROOT/services/kiloclaw/controller/src/config-writer.ts" "$known_plugin_paths" <<'PY'
+import re
+import sys
+
+src = open(sys.argv[1]).read()
+known = set(sys.argv[2].split())
+missing = []
+for m in re.finditer(r"const\s+(\w*_PLUGIN_PATH)\s*=\s*'([^']+)'", src):
+    name, path = m.group(1), m.group(2)
+    if name.startswith("LEGACY_"):
+        continue
+    if not path.startswith("/usr/local/lib/node_modules/"):
+        continue
+    if path not in known:
+        missing.append(path)
+print(",".join(sorted(set(missing))))
+PY
+)
+check "plugin-load set mirrors config-writer.ts (no drift)" "" "$uncovered"
+
+# Assert the plugin-load set resolves in THIS image. The externalized provider
+# path is emitted by the controller only when the plugin is installed
+# (>= 2026.6.9); mirror that off the same signal the pin check used ($kcp_version)
+# so the assertion is correct across the whole selectable-version matrix, not
+# just the latest pin.
+positive_paths="\"$customizer_path\",\"$morning_briefing_path\",\"$kilo_chat_path\""
 if [ -n "$kcp_version" ]; then
-  controller_plugin_paths="$controller_plugin_paths,\"/usr/local/lib/node_modules/@openclaw/kilocode-provider\""
+  positive_paths="$positive_paths,\"$kilocode_provider_path\""
 fi
 check "controller plugin-load set resolves in image (doctor)" \
   "ok" \
-  "$(doctor_plugin_result "{\"plugins\":{\"load\":{\"paths\":[$controller_plugin_paths]}}}")"
+  "$(doctor_plugin_result "{\"plugins\":{\"load\":{\"paths\":[$positive_paths]}}}")"
 # Self-check: a missing plugin path MUST be rejected, or the check above is inert.
 check "doctor rejects a missing plugin path (self-check)" \
   "plugin-path-error" \

@@ -10,14 +10,15 @@ All commands run from the **repo root** unless noted. Assumes a fresh checkout �
 pnpm dev:start --no-attach mobile cloud-agent-next kiloclaw
 ```
 
-- Starts everything in a tmux session named `kilo-dev-<dir>` (e.g. `kilo-dev-cloud`): Expo dev server (:8081), Next.js (:3000), Postgres (:5432), session-ingest (:8800), cloud-agent-next, kiloclaw (+ its tunnel and notifications). Dependencies start automatically.
+- Starts everything in a tmux session named `kilo-dev-<checkout-dir>`: Expo dev server (:8081), Next.js (:3000), Postgres (:5432), session-ingest (:8800), cloud-agent-next, kiloclaw (+ its tunnel and notifications). Dependencies start automatically.
 - `--no-attach` skips the interactive tmux dashboard — required for agents.
 - Verify with `pnpm dev:status`. Stop with `pnpm dev:stop`.
 - Read a service's logs from its tmux window:
 
 ```bash
-tmux list-windows -t kilo-dev-cloud
-tmux capture-pane -p -t kilo-dev-cloud:<window> -S -200
+tmux ls                                            # find the kilo-dev-* session
+tmux list-windows -t <session>
+tmux capture-pane -p -t <session>:<window> -S -200
 ```
 
 Before the first app launch, point the app at the local backend:
@@ -30,8 +31,8 @@ Restart the app (or reload from the Expo dev server) after this so Expo picks up
 
 ## 2. App on the simulator, signed in
 
-- The app is the dev-build `com.kilocode.kiloapp` on an iOS simulator. On Igor's machine the **"Kilo QA"** simulator already has it installed — `xcrun simctl list devices | grep "Kilo QA"`. If no simulator has the build, install one with `npx expo run:ios` from `apps/mobile/` (the `ios/` project is checked in).
-- Sign in with **fake-login**: the local sign-in page (reached via the app's normal sign-in flow) has a "Test Account" form — enter any email; appending `?fakeUser=<email>` to the sign-in URL auto-submits. The established QA account is `e2e-mobile@example.com`.
+- The app is the dev-build `com.kilocode.kiloapp` on an iOS simulator. Check booted simulators for it with `xcrun simctl listapps booted | grep kilocode`. If no simulator has the build, install one with `npx expo run:ios` from `apps/mobile/` (the `ios/` project is checked in).
+- Sign in with **fake-login**: the local sign-in page (reached via the app's normal sign-in flow) has a "Test Account" form — enter any email (an account is created on first login, e.g. `e2e-mobile@example.com`); appending `?fakeUser=<email>` to the sign-in URL auto-submits.
 - Seed data with `pnpm dev:seed` (topics in `dev/seed/`): `app:user-id <email>` to look up a user id, `app:add-credits <userId> <usd>` if completions return 402. Local Postgres is `postgres://postgres:postgres@localhost:5432/postgres`.
 
 ## 3. Kilo CLI against the local backend

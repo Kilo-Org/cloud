@@ -199,14 +199,7 @@ function buildLegacyGatewayOptions(input: BuildSessionModelOptionsInput): Sessio
         option => option.modelRef && modelRefsEqual(option.modelRef, currentSelection.model)
       )
     : undefined;
-  const notices: SessionModelNotice[] = [
-    {
-      id: 'legacy',
-      message:
-        'This CLI uses Gateway model fallback. Upgrade Kilo CLI to use its configured providers and models.',
-      retry: false,
-    },
-  ];
+  const notices: SessionModelNotice[] = [];
 
   if (currentSelection && !selectedOption) {
     selectedOption = createUnavailableOption(currentSelection.model);

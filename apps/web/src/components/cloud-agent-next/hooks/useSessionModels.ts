@@ -260,14 +260,7 @@ function buildLegacyGatewayModels(input: BuildSessionModelsInput): SessionModels
     availableVariants: selectedOption?.variants ?? [],
     modelPickerDisabled: input.gatewayModelsLoading,
     isLoadingModels: input.gatewayModelsLoading,
-    notices: [
-      {
-        id: 'legacy',
-        message:
-          'This CLI uses Gateway model fallback. Upgrade Kilo CLI to use its configured providers and models.',
-        retry: false,
-      },
-    ],
+    notices: [],
     gatewayOrganizationId: input.gatewayOrganizationId,
   };
 }

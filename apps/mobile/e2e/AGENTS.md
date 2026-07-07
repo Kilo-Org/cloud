@@ -80,11 +80,10 @@ The Maestro MCP drives the simulator (inspect screen, run YAML flows, screenshot
 **Setup** (once per machine):
 
 ```bash
-brew install maestro                      # or: curl -fsSL "https://get.maestro.mobile.dev" | bash
-claude mcp add maestro -- maestro mcp     # registers the MCP server for Claude Code
+brew install maestro   # or: curl -fsSL "https://get.maestro.mobile.dev" | bash
 ```
 
-Restart the Claude Code session after adding so the `mcp__maestro__*` tools appear.
+Then register the MCP server with your harness: stdio transport, command `maestro mcp` (e.g. `claude mcp add maestro -- maestro mcp` in Claude Code, or the equivalent MCP config entry in your harness). Restart the session after registering so the maestro tools appear.
 
 **Usage**: `list_devices` → pick the booted simulator's device id → `inspect_screen` before targeting any element → `run` with inline YAML. Flows declare `appId: com.kilocode.kiloapp` and start with `launchApp`. Use `cheat_sheet` for unfamiliar Maestro commands.
 

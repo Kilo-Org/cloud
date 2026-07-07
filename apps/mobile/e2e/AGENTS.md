@@ -7,10 +7,11 @@ All commands run from the **repo root** unless noted. Assumes a fresh checkout �
 ## 1. Local backend
 
 ```bash
-pnpm dev:start --no-attach mobile cloud-agent-next kiloclaw
+pnpm dev:start --no-attach mobile cloud-agent-next kiloclaw event-service
 ```
 
-- Starts everything in a tmux session named `kilo-dev-<checkout-dir>`: Expo dev server (:8081), Next.js (:3000), Postgres (:5432), session-ingest (:8800), cloud-agent-next, kiloclaw (+ its tunnel and notifications). Dependencies start automatically.
+- Starts everything in a tmux session named `kilo-dev-<checkout-dir>`: Expo dev server (:8081), Next.js (:3000), Postgres (:5432), session-ingest (:8800), cloud-agent-next, kiloclaw (+ its tunnel and notifications), event-service (:8809). Dependencies start automatically.
+- event-service tracks presence (which surfaces the user is actively on). The notifications worker queries it to suppress pushes when the user is in-context — e.g. the session-ready push is skipped while the app is foregrounded. Without it, presence lookups fail open: every push dispatches and the notifications logs fill with `Presence lookup failed` warnings, so presence-dependent flows can't be verified.
 - `--no-attach` skips the interactive tmux dashboard — required for agents.
 - Verify with `pnpm dev:status`. Stop with `pnpm dev:stop`.
 - Run DB migrations (`pnpm drizzle migrate` from the repo root) before testing. A local Postgres that's behind on migrations causes seemingly random 500s from the backend (e.g. every authenticated tRPC call failing with "column ... does not exist").

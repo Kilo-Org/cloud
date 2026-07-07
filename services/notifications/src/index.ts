@@ -17,6 +17,8 @@ import {
   type DispatchPushOutcome,
   type SendCloudAgentSessionNotificationParams,
   type SendCloudAgentSessionNotificationResult,
+  type SendSessionReadyNotificationParams,
+  type SendSessionReadyNotificationResult,
   type SendInstanceLifecycleNotificationParams,
   type SendInstanceLifecycleNotificationResult,
   type ListBadgesResponse,
@@ -27,7 +29,11 @@ import {
 } from '@kilocode/notifications';
 
 import { authMiddleware, type AuthContext } from './auth';
-import { dispatchCloudAgentSessionPush } from './lib/cloud-agent-session-push';
+import {
+  dispatchCloudAgentSessionPush,
+  dispatchSessionReadyPush,
+  type DispatchCloudAgentSessionPushDeps,
+} from './lib/cloud-agent-session-push';
 import type { TicketTokenPair } from './lib/expo-push';
 import { sendPushNotifications } from './lib/expo-push';
 import { dispatchInstanceLifecyclePush } from './lib/instance-lifecycle-push';
@@ -222,10 +228,20 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
   async sendCloudAgentSessionNotification(
     params: SendCloudAgentSessionNotificationParams
   ): Promise<SendCloudAgentSessionNotificationResult> {
+    return dispatchCloudAgentSessionPush(params, this.cloudAgentSessionPushDeps());
+  }
+
+  async sendSessionReadyNotification(
+    params: SendSessionReadyNotificationParams
+  ): Promise<SendSessionReadyNotificationResult> {
+    return dispatchSessionReadyPush(params, this.cloudAgentSessionPushDeps());
+  }
+
+  private cloudAgentSessionPushDeps(): DispatchCloudAgentSessionPushDeps {
     let db: ReturnType<typeof getWorkerDb> | undefined;
     const getDbForCall = () => (db ??= getWorkerDb(this.env.HYPERDRIVE.connectionString));
 
-    return dispatchCloudAgentSessionPush(params, {
+    return {
       getSession: async (userId, cliSessionId) => {
         const [session] = await getDbForCall()
           .select({
@@ -261,7 +277,7 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
         ) as unknown as RecipientDOStub;
         return stub.dispatchPush(input);
       },
-    });
+    };
   }
 
   async sendScheduledActionNotice(

@@ -84,6 +84,19 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
       type: 'session.created',
       data: { source: 'v2', session, changedAt: session.updatedAt },
     });
+
+    // Tell the user's phone the session can be taken over remotely. Push
+    // failures must never fail session creation, so log and move on.
+    const pushPromise = c.env.NOTIFICATIONS.sendSessionReadyNotification({
+      userId: kiloUserId,
+      cliSessionId: body.sessionId,
+    }).catch((error: unknown) => {
+      console.error('Failed to send session-ready push (non-fatal)', {
+        sessionId: body.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+    getOptionalExecutionContext(c)?.waitUntil(pushPromise);
   }
 
   // Warm the session cache so the first ingest can skip Postgres.

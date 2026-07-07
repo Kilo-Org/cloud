@@ -4,6 +4,7 @@ import { type DispatchPushInput, type DispatchPushOutcome } from '@kilocode/noti
 
 import {
   dispatchCloudAgentSessionPush,
+  dispatchSessionReadyPush,
   type DispatchCloudAgentSessionPushDeps,
 } from './cloud-agent-session-push';
 
@@ -204,5 +205,75 @@ describe('dispatchCloudAgentSessionPush', () => {
       )
     ).rejects.toThrow();
     expect(deps.getSession).not.toHaveBeenCalled();
+  });
+});
+
+describe('dispatchSessionReadyPush', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockDispatchPush.mockResolvedValue({ kind: 'delivered', tokenCount: 1 });
+  });
+
+  it('dispatches fixed copy with app presence suppression and per-session idempotency', async () => {
+    const deps = createDeps({ session: { title: null, organizationId: null } });
+
+    const result = await dispatchSessionReadyPush(
+      { userId: 'user-1', cliSessionId: 'ses_1' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: true });
+    expect(mockDispatchPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        presenceContext: '/presence/app',
+        idempotencyKey: 'cloud-agent:ses_1:session-ready',
+        badge: null,
+        push: expect.objectContaining({
+          title: 'Kilo session ready',
+          body: 'Your Kilo session is ready to control from your phone',
+          data: { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
+        }),
+      })
+    );
+  });
+
+  it('returns missing_session without dispatching when the session row is absent', async () => {
+    const deps = createDeps({ session: null });
+
+    const result = await dispatchSessionReadyPush(
+      { userId: 'user-1', cliSessionId: 'ses_missing' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'missing_session' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
+  });
+
+  it('does not send for organization sessions the user cannot access', async () => {
+    const deps = createDeps({
+      session: { title: null, organizationId: 'org-1' },
+      hasOrganizationAccess: false,
+    });
+
+    const result = await dispatchSessionReadyPush(
+      { userId: 'former-member', cliSessionId: 'ses_org' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'missing_session' });
+    expect(mockDispatchPush).not.toHaveBeenCalled();
+  });
+
+  it('reports dispatch failures from the recipient notification channel', async () => {
+    const deps = createDeps();
+    mockDispatchPush.mockResolvedValue({ kind: 'failed', error: 'Expo unavailable' });
+
+    const result = await dispatchSessionReadyPush(
+      { userId: 'user-1', cliSessionId: 'ses_1' },
+      deps
+    );
+
+    expect(result).toEqual({ dispatched: false, reason: 'dispatch_failed' });
   });
 });

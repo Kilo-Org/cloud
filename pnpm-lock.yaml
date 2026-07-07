@@ -2787,6 +2787,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
       '@kilocode/session-ingest-contracts':
         specifier: workspace:*
         version: link:../../packages/session-ingest-contracts

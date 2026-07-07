@@ -156,6 +156,22 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
   typeof sendCloudAgentSessionNotificationOutputSchema
 >;
 
+// ── sendSessionReadyNotification ────────────────────────────────────
+
+export const sendSessionReadyNotificationInputSchema = z.object({
+  userId: z.string().min(1),
+  cliSessionId: z.string().min(1),
+});
+export type SendSessionReadyNotificationParams = z.infer<
+  typeof sendSessionReadyNotificationInputSchema
+>;
+
+export const sendSessionReadyNotificationOutputSchema =
+  sendCloudAgentSessionNotificationOutputSchema;
+export type SendSessionReadyNotificationResult = z.infer<
+  typeof sendSessionReadyNotificationOutputSchema
+>;
+
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 
 export const dispatchPushInputSchema = z.object({

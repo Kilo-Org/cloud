@@ -42,6 +42,7 @@ type TestBindings = {
   HYPERDRIVE: HyperdriveBinding;
   SESSION_INGEST_R2: { put: ReturnType<typeof vi.fn> };
   INGEST_QUEUE: { send: ReturnType<typeof vi.fn> };
+  NOTIFICATIONS: { sendSessionReadyNotification: ReturnType<typeof vi.fn> };
 };
 
 function makeTestEnv(): TestBindings {
@@ -49,6 +50,7 @@ function makeTestEnv(): TestBindings {
     HYPERDRIVE: { connectionString: 'postgres://test' },
     SESSION_INGEST_R2: { put: vi.fn(async () => undefined) },
     INGEST_QUEUE: { send: vi.fn(async () => undefined) },
+    NOTIFICATIONS: { sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })) },
   };
 }
 
@@ -245,13 +247,14 @@ describe('api routes', () => {
     );
 
     const app = makeApiApp();
+    const env = makeTestEnv();
     const res = await app.fetch(
       new Request('http://local/session', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
       }),
-      makeTestEnv()
+      env
     );
 
     expect(res.status).toBe(200);
@@ -261,6 +264,10 @@ describe('api routes', () => {
       'usr_test',
       expect.objectContaining({ type: 'session.created' })
     );
+    expect(env.NOTIFICATIONS.sendSessionReadyNotification).toHaveBeenCalledWith({
+      userId: 'usr_test',
+      cliSessionId: 'ses_12345678901234567890123456',
+    });
   });
 
   it('POST /session does not emit created when row already exists', async () => {
@@ -278,18 +285,20 @@ describe('api routes', () => {
     );
 
     const app = makeApiApp();
+    const env = makeTestEnv();
     const res = await app.fetch(
       new Request('http://local/session', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sessionId: 'ses_12345678901234567890123456' }),
       }),
-      makeTestEnv()
+      env
     );
 
     expect(res.status).toBe(200);
     expect(fns.select).not.toHaveBeenCalled();
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    expect(env.NOTIFICATIONS.sendSessionReadyNotification).not.toHaveBeenCalled();
   });
 
   it('POST /session persists placeholder and warms cache', async () => {

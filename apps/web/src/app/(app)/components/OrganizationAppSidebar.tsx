@@ -113,7 +113,7 @@ export default function OrganizationAppSidebar({
     enabled: hasOwnerLevelAccess,
     staleTime: 60_000,
   });
-  const canViewCostInsights = costInsightsAccess?.enabled === true;
+  const canViewCostInsights = hasOwnerLevelAccess && costInsightsAccess?.enabled === true;
   const { data: costInsightsAttention } = useQuery({
     ...trpc.organizations.costInsights.getAttentionState.queryOptions({ organizationId }),
     enabled: canViewCostInsights,

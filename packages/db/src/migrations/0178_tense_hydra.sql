@@ -1,0 +1,1 @@
+ALTER TABLE "kilocode_users" ADD COLUMN "personal_account_disabled" boolean DEFAULT false NOT NULL;

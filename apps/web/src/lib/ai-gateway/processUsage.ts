@@ -428,7 +428,6 @@ type UsageStatementResult = UsageRecordInsertResult & {
 
 type UsageTransactionResult = {
   inserted: UsageStatementResult;
-  organizationUsage: OrganizationUsageMutationResult | null;
 };
 
 async function insertUsageTransaction(
@@ -441,29 +440,66 @@ async function insertUsageTransaction(
       coreUsageFields,
       metadataFields
     );
-    const organizationUsage = coreUsageFields.organization_id
-      ? await mutateOrganizationUsage(tx, coreUsageFields)
-      : null;
+    return { inserted };
+  });
+}
 
-    if (coreUsageFields.cost > 0) {
-      await captureCostInsightSpend(tx, {
-        owner: coreUsageFields.organization_id
-          ? { type: 'organization', id: coreUsageFields.organization_id }
-          : { type: 'user', id: coreUsageFields.kilo_user_id },
-        actorUserId: coreUsageFields.kilo_user_id,
-        occurredAt: coreUsageFields.created_at,
-        amountMicrodollars: coreUsageFields.cost,
+function scheduleOrganizationUsageMutation(usage: MicrodollarUsage): void {
+  const organizationId = usage.organization_id;
+  if (!organizationId) return;
+
+  void db
+    .transaction(tx => mutateOrganizationUsage(tx, usage))
+    .then((result: OrganizationUsageMutationResult) =>
+      scheduleOrganizationLowBalanceAlert(organizationId, result)
+    )
+    .catch(error => {
+      console.error('post-commit organization usage mutation failed', error);
+      captureException(error, {
+        tags: { source: 'postCommitOrganizationUsageMutation' },
+        extra: { usageId: usage.id, organizationId },
+      });
+    });
+}
+
+function scheduleCostInsightSpendCapture(
+  usage: MicrodollarUsage,
+  metadataFields: UsageMetaData
+): void {
+  if (usage.cost <= 0) return;
+
+  const owner = usage.organization_id
+    ? { type: 'organization' as const, id: usage.organization_id }
+    : { type: 'user' as const, id: usage.kilo_user_id };
+
+  void db
+    .transaction(tx =>
+      captureCostInsightSpend(tx, {
+        owner,
+        actorUserId: usage.kilo_user_id,
+        occurredAt: usage.created_at,
+        amountMicrodollars: usage.cost,
         category: 'variable',
         source: 'ai_gateway',
         productKey: getAiGatewayCostInsightProductKey(metadataFields.feature),
         featureKey: getAiGatewayCostInsightFeatureKey(metadataFields.api_kind),
-        modelOrPlanKey: coreUsageFields.requested_model || coreUsageFields.model || 'other',
-        providerKey: coreUsageFields.inference_provider || coreUsageFields.provider || 'other',
+        modelOrPlanKey: usage.requested_model || usage.model || 'other',
+        providerKey: usage.inference_provider || usage.provider || 'other',
+      })
+    )
+    .then(() => scheduleCostInsightEvaluationAfterSpend(owner))
+    .catch(error => {
+      console.error('post-commit cost insight spend capture failed', error);
+      captureException(error, {
+        tags: {
+          source: 'postCommitCostInsightSpendCapture',
+          spendCategory: 'variable',
+          spendSource: 'ai_gateway',
+          ownerType: owner.type,
+        },
+        extra: { usageId: usage.id, ownerId: owner.id },
       });
-    }
-
-    return { inserted, organizationUsage };
-  });
+    });
 }
 
 function scheduleKiloPassBonusIfNeeded(
@@ -511,7 +547,7 @@ export async function insertUsageRecord(
         while (true) {
           try {
             // This can fail if new deduplicated values are inserted simultaneously.
-            // Every retry opens a fresh transaction for source, charge, and rollups.
+            // Every retry opens a fresh transaction for the usage and balance write.
             return await insertUsageTransaction(coreUsageFields, metadataFields);
           } catch (error) {
             if (attempt >= 2) throw error;
@@ -526,19 +562,8 @@ export async function insertUsageRecord(
       }
     );
 
-    if (coreUsageFields.organization_id && result.organizationUsage) {
-      scheduleOrganizationLowBalanceAlert(
-        coreUsageFields.organization_id,
-        result.organizationUsage
-      );
-    }
-    if (coreUsageFields.cost > 0) {
-      scheduleCostInsightEvaluationAfterSpend(
-        coreUsageFields.organization_id
-          ? { type: 'organization', id: coreUsageFields.organization_id }
-          : { type: 'user', id: coreUsageFields.kilo_user_id }
-      );
-    }
+    scheduleOrganizationUsageMutation(coreUsageFields);
+    scheduleCostInsightSpendCapture(coreUsageFields, metadataFields);
     scheduleKiloPassBonusIfNeeded(coreUsageFields, result.inserted);
     return {
       usageId: result.inserted.usageId,

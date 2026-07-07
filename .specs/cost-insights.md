@@ -6,7 +6,7 @@ This spec defines business rules and invariants for Cost Insights, Spend Alerts,
 
 ## Status
 
-Draft -- created 2026-06-24. Updated 2026-06-24 to remove spend-blocking controls. Updated 2026-06-25 to rename the feature from Spend Insights to Cost Insights and add Cost Suggestions. Updated 2026-06-26 to require local-time UI timestamps, make Spend Anomaly Alerts opt-out by default, add independent rolling 7-day and rolling 30-day spend thresholds, and limit initial access to Kilo platform admins. Updated 2026-07-03 to render the 7-day spend-over-time evidence chart in daily buckets instead of hourly for readability; hourly owner-hour rollups and anomaly detection remain unchanged.
+Draft -- created 2026-06-24. Updated 2026-06-24 to remove spend-blocking controls. Updated 2026-06-25 to rename the feature from Spend Insights to Cost Insights and add Cost Suggestions. Updated 2026-06-26 to require local-time UI timestamps, make Spend Anomaly Alerts opt-out by default, add independent rolling 7-day and rolling 30-day spend thresholds, and limit initial access to Kilo platform admins. Updated 2026-07-03 to render the 7-day spend-over-time evidence chart in daily buckets instead of hourly for readability; hourly owner-hour rollups and anomaly detection remain unchanged. Updated 2026-07-07 to allow post-commit best-effort Cost Insights rollup capture for high-volume request-metered spend paths, preserving billing availability while relying on source-of-truth usage rows for repair/backfill.
 
 ## Conventions
 
@@ -170,8 +170,8 @@ Cost Insights does not replace low-balance alerts, auto-top-up setup, existing o
 11. V1 source taxonomy MUST include `ai_gateway`, `kiloclaw`, `coding_plan`, and `other`.
 12. Driver buckets MUST store actor user ID for both personal and organization spend.
 13. Driver buckets MUST store total spend and contributing spend-record count.
-14. Every Credit spend path MUST update owner-hour totals and applicable driver buckets atomically with spend recording.
-15. Credit spend MUST NOT commit unless the corresponding owner-hour total and applicable driver-bucket updates also commit.
+14. Credit spend paths SHOULD update owner-hour totals and applicable driver buckets as close to spend recording as practical.
+15. High-volume request-metered Credit spend paths MAY update Cost Insights rollups asynchronously after billing-critical spend recording commits, provided failures do not block or roll back the source-of-truth spend record and rollups can be repaired from source-of-truth Postgres usage data.
 16. Spend Alert evaluation and notification side effects SHOULD run asynchronously after spend recording.
 17. Enabling Spend Alerts MUST use already-maintained owner-hour totals for baseline data when available.
 18. Enabling Spend Alerts MUST backfill or repair the owner's last 7 days of hourly baseline from Postgres historical usage data when rollups are missing or incomplete.

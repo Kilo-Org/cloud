@@ -1,4 +1,4 @@
-import { test, describe, expect } from '@jest/globals';
+import { test, describe, expect, jest } from '@jest/globals';
 import type { MicrodollarUsageStats, MicrodollarUsageContext } from './processUsage.types';
 import {
   extractPromptInfo,
@@ -387,6 +387,23 @@ describe('logMicrodollarUsage', () => {
       ttfb_ms: null,
     }) satisfies MicrodollarUsageContext;
 
+  async function waitForExpectation(expectation: () => Promise<void>): Promise<void> {
+    const deadline = Date.now() + 2000;
+    let lastError: unknown;
+
+    while (Date.now() < deadline) {
+      try {
+        await expectation();
+        return;
+      } catch (error) {
+        lastError = error;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+    }
+
+    throw lastError;
+  }
+
   test('stores usage data and increments user microdollars for positive cost', async () => {
     const user = await insertTestUser({
       id: 'test-log-user-1',
@@ -428,30 +445,32 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.created_at).toBeTruthy();
     expect(metadataRecord?.created_at).toBe(usageRecord?.created_at);
 
-    const [total] = await db
-      .select()
-      .from(cost_insight_owner_hour_totals)
-      .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
-    expect(total).toMatchObject({
-      owned_by_organization_id: null,
-      spend_category: 'variable',
-      total_microdollars: 500,
-      spend_record_count: 1,
-    });
+    await waitForExpectation(async () => {
+      const [total] = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
+      expect(total).toMatchObject({
+        owned_by_organization_id: null,
+        spend_category: 'variable',
+        total_microdollars: 500,
+        spend_record_count: 1,
+      });
 
-    const [driver] = await db
-      .select()
-      .from(cost_insight_owner_hour_driver_buckets)
-      .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, user.id));
-    expect(driver).toMatchObject({
-      source: 'ai_gateway',
-      product_key: 'vscode-extension',
-      feature_key: 'chat_completions',
-      model_or_plan_key: 'anthropic/claude-3.7-sonnet',
-      provider_key: 'Provider',
-      actor_user_id: user.id,
-      total_microdollars: 500,
-      spend_record_count: 1,
+      const [driver] = await db
+        .select()
+        .from(cost_insight_owner_hour_driver_buckets)
+        .where(eq(cost_insight_owner_hour_driver_buckets.owned_by_user_id, user.id));
+      expect(driver).toMatchObject({
+        source: 'ai_gateway',
+        product_key: 'vscode-extension',
+        feature_key: 'chat_completions',
+        model_or_plan_key: 'anthropic/claude-3.7-sonnet',
+        provider_key: 'Provider',
+        actor_user_id: user.id,
+        total_microdollars: 500,
+        spend_record_count: 1,
+      });
     });
   });
 
@@ -568,26 +587,73 @@ describe('logMicrodollarUsage', () => {
     expect(totals).toHaveLength(0);
   });
 
-  test('rolls back AI source rows when mandatory capture fails', async () => {
+  test('keeps AI source rows when post-commit cost insight capture fails', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     const { core, metadata } = await defineMicrodollarUsage();
     const missingUserId = `missing-ai-user-${crypto.randomUUID()}`;
 
-    const result = await insertUsageRecord(
-      { ...core, kilo_user_id: missingUserId, cost: 1000 },
-      metadata
-    );
+    try {
+      const result = await insertUsageRecord(
+        { ...core, kilo_user_id: missingUserId, cost: 1000 },
+        metadata
+      );
 
-    expect(result).toBeNull();
-    const sourceRows = await db
-      .select()
-      .from(microdollar_usage)
-      .where(eq(microdollar_usage.kilo_user_id, missingUserId));
-    const totals = await db
-      .select()
-      .from(cost_insight_owner_hour_totals)
-      .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, missingUserId));
-    expect(sourceRows).toHaveLength(0);
-    expect(totals).toHaveLength(0);
+      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: null });
+      const sourceRows = await db
+        .select()
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.kilo_user_id, missingUserId));
+      expect(sourceRows).toHaveLength(1);
+
+      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => setImmediate(resolve));
+
+      const totals = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, missingUserId));
+      expect(totals).toHaveLength(0);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  test('keeps usage and balance write when post-commit cost insight capture fails', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const user = await insertTestUser({
+      id: ` test-cost-insight-failure-user-${crypto.randomUUID()} `,
+      microdollars_used: 0,
+      google_user_email: 'cost-insight-failure@example.com',
+    });
+    const { core, metadata } = await defineMicrodollarUsage();
+
+    try {
+      const result = await insertUsageRecord(
+        { ...core, kilo_user_id: user.id, organization_id: null, cost: 1000 },
+        metadata
+      );
+
+      expect(result).toMatchObject({ usageId: core.id, newMicrodollarsUsed: 1000 });
+      const updatedUser = await findUserById(user.id);
+      expect(updatedUser?.microdollars_used).toBe(1000);
+
+      const sourceRows = await db
+        .select()
+        .from(microdollar_usage)
+        .where(eq(microdollar_usage.kilo_user_id, user.id));
+      expect(sourceRows).toHaveLength(1);
+
+      await new Promise(resolve => setImmediate(resolve));
+      await new Promise(resolve => setImmediate(resolve));
+
+      const totals = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_user_id, user.id));
+      expect(totals).toHaveLength(0);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   test('stores 3 usage records with overlapping data and tests metadata deduplication', async () => {
@@ -762,30 +828,32 @@ describe('logMicrodollarUsage', () => {
     expect(usageRecord?.model).toBe('anthropic/claude-3.7-sonnet');
     expect(usageRecord?.provider).toBe('openrouter');
 
-    const [chargedOrganization] = await db
-      .select({ microdollars_used: organizations.microdollars_used })
-      .from(organizations)
-      .where(eq(organizations.id, organization.id));
-    expect(chargedOrganization.microdollars_used).toBe(500);
+    await waitForExpectation(async () => {
+      const [chargedOrganization] = await db
+        .select({ microdollars_used: organizations.microdollars_used })
+        .from(organizations)
+        .where(eq(organizations.id, organization.id));
+      expect(chargedOrganization.microdollars_used).toBe(500);
 
-    const [memberUsage] = await db
-      .select()
-      .from(organization_user_usage)
-      .where(eq(organization_user_usage.organization_id, organization.id));
-    expect(memberUsage).toMatchObject({
-      kilo_user_id: user.id,
-      microdollar_usage: 500,
-    });
+      const [memberUsage] = await db
+        .select()
+        .from(organization_user_usage)
+        .where(eq(organization_user_usage.organization_id, organization.id));
+      expect(memberUsage).toMatchObject({
+        kilo_user_id: user.id,
+        microdollar_usage: 500,
+      });
 
-    const [total] = await db
-      .select()
-      .from(cost_insight_owner_hour_totals)
-      .where(eq(cost_insight_owner_hour_totals.owned_by_organization_id, organization.id));
-    expect(total).toMatchObject({
-      owned_by_user_id: null,
-      spend_category: 'variable',
-      total_microdollars: 500,
-      spend_record_count: 1,
+      const [total] = await db
+        .select()
+        .from(cost_insight_owner_hour_totals)
+        .where(eq(cost_insight_owner_hour_totals.owned_by_organization_id, organization.id));
+      expect(total).toMatchObject({
+        owned_by_user_id: null,
+        spend_category: 'variable',
+        total_microdollars: 500,
+        spend_record_count: 1,
+      });
     });
   });
 

@@ -23,7 +23,7 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@/lib/drizzle';
-import { and, asc, desc, eq, inArray, isNull, gt } from 'drizzle-orm';
+import { and, asc, eq, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import { randomUUID } from 'crypto';
 import { fromMicrodollars, getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
@@ -173,10 +173,28 @@ export async function getProfileOrganizations(
   userId: User['id'],
   options: GetProfileOrganizationsOptions = {}
 ): Promise<ProfileOrganization[]> {
+  const { excludeAccessBlocked = false } = options;
+
+  // Only pull in each org's current subscription status when the caller needs
+  // to hide "Access Blocked" orgs. organization_seats_purchases is append-only,
+  // so the most recently created row reflects the current state. This keeps
+  // getProfileOrganizations a single query and adds no seat-purchase lookup for
+  // callers that don't opt in.
+  const latestSeatPurchaseStatus = excludeAccessBlocked
+    ? sql<OrganizationSeatsPurchase['subscription_status'] | null>`(
+        SELECT ${organization_seats_purchases.subscription_status}
+        FROM ${organization_seats_purchases}
+        WHERE ${organization_seats_purchases.organization_id} = ${organizations.id}
+        ORDER BY ${organization_seats_purchases.created_at} DESC
+        LIMIT 1
+      )`
+    : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
+
   const results = await db
     .select({
       organization: organizations,
       membership: organization_memberships,
+      latestSeatPurchaseStatus,
     })
     .from(organizations)
     .innerJoin(
@@ -194,68 +212,23 @@ export async function getProfileOrganizations(
     )
   );
 
-  const visible = results.filter(
-    result => !parentOrganizationIdsWithMembershipInAChild.has(result.organization.id)
-  );
-
-  const included = options.excludeAccessBlocked
-    ? await filterOutAccessBlockedOrganizations(visible)
-    : visible;
-
-  return included.map(result => ({
-    id: result.organization.id,
-    name: result.organization.name,
-    role: result.membership.role,
-  }));
-}
-
-/**
- * Drops organizations in the "Access Blocked" state — free trial hard-expired
- * with no active entitlement. Uses one batched query for the latest seat
- * purchase status per org so this stays a single round-trip regardless of how
- * many organizations the user belongs to.
- */
-async function filterOutAccessBlockedOrganizations<T extends { organization: Organization }>(
-  rows: T[]
-): Promise<T[]> {
-  if (rows.length === 0) return rows;
-
-  const latestSeatPurchaseStatusByOrgId = await getLatestSeatPurchaseStatusByOrgId(
-    rows.map(row => row.organization.id)
-  );
-
   const now = new Date();
-  return rows.filter(row => {
-    const classification = classifyOrganizationEntitlement({
-      organization: row.organization,
-      latestSeatPurchaseStatus: latestSeatPurchaseStatusByOrgId.get(row.organization.id) ?? null,
-      now,
-    });
-    return !classification.isTrialExpiredForEnforcement;
-  });
-}
-
-/**
- * organization_seats_purchases is append-only; the most recently created row
- * per org reflects its current subscription state (mirrors
- * getMostRecentSeatPurchase, but batched across many orgs).
- */
-async function getLatestSeatPurchaseStatusByOrgId(
-  organizationIds: Organization['id'][]
-): Promise<Map<string, OrganizationSeatsPurchase['subscription_status']>> {
-  const rows = await db
-    .selectDistinctOn([organization_seats_purchases.organization_id], {
-      organizationId: organization_seats_purchases.organization_id,
-      subscriptionStatus: organization_seats_purchases.subscription_status,
+  return results
+    .filter(result => !parentOrganizationIdsWithMembershipInAChild.has(result.organization.id))
+    .filter(result => {
+      if (!excludeAccessBlocked) return true;
+      const classification = classifyOrganizationEntitlement({
+        organization: result.organization,
+        latestSeatPurchaseStatus: result.latestSeatPurchaseStatus,
+        now,
+      });
+      return !classification.isTrialExpiredForEnforcement;
     })
-    .from(organization_seats_purchases)
-    .where(inArray(organization_seats_purchases.organization_id, organizationIds))
-    .orderBy(
-      asc(organization_seats_purchases.organization_id),
-      desc(organization_seats_purchases.created_at)
-    );
-
-  return new Map(rows.map(row => [row.organizationId, row.subscriptionStatus]));
+    .map(result => ({
+      id: result.organization.id,
+      name: result.organization.name,
+      role: result.membership.role,
+    }));
 }
 
 export async function createOrganization(

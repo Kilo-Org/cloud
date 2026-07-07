@@ -58,7 +58,12 @@ function mockDbWithSessionGuard(overrides: Record<string, unknown> = {}) {
   const where = vi.fn(() => ({ limit }));
   const from = vi.fn(() => ({ where }));
   const select = vi.fn(() => ({ from }));
-  return { select, ...overrides };
+  const db: Record<string, unknown> = { select, ...overrides };
+  // `applyMetadataChanges` runs its writes inside `db.transaction(async tx => ...)`.
+  // Forward the callback the same mocked db so tests can assert against the same
+  // `select`/`update`/`execute` mocks as if they were called directly on `tx`.
+  db.transaction = vi.fn(async (fn: (tx: typeof db) => unknown) => fn(db));
+  return db;
 }
 
 function createUpdateReturningMock(rows: unknown[] = []) {
@@ -860,5 +865,97 @@ describe('queue status notifications', () => {
     expect(retry).not.toHaveBeenCalled();
     expect(execute).toHaveBeenCalledTimes(1);
     expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
+  it('rolls back the metadata update when the status update in the same transaction fails', async () => {
+    // Title and status change together. The metadata UPDATE must succeed inside the
+    // transaction, but the status CTE then fails; the whole transaction should roll
+    // back rather than leave the title change committed with the status change lost.
+    vi.mocked(notifyUserSessionEvent).mockClear();
+    const { update, updateQuery } = createUpdateReturningMock([
+      {
+        session_id: 'ses_12345678901234567890123456',
+        created_at: '2026-05-05T00:00:00.000Z',
+        updated_at: '2026-05-05T00:00:01.000Z',
+        title: 'New title',
+        created_on_platform: null,
+        organization_id: null,
+        git_url: null,
+        git_branch: null,
+        parent_session_id: null,
+        status: 'busy',
+        status_updated_at: null,
+      },
+    ]);
+    const execute = vi.fn(async () => {
+      throw new Error('deadlock detected');
+    });
+
+    // Mirror mockDbWithSessionGuard's real db.transaction semantics (run the callback
+    // against the same mocked handles, but propagate a thrown error as a rollback
+    // instead of resolving), so we can assert nothing downstream observes the
+    // metadata write as having taken effect.
+    const limit = vi.fn(async () => [{ session_id: 'ses_exists' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    const select = vi.fn(() => ({ from }));
+    const db: Record<string, unknown> = { select, update, execute };
+    db.transaction = vi.fn(async (fn: (tx: typeof db) => unknown) => fn(db));
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      ingest: vi.fn(async () => ({
+        changes: [
+          { name: 'title', value: 'New title' },
+          { name: 'status', value: 'busy' },
+        ],
+      })),
+    } as never);
+
+    const body = JSON.stringify({
+      data: [
+        { type: 'session', data: { title: 'New title' } },
+        { type: 'session_status', data: { status: 'busy' } },
+      ],
+    });
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        delete: vi.fn(async () => undefined),
+        put: vi.fn(async () => undefined),
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const ctx = { waitUntil: vi.fn() } as unknown as ExecutionContext;
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'ingest/status-tx-failure',
+              kiloUserId: 'usr_test',
+              sessionId: 'ses_12345678901234567890123456',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      ctx
+    );
+
+    // The metadata UPDATE ran inside the same failed transaction as the status CTE, so
+    // it must not be reported as committed and no notification should have fired.
+    expect(updateQuery.set).toHaveBeenCalledWith(expect.objectContaining({ title: 'New title' }));
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+    // The whole message is retried so the DO's re-diffed changes get a chance to
+    // reapply the rolled-back metadata and status together on the next attempt.
+    expect(retry).toHaveBeenCalledWith({ delaySeconds: QUEUE_RETRY_DELAY_SECONDS });
+    expect(ack).not.toHaveBeenCalled();
   });
 });

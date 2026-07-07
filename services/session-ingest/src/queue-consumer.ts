@@ -399,6 +399,12 @@ function createIngestChunker(
   return { stage, flushChunkToSessionDO };
 }
 
+type WorkerDb = ReturnType<typeof getWorkerDb>;
+// A single connection within a `db.transaction(...)` call, used so the three
+// metadata/parent/status writes below commit or roll back together while each
+// remains one round trip (no separate SELECT ... FOR UPDATE round trip).
+type WorkerTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
+
 type SessionMetadataUpdates = Partial<
   Pick<
     typeof cli_sessions_v2.$inferInsert,
@@ -454,14 +460,14 @@ export function computeSessionMetadataUpdates(
 }
 
 async function updateSessionMetadata(
-  db: ReturnType<typeof getWorkerDb>,
+  tx: WorkerTransaction,
   kiloUserId: string,
   sessionId: string,
   updates: SessionMetadataUpdates
 ): Promise<SessionEventDbRow | null> {
   if (Object.keys(updates).length === 0) return null;
 
-  const [row] = await db
+  const [row] = await tx
     .update(cli_sessions_v2)
     .set(updates)
     .where(
@@ -472,7 +478,7 @@ async function updateSessionMetadata(
 }
 
 async function updateSessionParent(
-  db: ReturnType<typeof getWorkerDb>,
+  tx: WorkerTransaction,
   kiloUserId: string,
   sessionId: string,
   parentSessionId: string | null | undefined
@@ -480,7 +486,7 @@ async function updateSessionParent(
   if (parentSessionId === undefined) return null;
 
   if (parentSessionId && parentSessionId !== sessionId) {
-    const parentRows = await db
+    const parentRows = await tx
       .select({ session_id: cli_sessions_v2.session_id })
       .from(cli_sessions_v2)
       .where(
@@ -493,7 +499,7 @@ async function updateSessionParent(
 
     if (!parentRows[0]) return null;
 
-    const [row] = await db
+    const [row] = await tx
       .update(cli_sessions_v2)
       .set({ parent_session_id: parentSessionId })
       .where(
@@ -508,7 +514,7 @@ async function updateSessionParent(
   }
 
   if (parentSessionId === null) {
-    const [row] = await db
+    const [row] = await tx
       .update(cli_sessions_v2)
       .set({ parent_session_id: null })
       .where(
@@ -530,14 +536,14 @@ type StatusTransitionRow = SessionEventDbRow & {
 };
 
 async function updateSessionStatus(
-  db: ReturnType<typeof getWorkerDb>,
+  tx: WorkerTransaction,
   kiloUserId: string,
   sessionId: string,
   status: string | null | undefined
 ): Promise<{ session: SessionEventDbRow; previousStatus: SessionStatus | null } | null> {
   if (status === undefined) return null;
 
-  const { rows } = await db.execute<StatusTransitionRow>(sql`
+  const { rows } = await tx.execute<StatusTransitionRow>(sql`
     WITH locked AS (
       SELECT status AS previous_status
       FROM cli_sessions_v2
@@ -594,18 +600,27 @@ async function applyMetadataChanges(
   const parentSessionId = mergedChanges.has('parentId')
     ? (mergedChanges.get('parentId') ?? null)
     : undefined;
-  let changedNonStatus = false;
-  let notificationRow = await updateSessionMetadata(db, kiloUserId, sessionId, updates);
-  if (notificationRow) changedNonStatus = true;
+  // All three writes run in one transaction so a failure partway through (e.g. the
+  // status update) rolls back the metadata/parent updates too. The queue consumer
+  // only re-emits metadata changes that differ from the DO's last-sent value, so a
+  // partial commit here could never be repaired by a retry. Each write remains a
+  // single statement, so the status CTE's row lock is still held for only that one
+  // round trip, not across the whole transaction.
+  const { notificationRow, changedNonStatus, statusChange } = await db.transaction(async tx => {
+    let notificationRow = await updateSessionMetadata(tx, kiloUserId, sessionId, updates);
+    let changedNonStatus = !!notificationRow;
 
-  const parentUpdateRow = await updateSessionParent(db, kiloUserId, sessionId, parentSessionId);
-  if (parentUpdateRow) {
-    changedNonStatus = true;
-    notificationRow = parentUpdateRow;
-  }
+    const parentUpdateRow = await updateSessionParent(tx, kiloUserId, sessionId, parentSessionId);
+    if (parentUpdateRow) {
+      changedNonStatus = true;
+      notificationRow = parentUpdateRow;
+    }
 
-  const statusChange = await updateSessionStatus(db, kiloUserId, sessionId, status);
-  if (statusChange) notificationRow = statusChange.session;
+    const statusChange = await updateSessionStatus(tx, kiloUserId, sessionId, status);
+    if (statusChange) notificationRow = statusChange.session;
+
+    return { notificationRow, changedNonStatus, statusChange };
+  });
 
   const notification = notificationRow
     ? {

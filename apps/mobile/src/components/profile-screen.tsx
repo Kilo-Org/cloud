@@ -16,6 +16,7 @@ import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 import { useTRPC } from '@/lib/trpc';
 
 const SUPPORT_EMAIL = 'hi@kilo.ai';
@@ -110,13 +111,11 @@ export function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Profile" modal />
+      <ScreenHeader title="Profile" size="large" showBackButton={false} />
       <ScrollView
         className="flex-1 px-6"
         contentContainerClassName="pt-4"
-        contentContainerStyle={{
-          paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
-        }}
+        contentContainerStyle={{ paddingBottom: getTabBarOverlayHeight(bottom, Platform.OS) + 16 }}
         showsVerticalScrollIndicator={false}
       >
         {/* Credits */}

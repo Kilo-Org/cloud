@@ -47,9 +47,6 @@ vi.mock('@/components/kiloclaw/instance-card', () => ({
 vi.mock('@/components/kiloclaw/status-badge', () => ({
   isTransitionalStatus: () => false,
 }));
-vi.mock('@/components/profile-avatar-button', () => ({
-  ProfileAvatarButton: () => null,
-}));
 vi.mock('@/components/screen-header', () => ({
   ScreenHeader: () => null,
 }));

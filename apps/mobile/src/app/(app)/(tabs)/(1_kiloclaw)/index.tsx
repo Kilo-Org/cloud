@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyStateContent } from '@/components/kiloclaw/empty-state-content';
 import { getKiloClawEntryDecision } from '@/components/kiloclaw/instance-entry-state';
 import { InstanceListScreen } from '@/components/kiloclaw/instance-list-screen';
-import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,13 +54,7 @@ export default function KiloClawTab() {
   if (hasQueryError) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          title="KiloClaw"
-          size="large"
-          showBackButton={false}
-          className="px-[22px]"
-          headerRight={<ProfileAvatarButton />}
-        />
+        <ScreenHeader title="KiloClaw" size="large" showBackButton={false} className="px-[22px]" />
         <Animated.View entering={FadeIn.duration(200)} className="flex-1">
           <QueryError
             className="flex-1"
@@ -102,13 +95,7 @@ export default function KiloClawTab() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title="KiloClaw"
-        size="large"
-        showBackButton={false}
-        className="px-[22px]"
-        headerRight={<ProfileAvatarButton />}
-      />
+      <ScreenHeader title="KiloClaw" size="large" showBackButton={false} className="px-[22px]" />
       <Animated.View layout={LinearTransition} className="flex-1 px-4">
         {showInstanceSkeleton || onboardingQuery.data === undefined ? (
           <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 px-4 pt-5">

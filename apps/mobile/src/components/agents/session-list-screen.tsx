@@ -18,7 +18,6 @@ import {
   type SessionSection,
   type StoredSessionItem,
 } from '@/components/agents/session-list-helpers';
-import { ProfileAvatarButton } from '@/components/profile-avatar-button';
 import { ScreenHeader } from '@/components/screen-header';
 import {
   useAgentSessions,
@@ -256,7 +255,6 @@ export function AgentSessionListScreen() {
                 color={hasActiveFilter ? colors.foreground : colors.mutedForeground}
               />
             </Pressable>
-            <ProfileAvatarButton />
           </View>
         }
       />

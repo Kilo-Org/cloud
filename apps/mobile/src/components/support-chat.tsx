@@ -1,16 +1,7 @@
 import { PylonChatView } from '@pylon/react-native-chat';
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
-import {
-  type ComponentRef,
-  createContext,
-  type ReactNode,
-  useCallback,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { type ComponentRef, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, View, type ViewStyle } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -21,59 +12,36 @@ import { useTRPC } from '@/lib/trpc';
 // PylonChatView is a native component without className support, so a style object it is.
 const OVERLAY_STYLE: ViewStyle = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 };
 
-type SupportChatState = 'idle' | 'loading' | 'open' | 'hidden';
-
-type SupportChatContextValue = {
-  /** Whether support chat can be offered (identity available). */
-  available: boolean;
-  state: SupportChatState;
-  openSupportChat: () => void;
-};
-
-const SupportChatContext = createContext<SupportChatContextValue | undefined>(undefined);
-
-export function useSupportChat(): SupportChatContextValue {
-  const context = useContext(SupportChatContext);
-  if (!context) {
-    throw new Error('useSupportChat must be used within a SupportChatProvider');
-  }
-  return context;
-}
-
-/** Hosts the Pylon chat widget as an app-wide overlay. The widget mounts on first
- *  use and then stays mounted: remounting PylonChatView in the same process leaves
- *  the SDK's WebView permanently stuck, so closing the chat only hides it. */
-export function SupportChatProvider({ children }: { readonly children: ReactNode }) {
+function usePylonIdentity() {
   const { token } = useAuth();
   const trpc = useTRPC();
   const { data } = useQuery({
     ...trpc.user.getPylonIdentity.queryOptions(),
     enabled: token != null,
   });
-  const identity = data?.identity;
-  const [state, setState] = useState<SupportChatState>('idle');
+  return data?.identity;
+}
+
+/** Whether support chat can be offered (identity available). */
+export function useSupportChatAvailable(): boolean {
+  return usePylonIdentity() != null;
+}
+
+/** Fullscreen Pylon chat overlay. Mount it to open the chat; it calls onClose
+ *  when the user closes the widget (or it fails to load), at which point the
+ *  owner should unmount it. */
+export function SupportChatOverlay({ onClose }: { readonly onClose: () => void }) {
+  const identity = usePylonIdentity();
+  const [open, setOpen] = useState(false);
   const chatRef = useRef<ComponentRef<typeof PylonChatView>>(null);
 
-  const openSupportChat = useCallback(() => {
-    setState(current => {
-      if (current === 'hidden') {
-        chatRef.current?.openChat();
-        return current;
-      }
-      return current === 'idle' ? 'loading' : current;
-    });
-  }, []);
-
-  const available = identity != null;
-  const value = useMemo(
-    () => ({ available, state, openSupportChat }),
-    [available, state, openSupportChat]
-  );
+  if (!identity) {
+    return null;
+  }
 
   return (
-    <SupportChatContext value={value}>
-      {children}
-      {identity && state === 'loading' && (
+    <>
+      {!open && (
         <View
           pointerEvents="none"
           className="absolute inset-0 items-center justify-center"
@@ -84,33 +52,35 @@ export function SupportChatProvider({ children }: { readonly children: ReactNode
           </View>
         </View>
       )}
-      {identity && state !== 'idle' && (
-        <PylonChatView
-          ref={chatRef}
-          config={{ appId: PYLON_APP_ID }}
-          user={identity}
-          style={OVERLAY_STYLE}
-          listener={{
-            onPylonReady: () => {
-              chatRef.current?.hideChatBubble();
-              chatRef.current?.setNewIssueCustomFields({
-                platform: Platform.OS,
-                app_version: `${Application.nativeApplicationVersion} (${Application.nativeBuildVersion})`,
-              });
-              chatRef.current?.openChat();
-            },
-            onChatOpened: () => {
-              setState('open');
-            },
-            onChatClosed: () => {
-              setState(current => (current === 'idle' ? current : 'hidden'));
-            },
-            onPylonError: error => {
-              toast.error(`Could not load support chat: ${error}`);
-            },
-          }}
-        />
-      )}
-    </SupportChatContext>
+      <PylonChatView
+        ref={chatRef}
+        config={{ appId: PYLON_APP_ID }}
+        user={identity}
+        style={OVERLAY_STYLE}
+        listener={{
+          onPylonReady: () => {
+            chatRef.current?.hideChatBubble();
+            chatRef.current?.setNewIssueCustomFields({
+              platform: Platform.OS,
+              app_version: `${Application.nativeApplicationVersion} (${Application.nativeBuildVersion})`,
+            });
+            chatRef.current?.openChat();
+          },
+          onChatOpened: () => {
+            setOpen(true);
+          },
+          onChatClosed: wasOpen => {
+            // The widget fires spurious close events while initializing.
+            if (wasOpen) {
+              onClose();
+            }
+          },
+          onPylonError: error => {
+            toast.error(`Could not load support chat: ${error}`);
+            onClose();
+          },
+        }}
+      />
+    </>
   );
 }

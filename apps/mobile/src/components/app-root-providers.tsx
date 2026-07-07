@@ -5,7 +5,6 @@ import { type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Toaster } from 'sonner-native';
 
-import { SupportChatProvider } from '@/components/support-chat';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { OrganizationProvider } from '@/lib/organization-context';
 import { queryClient } from '@/lib/query-client';
@@ -22,7 +21,7 @@ export function AppRootProviders({ children }: { readonly children: ReactNode })
             <OrganizationProvider>
               <ActionSheetProvider>
                 <>
-                  <SupportChatProvider>{children}</SupportChatProvider>
+                  {children}
                   <Toaster />
                   <PortalHost />
                 </>

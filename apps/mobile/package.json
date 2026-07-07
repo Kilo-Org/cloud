@@ -28,7 +28,7 @@
     "@kilocode/kilo-chat-hooks": "workspace:*",
     "@kilocode/notifications": "workspace:*",
     "@kilocode/trpc": "workspace:*",
-    "@pylon/react-native-chat": "file:vendor/pylon-react-native-chat-0.1.0.tgz",
+    "@pylon/react-native-chat": "file:vendor/pylon-react-native-chat",
     "@react-native-community/netinfo": "11.5.2",
     "@rn-primitives/portal": "1.3.0",
     "@rn-primitives/slot": "1.2.0",

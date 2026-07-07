@@ -9,5 +9,7 @@
   "arrowParens": "avoid",
   "endOfLine": "lf",
   "sortPackageJson": false,
-  "ignorePatterns": []
+  "ignorePatterns": [
+    "apps/mobile/vendor/**"
+  ]
 }

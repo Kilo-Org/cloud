@@ -22,7 +22,9 @@ export default function OrganizationCostInsightsLayout({ params, children }: Lay
         if (!isGlobalAdmin) notFound();
 
         return (
-          <CostInsightsLayout basePath={`/organizations/${organizationRouteIdentifier}/cost-insights`}>
+          <CostInsightsLayout
+            basePath={`/organizations/${organizationRouteIdentifier}/cost-insights`}
+          >
             {children}
           </CostInsightsLayout>
         );

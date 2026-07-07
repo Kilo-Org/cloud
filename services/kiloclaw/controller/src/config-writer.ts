@@ -84,9 +84,12 @@ const LEGACY_STREAM_CHAT_PLUGIN_PATH =
 const KILO_CHAT_PLUGIN_ID = 'kilo-chat';
 const KILO_CHAT_PLUGIN_PATH = '/usr/local/lib/node_modules/@kiloclaw/kilo-chat';
 // KiloCode provider was externalized from openclaw core into a standalone plugin
-// (openclaw #93470, 2026.6.9). It is installed globally by the Dockerfile and must
-// be loaded explicitly — an explicit `models.providers.kilocode` entry alone no
-// longer loads it now that it is not bundled.
+// (openclaw #93470, 2026.6.9). On 2026.6.9+ it is installed globally by the
+// Dockerfile and must be loaded explicitly — an explicit `models.providers.kilocode`
+// entry alone no longer loads it now that it is not bundled. On older openclaw
+// versions (still selectable at provision time) the provider is in-core and this
+// path does not exist, so generateBaseConfig only wires it when it is installed
+// (see the presence check where plugins.load.paths is built).
 const KILOCODE_PROVIDER_PLUGIN_ID = 'kilocode';
 const KILOCODE_PROVIDER_PLUGIN_PATH = '/usr/local/lib/node_modules/@openclaw/kilocode-provider';
 const KILO_EXA_PROVIDER_ID = 'kilo-exa';
@@ -415,10 +418,31 @@ export function generateBaseConfig(
   if (!(config.plugins.load.paths as string[]).includes(KILOCLAW_CUSTOMIZER_PLUGIN_PATH)) {
     (config.plugins.load.paths as string[]).push(KILOCLAW_CUSTOMIZER_PLUGIN_PATH);
   }
-  // KiloCode provider is now an external plugin (openclaw #93470); load it explicitly
-  // so model routing through the Kilo Gateway continues to work.
-  if (!(config.plugins.load.paths as string[]).includes(KILOCODE_PROVIDER_PLUGIN_PATH)) {
-    (config.plugins.load.paths as string[]).push(KILOCODE_PROVIDER_PLUGIN_PATH);
+  // KiloCode provider became an external plugin only in openclaw 2026.6.9
+  // (#93470). On 2026.6.9+ the Dockerfile installs it at
+  // KILOCODE_PROVIDER_PLUGIN_PATH and it must be loaded explicitly via
+  // plugins.load.paths. On older openclaw versions — still selectable at
+  // provision time — the provider is bundled in-core and no plugin file exists;
+  // referencing a missing plugin path fails openclaw config validation, which
+  // fails `openclaw doctor` and prevents the gateway from ever starting.
+  //
+  // Gate on the plugin actually being present so both cases are correct, and
+  // actively prune a stale path that an instance may have inherited in its
+  // persisted openclaw.json from a newer image (downgrade / reprovision onto an
+  // older openclaw). generateBaseConfig runs on every boot, so this converges
+  // existing instances on their next restart.
+  const pluginPaths = config.plugins.load.paths as string[];
+  if (deps.existsSync(KILOCODE_PROVIDER_PLUGIN_PATH)) {
+    if (!pluginPaths.includes(KILOCODE_PROVIDER_PLUGIN_PATH)) {
+      pluginPaths.push(KILOCODE_PROVIDER_PLUGIN_PATH);
+    }
+  } else if (pluginPaths.includes(KILOCODE_PROVIDER_PLUGIN_PATH)) {
+    config.plugins.load.paths = pluginPaths.filter(
+      (pluginPath: unknown) => pluginPath !== KILOCODE_PROVIDER_PLUGIN_PATH
+    );
+    console.log(
+      'Removed kilocode-provider plugin path: plugin not installed on this openclaw version (pre-2026.6.9); provider is in-core'
+    );
   }
   if (
     Array.isArray(config.plugins.allow) &&

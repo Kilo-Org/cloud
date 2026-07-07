@@ -91,9 +91,6 @@ export const publicTrpcOpenApiProcedures = [
     summary: 'Return organization members',
     description:
       'Returns active and invited members for an organization the authenticated user can access. Invite tokens and invite URLs are omitted from the response.',
-    errorResponses: {
-      '404': 'Resource not found',
-    },
     input: OrganizationMembersInputSchema,
     output: PublicOrganizationMembersSchema,
   },

@@ -84,14 +84,6 @@ export const organizationsMembersRouter = createTRPCRouter({
     .input(OrganizationIdInputSchema)
     .output(PublicOrganizationMembersSchema)
     .query(async ({ input }) => {
-      const organization = await getOrganizationById(input.organizationId);
-      if (!organization) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
-        });
-      }
-
       return await getOrganizationMembers(input.organizationId);
     }),
 

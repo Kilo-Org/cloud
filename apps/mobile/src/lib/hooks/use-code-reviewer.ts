@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import {
@@ -48,7 +48,7 @@ export function useGitHubRepositories(scope: string, enabled: boolean) {
   return isPersonal(scope) ? personal : org;
 }
 
-export function useReviewConfig(scope: string) {
+export function useReviewConfig(scope: string): UseQueryResult<ReviewConfigData> {
   const trpc = useTRPC();
   const personal = useQuery({
     ...trpc.personalReviewAgent.getReviewConfig.queryOptions({ platform: 'github' }),
@@ -61,7 +61,12 @@ export function useReviewConfig(scope: string) {
     }),
     enabled: !isPersonal(scope),
   });
-  return isPersonal(scope) ? personal : org;
+  // The org procedure also serves Bitbucket (string repo IDs), so its
+  // inferred type is broader than our GitHub-only ReviewConfigData
+  // contract. We always request platform: 'github' above, which
+  // guarantees this shape at runtime (same reasoning as
+  // useSaveReviewConfig's getQueryData<ReviewConfigData> below).
+  return (isPersonal(scope) ? personal : org) as UseQueryResult<ReviewConfigData>;
 }
 
 function useReviewConfigQueryKey(scope: string) {

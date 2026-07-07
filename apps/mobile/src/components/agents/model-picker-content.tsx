@@ -10,7 +10,11 @@ import { Text } from '@/components/ui/text';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { buildModelPickerRows, type ModelPickerRow } from '@/lib/model-picker-rows';
+import {
+  buildModelPickerRows,
+  modelPickerFavoriteId,
+  type ModelPickerRow,
+} from '@/lib/model-picker-rows';
 import {
   clearModelPickerBridge,
   commitModelPickerSelection,
@@ -80,7 +84,7 @@ export function ModelPickerContent() {
   const handleToggleFavorite = useCallback(
     (option: SessionModelOption) => {
       void Haptics.selectionAsync();
-      toggleFavorite(option.id);
+      toggleFavorite(modelPickerFavoriteId(option));
     },
     [toggleFavorite]
   );

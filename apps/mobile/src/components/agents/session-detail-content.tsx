@@ -220,11 +220,12 @@ export function SessionDetailContent({ sessionId }: Readonly<SessionDetailConten
   const handleModelSelect = useCallback(
     (value: string, variant: string, pickerSelection?: ModelPickerSelection) => {
       if (activeSessionType === 'remote') {
-        const selectedRef = pickerSelection?.option.modelRef;
+        const selectedOption = pickerSelection?.option;
+        const selectedRef = selectedOption?.modelRef;
         const option = selectedRef
           ? modelOptions.find(
               candidate =>
-                candidate.overrideSource === pickerSelection.option.overrideSource &&
+                candidate.overrideSource === selectedOption.overrideSource &&
                 candidate.modelRef?.providerID === selectedRef.providerID &&
                 candidate.modelRef.modelID === selectedRef.modelID
             )

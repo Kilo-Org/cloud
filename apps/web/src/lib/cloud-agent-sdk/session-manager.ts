@@ -596,15 +596,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   // A web-picked override should stop applying once we see live proof the
-  // CLI actually ran a message on a different model — otherwise the picker
-  // gets stuck showing a choice that's no longer what's being sent. Gated on
+  // CLI actually ran a message on a different model or variant — otherwise
+  // the picker gets stuck showing a choice that's no longer what's being
+  // sent, and `send()` keeps re-applying a stale variant. Gated on
   // `remoteHistoryReplaying` so a reconnect's replayed history (which can
   // predate the override) can't wipe a selection that just hasn't been used
   // yet.
   function clearOverrideIfDiverged(model: ModelSelection): void {
     if (remoteHistoryReplaying) return;
     const override = store.get(remoteModelOverrideAtom);
-    if (override && !modelRefsEqual(override.selection.model, model.model)) {
+    if (override && !modelSelectionsEqual(override.selection, model)) {
       store.set(remoteModelOverrideAtom, null);
     }
   }

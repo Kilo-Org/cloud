@@ -368,6 +368,7 @@ export function SessionModelNotices({
             {notice.retry ? (
               <Pressable
                 onPress={onRetry}
+                hitSlop={12}
                 accessibilityRole="button"
                 accessibilityLabel="Retry loading CLI models"
                 className="flex-row items-center gap-1 rounded-full bg-secondary px-2 py-1 active:opacity-70"

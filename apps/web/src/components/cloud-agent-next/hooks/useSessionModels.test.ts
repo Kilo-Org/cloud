@@ -4,7 +4,7 @@ import type { ModelOption } from '@/components/shared/ModelCombobox';
 import {
   buildSessionModels,
   createRemoteModelOverride,
-  resolveGatewayOrganizationId,
+  resolveGatewayOrganization,
   validateRemoteModelOverride,
   type SessionModelOption,
 } from './useSessionModels';
@@ -25,25 +25,30 @@ const emptyRemoteState = {
   refresh: 'idle',
 } satisfies RemoteModelState;
 
-describe('resolveGatewayOrganizationId', () => {
+describe('resolveGatewayOrganization', () => {
   it('uses the persisted session organization instead of the route organization', () => {
     expect(
-      resolveGatewayOrganizationId({ organizationId: 'org-persisted' }, 'org-route', 'ses_existing')
-    ).toBe('org-persisted');
+      resolveGatewayOrganization({ organizationId: 'org-persisted' }, 'org-route', 'ses_existing')
+    ).toEqual({ organizationId: 'org-persisted', resolved: true });
   });
 
   it('keeps a persisted personal session personal on an organization route', () => {
     expect(
-      resolveGatewayOrganizationId({ organizationId: null }, 'org-route', 'ses_existing')
-    ).toBeUndefined();
+      resolveGatewayOrganization({ organizationId: null }, 'org-route', 'ses_existing')
+    ).toEqual({ organizationId: undefined, resolved: true });
   });
 
-  it('does not use the route organization while an existing remote session loads', () => {
-    expect(resolveGatewayOrganizationId(null, 'org-route', 'ses_remote')).toBeUndefined();
+  it('stays unresolved while an existing session loads so the personal catalog is not fetched', () => {
+    expect(resolveGatewayOrganization(null, 'org-route', 'ses_remote')).toEqual({
+      resolved: false,
+    });
   });
 
   it('uses the route organization while creating a Cloud Agent', () => {
-    expect(resolveGatewayOrganizationId(null, 'org-route', null)).toBe('org-route');
+    expect(resolveGatewayOrganization(null, 'org-route', null)).toEqual({
+      organizationId: 'org-route',
+      resolved: true,
+    });
   });
 });
 

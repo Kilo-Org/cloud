@@ -968,6 +968,75 @@ describe('createSessionManager', () => {
       });
     });
 
+    it('clears a stale override once a live message runs the same model on a different variant', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      mgr.setRemoteModelOverride({
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      });
+      mockSessionCallbacks.onReplayComplete?.();
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-live', 'ses-1', {
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+        }).info,
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toBeNull();
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+      });
+    });
+
+    it('keeps an override whose model and variant a live message echoes back', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onResolved?.({ type: 'remote', kiloSessionId: kiloId('ses-1') });
+      mockSessionCallbacks.onRemoteModelStateChange?.({
+        ownerConnectionId: 'owner-a',
+        protocol: 'v1',
+        catalog: remoteCatalog,
+        refresh: 'idle',
+      });
+      const override = {
+        source: 'cli-catalog',
+        selection: {
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+        },
+      } as const;
+      mgr.setRemoteModelOverride(override);
+      mockSessionCallbacks.onReplayComplete?.();
+
+      mockSessionCallbacks.onEvent?.({
+        type: 'message.updated',
+        info: createStoredAssistantMessage('msg-live', 'ses-1', {
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+          variant: 'high',
+        }).info,
+      });
+
+      expect(atomValue(config.store, mgr.atoms.remoteModelOverride)).toEqual(override);
+    });
+
     it('keeps a fresh override intact through a reconnect that replays pre-override history', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

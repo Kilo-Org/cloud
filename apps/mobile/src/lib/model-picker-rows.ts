@@ -10,6 +10,17 @@ type ModelGroup = {
   models: SessionModelOption[];
 };
 
+// Favorites are persisted server-side by this key, so it must be stable
+// across sessions and catalog refreshes. CLI catalog options get opaque
+// order-based `id`s (`remote-model-N`), so favorite them by their CLI model
+// identity instead. Legacy Gateway options keep `id` — it is the Gateway
+// model id and already shared with regular Gateway favorites.
+export function modelPickerFavoriteId(model: SessionModelOption): string {
+  return model.modelRef && model.overrideSource !== 'legacy-gateway'
+    ? `remote:${model.modelRef.providerID}:${model.modelRef.modelID}`
+    : model.id;
+}
+
 export function buildModelPickerRows({
   models,
   search,
@@ -22,8 +33,8 @@ export function buildModelPickerRows({
   const query = search.toLowerCase().trim();
   const filtered = models.filter(model => !query || searchableText(model).includes(query));
 
-  const favorites = filtered.filter(model => favoriteIds.has(model.id));
-  const rest = filtered.filter(model => !favoriteIds.has(model.id));
+  const favorites = filtered.filter(model => favoriteIds.has(modelPickerFavoriteId(model)));
+  const rest = filtered.filter(model => !favoriteIds.has(modelPickerFavoriteId(model)));
 
   const rows: ModelPickerRow[] = [];
 

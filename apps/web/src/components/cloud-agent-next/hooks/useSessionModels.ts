@@ -81,13 +81,24 @@ type UseSessionModelsResult = SessionModels & {
   remoteContextLengthByProviderAndModel?: ContextLengthByProviderAndModel;
 };
 
-export function resolveGatewayOrganizationId(
+type GatewayOrganization = { organizationId?: string; resolved: boolean };
+
+export function resolveGatewayOrganization(
   fetchedSessionData: Pick<FetchedSessionData, 'organizationId'> | null,
   routeOrganizationId: string | undefined,
   sessionIdFromParams: string | null
-): string | undefined {
-  if (fetchedSessionData) return fetchedSessionData.organizationId ?? undefined;
-  return sessionIdFromParams ? undefined : routeOrganizationId;
+): GatewayOrganization {
+  if (fetchedSessionData) {
+    return { organizationId: fetchedSessionData.organizationId ?? undefined, resolved: true };
+  }
+  // An existing session's owning organization is only known once its data
+  // loads. Until then the Gateway catalog must stay unfetched — falling back
+  // to the personal catalog could expose models outside the organization's
+  // model policy (e.g. through the legacy-CLI Gateway fallback).
+  if (sessionIdFromParams) {
+    return { resolved: false };
+  }
+  return { organizationId: routeOrganizationId, resolved: true };
 }
 
 export function useSessionModels(input: UseSessionModelsInput): UseSessionModelsResult {
@@ -102,13 +113,16 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
     routeOrganizationId,
     sessionIdFromParams,
   } = input;
-  const gatewayOrganizationId = resolveGatewayOrganizationId(
+  const gatewayOrganization = resolveGatewayOrganization(
     fetchedSessionData,
     routeOrganizationId,
     sessionIdFromParams
   );
   const usesGateway = activeSessionType !== 'remote' || remoteModelState.protocol === 'legacy';
-  const gatewayModels = useOrganizationModels(gatewayOrganizationId, usesGateway);
+  const gatewayModels = useOrganizationModels(
+    gatewayOrganization.organizationId,
+    usesGateway && gatewayOrganization.resolved
+  );
   const models = useMemo(
     () =>
       buildSessionModels({
@@ -116,18 +130,19 @@ export function useSessionModels(input: UseSessionModelsInput): UseSessionModels
         remoteModelState,
         observedModel,
         remoteModelOverride,
-        gatewayModels: gatewayModels.modelOptions,
-        gatewayModelsLoading: gatewayModels.isLoadingModels,
+        gatewayModels: gatewayOrganization.resolved ? gatewayModels.modelOptions : [],
+        gatewayModelsLoading: gatewayModels.isLoadingModels || !gatewayOrganization.resolved,
         gatewayModelId,
         gatewayVariant,
-        gatewayOrganizationId,
+        gatewayOrganizationId: gatewayOrganization.organizationId,
       }),
     [
       activeSessionType,
       gatewayModelId,
       gatewayModels.isLoadingModels,
       gatewayModels.modelOptions,
-      gatewayOrganizationId,
+      gatewayOrganization.organizationId,
+      gatewayOrganization.resolved,
       gatewayVariant,
       observedModel,
       remoteModelOverride,

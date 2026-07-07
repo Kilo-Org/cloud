@@ -136,7 +136,16 @@ export function useSaveReviewConfig(scope: string) {
             organizationId: scope,
           });
     },
-    onError: error => {
+    onMutate: async patch => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<ReviewConfigData>(queryKey);
+      queryClient.setQueryData<ReviewConfigData>(queryKey, old =>
+        old ? { ...old, ...patch } : old
+      );
+      return { previous };
+    },
+    onError: (error, _patch, context) => {
+      queryClient.setQueryData<ReviewConfigData>(queryKey, context?.previous);
       toast.error(error.message);
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule

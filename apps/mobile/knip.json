@@ -10,7 +10,7 @@
     "@sentry/cli"
   ],
   "ignoreBinaries": ["oxfmt", "oxlint"],
-  "ignore": ["src/components/ui/**"],
+  "ignore": ["src/components/ui/**", "vendor/**"],
   "postcss": {
     "config": ["postcss.config.mjs"]
   }

@@ -1,9 +1,8 @@
-import { createHmac } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { PYLON_IDENTITY_SECRET } from '@/lib/config.server';
+import { getPylonIdentity, type PylonIdentity } from '@/lib/pylon-identity';
 import { getUserFromAuth } from '@/lib/user/server';
 
-type IdentityResponse = { email: string; name: string; emailHash: string } | { error: string };
+type IdentityResponse = PylonIdentity | { error: string };
 
 export async function GET(): Promise<NextResponse<IdentityResponse>> {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -12,16 +11,10 @@ export async function GET(): Promise<NextResponse<IdentityResponse>> {
     return authFailedResponse;
   }
 
-  if (!PYLON_IDENTITY_SECRET) {
+  const identity = getPylonIdentity(user);
+  if (!identity) {
     return NextResponse.json({ error: 'Pylon not configured' }, { status: 503 });
   }
 
-  const email = user.google_user_email;
-  const name = user.google_user_name;
-  // Pylon's identity secret is hex-encoded and must be decoded to raw bytes before HMAC.
-  // See: https://docs.usepylon.com/pylon-docs/chat-widget/identity-verification
-  const secretBytes = Buffer.from(PYLON_IDENTITY_SECRET, 'hex');
-  const emailHash = createHmac('sha256', secretBytes).update(email).digest('hex');
-
-  return NextResponse.json({ email, name, emailHash });
+  return NextResponse.json(identity);
 }

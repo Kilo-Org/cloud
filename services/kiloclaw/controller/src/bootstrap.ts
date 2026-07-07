@@ -612,6 +612,35 @@ export function ensureWeatherSkillInstalled(
 // ---- Step 5: GitHub config ----
 
 /**
+ * Extract a human-readable, secret-scrubbed message from an execFileSync
+ * failure. `execFileSync` errors expose the child's stderr (string when the
+ * dep is configured with an encoding, Buffer otherwise); fall back to the
+ * error message. Any provided secret values are redacted before returning so
+ * the message is safe to log.
+ */
+function describeExecFailure(err: unknown, secrets: Array<string | undefined>): string {
+  let message = '';
+  if (err && typeof err === 'object') {
+    const e = err as { stderr?: unknown; message?: unknown };
+    if (typeof e.stderr === 'string') {
+      message = e.stderr;
+    } else if (Buffer.isBuffer(e.stderr)) {
+      message = e.stderr.toString('utf8');
+    }
+    if (!message.trim() && typeof e.message === 'string') {
+      message = e.message;
+    }
+  }
+  message = message.trim() || 'unknown error';
+  for (const secret of secrets) {
+    if (secret) {
+      message = message.split(secret).join('***');
+    }
+  }
+  return message;
+}
+
+/**
  * Configure or clean up GitHub access (gh CLI + git user config).
  * Best-effort: logs warnings on failure, does not throw.
  */
@@ -619,15 +648,53 @@ export function configureGitHub(env: EnvLike, deps: BootstrapDeps = defaultDeps)
   if (env.GITHUB_TOKEN) {
     console.log('Configuring GitHub access...');
 
+    // `gh` refuses to persist credentials to ~/.config/gh/hosts.yml while
+    // GH_TOKEN/GITHUB_TOKEN is set in its environment — it authenticates from
+    // the env token directly and never writes the credential store. OpenClaw
+    // strips those vars from the agent's tool-exec environment (host-env
+    // security policy), so the agent can ONLY authenticate from the persisted
+    // store. Run the bootstrap `gh` calls with the tokens removed from the
+    // child env so credentials land on disk (on the persistent /root volume)
+    // and survive that stripping. `gh auth setup-git` then wires git's
+    // credential helper to gh, covering both `gh` and `git`.
+    // Cast: the worker tsconfig augments NodeJS.ProcessEnv with required
+    // provider fields (NF_*) that a spread of `env` doesn't carry at the type
+    // level; at runtime `env` is process.env, which has whatever is set.
+    const ghEnv = { ...env } as NodeJS.ProcessEnv;
+    delete ghEnv.GITHUB_TOKEN;
+    delete ghEnv.GH_TOKEN;
+
+    let loginSucceeded = false;
     try {
       deps.execFileSync('gh', ['auth', 'login', '--with-token'], {
         input: env.GITHUB_TOKEN,
         stdio: 'pipe',
+        env: ghEnv,
       });
-      deps.execFileSync('gh', ['auth', 'setup-git'], { stdio: 'pipe' });
+      loginSucceeded = true;
       console.log('gh CLI authenticated');
-    } catch {
-      console.warn('WARNING: gh auth login failed');
+    } catch (err) {
+      // gh's stderr on the env-conflict path carries no secret, but scrub the
+      // token defensively in case a future gh error echoes the supplied value.
+      console.warn(
+        `WARNING: gh auth login failed: ${describeExecFailure(err, [env.GITHUB_TOKEN, env.GH_TOKEN])}`
+      );
+    }
+
+    // Only wire git's credential helper once login actually stored a
+    // credential. Separate try/catch so a setup-git failure (git missing from
+    // PATH, credential-helper conflict) after a successful login is reported as
+    // its own distinct failure — not mislabeled a login failure and not
+    // discarding the login-success log. Skipped entirely when login failed, so
+    // a single root-cause warning is emitted instead of two for one problem.
+    if (loginSucceeded) {
+      try {
+        deps.execFileSync('gh', ['auth', 'setup-git'], { stdio: 'pipe', env: ghEnv });
+      } catch (err) {
+        console.warn(
+          `WARNING: gh auth setup-git failed: ${describeExecFailure(err, [env.GITHUB_TOKEN, env.GH_TOKEN])}`
+        );
+      }
     }
 
     if (env.GITHUB_USERNAME) {

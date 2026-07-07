@@ -10,7 +10,7 @@ import { Text } from '@/components/ui/text';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
-export const STATUS_META: Record<string, { label: string; className: string }> = {
+const STATUS_META: Record<string, { label: string; className: string }> = {
   pending: { label: 'Pending', className: 'text-muted-foreground' },
   queued: { label: 'Queued', className: 'text-muted-foreground' },
   running: { label: 'Running', className: 'text-blue-600 dark:text-blue-400' },

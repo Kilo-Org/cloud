@@ -285,6 +285,25 @@ describe('User', () => {
       );
     });
 
+    it('does not auto-provision admin access for a new production-shaped @kilocode.ai signup', async () => {
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: 'new-admin-candidate@kilocode.ai',
+          google_user_name: 'New Admin Candidate',
+          google_user_image_url: 'https://example.com/avatar.png',
+          hosted_domain: 'kilocode.ai',
+          provider: 'google',
+          provider_account_id: 'google-new-admin-candidate',
+        },
+        undefined,
+        false
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.user.is_admin).toBe(false);
+    });
+
     it('rejects new signups after the per-IP burst threshold (100/24h)', async () => {
       const signupIp = '203.0.113.50';
       for (let i = 1; i <= 100; i++) {

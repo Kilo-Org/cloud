@@ -98,7 +98,7 @@ import {
 import { eq, and, inArray, isNotNull, isNull, sql, or, gte, count } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@/lib/constants';
 import type { AuthErrorType } from '@/lib/auth/constants';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { shouldAutoProvisionPlatformAdmin } from '@/lib/admin/platform-admin';
 import { strict as assert } from 'node:assert';
 import type { OptionalError, Result } from '@/lib/maybe-result';
 import { failureResult, successResult, trpcFailure } from '@/lib/maybe-result';
@@ -242,21 +242,6 @@ async function checkNormalizedEmailUnique(
   });
 
   return failureResult('EMAIL-ALREADY-USED');
-}
-
-/**
- * Determines if a user should have admin privileges based on their email and hosted domain.
- * Centralized logic ensures all auth providers (Google, magic link, GitHub, etc.) get
- * consistent admin status based on the same rules.
- */
-function shouldBeAdmin(email: string, hosted_domain: string | null): boolean {
-  return (
-    (hosted_domain === hosted_domain_specials.kilocode_admin &&
-      email.endsWith('@' + hosted_domain_specials.kilocode_admin)) ||
-    (allow_fake_login &&
-      hosted_domain === hosted_domain_specials.fake_devonly &&
-      email.endsWith('@admin.example.com'))
-  );
 }
 
 export type CreateOrUpdateUserArgs = {
@@ -644,7 +629,11 @@ export async function createOrUpdateUser(
     google_user_name: args.google_user_name,
     google_user_image_url: args.google_user_image_url,
     hosted_domain: args.hosted_domain,
-    is_admin: shouldBeAdmin(args.google_user_email, args.hosted_domain),
+    is_admin: shouldAutoProvisionPlatformAdmin(
+      args.google_user_email,
+      args.hosted_domain,
+      allow_fake_login
+    ),
     stripe_customer_id: stripeCustomer.id,
     signup_ip: signupIp,
     openrouter_upstream_safety_identifier: generateOpenRouterUpstreamSafetyIdentifier(newUserId),

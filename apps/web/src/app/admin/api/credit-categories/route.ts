@@ -9,10 +9,16 @@ import type {
 } from '@/lib/PromoCreditCategoryConfig';
 import { toGuiCreditCategory } from '@/lib/PromoCreditCategoryConfig';
 import { promoCreditCategories, promoCreditCategoriesByKey } from '@/lib/promoCreditCategories';
+import { getUserFromAuth } from '@/lib/user/server';
 
 export async function GET(
   request: NextRequest
-): Promise<NextResponse<CreditCategoriesApiResponse>> {
+): Promise<NextResponse<{ error: string } | CreditCategoriesApiResponse>> {
+  const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
+  if (authFailedResponse) {
+    return authFailedResponse;
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const key = searchParams.get('key'); // Filter by specific credit category key
   const oneWeekAgo = new Date();

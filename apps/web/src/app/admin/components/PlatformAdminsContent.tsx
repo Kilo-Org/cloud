@@ -1,0 +1,361 @@
+'use client';
+
+import { useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { inferRouterOutputs } from '@trpc/server';
+import { toast } from 'sonner';
+import type { RootRouter } from '@/routers/root-router';
+import { useTRPC } from '@/lib/trpc/utils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { UserAvatarLink } from './UserAvatarLink';
+import { UserSearchInput } from './UserSearchInput';
+
+type RouterOutputs = inferRouterOutputs<RootRouter>;
+// Both procedures share the same server-side column projection
+// (`platformAdminUserColumns` in admin-router.ts), so their outputs have the
+// same shape; deriving from the roster's output type here means this type
+// can't drift from the server contract the way a hand-copied literal could.
+type PlatformAdminUser = RouterOutputs['admin']['users']['listPlatformAdmins']['admins'][number];
+
+type ConfirmAction =
+  | { type: 'grant'; user: PlatformAdminUser }
+  | { type: 'revoke'; user: PlatformAdminUser };
+
+function AccountStatusBadge({ user }: { user: PlatformAdminUser }) {
+  if (user.blocked_reason) {
+    return <Badge variant="destructive">Blocked</Badge>;
+  }
+  return <Badge variant="secondary">Active</Badge>;
+}
+
+export function PlatformAdminsContent() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
+  // Stable focus target for after the confirmation dialog closes. The row that
+  // triggered the dialog (a roster "Revoke" button or a candidate "Grant"
+  // button) is removed from the DOM once the mutation succeeds and the roster/
+  // candidate queries are invalidated, so Radix's default trigger-based focus
+  // restoration has nothing to return focus to and would otherwise fall back
+  // to <body>.
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const trimmedSearchTerm = searchTerm.trim();
+
+  const {
+    data: rosterData,
+    isLoading: isRosterLoading,
+    error: rosterError,
+  } = useQuery(trpc.admin.users.listPlatformAdmins.queryOptions());
+
+  const canGrantAdmins = rosterData?.canGrantAdmins ?? false;
+
+  const { data: candidates, isFetching: isSearching } = useQuery({
+    ...trpc.admin.users.searchPlatformAdminCandidates.queryOptions({ query: trimmedSearchTerm }),
+    enabled: canGrantAdmins && trimmedSearchTerm.length > 0,
+  });
+
+  function invalidateAfterChange() {
+    void queryClient.invalidateQueries({
+      queryKey: trpc.admin.users.listPlatformAdmins.queryKey(),
+    });
+    void queryClient.invalidateQueries({
+      queryKey: trpc.admin.users.searchPlatformAdminCandidates.queryKey(),
+    });
+  }
+
+  const setAccessMutation = useMutation(
+    trpc.admin.users.setPlatformAdminAccess.mutationOptions({
+      onSuccess: (result, variables) => {
+        invalidateAfterChange();
+        setConfirmAction(null);
+        if (!result.changed) {
+          toast.message(
+            variables.isAdmin
+              ? `${result.user.google_user_email} already has platform admin access.`
+              : `${result.user.google_user_email} already does not have platform admin access.`
+          );
+          return;
+        }
+        if (variables.isAdmin) {
+          setSearchTerm('');
+          toast.success(`Granted platform admin access to ${result.user.google_user_email}.`);
+        } else {
+          toast.success(`Revoked platform admin access from ${result.user.google_user_email}.`);
+        }
+      },
+      onError: error => {
+        toast.error(error.message || 'Failed to update platform admin access');
+      },
+    })
+  );
+
+  const pendingUserId =
+    setAccessMutation.isPending && setAccessMutation.variables
+      ? setAccessMutation.variables.userId
+      : null;
+
+  const admins = rosterData?.admins ?? [];
+  const currentUserId = rosterData?.currentUserId;
+
+  const candidateRows = useMemo(() => candidates ?? [], [candidates]);
+
+  function requestRevoke(user: PlatformAdminUser) {
+    setConfirmAction({ type: 'revoke', user });
+  }
+
+  function requestGrant(user: PlatformAdminUser) {
+    setConfirmAction({ type: 'grant', user });
+  }
+
+  function confirmPendingAction() {
+    if (!confirmAction) return;
+    setAccessMutation.mutate({
+      userId: confirmAction.user.id,
+      isAdmin: confirmAction.type === 'grant',
+    });
+  }
+
+  return (
+    <div ref={contentRef} tabIndex={-1} className="flex flex-col gap-y-6 outline-none">
+      <Card>
+        <CardHeader>
+          <CardTitle>Current admins</CardTitle>
+          <CardDescription>
+            Everyone with platform admin access today. Revoking a credit manager also removes
+            credit-management permission.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isRosterLoading ? (
+            <div className="text-muted-foreground py-8 text-center text-sm">Loading admins...</div>
+          ) : rosterError ? (
+            <div className="text-destructive py-8 text-center text-sm">
+              {rosterError.message || 'Failed to load admins'}
+            </div>
+          ) : admins.length === 0 ? (
+            <div className="text-muted-foreground py-8 text-center text-sm">
+              No platform admins found.
+            </div>
+          ) : (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Hosted domain</TableHead>
+                    <TableHead>Account status</TableHead>
+                    <TableHead>Credit management</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {admins.map(admin => (
+                    <TableRow key={admin.id}>
+                      <TableCell>
+                        <UserAvatarLink user={admin} displayFormat="email-name" className="flex" />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {admin.hosted_domain ?? '—'}
+                      </TableCell>
+                      <TableCell>
+                        <AccountStatusBadge user={admin} />
+                      </TableCell>
+                      <TableCell>
+                        {admin.can_manage_credits ? (
+                          <Badge variant="secondary">Credit manager</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {admin.id === currentUserId ? (
+                          <span className="text-muted-foreground text-sm">You</span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={pendingUserId === admin.id}
+                            onClick={() => requestRevoke(admin)}
+                          >
+                            Revoke
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Grant admin access</CardTitle>
+          <CardDescription>
+            {canGrantAdmins
+              ? 'Search registered kilocode.ai users who are not already admins.'
+              : 'Only a qualifying kilocode.ai admin can grant platform admin access. You can still revoke other admins from the roster above.'}
+          </CardDescription>
+        </CardHeader>
+        {canGrantAdmins && (
+          <CardContent className="flex flex-col gap-4">
+            <UserSearchInput
+              value={searchTerm}
+              onChange={setSearchTerm}
+              isLoading={isSearching}
+              placeholder="Search by email or name..."
+            />
+
+            {trimmedSearchTerm.length === 0 ? (
+              <div className="text-muted-foreground py-4 text-center text-sm">
+                Enter an email or name to search for eligible users.
+              </div>
+            ) : candidateRows.length === 0 && !isSearching ? (
+              <div className="text-muted-foreground py-4 text-center text-sm">
+                No eligible kilocode.ai users matched that search.
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>User</TableHead>
+                      <TableHead>Hosted domain</TableHead>
+                      <TableHead>Account status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {candidateRows.map(candidate => (
+                      <TableRow key={candidate.id}>
+                        <TableCell>
+                          <UserAvatarLink
+                            user={candidate}
+                            displayFormat="email-name"
+                            className="flex"
+                          />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {candidate.hosted_domain ?? '—'}
+                        </TableCell>
+                        <TableCell>
+                          <AccountStatusBadge user={candidate} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            disabled={pendingUserId === candidate.id}
+                            onClick={() => requestGrant(candidate)}
+                          >
+                            Grant
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
+
+      <Dialog
+        open={confirmAction !== null}
+        onOpenChange={open => {
+          // Ignore Escape/backdrop/close-button dismissal while a mutation is
+          // in flight: this is the single mutation shared by every row in both
+          // tables, so letting the dialog close mid-request would let an admin
+          // open a second confirmation for a different user before the first
+          // request resolves, defeating the "one action at a time" intent of
+          // `pendingUserId`-based row disabling below.
+          if (!open && !setAccessMutation.isPending) {
+            setConfirmAction(null);
+          }
+        }}
+      >
+        <DialogContent
+          showCloseButton={!setAccessMutation.isPending}
+          onCloseAutoFocus={event => {
+            // The row that triggered this dialog is gone by the time it closes
+            // (see `contentRef` above); redirect focus there instead of letting
+            // Radix's default trigger-focus restoration fall back to <body>.
+            event.preventDefault();
+            contentRef.current?.focus();
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {confirmAction
+                ? confirmAction.type === 'grant'
+                  ? 'Grant platform admin access'
+                  : 'Revoke platform admin access'
+                : ''}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmAction && confirmAction.type === 'grant' ? (
+                <>
+                  Are you sure you want to grant platform admin access to{' '}
+                  <span className="font-medium">{confirmAction.user.google_user_email}</span>? This
+                  will not grant credit-management permission. Their current browser sessions will
+                  be signed out.
+                </>
+              ) : confirmAction ? (
+                <>
+                  Are you sure you want to revoke platform admin access from{' '}
+                  <span className="font-medium">{confirmAction.user.google_user_email}</span>? Their
+                  current browser sessions will be signed out.
+                  {confirmAction.user.can_manage_credits && (
+                    <> Credit-management permission will also be removed.</>
+                  )}
+                </>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline" disabled={setAccessMutation.isPending}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              variant={confirmAction?.type === 'revoke' ? 'destructive' : 'default'}
+              onClick={confirmPendingAction}
+              disabled={setAccessMutation.isPending}
+            >
+              {setAccessMutation.isPending
+                ? 'Saving...'
+                : confirmAction?.type === 'grant'
+                  ? 'Grant Access'
+                  : 'Revoke Access'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

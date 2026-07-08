@@ -19,8 +19,6 @@ import {
   List,
   Shield,
   ListChecks,
-  Download,
-  BookOpen,
   Key,
   Wrench,
   Webhook,
@@ -281,25 +279,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     },
   ];
 
-  // Start group
-  const startItems: Array<{
-    title: string;
-    icon: React.ElementType;
-    url: string;
-    className?: string;
-  }> = [
-    {
-      title: 'Install',
-      icon: Download,
-      url: '/install',
-    },
-    {
-      title: 'Learn',
-      icon: BookOpen,
-      url: '/learn',
-    },
-  ];
-
   const kiloClawBaseUrl = '/claw';
   const kiloClawInstanceState = kiloClawNavStateQuery.isSuccess
     ? kiloClawNavStateQuery.data.hasActiveInstance
@@ -363,7 +342,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
     ...kiloClawItems,
     ...cloudItems,
     ...accountItems,
-    ...startItems,
   ].map(i => (typeof i === 'string' ? i : i.url));
 
   return (
@@ -393,7 +371,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
               <SidebarMenuList label="Cloud" items={cloudItems} allUrls={allUrls} />
             )}
             <SidebarMenuList label="Account" items={accountItems} allUrls={allUrls} />
-            <SidebarMenuList label="Start" items={startItems} allUrls={allUrls} />
           </>
         )}
       </SidebarContent>

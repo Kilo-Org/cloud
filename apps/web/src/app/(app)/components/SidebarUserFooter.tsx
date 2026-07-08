@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@radix-ui/react-avatar';
-import { ChevronsUpDown, LogOut, UserCog } from 'lucide-react';
+import { BookOpen, ChevronsUpDown, Download, LogOut, UserCog } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -84,6 +84,14 @@ export default function SidebarUserFooter({ user, isLoading }: SidebarUserFooter
             <DropdownMenuItem onClick={() => router.push('/connected-accounts')}>
               <UserCog className="h-4 w-4" />
               Connected Accounts
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/install')}>
+              <Download className="h-4 w-4" />
+              Install
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => router.push('/learn')}>
+              <BookOpen className="h-4 w-4" />
+              Learn
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>

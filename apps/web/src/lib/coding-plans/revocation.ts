@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
@@ -116,6 +116,7 @@ export async function replaceManualCredentialRevocation(
     .select({
       planId: coding_plan_key_inventory.plan_id,
       upstreamPlanId: coding_plan_key_inventory.upstream_plan_id,
+      credentialFingerprint: coding_plan_key_inventory.credential_fingerprint,
     })
     .from(coding_plan_key_inventory)
     .where(
@@ -130,6 +131,26 @@ export async function replaceManualCredentialRevocation(
   }
   if (!isCodingPlanId(credential.planId)) {
     throw new Error('Credential has an unsupported Coding Plan ID.');
+  }
+  const replacementFingerprint = codingPlanCredentialFingerprint(normalizedApiKey);
+  if (replacementFingerprint === credential.credentialFingerprint) {
+    throw new Error(
+      'Replacement MiniMax credential must be different from the current credential.'
+    );
+  }
+
+  const [duplicateCredential] = await db
+    .select({ id: coding_plan_key_inventory.id })
+    .from(coding_plan_key_inventory)
+    .where(
+      and(
+        eq(coding_plan_key_inventory.credential_fingerprint, replacementFingerprint),
+        ne(coding_plan_key_inventory.id, inventoryKeyId)
+      )
+    )
+    .limit(1);
+  if (duplicateCredential) {
+    throw new Error('Replacement MiniMax credential is already present in inventory.');
   }
 
   const validateCredential = options.validateCredential ?? validateMiniMaxCodingPlanCredential;
@@ -149,7 +170,7 @@ export async function replaceManualCredentialRevocation(
     .set({
       status: 'available',
       encrypted_api_key: encryptApiKey(normalizedApiKey, BYOK_ENCRYPTION_KEY),
-      credential_fingerprint: codingPlanCredentialFingerprint(normalizedApiKey),
+      credential_fingerprint: replacementFingerprint,
       assigned_to_user_id: null,
       assigned_at: null,
       revocation_requested_at: null,

@@ -373,7 +373,9 @@ export const codingPlansRouter = createTRPCRouter({
     }),
 
   adminReplaceRevocationCredential: adminProcedure
-    .input(z.object({ inventoryKeyId: z.string().uuid(), apiKey: z.string().trim().min(1) }))
+    .input(
+      z.object({ inventoryKeyId: z.string().uuid(), apiKey: z.string().trim().min(1).max(500) })
+    )
     .mutation(async ({ input }) => {
       try {
         await replaceManualCredentialRevocation(input.inventoryKeyId, input.apiKey);

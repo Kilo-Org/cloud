@@ -43,7 +43,7 @@ describe('Coding Plan subscription helpers', () => {
         status: 'past_due',
         cancelAtPeriodEnd: true,
       })
-    ).toBe('pending_cancellation');
+    ).toBe('past_due');
     expect(getCodingPlanBillingDate({ ...activeSubscription, cancelAtPeriodEnd: true })).toEqual({
       label: 'Access ends',
       date: activeSubscription.currentPeriodEnd,

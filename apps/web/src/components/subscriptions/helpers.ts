@@ -20,7 +20,7 @@ export function getCodingPlanDisplayStatus(params: {
   status: string;
   cancelAtPeriodEnd: boolean;
 }): string {
-  return params.status !== 'canceled' && params.cancelAtPeriodEnd
+  return params.status === 'active' && params.cancelAtPeriodEnd
     ? 'pending_cancellation'
     : params.status;
 }

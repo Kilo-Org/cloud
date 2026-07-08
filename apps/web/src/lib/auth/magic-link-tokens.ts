@@ -4,7 +4,14 @@ import { magic_link_tokens } from '@kilocode/db/schema';
 import * as z from 'zod';
 import 'server-only';
 import { NEXTAUTH_URL } from '@/lib/config.server';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes, randomInt, createHash } from 'crypto';
+
+const SIGN_IN_CODE_EXPIRY_MINUTES = 10;
+const SIGN_IN_CODE_MAX_ATTEMPTS = 5;
+
+function hashSignInCode(email: string, code: string): string {
+  return createHash('sha256').update(`${email}:${code}`).digest('hex');
+}
 
 export type MagicLinkToken = z.infer<typeof MagicLinkToken>;
 export const MagicLinkToken = z.object({
@@ -82,6 +89,96 @@ export async function verifyAndConsumeMagicLinkToken(
   }
 
   return MagicLinkToken.parse(result[0]);
+}
+
+/**
+ * Create a 6-digit email sign-in code. Since a 6-digit code has low entropy,
+ * only one live (unconsumed) code is allowed per email at a time: any prior
+ * unconsumed rows for the email are deleted before inserting the new one.
+ *
+ * The stored hash is keyed by email so a leaked hash can't be replayed
+ * against a different address: sha256(`${email}:${code}`).
+ *
+ * @param email - The email address to send the code to (case-insensitive)
+ * @returns The plaintext 6-digit code (for sending in email)
+ */
+export async function createSignInCode(email: string): Promise<string> {
+  const emailLower = email.toLowerCase();
+  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  const token_hash = hashSignInCode(emailLower, code);
+  const expires_at = new Date(Date.now() + SIGN_IN_CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
+
+  await db.transaction(async tx => {
+    await tx
+      .delete(magic_link_tokens)
+      .where(and(eq(magic_link_tokens.email, emailLower), isNull(magic_link_tokens.consumed_at)));
+    await tx.insert(magic_link_tokens).values({ token_hash, email: emailLower, expires_at });
+  });
+
+  return code;
+}
+
+export type VerifySignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts';
+
+/**
+ * Verify and consume an email sign-in code atomically, scoped by email.
+ *
+ * Attempt limiting is checked BEFORE the hash comparison: once the live
+ * code for an email has recorded 5+ failed attempts, this returns
+ * 'too_many_attempts' even for the correct code. A mismatch increments
+ * attempts on the email's unconsumed row(s) and returns 'invalid'; so does
+ * an expired, already-consumed, or nonexistent code.
+ */
+export async function verifyAndConsumeSignInCode(
+  email: string,
+  code: string
+): Promise<VerifySignInCodeResult> {
+  const emailLower = email.toLowerCase();
+
+  const [row] = await db
+    .select()
+    .from(magic_link_tokens)
+    .where(
+      and(
+        eq(magic_link_tokens.email, emailLower),
+        isNull(magic_link_tokens.consumed_at),
+        sql`${magic_link_tokens.expires_at} > NOW()`
+      )
+    )
+    .limit(1);
+
+  if (!row) {
+    return 'invalid';
+  }
+
+  if (row.attempts >= SIGN_IN_CODE_MAX_ATTEMPTS) {
+    return 'too_many_attempts';
+  }
+
+  const token_hash = hashSignInCode(emailLower, code);
+  if (row.token_hash === token_hash) {
+    const consumed = await db
+      .update(magic_link_tokens)
+      .set({ consumed_at: sql`NOW()` })
+      .where(
+        and(
+          eq(magic_link_tokens.token_hash, token_hash),
+          eq(magic_link_tokens.email, emailLower),
+          isNull(magic_link_tokens.consumed_at),
+          sql`${magic_link_tokens.expires_at} > NOW()`
+        )
+      )
+      .returning();
+
+    return consumed[0] ? 'ok' : 'invalid';
+  }
+
+  await db
+    .update(magic_link_tokens)
+    .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
+    .where(and(eq(magic_link_tokens.email, emailLower), isNull(magic_link_tokens.consumed_at)));
+
+  return 'invalid';
 }
 
 export function getMagicLinkUrl(

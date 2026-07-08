@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import {
   createMagicLinkToken,
+  createSignInCode,
   getMagicLinkUrl,
   verifyAndConsumeMagicLinkToken,
+  verifyAndConsumeSignInCode,
 } from './magic-link-tokens';
 import { db } from '@/lib/drizzle';
-import { sql } from 'drizzle-orm';
+import { sql, eq } from 'drizzle-orm';
+import { magic_link_tokens } from '@kilocode/db/schema';
+import { createHash } from 'crypto';
 
 describe('Magic Link Tokens', () => {
   const testEmail = 'test@example.com';
@@ -106,6 +110,160 @@ describe('Magic Link Tokens', () => {
 
       const verified = await verifyAndConsumeMagicLinkToken(created.plaintext_token);
       expect(verified).toBeNull();
+    });
+  });
+
+  describe('createSignInCode', () => {
+    const rowFor = async (email: string) => {
+      const rows = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, email));
+      return rows[0];
+    };
+
+    it('returns a 6-digit zero-padded code and stores its hash', async () => {
+      const code = await createSignInCode(testEmail);
+
+      expect(code).toMatch(/^\d{6}$/);
+
+      const row = await rowFor(testEmail);
+      expect(row).toBeDefined();
+      expect(row?.token_hash).toBe(
+        createHash('sha256').update(`${testEmail}:${code}`).digest('hex')
+      );
+      expect(row?.consumed_at).toBeNull();
+      expect(row?.attempts).toBe(0);
+    });
+
+    it('lowercases the email before hashing and storing', async () => {
+      const mixedCaseEmail = 'Test@Example.com';
+      await db.execute(sql`DELETE FROM magic_link_tokens WHERE email = ${testEmail}`);
+
+      const code = await createSignInCode(mixedCaseEmail);
+      const row = await rowFor(testEmail);
+
+      expect(row).toBeDefined();
+      expect(row?.email).toBe(testEmail);
+      expect(row?.token_hash).toBe(
+        createHash('sha256').update(`${testEmail}:${code}`).digest('hex')
+      );
+    });
+
+    it('sets an expiry approximately 10 minutes out', async () => {
+      await createSignInCode(testEmail);
+      const row = await rowFor(testEmail);
+      const minutesDiff = (new Date(row!.expires_at).getTime() - Date.now()) / (1000 * 60);
+
+      expect(minutesDiff).toBeGreaterThan(9.9);
+      expect(minutesDiff).toBeLessThan(10.1);
+    });
+
+    it('deletes prior unconsumed rows for the email so only one code is live', async () => {
+      await createSignInCode(testEmail);
+      const secondCode = await createSignInCode(testEmail);
+
+      const rows = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.token_hash).toBe(
+        createHash('sha256').update(`${testEmail}:${secondCode}`).digest('hex')
+      );
+    });
+
+    it('does not delete already-consumed rows for the email', async () => {
+      const firstCode = await createSignInCode(testEmail);
+      await verifyAndConsumeSignInCode(testEmail, firstCode);
+
+      await createSignInCode(testEmail);
+
+      const rows = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(rows).toHaveLength(2);
+    });
+  });
+
+  describe('verifyAndConsumeSignInCode', () => {
+    it('consumes a correct code and returns ok', async () => {
+      const code = await createSignInCode(testEmail);
+
+      const result = await verifyAndConsumeSignInCode(testEmail, code);
+      expect(result).toBe('ok');
+
+      const rows = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(rows[0]?.consumed_at).not.toBeNull();
+    });
+
+    it('is case-insensitive on email', async () => {
+      const code = await createSignInCode('Test@Example.com');
+      const result = await verifyAndConsumeSignInCode('TEST@EXAMPLE.COM', code);
+      expect(result).toBe('ok');
+    });
+
+    it('increments attempts and returns invalid on wrong code', async () => {
+      await createSignInCode(testEmail);
+
+      const result = await verifyAndConsumeSignInCode(testEmail, '000000');
+      expect(result).toBe('invalid');
+
+      const rows = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(rows[0]?.attempts).toBe(1);
+      expect(rows[0]?.consumed_at).toBeNull();
+    });
+
+    it('returns too_many_attempts on the 6th attempt even with the correct code', async () => {
+      const code = await createSignInCode(testEmail);
+      const wrongCode = code === '000000' ? '111111' : '000000';
+
+      for (let i = 0; i < 5; i++) {
+        const result = await verifyAndConsumeSignInCode(testEmail, wrongCode);
+        expect(result).toBe('invalid');
+      }
+
+      const result = await verifyAndConsumeSignInCode(testEmail, code);
+      expect(result).toBe('too_many_attempts');
+    });
+
+    it('returns invalid for an expired code', async () => {
+      // Directly insert an already-expired row since createSignInCode always
+      // sets a 10-minute expiry. created_at is backdated too, to satisfy the
+      // check_expires_at_future constraint (expires_at > created_at).
+      const code = '123456';
+      const token_hash = createHash('sha256').update(`${testEmail}:${code}`).digest('hex');
+      await db.insert(magic_link_tokens).values({
+        token_hash,
+        email: testEmail,
+        created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+        expires_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      });
+
+      const result = await verifyAndConsumeSignInCode(testEmail, code);
+      expect(result).toBe('invalid');
+    });
+
+    it('returns invalid for an already-consumed code', async () => {
+      const code = await createSignInCode(testEmail);
+      const first = await verifyAndConsumeSignInCode(testEmail, code);
+      expect(first).toBe('ok');
+
+      const second = await verifyAndConsumeSignInCode(testEmail, code);
+      expect(second).toBe('invalid');
+    });
+
+    it('returns invalid when there is no code for the email', async () => {
+      const result = await verifyAndConsumeSignInCode(testEmail, '123456');
+      expect(result).toBe('invalid');
     });
   });
 });

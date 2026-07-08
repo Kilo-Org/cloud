@@ -145,6 +145,7 @@ describe('SessionIngestDO ingest ordering', () => {
       SESSION_INGEST_R2: {
         delete: deleteObject,
       },
+      NOTIFICATIONS: { sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })) },
     } as never;
 
     const durableObject = new SessionIngestDO(state, env);
@@ -216,5 +217,164 @@ describe('SessionIngestDO ingest ordering', () => {
 
     expect(metaWrites).toContain('closeReason:completed');
     expect(metaWrites).not.toContain('title:Hello');
+  });
+});
+
+describe('SessionIngestDO session-ready push', () => {
+  // Stateful db mock: meta rows and item rows persist across ingest() calls so
+  // once-only semantics (`sessionReadyNotified`) behave like real SQLite.
+  function makeHarness() {
+    const rows = new Map<string, Record<string, unknown>>();
+
+    // eq(column, value) embeds the bound value as a Param chunk; that value is
+    // the meta key or item_id being queried.
+    const extractConditionKey = (condition: unknown): string | undefined => {
+      const chunks = (condition as { queryChunks?: unknown[] } | undefined)?.queryChunks ?? [];
+      for (const chunk of chunks) {
+        const value = (chunk as { value?: unknown } | null)?.value;
+        if (typeof value === 'string') return value;
+      }
+      return undefined;
+    };
+
+    let queriedKey: string | undefined;
+    const selectQuery = {
+      from: vi.fn(() => selectQuery),
+      where: vi.fn((condition: unknown) => {
+        queriedKey = extractConditionKey(condition);
+        return selectQuery;
+      }),
+      get: vi.fn(() => (queriedKey === undefined ? undefined : rows.get(queriedKey))),
+    };
+    const db = {
+      select: vi.fn(() => selectQuery),
+      insert: vi.fn(() => ({
+        values: vi.fn((values: { key?: string; value?: string | null; item_id?: string }) => ({
+          onConflictDoUpdate: vi.fn(() => ({
+            run: vi.fn(() => {
+              if (values.key !== undefined) {
+                rows.set(values.key, { value: values.value ?? null });
+              } else if (values.item_id !== undefined) {
+                rows.set(values.item_id, values);
+              }
+            }),
+          })),
+        })),
+      })),
+      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+    };
+    drizzleMocks.db = db;
+
+    const waitUntilPromises: Promise<unknown>[] = [];
+    const state = {
+      storage: { setAlarm: vi.fn() },
+      waitUntil: vi.fn((promise: Promise<unknown>) => waitUntilPromises.push(promise)),
+      blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
+    } as unknown as DurableObjectState;
+    const sendSessionReadyNotification = vi.fn(async () => ({ dispatched: true }));
+    const env = {
+      SESSION_INGEST_R2: { delete: vi.fn() },
+      NOTIFICATIONS: { sendSessionReadyNotification },
+    } as never;
+
+    return {
+      durableObject: new SessionIngestDO(state, env),
+      sendSessionReadyNotification,
+      settle: () => Promise.all(waitUntilPromises),
+    };
+  }
+
+  it('pushes once when the session record first arrives without a parent', async () => {
+    const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
+
+    await durableObject.ingest(
+      [{ type: 'session', data: { title: 'Hello' } }],
+      'usr_push',
+      'ses_push',
+      1,
+      1
+    );
+    await settle();
+
+    expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
+    expect(sendSessionReadyNotification).toHaveBeenCalledWith({
+      userId: 'usr_push',
+      cliSessionId: 'ses_push',
+    });
+
+    // Later session-record updates (e.g. title change) must not re-push.
+    await durableObject.ingest(
+      [{ type: 'session', data: { title: 'Renamed' } }],
+      'usr_push',
+      'ses_push',
+      1,
+      2
+    );
+    await settle();
+
+    expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it('never pushes for a subagent session record', async () => {
+    const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
+
+    await durableObject.ingest(
+      [{ type: 'session', data: { title: 'Sub', parentID: 'ses_parent' } }],
+      'usr_push',
+      'ses_sub',
+      1,
+      1
+    );
+    await settle();
+
+    expect(sendSessionReadyNotification).not.toHaveBeenCalled();
+  });
+
+  it('does not push for payloads without a session record, even for a subagent whose record arrives later', async () => {
+    const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
+
+    await durableObject.ingest(
+      [{ type: 'message', data: { id: 'msg_1' } }],
+      'usr_push',
+      'ses_sub',
+      1,
+      1
+    );
+    await settle();
+    expect(sendSessionReadyNotification).not.toHaveBeenCalled();
+
+    await durableObject.ingest(
+      [{ type: 'session', data: { title: 'Sub', parentID: 'ses_parent' } }],
+      'usr_push',
+      'ses_sub',
+      1,
+      2
+    );
+    await settle();
+    expect(sendSessionReadyNotification).not.toHaveBeenCalled();
+  });
+
+  it('pushes when a main session record arrives after message-only payloads', async () => {
+    const { durableObject, sendSessionReadyNotification, settle } = makeHarness();
+
+    await durableObject.ingest(
+      [{ type: 'message', data: { id: 'msg_1' } }],
+      'usr_push',
+      'ses_late',
+      1,
+      1
+    );
+    await settle();
+    expect(sendSessionReadyNotification).not.toHaveBeenCalled();
+
+    await durableObject.ingest(
+      [{ type: 'session', data: { title: 'Late main' } }],
+      'usr_push',
+      'ses_late',
+      1,
+      2
+    );
+    await settle();
+    expect(sendSessionReadyNotification).toHaveBeenCalledTimes(1);
   });
 });

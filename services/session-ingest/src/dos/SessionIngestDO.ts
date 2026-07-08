@@ -37,7 +37,8 @@ type IngestMetaKey =
   | 'ingestVersion'
   | 'closeReason'
   | 'metricsEmitted'
-  | 'deleted';
+  | 'deleted'
+  | 'sessionReadyNotified';
 
 type ExtractableMetaKey =
   | 'title'
@@ -137,7 +138,6 @@ export class SessionIngestDO extends DurableObject<Env> {
     r2References?: Record<string, string>
   ): Promise<{
     changes: Changes;
-    firstIngest: boolean;
   }> {
     const deletedRow = this.db
       .select({ value: ingestMeta.value })
@@ -152,15 +152,10 @@ export class SessionIngestDO extends DurableObject<Env> {
           await this.env.SESSION_INGEST_R2.delete(keys);
         }
       }
-      return { changes: [], firstIngest: false };
+      return { changes: [] };
     }
 
-    // The kiloUserId meta row is written exactly once per DO lifetime, so its
-    // first write doubles as the "first ingest for this session" signal.
-    const firstIngest = writeIngestMetaIfChanged(this.db, {
-      key: 'kiloUserId',
-      incomingValue: kiloUserId,
-    }).changed;
+    writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: kiloUserId });
     writeIngestMetaIfChanged(this.db, { key: 'sessionId', incomingValue: sessionId });
     writeIngestMetaIfChanged(this.db, {
       key: 'ingestVersion',
@@ -289,6 +284,8 @@ export class SessionIngestDO extends DurableObject<Env> {
       }
     }
 
+    this.maybeSendSessionReadyPush(payload, kiloUserId, sessionId);
+
     // Clean up orphaned R2 blobs after metadata is persisted. R2 is external I/O,
     // so awaiting it before metadata writes can let another DO request interleave
     // and then be overwritten by stale pre-await metadata from this request.
@@ -307,8 +304,51 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     return {
       changes,
-      firstIngest,
     };
+  }
+
+  /**
+   * Push "session ready to control from your phone" the first time this
+   * session's record arrives with no parent. The session record carries
+   * `parentID` from creation, so its first sight — not ingest timing — is what
+   * safely distinguishes a main session from a subagent; the extractor loop
+   * has already persisted any `parentID` from this payload by the time we read
+   * it. The `sessionReadyNotified` meta row flips exactly once and commits
+   * with this DO call, so a failure later in the queue message can neither
+   * re-arm nor permanently drop the push. Push failures are non-fatal: log
+   * and move on.
+   */
+  private maybeSendSessionReadyPush(
+    payload: IngestBatch,
+    kiloUserId: string,
+    sessionId: string
+  ): void {
+    if (!payload.some(item => item.type === 'session')) return;
+
+    const parentIdRow = this.db
+      .select({ value: ingestMeta.value })
+      .from(ingestMeta)
+      .where(eq(ingestMeta.key, 'parentId'))
+      .get();
+    if ((parentIdRow?.value ?? null) !== null) return;
+
+    const notified = writeIngestMetaIfChanged(this.db, {
+      key: 'sessionReadyNotified',
+      incomingValue: 'true',
+    });
+    if (!notified.changed) return;
+
+    this.ctx.waitUntil(
+      this.env.NOTIFICATIONS.sendSessionReadyNotification({
+        userId: kiloUserId,
+        cliSessionId: sessionId,
+      }).catch((error: unknown) => {
+        console.error('Failed to send session-ready push (non-fatal)', {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      })
+    );
   }
 
   async readKiloSdkSessionSnapshot(): Promise<KiloSdkSessionSnapshotRead> {

@@ -21,7 +21,11 @@ import {
 } from '@/lib/ai-gateway/gateway-config';
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
-import { getVercelModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getVercelInferenceProviders,
+  getVercelModels,
+  type VercelInferenceProvidersByModel,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
@@ -53,6 +57,21 @@ function hasOpenRouterExclusiveProviderOptions(request: GatewayRequest) {
     return true;
   }
   return false;
+}
+
+export function hasCompatibleVercelInferenceProvider(
+  vercelModelId: string,
+  openRouterInferenceProviders: string[],
+  vercelInferenceProvidersByModel: VercelInferenceProvidersByModel
+) {
+  const vercelInferenceProviders = vercelInferenceProvidersByModel[vercelModelId];
+  if (!vercelInferenceProviders) {
+    return true;
+  }
+
+  return openRouterInferenceProviders.some(provider =>
+    vercelInferenceProviders.includes(openRouterToVercelInferenceProviderId(provider))
+  );
 }
 
 export async function shouldRouteToVercel(
@@ -91,6 +110,19 @@ export async function shouldRouteToVercel(
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
+  }
+
+  const only = request.body.provider?.only;
+  if (only) {
+    const vercelInferenceProvidersByModel = await getVercelInferenceProviders();
+    if (
+      !hasCompatibleVercelInferenceProvider(vercelModelId, only, vercelInferenceProvidersByModel)
+    ) {
+      console.debug(
+        '[shouldRouteToVercel] none of the requested inference providers are available on Vercel'
+      );
+      return false;
+    }
   }
 
   return true;

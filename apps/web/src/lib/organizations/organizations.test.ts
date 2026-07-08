@@ -7,6 +7,7 @@ import {
   organization_membership_removals,
   organization_seats_purchases,
   organization_user_limits,
+  kilocode_users,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
@@ -1595,6 +1596,48 @@ describe('Organizations', () => {
         });
         expect(storedInvitation?.accepted_at).toBeDefined();
         expect(storedInvitation?.accepted_at).not.toBeNull();
+      });
+
+      test('disables the personal account for a new user joining via invite', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token, {}, true);
+        expect(result.success).toBe(true);
+
+        const updatedInvitee = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, invitee.id),
+        });
+        expect(updatedInvitee?.personal_account_disabled).toBe(true);
+      });
+
+      test('leaves the personal account untouched for an existing user joining via invite', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+        expect(result.success).toBe(true);
+
+        const updatedInvitee = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, invitee.id),
+        });
+        expect(updatedInvitee?.personal_account_disabled).toBe(false);
       });
 
       test('rejects accepting a pre-existing invitation into a child organization', async () => {

@@ -661,7 +661,10 @@ export type InvitationAuthenticationContext = {
 export async function acceptOrganizationInvite(
   userId: User['id'],
   inviteToken: string,
-  authentication: InvitationAuthenticationContext = {}
+  authentication: InvitationAuthenticationContext = {},
+  // When a brand-new account is created specifically to accept an org invite,
+  // we disable its personal account. Existing users keep their current value.
+  isNewUser = false
 ): Promise<AcceptInviteResult> {
   try {
     const result = await db.transaction(async tx => {
@@ -780,6 +783,15 @@ export async function acceptOrganizationInvite(
         role: invitation.role,
         invited_by: invitation.invited_by,
       });
+
+      // A newly created account that joins an organization via invite should
+      // not have a personal account. Existing users keep their current value.
+      if (isNewUser) {
+        await tx
+          .update(kilocode_users)
+          .set({ personal_account_disabled: true })
+          .where(eq(kilocode_users.id, userId));
+      }
 
       // Clear any previous removal record so the user isn't treated as "removed"
       // by subsequent webhook events (Subscription Lifecycle 2)

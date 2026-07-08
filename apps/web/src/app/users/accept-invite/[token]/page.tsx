@@ -19,10 +19,15 @@ export default async function AcceptInvitePage({ params }: AcceptInvitePageProps
   );
 
   const session = await getServerSession(authOptions);
-  const result = await acceptOrganizationInvite(user.id, token, {
-    provider: session?.authProvider,
-    ssoSourceOrganizationId: session?.ssoSourceOrganizationId,
-  });
+  const result = await acceptOrganizationInvite(
+    user.id,
+    token,
+    {
+      provider: session?.authProvider,
+      ssoSourceOrganizationId: session?.ssoSourceOrganizationId,
+    },
+    session?.isNewUser ?? false
+  );
 
   if (result.success) {
     // we need to set user to be styched if they're not so they don't get styched since they were invited to an org

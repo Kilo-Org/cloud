@@ -1,11 +1,22 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
-import { verifyNativeAppleIdToken, verifyNativeGoogleIdToken } from '@/lib/auth/native-id-tokens';
+import {
+  verifyNativeAppleIdToken,
+  verifyNativeGoogleIdToken,
+  NativeIdTokenError,
+} from '@/lib/auth/native-id-tokens';
+import { AppleJwtClientError } from '@/lib/auth/apple-jwks';
 import { verifyAndConsumeSignInCode } from '@/lib/auth/magic-link-tokens';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import { createOrUpdateUser, type CreateOrUpdateUserArgs } from '@/lib/user';
 import { generateApiToken } from '@/lib/tokens';
+
+// Bad/expired ID tokens are a 401; JWKS-fetch or network failures during verification are
+// server faults and must surface as 500, not be misreported as an invalid token.
+function isInvalidNativeTokenError(error: unknown): boolean {
+  return error instanceof NativeIdTokenError || error instanceof AppleJwtClientError;
+}
 
 const requestSchema = z.discriminatedUnion('provider', [
   z.object({
@@ -53,7 +64,10 @@ export async function POST(request: NextRequest) {
     let verified;
     try {
       verified = await verifyNativeAppleIdToken(data.idToken);
-    } catch {
+    } catch (error) {
+      if (!isInvalidNativeTokenError(error)) {
+        throw error;
+      }
       return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 401 });
     }
 
@@ -71,7 +85,10 @@ export async function POST(request: NextRequest) {
     let verified;
     try {
       verified = await verifyNativeGoogleIdToken(data.idToken);
-    } catch {
+    } catch (error) {
+      if (!isInvalidNativeTokenError(error)) {
+        throw error;
+      }
       return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 401 });
     }
 

@@ -12,13 +12,21 @@ jest.mock('@/lib/auth/apple-jwks', () => ({
   verifyAppleJwtWithJwks: jest.fn(),
 }));
 jest.mock('google-auth-library');
+// GOOGLE_IOS_CLIENT_ID is mutable (via the getter) so a test can simulate it being unset.
+const mockConfig = { GOOGLE_IOS_CLIENT_ID: 'ios-client-id' };
 jest.mock('@/lib/config.server', () => ({
   APPLE_NATIVE_CLIENT_IDS: 'com.kilocode.kiloapp',
   GOOGLE_CLIENT_ID: 'web-client-id',
-  GOOGLE_IOS_CLIENT_ID: 'ios-client-id',
+  get GOOGLE_IOS_CLIENT_ID() {
+    return mockConfig.GOOGLE_IOS_CLIENT_ID;
+  },
 }));
 
-import { verifyNativeAppleIdToken, verifyNativeGoogleIdToken } from './native-id-tokens';
+import {
+  verifyNativeAppleIdToken,
+  verifyNativeGoogleIdToken,
+  NativeIdTokenError,
+} from './native-id-tokens';
 
 const mockVerifyAppleJwtWithJwks = jest.mocked(verifyAppleJwtWithJwks);
 const mockVerifyIdToken = jest.fn();
@@ -78,6 +86,7 @@ describe('verifyNativeAppleIdToken', () => {
 describe('verifyNativeGoogleIdToken', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConfig.GOOGLE_IOS_CLIENT_ID = 'ios-client-id';
   });
 
   it('verifies against [GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID] audience and returns the payload', async () => {
@@ -119,9 +128,39 @@ describe('verifyNativeGoogleIdToken', () => {
     await expect(verifyNativeGoogleIdToken('g-token')).rejects.toThrow();
   });
 
+  it('throws when email_verified is undefined', async () => {
+    mockVerifyIdToken.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: undefined,
+      }),
+    });
+
+    await expect(verifyNativeGoogleIdToken('g-token')).rejects.toThrow(NativeIdTokenError);
+  });
+
   it('throws when verifyIdToken rejects (invalid token)', async () => {
     mockVerifyIdToken.mockRejectedValue(new Error('Wrong number of segments'));
 
     await expect(verifyNativeGoogleIdToken('bad-token')).rejects.toThrow();
+  });
+
+  it('filters out an empty GOOGLE_IOS_CLIENT_ID from the audience list', async () => {
+    mockConfig.GOOGLE_IOS_CLIENT_ID = '';
+    mockVerifyIdToken.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+
+    await verifyNativeGoogleIdToken('g-token');
+
+    expect(mockVerifyIdToken).toHaveBeenCalledWith({
+      idToken: 'g-token',
+      audience: ['web-client-id'],
+    });
   });
 });

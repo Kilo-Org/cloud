@@ -1,10 +1,20 @@
 import { NextRequest } from 'next/server';
-import { verifyNativeAppleIdToken, verifyNativeGoogleIdToken } from '@/lib/auth/native-id-tokens';
+import {
+  verifyNativeAppleIdToken,
+  verifyNativeGoogleIdToken,
+  NativeIdTokenError,
+} from '@/lib/auth/native-id-tokens';
 import { verifyAndConsumeSignInCode } from '@/lib/auth/magic-link-tokens';
 import { createOrUpdateUser } from '@/lib/user';
 import { generateApiToken } from '@/lib/tokens';
 
-jest.mock('@/lib/auth/native-id-tokens');
+// Keep the real NativeIdTokenError class (route.ts uses `instanceof` on it) and only mock
+// the verifier functions.
+jest.mock('@/lib/auth/native-id-tokens', () => ({
+  ...jest.requireActual('@/lib/auth/native-id-tokens'),
+  verifyNativeAppleIdToken: jest.fn(),
+  verifyNativeGoogleIdToken: jest.fn(),
+}));
 jest.mock('@/lib/auth/magic-link-tokens');
 jest.mock('@/lib/user');
 jest.mock('@/lib/tokens');
@@ -83,14 +93,23 @@ describe('POST /api/auth/native/token', () => {
       );
     });
 
-    it('returns 401 INVALID_TOKEN when Apple verification throws', async () => {
-      mockVerifyNativeAppleIdToken.mockRejectedValue(new Error('bad token'));
+    it('returns 401 INVALID_TOKEN when Apple verification throws NativeIdTokenError', async () => {
+      mockVerifyNativeAppleIdToken.mockRejectedValue(new NativeIdTokenError('bad token'));
 
       const response = await POST(createRequest({ provider: 'apple', idToken: 'bad-token' }));
       const data = await response.json();
 
       expect(response.status).toBe(401);
       expect(data).toEqual({ error: 'INVALID_TOKEN' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('rethrows (500) instead of returning 401 when Apple verification fails with a non-token error (e.g. JWKS fetch/network failure)', async () => {
+      mockVerifyNativeAppleIdToken.mockRejectedValue(new Error('network'));
+
+      await expect(
+        POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }))
+      ).rejects.toThrow('network');
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
   });
@@ -143,14 +162,23 @@ describe('POST /api/auth/native/token', () => {
       );
     });
 
-    it('returns 401 INVALID_TOKEN when Google verification throws', async () => {
-      mockVerifyNativeGoogleIdToken.mockRejectedValue(new Error('bad token'));
+    it('returns 401 INVALID_TOKEN when Google verification throws NativeIdTokenError', async () => {
+      mockVerifyNativeGoogleIdToken.mockRejectedValue(new NativeIdTokenError('bad token'));
 
       const response = await POST(createRequest({ provider: 'google', idToken: 'bad-token' }));
       const data = await response.json();
 
       expect(response.status).toBe(401);
       expect(data).toEqual({ error: 'INVALID_TOKEN' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('rethrows (500) instead of returning 401 when Google verification fails with a non-token error (e.g. network failure)', async () => {
+      mockVerifyNativeGoogleIdToken.mockRejectedValue(new Error('network'));
+
+      await expect(
+        POST(createRequest({ provider: 'google', idToken: 'google-id-token' }))
+      ).rejects.toThrow('network');
       expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
   });

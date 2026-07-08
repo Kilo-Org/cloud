@@ -2,7 +2,48 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-import { getAlwaysOnGroupIds, getService, resolveGroups } from './services';
+import {
+  getAlwaysOnGroupIds,
+  getService,
+  resolveGroups,
+  resolveSessionNextAuthUrl,
+} from './services';
+
+test('points NEXTAUTH_URL at the offset port when the web app runs without a tunnel', () => {
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 2900,
+    serviceNames: ['nextjs', 'postgres', 'redis'],
+    nextjsPort: 5900,
+  });
+  assert.equal(url, 'http://localhost:5900');
+});
+
+test('leaves NEXTAUTH_URL to .env.local when there is no port offset', () => {
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 0,
+    serviceNames: ['nextjs'],
+    nextjsPort: 3000,
+  });
+  assert.equal(url, undefined);
+});
+
+test('does not override NEXTAUTH_URL when a tunnel rewrites it to a public origin', () => {
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 2900,
+    serviceNames: ['nextjs', 'kiloclaw-tunnel'],
+    nextjsPort: 5900,
+  });
+  assert.equal(url, undefined);
+});
+
+test('skips NEXTAUTH_URL when the web app is not being started', () => {
+  const url = resolveSessionNextAuthUrl({
+    portOffset: 2900,
+    serviceNames: ['postgres', 'redis'],
+    nextjsPort: 5900,
+  });
+  assert.equal(url, undefined);
+});
 
 test('keeps auto routing workers in their own opt-in group', () => {
   const service = getService('auto-routing');

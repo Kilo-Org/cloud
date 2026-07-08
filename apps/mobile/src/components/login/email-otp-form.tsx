@@ -1,0 +1,68 @@
+import { useRef } from 'react';
+import { ActivityIndicator, TextInput, View } from 'react-native';
+
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
+import { type useNativeAuth } from '@/lib/auth/use-native-auth';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+
+export function EmailOtpForm({
+  email,
+  busy,
+  onVerify,
+  onResend,
+  onBack,
+}: Readonly<{
+  email: string;
+  busy: ReturnType<typeof useNativeAuth>['busy'];
+  onVerify: (code: string) => void;
+  onResend: () => void;
+  onBack: () => void;
+}>) {
+  const colors = useThemeColors();
+  const codeRef = useRef('');
+
+  return (
+    <View className="gap-3">
+      <Text variant="muted" className="text-center text-sm">
+        Enter the code sent to {email}
+      </Text>
+      <TextInput
+        className="h-12 rounded-md border border-input bg-background px-3 text-center text-lg leading-5 tracking-widest text-foreground"
+        placeholder="123456"
+        placeholderTextColor={colors.mutedForeground}
+        keyboardType="number-pad"
+        maxLength={6}
+        onChangeText={value => {
+          codeRef.current = value;
+        }}
+        accessibilityLabel="Sign-in code"
+      />
+      <Button
+        size="lg"
+        className="flex-row gap-2"
+        disabled={busy === 'otp-verify'}
+        onPress={() => {
+          onVerify(codeRef.current);
+        }}
+        accessibilityLabel="Verify code"
+      >
+        {busy === 'otp-verify' ? <ActivityIndicator size="small" /> : null}
+        <Text>Verify code</Text>
+      </Button>
+      <Button
+        variant="outline"
+        className="flex-row gap-2"
+        disabled={busy === 'otp-send'}
+        onPress={onResend}
+        accessibilityLabel="Resend code"
+      >
+        {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
+        <Text>Resend code</Text>
+      </Button>
+      <Button variant="ghost" onPress={onBack} accessibilityLabel="Back">
+        <Text>Back</Text>
+      </Button>
+    </View>
+  );
+}

@@ -21,6 +21,7 @@ import { organization_seats_purchases, organizations } from '@kilocode/db/schema
 import type { Organization, User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { PERSONAL_ACCOUNT_DISABLED_PATH } from '@/lib/personal-account';
 import { generateApiToken } from '@/lib/tokens';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
@@ -561,5 +562,36 @@ describe('getProfileRedirectPath', () => {
     await expect(getProfileRedirectPath(pastDueUser)).resolves.toBe(
       `/organizations/${pastDueOrganization.id}`
     );
+  });
+
+  test('sends personal-account-disabled users to their organization even when its trial is hard-expired', async () => {
+    const user = await insertTestUser({
+      google_user_name: 'Disabled Redirect User',
+      personal_account_disabled: true,
+    });
+    const organization = await createTestOrganization(
+      'Disabled Redirect Org',
+      user.id,
+      100_000,
+      undefined,
+      true
+    );
+    await db
+      .update(organizations)
+      .set({
+        free_trial_end_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .where(eq(organizations.id, organization.id));
+
+    await expect(getProfileRedirectPath(user)).resolves.toBe(`/organizations/${organization.id}`);
+  });
+
+  test('sends personal-account-disabled users with no organization to the error page', async () => {
+    const user = await insertTestUser({
+      google_user_name: 'Disabled Orphan User',
+      personal_account_disabled: true,
+    });
+
+    await expect(getProfileRedirectPath(user)).resolves.toBe(PERSONAL_ACCOUNT_DISABLED_PATH);
   });
 });

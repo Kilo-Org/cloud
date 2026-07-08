@@ -45,7 +45,12 @@ import type { Organization, User } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
-import { getSingleUserOrganization, isOrganizationMember } from '@/lib/organizations/organizations';
+import {
+  getSingleUserOrganization,
+  getProfileOrganizations,
+  isOrganizationMember,
+} from '@/lib/organizations/organizations';
+import { PERSONAL_ACCOUNT_DISABLED_PATH } from '@/lib/personal-account';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
@@ -1168,6 +1173,17 @@ export function getUserUUID(user: User): string {
 // the org page will be redirected to if the user is a member of exactly one organization
 // or if the org is SSO org
 export async function getProfileRedirectPath(user: User) {
+  // Users without a personal account never land on personal surfaces. Send them
+  // to their earliest-created organization, or to the error page when they have
+  // none (a state that should not occur in practice).
+  if (user.personal_account_disabled) {
+    const organizations = await getProfileOrganizations(user.id);
+    const firstOrganization = organizations[0];
+    return firstOrganization
+      ? `/organizations/${firstOrganization.id}`
+      : PERSONAL_ACCOUNT_DISABLED_PATH;
+  }
+
   // Check if user is a member of exactly one organization (skip redirect if multiple)
   const singleOrg = await getSingleUserOrganization(user.id);
   if (singleOrg) {

@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { Check, ChevronDown } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import { usePersonalAccountDisabled } from '@/contexts/PersonalAccountContext';
 
 type OrganizationSwitcherProps = {
   organizationId?: string | null;
@@ -30,6 +31,7 @@ type OrganizationSwitcherViewProps = {
   organizations?: OrganizationSwitcherOrganization[];
   isPending?: boolean;
   onOrganizationSwitch: (organizationId: string | null) => void;
+  hidePersonalOption?: boolean;
 };
 
 const triggerClassName =
@@ -51,6 +53,7 @@ const selectedIconClassName = 'text-primary h-4 w-4 shrink-0';
 export default function OrganizationSwitcher({ organizationId = null }: OrganizationSwitcherProps) {
   const trpc = useTRPC();
   const router = useRouter();
+  const personalAccountDisabled = usePersonalAccountDisabled();
 
   // Fetch user organizations
   const { data: organizations, isPending } = useQuery(
@@ -77,6 +80,7 @@ export default function OrganizationSwitcher({ organizationId = null }: Organiza
       organizations={organizations}
       isPending={isPending}
       onOrganizationSwitch={handleOrganizationSwitch}
+      hidePersonalOption={personalAccountDisabled}
     />
   );
 }
@@ -86,6 +90,7 @@ export function OrganizationSwitcherView({
   organizations = [],
   isPending = false,
   onOrganizationSwitch,
+  hidePersonalOption = false,
 }: OrganizationSwitcherViewProps) {
   // Get role display label
   const getRoleLabel = (role: string) => {
@@ -165,22 +170,24 @@ export function OrganizationSwitcherView({
             </DropdownMenuItem>
           ))}
 
-          {/* Separator */}
-          <DropdownMenuSeparator />
-
-          {/* Personal Option */}
-          <DropdownMenuItem
-            onClick={() => onOrganizationSwitch(null)}
-            className={cn(menuItemClassName, !organizationId && selectedMenuItemClassName)}
-          >
-            <div className={switcherRowClassName}>
-              <div className={switcherTextClassName}>
-                <div className={switcherTitleClassName}>Personal</div>
-                <div className={switcherSubtitleClassName}>Personal Workspace</div>
-              </div>
-              {!organizationId && <Check className={selectedIconClassName} />}
-            </div>
-          </DropdownMenuItem>
+          {/* Personal Option — hidden for users whose personal account is disabled */}
+          {!hidePersonalOption && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onOrganizationSwitch(null)}
+                className={cn(menuItemClassName, !organizationId && selectedMenuItemClassName)}
+              >
+                <div className={switcherRowClassName}>
+                  <div className={switcherTextClassName}>
+                    <div className={switcherTitleClassName}>Personal</div>
+                    <div className={switcherSubtitleClassName}>Personal Workspace</div>
+                  </div>
+                  {!organizationId && <Check className={selectedIconClassName} />}
+                </div>
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

@@ -55,9 +55,17 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
   const setupStep = searchParams.get('step');
   const { open, setOpenMobile, setOpenTransient } = useSidebar();
   const personalAccountDisabled = Boolean(user?.personal_account_disabled);
+  // The only personal route we still link to for these users (footer user menu).
+  // For that route we keep them in their org sidebar instead of the personal one;
+  // other personal routes are not linked but remain accessible with the personal
+  // sidebar if reached directly.
+  const isLinkedAccountRoute =
+    pathname === '/connected-accounts' || pathname.startsWith('/connected-accounts/');
+  const useOrgSidebarForAccountRoute =
+    personalAccountDisabled && !currentOrgId && isLinkedAccountRoute;
   const { data: organizations, isPending: isOrganizationsPending } = useQuery(
     trpc.organizations.list.queryOptions(undefined, {
-      enabled: personalAccountDisabled && !currentOrgId,
+      enabled: useOrgSidebarForAccountRoute,
       trpc: { context: { skipBatch: true } },
     })
   );
@@ -142,16 +150,16 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
     return <OrganizationAppSidebar organizationId={currentOrgId} {...props} />;
   }
 
-  // Users with a disabled personal account have no personal surface.
-  // On non-org routes that remain reachable to them (e.g. /connected-accounts),
-  // keep them in their default organization's sidebar rather than the personal one.
-  if (personalAccountDisabled) {
+  // On the account route we link to from the footer, keep users with a disabled
+  // personal account in their default organization's sidebar rather than the
+  // personal one. Any other personal route falls through to the personal sidebar.
+  if (useOrgSidebarForAccountRoute) {
     if (defaultOrganizationId) {
       return <OrganizationAppSidebar organizationId={defaultOrganizationId} {...props} />;
     }
     // Avoid flashing the personal sidebar while resolving their default org.
-    // Only fall through to the personal sidebar for the rare case of a user with
-    // a disabled personal account who belongs to no organizations.
+    // Only fall through for the rare case of a user with a disabled personal
+    // account who belongs to no organizations.
     if (isOrganizationsPending) {
       return <Sidebar {...props} />;
     }

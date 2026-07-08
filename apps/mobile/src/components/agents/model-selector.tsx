@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
 import * as Haptics from 'expo-haptics';
-import { type Href, useRouter } from 'expo-router';
+import { type Href, type Router, useRouter } from 'expo-router';
 import { BookOpenCheck, Brain, Check, ChevronDown, Star } from 'lucide-react-native';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -94,6 +94,30 @@ function compactThinkingEffortLabel(variant: string) {
   return thinkingEffortLabel(variant);
 }
 
+export function openModelPicker(
+  router: Router,
+  params: {
+    options: (ModelOption | SessionModelOption)[];
+    value: string;
+    variant: string;
+    onSelect: (modelId: string, variant: string, pickerSelection?: ModelPickerSelection) => void;
+    selectionScope?: ModelPickerSelectionScopeContextValue;
+  }
+) {
+  const { options, value, variant, onSelect, selectionScope = UNFENCED_SELECTION_CONTEXT } = params;
+  setModelPickerBridge({
+    options: options.map(option => toSessionModelOption(option)),
+    currentValue: value,
+    currentVariant: variant,
+    selectionScope: selectionScope.selectionScope,
+    isSelectionCurrent: selectionScope.isSelectionCurrent,
+    onSelect: selection => {
+      onSelect(selection.option.id, selection.variant, selection);
+    },
+  });
+  router.push('/(app)/agent-chat/model-picker' as Href);
+}
+
 export function ModelSelector({
   value,
   variant,
@@ -126,17 +150,13 @@ export function ModelSelector({
     if (effectivelyDisabled) {
       return;
     }
-    setModelPickerBridge({
+    openModelPicker(router, {
       options: pickerOptions,
-      currentValue: value,
-      currentVariant: variant,
-      selectionScope: selectionContext.selectionScope,
-      isSelectionCurrent: selectionContext.isSelectionCurrent,
-      onSelect: selection => {
-        onSelect(selection.option.id, selection.variant, selection);
-      },
+      value,
+      variant,
+      onSelect,
+      selectionScope: selectionContext,
     });
-    router.push('/(app)/agent-chat/model-picker' as Href);
   }
 
   return (

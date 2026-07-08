@@ -11,6 +11,7 @@ import {
 import { ScrollView, Switch, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
 import { ScreenHeader } from '@/components/screen-header';
@@ -18,6 +19,7 @@ import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   PERSONAL_SCOPE,
   useCanEditReviewer,
@@ -41,6 +43,9 @@ export function PlatformOverviewScreen({
   const toggle = useToggleReviewer(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const canEdit = useCanEditReviewer(scope);
+  const { models, isLoading: modelsLoading } = useAvailableModels(
+    scope === PERSONAL_SCOPE ? undefined : scope
+  );
 
   if (platform === 'bitbucket' && scope === PERSONAL_SCOPE) {
     return (
@@ -68,39 +73,56 @@ export function PlatformOverviewScreen({
     router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/${platform}/${field}` as Href);
   };
 
+  const data = config.data;
   const rows =
-    config.data == null
+    data == null
       ? null
       : [
           {
             field: 'style',
             icon: MessageSquareText,
             title: 'Review Style',
-            subtitle: capitalize(config.data.reviewStyle),
+            subtitle: capitalize(data.reviewStyle),
           },
           {
             field: 'focus-areas',
             icon: ShieldCheck,
             title: 'Focus Areas',
             subtitle:
-              config.data.focusAreas.length > 0
-                ? config.data.focusAreas.map(capitalize).join(', ')
-                : 'All areas',
+              data.focusAreas.length > 0 ? data.focusAreas.map(capitalize).join(', ') : 'All areas',
           },
           {
             field: 'instructions',
             icon: ScrollText,
             title: 'Custom Instructions',
-            subtitle: config.data.customInstructions ? 'Set' : 'None',
+            subtitle: data.customInstructions ? 'Set' : 'None',
           },
-          { field: 'model', icon: FileSliders, title: 'Model', subtitle: config.data.modelSlug },
+          {
+            field: 'model',
+            icon: FileSliders,
+            title: 'Model',
+            subtitle: models.find(model => model.id === data.modelSlug)?.name ?? data.modelSlug,
+            onPress:
+              modelsLoading || models.length === 0
+                ? undefined
+                : () => {
+                    openModelPicker(router, {
+                      options: models,
+                      value: data.modelSlug,
+                      variant: data.thinkingEffort ?? '',
+                      onSelect: (modelSlug, variant) => {
+                        save.mutate({ modelSlug, thinkingEffort: variant || null });
+                      },
+                    });
+                  },
+          },
           ...(capabilities.gateRow
             ? [
                 {
                   field: 'gate',
                   icon: Gauge,
                   title: 'Merge Gate',
-                  subtitle: capitalize(config.data.gateThreshold),
+                  subtitle: capitalize(data.gateThreshold),
                 },
               ]
             : []),
@@ -109,11 +131,23 @@ export function PlatformOverviewScreen({
             icon: FolderGit2,
             title: 'Repositories',
             subtitle:
-              capabilities.selectionModePicker && config.data.repositorySelectionMode === 'all'
+              capabilities.selectionModePicker && data.repositorySelectionMode === 'all'
                 ? 'All repositories'
-                : `${config.data.selectedRepositoryIds.length} selected`,
+                : `${data.selectedRepositoryIds.length} selected`,
           },
         ];
+
+  const resolveRowOnPress = (row: NonNullable<typeof rows>[number]) => {
+    if (!canEdit) {
+      return undefined;
+    }
+    if ('onPress' in row) {
+      return row.onPress;
+    }
+    return () => {
+      pushField(row.field);
+    };
+  };
 
   return (
     <View className="flex-1 bg-background">
@@ -172,13 +206,7 @@ export function PlatformOverviewScreen({
                     title={row.title}
                     subtitle={row.subtitle}
                     last={index === rows.length - 1}
-                    onPress={
-                      canEdit
-                        ? () => {
-                            pushField(row.field);
-                          }
-                        : undefined
-                    }
+                    onPress={resolveRowOnPress(row)}
                   />
                 ))}
               </View>

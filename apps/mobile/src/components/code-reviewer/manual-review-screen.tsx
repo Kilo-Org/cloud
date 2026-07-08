@@ -5,11 +5,18 @@ import { useRef, useState } from 'react';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { toast } from 'sonner-native';
 
+import { ModelSelector } from '@/components/agents/model-selector';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
-import { useGitHubStatus, useGitLabStatus, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import {
+  PERSONAL_SCOPE,
+  useGitHubStatus,
+  useGitLabStatus,
+  useReviewConfig,
+} from '@/lib/hooks/use-code-reviewer';
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -41,6 +48,15 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const instructionsRef = useRef('');
   const config = useReviewConfig(scope, platform);
   const createReview = useCreateManualReview(scope);
+  const { models } = useAvailableModels(scope === PERSONAL_SCOPE ? undefined : scope);
+  const [modelChoice, setModelChoice] = useState<{
+    modelSlug: string;
+    thinkingEffort: string | null;
+  } | null>(null);
+  const effectiveModel = modelChoice ?? {
+    modelSlug: config.data?.modelSlug ?? '',
+    thinkingEffort: config.data?.thinkingEffort ?? null,
+  };
 
   const onSubmit = () => {
     const url = urlRef.current.trim();
@@ -55,8 +71,8 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
       {
         platform,
         url,
-        modelSlug: config.data.modelSlug,
-        thinkingEffort: config.data.thinkingEffort,
+        modelSlug: effectiveModel.modelSlug,
+        thinkingEffort: effectiveModel.thinkingEffort,
         instructions: instructionsRef.current.trim() || undefined,
       },
       {
@@ -156,10 +172,19 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           />
         </View>
 
-        {/* Manual jobs reuse the platform config's model; add a picker if someone asks for one. */}
-        <Text variant="muted" className="text-xs">
-          Model: {config.data?.modelSlug ?? '…'}
-        </Text>
+        <View className="gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            Model
+          </Text>
+          <ModelSelector
+            options={models}
+            value={effectiveModel.modelSlug}
+            variant={effectiveModel.thinkingEffort ?? ''}
+            onSelect={(modelId, variant) => {
+              setModelChoice({ modelSlug: modelId, thinkingEffort: variant || null });
+            }}
+          />
+        </View>
 
         <Button
           disabled={createReview.isPending || !config.data || !isConnected(platform)}

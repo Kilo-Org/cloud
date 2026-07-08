@@ -459,7 +459,7 @@ describe('coding plans router', () => {
       inventoryKeyId: workItem.id,
       apiKey: 'replacement-minimax-key',
     });
-    let [credential] = await db
+    const [credential] = await db
       .select()
       .from(coding_plan_key_inventory)
       .where(eq(coding_plan_key_inventory.id, workItem.id));

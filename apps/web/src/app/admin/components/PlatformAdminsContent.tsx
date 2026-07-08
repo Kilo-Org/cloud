@@ -56,11 +56,19 @@ export function PlatformAdminsContent() {
   // The dialog is controlled and has no DialogTrigger, so Radix has no trigger
   // ref to restore focus to on close and would leave focus on <body>. We track
   // the element that opened the dialog (the clicked Grant/Revoke button) and
-  // restore focus to it if it's still connected — which it is for a plain
-  // cancel/Escape/close-button dismissal. On a state-changing mutation that
-  // row is unmounted, so we fall back to a stable container instead.
+  // restore focus to it on cancel/Escape/close-button/no-op closes.
+  //
+  // For a state-changing mutation we must NOT rely on `opener.isConnected` at
+  // close time: onCloseAutoFocus fires right after the ~200ms Radix close
+  // animation, but the opener row only unmounts once the invalidated queries
+  // refetch (a network round trip that typically outlasts the animation). So
+  // the opener is usually still connected at close time, we'd focus it, and
+  // then the later refetch would drop focus to <body>. Instead we decide
+  // deterministically in onSuccess: a changed result means the row is going
+  // away, so redirect focus to the stable container.
   const contentRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
+  const redirectFocusToContainerRef = useRef(false);
 
   const trimmedSearchTerm = searchTerm.trim();
 
@@ -95,6 +103,10 @@ export function PlatformAdminsContent() {
     trpc.admin.users.setPlatformAdminAccess.mutationOptions({
       onSuccess: (result, variables) => {
         invalidateAfterChange();
+        // A changed result unmounts the opener row once the refetch settles, so
+        // send focus to the stable container rather than the doomed button. A
+        // no-op leaves the row in place, so keep focus on the opener.
+        redirectFocusToContainerRef.current = result.changed;
         setConfirmAction(null);
         if (!result.changed) {
           toast.message(
@@ -331,17 +343,20 @@ export function PlatformAdminsContent() {
           showCloseButton={!setAccessMutation.isPending}
           onCloseAutoFocus={event => {
             // Controlled dialog with no DialogTrigger: Radix can't restore focus
-            // on its own. Return focus to the opener button if it's still in the
-            // DOM (cancel/Escape/close-button paths), otherwise fall back to the
-            // stable container (the opener row was unmounted by a state change).
+            // on its own. A state-changing mutation (flagged deterministically in
+            // onSuccess) will unmount the opener row after its refetch settles, so
+            // send focus to the stable container. Otherwise (cancel/Escape/close/
+            // no-op) the opener still exists — restore focus to it, falling back
+            // to the container only if it has somehow already been removed.
             event.preventDefault();
             const opener = openerRef.current;
-            if (opener && opener.isConnected) {
-              opener.focus();
-            } else {
+            if (redirectFocusToContainerRef.current || !opener || !opener.isConnected) {
               contentRef.current?.focus();
+            } else {
+              opener.focus();
             }
             openerRef.current = null;
+            redirectFocusToContainerRef.current = false;
           }}
         >
           <DialogHeader>

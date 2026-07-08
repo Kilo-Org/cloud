@@ -9,7 +9,6 @@ import {
   Coins,
   Receipt,
   User,
-  UserCog,
   Building2,
   Plus,
   Rocket,
@@ -274,11 +273,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
       title: 'Credits',
       icon: Coins,
       url: '/credits',
-    },
-    {
-      title: 'Connected Accounts',
-      icon: UserCog,
-      url: '/connected-accounts',
     },
     {
       title: 'Bring Your Own Key (BYOK)',

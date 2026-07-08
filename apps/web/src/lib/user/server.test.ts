@@ -562,4 +562,28 @@ describe('getProfileRedirectPath', () => {
       `/organizations/${pastDueOrganization.id}`
     );
   });
+
+  describe('invited-only users (personal account disabled)', () => {
+    test('redirects multi-organization users to one of their organizations', async () => {
+      const invitedUser = await insertTestUser({
+        google_user_name: 'Invited Multi Org User',
+        personal_account_disabled: true,
+      });
+      const orgA = await createTestOrganization('Invited Org A', invitedUser.id, 100_000);
+      const orgB = await createTestOrganization('Invited Org B', invitedUser.id, 100_000);
+
+      await expect(getProfileRedirectPath(invitedUser)).resolves.toMatch(
+        new RegExp(`^/organizations/(${orgA.id}|${orgB.id})$`)
+      );
+    });
+
+    test('falls back to connected accounts when the user has no organizations', async () => {
+      const orphanUser = await insertTestUser({
+        google_user_name: 'Invited Orphan User',
+        personal_account_disabled: true,
+      });
+
+      await expect(getProfileRedirectPath(orphanUser)).resolves.toBe('/connected-accounts');
+    });
+  });
 });

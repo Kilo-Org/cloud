@@ -14,7 +14,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ProviderPolicyTag } from '@/components/organizations/providers-and-models/PolicyPills';
+import {
+  PolicyPill,
+  ProviderPolicyTag,
+} from '@/components/organizations/providers-and-models/PolicyPills';
 import type {
   ProviderModelRow,
   ProviderRow,
@@ -87,7 +90,6 @@ export function ProviderDetailsDialog({
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <ProviderPolicyTag value={infoProvider.trains} variant="trains" />
-                <ProviderPolicyTag value={infoProvider.retainsPrompts} variant="retainsPrompts" />
               </div>
 
               {infoProvider.headquarters ? (
@@ -117,6 +119,7 @@ export function ProviderDetailsDialog({
                 <TableHead>Model</TableHead>
                 <TableHead>In</TableHead>
                 <TableHead>Out</TableHead>
+                <TableHead>Retains prompts</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -139,6 +142,9 @@ export function ProviderDetailsDialog({
                     </TableCell>
                     <TableCell>{formatPriceCompact(model.promptPrice)}</TableCell>
                     <TableCell>{formatPriceCompact(model.completionPrice)}</TableCell>
+                    <TableCell>
+                      <PolicyPill value={model.retainsPrompts} variant="retainsPrompts" />
+                    </TableCell>
                   </TableRow>
                 );
               })}

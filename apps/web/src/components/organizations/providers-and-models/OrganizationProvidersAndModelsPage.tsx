@@ -31,6 +31,7 @@ import {
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 import { preferredModels } from '@/lib/ai-gateway/models';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
+import { modelRetainsPrompts } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 
 type Props = {
   organizationId: string;
@@ -270,7 +271,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         providerDisplayName: provider.displayName,
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
         trains: provider.dataPolicy.training,
-        retainsPrompts: provider.dataPolicy.retainsPrompts,
+        retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
         promptPrice: model.endpoint.pricing.prompt,
         completionPrice: model.endpoint.pricing.completion,
       });
@@ -311,7 +312,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
         modelCount: providerModels.length,
         trains: provider.dataPolicy.training,
-        retainsPrompts: provider.dataPolicy.retainsPrompts,
         headquarters: provider.headquarters,
         datacenters: provider.datacenters,
       });
@@ -349,13 +349,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         }
       }
 
-      if (state.providerRetainsPromptsFilter !== 'all') {
-        const wantsRetainsPrompts = state.providerRetainsPromptsFilter === 'yes';
-        if (row.retainsPrompts !== wantsRetainsPrompts) {
-          return false;
-        }
-      }
-
       if (state.providerLocationsFilter.length > 0) {
         const matchesLocation =
           (row.headquarters &&
@@ -386,7 +379,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     enabledProviderSlugs,
     state.enabledProvidersOnly,
     state.providerLocationsFilter,
-    state.providerRetainsPromptsFilter,
     providerRows,
     state.providerSearch,
     state.providerTrainsFilter,
@@ -415,6 +407,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         sourceIndex,
         promptPrice: model.endpoint.pricing.prompt,
         completionPrice: model.endpoint.pricing.completion,
+        retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
       });
     }
 
@@ -445,7 +438,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   }
 
   const providerTrainsFilter: ProviderPolicyFilter = state.providerTrainsFilter;
-  const providerRetainsPromptsFilter: ProviderPolicyFilter = state.providerRetainsPromptsFilter;
 
   return (
     <OrganizationContextProvider value={{ userRole: currentRole, isKiloAdmin }}>
@@ -487,7 +479,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               search={state.providerSearch}
               enabledOnly={state.enabledProvidersOnly}
               providerTrainsFilter={providerTrainsFilter}
-              providerRetainsPromptsFilter={providerRetainsPromptsFilter}
               providerLocationsFilter={state.providerLocationsFilter}
               providerLocationOptions={providerLocationOptions}
               filteredProviderRows={filteredProviderRows}
@@ -496,7 +487,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onSearchChange={actions.setProviderSearch}
               onEnabledOnlyChange={actions.setEnabledProvidersOnly}
               onProviderTrainsFilterChange={actions.setProviderTrainsFilter}
-              onProviderRetainsPromptsFilterChange={actions.setProviderRetainsPromptsFilter}
               onProviderLocationsFilterChange={actions.setProviderLocationsFilter}
               onToggleProviderEnabled={handleToggleProviderEnabled}
               onOpenProviderDetails={actions.setInfoProviderSlug}

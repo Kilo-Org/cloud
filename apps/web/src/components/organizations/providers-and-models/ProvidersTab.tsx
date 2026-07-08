@@ -28,7 +28,6 @@ export function ProvidersTab({
   search,
   enabledOnly,
   providerTrainsFilter,
-  providerRetainsPromptsFilter,
   providerLocationsFilter,
   providerLocationOptions,
   filteredProviderRows,
@@ -37,7 +36,6 @@ export function ProvidersTab({
   onSearchChange,
   onEnabledOnlyChange,
   onProviderTrainsFilterChange,
-  onProviderRetainsPromptsFilterChange,
   onProviderLocationsFilterChange,
   onToggleProviderEnabled,
   onOpenProviderDetails,
@@ -47,7 +45,6 @@ export function ProvidersTab({
   search: string;
   enabledOnly: boolean;
   providerTrainsFilter: ProviderPolicyFilter;
-  providerRetainsPromptsFilter: ProviderPolicyFilter;
   providerLocationsFilter: string[];
   providerLocationOptions: string[];
   filteredProviderRows: ReadonlyArray<ProviderRow>;
@@ -56,7 +53,6 @@ export function ProvidersTab({
   onSearchChange: (value: string) => void;
   onEnabledOnlyChange: (value: boolean) => void;
   onProviderTrainsFilterChange: (value: ProviderPolicyFilter) => void;
-  onProviderRetainsPromptsFilterChange: (value: ProviderPolicyFilter) => void;
   onProviderLocationsFilterChange: (value: string[]) => void;
   onToggleProviderEnabled: (providerSlug: string, nextEnabled: boolean) => void;
   onOpenProviderDetails: (providerSlug: string) => void;
@@ -91,7 +87,7 @@ export function ProvidersTab({
             <div className="shrink-0 lg:w-80">
               <div className="rounded-lg border p-4">
                 <div className="text-sm font-medium">Filters</div>
-                <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                <div className="mt-3 grid gap-4">
                   <div className="space-y-2">
                     <div className="text-muted-foreground text-xs">Trains</div>
                     <RadioButtonGroup
@@ -101,20 +97,6 @@ export function ProvidersTab({
                         const next = parseProviderPolicyFilter(value);
                         if (next) {
                           onProviderTrainsFilterChange(next);
-                        }
-                      }}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="text-muted-foreground text-xs">Retains prompts</div>
-                    <RadioButtonGroup
-                      options={providerPolicyFilterOptions}
-                      value={providerRetainsPromptsFilter}
-                      onChange={value => {
-                        const next = parseProviderPolicyFilter(value);
-                        if (next) {
-                          onProviderRetainsPromptsFilterChange(next);
                         }
                       }}
                     />
@@ -181,10 +163,6 @@ export function ProvidersTab({
                                   {row.providerDisplayName}
                                 </div>
                                 <ProviderPolicyTag value={row.trains} variant="trains" />
-                                <ProviderPolicyTag
-                                  value={row.retainsPrompts}
-                                  variant="retainsPrompts"
-                                />
                               </div>
                               <div className="text-muted-foreground mt-0.5 truncate text-xs">
                                 {row.providerSlug}

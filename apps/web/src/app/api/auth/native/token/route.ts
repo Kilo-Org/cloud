@@ -11,6 +11,7 @@ import { verifyAndConsumeSignInCode } from '@/lib/auth/magic-link-tokens';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import { createOrUpdateUser, type CreateOrUpdateUserArgs } from '@/lib/user';
 import { generateApiToken } from '@/lib/tokens';
+import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 
 // Bad/expired ID tokens are a 401; JWKS-fetch or network failures during verification are
 // server faults and must surface as 500, not be misreported as an invalid token.
@@ -45,6 +46,8 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   401 { error: 'INVALID_TOKEN' }        — bad apple/google ID token
  *   401 { error: 'INVALID_CODE' }         — bad email sign-in code
  *   429 { error: 'TOO_MANY_ATTEMPTS' }    — email code attempt budget exhausted
+ *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? } — apple/google domain
+ *                                            blacklisted or SSO-enforced (checkDomainSignInEligibility)
  *   403 { error: AuthErrorType }          — createOrUpdateUser rejected the sign-in
  *   400                                   — invalid request body
  */
@@ -71,6 +74,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 401 });
     }
 
+    const eligibility = await checkDomainSignInEligibility(verified.email);
+    if (!eligibility.ok) {
+      return NextResponse.json(
+        {
+          error: eligibility.errorCode,
+          ...(eligibility.ssoOrganizationId
+            ? { ssoOrganizationId: eligibility.ssoOrganizationId }
+            : {}),
+        },
+        { status: eligibility.status }
+      );
+    }
+
     args = {
       google_user_email: verified.email,
       google_user_name: data.fullName ?? verified.email.split('@')[0],
@@ -92,6 +108,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'INVALID_TOKEN' }, { status: 401 });
     }
 
+    const eligibility = await checkDomainSignInEligibility(verified.email);
+    if (!eligibility.ok) {
+      return NextResponse.json(
+        {
+          error: eligibility.errorCode,
+          ...(eligibility.ssoOrganizationId
+            ? { ssoOrganizationId: eligibility.ssoOrganizationId }
+            : {}),
+        },
+        { status: eligibility.status }
+      );
+    }
+
     args = {
       google_user_email: verified.email,
       google_user_name: verified.name || '',
@@ -111,14 +140,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'TOO_MANY_ATTEMPTS' }, { status: 429 });
     }
 
-    const emailDomain = data.email.split('@')[1];
+    // web NextAuth lowercases the email before use; this public endpoint shouldn't trust the client's casing.
+    const email = data.email.toLowerCase();
+    const emailDomain = email.split('@')[1];
     args = {
-      google_user_email: data.email,
-      google_user_name: data.email.split('@')[0],
+      google_user_email: email,
+      google_user_name: email.split('@')[0],
       google_user_image_url: '',
       hosted_domain: emailDomain || hosted_domain_specials.email,
       provider: 'email',
-      provider_account_id: data.email,
+      provider_account_id: email,
       display_name: null,
     };
     autoLinkToExistingUser = true;

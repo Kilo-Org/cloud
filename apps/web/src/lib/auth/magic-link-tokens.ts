@@ -157,6 +157,10 @@ export async function verifyAndConsumeSignInCode(
 
   const token_hash = hashSignInCode(emailLower, code);
   if (row.token_hash === token_hash) {
+    // attempts < MAX is re-checked here atomically: the early read above is
+    // only a fast path, and two concurrent wrong guesses can race it past
+    // the budget. This predicate guarantees an over-budget code can never
+    // consume regardless of racing increments.
     const consumed = await db
       .update(magic_link_tokens)
       .set({ consumed_at: sql`NOW()` })
@@ -165,7 +169,8 @@ export async function verifyAndConsumeSignInCode(
           eq(magic_link_tokens.token_hash, token_hash),
           eq(magic_link_tokens.email, emailLower),
           isNull(magic_link_tokens.consumed_at),
-          sql`${magic_link_tokens.expires_at} > NOW()`
+          sql`${magic_link_tokens.expires_at} > NOW()`,
+          sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
         )
       )
       .returning();

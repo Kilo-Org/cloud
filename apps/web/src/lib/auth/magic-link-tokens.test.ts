@@ -235,6 +235,26 @@ describe('Magic Link Tokens', () => {
       expect(result).toBe('too_many_attempts');
     });
 
+    it('never consumes a correct code once the attempt budget is exceeded (racing increments)', async () => {
+      const code = await createSignInCode(testEmail);
+      // Simulate concurrent wrong guesses racing the pre-check past the
+      // budget: force attempts beyond the max directly.
+      await db
+        .update(magic_link_tokens)
+        .set({ attempts: 6 })
+        .where(eq(magic_link_tokens.email, testEmail));
+
+      const result = await verifyAndConsumeSignInCode(testEmail, code);
+      expect(result).not.toBe('ok');
+      expect(result).toBe('too_many_attempts');
+
+      const rows = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(eq(magic_link_tokens.email, testEmail));
+      expect(rows[0]?.consumed_at).toBeNull();
+    });
+
     it('returns invalid for an expired code', async () => {
       // Directly insert an already-expired row since createSignInCode always
       // sets a 10-minute expiry. created_at is backdated too, to satisfy the

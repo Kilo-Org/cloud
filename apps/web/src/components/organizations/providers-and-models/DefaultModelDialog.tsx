@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import {
   hasActiveOrganizationModelPolicy,
   isOrganizationAutoTargetModel,
@@ -189,9 +189,7 @@ export function DefaultModelDialog({
       }),
     [availableModels, hasActiveModelPolicy]
   );
-  const defaultAutoFallback = hasActiveModelPolicy
-    ? (autoTargetModels[0]?.id ?? '')
-    : 'kilo-auto/balanced';
+  const defaultAutoFallback = hasActiveModelPolicy ? '' : KILO_AUTO_BALANCED_MODEL.id;
   const fallbackUnavailable =
     !!organizationAutoFallbackModel &&
     !autoTargetModels.some(model => model.id === organizationAutoFallbackModel);
@@ -205,7 +203,7 @@ export function DefaultModelDialog({
   const isDirty =
     behavior !== (organizationAutoEnabled ? 'auto' : 'specific') ||
     (behavior === 'auto' &&
-      effectiveFallback !== (organizationAutoFallbackModel || 'kilo-auto/balanced')) ||
+      effectiveFallback !== (organizationAutoFallbackModel || defaultAutoFallback)) ||
     (behavior === 'specific' && effectiveSpecificModel !== (organizationDefaultModel || ''));
 
   useEffect(() => {

@@ -23,13 +23,14 @@ import {
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getOrganizationById, mutateOrganizationSettings } from '@/lib/organizations/organizations';
 import { successResult } from '@/lib/maybe-result';
-import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import type { Organization } from '@kilocode/db/schema';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
-  ORGANIZATION_AUTO_MODEL_FLAG,
   MAX_ORGANIZATION_AUTO_ROUTES,
+  assertOrganizationAutoEligible,
+  assertOrganizationAutoWriteEnabled,
+  hasOrganizationAutoRoute,
   validateOrganizationAutoTarget,
 } from '@/lib/organizations/organization-auto-model';
 
@@ -80,35 +81,10 @@ const ModeIdInputSchema = OrganizationIdInputSchema.extend({
 
 const BUILT_IN_MODE_SLUGS = new Set(['architect', 'code', 'ask', 'debug', 'orchestrator']);
 
-function hasRoute(routes: Record<string, string>, slug: string): boolean {
-  return Object.prototype.hasOwnProperty.call(routes, slug);
-}
-
-async function assertOrganizationAutoWriteEnabled(userId: string): Promise<void> {
-  if (
-    process.env.NODE_ENV !== 'development' &&
-    !(await isReleaseToggleEnabled(ORGANIZATION_AUTO_MODEL_FLAG, userId))
-  ) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Organization Auto routing configuration is not available',
-    });
-  }
-}
-
 function getOrganizationAutoSettings(
   settings: OrganizationSettings
 ): typeof DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS {
   return settings.org_auto_model ?? DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS;
-}
-
-function assertOrganizationAutoEligible(organization: Pick<Organization, 'plan'>): void {
-  if (organization.plan !== 'enterprise') {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Organization Auto is only available for Enterprise organizations.',
-    });
-  }
 }
 
 type OrganizationAccessContext = Parameters<typeof ensureOrganizationAccess>[0];
@@ -383,14 +359,14 @@ export const organizationModesRouter = createTRPCRouter({
             const routes = { ...orgAutoModel.routes };
             const nextSlug = updates.slug ?? lockedMode.slug;
             const slugChanged = nextSlug !== lockedMode.slug;
-            const sourceHasRoute = hasRoute(routes, lockedMode.slug);
+            const sourceHasRoute = hasOrganizationAutoRoute(routes, lockedMode.slug);
             const initialRoute = routes[lockedMode.slug];
 
             let nextSettings = lockedOrganization.settings;
 
             if (sourceHasRoute && slugChanged) {
               await ensureOrganizationAccess(ctx, organizationId, ['owner']);
-              if (hasRoute(routes, nextSlug)) {
+              if (hasOrganizationAutoRoute(routes, nextSlug)) {
                 throw new TRPCError({
                   code: 'CONFLICT',
                   message: `Organization Auto route already exists for mode "${nextSlug}"`,
@@ -521,7 +497,7 @@ export const organizationModesRouter = createTRPCRouter({
             let nextSettings = lockedOrganization.settings;
 
             const preserveBuiltInRoute = preserve_route && BUILT_IN_MODE_SLUGS.has(lockedMode.slug);
-            const hasExistingRoute = hasRoute(orgAutoModel.routes, lockedMode.slug);
+            const hasExistingRoute = hasOrganizationAutoRoute(orgAutoModel.routes, lockedMode.slug);
 
             if (route_model !== undefined && !preserveBuiltInRoute) {
               throw new TRPCError({

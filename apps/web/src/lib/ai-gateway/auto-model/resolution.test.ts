@@ -230,6 +230,116 @@ describe('resolveAutoModel — Organization Auto branch', () => {
     });
   });
 
+  it('falls build back to the canonical code route', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'build',
+        apiKind: 'chat_completions',
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: {
+              routes: { code: 'kilo-auto/frontier' },
+              fallback_model: 'kilo-auto/balanced',
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toMatchObject({
+      kind: 'ok',
+      routingTarget: 'kilo-auto/frontier',
+    });
+  });
+
+  it('does not fall canonical code back to a build route', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'code',
+        apiKind: 'chat_completions',
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            default_model: ORG_AUTO_MODEL.id,
+            org_auto_model: {
+              routes: { build: 'kilo-auto/frontier' },
+              fallback_model: 'kilo-auto/balanced',
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toMatchObject({
+      kind: 'ok',
+      routingTarget: 'kilo-auto/balanced',
+    });
+  });
+
+  it('falls plan back to architect without falling architect back to plan', async () => {
+    const settings = {
+      default_model: ORG_AUTO_MODEL.id,
+      org_auto_model: {
+        routes: { architect: 'kilo-auto/frontier', plan: 'kilo-auto/small' },
+        fallback_model: 'kilo-auto/balanced',
+      },
+    };
+    const planResult = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'plan',
+        apiKind: 'chat_completions',
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            ...settings,
+            org_auto_model: {
+              ...settings.org_auto_model,
+              routes: { architect: 'kilo-auto/frontier' },
+            },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+    const architectResult = await resolveAutoModel(
+      {
+        ...baseParams,
+        model: ORG_AUTO_MODEL.id,
+        modeHeader: 'architect',
+        apiKind: 'chat_completions',
+        organizationContext: Promise.resolve({
+          organizationId: 'org-1',
+          plan: 'enterprise',
+          settings: {
+            ...settings,
+            org_auto_model: { ...settings.org_auto_model, routes: { plan: 'kilo-auto/small' } },
+          },
+        }),
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(planResult).toMatchObject({ kind: 'ok', routingTarget: 'kilo-auto/frontier' });
+    expect(architectResult).toMatchObject({ kind: 'ok', routingTarget: 'kilo-auto/balanced' });
+  });
+
   it('uses the configured fallback when no mode route exists', async () => {
     const result = await resolveAutoModel(
       {

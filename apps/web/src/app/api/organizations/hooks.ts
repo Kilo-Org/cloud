@@ -211,26 +211,6 @@ export function useUpdateDefaultModel() {
   );
 }
 
-export function useEnableOrganizationAuto() {
-  const trpc = useTRPC();
-  const onSuccess = useInvalidateOrganizationDataAndDefaults();
-  return useMutation(
-    trpc.organizations.settings.enableOrganizationAuto.mutationOptions({
-      onSuccess,
-    })
-  );
-}
-
-export function useDisableOrganizationAuto() {
-  const trpc = useTRPC();
-  const onSuccess = useInvalidateOrganizationDataAndDefaults();
-  return useMutation(
-    trpc.organizations.settings.disableOrganizationAuto.mutationOptions({
-      onSuccess,
-    })
-  );
-}
-
 export function useConfigureOrganizationDefaultBehavior() {
   const trpc = useTRPC();
   const onSuccess = useInvalidateOrganizationDataAndDefaults();
@@ -241,38 +221,22 @@ export function useConfigureOrganizationDefaultBehavior() {
   );
 }
 
-export function useSetOrganizationAutoFallback() {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  return useMutation(
-    trpc.organizations.settings.setOrganizationAutoFallback.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
-      },
-    })
-  );
-}
-
 export function useSetOrganizationAutoRoute() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
   return useMutation(
     trpc.organizations.settings.setOrganizationAutoRoute.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
-      },
+      onSuccess,
     })
   );
 }
 
 export function useClearOrganizationAutoRoute() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const onSuccess = useInvalidateOrganizationDataAndDefaults();
   return useMutation(
     trpc.organizations.settings.clearOrganizationAutoRoute.mutationOptions({
-      onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: trpc.organizations.pathKey() });
-      },
+      onSuccess,
     })
   );
 }

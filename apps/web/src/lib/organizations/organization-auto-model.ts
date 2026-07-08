@@ -14,13 +14,19 @@ import { getBYOKforOrganization } from '@/lib/ai-gateway/byok';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
 import { isPublicIdExperimented } from '@/lib/ai-gateway/experiments/membership';
+import { isReleaseToggleEnabled } from '@/lib/posthog-feature-flags';
+import { TRPCError } from '@trpc/server';
 export {
   getOrganizationAutoRoute,
+  hasOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
   MAX_ORGANIZATION_AUTO_ROUTES,
   ORGANIZATION_AUTO_MODEL_FLAG,
 } from '@/lib/organizations/organization-auto-model-shared';
-import { isOrganizationAutoTargetModel } from '@/lib/organizations/organization-auto-model-shared';
+import {
+  isOrganizationAutoTargetModel,
+  ORGANIZATION_AUTO_MODEL_FLAG,
+} from '@/lib/organizations/organization-auto-model-shared';
 
 type OrganizationAutoPolicyOrganization = Pick<Organization, 'id' | 'plan' | 'settings'>;
 
@@ -29,8 +35,30 @@ export const DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS: OrganizationAutoModelSett
   fallback_model: KILO_AUTO_BALANCED_MODEL.id,
 };
 
-export function isOrganizationAutoEligible(organization: Organization): boolean {
+export function isOrganizationAutoEligible(organization: Pick<Organization, 'plan'>): boolean {
   return organization.plan === 'enterprise';
+}
+
+// The rollout is actor-scoped so flagged admins can configure eligible organizations early.
+export async function assertOrganizationAutoWriteEnabled(userId: string): Promise<void> {
+  if (
+    process.env.NODE_ENV !== 'development' &&
+    !(await isReleaseToggleEnabled(ORGANIZATION_AUTO_MODEL_FLAG, userId))
+  ) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Organization Auto configuration is not available',
+    });
+  }
+}
+
+export function assertOrganizationAutoEligible(organization: Pick<Organization, 'plan'>): void {
+  if (!isOrganizationAutoEligible(organization)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Organization Auto is only available for Enterprise organizations.',
+    });
+  }
 }
 
 export function isOrganizationAutoConfigured(organization: Organization): boolean {

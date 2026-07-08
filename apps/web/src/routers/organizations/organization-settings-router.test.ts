@@ -598,8 +598,10 @@ describe('organizations settings trpc router', () => {
     it('enables Organization Auto and preserves its default route settings', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      const result = await caller.organizations.settings.enableOrganizationAuto({
+      const result = await caller.organizations.settings.configureOrganizationDefaultBehavior({
         organizationId: testOrganization.id,
+        behavior: 'auto',
+        fallback_model: 'kilo-auto/balanced',
       });
 
       expect(result.settings.default_model).toBe('kilo-auto/org');
@@ -777,15 +779,26 @@ describe('organizations settings trpc router', () => {
       expect(updatedOrg?.settings.org_auto_model?.routes.code).toBeUndefined();
     });
 
-    it('requires a replacement model when disabling Organization Auto', async () => {
+    it('requires a specific model when replacing Organization Auto', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await caller.organizations.settings.enableOrganizationAuto({
+      await caller.organizations.settings.configureOrganizationDefaultBehavior({
         organizationId: testOrganization.id,
+        behavior: 'auto',
+        fallback_model: 'kilo-auto/balanced',
       });
-      const result = await caller.organizations.settings.disableOrganizationAuto({
+
+      await expect(
+        caller.organizations.settings.configureOrganizationDefaultBehavior({
+          organizationId: testOrganization.id,
+          behavior: 'specific',
+        })
+      ).rejects.toThrow('Specific model is required.');
+
+      const result = await caller.organizations.settings.configureOrganizationDefaultBehavior({
         organizationId: testOrganization.id,
-        replacement_model: 'kilo-auto/balanced',
+        behavior: 'specific',
+        specific_model: 'kilo-auto/balanced',
       });
 
       expect(result.settings.default_model).toBe('kilo-auto/balanced');
@@ -795,22 +808,13 @@ describe('organizations settings trpc router', () => {
       });
     });
 
-    it('rejects disableOrganizationAuto when Organization Auto is not enabled', async () => {
-      const caller = await createCallerForUser(owner.id);
-
-      await expect(
-        caller.organizations.settings.disableOrganizationAuto({
-          organizationId: testOrganization.id,
-          replacement_model: 'kilo-auto/balanced',
-        })
-      ).rejects.toThrow('Organization Auto is not enabled for this organization.');
-    });
-
     it('does not allow updateDefaultModel to clear an active Organization Auto default', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await caller.organizations.settings.enableOrganizationAuto({
+      await caller.organizations.settings.configureOrganizationDefaultBehavior({
         organizationId: testOrganization.id,
+        behavior: 'auto',
+        fallback_model: 'kilo-auto/balanced',
       });
 
       await expect(
@@ -818,14 +822,16 @@ describe('organizations settings trpc router', () => {
           organizationId: testOrganization.id,
           default_model: null,
         })
-      ).rejects.toThrow('Disable Organization Auto through its dedicated controls.');
+      ).rejects.toThrow('Configure Organization Auto through the default model behavior flow.');
     });
 
     it('preserves Organization Auto routes when unrelated settings change', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await caller.organizations.settings.enableOrganizationAuto({
+      await caller.organizations.settings.configureOrganizationDefaultBehavior({
         organizationId: testOrganization.id,
+        behavior: 'auto',
+        fallback_model: 'kilo-auto/balanced',
       });
       await caller.organizations.settings.setOrganizationAutoRoute({
         organizationId: testOrganization.id,
@@ -852,8 +858,10 @@ describe('organizations settings trpc router', () => {
         false
       );
 
-      await caller.organizations.settings.enableOrganizationAuto({
+      await caller.organizations.settings.configureOrganizationDefaultBehavior({
         organizationId: autoOrg.id,
+        behavior: 'auto',
+        fallback_model: 'kilo-auto/balanced',
       });
 
       await expect(

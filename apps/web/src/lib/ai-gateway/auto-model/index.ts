@@ -5,7 +5,11 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { OpenCodeSettings, Verbosity } from '@kilocode/db/schema-types';
+import {
+  ORGANIZATION_AUTO_MODEL_ID,
+  type OpenCodeSettings,
+  type Verbosity,
+} from '@kilocode/db/schema-types';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import { NVIDIA_TRIAL_TOS } from '@/lib/ai-gateway/providers/nvidia';
 
@@ -164,7 +168,7 @@ export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {
 
 export const ORG_AUTO_MODEL: AutoModel = {
   ...KILO_AUTO_BALANCED_MODEL,
-  id: 'kilo-auto/org',
+  id: ORGANIZATION_AUTO_MODEL_ID,
   name: 'Organization Auto',
   description: "Routes requests using your organization's mode-specific model settings.",
 };

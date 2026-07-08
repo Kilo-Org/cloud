@@ -27,7 +27,6 @@ import {
   type ResolvedAutoModel,
   KILO_AUTO_LEGACY_MODEL,
   ORG_AUTO_MODEL,
-  ORGANIZATION_AUTO_TARGET_MODELS,
 } from '@/lib/ai-gateway/auto-model';
 import { userIsWithinFirstKiloClawInstanceWindow } from '@/lib/kiloclaw/setup-promo';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
@@ -39,7 +38,11 @@ import {
 import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import PROVIDERS from '@/lib/ai-gateway/providers/provider-definitions';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import { validateOrganizationAutoTarget } from '@/lib/organizations/organization-auto-model';
+import {
+  getOrganizationAutoRoute,
+  isOrganizationAutoTargetModel,
+  validateOrganizationAutoTarget,
+} from '@/lib/organizations/organization-auto-model';
 
 type ResolveAutoModelParams = {
   model: string;
@@ -106,39 +109,29 @@ type OrganizationAutoContext = {
   plan?: OrganizationPlan;
 };
 
-function hasOrganizationAutoRoute(routes: Record<string, string>, slug: string): boolean {
-  return Object.prototype.hasOwnProperty.call(routes, slug);
-}
-
 function resolveOrganizationAutoRouteTarget(
   settings: OrganizationSettings,
   modeHeader: string | null
 ): string | undefined {
-  const routes = settings.org_auto_model?.routes ?? {};
   const mode = modeHeader?.trim() ?? '';
   const normalizedMode = mode.toLowerCase();
+  const exactRoute = getOrganizationAutoRoute(settings, normalizedMode);
 
-  if (normalizedMode && hasOrganizationAutoRoute(routes, normalizedMode)) {
-    return routes[normalizedMode];
+  if (exactRoute) {
+    return exactRoute;
   }
 
-  if (normalizedMode === 'code' || normalizedMode === 'build') {
-    if (hasOrganizationAutoRoute(routes, 'code')) return routes.code;
-    if (hasOrganizationAutoRoute(routes, 'build')) return routes.build;
-    return settings.org_auto_model?.fallback_model;
+  if (normalizedMode === 'build') {
+    return getOrganizationAutoRoute(settings, 'code') ?? settings.org_auto_model?.fallback_model;
   }
 
-  if (normalizedMode === 'plan' || normalizedMode === 'architect') {
-    if (hasOrganizationAutoRoute(routes, 'architect')) return routes.architect;
-    if (hasOrganizationAutoRoute(routes, 'plan')) return routes.plan;
-    return settings.org_auto_model?.fallback_model;
+  if (normalizedMode === 'plan') {
+    return (
+      getOrganizationAutoRoute(settings, 'architect') ?? settings.org_auto_model?.fallback_model
+    );
   }
 
   return settings.org_auto_model?.fallback_model;
-}
-
-function isSupportedNestedAutoTarget(modelId: string): boolean {
-  return (ORGANIZATION_AUTO_TARGET_MODELS as readonly string[]).includes(modelId);
 }
 
 export type ResolveAutoModelResult =
@@ -209,13 +202,14 @@ async function resolveOrganizationAutoModel(
   }
 
   if (validation.modelId === ORG_AUTO_MODEL.id) {
+    // Keep this fail-closed guard at the recursion boundary even though validation rejects self-targets.
     return {
       kind: 'organization_auto_configuration_error',
       message: 'Organization Auto cannot target itself.',
     };
   }
 
-  if (isSupportedNestedAutoTarget(validation.modelId)) {
+  if (isOrganizationAutoTargetModel(validation.modelId)) {
     const nestedResult = await resolveAutoModel(
       {
         ...params,

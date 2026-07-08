@@ -733,6 +733,9 @@ export const OrganizationPlanSchema = z.enum(['teams', 'enterprise']);
 
 export type OrganizationPlan = z.infer<typeof OrganizationPlanSchema>;
 
+export const ORGANIZATION_AUTO_MODEL_ID = 'kilo-auto/org';
+export const MAX_ORGANIZATION_AUTO_ROUTES = 100;
+
 const OrganizationAutoModelRouteSlugSchema = z
   .string()
   .min(1, 'Organization Auto route slug is required')
@@ -749,15 +752,15 @@ const OrganizationAutoModelTargetSchema = z
   .refine(value => !value.endsWith('/*'), {
     message: 'Organization Auto route target must be a concrete model identifier',
   })
-  .refine(value => value !== 'kilo-auto/org', {
+  .refine(value => value !== ORGANIZATION_AUTO_MODEL_ID, {
     message: 'Organization Auto cannot target itself',
   });
 
 export const OrganizationAutoModelSettingsSchema = z.object({
   routes: z
     .record(OrganizationAutoModelRouteSlugSchema, OrganizationAutoModelTargetSchema)
-    .refine(routes => Object.keys(routes).length <= 100, {
-      message: 'Organization Auto supports at most 100 routes',
+    .refine(routes => Object.keys(routes).length <= MAX_ORGANIZATION_AUTO_ROUTES, {
+      message: `Organization Auto supports at most ${MAX_ORGANIZATION_AUTO_ROUTES} routes`,
     }),
   fallback_model: OrganizationAutoModelTargetSchema,
 });

@@ -867,6 +867,7 @@ describe('CloudflareAgentSandbox', () => {
     expect(sandboxApi.createBackup).toHaveBeenCalledWith({
       dir: '/workspace/cloudflare',
       ttl: 86_400,
+      multipart: false,
       localBucket: true,
     });
     expect(bucket.put).toHaveBeenCalledOnce();
@@ -1012,6 +1013,7 @@ describe('CloudflareAgentSandbox', () => {
     expect(sandboxApi.createBackup).toHaveBeenCalledWith({
       dir: '/workspace/cloudflare',
       ttl: 86_400,
+      multipart: false,
       localBucket: true,
     });
     expect(bucket.put).toHaveBeenCalledOnce();

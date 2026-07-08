@@ -8,7 +8,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { API_BASE_URL, GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { useAuth } from '@/lib/auth/auth-context';
 
-export const AUTH_ERROR_MESSAGES: Record<string, string> = {
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'EMAIL-ALREADY-USED':
     "An account with this email already exists with a different sign-in method. Try another method or use 'More sign-in options'.",
   'DIFFERENT-OAUTH':

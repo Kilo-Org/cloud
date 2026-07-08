@@ -571,6 +571,25 @@ describe('organizations trpc router', () => {
 
       expect(row.company_domain).toBeNull();
     });
+
+    it('rejects organization creation for personal-account-disabled users', async () => {
+      const disabledUser = await insertTestUser({
+        google_user_email: 'disabled-create-org@example.com',
+        google_user_name: 'Disabled Create Org User',
+        personal_account_disabled: true,
+      });
+      const caller = await createCallerForUser(disabledUser.id);
+
+      await expect(
+        caller.organizations.create({ name: 'Should Not Exist', autoAddCreator: true })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+      const rows = await db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.name, 'Should Not Exist'));
+      expect(rows).toHaveLength(0);
+    });
   });
 
   describe('creditTransactions procedure', () => {

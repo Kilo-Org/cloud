@@ -140,6 +140,17 @@ export const organizationsRouter = createTRPCRouter({
 
   create: baseProcedure.input(OrganizationCreateRequestSchema).mutation(async opts => {
     const { user } = opts.ctx;
+
+    // Personal-account-disabled users are organization-managed and must not be
+    // able to mint their own workspace, which would bypass the terminal
+    // no-workspace state and defeat the disabled-account restriction.
+    if (user.personal_account_disabled) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Your account cannot create organizations.',
+      });
+    }
+
     const existingOrgMemberships = await getUserOrganizationsWithSeats(user.id);
 
     if (

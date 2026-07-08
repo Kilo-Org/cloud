@@ -10,12 +10,18 @@ describe('isRestrictedPersonalPath', () => {
   );
 
   test.each([
-    '/organizations',
     '/organizations/11111111-1111-1111-1111-111111111111',
     '/organizations/11111111-1111-1111-1111-111111111111/usage-details',
-  ])('allows organization route %s', pathname => {
+  ])('allows specific organization route %s', pathname => {
     expect(isRestrictedPersonalPath(pathname)).toBe(false);
   });
+
+  test.each(['/organizations', '/organizations/create', '/organizations/new', '/n'])(
+    'blocks the organization index and creation route %s',
+    pathname => {
+      expect(isRestrictedPersonalPath(pathname)).toBe(true);
+    }
+  );
 
   test.each([
     '/connected-accounts',

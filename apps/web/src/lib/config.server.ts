@@ -23,10 +23,14 @@ export const GOOGLE_WORKSPACE_REFRESH_TOKEN_ENCRYPTION_KEY = getEnvVariable(
 );
 // AgentCard OAuth (mcp.agentcard.sh is a full OAuth 2.1 authorization server).
 // Base URL is overridable for sandbox/local AgentCard; client_id is optional —
-// when unset the integration dynamically registers a client on first use.
+// when unset the integration dynamically registers a public client on first use.
+// A pinned client minted by AgentCard's admin CLI is CONFIDENTIAL by default
+// (has an `acs_` client_secret, required on token exchange AND refresh); a
+// pinned client created with `--public` is PKCE-only and needs no secret.
 export const AGENTCARD_MCP_BASE_URL =
   getEnvVariable('AGENTCARD_MCP_BASE_URL') || 'https://mcp.agentcard.sh';
 export const AGENTCARD_OAUTH_CLIENT_ID = getEnvVariable('AGENTCARD_OAUTH_CLIENT_ID');
+export const AGENTCARD_OAUTH_CLIENT_SECRET = getEnvVariable('AGENTCARD_OAUTH_CLIENT_SECRET');
 
 export const GITHUB_CLIENT_ID = getEnvVariable('GITHUB_CLIENT_ID');
 export const GITHUB_CLIENT_SECRET = getEnvVariable('GITHUB_CLIENT_SECRET');

@@ -24,6 +24,7 @@ import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client'
 // the keys seeded by the connect callback.
 const AGENTCARD_OAUTH_SECRET_KEYS = [
   'AGENTCARD_OAUTH_CLIENT_ID',
+  'AGENTCARD_OAUTH_CLIENT_SECRET',
   'AGENTCARD_OAUTH_REFRESH_TOKEN',
   'AGENTCARD_OAUTH_ACCESS_TOKEN',
   'AGENTCARD_OAUTH_EXPIRES_IN',
@@ -54,7 +55,10 @@ export async function POST(request: NextRequest) {
 
   try {
     if (!isSameOriginMutation(request)) {
-      return NextResponse.redirect(new URL(buildDisconnectPath(undefined, 'error=invalid_origin'), APP_URL), 303);
+      return NextResponse.redirect(
+        new URL(buildDisconnectPath(undefined, 'error=invalid_origin'), APP_URL),
+        303
+      );
     }
 
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
@@ -93,25 +97,35 @@ export async function POST(request: NextRequest) {
 
     const existing = await getKiloClawAgentCardOAuthConnection(instance.id);
 
-    // Revoke the OAuth grant at AgentCard first — this is the authoritative
-    // "cut off access": it invalidates both the refresh token (no new tokens)
-    // and the (still ~1h-valid) access token, so even the copy already pushed to
-    // the worker stops working. revokeAgentCardToken is best-effort (never throws).
+    // Best-effort server-side revoke of the connect-time tokens. NOTE: with
+    // native MCP OAuth the worker rotates the refresh token on every refresh,
+    // and AgentCard's /revoke matches the exact presented token — so once the
+    // worker has refreshed at least once, these connect-time tokens are already
+    // dead rows and this revoke does NOT kill the live successor. The
+    // authoritative cut-off is therefore the worker secret null-out + token
+    // cache clear below (config-writer drops the `agentcard` server and deletes
+    // tokens.json). Users can always hard-revoke the whole grant themselves via
+    // AgentCard (`agent-cards connections revoke <clientId>`).
     if (existing) {
       const refreshToken = decryptRefreshToken(existing);
       if (refreshToken) {
-        await revokeAgentCardToken(refreshToken);
+        await revokeAgentCardToken({ token: refreshToken, clientId: existing.oauth_client_id });
       }
-      await revokeAgentCardToken(decryptAccessToken(existing));
+      await revokeAgentCardToken({
+        token: decryptAccessToken(existing),
+        clientId: existing.oauth_client_id,
+      });
     }
 
     // Drop the stored connection so the refresh cron stops touching it.
     await clearKiloClawAgentCardOAuthConnection(instance.id);
 
-    // Best-effort: remove the worker secret so the `agentcard` MCP server is
-    // dropped from the gateway config on next sync. The grant is already revoked
-    // above, so a failure here (e.g. worker unreachable) leaves only an
-    // already-dead token behind — it must not fail the whole disconnect.
+    // Remove the worker secrets so the `agentcard` MCP server is dropped from
+    // the gateway config and mcporter's token cache (with the live rotated
+    // refresh token) is deleted on next sync. This is the real cut-off — see
+    // the revocation note above. A failure here (e.g. worker unreachable) is
+    // logged but must not fail the whole disconnect; the next config sync
+    // converges.
     try {
       const kiloclawClient = new KiloClawInternalClient();
       const clearedSecrets: Record<string, null> = {};
@@ -149,5 +163,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.redirect(new URL(buildDisconnectPath(undefined, 'error=method_not_allowed'), APP_URL));
+  return NextResponse.redirect(
+    new URL(buildDisconnectPath(undefined, 'error=method_not_allowed'), APP_URL)
+  );
 }

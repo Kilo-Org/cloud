@@ -740,6 +740,14 @@ const AGENTCARD_OAUTH_CLIENT_FILE = 'client.json';
  *
  * Shape matches the MCP SDK's OAuthTokens / OAuthClientInformation that
  * mcporter@0.7.3 persists.
+ *
+ * client.json carries `client_secret` when AGENTCARD_OAUTH_CLIENT_SECRET is
+ * set (a pinned AgentCard client minted by their admin CLI is confidential by
+ * default, and AgentCard requires the secret on the *refresh* grant too). The
+ * MCP SDK then authenticates refreshes with client_secret_post; without a
+ * secret it uses "none" (public PKCE-only client — DCR clients and pinned
+ * `--public` clients). Note client.json is only (re)written together with
+ * tokens.json: same seed-if-absent rule.
  */
 export function seedAgentCardOAuthCache(
   env: EnvLike,
@@ -768,10 +776,18 @@ export function seedAgentCardOAuthCache(
     tokens.scope = env.AGENTCARD_OAUTH_SCOPE;
   }
 
+  const clientInfo: Record<string, unknown> = {
+    client_id: env.AGENTCARD_OAUTH_CLIENT_ID,
+    token_endpoint_auth_method: env.AGENTCARD_OAUTH_CLIENT_SECRET ? 'client_secret_post' : 'none',
+  };
+  if (env.AGENTCARD_OAUTH_CLIENT_SECRET) {
+    clientInfo.client_secret = env.AGENTCARD_OAUTH_CLIENT_SECRET;
+  }
+
   deps.writeFileSync(tokensPath, JSON.stringify(tokens, null, 2));
   deps.writeFileSync(
     path.join(cacheDir, AGENTCARD_OAUTH_CLIENT_FILE),
-    JSON.stringify({ client_id: env.AGENTCARD_OAUTH_CLIENT_ID }, null, 2)
+    JSON.stringify(clientInfo, null, 2)
   );
   console.log(`Seeded AgentCard OAuth token cache at ${cacheDir}`);
 }

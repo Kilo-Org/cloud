@@ -141,8 +141,9 @@ const SECRET_CATALOG_RAW = [
   },
   // AgentCard is no longer a paste-a-token secret. It connects via OAuth — see
   // AgentCardCard in SettingsTab.tsx and /api/integrations/agentcard/*. The
-  // worker still reads the AGENTCARD_API_KEY secret (now an OAuth access token
-  // pushed by the callback route), so config-writer is unchanged.
+  // callback route pushes AGENTCARD_OAUTH_{CLIENT_ID,CLIENT_SECRET,REFRESH_TOKEN,
+  // ACCESS_TOKEN,EXPIRES_IN,SCOPE} worker secrets; config-writer seeds mcporter's
+  // native MCP OAuth token cache from them (mcporter self-refreshes on 401).
   {
     id: 'onepassword',
     label: '1Password',

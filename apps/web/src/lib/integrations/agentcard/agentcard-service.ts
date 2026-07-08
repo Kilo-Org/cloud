@@ -2,7 +2,11 @@ import 'server-only';
 
 import crypto from 'node:crypto';
 import { APP_URL } from '@/lib/constants';
-import { AGENTCARD_MCP_BASE_URL, AGENTCARD_OAUTH_CLIENT_ID } from '@/lib/config.server';
+import {
+  AGENTCARD_MCP_BASE_URL,
+  AGENTCARD_OAUTH_CLIENT_ID,
+  AGENTCARD_OAUTH_CLIENT_SECRET,
+} from '@/lib/config.server';
 
 /**
  * AgentCard OAuth 2.1 client.
@@ -14,8 +18,16 @@ import { AGENTCARD_MCP_BASE_URL, AGENTCARD_OAUTH_CLIENT_ID } from '@/lib/config.
  * the authorization-code + PKCE flow so Kilo can show a "Connect AgentCard"
  * button instead of asking users to paste a token.
  *
- * The client is a *public* client (token_endpoint_auth_method = "none"); there
- * is no client secret — security comes from PKCE + the registered redirect URI.
+ * Client types (PKCE is enforced for both):
+ * - Dynamically registered clients (no pinned AGENTCARD_OAUTH_CLIENT_ID) are
+ *   *public* (token_endpoint_auth_method = "none") — no client secret.
+ * - A pinned client minted by AgentCard's admin CLI is *confidential by
+ *   default*: set AGENTCARD_OAUTH_CLIENT_SECRET and it is sent on token
+ *   exchange, refresh, and revocation. A pinned client created with `--public`
+ *   is PKCE-only; leave the secret unset.
+ *
+ * Every /authorize and /token request carries the RFC 8707 `resource`
+ * indicator (the MCP server URL) so issued tokens are audience-bound.
  */
 
 export const AGENTCARD_OAUTH_GRANT_TYPES = ['authorization_code', 'refresh_token'] as const;
@@ -39,6 +51,32 @@ function registrationEndpoint(): string {
 
 function revocationEndpoint(): string {
   return `${AGENTCARD_MCP_BASE_URL}/revoke`;
+}
+
+/**
+ * The RFC 8707 resource indicator: tokens are requested for (and bound to)
+ * AgentCard's MCP server. Sent on /authorize and every /token grant.
+ */
+export function agentCardResource(): string {
+  return `${AGENTCARD_MCP_BASE_URL}/mcp`;
+}
+
+/**
+ * Returns the client secret for a given client_id, or null for public clients.
+ *
+ * Only the pinned AGENTCARD_OAUTH_CLIENT_ID can be confidential — dynamically
+ * registered clients are always public, so a configured secret must never be
+ * sent for them (the token endpoint would reject the mismatch).
+ */
+export function agentCardClientSecretFor(clientId: string): string | null {
+  if (
+    AGENTCARD_OAUTH_CLIENT_ID &&
+    AGENTCARD_OAUTH_CLIENT_SECRET &&
+    clientId === AGENTCARD_OAUTH_CLIENT_ID
+  ) {
+    return AGENTCARD_OAUTH_CLIENT_SECRET;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -118,6 +156,7 @@ export function buildAgentCardOAuthUrl(args: {
   url.searchParams.set('redirect_uri', agentCardRedirectUri());
   url.searchParams.set('code_challenge', args.codeChallenge);
   url.searchParams.set('code_challenge_method', 'S256');
+  url.searchParams.set('resource', agentCardResource());
   url.searchParams.set('state', args.state);
   return url.toString();
 }
@@ -167,7 +206,11 @@ async function postToken(body: URLSearchParams): Promise<AgentCardTokenSet> {
   return parseTokenResponse((await res.json()) as RawTokenResponse);
 }
 
-/** Exchange an authorization code (+ PKCE verifier) for a token set. */
+/**
+ * Exchange an authorization code (+ PKCE verifier) for a token set. The
+ * confidential-client secret (when the pinned client has one) is REQUIRED here
+ * — PKCE is enforced either way, the secret is additive.
+ */
 export function exchangeAgentCardCode(args: {
   code: string;
   codeVerifier: string;
@@ -179,30 +222,36 @@ export function exchangeAgentCardCode(args: {
     redirect_uri: agentCardRedirectUri(),
     client_id: args.clientId,
     code_verifier: args.codeVerifier,
+    resource: agentCardResource(),
   });
+  const clientSecret = agentCardClientSecretFor(args.clientId);
+  if (clientSecret) {
+    body.set('client_secret', clientSecret);
+  }
   return postToken(body);
 }
 
-/** Exchange a refresh token for a fresh access token. */
-export function refreshAgentCardToken(args: {
-  refreshToken: string;
-  clientId: string;
-}): Promise<AgentCardTokenSet> {
-  const body = new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: args.refreshToken,
-    client_id: args.clientId,
-  });
-  return postToken(body);
-}
+// NOTE: there is intentionally no refresh helper here. Refresh happens inside
+// the worker via mcporter's native MCP OAuth (refresh-on-401 with the rotating
+// refresh token); the web app never refreshes. AgentCard requires the
+// client_secret on the refresh grant too for confidential clients, which is
+// why config-writer seeds it into mcporter's client.json.
 
 /** Best-effort token revocation (RFC 7009). Never throws. */
-export async function revokeAgentCardToken(token: string): Promise<void> {
+export async function revokeAgentCardToken(args: {
+  token: string;
+  clientId: string;
+}): Promise<void> {
   try {
+    const body = new URLSearchParams({ token: args.token, client_id: args.clientId });
+    const clientSecret = agentCardClientSecretFor(args.clientId);
+    if (clientSecret) {
+      body.set('client_secret', clientSecret);
+    }
     await fetch(revocationEndpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ token }).toString(),
+      body: body.toString(),
     });
   } catch {
     // Revocation is best-effort; local disconnect succeeds regardless.

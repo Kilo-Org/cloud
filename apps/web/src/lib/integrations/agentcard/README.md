@@ -46,10 +46,42 @@ Key files:
 
 | Var | Required | Default | Notes |
 |---|---|---|---|
-| `AGENTCARD_MCP_BASE_URL` | no | `https://mcp.agentcard.sh` | AgentCard's OAuth 2.1 server. Override for sandbox/local. |
-| `AGENTCARD_OAUTH_CLIENT_ID` | no | — | Pre-registered client id; if unset, the integration dynamically registers one. |
+| `AGENTCARD_MCP_BASE_URL` | no | `https://mcp.agentcard.sh` | AgentCard's OAuth 2.1 server. Override for local AgentCard. |
+| `AGENTCARD_OAUTH_CLIENT_ID` | no | — | Pinned client id (minted by AgentCard's admin CLI); if unset, the integration dynamically registers a public client. |
+| `AGENTCARD_OAUTH_CLIENT_SECRET` | only for a confidential pinned client | — | The `acs_` secret. AgentCard pinned clients are **confidential by default** (secret required on code exchange *and* refresh); a client minted with `--public` is PKCE-only and needs no secret. |
 | `AGENT_ENV_VARS_PUBLIC_KEY` | for the worker push | — | RSA public key used to encrypt the token pushed to the worker (worker decrypts with `AGENT_ENV_VARS_PRIVATE_KEY`). Normally pulled from the project's Vercel env. |
 | `BYOK_ENCRYPTION_KEY` | yes | — | Symmetric key the web app uses to encrypt tokens at rest. |
+
+### Choosing the pinned client type
+
+- **Public (`agent-cards-admin oauth-clients create … --public`) — recommended
+  here.** Native MCP OAuth means the refresh grant runs *inside each user's
+  worker*, so a confidential secret must be distributed to every connected
+  worker — at which point it is no longer meaningfully confidential. A public
+  client relies on PKCE + the registered redirect URI and distributes nothing.
+- **Confidential (the CLI default)** is fully supported: set
+  `AGENTCARD_OAUTH_CLIENT_SECRET` and the callback pushes it to the worker as
+  `AGENTCARD_OAUTH_CLIENT_SECRET`, where config-writer seeds it into mcporter's
+  `client.json` so refreshes authenticate with `client_secret_post`.
+- The client's AgentCard **mode** (sandbox vs production) decides whether
+  connected users get test or live cards — it's a property of the client, not a
+  per-request choice. Production clients require an active AgentCard
+  subscription.
+
+All `/authorize` and `/token` requests carry the RFC 8707
+`resource=<base>/mcp` indicator, so issued tokens are audience-bound to the
+AgentCard MCP server.
+
+### Disconnect semantics
+
+Disconnect revokes the *connect-time* tokens at AgentCard (best-effort), clears
+the stored connection, and null-outs the worker secrets so config-writer drops
+the `agentcard` server and deletes mcporter's token cache. Because the refresh
+token **rotates inside the worker**, the connect-time tokens no longer match
+the live grant after the first refresh — AgentCard's `/revoke` is
+exact-token-match, so the cache deletion is the authoritative cut-off. Users
+can always hard-revoke the whole grant on the AgentCard side
+(`agent-cards connections revoke <clientId>`).
 
 ## Testing
 
@@ -108,5 +140,7 @@ Authorization: Bearer <decrypted access token>
 { "jsonrpc": "2.0", "id": 1, "method": "tools/list" }
 ```
 
-A successful `tools/list` (and a read-only `get_mode` / `list_cards` call) confirms
-the full chain end-to-end except the Cloudflare worker hop.
+A successful `tools/list` (and a read-only `whoami` / `list_cards` call) confirms
+the full chain end-to-end except the Cloudflare worker hop. A brand-new client
+seeing zero pre-existing cards is expected — AgentCard connections only see the
+cards they created.

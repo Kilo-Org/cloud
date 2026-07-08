@@ -1797,7 +1797,37 @@ describe('writeMcporterConfig', () => {
     const client = JSON.parse(
       written.find(w => w.path === '/tmp/agentcard-oauth/client.json')!.data
     );
-    expect(client).toEqual({ client_id: 'oauth_client_abc' });
+    // No AGENTCARD_OAUTH_CLIENT_SECRET → public PKCE-only client.
+    expect(client).toEqual({
+      client_id: 'oauth_client_abc',
+      token_endpoint_auth_method: 'none',
+    });
+  });
+
+  it('seeds client.json with the client_secret for a confidential pinned client', () => {
+    const { deps, written } = mcporterFakeDeps();
+    const env = {
+      AGENTCARD_OAUTH_CLIENT_ID: 'oauth_client_abc',
+      AGENTCARD_OAUTH_CLIENT_SECRET: 'acs_confidential_secret',
+      AGENTCARD_OAUTH_REFRESH_TOKEN: 'rt_seed_123',
+      AGENTCARD_OAUTH_ACCESS_TOKEN: 'at_seed_456',
+    };
+
+    writeMcporterConfig(env, '/tmp/mcporter.json', deps);
+
+    // AgentCard requires client_secret on the refresh grant too, so mcporter
+    // must authenticate refreshes with client_secret_post.
+    const client = JSON.parse(
+      written.find(w => w.path === '/tmp/agentcard-oauth/client.json')!.data
+    );
+    expect(client).toEqual({
+      client_id: 'oauth_client_abc',
+      client_secret: 'acs_confidential_secret',
+      token_endpoint_auth_method: 'client_secret_post',
+    });
+    // The secret never appears in mcporter.json itself.
+    const config = JSON.parse(written.find(w => w.path === '/tmp/mcporter.json')!.data);
+    expect(JSON.stringify(config)).not.toContain('acs_confidential_secret');
   });
 
   it('does not re-seed the token cache when tokens.json already exists (preserves rotated refresh token)', () => {

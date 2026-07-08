@@ -31,8 +31,11 @@ mcporter call agentcard.<tool> --schema      # see one tool's exact parameters
 - **`list_cards`** — List all virtual cards with IDs, last four, expiry, balance,
   and status. Start here to find a card.
 - **`create_card`** — Create a new virtual debit card. Takes `amount_cents` (integer,
-  min 100; e.g. `2000` = $20). New accounts default to test mode. Limits depend on the
-  plan — see `get_plan`.
+  min 100; e.g. `2000` = $20). Cards are funded from the user's AgentCard wallet.
+  May return a resolvable precondition instead of a card: `user_info_required`
+  (→ `submit_user_info`), `kyc_required` (→ `start_kyc`), `wallet_funding_required`
+  (→ `fund_wallet`), or `deposit_confirming` (funds are on the way — wait and retry;
+  do NOT ask the user to pay again). Limits depend on the plan — see `get_plan`.
 - **`check_balance`** — Live balance for a card. Prefer this over `get_card_details`
   when you only need funds (faster, no sensitive credentials).
 - **`get_card_details`** — Decrypted PAN, CVV, expiry, and balance for a card. Use
@@ -48,19 +51,27 @@ mcporter call agentcard.<tool> --schema      # see one tool's exact parameters
   automatically completes the follow-up action.
 
 ### Account & onboarding
+- **`whoami`** — The connected AgentCard account (who this token belongs to).
 - **`submit_user_info`** — Submit phone number + terms acceptance required before the
   first card. Call after `create_card` returns a `user_info_required` response. (Name
   and DOB are collected automatically during KYC.)
-- **`get_mode`** — Get the current issuing mode (`test` vs `prod`).
-- **`set_mode`** — Switch issuing mode. `mode:prod` issues live cards funded by the
-  saved payment method (real charges); `mode:test` issues sandbox cards. Confirm with
-  the user before switching to `prod`.
+- **`start_kyc`** / **`get_kyc_status`** — Identity verification, required before the
+  first live card. It is conversational (government ID photo, missing fields, then a
+  short browser face scan) — parts need the user's own browser/phone, so relay the
+  links/instructions to the user and poll `get_kyc_status` until verified.
+
+### Wallet & funding
+- **`get_wallet`** — The user's wallet and its balance; cards are funded from here.
+- **`fund_wallet`** — Add funds in USD (returns an Apple Pay / Google Pay link the
+  user opens). Use when `create_card` returns `wallet_funding_required`.
+- **`redeem_code`** / **`list_codes`** — Apply a promo code (credits the wallet;
+  once per user per code) / see which codes were used.
 
 ### Plan & billing
 - **`get_plan`** — Current plan, per-card cap, monthly card limit, and usage. Call
   before `create_card` when you need the cap or remaining quota.
-- **`upgrade_plan`** — Start an upgrade to the Basic plan ($15/mo); returns a Stripe
-  Checkout URL the user opens to pay. Use only when the user explicitly wants to upgrade.
+- **`upgrade_plan`** — Start a paid-plan upgrade; returns a Stripe Checkout URL the
+  user opens to pay. Use only when the user explicitly wants to upgrade.
 - **`cancel_plan`** — Cancel the active paid subscription, reverting to free.
 
 ### Payment methods
@@ -74,13 +85,21 @@ mcporter call agentcard.<tool> --schema      # see one tool's exact parameters
 
 ### Connections
 - **`list_connections`** — Third-party apps (e.g. Kilo) connected to the user's
-  AgentCard account via OAuth, with connected-at and active status. Read-only — to
-  revoke, the user runs `agent-cards connections revoke <clientId>` in the CLI.
+  AgentCard account via OAuth, with connected-at and active status.
+- **`revoke_connection`** — Revoke one of those connections. **Confirm with the user
+  first** — revoking the Kilo connection cuts off this agent's own AgentCard access.
 
 ### Support
 - **`start_support_chat`** — Start a support conversation and send the first message.
 - **`send_support_message`** — Send a message in an existing support conversation.
 - **`read_support_chat`** — Read a support conversation's message history.
+
+### Shopping
+- **`buy`** — Describe a purchase in natural language (e.g. "order a caesar salad
+  from Zuni on DoorDash") and it runs the whole flow conversationally — call `buy`
+  again to answer its questions. Call `get_instructions` first for the current usage
+  guide. **Never place an order without the user's explicit confirmation of the cart
+  and total** — this spends real money.
 
 ### Browser checkout (requires the AgentCard Pay Chrome extension)
 These automate paying on a real checkout page and need Chrome with the AgentCard Pay
@@ -101,15 +120,14 @@ mcporter call agentcard.list_transactions card_id:<id>
 mcporter call agentcard.close_card card_id:<id>
 ```
 
-## Test mode vs production
+## Sandbox vs live cards
 
-New AgentCard accounts start in **TEST mode**: cards are sandbox-funded, incur no
-real charges, and won't work at real merchants. After creating a card, check whether
-the result says it's a TEST card and, if so, tell the user they're in test mode.
-
-- Check the current mode: `mcporter call agentcard.get_mode`
-- Switch to live cards: `mcporter call agentcard.set_mode mode:prod` — **confirm with
-  the user first**, since prod cards are charged to their real payment method.
+Whether cards are LIVE or TEST is decided by **how this connection was authorized**
+(the OAuth client's mode), not by a per-request choice — there is no runtime mode
+switch. Cards are live by default; a connection authorized in sandbox mode mints
+TEST cards (mock: no real charge, not usable at real merchants), and such a card is
+flagged as a test card in the result. After creating a card, check the result — if
+it says TEST, tell the user this connection is in sandbox mode.
 
 ## If AgentCard isn't connected
 

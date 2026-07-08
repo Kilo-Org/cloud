@@ -6636,11 +6636,13 @@ export type NewKiloClawGoogleOAuthConnection =
 // "Connect AgentCard" button can replace the legacy paste-a-token flow.
 //
 // Unlike the Google connection (whose worker uses a token broker), the
-// OpenClaw gateway talks to the AgentCard MCP server directly with a static
-// Bearer header. So the *access* token is pushed to the worker as the
-// AGENTCARD_API_KEY secret, and both tokens are stored here symmetric-
-// encrypted (web-readable) so the web app can refresh the short-lived
-// (~1h) access token and re-push it.
+// worker's mcporter holds the AgentCard OAuth tokens itself (native MCP
+// OAuth, `auth: "oauth"`) and self-refreshes on 401 — the refresh token
+// rotates inside the worker. The tokens stored here (symmetric-encrypted,
+// web-readable) are the connect-time originals, kept for connection status
+// and best-effort revocation on disconnect; the web app never refreshes them
+// (no cron), and after the worker's first refresh they no longer match the
+// live rotated tokens.
 // ---------------------------------------------------------------------------
 export type KiloClawAgentCardOAuthStatus = 'active' | 'action_required' | 'disconnected';
 

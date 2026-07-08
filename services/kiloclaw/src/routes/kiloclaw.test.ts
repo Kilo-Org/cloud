@@ -11,13 +11,14 @@ describe('buildConfiguredSecrets', () => {
 
   it('returns all entries as false when no secrets are configured', () => {
     const result = buildConfiguredSecrets({});
+    // No `agentcard` entry: AgentCard is no longer a paste-a-token catalog
+    // secret — it connects via OAuth (see kiloclaw-secret-catalog).
     expect(result).toEqual({
       telegram: false,
       discord: false,
       slack: false,
       github: false,
       linear: false,
-      agentcard: false,
       onepassword: false,
       'brave-search': false,
       composio: false,
@@ -118,7 +119,7 @@ describe('buildConfiguredSecrets', () => {
     expect(keys).toContain('onepassword');
     expect(keys).toContain('brave-search');
     expect(keys).toContain('composio');
-    expect(keys).toHaveLength(9);
+    expect(keys).toHaveLength(8);
   });
 
   it('treats null values as not configured', () => {

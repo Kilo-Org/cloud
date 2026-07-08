@@ -8,7 +8,10 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireKiloClawAccess } from '@/lib/kiloclaw/access-gate';
 import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
 import { getInstanceById, workerInstanceId } from '@/lib/kiloclaw/instance-registry';
-import { exchangeAgentCardCode } from '@/lib/integrations/agentcard/agentcard-service';
+import {
+  agentCardClientSecretFor,
+  exchangeAgentCardCode,
+} from '@/lib/integrations/agentcard/agentcard-service';
 import {
   type VerifiedAgentCardOAuthState,
   verifyAgentCardOAuthState,
@@ -19,13 +22,21 @@ import {
 } from '@/lib/kiloclaw/agentcard-oauth-connections';
 import { encryptKiloClawSecret } from '@/lib/kiloclaw/encryption';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import type { SecretsPatchInput } from '@/lib/kiloclaw/types';
 
 // The OpenClaw worker reads these env secrets; config-writer seeds mcporter's
 // native-OAuth token cache from them (see config-writer.ts → seedAgentCardOAuthCache).
 // mcporter then self-refreshes on a 401 using the refresh token, so no
 // server-side refresh cron is required.
+//
+// clientSecret is only pushed when the pinned client is confidential
+// (AgentCard requires it on the refresh grant too, so mcporter needs it inside
+// the worker). Prefer a `--public` pinned client for this deployment shape —
+// refresh runs inside per-user workers, so a confidential secret is
+// necessarily distributed to every connected worker.
 const AGENTCARD_OAUTH_SECRET_KEYS = {
   clientId: 'AGENTCARD_OAUTH_CLIENT_ID',
+  clientSecret: 'AGENTCARD_OAUTH_CLIENT_SECRET',
   refreshToken: 'AGENTCARD_OAUTH_REFRESH_TOKEN',
   accessToken: 'AGENTCARD_OAUTH_ACCESS_TOKEN',
   expiresIn: 'AGENTCARD_OAUTH_EXPIRES_IN',
@@ -108,7 +119,9 @@ export async function GET(request: NextRequest) {
         tags: { endpoint: 'agentcard/callback', source: 'agentcard_oauth' },
         extra: oauthSentryContext(searchParams),
       });
-      return NextResponse.redirect(new URL(buildRedirectPath(null, 'error=invalid_state'), APP_URL));
+      return NextResponse.redirect(
+        new URL(buildRedirectPath(null, 'error=invalid_state'), APP_URL)
+      );
     }
 
     if (verifiedState.userId !== user.id) {
@@ -211,8 +224,16 @@ export async function GET(request: NextRequest) {
     // Retry a few times: the grant is already persisted, but a silent push
     // failure would leave the agent "connected" yet unable to use AgentCard.
     const expiresAtMs = tokens.expiresAt ? Date.parse(tokens.expiresAt) : Number.NaN;
-    const secrets: Record<string, string> = {
+    const clientSecret = agentCardClientSecretFor(verifiedState.clientId);
+    const secrets: SecretsPatchInput['secrets'] = {
       [AGENTCARD_OAUTH_SECRET_KEYS.clientId]: encryptKiloClawSecret(verifiedState.clientId),
+      // Confidential pinned client: mcporter must send client_secret on every
+      // refresh grant, so the worker needs it alongside the refresh token.
+      // Public client: explicitly clear any stale secret from a previous
+      // connection so the seeded client.json stays public.
+      [AGENTCARD_OAUTH_SECRET_KEYS.clientSecret]: clientSecret
+        ? encryptKiloClawSecret(clientSecret)
+        : null,
       [AGENTCARD_OAUTH_SECRET_KEYS.refreshToken]: encryptKiloClawSecret(tokens.refreshToken),
       [AGENTCARD_OAUTH_SECRET_KEYS.accessToken]: encryptKiloClawSecret(tokens.accessToken),
       [AGENTCARD_OAUTH_SECRET_KEYS.scope]: encryptKiloClawSecret(tokens.scopes.join(' ')),

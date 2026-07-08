@@ -14,6 +14,9 @@ import { WastelandSidebar } from '@/components/wasteland/WastelandSidebar';
 
 const UUID = '[0-9a-f-]{36}';
 
+// Routes linked from the footer user menu (see SidebarUserFooter). Keep in sync.
+const FOOTER_MENU_ROUTES = ['/connected-accounts', '/install', '/learn'];
+
 /** Extract the townId from a /gastown/[townId] pathname, or null. */
 function extractGastownTownId(pathname: string): string | null {
   const match = pathname.match(new RegExp(`^/gastown/(${UUID})`));
@@ -55,17 +58,17 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
   const setupStep = searchParams.get('step');
   const { open, setOpenMobile, setOpenTransient } = useSidebar();
   const personalAccountDisabled = Boolean(user?.personal_account_disabled);
-  // The only personal route we still link to for these users (footer user menu).
-  // For that route we keep them in their org sidebar instead of the personal one;
-  // other personal routes are not linked but remain accessible with the personal
-  // sidebar if reached directly.
-  const isLinkedAccountRoute =
-    pathname === '/connected-accounts' || pathname.startsWith('/connected-accounts/');
-  const useOrgSidebarForAccountRoute =
-    personalAccountDisabled && !currentOrgId && isLinkedAccountRoute;
+  // Routes we still link to for these users via the footer user menu. On these we
+  // keep them in their org sidebar instead of switching to the personal one; other
+  // personal routes are not linked but remain accessible with the personal sidebar
+  // if reached directly.
+  const isFooterMenuRoute = FOOTER_MENU_ROUTES.some(
+    route => pathname === route || pathname.startsWith(route + '/')
+  );
+  const useOrgSidebarForFooterRoute = personalAccountDisabled && !currentOrgId && isFooterMenuRoute;
   const { data: organizations, isPending: isOrganizationsPending } = useQuery(
     trpc.organizations.list.queryOptions(undefined, {
-      enabled: useOrgSidebarForAccountRoute,
+      enabled: useOrgSidebarForFooterRoute,
       trpc: { context: { skipBatch: true } },
     })
   );
@@ -150,10 +153,10 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
     return <OrganizationAppSidebar organizationId={currentOrgId} {...props} />;
   }
 
-  // On the account route we link to from the footer, keep users with a disabled
+  // On routes we link to from the footer user menu, keep users with a disabled
   // personal account in their default organization's sidebar rather than the
   // personal one. Any other personal route falls through to the personal sidebar.
-  if (useOrgSidebarForAccountRoute) {
+  if (useOrgSidebarForFooterRoute) {
     if (defaultOrganizationId) {
       return <OrganizationAppSidebar organizationId={defaultOrganizationId} {...props} />;
     }

@@ -176,14 +176,17 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Model
           </Text>
-          <ModelSelector
-            options={models}
-            value={effectiveModel.modelSlug}
-            variant={effectiveModel.thinkingEffort ?? ''}
-            onSelect={(modelId, variant) => {
-              setModelChoice({ modelSlug: modelId, thinkingEffort: variant || null });
-            }}
-          />
+          {/* flex-row so the pill hugs its content instead of stretching to column width */}
+          <View className="flex-row">
+            <ModelSelector
+              options={models}
+              value={effectiveModel.modelSlug}
+              variant={effectiveModel.thinkingEffort ?? ''}
+              onSelect={(modelId, variant) => {
+                setModelChoice({ modelSlug: modelId, thinkingEffort: variant || null });
+              }}
+            />
+          </View>
         </View>
 
         <Button

@@ -77,6 +77,7 @@ function createMockCtx() {
         storage: {
           setAlarm: vi.fn(),
         },
+        waitUntil: vi.fn(),
       };
     },
   };
@@ -2144,6 +2145,100 @@ describe('UserConnectionDO', () => {
 
       // Should not throw
       sendCliResponse(doInstance, cliWs, { id: 'nonexistent', result: 'ok' });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Session-ready push claim
+  // -------------------------------------------------------------------------
+
+  describe('session-ready push claim', () => {
+    function setupWithIngestDO() {
+      const mockCtx = createMockCtx();
+      const ctx = mockCtx.build();
+      const claimSessionReadyPush = vi.fn(async () => {});
+      const env = {
+        SESSION_INGEST_DO: {
+          idFromName: vi.fn((name: string) => name),
+          get: vi.fn(() => ({ claimSessionReadyPush })),
+        },
+      };
+      const doInstance = new UserConnectionDO(ctx as never, env as never);
+      return { doInstance, mockCtx, claimSessionReadyPush };
+    }
+
+    function addCliSocketForUser(
+      mockCtx: ReturnType<typeof createMockCtx>,
+      connectionId: string,
+      kiloUserId: string
+    ): MockWS {
+      const attachment = { role: 'cli' as const, connectionId, sessions: [], kiloUserId };
+      const ws = createMockWs(['cli'], attachment);
+      mockCtx.addSocket(ws);
+      return ws;
+    }
+
+    it('claims the push the first time a parentless session appears in a heartbeat', () => {
+      const { doInstance, mockCtx, claimSessionReadyPush } = setupWithIngestDO();
+      const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')]);
+
+      expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
+      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main');
+
+      // Subsequent heartbeats for the same session must not re-claim.
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')]);
+      expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
+    });
+
+    it('never claims for subagent sessions', () => {
+      const { doInstance, mockCtx, claimSessionReadyPush } = setupWithIngestDO();
+      const cliWs = addCliSocketForUser(mockCtx, 'cli-1', 'usr_1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('ses_main'),
+        makeSession('ses_sub', 'busy', 'Sub', 'ses_main'),
+      ]);
+
+      expect(claimSessionReadyPush).toHaveBeenCalledTimes(1);
+      expect(claimSessionReadyPush).toHaveBeenCalledWith('usr_1', 'ses_main');
+    });
+
+    it('does not claim on sockets without a kiloUserId (legacy attachment)', () => {
+      const { doInstance, mockCtx, claimSessionReadyPush } = setupWithIngestDO();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [makeSession('ses_main')]);
+
+      expect(claimSessionReadyPush).not.toHaveBeenCalled();
+    });
+
+    it('stores the kiloUserId from the connection URL on the attachment', () => {
+      const { doInstance } = setupWithIngestDO();
+      const client = createMockWs();
+      const server = createMockWs();
+      vi.stubGlobal(
+        'WebSocketPair',
+        class {
+          0 = client;
+          1 = server;
+        }
+      );
+      vi.stubGlobal(
+        'Response',
+        class {
+          constructor(_body?: BodyInit | null, _init?: ResponseInit) {}
+        }
+      );
+
+      doInstance.fetch(
+        new Request('http://local/cli?connectionId=cli-1&kiloUserId=usr_1', {
+          headers: { Upgrade: 'websocket' },
+        })
+      );
+
+      expect(server.deserializeAttachment()).toMatchObject({ role: 'cli', kiloUserId: 'usr_1' });
     });
   });
 });

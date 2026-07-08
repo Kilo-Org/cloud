@@ -84,8 +84,8 @@ api.post('/session', zodJsonValidator(createSessionSchema), async c => {
       type: 'session.created',
       data: { source: 'v2', session, changedAt: session.updatedAt },
     });
-    // The session-ready push fires from the queue consumer on first ingest,
-    // not here — a subagent's parentID isn't known at creation time.
+    // The session-ready push fires from UserConnectionDO when a CLI heartbeat
+    // first reports the session as remote-controllable — not here.
   }
 
   // Warm the session cache so the first ingest can skip Postgres.
@@ -408,6 +408,9 @@ api.get('/user/cli', async c => {
   const stub = getUserConnectionDO(c.env, { kiloUserId });
   const wsUrl = new URL(c.req.url);
   wsUrl.pathname = '/cli';
+  // The DO can't recover the user from its idFromName-derived id; it needs the
+  // authenticated user for the session-ready push.
+  wsUrl.searchParams.set('kiloUserId', kiloUserId);
 
   return stub.fetch(new Request(wsUrl.toString(), c.req.raw));
 });

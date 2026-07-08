@@ -7,10 +7,10 @@ describe('pending notification navigation', () => {
     expect(resolvePendingNotificationNavigation(null)).toBeNull();
   });
 
-  it('replaces the current route instead of pushing a duplicate history entry', () => {
+  it('navigates so the target screen keeps a back stack without duplicate history entries', () => {
     expect(resolvePendingNotificationNavigation('/chat/sandbox/conversation')).toEqual({
       href: '/chat/sandbox/conversation',
-      method: 'replace',
+      method: 'navigate',
     });
   });
 });

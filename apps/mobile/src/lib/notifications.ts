@@ -93,8 +93,11 @@ export function setupNotificationResponseHandler() {
     const path = notificationPathForData(data);
     Notifications.clearLastNotificationResponse();
     // If the router is ready, navigate immediately; otherwise store as pending.
+    // navigate (not replace) so the target screen keeps a back stack — replace
+    // on a stack root leaves canGoBack() false and strands the user — while
+    // still deduplicating if the route is already on top.
     try {
-      router.replace(path as Href);
+      router.navigate(path as Href);
     } catch {
       pendingNotificationLink = path;
     }

@@ -218,7 +218,7 @@ function RootLayoutNav() {
       // Navigate to pending notification deep link (cold start / background tap)
       const pendingNavigation = resolvePendingNotificationNavigation(getPendingNotificationLink());
       if (pendingNavigation) {
-        router.replace(pendingNavigation.href as Href);
+        router.navigate(pendingNavigation.href as Href);
       }
     }
   }, [

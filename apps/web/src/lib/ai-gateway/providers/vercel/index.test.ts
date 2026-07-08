@@ -51,32 +51,22 @@ describe('getAnthropicProviderOptionsForVercel', () => {
 
 describe('hasCompatibleVercelInferenceProvider', () => {
   it('accepts when a translated OpenRouter provider is available on Vercel', () => {
-    expect(
-      hasCompatibleVercelInferenceProvider('anthropic/claude-sonnet-4.5', ['amazon-bedrock'], {
-        'anthropic/claude-sonnet-4.5': ['anthropic', 'bedrock'],
-      })
-    ).toBe(true);
+    expect(hasCompatibleVercelInferenceProvider(['amazon-bedrock'], ['anthropic', 'bedrock'])).toBe(
+      true
+    );
   });
 
   it('rejects when none of the requested providers are available on Vercel', () => {
-    expect(
-      hasCompatibleVercelInferenceProvider('anthropic/claude-sonnet-4.5', ['google-vertex'], {
-        'anthropic/claude-sonnet-4.5': ['anthropic', 'bedrock'],
-      })
-    ).toBe(false);
+    expect(hasCompatibleVercelInferenceProvider(['google-vertex'], ['anthropic', 'bedrock'])).toBe(
+      false
+    );
   });
 
   it('rejects an empty only list when provider data is available', () => {
-    expect(
-      hasCompatibleVercelInferenceProvider('anthropic/claude-sonnet-4.5', [], {
-        'anthropic/claude-sonnet-4.5': ['anthropic'],
-      })
-    ).toBe(false);
+    expect(hasCompatibleVercelInferenceProvider([], ['anthropic'])).toBe(false);
   });
 
   it('accepts when the model has no cached provider entry', () => {
-    expect(
-      hasCompatibleVercelInferenceProvider('anthropic/claude-sonnet-4.5', ['google-vertex'], {})
-    ).toBe(true);
+    expect(hasCompatibleVercelInferenceProvider(['google-vertex'], null)).toBe(true);
   });
 });

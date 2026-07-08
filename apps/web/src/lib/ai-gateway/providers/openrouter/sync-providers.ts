@@ -25,10 +25,14 @@ import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
 import { redisClient } from '@/lib/redis';
-import { GATEWAY_METADATA_REDIS_KEYS, type RedisKey } from '@/lib/redis-keys';
+import {
+  GATEWAY_METADATA_REDIS_KEYS,
+  type RedisKey,
+  vercelInferenceProvidersRedisKey,
+} from '@/lib/redis-keys';
 import {
   getLanguageModelIds,
-  getVercelInferenceProvidersByModel,
+  getVercelInferenceProviderIds,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -46,6 +50,18 @@ import {
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 const VERCEL_INFERENCE_PROVIDERS_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+async function mirrorVercelInferenceProvidersToRedis(vercelModels: Record<string, StoredModel>) {
+  const pipeline = redisClient.pipeline();
+  for (const model of Object.values(vercelModels)) {
+    pipeline.set(
+      vercelInferenceProvidersRedisKey(model.id),
+      JSON.stringify(getVercelInferenceProviderIds(model)),
+      { ex: VERCEL_INFERENCE_PROVIDERS_TTL_SECONDS }
+    );
+  }
+  await pipeline.exec();
+}
 
 async function fetchGatewayModels(gateway: Provider) {
   const headers = {
@@ -396,11 +412,7 @@ async function mirrorToRedis(values: {
   }
   await Promise.all([
     ...entries.map(([key, value]) => redisClient.set(key, JSON.stringify(value))),
-    redisClient.set(
-      GATEWAY_METADATA_REDIS_KEYS.vercelInferenceProviders,
-      JSON.stringify(getVercelInferenceProvidersByModel(values.vercel)),
-      { ex: VERCEL_INFERENCE_PROVIDERS_TTL_SECONDS }
-    ),
+    mirrorVercelInferenceProvidersToRedis(values.vercel),
   ]);
 }
 

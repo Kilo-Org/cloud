@@ -28,9 +28,11 @@ export const GATEWAY_METADATA_REDIS_KEYS = {
   // metadata and endpoints.
   openrouterModelIds: redisKey('ai-gateway.metadata:openrouter-model-ids'),
   vercelModelIds: redisKey('ai-gateway.metadata:vercel-model-ids'),
-  vercelInferenceProviders: redisKey('ai-gateway.metadata:vercel-inference-providers'),
   openrouterProviders: redisKey('ai-gateway.metadata:openrouter-providers'),
 } as const;
+
+export const vercelInferenceProvidersRedisKey = (modelId: string) =>
+  redisKey(`ai-gateway.metadata:vercel-inference-providers:${modelId}`);
 
 export const directByokModelsRedisKey = (providerId: DirectUserByokInferenceProviderId) =>
   redisKey(`ai-gateway.metadata.direct-byok-models:${providerId}`);

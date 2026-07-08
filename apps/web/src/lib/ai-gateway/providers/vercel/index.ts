@@ -24,7 +24,6 @@ import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import {
   getVercelInferenceProviders,
   getVercelModels,
-  type VercelInferenceProvidersByModel,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
@@ -60,11 +59,9 @@ function hasOpenRouterExclusiveProviderOptions(request: GatewayRequest) {
 }
 
 export function hasCompatibleVercelInferenceProvider(
-  vercelModelId: string,
   openRouterInferenceProviders: string[],
-  vercelInferenceProvidersByModel: VercelInferenceProvidersByModel
+  vercelInferenceProviders: string[] | null
 ) {
-  const vercelInferenceProviders = vercelInferenceProvidersByModel[vercelModelId];
   if (!vercelInferenceProviders) {
     return true;
   }
@@ -114,10 +111,8 @@ export async function shouldRouteToVercel(
 
   const only = request.body.provider?.only;
   if (only) {
-    const vercelInferenceProvidersByModel = await getVercelInferenceProviders();
-    if (
-      !hasCompatibleVercelInferenceProvider(vercelModelId, only, vercelInferenceProvidersByModel)
-    ) {
+    const vercelInferenceProviders = await getVercelInferenceProviders(vercelModelId);
+    if (!hasCompatibleVercelInferenceProvider(only, vercelInferenceProviders)) {
       console.debug(
         '[shouldRouteToVercel] none of the requested inference providers are available on Vercel'
       );

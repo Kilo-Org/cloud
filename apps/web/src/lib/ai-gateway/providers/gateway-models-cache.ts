@@ -2,11 +2,10 @@ import { StoredModelSchema, type StoredModel } from '@kilocode/db';
 import * as z from 'zod';
 import { redisClient } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
-import { GATEWAY_METADATA_REDIS_KEYS } from '@/lib/redis-keys';
+import { GATEWAY_METADATA_REDIS_KEYS, vercelInferenceProvidersRedisKey } from '@/lib/redis-keys';
 import type { RedisKey } from '@/lib/redis-keys';
 
 export type StoredModelMap = Record<string, StoredModel>;
-export type VercelInferenceProvidersByModel = Record<string, string[]>;
 
 const StoredModelMapSchema = z.record(z.string(), StoredModelSchema);
 
@@ -46,19 +45,35 @@ export function getLanguageModelIds(models: StoredModelMap): string[] {
     .map(model => model.id);
 }
 
-export function getVercelInferenceProvidersByModel(
-  models: StoredModelMap
-): VercelInferenceProvidersByModel {
-  return Object.fromEntries(
-    Object.values(models).map(model => [
-      model.id,
-      [
-        ...new Set(
-          model.endpoints.map(endpoint => endpoint.provider_name).filter(p => p !== undefined)
-        ),
-      ],
-    ])
-  );
+export function getVercelInferenceProviderIds(model: StoredModel): string[] {
+  return [
+    ...new Set(
+      model.endpoints.map(endpoint => endpoint.provider_name).filter(p => p !== undefined)
+    ),
+  ];
+}
+
+const VercelInferenceProvidersSchema = z.array(z.string());
+const vercelInferenceProviderFetchers = new Map<string, () => Promise<string[] | null>>();
+
+export function getVercelInferenceProviders(modelId: string): Promise<string[] | null> {
+  let fetchProviders = vercelInferenceProviderFetchers.get(modelId);
+  if (!fetchProviders) {
+    fetchProviders = createCachedFetch<string[] | null>(
+      async () => {
+        const raw = await redisClient.get<string>(vercelInferenceProvidersRedisKey(modelId));
+        if (raw === null) {
+          return null;
+        }
+        return VercelInferenceProvidersSchema.parse(JSON.parse(raw));
+      },
+      600_000,
+      null
+    );
+    vercelInferenceProviderFetchers.set(modelId, fetchProviders);
+  }
+
+  return fetchProviders();
 }
 
 const ModelIdsSchema = z.array(z.string());
@@ -86,22 +101,4 @@ export const getVercelModels = createModelIdsFetcher(
 export const getOpenRouterModels = createModelIdsFetcher(
   GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds,
   'OpenRouter'
-);
-
-const VercelInferenceProvidersByModelSchema = z.record(z.string(), z.array(z.string()));
-
-export const getVercelInferenceProviders = createCachedFetch<VercelInferenceProvidersByModel>(
-  async () => {
-    const raw = JSON.parse(
-      (await redisClient.get<string>(GATEWAY_METADATA_REDIS_KEYS.vercelInferenceProviders)) ??
-        'null'
-    );
-    if (!raw || typeof raw !== 'object') {
-      console.debug('[getGatewayModels] no Vercel inference providers found in Redis');
-      return {};
-    }
-    return VercelInferenceProvidersByModelSchema.parse(raw);
-  },
-  600_000,
-  {}
 );

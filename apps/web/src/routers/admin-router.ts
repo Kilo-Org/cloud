@@ -281,6 +281,11 @@ const UpdateUserBlockStatusSchema = z.object({
   blocked_reason: z.string().trim().min(1).nullable(),
 });
 
+const SetPersonalAccountDisabledSchema = z.object({
+  userId: z.string(),
+  value: z.boolean(),
+});
+
 const GetStytchFingerprintsSchema = z.object({
   kilo_user_id: z.string(),
   fingerprint_type: z
@@ -557,6 +562,21 @@ export const adminRouter = createTRPCRouter({
               },
             ],
           });
+        }
+
+        return successResult();
+      }),
+
+    setPersonalAccountDisabled: adminProcedure
+      .input(SetPersonalAccountDisabledSchema)
+      .mutation(async ({ input }) => {
+        const result = await db
+          .update(kilocode_users)
+          .set({ personal_account_disabled: input.value })
+          .where(eq(kilocode_users.id, input.userId));
+
+        if ((result.rowCount ?? 0) === 0) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
         }
 
         return successResult();

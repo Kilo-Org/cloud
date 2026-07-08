@@ -9,9 +9,11 @@ import type { UserDetailProps } from '@/types/admin';
 import ResetAPIKeyButton from './ResetAPIKeyButton';
 import ResetToMagicLinkLoginButton from './ResetToMagicLinkLoginButton';
 import SignOutBrowserSessionsButton from './SignOutBrowserSessionsButton';
+import PersonalAccountDisabledToggle from './PersonalAccountDisabledToggle';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
-import { SquareArrowOutUpRight, Webhook } from 'lucide-react';
+import { Info, SquareArrowOutUpRight, Webhook } from 'lucide-react';
 import { createHash } from 'crypto';
 
 function getGravatarUrl(email: string, size: number = 80): string {
@@ -32,7 +34,7 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
         user.blocked_reason || user.is_blacklisted_by_domain ? 'border-red-500 bg-red-950/50' : ''
       }
     >
-      <CardContent className="pt-5">
+      <CardContent className="pt-6">
         {/* Top row: identity + badges/actions */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -100,7 +102,7 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
         </div>
 
         {/* Metadata grid */}
-        <div className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="border-border mt-6 grid grid-cols-2 gap-x-8 gap-y-5 border-t pt-6 sm:grid-cols-3 lg:grid-cols-4">
           <Field label="User ID" mono>
             {user.id} <CopyTextButton text={user.id} />
           </Field>
@@ -151,6 +153,16 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
               <span className="text-muted-foreground">N/A</span>
             )}
           </Field>
+          <Field
+            label="Personal Account"
+            tooltip="A personal account lets this user accrue usage under their own personal namespace. When disabled, they can't select their personal namespace in the clients or the web app. Either way, they can still join organizations."
+          >
+            <PersonalAccountDisabledToggle
+              userId={user.id}
+              initialValue={user.personal_account_disabled}
+              isInOrganization={user.organization_memberships.length > 0}
+            />
+          </Field>
         </div>
       </CardContent>
     </Card>
@@ -160,15 +172,33 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
 function Field({
   label,
   mono,
+  tooltip,
   children,
 }: {
   label: string;
   mono?: boolean;
+  tooltip?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-w-0">
-      <h4 className="text-muted-foreground text-xs font-medium">{label}</h4>
+    <div className="flex min-w-0 flex-col gap-1">
+      <h4 className="text-muted-foreground flex items-center gap-1 text-xs font-medium">
+        {label}
+        {tooltip ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="text-muted-foreground/70 hover:text-foreground transition-colors"
+                aria-label={`${label} info`}
+              >
+                <Info className="h-3 w-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
+          </Tooltip>
+        ) : null}
+      </h4>
       <div
         className={`flex items-center gap-1 text-sm break-all ${mono ? 'font-mono text-xs' : ''}`}
       >

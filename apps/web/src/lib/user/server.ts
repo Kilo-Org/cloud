@@ -1059,27 +1059,14 @@ export async function getUserFromAuthOrRedirect(
   if (user.blocked_reason) {
     redirect('/account-blocked');
   }
-  await redirectPersonalAccountDisabledUserOffPersonalRoutes(user);
   return user;
 }
 
-// Personal routes that remain reachable for users whose personal account is
-// disabled. Connected Accounts is a user-global identity surface, not a
-// personal-account feature.
-const PERSONAL_ACCOUNT_DISABLED_ALLOWED_PATHS = ['/connected-accounts'];
-
-function isPersonalRoute(pathname: string): boolean {
-  if (pathname.startsWith('/organizations/') || pathname === '/organizations') {
-    return false;
-  }
-  return !PERSONAL_ACCOUNT_DISABLED_ALLOWED_PATHS.some(
-    allowed => pathname === allowed || pathname.startsWith(allowed + '/')
-  );
-}
-
-// Resolve where a user whose personal account is disabled should land.
+// Resolve where a user whose personal account is disabled should land by default.
 // Prefers their oldest organization (stable across requests); falls back to an
 // allowed personal route when they somehow belong to no organizations.
+// Note: this only affects where we send them by default (e.g. after login); we
+// do not block direct navigation to personal routes.
 async function resolvePersonalAccountDisabledLandingPath(userId: User['id']): Promise<string> {
   const orgs = await getUserOrganizationsWithSeats(userId);
   const firstOrg = [...orgs].sort((a, b) => {
@@ -1087,18 +1074,6 @@ async function resolvePersonalAccountDisabledLandingPath(userId: User['id']): Pr
     return byCreatedAt !== 0 ? byCreatedAt : a.organizationId.localeCompare(b.organizationId);
   })[0];
   return firstOrg ? `/organizations/${firstOrg.organizationId}` : '/connected-accounts';
-}
-
-async function redirectPersonalAccountDisabledUserOffPersonalRoutes(user: User): Promise<void> {
-  if (!user.personal_account_disabled) {
-    return;
-  }
-  const headersList = await headers();
-  const pathname = headersList.get('x-pathname');
-  if (!pathname || !isPersonalRoute(pathname)) {
-    return;
-  }
-  redirect(await resolvePersonalAccountDisabledLandingPath(user.id));
 }
 
 export async function signInUrlWithCallbackPath(): Promise<string> {

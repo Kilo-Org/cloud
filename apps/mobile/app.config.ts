@@ -1,5 +1,5 @@
 import type { ExpoConfig } from 'expo/config';
-import { ENV_KEYS } from './src/lib/env-keys';
+import { ENV_KEYS, OPTIONAL_ENV_KEYS } from './src/lib/env-keys';
 
 const missing = Object.values(ENV_KEYS).filter(key => !process.env[key]);
 if (missing.length > 0) {
@@ -10,6 +10,16 @@ if (missing.length > 0) {
     throw new Error(message);
   }
 }
+
+// ponytail: Google OAuth client IDs aren't created yet — plugin/config below tolerate absence
+// so the app still builds; the native Google button (Task 6) hides itself when undefined.
+const googleIosClientId = process.env[OPTIONAL_ENV_KEYS.googleIosClientId];
+const googleIosUrlScheme = googleIosClientId
+  ? `com.googleusercontent.apps.${googleIosClientId.replace(/\.apps\.googleusercontent\.com$/, '')}`
+  : undefined;
+const googleSignInPlugins: NonNullable<ExpoConfig['plugins']> = googleIosUrlScheme
+  ? [['@react-native-google-signin/google-signin', { iosUrlScheme: googleIosUrlScheme }]]
+  : [];
 
 const config: ExpoConfig = {
   name: 'Kilo',
@@ -112,6 +122,9 @@ const config: ExpoConfig = {
     ],
     ['react-native-appsflyer', {}],
     './plugins/withAndroidManifestFix',
+    // ponytail: only registered when GOOGLE_IOS_CLIENT_ID is set, so prebuild works before the
+    // Google OAuth clients exist.
+    ...googleSignInPlugins,
   ],
   experiments: {
     typedRoutes: true,
@@ -119,6 +132,9 @@ const config: ExpoConfig = {
   },
   extra: {
     ...Object.fromEntries(Object.entries(ENV_KEYS).map(([key, env]) => [key, process.env[env]])),
+    ...Object.fromEntries(
+      Object.entries(OPTIONAL_ENV_KEYS).map(([key, env]) => [key, process.env[env]])
+    ),
     router: {},
     eas: {
       projectId: '2cf05e39-90b5-48a5-a8a5-e0b3423cf3f4',

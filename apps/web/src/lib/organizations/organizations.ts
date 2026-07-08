@@ -661,10 +661,7 @@ export type InvitationAuthenticationContext = {
 export async function acceptOrganizationInvite(
   userId: User['id'],
   inviteToken: string,
-  authentication: InvitationAuthenticationContext = {},
-  // When a brand-new account is created specifically to accept an org invite,
-  // we disable its personal account. Existing users keep their current value.
-  isNewUser = false
+  authentication: InvitationAuthenticationContext = {}
 ): Promise<AcceptInviteResult> {
   try {
     const result = await db.transaction(async tx => {
@@ -695,6 +692,7 @@ export async function acceptOrganizationInvite(
         .select({
           email: kilocode_users.google_user_email,
           normalizedEmail: kilocode_users.normalized_email,
+          createdAt: kilocode_users.created_at,
         })
         .from(kilocode_users)
         .where(eq(kilocode_users.id, userId))
@@ -784,9 +782,13 @@ export async function acceptOrganizationInvite(
         invited_by: invitation.invited_by,
       });
 
-      // A newly created account that joins an organization via invite should
-      // not have a personal account. Existing users keep their current value.
-      if (isNewUser) {
+      // If the invitation predates the account, the account was created after
+      // (i.e. because of) a pending invite: this is a brand-new user joining an
+      // organization via invite, so disable their personal account. Existing
+      // users — whose account predates the invitation — keep their value.
+      const accountCreatedForInvite =
+        new Date(invitation.created_at).getTime() < new Date(acceptingUser.createdAt).getTime();
+      if (accountCreatedForInvite) {
         await tx
           .update(kilocode_users)
           .set({ personal_account_disabled: true })

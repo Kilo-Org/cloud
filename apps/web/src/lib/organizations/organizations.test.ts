@@ -1598,7 +1598,7 @@ describe('Organizations', () => {
         expect(storedInvitation?.accepted_at).not.toBeNull();
       });
 
-      test('disables the personal account for a new user joining via invite', async () => {
+      test('disables the personal account when the account was created after the invite', async () => {
         const owner = await insertTestUser();
         const invitee = await insertTestUser();
         const organization = await createOrganization('Test Org', owner.id);
@@ -1609,8 +1609,13 @@ describe('Organizations', () => {
           invitee.google_user_email,
           'member'
         );
+        // Simulate a brand-new account created to accept an already-pending invite.
+        await db
+          .update(organization_invitations)
+          .set({ created_at: sql`NOW() - INTERVAL '1 hour'` })
+          .where(eq(organization_invitations.id, invitation.id));
 
-        const result = await acceptOrganizationInvite(invitee.id, invitation.token, {}, true);
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
         expect(result.success).toBe(true);
 
         const updatedInvitee = await db.query.kilocode_users.findFirst({
@@ -1619,11 +1624,13 @@ describe('Organizations', () => {
         expect(updatedInvitee?.personal_account_disabled).toBe(true);
       });
 
-      test('leaves the personal account untouched for an existing user joining via invite', async () => {
+      test('leaves the personal account untouched when the account predates the invite', async () => {
         const owner = await insertTestUser();
         const invitee = await insertTestUser();
         const organization = await createOrganization('Test Org', owner.id);
 
+        // The invitation is created after the invitee's account, matching an
+        // existing user who is later invited to an organization.
         const invitation = await inviteUserToOrganization(
           organization.id,
           owner.id,

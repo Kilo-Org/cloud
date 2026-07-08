@@ -2,6 +2,7 @@ import {
   getOrganizationById,
   mutateOrganizationSettings,
   setOrganizationRecommendationsDigestEnabled,
+  updateOrganizationSettings,
 } from '@/lib/organizations/organizations';
 import type {
   OpenRouterModelsResponse,
@@ -723,16 +724,11 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      const updatedSettings = await db.transaction(async tx =>
-        mutateOrganizationSettings(
-          organizationId,
-          organization => ({
-            ...organization.settings,
-            data_collection: dataCollection,
-          }),
-          tx
-        )
-      );
+      // Update the data collection setting
+      const updatedSettings = await updateOrganizationSettings(organizationId, {
+        ...existingOrg.settings,
+        data_collection: dataCollection,
+      });
 
       return {
         settings: updatedSettings,
@@ -765,34 +761,24 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      let previousSettings: OrganizationSettings | undefined;
-      const updatedSettings = await db.transaction(async tx => {
-        const settings = await mutateOrganizationSettings(
-          organizationId,
-          organization => {
-            previousSettings = organization.settings;
-            return {
-              ...organization.settings,
-              projects_ui_enabled,
-            };
-          },
-          tx
-        );
-
-        if (previousSettings?.projects_ui_enabled !== projects_ui_enabled) {
-          await createAuditLog({
-            action: 'organization.settings.change',
-            actor_email: ctx.user.google_user_email,
-            actor_id: ctx.user.id,
-            actor_name: ctx.user.google_user_name,
-            message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
-            organization_id: organizationId,
-            tx,
-          });
-        }
-
-        return settings;
+      // Merge with existing settings
+      const currentSettings = existingOrg.settings || {};
+      const updatedSettings = await updateOrganizationSettings(organizationId, {
+        ...currentSettings,
+        projects_ui_enabled,
       });
+
+      // Create audit log if the value changed
+      if (currentSettings.projects_ui_enabled !== projects_ui_enabled) {
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: `Projects UI: ${projects_ui_enabled ? 'enabled' : 'disabled'}`,
+          organization_id: organizationId,
+        });
+      }
 
       return {
         settings: updatedSettings,
@@ -813,34 +799,24 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      let previousSettings: OrganizationSettings | undefined;
-      const updatedSettings = await db.transaction(async tx => {
-        const settings = await mutateOrganizationSettings(
-          organizationId,
-          organization => {
-            previousSettings = organization.settings;
-            return {
-              ...organization.settings,
-              code_indexing_enabled,
-            };
-          },
-          tx
-        );
-
-        if (previousSettings?.code_indexing_enabled !== code_indexing_enabled) {
-          await createAuditLog({
-            action: 'organization.settings.change',
-            actor_email: ctx.user.google_user_email,
-            actor_id: ctx.user.id,
-            actor_name: ctx.user.google_user_name,
-            message: `[Admin] Code indexing: ${code_indexing_enabled ? 'enabled' : 'disabled'}`,
-            organization_id: organizationId,
-            tx,
-          });
-        }
-
-        return settings;
+      // Merge with existing settings
+      const currentSettings = existingOrg.settings || {};
+      const updatedSettings = await updateOrganizationSettings(organizationId, {
+        ...currentSettings,
+        code_indexing_enabled,
       });
+
+      // Create audit log if the value changed
+      if (currentSettings.code_indexing_enabled !== code_indexing_enabled) {
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: `[Admin] Code indexing: ${code_indexing_enabled ? 'enabled' : 'disabled'}`,
+          organization_id: organizationId,
+        });
+      }
 
       return {
         settings: updatedSettings,
@@ -861,47 +837,41 @@ export const organizationsSettingsRouter = createTRPCRouter({
         });
       }
 
-      let previousSettings: OrganizationSettings | undefined;
-      const updatedSettings = await db.transaction(async tx => {
-        const settings = await mutateOrganizationSettings(
-          organizationId,
-          organization => {
-            previousSettings = organization.settings;
-            if (enabled) {
-              return {
-                ...organization.settings,
-                minimum_balance,
-                minimum_balance_alert_email,
-              };
-            }
+      const currentSettings = existingOrg.settings || {};
+      let updatedSettings: OrganizationSettings;
 
-            const settings = { ...organization.settings };
-            delete settings.minimum_balance;
-            delete settings.minimum_balance_alert_email;
-            return settings;
-          },
-          tx
-        );
+      if (enabled) {
+        updatedSettings = await updateOrganizationSettings(organizationId, {
+          ...currentSettings,
+          minimum_balance,
+          minimum_balance_alert_email,
+        });
+      } else {
+        // Remove the fields when disabled
+        const {
+          minimum_balance: _mb,
+          minimum_balance_alert_email: _mbae,
+          ...rest
+        } = currentSettings;
+        updatedSettings = await updateOrganizationSettings(organizationId, rest);
+      }
 
-        const wasEnabled =
-          previousSettings?.minimum_balance !== undefined &&
-          previousSettings?.minimum_balance_alert_email !== undefined;
-        if (enabled !== wasEnabled || enabled) {
-          await createAuditLog({
-            action: 'organization.settings.change',
-            actor_email: ctx.user.google_user_email,
-            actor_id: ctx.user.id,
-            actor_name: ctx.user.google_user_name,
-            message: enabled
-              ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
-              : 'Minimum balance alert: disabled',
-            organization_id: organizationId,
-            tx,
-          });
-        }
-
-        return settings;
-      });
+      // Create audit log
+      const wasEnabled =
+        currentSettings.minimum_balance !== undefined &&
+        currentSettings.minimum_balance_alert_email !== undefined;
+      if (enabled !== wasEnabled || enabled) {
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: enabled
+            ? `Minimum balance alert: enabled (threshold: $${minimum_balance}, emails: ${minimum_balance_alert_email?.join(', ')})`
+            : 'Minimum balance alert: disabled',
+          organization_id: organizationId,
+        });
+      }
 
       return {
         settings: updatedSettings,

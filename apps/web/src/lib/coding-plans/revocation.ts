@@ -1,12 +1,35 @@
 import 'server-only';
 
+import { createHmac } from 'node:crypto';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
-import type { CodingPlanId } from '@/lib/coding-plans/pricing';
+import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import {
+  type MiniMaxCodingPlanCredentialValidationInput,
+  validateMiniMaxCodingPlanCredential,
+} from '@/lib/coding-plans/inventory-validation';
+import { isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@/lib/drizzle';
 import { coding_plan_key_inventory, coding_plan_subscriptions } from '@kilocode/db/schema';
 
 export type ManualRevocationStatus = 'revocation_pending' | 'revocation_failed';
+
+type InventoryCredentialValidator = (
+  input: MiniMaxCodingPlanCredentialValidationInput
+) => Promise<boolean>;
+
+type ManualCredentialReplacementOptions = {
+  validateCredential?: InventoryCredentialValidator;
+};
+
+function credentialFingerprint(apiKey: string): string {
+  if (!BYOK_ENCRYPTION_KEY) {
+    throw new Error('BYOK encryption is not configured');
+  }
+
+  return createHmac('sha256', BYOK_ENCRYPTION_KEY).update(apiKey).digest('hex');
+}
 
 export async function listManualCredentialRevocations(input: {
   planId?: CodingPlanId;
@@ -80,6 +103,77 @@ export async function markCredentialManuallyRevoked(inventoryKeyId: string): Pro
 
   if ((result.rowCount ?? 0) === 0) {
     throw new Error('Credential is not eligible for manual revocation completion.');
+  }
+}
+
+export async function replaceManualCredentialRevocation(
+  inventoryKeyId: string,
+  apiKey: string,
+  options: ManualCredentialReplacementOptions = {}
+): Promise<void> {
+  if (!BYOK_ENCRYPTION_KEY) {
+    throw new Error('BYOK encryption is not configured');
+  }
+
+  const normalizedApiKey = apiKey.trim();
+  if (!normalizedApiKey) {
+    throw new Error('A replacement MiniMax API key is required.');
+  }
+
+  const [credential] = await db
+    .select({
+      planId: coding_plan_key_inventory.plan_id,
+      upstreamPlanId: coding_plan_key_inventory.upstream_plan_id,
+    })
+    .from(coding_plan_key_inventory)
+    .where(
+      and(
+        eq(coding_plan_key_inventory.id, inventoryKeyId),
+        inArray(coding_plan_key_inventory.status, ['revocation_pending', 'revocation_failed'])
+      )
+    )
+    .limit(1);
+  if (!credential) {
+    throw new Error('Credential is not eligible for replacement.');
+  }
+  if (!isCodingPlanId(credential.planId)) {
+    throw new Error('Credential has an unsupported Coding Plan ID.');
+  }
+
+  const validateCredential = options.validateCredential ?? validateMiniMaxCodingPlanCredential;
+  const isValid = await validateCredential({
+    apiKey: normalizedApiKey,
+    planId: credential.planId,
+    upstreamPlanId: credential.upstreamPlanId,
+  });
+  if (!isValid) {
+    throw new Error(
+      'Replacement MiniMax credential failed validation. Confirm plan access and supported model behavior, then try again.'
+    );
+  }
+
+  const result = await db
+    .update(coding_plan_key_inventory)
+    .set({
+      status: 'available',
+      encrypted_api_key: encryptApiKey(normalizedApiKey, BYOK_ENCRYPTION_KEY),
+      credential_fingerprint: credentialFingerprint(normalizedApiKey),
+      assigned_to_user_id: null,
+      assigned_at: null,
+      revocation_requested_at: null,
+      revoked_at: null,
+      revocation_attempt_count: sql`${coding_plan_key_inventory.revocation_attempt_count} + 1`,
+      last_revocation_error: null,
+    })
+    .where(
+      and(
+        eq(coding_plan_key_inventory.id, inventoryKeyId),
+        inArray(coding_plan_key_inventory.status, ['revocation_pending', 'revocation_failed'])
+      )
+    );
+
+  if ((result.rowCount ?? 0) === 0) {
+    throw new Error('Credential is not eligible for replacement.');
   }
 }
 

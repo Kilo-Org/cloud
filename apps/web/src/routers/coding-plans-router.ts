@@ -1,4 +1,4 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
@@ -17,6 +17,7 @@ import {
   markCredentialManuallyRevoked,
   markCredentialManualRevocationFailed,
   requeueManualCredentialRevocation,
+  replaceManualCredentialRevocation,
 } from '@/lib/coding-plans/revocation';
 import {
   CODING_PLAN_IDS,
@@ -28,9 +29,11 @@ import { UserByokProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/
 import { billingHistoryResponseSchema } from '@/lib/subscriptions/subscription-center';
 import { baseProcedure, adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
+  coding_plan_availability_intents,
   coding_plan_subscriptions,
   coding_plan_terms,
   credit_transactions,
+  kilocode_users,
 } from '@kilocode/db/schema';
 
 const CodingPlanIdSchema = z.enum(CODING_PLAN_IDS);
@@ -43,8 +46,10 @@ const BillingHistoryInputSchema = z.object({
 
 const codingPlanSubscriptionColumns = {
   id: coding_plan_subscriptions.id,
+  userId: coding_plan_subscriptions.user_id,
   planId: coding_plan_subscriptions.plan_id,
   providerId: coding_plan_subscriptions.provider_id,
+  keyInventoryId: coding_plan_subscriptions.key_inventory_id,
   installedByokKeyId: coding_plan_subscriptions.installed_byok_key_id,
   status: coding_plan_subscriptions.status,
   costMicrodollars: coding_plan_subscriptions.cost_microdollars,
@@ -156,6 +161,33 @@ export const codingPlansRouter = createTRPCRouter({
   listSubscriptions: baseProcedure.query(async ({ ctx }) => {
     const subscriptions = await listOwnedSubscriptions(ctx.user.id);
     return subscriptions.map(toCodingPlanSubscriptionView);
+  }),
+
+  adminListSubscriptions: adminProcedure.input(z.object({})).query(async () => {
+    const subscriptions = await db
+      .select({
+        ...codingPlanSubscriptionColumns,
+        userName: kilocode_users.google_user_name,
+      })
+      .from(coding_plan_subscriptions)
+      .innerJoin(kilocode_users, eq(kilocode_users.id, coding_plan_subscriptions.user_id))
+      .orderBy(desc(coding_plan_subscriptions.created_at));
+
+    return subscriptions.map(subscription => ({
+      ...toCodingPlanSubscriptionView(subscription),
+      userId: subscription.userId,
+      userName: subscription.userName,
+    }));
+  }),
+
+  adminAvailabilityIntentCounts: adminProcedure.input(z.object({})).query(async () => {
+    return db
+      .select({
+        planId: coding_plan_availability_intents.plan_id,
+        count: count(),
+      })
+      .from(coding_plan_availability_intents)
+      .groupBy(coding_plan_availability_intents.plan_id);
   }),
 
   getSubscriptionDetail: baseProcedure
@@ -334,6 +366,17 @@ export const codingPlansRouter = createTRPCRouter({
     .mutation(async ({ input }) => {
       try {
         await markCredentialManuallyRevoked(input.inventoryKeyId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message });
+      }
+    }),
+
+  adminReplaceRevocationCredential: adminProcedure
+    .input(z.object({ inventoryKeyId: z.string().uuid(), apiKey: z.string().trim().min(1) }))
+    .mutation(async ({ input }) => {
+      try {
+        await replaceManualCredentialRevocation(input.inventoryKeyId, input.apiKey);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message });

@@ -454,7 +454,23 @@ describe('coding plans router', () => {
     expect(failed.encrypted_api_key).toBeNull();
     expect(failed.last_revocation_error).toContain('bearer [redacted]');
 
-    await adminCaller.codingPlans.adminRequeueRevocation({ inventoryKeyId: workItem.id });
+    mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
+    await adminCaller.codingPlans.adminReplaceRevocationCredential({
+      inventoryKeyId: workItem.id,
+      apiKey: 'replacement-minimax-key',
+    });
+    let [credential] = await db
+      .select()
+      .from(coding_plan_key_inventory)
+      .where(eq(coding_plan_key_inventory.id, workItem.id));
+    expect(credential.status).toBe('available');
+    expect(credential.upstream_plan_id).toBe('minimax-deprovision-plan');
+    expect(credential.encrypted_api_key).not.toBeNull();
+
+    await db
+      .update(coding_plan_key_inventory)
+      .set({ status: 'revocation_pending', encrypted_api_key: null })
+      .where(eq(coding_plan_key_inventory.id, workItem.id));
     await adminCaller.codingPlans.adminMarkRevocationComplete({ inventoryKeyId: workItem.id });
     const [revoked] = await db
       .select()

@@ -24,6 +24,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // users. The switcher hiding and default sign-in redirect are not enough on
   // their own — a user could otherwise reach e.g. /profile by typing the URL or
   // via a validated callbackPath. Enforce it at the layout boundary.
+  //
+  // Scope note: this is a navigation/UX policy for org-managed users, not a
+  // hard security boundary. It covers the personal surfaces rendered under the
+  // (app) group; it deliberately does not gate every personal tRPC mutation or
+  // OAuth flow. The one action that would let such a user regain a personal
+  // workspace (organization creation) is gated separately in the organizations
+  // router. Broader per-endpoint enforcement is intentionally out of scope.
   if (user && personalAccountDisabled) {
     const pathname = (await headers()).get('x-pathname') ?? '';
     if (pathname && isRestrictedPersonalPath(pathname)) {

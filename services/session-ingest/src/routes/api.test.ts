@@ -264,10 +264,9 @@ describe('api routes', () => {
       'usr_test',
       expect.objectContaining({ type: 'session.created' })
     );
-    expect(env.NOTIFICATIONS.sendSessionReadyNotification).toHaveBeenCalledWith({
-      userId: 'usr_test',
-      cliSessionId: 'ses_12345678901234567890123456',
-    });
+    // The session-ready push fires from the queue consumer on first ingest
+    // (where parentID is known), never at creation.
+    expect(env.NOTIFICATIONS.sendSessionReadyNotification).not.toHaveBeenCalled();
   });
 
   it('POST /session does not emit created when row already exists', async () => {

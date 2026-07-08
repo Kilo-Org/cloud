@@ -137,6 +137,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     r2References?: Record<string, string>
   ): Promise<{
     changes: Changes;
+    firstIngest: boolean;
   }> {
     const deletedRow = this.db
       .select({ value: ingestMeta.value })
@@ -151,10 +152,15 @@ export class SessionIngestDO extends DurableObject<Env> {
           await this.env.SESSION_INGEST_R2.delete(keys);
         }
       }
-      return { changes: [] };
+      return { changes: [], firstIngest: false };
     }
 
-    writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: kiloUserId });
+    // The kiloUserId meta row is written exactly once per DO lifetime, so its
+    // first write doubles as the "first ingest for this session" signal.
+    const firstIngest = writeIngestMetaIfChanged(this.db, {
+      key: 'kiloUserId',
+      incomingValue: kiloUserId,
+    }).changed;
     writeIngestMetaIfChanged(this.db, { key: 'sessionId', incomingValue: sessionId });
     writeIngestMetaIfChanged(this.db, {
       key: 'ingestVersion',
@@ -301,6 +307,7 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     return {
       changes,
+      firstIngest,
     };
   }
 

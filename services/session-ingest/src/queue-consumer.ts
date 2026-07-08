@@ -169,9 +169,10 @@ async function processMessage(
 
   const body = await getStagingObjectBody(env, msg.r2Key);
   const mergedChanges = new Map<string, string | null>();
+  let firstIngest = false;
 
   try {
-    await ingestStagedSessionItems(env, msg, body, mergedChanges);
+    firstIngest = await ingestStagedSessionItems(env, msg, body, mergedChanges);
   } catch (err) {
     // An earlier chunk may have committed to the DO before a later chunk (or the
     // JSON parse) failed. The DO reports a metadata change only when its stored
@@ -183,7 +184,50 @@ async function processMessage(
   }
 
   await applyMetadataChanges(env, msg.kiloUserId, msg.sessionId, mergedChanges, ctx);
+  if (firstIngest) {
+    await sendSessionReadyPushForMainSession(env, msg, ctx);
+  }
   await env.SESSION_INGEST_R2.delete(msg.r2Key);
+}
+
+/**
+ * Push "session ready to control from your phone" once per session, on its
+ * first ingest. Fired here rather than at `POST /session` because a subagent
+ * is only identifiable by the `parentID` on its ingested session item — at
+ * creation time every session looks like a main session. The parent check runs
+ * after `applyMetadataChanges`, so a subagent's first payload has already set
+ * `parent_session_id` by the time we read it.
+ */
+async function sendSessionReadyPushForMainSession(
+  env: Env,
+  msg: IngestQueueMessage,
+  ctx: ExecutionContext
+): Promise<void> {
+  const db = getWorkerDb(env.HYPERDRIVE.connectionString);
+  const [row] = await db
+    .select({ parent_session_id: cli_sessions_v2.parent_session_id })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.session_id, msg.sessionId),
+        eq(cli_sessions_v2.kilo_user_id, msg.kiloUserId)
+      )
+    )
+    .limit(1);
+
+  if (!row || row.parent_session_id !== null) return;
+
+  // Push failures must never fail ingest processing, so log and move on.
+  const pushPromise = env.NOTIFICATIONS.sendSessionReadyNotification({
+    userId: msg.kiloUserId,
+    cliSessionId: msg.sessionId,
+  }).catch((error: unknown) => {
+    console.error('Failed to send session-ready push (non-fatal)', {
+      sessionId: msg.sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+  ctx.waitUntil(pushPromise);
 }
 
 async function flushPartialMetadataChanges(
@@ -241,7 +285,7 @@ async function ingestStagedSessionItems(
   msg: IngestQueueMessage,
   body: ReadableStream<Uint8Array>,
   mergedChanges: Map<string, string | null>
-): Promise<void> {
+): Promise<boolean> {
   const chunker = createIngestChunker(env, msg, mergedChanges);
   const parseError = await streamSessionItems(msg.r2Key, body, rawItem => chunker.stage(rawItem));
 
@@ -251,6 +295,7 @@ async function ingestStagedSessionItems(
 
   // Handle any remaining items not flushed yet.
   await chunker.flushChunkToSessionDO();
+  return chunker.wasFirstIngest();
 }
 
 async function streamSessionItems(
@@ -330,6 +375,7 @@ function createIngestChunker(
   const chunkItemIds = new Set<string>();
   let chunkR2References: Record<string, string> = {};
   let chunkBytes = 0;
+  let firstIngest = false;
 
   const flushChunkToSessionDO = async (): Promise<void> => {
     if (chunk.length === 0) return;
@@ -346,6 +392,9 @@ function createIngestChunker(
     );
     for (const change of ingestResult.changes) {
       mergedChanges.set(change.name, change.value);
+    }
+    if (ingestResult.firstIngest) {
+      firstIngest = true;
     }
   };
 
@@ -392,7 +441,7 @@ function createIngestChunker(
     }
   };
 
-  return { stage, flushChunkToSessionDO };
+  return { stage, flushChunkToSessionDO, wasFirstIngest: () => firstIngest };
 }
 
 type SessionMetadataUpdates = Partial<

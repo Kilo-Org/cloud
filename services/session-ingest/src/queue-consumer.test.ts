@@ -372,6 +372,148 @@ describe('queue', () => {
     expect(retry).not.toHaveBeenCalled();
   });
 
+  it('sends the session-ready push on first ingest of a main session', async () => {
+    const ingest = vi.fn(async () => ({ changes: [], firstIngest: true }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    const limit = vi.fn(async () => [{ session_id: 'ses_main', parent_session_id: null }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+
+    const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
+    const sendSessionReadyNotification = vi.fn(async () => ({ dispatched: true }));
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: vi.fn(async () => undefined),
+      },
+      NOTIFICATIONS: { sendSessionReadyNotification },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/push-main',
+              kiloUserId: 'usr_push',
+              sessionId: 'ses_main',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(sendSessionReadyNotification).toHaveBeenCalledWith({
+      userId: 'usr_push',
+      cliSessionId: 'ses_main',
+    });
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('does not push for a subagent session (parent_session_id set by first ingest)', async () => {
+    const ingest = vi.fn(async () => ({ changes: [], firstIngest: true }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    const limit = vi.fn(async () => [{ session_id: 'ses_child', parent_session_id: 'ses_parent' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+
+    const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
+    const sendSessionReadyNotification = vi.fn(async () => ({ dispatched: true }));
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: vi.fn(async () => undefined),
+      },
+      NOTIFICATIONS: { sendSessionReadyNotification },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/push-subagent',
+              kiloUserId: 'usr_push',
+              sessionId: 'ses_child',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(sendSessionReadyNotification).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not push on subsequent ingests', async () => {
+    const ingest = vi.fn(async () => ({ changes: [], firstIngest: false }));
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    const limit = vi.fn(async () => [{ session_id: 'ses_main', parent_session_id: null }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+
+    const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_2' } }] });
+    const sendSessionReadyNotification = vi.fn(async () => ({ dispatched: true }));
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(body)),
+        put: vi.fn(async () => undefined),
+        delete: vi.fn(async () => undefined),
+      },
+      NOTIFICATIONS: { sendSessionReadyNotification },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/push-repeat',
+              kiloUserId: 'usr_push',
+              sessionId: 'ses_main',
+              ingestVersion: 1,
+              ingestedAt: 2,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(sendSessionReadyNotification).not.toHaveBeenCalled();
+    expect(ack).toHaveBeenCalledTimes(1);
+  });
+
   it('splits a message past the chunk cap into ordered DO ingest calls', async () => {
     // 129 items exceed INGEST_CHUNK_MAX_ITEMS (128) -> two chunks: 128 then 1.
     // Both chunks must commit in order; non-empty changes trigger the final metadata flush.

@@ -53,15 +53,14 @@ export function PlatformAdminsContent() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
-  // Stable focus target for the case where the confirmation dialog closes
-  // because its mutation succeeded: the row that triggered it (a roster
-  // "Revoke" or candidate "Grant" button) is removed from the DOM once the
-  // roster/candidate queries are invalidated, so Radix's default trigger-based
-  // focus restoration has nothing to return to and would fall back to <body>.
-  // On a plain cancel/Escape/close-button dismissal the trigger still exists,
-  // so we let Radix restore focus to it normally (see onCloseAutoFocus below).
+  // The dialog is controlled and has no DialogTrigger, so Radix has no trigger
+  // ref to restore focus to on close and would leave focus on <body>. We track
+  // the element that opened the dialog (the clicked Grant/Revoke button) and
+  // restore focus to it if it's still connected — which it is for a plain
+  // cancel/Escape/close-button dismissal. On a state-changing mutation that
+  // row is unmounted, so we fall back to a stable container instead.
   const contentRef = useRef<HTMLDivElement>(null);
-  const redirectFocusOnCloseRef = useRef(false);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   const trimmedSearchTerm = searchTerm.trim();
 
@@ -96,11 +95,6 @@ export function PlatformAdminsContent() {
     trpc.admin.users.setPlatformAdminAccess.mutationOptions({
       onSuccess: (result, variables) => {
         invalidateAfterChange();
-        // A changed result removes the triggering row from its table, so the
-        // dialog's close should redirect focus to a stable element rather than
-        // a now-unmounted trigger. A no-op leaves the trigger in place, so let
-        // Radix restore focus to it as usual.
-        redirectFocusOnCloseRef.current = result.changed;
         setConfirmAction(null);
         if (!result.changed) {
           toast.message(
@@ -133,11 +127,13 @@ export function PlatformAdminsContent() {
 
   const candidateRows = useMemo(() => candidates ?? [], [candidates]);
 
-  function requestRevoke(user: PlatformAdminUser) {
+  function requestRevoke(user: PlatformAdminUser, event: React.MouseEvent<HTMLButtonElement>) {
+    openerRef.current = event.currentTarget;
     setConfirmAction({ type: 'revoke', user });
   }
 
-  function requestGrant(user: PlatformAdminUser) {
+  function requestGrant(user: PlatformAdminUser, event: React.MouseEvent<HTMLButtonElement>) {
+    openerRef.current = event.currentTarget;
     setConfirmAction({ type: 'grant', user });
   }
 
@@ -209,7 +205,7 @@ export function PlatformAdminsContent() {
                             size="sm"
                             variant="outline"
                             disabled={pendingUserId === admin.id}
-                            onClick={() => requestRevoke(admin)}
+                            onClick={event => requestRevoke(admin, event)}
                           >
                             Revoke
                           </Button>
@@ -247,8 +243,14 @@ export function PlatformAdminsContent() {
                 onChange={setSearchTerm}
                 isLoading={isSearching}
                 placeholder="Search by email or name..."
-                aria-label="Search for a kilocode.ai user to grant platform admin access"
+                aria-describedby="platform-admin-candidate-search-hint"
               />
+              <p
+                id="platform-admin-candidate-search-hint"
+                className="text-muted-foreground text-xs"
+              >
+                Only registered kilocode.ai users who are not already admins can be granted access.
+              </p>
             </div>
 
             {trimmedSearchTerm.length === 0 ? (
@@ -296,7 +298,7 @@ export function PlatformAdminsContent() {
                           <Button
                             size="sm"
                             disabled={pendingUserId === candidate.id}
-                            onClick={() => requestGrant(candidate)}
+                            onClick={event => requestGrant(candidate, event)}
                           >
                             Grant
                           </Button>
@@ -328,16 +330,18 @@ export function PlatformAdminsContent() {
         <DialogContent
           showCloseButton={!setAccessMutation.isPending}
           onCloseAutoFocus={event => {
-            // Only override Radix's focus restoration when the close was caused
-            // by a state-changing mutation that removed the triggering row (see
-            // `redirectFocusOnCloseRef`). For a plain cancel/Escape/close-button
-            // dismissal the trigger still exists, so let Radix return focus to
-            // it instead of stealing focus to the container.
-            if (redirectFocusOnCloseRef.current) {
-              event.preventDefault();
+            // Controlled dialog with no DialogTrigger: Radix can't restore focus
+            // on its own. Return focus to the opener button if it's still in the
+            // DOM (cancel/Escape/close-button paths), otherwise fall back to the
+            // stable container (the opener row was unmounted by a state change).
+            event.preventDefault();
+            const opener = openerRef.current;
+            if (opener && opener.isConnected) {
+              opener.focus();
+            } else {
               contentRef.current?.focus();
-              redirectFocusOnCloseRef.current = false;
             }
+            openerRef.current = null;
           }}
         >
           <DialogHeader>

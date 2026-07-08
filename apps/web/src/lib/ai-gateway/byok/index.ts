@@ -12,12 +12,12 @@ import {
 import { isCodestralModel } from '@/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
-import { getVercelModelsMetadata } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getVercelModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
 
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
-  const vercelModelMetadata = await getVercelModelsMetadata();
+  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
   if (Object.keys(vercelModelMetadata).length === 0) {
     console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
     return [];

@@ -5,7 +5,7 @@ import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage
 import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
-import { getOpenRouterModels } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterModelsFromRedis } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { accountForMicrodollarUsage } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { redisClient } from '@/lib/redis';
@@ -86,7 +86,7 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedClassifyAbuse = jest.mocked(classifyAbuse);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
-const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModels);
+const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromRedis);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
 const mockedRedisGet = jest.mocked(redisClient.get);

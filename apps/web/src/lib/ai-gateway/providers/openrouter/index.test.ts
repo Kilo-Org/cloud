@@ -21,7 +21,7 @@ import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getOpenRouterModelsMetadata: jest.fn(() => Promise.resolve({})),
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
 }));
 
 const originalFetch = global.fetch;

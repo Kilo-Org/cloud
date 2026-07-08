@@ -23,7 +23,7 @@ import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 import {
   getCachedVercelInferenceProviderIdsForModel,
-  getVercelModels,
+  getVercelModelsFromRedis,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
@@ -104,7 +104,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const vercelModels = await getVercelModels();
+  const vercelModels = await getVercelModelsFromRedis();
   const vercelModelId = mapModelIdToVercel(requestedModel, isReasoningExplicitlyDisabled(request));
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);

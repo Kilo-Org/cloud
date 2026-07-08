@@ -2,8 +2,11 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useSidebar, type Sidebar } from '@/components/ui/sidebar';
+import { useQuery } from '@tanstack/react-query';
+import { Sidebar, useSidebar } from '@/components/ui/sidebar';
 import { useUrlOrganizationId } from '@/hooks/useUrlOrganizationId';
+import { useUser } from '@/hooks/useUser';
+import { useTRPC } from '@/lib/trpc/utils';
 import PersonalAppSidebar from './PersonalAppSidebar';
 import OrganizationAppSidebar from './OrganizationAppSidebar';
 import { GastownTownSidebar } from '@/components/gastown/GastownTownSidebar';
@@ -44,11 +47,28 @@ function extractOrgWastelandId(pathname: string): { orgId: string; wastelandId: 
 }
 
 export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+  const trpc = useTRPC();
   const currentOrgId = useUrlOrganizationId();
+  const { data: user } = useUser();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const setupStep = searchParams.get('step');
   const { open, setOpenMobile, setOpenTransient } = useSidebar();
+  const isInvitedOnly = Boolean(user?.personal_account_disabled);
+  const { data: organizations, isPending: isOrganizationsPending } = useQuery(
+    trpc.organizations.list.queryOptions(undefined, {
+      enabled: isInvitedOnly && !currentOrgId,
+      trpc: { context: { skipBatch: true } },
+    })
+  );
+  // Match the server-side default (oldest org) so the sidebar org is consistent
+  // with getProfileRedirectPath.
+  const defaultOrganizationId = organizations?.length
+    ? [...organizations].sort((a, b) => {
+        const byCreatedAt = a.created_at.localeCompare(b.created_at);
+        return byCreatedAt !== 0 ? byCreatedAt : a.organizationId.localeCompare(b.organizationId);
+      })[0].organizationId
+    : null;
   const previousSidebarOpen = useRef<boolean | null>(null);
   const currentSidebarOpen = useRef(open);
   const sidebarActions = useRef({ setOpenMobile, setOpenTransient });
@@ -120,6 +140,21 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
   // Render organization sidebar if viewing an organization
   if (currentOrgId) {
     return <OrganizationAppSidebar organizationId={currentOrgId} {...props} />;
+  }
+
+  // Invited-only users (personal account disabled) have no personal surface.
+  // On non-org routes that remain reachable to them (e.g. /connected-accounts),
+  // keep them in their default organization's sidebar rather than the personal one.
+  if (isInvitedOnly) {
+    if (defaultOrganizationId) {
+      return <OrganizationAppSidebar organizationId={defaultOrganizationId} {...props} />;
+    }
+    // Avoid flashing the personal sidebar while resolving their default org.
+    // Only fall through to the personal sidebar for the rare orphan case
+    // (invited-only user who belongs to no organizations).
+    if (isOrganizationsPending) {
+      return <Sidebar {...props} />;
+    }
   }
 
   // Otherwise render personal sidebar

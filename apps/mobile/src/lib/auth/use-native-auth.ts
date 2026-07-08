@@ -218,6 +218,9 @@ export function useNativeAuth(): NativeAuthResult {
         }
         await signIn((result.data as TokenResponse).token);
         return true;
+      } catch {
+        toast.error(DEFAULT_ERROR_MESSAGE);
+        return false;
       } finally {
         setBusy(undefined);
       }

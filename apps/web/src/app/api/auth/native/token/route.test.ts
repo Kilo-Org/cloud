@@ -1,0 +1,241 @@
+import { NextRequest } from 'next/server';
+import { verifyNativeAppleIdToken, verifyNativeGoogleIdToken } from '@/lib/auth/native-id-tokens';
+import { verifyAndConsumeSignInCode } from '@/lib/auth/magic-link-tokens';
+import { createOrUpdateUser } from '@/lib/user';
+import { generateApiToken } from '@/lib/tokens';
+
+jest.mock('@/lib/auth/native-id-tokens');
+jest.mock('@/lib/auth/magic-link-tokens');
+jest.mock('@/lib/user');
+jest.mock('@/lib/tokens');
+
+import { POST } from './route';
+
+const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
+const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
+const mockVerifyAndConsumeSignInCode = jest.mocked(verifyAndConsumeSignInCode);
+const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
+const mockGenerateApiToken = jest.mocked(generateApiToken);
+
+const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as never;
+
+describe('POST /api/auth/native/token', () => {
+  const createRequest = (body: unknown) =>
+    new NextRequest('http://localhost:3000/api/auth/native/token', {
+      method: 'POST',
+      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateOrUpdateUser.mockResolvedValue({
+      success: true,
+      user: fakeUser,
+      isNew: false,
+    } as never);
+    mockGenerateApiToken.mockReturnValue('minted-jwt');
+  });
+
+  describe('apple', () => {
+    it('builds args mirroring createAppleAccountInfo, autoLink=false, and mints a token', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'apple', idToken: 'apple-id-token', fullName: 'Jane Doe' })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(mockVerifyNativeAppleIdToken).toHaveBeenCalledWith('apple-id-token');
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          google_user_email: 'appleuser@example.com',
+          google_user_name: 'Jane Doe',
+          hosted_domain: '@@apple@@',
+          provider: 'apple',
+          provider_account_id: 'apple-sub-1',
+        }),
+        undefined,
+        false,
+        expect.any(Headers)
+      );
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
+    });
+
+    it('falls back to the email prefix as the name when fullName is not provided', async () => {
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token' }));
+
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
+        expect.objectContaining({ google_user_name: 'appleuser' }),
+        undefined,
+        false,
+        expect.any(Headers)
+      );
+    });
+
+    it('returns 401 INVALID_TOKEN when Apple verification throws', async () => {
+      mockVerifyNativeAppleIdToken.mockRejectedValue(new Error('bad token'));
+
+      const response = await POST(createRequest({ provider: 'apple', idToken: 'bad-token' }));
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data).toEqual({ error: 'INVALID_TOKEN' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('google', () => {
+    it('builds args mirroring createGoogleAccountInfo (using hd) and autoLink=false', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+        name: 'Google User',
+        picture: 'https://example.com/pic.png',
+        hd: 'example.com',
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          google_user_email: 'googleuser@example.com',
+          google_user_name: 'Google User',
+          google_user_image_url: 'https://example.com/pic.png',
+          hosted_domain: 'example.com',
+          provider: 'google',
+          provider_account_id: 'google-sub-1',
+        }),
+        undefined,
+        false,
+        expect.any(Headers)
+      );
+    });
+
+    it('falls back to non_workspace_google_account hosted_domain when hd is absent', async () => {
+      mockVerifyNativeGoogleIdToken.mockResolvedValue({
+        sub: 'google-sub-1',
+        email: 'googleuser@example.com',
+      });
+
+      await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
+
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
+        expect.objectContaining({ hosted_domain: '@@personal@@' }),
+        undefined,
+        false,
+        expect.any(Headers)
+      );
+    });
+
+    it('returns 401 INVALID_TOKEN when Google verification throws', async () => {
+      mockVerifyNativeGoogleIdToken.mockRejectedValue(new Error('bad token'));
+
+      const response = await POST(createRequest({ provider: 'google', idToken: 'bad-token' }));
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data).toEqual({ error: 'INVALID_TOKEN' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('email', () => {
+    it('verifies the code before createOrUpdateUser, builds args mirroring createEmailAccountInfo, autoLink=true', async () => {
+      mockVerifyAndConsumeSignInCode.mockResolvedValue('ok');
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toEqual({ token: 'minted-jwt' });
+      expect(mockVerifyAndConsumeSignInCode).toHaveBeenCalledWith(
+        'emailuser@example.com',
+        '123456'
+      );
+      expect(mockCreateOrUpdateUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          google_user_email: 'emailuser@example.com',
+          google_user_name: 'emailuser',
+          hosted_domain: 'example.com',
+          provider: 'email',
+          provider_account_id: 'emailuser@example.com',
+        }),
+        undefined,
+        true,
+        expect.any(Headers)
+      );
+    });
+
+    it('returns 401 INVALID_CODE when the code is invalid, without calling createOrUpdateUser', async () => {
+      mockVerifyAndConsumeSignInCode.mockResolvedValue('invalid');
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '000000' })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data).toEqual({ error: 'INVALID_CODE' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('returns 429 TOO_MANY_ATTEMPTS when the attempt budget is exhausted', async () => {
+      mockVerifyAndConsumeSignInCode.mockResolvedValue('too_many_attempts');
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '000000' })
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(429);
+      expect(data).toEqual({ error: 'TOO_MANY_ATTEMPTS' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+  });
+
+  it('returns 403 with the AuthErrorType when createOrUpdateUser fails', async () => {
+    mockVerifyNativeGoogleIdToken.mockResolvedValue({
+      sub: 'google-sub-1',
+      email: 'googleuser@example.com',
+    });
+    mockCreateOrUpdateUser.mockResolvedValue({ success: false, error: 'BLOCKED' } as never);
+
+    const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data).toEqual({ error: 'BLOCKED' });
+    expect(mockGenerateApiToken).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an invalid body (unknown provider)', async () => {
+    const response = await POST(createRequest({ provider: 'bogus' }));
+
+    expect(response.status).toBe(400);
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when required fields are missing', async () => {
+    const response = await POST(createRequest({ provider: 'email', email: 'no-code@example.com' }));
+
+    expect(response.status).toBe(400);
+  });
+});

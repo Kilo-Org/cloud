@@ -33,6 +33,50 @@ describe('isKiloServerUnreachableError', () => {
     ).toBe(true);
   });
 
+  it('matches Bun fetch connection codes', () => {
+    expect(
+      isKiloServerUnreachableError(
+        Object.assign(new Error('Unable to connect. Is the computer able to access the url?'), {
+          code: 'ConnectionRefused',
+        })
+      )
+    ).toBe(true);
+  });
+
+  it('matches a wrapped SDK transport failure through its cause', () => {
+    const transport = Object.assign(
+      new Error('Unable to connect. Is the computer able to access the url?'),
+      { code: 'ConnectionRefused' }
+    );
+    expect(
+      isKiloServerUnreachableError(
+        new Error('Command for session ses_123 failed: Unable to connect.', { cause: transport })
+      )
+    ).toBe(true);
+  });
+
+  it('does not match a live-server application error whose body mentions a fetch failure', () => {
+    // A live kilo server relaying an upstream failure: the parsed response body
+    // (a plain object, not an Error) is attached as cause by the wrapper.
+    expect(
+      isKiloServerUnreachableError(
+        new Error('Async prompt for session ses_123 failed: upstream fetch failed: provider 502', {
+          cause: { message: 'upstream fetch failed: provider 502' },
+        })
+      )
+    ).toBe(false);
+  });
+
+  it('never pattern-matches the composed message of an error that carries a cause', () => {
+    expect(
+      isKiloServerUnreachableError(
+        new Error('Command for session ses_123 failed: fetch failed', {
+          cause: new Error('application rejected the command'),
+        })
+      )
+    ).toBe(false);
+  });
+
   it('does not match application-level errors from a live server', () => {
     expect(
       isKiloServerUnreachableError(new Error('Session get returned no data for ses_123'))

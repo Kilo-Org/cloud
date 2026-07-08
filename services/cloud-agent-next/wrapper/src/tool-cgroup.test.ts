@@ -6,6 +6,7 @@ import {
   classifyProcesses,
   isKiloServerProcess,
   parseToolCgroupConfig,
+  pidStillMatches,
   readMemTotalBytes,
   readProcessTable,
   startToolCgroup,
@@ -218,6 +219,22 @@ describe('readProcessTable / classifyProcesses', () => {
     expect(serverPids.sort((a, b) => a - b)).toEqual([101, 102]);
   });
 
+  it('pidStillMatches accepts an unchanged process and rejects reuse, exec and exit', async () => {
+    const procRoot = makeProcRoot([{ pid: 42, ppid: 7, argv: ['git', 'status'] }]);
+    const snapshot = { pid: 42, ppid: 7, argv: ['git', 'status'] };
+    expect(await pidStillMatches(procRoot, snapshot)).toBe(true);
+    // pid reused by a child of a different parent
+    writeFileSync(join(procRoot, '42', 'stat'), '42 (git) S 9 1 1 0');
+    expect(await pidStillMatches(procRoot, snapshot)).toBe(false);
+    // exec()ed into a different command since the snapshot
+    writeFileSync(join(procRoot, '42', 'stat'), '42 (git) S 7 1 1 0');
+    writeFileSync(join(procRoot, '42', 'cmdline'), 'node\0tsc\0');
+    expect(await pidStillMatches(procRoot, snapshot)).toBe(false);
+    // exited
+    rmSync(join(procRoot, '42'), { recursive: true, force: true });
+    expect(await pidStillMatches(procRoot, snapshot)).toBe(false);
+  });
+
   it('handles a comm containing spaces and parens', async () => {
     const procRoot = makeTempDir();
     const dir = join(procRoot, '42');
@@ -392,6 +409,26 @@ describe('ToolCgroupManager.sweep', () => {
     expect(migratedPids(config, 'kilo-server')).toEqual([101, 102]);
     expect(manager.health().migratedTotal).toBe(2);
     expect(manager.health().server.migratedTotal).toBe(1);
+  });
+
+  it('logs a migration failure once per error code instead of swallowing it', async () => {
+    const logs: string[] = [];
+    const config = makeConfig({});
+    const manager = new ToolCgroupManager(config, message => logs.push(message));
+    manager.setup();
+    // Break the tool slice's cgroup.procs deterministically (append hits EISDIR),
+    // standing in for a persistent failure like EACCES or a read-only remount.
+    mkdirSync(join(config.cgroupRoot, 'kilo-tools', 'cgroup.procs'));
+
+    await manager.sweep();
+    expect(logs.filter(line => line.includes('tool_cgroup_migrate_failed')).length).toBe(1);
+    expect(manager.health().migratedTotal).toBe(0);
+    // The healthy server slice keeps migrating.
+    expect(manager.health().server.migratedTotal).toBe(2);
+
+    // Repeated sweeps with the same persistent failure do not spam the log.
+    await manager.sweep();
+    expect(logs.filter(line => line.includes('tool_cgroup_migrate_failed')).length).toBe(1);
   });
 
   it('logs tool_cgroup_oom_kill when the tool slice records an OOM kill', async () => {

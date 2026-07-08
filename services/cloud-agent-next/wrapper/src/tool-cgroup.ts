@@ -260,6 +260,28 @@ export function isKiloServerProcess(argv: string[]): boolean {
 }
 
 /**
+ * True when /proc still shows the same (ppid, argv) for `snapshot.pid`.
+ * Checked immediately before migrating a pid: it may have exited after the
+ * sweep's /proc snapshot and been reused by an unrelated process, which the
+ * cgroup.procs write would then silently capture into the wrong slice. An
+ * identical (ppid, argv) replacement would classify identically, so equality
+ * suffices; a process that exec()ed since the snapshot is skipped and picked
+ * up on the next sweep under its new argv. The residual read→write race is
+ * accepted — reuse that fast would mean cycling the whole pid space in
+ * microseconds, and a wrongly captured wrapper descendant is re-migrated to
+ * its correct slice by the next sweep anyway.
+ */
+export async function pidStillMatches(procRoot: string, snapshot: ProcessEntry): Promise<boolean> {
+  const fresh = await readProcessEntry(procRoot, snapshot.pid);
+  return (
+    fresh !== undefined &&
+    fresh.ppid === snapshot.ppid &&
+    fresh.argv.length === snapshot.argv.length &&
+    fresh.argv.every((arg, index) => arg === snapshot.argv[index])
+  );
+}
+
+/**
  * Classifies strict descendants of `rootPid` into tool work vs. the
  * kilo-server chain. Traversal continues through server-chain processes so
  * tools they spawn are still classified as tool work.
@@ -307,6 +329,7 @@ class CgroupSlice {
   private eventsSeen: MemoryEvents = { oomKill: 0, oomGroupKill: 0 };
   private migratedTotal = 0;
   private lastOomAt: number | null = null;
+  private lastMigrateFailureCode: string | undefined;
 
   constructor(
     cgroupRoot: string,
@@ -360,16 +383,39 @@ class CgroupSlice {
     }
   }
 
-  async migrate(pids: number[], members: Set<number>): Promise<void> {
+  /** `stillCurrent` re-checks a pid against the /proc snapshot right before the write (pid reuse). */
+  async migrate(
+    pids: number[],
+    members: Set<number>,
+    stillCurrent: (pid: number) => Promise<boolean>
+  ): Promise<void> {
     for (const pid of pids) {
       if (members.has(pid)) continue;
+      if (!(await stillCurrent(pid))) continue;
       try {
         await appendFile(join(this.dir, 'cgroup.procs'), `${pid}\n`);
         this.migratedTotal++;
-      } catch {
-        // Expected race: the process exited between the /proc walk and the write.
+      } catch (error) {
+        this.logMigrateFailure(pid, error);
       }
     }
+  }
+
+  /**
+   * ESRCH is the expected race (the process exited between the /proc walk and
+   * the write) and stays silent. Anything else (EACCES, EROFS, removed dir)
+   * means migration — the point of this module — has stopped working and must
+   * be visible; deduped by code so a persistent failure logs once rather than
+   * once per pid per sweep.
+   */
+  private logMigrateFailure(pid: number, error: unknown): void {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ESRCH') return;
+    if (code !== undefined && code === this.lastMigrateFailureCode) return;
+    this.lastMigrateFailureCode = code;
+    this.log(
+      `tool_cgroup_migrate_failed cgroup=${this.name} pid=${pid} error=${error instanceof Error ? error.message : String(error)}`
+    );
   }
 
   /** Logs `oomLogTag` when a new OOM (group) kill happened since the last check. */
@@ -549,9 +595,13 @@ export class ToolCgroupManager {
         this.toolSlice.currentMembers(),
         this.serverSlice.currentMembers(),
       ]);
+      const stillCurrent = (pid: number) => {
+        const snapshot = table.get(pid);
+        return snapshot ? pidStillMatches(this.config.procRoot, snapshot) : Promise.resolve(false);
+      };
       await Promise.all([
-        this.toolSlice.migrate(toolPids, toolMembers),
-        this.serverSlice.migrate(serverPids, serverMembers),
+        this.toolSlice.migrate(toolPids, toolMembers, stillCurrent),
+        this.serverSlice.migrate(serverPids, serverMembers, stillCurrent),
       ]);
       this.toolSlice.checkOomEvents();
       this.serverSlice.checkOomEvents();

@@ -290,8 +290,10 @@ async function main() {
     toolCgroupHealth: () => toolCgroup?.health() ?? null,
     // Deduped: concurrent failed requests must share one restart rather than each
     // respawning the kilo server and racing to mutate closeKiloServer/kiloClient.
+    // No restarts during shutdown — a server spawned after handleShutdown snapshots
+    // activeRuntimeStartups would never be closed and leak past the wrapper's exit.
     restartKiloRuntime: (): Promise<void> => {
-      if (!runtimeWorkspacePath) return Promise.resolve();
+      if (isShuttingDown || !runtimeWorkspacePath) return Promise.resolve();
       if (inFlightRuntimeRestart) return inFlightRuntimeRestart;
       const restart = startKiloRuntime(runtimeWorkspacePath, kiloSessionId || undefined, true);
       inFlightRuntimeRestart = restart;
@@ -347,11 +349,31 @@ async function main() {
     },
   });
 
-  async function startKiloRuntime(
+  // Runtime transitions must not interleave: readySession, updateRuntimeEnvironment
+  // and restartKiloRuntime can each request one concurrently, and two bodies racing
+  // through the awaits in doStartKiloRuntime would overwrite each other's
+  // closeKiloServer/kiloClient/connectionManager bindings, orphaning one of the
+  // freshly spawned kilo server processes.
+  let runtimeTransitionChain: Promise<unknown> = Promise.resolve();
+
+  function startKiloRuntime(
     workspacePath: string,
     expectedSessionId?: string,
     forceRestart = false
   ): Promise<void> {
+    const transition = runtimeTransitionChain.then(() =>
+      doStartKiloRuntime(workspacePath, expectedSessionId, forceRestart)
+    );
+    runtimeTransitionChain = transition.catch(() => {});
+    return transition;
+  }
+
+  async function doStartKiloRuntime(
+    workspacePath: string,
+    expectedSessionId?: string,
+    forceRestart = false
+  ): Promise<void> {
+    if (isShuttingDown) throw new Error('Wrapper is shutting down');
     logToFile(
       `startKiloRuntime requested workspacePath=${workspacePath} expectedSessionId=${expectedSessionId ?? '(none)'} currentSessionId=${kiloSessionId || '(unset)'} hasClient=${Boolean(kiloClient)} runtimeWorkspacePath=${runtimeWorkspacePath ?? '(unset)'} home=${process.env.HOME ?? '(unset)'}`
     );

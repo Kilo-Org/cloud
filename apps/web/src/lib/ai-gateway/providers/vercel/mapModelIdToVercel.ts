@@ -15,6 +15,7 @@ import {
   GPT_MINI_CURRENT_VERCEL_MODEL_ID,
 } from '@/lib/ai-gateway/providers/openai';
 import { inferVercelFirstPartyInferenceProviderForModel } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { GROK_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/xai';
 
 const vercelModelIdMapping: Record<string, string | undefined> = {
   '~anthropic/claude-fable-latest': CLAUDE_FABLE_CURRENT_VERCEL_MODEL_ID,
@@ -26,6 +27,7 @@ const vercelModelIdMapping: Record<string, string | undefined> = {
   '~moonshotai/kimi-latest': KIMI_CURRENT_VERCEL_MODEL_ID,
   '~google/gemini-pro-latest': GEMINI_PRO_CURRENT_VERCEL_MODEL_ID,
   '~google/gemini-flash-latest': GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID,
+  '~x-ai/grok-latest': GROK_CURRENT_VERCEL_MODEL_ID,
   'mistralai/codestral-2508': 'mistral/codestral',
   'mistralai/devstral-2512': 'mistral/devstral-2',
   'mistralai/mistral-embed-2312': 'mistral/mistral-embed',

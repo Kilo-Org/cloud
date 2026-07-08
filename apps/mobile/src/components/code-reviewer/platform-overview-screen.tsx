@@ -28,6 +28,8 @@ import {
   useToggleReviewer,
 } from '@/lib/hooks/use-code-reviewer';
 
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
 export function PlatformOverviewScreen({
   scope,
   platform,
@@ -74,14 +76,16 @@ export function PlatformOverviewScreen({
             field: 'style',
             icon: MessageSquareText,
             title: 'Review Style',
-            subtitle: config.data.reviewStyle,
+            subtitle: capitalize(config.data.reviewStyle),
           },
           {
             field: 'focus-areas',
             icon: ShieldCheck,
             title: 'Focus Areas',
             subtitle:
-              config.data.focusAreas.length > 0 ? config.data.focusAreas.join(', ') : 'All areas',
+              config.data.focusAreas.length > 0
+                ? config.data.focusAreas.map(capitalize).join(', ')
+                : 'All areas',
           },
           {
             field: 'instructions',
@@ -96,7 +100,7 @@ export function PlatformOverviewScreen({
                   field: 'gate',
                   icon: Gauge,
                   title: 'Merge Gate',
-                  subtitle: config.data.gateThreshold,
+                  subtitle: capitalize(config.data.gateThreshold),
                 },
               ]
             : []),

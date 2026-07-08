@@ -49,7 +49,7 @@ export function OptionList<T extends string>({
                 </Text>
               ) : null}
             </View>
-            {selected === option ? <Check size={18} color={colors.foreground} /> : null}
+            <Check size={18} color={selected === option ? colors.foreground : 'transparent'} />
           </Pressable>
         ))}
       </ScrollView>

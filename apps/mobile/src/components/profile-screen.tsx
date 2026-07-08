@@ -131,6 +131,7 @@ export function ProfileScreen() {
             icon={GitPullRequest}
             title="Code Reviewer"
             subtitle="Automatic PR reviews"
+            className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/code-reviewer' as Href);

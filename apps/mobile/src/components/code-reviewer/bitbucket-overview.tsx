@@ -23,6 +23,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer';
 
 const capabilities = PLATFORM_CAPABILITIES.bitbucket;
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
 export function BitbucketOverview({
   scope,
@@ -52,14 +53,16 @@ export function BitbucketOverview({
             field: 'style',
             icon: MessageSquareText,
             title: 'Review Style',
-            subtitle: config.data.reviewStyle,
+            subtitle: capitalize(config.data.reviewStyle),
           },
           {
             field: 'focus-areas',
             icon: ShieldCheck,
             title: 'Focus Areas',
             subtitle:
-              config.data.focusAreas.length > 0 ? config.data.focusAreas.join(', ') : 'All areas',
+              config.data.focusAreas.length > 0
+                ? config.data.focusAreas.map(capitalize).join(', ')
+                : 'All areas',
           },
           {
             field: 'instructions',

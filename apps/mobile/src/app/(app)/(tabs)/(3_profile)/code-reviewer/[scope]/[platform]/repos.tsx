@@ -81,7 +81,7 @@ export default function ReposRoute() {
               <Text className="text-sm font-medium">
                 {option === 'all' ? 'All repositories' : 'Selected repositories'}
               </Text>
-              {mode === option ? <Check size={18} color={colors.foreground} /> : null}
+              <Check size={18} color={mode === option ? colors.foreground : 'transparent'} />
             </Pressable>
           ))}
 
@@ -117,9 +117,10 @@ export default function ReposRoute() {
                     {repo.fullName}
                   </Text>
                 </View>
-                {selectedIds.includes(repo.id) ? (
-                  <Check size={18} color={colors.foreground} />
-                ) : null}
+                <Check
+                  size={18}
+                  color={selectedIds.includes(repo.id) ? colors.foreground : 'transparent'}
+                />
               </Pressable>
             ))}
           </View>

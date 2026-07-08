@@ -53,7 +53,7 @@ export default function FocusAreasRoute() {
             }}
           >
             <Text className="text-sm font-medium capitalize">{area}</Text>
-            {selected.includes(area) ? <Check size={18} color={colors.foreground} /> : null}
+            <Check size={18} color={selected.includes(area) ? colors.foreground : 'transparent'} />
           </Pressable>
         ))}
       </ScrollView>

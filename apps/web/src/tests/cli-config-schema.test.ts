@@ -51,6 +51,7 @@ describe('kilo config.json schema merge', () => {
     expect(props.terminal_command_display).toBeDefined();
     expect(props.code_edit_display).toBeDefined();
     expect(props.hide_prompt_training_models).toBeDefined();
+    expect(props.sandbox).toBeDefined();
   });
 
   test('auto_collapse_reasoning is a boolean', () => {
@@ -75,6 +76,22 @@ describe('kilo config.json schema merge', () => {
   test('commit_message has a prompt string property', () => {
     const cm = props.commit_message as { properties: { prompt: unknown } };
     expect(cm.properties.prompt).toEqual(expect.objectContaining({ type: 'string' }));
+  });
+
+  test('sandbox is a first-class config object', () => {
+    const sandbox = props.sandbox as {
+      properties: Record<string, { type: string; enum?: string[] }>;
+      additionalProperties: boolean;
+    };
+    expect(sandbox.properties.enabled.type).toBe('boolean');
+    expect(sandbox.properties.network.enum).toEqual(['allow', 'deny']);
+    expect(sandbox.properties.writable_paths.type).toBe('array');
+    expect(sandbox.additionalProperties).toBe(false);
+
+    const experimental = props.experimental as { properties: Record<string, unknown> };
+    expect(experimental.properties.sandbox).toBeUndefined();
+    expect(experimental.properties.sandbox_restrict_network).toBeUndefined();
+    expect(experimental.properties.sandbox_writable_paths).toBeUndefined();
   });
 
   test('allows null on model and small_model', () => {

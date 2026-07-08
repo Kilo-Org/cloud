@@ -75,6 +75,27 @@ export const kiloExtras = {
       description: 'Hide Kilo Gateway models that may train on your prompts from model listings',
       type: 'boolean',
     },
+    sandbox: {
+      type: 'object',
+      properties: {
+        enabled: {
+          type: 'boolean',
+          description: 'Enable sandbox confinement for new sessions (default: false)',
+        },
+        network: {
+          type: 'string',
+          enum: ['allow', 'deny'],
+          description: 'Control outbound network access from sandboxed tools (default: deny)',
+        },
+        writable_paths: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Additional filesystem paths that sandboxed tools may write to',
+        },
+      },
+      additionalProperties: false,
+      description: 'Sandbox configuration for agent tools',
+    },
     commit_message: {
       description: 'Configuration for AI-generated commit messages',
       type: 'object',

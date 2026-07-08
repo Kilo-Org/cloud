@@ -6,7 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest } from '@/lib/utils.server';
 import { APPLE_CLIENT_ID } from '@/lib/config.server';
-import { verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
+import { AppleJwtClientError, verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
 
 type AppleEvent = {
   type: 'consent-revoked' | 'account-delete' | 'email-disabled' | 'email-enabled';
@@ -15,14 +15,6 @@ type AppleEvent = {
   is_private_email?: string;
   event_time: number;
 };
-
-// Errors thrown by verifyAppleJwtWithJwks for malformed/unresolvable requests
-// (as opposed to verification failures), which the route reports as 400s.
-const APPLE_JWT_CLIENT_ERRORS = new Set([
-  'Invalid JWT',
-  'Missing kid in JWT header',
-  'No matching Apple public key',
-]);
 
 function extractAppleEvent(payload: Record<string, unknown>): AppleEvent {
   const events = payload.events;
@@ -74,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (error instanceof Error && APPLE_JWT_CLIENT_ERRORS.has(error.message)) {
+    if (error instanceof AppleJwtClientError) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
     captureException(error);

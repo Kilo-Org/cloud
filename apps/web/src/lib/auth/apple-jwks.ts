@@ -3,6 +3,9 @@ import { createPublicKey } from 'node:crypto';
 
 const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
 
+/** Thrown for malformed tokens or unresolvable keys — caller error, not a server fault. */
+export class AppleJwtClientError extends Error {}
+
 type AppleJWK = {
   kty: string;
   kid: string;
@@ -50,12 +53,12 @@ export async function verifyAppleJwtWithJwks(
 ): Promise<jwt.JwtPayload> {
   const decoded = jwt.decode(token, { complete: true });
   if (!decoded || typeof decoded === 'string') {
-    throw new Error('Invalid JWT');
+    throw new AppleJwtClientError('Invalid JWT');
   }
 
   const { kid } = decoded.header;
   if (!kid) {
-    throw new Error('Missing kid in JWT header');
+    throw new AppleJwtClientError('Missing kid in JWT header');
   }
 
   const keys = await getApplePublicKeys();
@@ -66,7 +69,7 @@ export async function verifyAppleJwtWithJwks(
     const freshKeys = await getApplePublicKeys();
     matchingKey = freshKeys.find(k => k.kid === kid);
     if (!matchingKey) {
-      throw new Error('No matching Apple public key');
+      throw new AppleJwtClientError('No matching Apple public key');
     }
   }
 

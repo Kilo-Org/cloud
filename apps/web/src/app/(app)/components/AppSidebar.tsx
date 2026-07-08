@@ -54,10 +54,10 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
   const searchParams = useSearchParams();
   const setupStep = searchParams.get('step');
   const { open, setOpenMobile, setOpenTransient } = useSidebar();
-  const isInvitedOnly = Boolean(user?.personal_account_disabled);
+  const personalAccountDisabled = Boolean(user?.personal_account_disabled);
   const { data: organizations, isPending: isOrganizationsPending } = useQuery(
     trpc.organizations.list.queryOptions(undefined, {
-      enabled: isInvitedOnly && !currentOrgId,
+      enabled: personalAccountDisabled && !currentOrgId,
       trpc: { context: { skipBatch: true } },
     })
   );
@@ -142,16 +142,16 @@ export default function AppSidebar(props: React.ComponentProps<typeof Sidebar>) 
     return <OrganizationAppSidebar organizationId={currentOrgId} {...props} />;
   }
 
-  // Invited-only users (personal account disabled) have no personal surface.
+  // Users with a disabled personal account have no personal surface.
   // On non-org routes that remain reachable to them (e.g. /connected-accounts),
   // keep them in their default organization's sidebar rather than the personal one.
-  if (isInvitedOnly) {
+  if (personalAccountDisabled) {
     if (defaultOrganizationId) {
       return <OrganizationAppSidebar organizationId={defaultOrganizationId} {...props} />;
     }
     // Avoid flashing the personal sidebar while resolving their default org.
-    // Only fall through to the personal sidebar for the rare orphan case
-    // (invited-only user who belongs to no organizations).
+    // Only fall through to the personal sidebar for the rare case of a user with
+    // a disabled personal account who belongs to no organizations.
     if (isOrganizationsPending) {
       return <Sidebar {...props} />;
     }

@@ -1059,28 +1059,28 @@ export async function getUserFromAuthOrRedirect(
   if (user.blocked_reason) {
     redirect('/account-blocked');
   }
-  await redirectInvitedOnlyUserOffPersonalRoutes(user);
+  await redirectPersonalAccountDisabledUserOffPersonalRoutes(user);
   return user;
 }
 
-// Personal routes that remain reachable for invited-only users
-// (accounts whose personal account is disabled). Connected Accounts is a
-// user-global identity surface, not a personal-account feature.
-const INVITED_ONLY_ALLOWED_PERSONAL_PATHS = ['/connected-accounts'];
+// Personal routes that remain reachable for users whose personal account is
+// disabled. Connected Accounts is a user-global identity surface, not a
+// personal-account feature.
+const PERSONAL_ACCOUNT_DISABLED_ALLOWED_PATHS = ['/connected-accounts'];
 
 function isPersonalRoute(pathname: string): boolean {
   if (pathname.startsWith('/organizations/') || pathname === '/organizations') {
     return false;
   }
-  return !INVITED_ONLY_ALLOWED_PERSONAL_PATHS.some(
+  return !PERSONAL_ACCOUNT_DISABLED_ALLOWED_PATHS.some(
     allowed => pathname === allowed || pathname.startsWith(allowed + '/')
   );
 }
 
-// Resolve where an invited-only user (personal account disabled) should land.
+// Resolve where a user whose personal account is disabled should land.
 // Prefers their oldest organization (stable across requests); falls back to an
 // allowed personal route when they somehow belong to no organizations.
-async function resolveInvitedOnlyLandingPath(userId: User['id']): Promise<string> {
+async function resolvePersonalAccountDisabledLandingPath(userId: User['id']): Promise<string> {
   const orgs = await getUserOrganizationsWithSeats(userId);
   const firstOrg = [...orgs].sort((a, b) => {
     const byCreatedAt = a.created_at.localeCompare(b.created_at);
@@ -1089,7 +1089,7 @@ async function resolveInvitedOnlyLandingPath(userId: User['id']): Promise<string
   return firstOrg ? `/organizations/${firstOrg.organizationId}` : '/connected-accounts';
 }
 
-async function redirectInvitedOnlyUserOffPersonalRoutes(user: User): Promise<void> {
+async function redirectPersonalAccountDisabledUserOffPersonalRoutes(user: User): Promise<void> {
   if (!user.personal_account_disabled) {
     return;
   }
@@ -1098,7 +1098,7 @@ async function redirectInvitedOnlyUserOffPersonalRoutes(user: User): Promise<voi
   if (!pathname || !isPersonalRoute(pathname)) {
     return;
   }
-  redirect(await resolveInvitedOnlyLandingPath(user.id));
+  redirect(await resolvePersonalAccountDisabledLandingPath(user.id));
 }
 
 export async function signInUrlWithCallbackPath(): Promise<string> {
@@ -1211,10 +1211,10 @@ export function getUserUUID(user: User): string {
 // the org page will be redirected to if the user is a member of exactly one organization
 // or if the org is SSO org
 export async function getProfileRedirectPath(user: User) {
-  // Invited-only users (personal account disabled) have no personal surface;
+  // Users whose personal account is disabled have no personal surface;
   // always send them into an organization regardless of org count.
   if (user.personal_account_disabled) {
-    return resolveInvitedOnlyLandingPath(user.id);
+    return resolvePersonalAccountDisabledLandingPath(user.id);
   }
 
   // Check if user is a member of exactly one organization (skip redirect if multiple)

@@ -563,7 +563,7 @@ describe('getProfileRedirectPath', () => {
     );
   });
 
-  describe('invited-only users (personal account disabled)', () => {
+  describe('users with personal account disabled', () => {
     test('redirects multi-organization users to one of their organizations', async () => {
       const invitedUser = await insertTestUser({
         google_user_name: 'Invited Multi Org User',

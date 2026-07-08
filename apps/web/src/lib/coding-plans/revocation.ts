@@ -1,10 +1,10 @@
 import 'server-only';
 
-import { createHmac } from 'node:crypto';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 
 import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
   type MiniMaxCodingPlanCredentialValidationInput,
   validateMiniMaxCodingPlanCredential,
@@ -22,14 +22,6 @@ type InventoryCredentialValidator = (
 type ManualCredentialReplacementOptions = {
   validateCredential?: InventoryCredentialValidator;
 };
-
-function credentialFingerprint(apiKey: string): string {
-  if (!BYOK_ENCRYPTION_KEY) {
-    throw new Error('BYOK encryption is not configured');
-  }
-
-  return createHmac('sha256', BYOK_ENCRYPTION_KEY).update(apiKey).digest('hex');
-}
 
 export async function listManualCredentialRevocations(input: {
   planId?: CodingPlanId;
@@ -157,7 +149,7 @@ export async function replaceManualCredentialRevocation(
     .set({
       status: 'available',
       encrypted_api_key: encryptApiKey(normalizedApiKey, BYOK_ENCRYPTION_KEY),
-      credential_fingerprint: credentialFingerprint(normalizedApiKey),
+      credential_fingerprint: codingPlanCredentialFingerprint(normalizedApiKey),
       assigned_to_user_id: null,
       assigned_at: null,
       revocation_requested_at: null,

@@ -1,12 +1,13 @@
 import 'server-only';
 
-import { createHash, createHmac } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { addDays } from 'date-fns';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import pLimit from 'p-limit';
 
 import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
   type MiniMaxCodingPlanCredentialValidationInput,
   validateMiniMaxCodingPlanCredential,
@@ -45,13 +46,6 @@ type SubscriptionOutcome = {
 
 function idempotencyFingerprint(idempotencyKey: string): string {
   return createHash('sha256').update(idempotencyKey).digest('hex');
-}
-
-function credentialFingerprint(apiKey: string): string {
-  if (!BYOK_ENCRYPTION_KEY) {
-    throw new Error('BYOK encryption is not configured');
-  }
-  return createHmac('sha256', BYOK_ENCRYPTION_KEY).update(apiKey).digest('hex');
 }
 
 async function evaluateUsageBonus(userId: string): Promise<void> {
@@ -429,7 +423,7 @@ export async function uploadKeysToInventory(
           provider_id: providerId,
           upstream_plan_id: entry.upstreamPlanId,
           encrypted_api_key: encryptApiKey(entry.apiKey, BYOK_ENCRYPTION_KEY),
-          credential_fingerprint: credentialFingerprint(entry.apiKey),
+          credential_fingerprint: codingPlanCredentialFingerprint(entry.apiKey),
           status: 'available' as const,
         }))
       )

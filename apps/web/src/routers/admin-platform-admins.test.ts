@@ -196,7 +196,10 @@ describe('admin.users.searchPlatformAdminCandidates', () => {
 describe('admin.users.setPlatformAdminAccess — grant', () => {
   test('a qualifying admin can grant an eligible target', async () => {
     const admin = await insertQualifyingAdmin();
-    const target = await insertEligibleCandidate({ web_session_pepper: 'before-grant-pepper' });
+    const target = await insertEligibleCandidate({
+      web_session_pepper: 'before-grant-pepper',
+      api_token_pepper: 'before-grant-api-pepper',
+    });
     const caller = await createCallerForUser(admin.id);
 
     const result = await caller.admin.users.setPlatformAdminAccess({
@@ -212,6 +215,9 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
     // Grant sets only is_admin — can_manage_credits must remain untouched.
     expect(updated.can_manage_credits).toBe(false);
     expect(updated.web_session_pepper).not.toBe('before-grant-pepper');
+    // Grant must rotate api_token_pepper so pre-grant bearer tokens can't
+    // inherit admin capability.
+    expect(updated.api_token_pepper).not.toBe('before-grant-api-pepper');
 
     const notes = await getUserAdminNotes(target.id);
     expect(notes).toHaveLength(1);
@@ -266,6 +272,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
 
     const afterSecondGrant = await getUser(target.id);
     expect(afterSecondGrant.web_session_pepper).toBe(afterFirstGrant.web_session_pepper);
+    expect(afterSecondGrant.api_token_pepper).toBe(afterFirstGrant.api_token_pepper);
 
     const notes = await getUserAdminNotes(target.id);
     expect(notes).toHaveLength(1);
@@ -275,6 +282,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
     const admin = await insertQualifyingAdmin();
     const grandfatheredTarget = await insertGrandfatheredAdmin({
       web_session_pepper: 'before-redundant-grant-pepper',
+      api_token_pepper: 'before-redundant-grant-api-pepper',
     });
     const caller = await createCallerForUser(admin.id);
 
@@ -288,6 +296,7 @@ describe('admin.users.setPlatformAdminAccess — grant', () => {
     const unchanged = await getUser(grandfatheredTarget.id);
     expect(unchanged.is_admin).toBe(true);
     expect(unchanged.web_session_pepper).toBe('before-redundant-grant-pepper');
+    expect(unchanged.api_token_pepper).toBe('before-redundant-grant-api-pepper');
 
     const notes = await getUserAdminNotes(grandfatheredTarget.id);
     expect(notes).toHaveLength(0);
@@ -322,6 +331,7 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
     const target = await insertQualifyingAdmin({
       can_manage_credits: true,
       web_session_pepper: 'before-revoke-pepper',
+      api_token_pepper: 'before-revoke-api-pepper',
     });
     const caller = await createCallerForUser(admin.id);
 
@@ -336,6 +346,9 @@ describe('admin.users.setPlatformAdminAccess — revoke', () => {
     expect(updated.is_admin).toBe(false);
     expect(updated.can_manage_credits).toBe(false);
     expect(updated.web_session_pepper).not.toBe('before-revoke-pepper');
+    // Revoke must rotate api_token_pepper so pre-revoke bearer tokens lose
+    // their admin capability immediately.
+    expect(updated.api_token_pepper).not.toBe('before-revoke-api-pepper');
 
     const notes = await getUserAdminNotes(target.id);
     expect(notes).toHaveLength(1);

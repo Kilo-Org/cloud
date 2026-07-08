@@ -1545,6 +1545,9 @@ export const adminRouter = createTRPCRouter({
               )
             )
           )
+          // Deterministic ordering so the truncated top-20 is stable across
+          // repeated identical searches regardless of DB plan/physical order.
+          .orderBy(asc(kilocode_users.google_user_email), asc(kilocode_users.id))
           .limit(20);
 
         return candidates;
@@ -1610,15 +1613,27 @@ export const adminRouter = createTRPCRouter({
             }
           }
 
+          // Rotate both the web session pepper AND the API token pepper on any
+          // privilege change. getUserFromAuth authorizes bearer tokens from the
+          // current DB is_admin value after only matching api_token_pepper, so a
+          // token minted while the user was non-admin would otherwise become
+          // admin-capable the instant we grant (and, on revoke, a pre-revoke
+          // token would retain admin capability). Rotating the pepper here
+          // invalidates every previously-issued token in the same transaction.
           const [updatedTarget] = await tx
             .update(kilocode_users)
             .set(
               input.isAdmin
-                ? { is_admin: true, web_session_pepper: crypto.randomUUID() }
+                ? {
+                    is_admin: true,
+                    web_session_pepper: crypto.randomUUID(),
+                    api_token_pepper: crypto.randomUUID(),
+                  }
                 : {
                     is_admin: false,
                     can_manage_credits: false,
                     web_session_pepper: crypto.randomUUID(),
+                    api_token_pepper: crypto.randomUUID(),
                   }
             )
             .where(eq(kilocode_users.id, target.id))

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogClose,
@@ -52,13 +53,15 @@ export function PlatformAdminsContent() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
-  // Stable focus target for after the confirmation dialog closes. The row that
-  // triggered the dialog (a roster "Revoke" button or a candidate "Grant"
-  // button) is removed from the DOM once the mutation succeeds and the roster/
-  // candidate queries are invalidated, so Radix's default trigger-based focus
-  // restoration has nothing to return focus to and would otherwise fall back
-  // to <body>.
+  // Stable focus target for the case where the confirmation dialog closes
+  // because its mutation succeeded: the row that triggered it (a roster
+  // "Revoke" or candidate "Grant" button) is removed from the DOM once the
+  // roster/candidate queries are invalidated, so Radix's default trigger-based
+  // focus restoration has nothing to return to and would fall back to <body>.
+  // On a plain cancel/Escape/close-button dismissal the trigger still exists,
+  // so we let Radix restore focus to it normally (see onCloseAutoFocus below).
   const contentRef = useRef<HTMLDivElement>(null);
+  const redirectFocusOnCloseRef = useRef(false);
 
   const trimmedSearchTerm = searchTerm.trim();
 
@@ -70,7 +73,12 @@ export function PlatformAdminsContent() {
 
   const canGrantAdmins = rosterData?.canGrantAdmins ?? false;
 
-  const { data: candidates, isFetching: isSearching } = useQuery({
+  const {
+    data: candidates,
+    isFetching: isSearching,
+    isError: isSearchError,
+    error: searchError,
+  } = useQuery({
     ...trpc.admin.users.searchPlatformAdminCandidates.queryOptions({ query: trimmedSearchTerm }),
     enabled: canGrantAdmins && trimmedSearchTerm.length > 0,
   });
@@ -88,6 +96,11 @@ export function PlatformAdminsContent() {
     trpc.admin.users.setPlatformAdminAccess.mutationOptions({
       onSuccess: (result, variables) => {
         invalidateAfterChange();
+        // A changed result removes the triggering row from its table, so the
+        // dialog's close should redirect focus to a stable element rather than
+        // a now-unmounted trigger. A no-op leaves the trigger in place, so let
+        // Radix restore focus to it as usual.
+        redirectFocusOnCloseRef.current = result.changed;
         setConfirmAction(null);
         if (!result.changed) {
           toast.message(
@@ -215,23 +228,38 @@ export function PlatformAdminsContent() {
         <CardHeader>
           <CardTitle>Grant admin access</CardTitle>
           <CardDescription>
-            {canGrantAdmins
-              ? 'Search registered kilocode.ai users who are not already admins.'
-              : 'Only a qualifying kilocode.ai admin can grant platform admin access. You can still revoke other admins from the roster above.'}
+            {isRosterLoading
+              ? 'Checking your permissions…'
+              : rosterError
+                ? 'Could not determine your permissions. Reload to try again.'
+                : canGrantAdmins
+                  ? 'Search registered kilocode.ai users who are not already admins.'
+                  : 'Only a qualifying kilocode.ai admin can grant platform admin access. You can still revoke other admins from the roster above.'}
           </CardDescription>
         </CardHeader>
-        {canGrantAdmins && (
+        {!isRosterLoading && !rosterError && canGrantAdmins && (
           <CardContent className="flex flex-col gap-4">
-            <UserSearchInput
-              value={searchTerm}
-              onChange={setSearchTerm}
-              isLoading={isSearching}
-              placeholder="Search by email or name..."
-            />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="platform-admin-candidate-search">Search for a user to grant</Label>
+              <UserSearchInput
+                id="platform-admin-candidate-search"
+                value={searchTerm}
+                onChange={setSearchTerm}
+                isLoading={isSearching}
+                placeholder="Search by email or name..."
+                aria-label="Search for a kilocode.ai user to grant platform admin access"
+              />
+            </div>
 
             {trimmedSearchTerm.length === 0 ? (
               <div className="text-muted-foreground py-4 text-center text-sm">
                 Enter an email or name to search for eligible users.
+              </div>
+            ) : isSearchError ? (
+              <div className="text-destructive py-4 text-center text-sm">
+                {searchError instanceof Error
+                  ? searchError.message
+                  : 'Something went wrong while searching. Try again.'}
               </div>
             ) : candidateRows.length === 0 && !isSearching ? (
               <div className="text-muted-foreground py-4 text-center text-sm">
@@ -300,11 +328,16 @@ export function PlatformAdminsContent() {
         <DialogContent
           showCloseButton={!setAccessMutation.isPending}
           onCloseAutoFocus={event => {
-            // The row that triggered this dialog is gone by the time it closes
-            // (see `contentRef` above); redirect focus there instead of letting
-            // Radix's default trigger-focus restoration fall back to <body>.
-            event.preventDefault();
-            contentRef.current?.focus();
+            // Only override Radix's focus restoration when the close was caused
+            // by a state-changing mutation that removed the triggering row (see
+            // `redirectFocusOnCloseRef`). For a plain cancel/Escape/close-button
+            // dismissal the trigger still exists, so let Radix return focus to
+            // it instead of stealing focus to the container.
+            if (redirectFocusOnCloseRef.current) {
+              event.preventDefault();
+              contentRef.current?.focus();
+              redirectFocusOnCloseRef.current = false;
+            }
           }}
         >
           <DialogHeader>

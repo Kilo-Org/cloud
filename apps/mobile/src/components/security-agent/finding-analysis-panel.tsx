@@ -1,21 +1,28 @@
 import { type Href, useRouter } from 'expo-router';
 import { ExternalLink } from 'lucide-react-native';
-import { Pressable, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { QueryError } from '@/components/query-error';
+import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
+import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isPersonalSecurityScope, type SecurityAnalysis } from '@/lib/security-agent';
-import { getSecurityAnalysisDetailPresentation } from '@/lib/security-agent-presentation';
+import {
+  getSecurityAnalysisDetailPresentation,
+  getSecurityFindingAnalysisState,
+} from '@/lib/security-agent-presentation';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingAnalysisPanelProps = {
   scope: string;
+  findingId: string;
   analysis: SecurityAnalysis | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -46,6 +53,7 @@ function formatExploitable(isExploitable: boolean | 'unknown'): string {
 // report, rather than the web's hero/summary/action/steps narrative.
 export function FindingAnalysisPanel({
   scope,
+  findingId,
   analysis,
   isLoading,
   isError,
@@ -53,6 +61,8 @@ export function FindingAnalysisPanel({
 }: Readonly<FindingAnalysisPanelProps>) {
   const router = useRouter();
   const colors = useThemeColors();
+  const capacity = useSecurityAnalysisCapacity(scope);
+  const startAnalysis = useStartSecurityAnalysis(scope);
 
   if (isLoading && !analysis) {
     return (
@@ -89,6 +99,42 @@ export function FindingAnalysisPanel({
     : '';
   const sessionHref = getAgentChatSessionHref(scope, analysis.cliSessionId);
 
+  // Admission mirrors SecurityFindingRow.tsx's showAnalysisAction/canRestartAnalysis
+  // — server owns eligibility, this just reads the already-fetched state.
+  const findingOpen = analysis.findingState.status === 'open';
+  const analysisState = getSecurityFindingAnalysisState(analysis.status, analysis.analysis);
+  const canStartAnalysis =
+    findingOpen && (analysisState === 'not-analyzed' || analysisState === 'failed');
+  const canRestartAnalysis = findingOpen && analysis.status === 'running';
+  const hasCapacity =
+    capacity.runningCount !== undefined &&
+    capacity.concurrencyLimit !== undefined &&
+    capacity.runningCount < capacity.concurrencyLimit;
+
+  const handleStartAnalysis = () => {
+    startAnalysis.mutate({
+      findingId,
+      retrySandboxOnly: analysisState === 'failed' && Boolean(triage),
+    });
+  };
+
+  const handleRestartAnalysis = () => {
+    Alert.alert(
+      'Restart this analysis?',
+      'Security Agent will stop waiting for the current run and queue a new analysis. Any result that arrives from the current run will be ignored.',
+      [
+        { text: 'Keep waiting', style: 'cancel' },
+        {
+          text: 'Restart analysis',
+          style: 'destructive',
+          onPress: () => {
+            startAnalysis.mutate({ findingId, restartActive: true });
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View className="gap-4">
       <View className="gap-1 rounded-lg bg-secondary p-3">
@@ -101,6 +147,41 @@ export function FindingAnalysisPanel({
           {presentation.description}
         </Text>
       </View>
+
+      {canStartAnalysis || canRestartAnalysis ? (
+        <View className="gap-2">
+          {canStartAnalysis ? (
+            <Button
+              disabled={startAnalysis.isPending || !hasCapacity}
+              onPress={handleStartAnalysis}
+            >
+              {startAnalysis.isPending ? (
+                <ActivityIndicator size="small" color={colors.primaryForeground} />
+              ) : null}
+              <Text className="text-primary-foreground">
+                {analysisState === 'failed' ? 'Retry analysis' : 'Analyze repository'}
+              </Text>
+            </Button>
+          ) : null}
+          {canStartAnalysis && !hasCapacity ? (
+            <Text variant="muted" className="text-xs">
+              Analysis capacity is full. Wait for an active analysis to finish.
+            </Text>
+          ) : null}
+          {canRestartAnalysis ? (
+            <Button
+              variant="outline"
+              disabled={startAnalysis.isPending}
+              onPress={handleRestartAnalysis}
+            >
+              {startAnalysis.isPending ? (
+                <ActivityIndicator size="small" color={colors.foreground} />
+              ) : null}
+              <Text>Restart analysis</Text>
+            </Button>
+          ) : null}
+        </View>
+      ) : null}
 
       {sessionHref ? (
         <Pressable

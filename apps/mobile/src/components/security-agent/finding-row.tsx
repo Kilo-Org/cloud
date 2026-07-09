@@ -1,12 +1,15 @@
 import { useRouter } from 'expo-router';
-import { Pressable, View } from 'react-native';
+import { ExternalLink } from 'lucide-react-native';
+import { ActivityIndicator, Linking, Pressable, View } from 'react-native';
 
 import {
   FINDING_ICONS,
   FINDING_TONE_TEXT_CLASS,
   findingToneColor,
 } from '@/components/security-agent/finding-tone';
+import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
 import {
@@ -60,13 +63,90 @@ function getNextActionLabel(finding: SecurityFinding): string | null {
   return null;
 }
 
+type FindingRowQuickActionProps = {
+  finding: SecurityFinding;
+  scope: string;
+  prUrl: string | null;
+  canQuickAnalyze: boolean;
+  nextAction: string | null;
+};
+
+// Extracted to avoid a nested ternary (prUrl / canQuickAnalyze / nextAction
+// fallback) while keeping FindingRow's render body flat.
+function FindingRowQuickAction({
+  finding,
+  scope,
+  prUrl,
+  canQuickAnalyze,
+  nextAction,
+}: Readonly<FindingRowQuickActionProps>) {
+  const colors = useThemeColors();
+  const startAnalysis = useStartSecurityAnalysis(scope);
+  const analysisFailed = finding.analysis_status === 'failed';
+
+  if (prUrl) {
+    return (
+      <Button
+        variant="secondary"
+        size="sm"
+        className="mt-1 h-8 self-start px-3"
+        onPress={() => {
+          void Linking.openURL(prUrl);
+        }}
+      >
+        <ExternalLink size={13} color={colors.foreground} />
+        <Text className="text-xs font-medium">View PR</Text>
+      </Button>
+    );
+  }
+
+  if (canQuickAnalyze) {
+    return (
+      <Button
+        variant="secondary"
+        size="sm"
+        className="mt-1 h-8 self-start px-3"
+        disabled={startAnalysis.isPending}
+        onPress={() => {
+          startAnalysis.mutate({
+            findingId: finding.id,
+            retrySandboxOnly: analysisFailed && Boolean(finding.analysis?.triage),
+          });
+        }}
+      >
+        {startAnalysis.isPending ? (
+          <ActivityIndicator size="small" color={colors.foreground} />
+        ) : null}
+        <Text className="text-xs font-medium">{analysisFailed ? 'Retry analysis' : 'Analyze'}</Text>
+      </Button>
+    );
+  }
+
+  if (!nextAction) {
+    return null;
+  }
+
+  return (
+    <Text variant="muted" className="text-xs">
+      {nextAction}
+    </Text>
+  );
+}
+
 type FindingRowProps = {
   finding: SecurityFinding;
   scope: string;
   slaEnabled: boolean;
+  /** From useSecurityAnalysisCapacity(scope) — gates the row's quick Analyze action. */
+  hasAnalysisCapacity: boolean;
 };
 
-export function FindingRow({ finding, scope, slaEnabled }: Readonly<FindingRowProps>) {
+export function FindingRow({
+  finding,
+  scope,
+  slaEnabled,
+  hasAnalysisCapacity,
+}: Readonly<FindingRowProps>) {
   const router = useRouter();
   const colors = useThemeColors();
 
@@ -76,6 +156,14 @@ export function FindingRow({ finding, scope, slaEnabled }: Readonly<FindingRowPr
 
   const AnalysisIcon = FINDING_ICONS[analysis.icon];
   const DeadlineIcon = deadline ? FINDING_ICONS[deadline.icon] : null;
+
+  const prUrl =
+    finding.remediationSummary?.status === 'pr_opened' ? finding.remediationSummary.prUrl : null;
+  const canQuickAnalyze =
+    !prUrl &&
+    finding.status === 'open' &&
+    (!finding.analysis_status || finding.analysis_status === 'failed') &&
+    hasAnalysisCapacity;
 
   return (
     <Pressable
@@ -114,11 +202,13 @@ export function FindingRow({ finding, scope, slaEnabled }: Readonly<FindingRowPr
           </View>
         )}
       </View>
-      {nextAction && (
-        <Text variant="muted" className="text-xs">
-          {nextAction}
-        </Text>
-      )}
+      <FindingRowQuickAction
+        finding={finding}
+        scope={scope}
+        prUrl={prUrl}
+        canQuickAnalyze={canQuickAnalyze}
+        nextAction={nextAction}
+      />
     </Pressable>
   );
 }

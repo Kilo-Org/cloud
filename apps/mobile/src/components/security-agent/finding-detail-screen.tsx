@@ -1,4 +1,5 @@
-import { ShieldOff } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Ban, ShieldOff } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 
@@ -10,8 +11,13 @@ import { FindingDetailsPanel } from '@/components/security-agent/finding-details
 import { FindingRemediationPanel } from '@/components/security-agent/finding-remediation-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useTrackSecurityAgentInteraction } from '@/lib/hooks/use-security-agent';
+import {
+  useSecurityAgentOrgRole,
+  useTrackSecurityAgentInteraction,
+} from '@/lib/hooks/use-security-agent';
 import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { canManageSecurityAgent, getSecurityAgentPath } from '@/lib/security-agent';
 import { cn } from '@/lib/utils';
 
 type FindingTab = 'details' | 'analysis' | 'remediation';
@@ -39,10 +45,13 @@ type FindingDetailScreenProps = {
 };
 
 export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetailScreenProps>) {
+  const router = useRouter();
+  const colors = useThemeColors();
   const [tab, setTab] = useState<FindingTab>('details');
   const findingQuery = useSecurityFinding(scope, findingId);
   const analysisQuery = useSecurityAnalysis(scope, findingId);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
+  const role = useSecurityAgentOrgRole(scope);
 
   // Ref indirection keeps the tracking effects independent of the mutation
   // object's identity (a new object every render), so they only re-fire on
@@ -114,10 +123,29 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   }
 
   const finding = findingQuery.data;
+  const canDismiss = finding.status === 'open' && canManageSecurityAgent(scope, role);
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title="Finding" eyebrow={finding.repo_full_name} />
+      <ScreenHeader
+        title="Finding"
+        eyebrow={finding.repo_full_name}
+        headerRight={
+          canDismiss ? (
+            <Pressable
+              onPress={() => {
+                router.push(getSecurityAgentPath(scope, `dismiss/${findingId}`));
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss finding"
+              hitSlop={8}
+              className="active:opacity-70"
+            >
+              <Ban size={20} color={colors.mutedForeground} />
+            </Pressable>
+          ) : undefined
+        }
+      />
       <View className="flex-row gap-2 px-6 pb-2 pt-1">
         {TABS.map(({ key, label }) => {
           const selected = tab === key;
@@ -151,6 +179,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         {tab === 'analysis' && (
           <FindingAnalysisPanel
             scope={scope}
+            findingId={findingId}
             analysis={analysisQuery.data}
             isLoading={analysisQuery.isLoading}
             isError={analysisQuery.isError}
@@ -159,6 +188,8 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         )}
         {tab === 'remediation' && (
           <FindingRemediationPanel
+            scope={scope}
+            findingId={findingId}
             analysis={analysisQuery.data}
             isLoading={analysisQuery.isLoading}
             isError={analysisQuery.isError}

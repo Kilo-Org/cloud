@@ -1,4 +1,4 @@
-import { Linking, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, View } from 'react-native';
 
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
@@ -7,6 +7,12 @@ import { Button } from '@/components/ui/button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import {
+  useCancelSecurityRemediation,
+  useRetrySecurityRemediation,
+  useStartSecurityRemediation,
+} from '@/lib/hooks/use-security-findings';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 import {
   formatRemediationOrigin,
@@ -17,6 +23,8 @@ import {
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingRemediationPanelProps = {
+  scope: string;
+  findingId: string;
   analysis: SecurityAnalysis | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -26,13 +34,21 @@ type FindingRemediationPanelProps = {
 // Ported from FindingDetailDialog.tsx:1849 (getRemediationPresentation) and
 // remediation-unavailable-copy.ts — capability/blocker, current summary, and
 // attempt history (already newest-first from the server) as plain facts.
-// No mutation buttons yet; Task 7 adds start/retry/cancel actions.
+// Start/retry/cancel buttons are driven entirely by the server-computed
+// remediationCapability — no eligibility rules are re-derived here.
 export function FindingRemediationPanel({
+  scope,
+  findingId,
   analysis,
   isLoading,
   isError,
   onRetry,
 }: Readonly<FindingRemediationPanelProps>) {
+  const colors = useThemeColors();
+  const startRemediation = useStartSecurityRemediation(scope);
+  const retryRemediation = useRetrySecurityRemediation(scope);
+  const cancelRemediation = useCancelSecurityRemediation(scope);
+
   if (isLoading && !analysis) {
     return (
       <View className="gap-3">
@@ -94,6 +110,63 @@ export function FindingRemediationPanel({
           </Text>
         ) : null}
       </View>
+
+      {remediationCapability.canStart ? (
+        <Button
+          disabled={startRemediation.isPending}
+          onPress={() => {
+            startRemediation.mutate({ findingId });
+          }}
+        >
+          {startRemediation.isPending ? <ActivityIndicator size="small" color="white" /> : null}
+          <Text className="text-primary-foreground">Start fix</Text>
+        </Button>
+      ) : null}
+
+      {remediationCapability.canRetry ? (
+        <Button
+          variant="outline"
+          disabled={retryRemediation.isPending}
+          onPress={() => {
+            retryRemediation.mutate({ findingId });
+          }}
+        >
+          {retryRemediation.isPending ? (
+            <ActivityIndicator size="small" color={colors.foreground} />
+          ) : null}
+          <Text>Retry fix</Text>
+        </Button>
+      ) : null}
+
+      {remediationCapability.canCancel && remediationCapability.cancelAttemptId ? (
+        <Button
+          variant="destructive"
+          disabled={cancelRemediation.isPending}
+          onPress={() => {
+            const attemptId = remediationCapability.cancelAttemptId;
+            if (!attemptId) {
+              return;
+            }
+            Alert.alert(
+              'Cancel this remediation?',
+              'Security Agent will stop the in-progress remediation attempt.',
+              [
+                { text: 'Keep running', style: 'cancel' },
+                {
+                  text: 'Cancel remediation',
+                  style: 'destructive',
+                  onPress: () => {
+                    cancelRemediation.mutate({ attemptId, findingId });
+                  },
+                },
+              ]
+            );
+          }}
+        >
+          {cancelRemediation.isPending ? <ActivityIndicator size="small" color="white" /> : null}
+          <Text>Cancel fix</Text>
+        </Button>
+      ) : null}
 
       {summaryPrUrl ? (
         <Button

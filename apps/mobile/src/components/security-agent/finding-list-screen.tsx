@@ -10,7 +10,11 @@ import { FindingRow } from '@/components/security-agent/finding-row';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useSecurityAgentConfig, useSecurityAgentRepositories } from '@/lib/hooks/use-security-agent';
+import {
+  useSecurityAgentConfig,
+  useSecurityAgentRepositories,
+  useSecurityAnalysisCapacity,
+} from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -36,8 +40,13 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   const repositories = useSecurityAgentRepositories(scope);
   const query = useMemo(() => toSecurityFindingQuery(filters), [filters]);
   const findings = useSecurityFindings(scope, query);
+  const capacity = useSecurityAnalysisCapacity(scope);
 
   const slaEnabled = config.data?.slaEnabled ?? true;
+  const hasAnalysisCapacity =
+    capacity.runningCount !== undefined &&
+    capacity.concurrencyLimit !== undefined &&
+    capacity.runningCount < capacity.concurrencyLimit;
   const filtersActive = hasActiveSecurityFindingFilters(filters);
   const items = findings.data?.findings ?? [];
 
@@ -94,7 +103,12 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           data={items}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <FindingRow finding={item} scope={scope} slaEnabled={slaEnabled} />
+            <FindingRow
+              finding={item}
+              scope={scope}
+              slaEnabled={slaEnabled}
+              hasAnalysisCapacity={hasAnalysisCapacity}
+            />
           )}
           contentContainerClassName="gap-3 px-6 pb-8 pt-4"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}

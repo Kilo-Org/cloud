@@ -1,15 +1,17 @@
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
 import { Check, Lock } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
+import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { getSettingsDirtyState } from '@/components/security-agent/settings-screen-state';
 import { ScreenHeader } from '@/components/screen-header';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useSettingsBackGuard } from '@/lib/hooks/use-settings-back-guard';
+import {
+  useSecurityAgentSettingsRedirect,
+  useSettingsBackGuard,
+} from '@/lib/hooks/use-settings-back-guard';
 import {
   useSaveSecurityAgentConfig,
   useSecurityAgentConfig,
@@ -17,7 +19,7 @@ import {
   useSecurityAgentRepositories,
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getSecurityAgentPath, type SecurityAgentConfig } from '@/lib/security-agent';
+import { type SecurityAgentConfig } from '@/lib/security-agent';
 
 type RepositorySelectionMode = SecurityAgentConfig['repositorySelectionMode'];
 
@@ -36,7 +38,6 @@ function RepositorySettingsSkeleton() {
 }
 
 export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
   const colors = useThemeColors();
   const canManage = useSecurityAgentEditCapability(scope);
   const config = useSecurityAgentConfig(scope);
@@ -59,14 +60,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     setSelectedIds(config.data.selectedRepositoryIds);
   }, [config.data]);
 
-  // A config save never re-enables the agent on its own, but this screen
-  // still shouldn't be reachable while disabled — bounce back to the
-  // overview, which is the only place enablement can be turned on.
-  useEffect(() => {
-    if (config.data && !config.data.isEnabled) {
-      router.replace(getSecurityAgentPath(scope, 'settings'));
-    }
-  }, [config.data, router, scope]);
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
 
   const valid = mode === 'all' || selectedIds.length > 0;
   const dirty =
@@ -109,25 +103,12 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         onBack={onBack}
         headerRight={
           canManage ? (
-            <Button
-              size="sm"
-              disabled={!dirty || !valid || save.isPending}
-              onPress={() => {
-                void (async () => {
-                  try {
-                    await handleSave();
-                    router.back();
-                  } catch {
-                    // Centralized onError already toasted; stay on screen.
-                  }
-                })();
-              }}
-            >
-              {save.isPending ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : null}
-              <Text>Save</Text>
-            </Button>
+            <SettingsSaveButton
+              dirty={dirty}
+              valid={valid}
+              pending={save.isPending}
+              onSave={handleSave}
+            />
           ) : undefined
         }
       />

@@ -118,7 +118,9 @@ export function FindingRemediationPanel({
             startRemediation.mutate({ findingId });
           }}
         >
-          {startRemediation.isPending ? <ActivityIndicator size="small" color="white" /> : null}
+          {startRemediation.isPending ? (
+            <ActivityIndicator size="small" color={colors.primaryForeground} />
+          ) : null}
           <Text className="text-primary-foreground">Start fix</Text>
         </Button>
       ) : null}
@@ -163,7 +165,9 @@ export function FindingRemediationPanel({
             );
           }}
         >
-          {cancelRemediation.isPending ? <ActivityIndicator size="small" color="white" /> : null}
+          {cancelRemediation.isPending ? (
+            <ActivityIndicator size="small" color={colors.primaryForeground} />
+          ) : null}
           <Text>Cancel fix</Text>
         </Button>
       ) : null}

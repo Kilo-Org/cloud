@@ -7,6 +7,7 @@ import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { RestorePurchasesButton } from '@/components/kilo-pass/restore-purchases-button';
 import { NotificationsCard } from '@/components/notifications-card';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { ScreenHeader } from '@/components/screen-header';
@@ -17,6 +18,7 @@ import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useOrganization } from '@/lib/organization-context';
 import { getTabBarOverlayHeight } from '@/lib/tab-bar-layout';
 import { useTRPC } from '@/lib/trpc';
 
@@ -47,6 +49,7 @@ export function ProfileScreen() {
   });
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
+  const { organizationId } = useOrganization();
 
   const { bottom } = useSafeAreaInsets();
 
@@ -188,6 +191,13 @@ export function ProfileScreen() {
         <View className="mt-6">
           <NotificationsCard />
         </View>
+
+        {/* Restore Purchases (iOS-only; self-hides on Android and for org accounts) */}
+        {isAuthenticated && !organizationId ? (
+          <View className="mt-6">
+            <RestorePurchasesButton />
+          </View>
+        ) : null}
 
         {/* Actions */}
         <View className="mt-6 gap-3">

@@ -139,6 +139,17 @@ export function useSecurityAnalysisCapacity(scope: string): {
   return { runningCount: data?.runningCount, concurrencyLimit: data?.concurrencyLimit };
 }
 
+function pick<K extends keyof SecurityAgentConfig>(
+  config: SecurityAgentConfig,
+  keys: readonly K[]
+): Pick<SecurityAgentConfig, K> {
+  const result: Partial<SecurityAgentConfig> = {};
+  for (const key of keys) {
+    result[key] = config[key];
+  }
+  return result as Pick<SecurityAgentConfig, K>;
+}
+
 export function useSaveSecurityAgentConfig(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -159,11 +170,15 @@ export function useSaveSecurityAgentConfig(scope: string) {
       queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
         old ? { ...old, ...patch } : old
       );
-      return { previous };
+      return { previous, patch };
     },
     onError: (error, _patch, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(configQueryKey, context.previous);
+        const keys = Object.keys(context.patch) as (keyof SecurityAgentConfigPatch)[];
+        const restoredFields = pick(context.previous, keys);
+        queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
+          old ? { ...old, ...restoredFields } : old
+        );
       }
       toast.error(error.message);
     },
@@ -228,9 +243,9 @@ export function useSetSecurityAgentEnabled(scope: string) {
       return { previous };
     },
     onError: (error, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(configQueryKey, context.previous);
-      }
+      queryClient.setQueryData<SecurityAgentConfig>(configQueryKey, old =>
+        old && context?.previous ? { ...old, isEnabled: context.previous.isEnabled } : old
+      );
       toast.error(error.message);
     },
     onSuccess: result => {
@@ -245,7 +260,9 @@ export function useSetSecurityAgentEnabled(scope: string) {
             queryKey: trpc.securityAgent.getPermissionStatus.queryKey(),
           }),
           queryClient.invalidateQueries({ queryKey: configQueryKey }),
-          queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getRepositories.queryKey() }),
+          queryClient.invalidateQueries({
+            queryKey: trpc.securityAgent.getRepositories.queryKey(),
+          }),
         ]);
         return;
       }

@@ -152,8 +152,8 @@ function IdleAuth({ start }: Readonly<{ start: (mode: 'signin' | 'signup') => Pr
           onPress={() => void signInWithGoogle()}
           accessibilityLabel="Sign in with Google"
         >
-          {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={20} />}
-          <Text className="text-[19px] font-semibold">Sign in with Google</Text>
+          {busy === 'google' ? <ActivityIndicator size="small" /> : <GoogleLogo size={18} />}
+          <Text className="text-[17px] font-medium">Sign in with Google</Text>
         </Button>
       )}
 

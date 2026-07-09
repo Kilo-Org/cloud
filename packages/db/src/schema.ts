@@ -4577,7 +4577,7 @@ export const magic_link_tokens = pgTable(
     purpose: text().default('magic_link').notNull().$type<'magic_link' | 'sign_in_code'>(),
   },
   table => [
-    index('idx_magic_link_tokens_email_purpose').on(table.email, table.purpose),
+    index('idx_magic_link_tokens_email').on(table.email),
     index('idx_magic_link_tokens_expires_at').on(table.expires_at),
     check('check_expires_at_future', sql`${table.expires_at} > ${table.created_at}`),
   ]

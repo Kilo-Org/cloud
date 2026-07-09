@@ -1,0 +1,1 @@
+ALTER TABLE "magic_link_tokens" ADD COLUMN "purpose" text DEFAULT 'magic_link' NOT NULL;

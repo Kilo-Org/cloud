@@ -1,5 +1,5 @@
 {
-  "id": "7ed96991-c37b-4eac-9353-11d7c9688629",
+  "id": "c9e7c86b-668e-4e83-855c-350559cef725",
   "prevId": "0b68545d-943f-42cb-8aab-ef2803a94674",
   "version": "7",
   "dialect": "postgresql",
@@ -20185,17 +20185,11 @@
         }
       },
       "indexes": {
-        "idx_magic_link_tokens_email_purpose": {
-          "name": "idx_magic_link_tokens_email_purpose",
+        "idx_magic_link_tokens_email": {
+          "name": "idx_magic_link_tokens_email",
           "columns": [
             {
               "expression": "email",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "purpose",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

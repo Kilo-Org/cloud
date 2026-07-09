@@ -526,7 +526,7 @@ app.put(
     }
 
     const kiloSessionId = new URL(c.req.url).searchParams.get('kiloSessionId');
-    if (!kiloSessionId) {
+    if (!kiloSessionId && authResult.claims.type === 'wrapper_dispatch_ticket') {
       return c.text('Missing kiloSessionId parameter', 400);
     }
 
@@ -540,12 +540,16 @@ app.put(
     }
 
     try {
-      await requireCurrentSessionAccess({
+      const sessionAccess = await requireCurrentSessionAccess({
         env: c.env,
         kiloUserId: userId,
         cloudAgentSessionId: sessionId,
-        expectedKiloSessionId: kiloSessionId,
+        expectedKiloSessionId: kiloSessionId ?? undefined,
       });
+      const authoritativeKiloSessionId = kiloSessionId ?? sessionAccess.kiloSessionId;
+      if (!authoritativeKiloSessionId) {
+        return c.text('Missing kiloSessionId parameter', 400);
+      }
     } catch (error) {
       return projectSessionAccessHttpError(error);
     }

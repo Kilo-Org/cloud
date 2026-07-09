@@ -829,6 +829,29 @@ describe('server wrapper log upload route', () => {
     expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
   });
 
+  it('accepts the old legacy log upload URL without a kiloSessionId query parameter', async () => {
+    const env = createLogEnv();
+    const token = signKiloToken('usr_feed');
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+      env,
+      kiloUserId: 'usr_feed',
+      cloudAgentSessionId: 'agent_live',
+    });
+    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
+    expect(env.R2_BUCKET.put.mock.calls[0][0]).toBe('logs/usr_feed/agent_live/session/logs.tar.gz');
+  });
+
   it('rejects an upload missing the kiloSessionId parameter', async () => {
     const env = createLogEnv();
     const ticket = signWrapperDispatchTicket();

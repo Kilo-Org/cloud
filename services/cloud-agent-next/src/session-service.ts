@@ -133,6 +133,14 @@ function gitLabTokenLookupFailureMessage(reason: string): string {
   }
 }
 
+function isRetryableKiloCapabilityIssuanceFailure(reason: string): boolean {
+  return (
+    reason === 'rpc_error' ||
+    reason === 'service_not_configured' ||
+    reason === 'temporarily_unavailable'
+  );
+}
+
 // Keep in sync with: cloudflare-code-review-infra/src/code-review-orchestrator.ts
 // mkdir and touch are intentionally allowed for agent scratch space during analysis
 const CODE_REVIEW_ALLOWED_COMMANDS = [
@@ -1260,6 +1268,7 @@ export class SessionService {
       env: opts.env,
       kiloCapability: opts.kiloCapability,
       kiloProviderBaseUrl: opts.kiloProviderBaseUrl,
+      kiloSessionIngestBaseUrl: opts.kiloSessionIngestBaseUrl,
       kilocodeModel: opts.kilocodeModel,
       originalOrgId: opts.originalOrgId,
       githubToken: context.githubToken,
@@ -1287,6 +1296,7 @@ export class SessionService {
       env,
       kiloCapability,
       kiloProviderBaseUrl,
+      kiloSessionIngestBaseUrl,
       kilocodeModel,
       originalOrgId,
       githubToken,
@@ -1603,7 +1613,9 @@ export class SessionService {
       envVars.KILO_API_URL = sandboxUrl;
     }
 
-    if (env.KILO_SESSION_INGEST_URL) {
+    if (kiloSessionIngestBaseUrl) {
+      envVars.KILO_SESSION_INGEST_URL = kiloSessionIngestBaseUrl;
+    } else if (env.KILO_SESSION_INGEST_URL) {
       envVars.KILO_SESSION_INGEST_URL = env.KILO_SESSION_INGEST_URL;
     }
 
@@ -1842,7 +1854,7 @@ export class SessionService {
       managedScmContainment: boolean;
       userToken: string;
     }
-  ): Promise<{ capability: string; providerBaseUrl?: string }> {
+  ): Promise<{ capability: string; providerBaseUrl?: string; sessionIngestBaseUrl?: string }> {
     if (params.sandboxId.startsWith('dind-')) {
       return { capability: params.userToken };
     }
@@ -1869,18 +1881,19 @@ export class SessionService {
       targets: derivedTargets.targets,
     });
     if (!issued.success) {
-      throw ExecutionError.invalidRequest(
-        `Kilo session capability issuance failed (${issued.error.reason})`
-      );
+      const message = `Kilo session capability issuance failed (${issued.error.reason})`;
+      if (isRetryableKiloCapabilityIssuanceFailure(issued.error.reason)) {
+        throw ExecutionError.workspaceSetupFailed(message);
+      }
+      throw ExecutionError.invalidRequest(message);
     }
-    // The provider base URL baked into the capability's targets MUST match the
-    // baseURL the sandbox actually calls — otherwise the outbound interceptor's
-    // route classification rejects the request as `upstream_not_allowed`, even
-    // though the capability itself is valid. Never let getSaferEnvVars derive
-    // this independently from env.KILO_OPENROUTER_BASE.
+    // Capability targets MUST match the URLs the sandbox actually calls —
+    // otherwise the outbound interceptor rejects the request as
+    // `upstream_not_allowed`, even though the capability itself is valid.
     return {
       capability: issued.value.capability,
       providerBaseUrl: derivedTargets.targets.providerBaseUrl,
+      sessionIngestBaseUrl: derivedTargets.targets.sessionIngestBaseUrl,
     };
   }
 
@@ -1911,15 +1924,18 @@ export class SessionService {
     if (!nextAuthSecret) {
       throw ExecutionError.invalidRequest('NEXTAUTH_SECRET is not configured on the worker');
     }
-    const { capability: kiloCapability, providerBaseUrl: kiloProviderBaseUrl } =
-      await this.issueKiloSessionCapability(env, {
-        userId,
-        cloudAgentSessionId: sessionId,
-        kiloSessionId: metadata.auth.kiloSessionId,
-        sandboxId,
-        managedScmContainment: metadata.workspace?.managedScmContainment === true,
-        userToken: metadata.auth.kilocodeToken,
-      });
+    const {
+      capability: kiloCapability,
+      providerBaseUrl: kiloProviderBaseUrl,
+      sessionIngestBaseUrl: kiloSessionIngestBaseUrl,
+    } = await this.issueKiloSessionCapability(env, {
+      userId,
+      cloudAgentSessionId: sessionId,
+      kiloSessionId: metadata.auth.kiloSessionId,
+      sandboxId,
+      managedScmContainment: metadata.workspace?.managedScmContainment === true,
+      userToken: metadata.auth.kilocodeToken,
+    });
 
     const devcontainerRequested =
       metadata.workspace?.devcontainerRequested === true || metadata.devcontainer !== undefined;
@@ -1964,6 +1980,7 @@ export class SessionService {
       env,
       kiloCapability,
       kiloProviderBaseUrl,
+      kiloSessionIngestBaseUrl,
       kilocodeModel: agent.model,
       originalOrgId: orgId,
       githubToken: resolvedTokens.githubToken,
@@ -2156,15 +2173,18 @@ export class SessionService {
     if (!metadata.auth.kiloSessionId) {
       throw ExecutionError.invalidRequest('Missing kiloSessionId in session metadata');
     }
-    const { capability: kiloCapability, providerBaseUrl: kiloProviderBaseUrl } =
-      await this.issueKiloSessionCapability(env, {
-        userId,
-        cloudAgentSessionId: sessionId,
-        kiloSessionId: metadata.auth.kiloSessionId,
-        sandboxId,
-        managedScmContainment: metadata.workspace?.managedScmContainment === true,
-        userToken: metadata.auth.kilocodeToken,
-      });
+    const {
+      capability: kiloCapability,
+      providerBaseUrl: kiloProviderBaseUrl,
+      sessionIngestBaseUrl: kiloSessionIngestBaseUrl,
+    } = await this.issueKiloSessionCapability(env, {
+      userId,
+      cloudAgentSessionId: sessionId,
+      kiloSessionId: metadata.auth.kiloSessionId,
+      sandboxId,
+      managedScmContainment: metadata.workspace?.managedScmContainment === true,
+      userToken: metadata.auth.kilocodeToken,
+    });
 
     const resolvedTokens = await this.resolveWorkspaceTokens(env, metadata, sandboxId);
     const github = githubRepository(metadata);
@@ -2221,6 +2241,7 @@ export class SessionService {
       env,
       kiloCapability,
       kiloProviderBaseUrl,
+      kiloSessionIngestBaseUrl,
       kilocodeModel: options.kilocodeModel,
       originalOrgId: orgId,
       createdOnPlatform: metadata.identity.createdOnPlatform,
@@ -2245,7 +2266,8 @@ export class SessionService {
         options.kilocodeModel,
         orgId,
         kiloCapability,
-        kiloProviderBaseUrl
+        kiloProviderBaseUrl,
+        kiloSessionIngestBaseUrl
       );
       if (
         !(await this.sanitizeBitbucketCodeReviewRemote(session, context.workspacePath, metadata))
@@ -2316,7 +2338,8 @@ export class SessionService {
       options.kilocodeModel,
       orgId,
       kiloCapability,
-      kiloProviderBaseUrl
+      kiloProviderBaseUrl,
+      kiloSessionIngestBaseUrl
     );
 
     let devcontainer: DevContainerHandle | undefined;
@@ -2385,6 +2408,7 @@ export class SessionService {
           dockerEnv,
           env,
           kiloCapability,
+          kiloSessionIngestBaseUrl,
           runtimeEnv,
           sessionHome,
         }
@@ -2429,7 +2453,8 @@ export class SessionService {
     kilocodeModel: string | undefined,
     orgId: string | undefined,
     kiloCapability: string,
-    kiloProviderBaseUrl: string | undefined
+    kiloProviderBaseUrl: string | undefined,
+    kiloSessionIngestBaseUrl: string | undefined
   ): Promise<ExecutionSession> {
     return this.getOrCreateSession({
       sandbox,
@@ -2437,6 +2462,7 @@ export class SessionService {
       env,
       kiloCapability,
       kiloProviderBaseUrl,
+      kiloSessionIngestBaseUrl,
       kilocodeModel,
       originalOrgId: orgId,
       createdOnPlatform: metadata.identity.createdOnPlatform,
@@ -2642,7 +2668,8 @@ export class SessionService {
       : undefined;
     return {
       KILOCODE_TOKEN_FILE: restoreTokenFilePath,
-      KILO_SESSION_INGEST_URL: options.env.KILO_SESSION_INGEST_URL,
+      KILO_SESSION_INGEST_URL:
+        options.kiloSessionIngestBaseUrl ?? options.env.KILO_SESSION_INGEST_URL,
       ...buildKiloSessionXdgEnv(options.sessionHome),
       ...(backendUrl ? { KILOCODE_BACKEND_BASE_URL: backendUrl, KILO_API_URL: backendUrl } : {}),
     };
@@ -2851,6 +2878,7 @@ export type GetOrCreateSessionOptions = {
   env: PersistenceEnv;
   kiloCapability: string;
   kiloProviderBaseUrl?: string;
+  kiloSessionIngestBaseUrl?: string;
   kilocodeModel?: string;
   originalOrgId?: string;
   createdOnPlatform?: string;
@@ -2866,6 +2894,7 @@ type RestoreRuntimeOptions = {
   dockerEnv?: Record<string, string>;
   env: PersistenceEnv;
   kiloCapability: string;
+  kiloSessionIngestBaseUrl?: string;
   runtimeEnv: Record<string, string>;
   sessionHome: string;
 };
@@ -2877,6 +2906,7 @@ type GetSaferEnvVarsOptions = {
   env: PersistenceEnv;
   kiloCapability: string;
   kiloProviderBaseUrl?: string;
+  kiloSessionIngestBaseUrl?: string;
   kilocodeModel?: string;
   originalOrgId?: string;
   githubToken?: string;

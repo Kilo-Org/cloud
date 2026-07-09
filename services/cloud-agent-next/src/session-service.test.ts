@@ -2159,6 +2159,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     const env = createEnv();
     env.WORKER_URL = 'https://cloud-agent.example.com';
     env.KILO_OPENROUTER_BASE = 'https://openrouter.wrong-base.example.com';
+    env.KILO_SESSION_INGEST_URL = 'http://localhost:8800/ingest/';
     const issueKiloSessionCapability = vi.fn().mockResolvedValue({
       success: true,
       capability: 'kka1.issued',
@@ -2206,12 +2207,33 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(configContent.provider.kilo.options.baseURL).toBe(
       derivedTargets.targets.providerBaseUrl
     );
+    expect(result.readyRequest.materialized.env.KILO_SESSION_INGEST_URL).toBe(
+      derivedTargets.targets.sessionIngestBaseUrl
+    );
     expect(issueKiloSessionCapability).toHaveBeenCalledWith(
       expect.objectContaining({ targets: derivedTargets.targets })
     );
     expect(configContent.provider.kilo.options.baseURL).not.toBe(
       'https://openrouter.wrong-base.example.com'
     );
+    expect(result.readyRequest.materialized.env.KILO_SESSION_INGEST_URL).not.toBe(
+      'http://localhost:8800/ingest/'
+    );
+  });
+
+  it('treats transient Kilo capability issuance failures as retryable workspace setup failures', async () => {
+    await expect(
+      buildPromptWrapperRequests(createMetadata({ managedScmContainment: true }), env => {
+        if (!env.GIT_TOKEN_SERVICE) throw new Error('Expected GIT_TOKEN_SERVICE in test env');
+        env.GIT_TOKEN_SERVICE.issueKiloSessionCapability = vi
+          .fn()
+          .mockRejectedValue(new Error('binding unavailable'));
+      })
+    ).rejects.toMatchObject({
+      code: 'WORKSPACE_SETUP_FAILED',
+      retryable: true,
+      message: 'Kilo session capability issuance failed (rpc_error)',
+    });
   });
 
   it('falls back to the raw Kilo token for DIND sandboxes, which have no outbound interceptor to redeem a capability against', async () => {

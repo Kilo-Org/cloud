@@ -140,8 +140,8 @@ export function FindingRemediationPanel({
                     tone={attemptPresentation.tone}
                   />
                   <KvRow label="Started by" value={formatRemediationOrigin(attempt.origin)} />
-                  <KvRow label="Model" value={attempt.remediationModelSlug} />
-                  <KvRow label="Branch" value={attempt.branchName} last />
+                  <KvRow label="Model" value={attempt.remediationModelSlug} selectable />
+                  <KvRow label="Branch" value={attempt.branchName} last selectable />
                   {outcome ? (
                     <Text variant="muted" className="text-xs" selectable>
                       {outcome}

@@ -113,16 +113,23 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label="Vulnerable versions"
           value={firstNonEmpty(finding.vulnerable_version_range, 'Unknown')}
+          selectable
         />
         <KvRow
           label="Patched version"
           value={firstNonEmpty(finding.patched_version, 'No patch available')}
+          selectable
         />
-        {finding.cve_id ? <KvRow label="CVE" value={finding.cve_id} /> : null}
-        {finding.ghsa_id ? <KvRow label="GHSA" value={finding.ghsa_id} /> : null}
-        <KvRow label="Repository" value={finding.repo_full_name} last={!finding.manifest_path} />
+        {finding.cve_id ? <KvRow label="CVE" value={finding.cve_id} selectable /> : null}
+        {finding.ghsa_id ? <KvRow label="GHSA" value={finding.ghsa_id} selectable /> : null}
+        <KvRow
+          label="Repository"
+          value={finding.repo_full_name}
+          last={!finding.manifest_path}
+          selectable
+        />
         {finding.manifest_path ? (
-          <KvRow label="Manifest" value={finding.manifest_path} last />
+          <KvRow label="Manifest" value={finding.manifest_path} last selectable />
         ) : null}
       </View>
 
@@ -152,7 +159,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
 
       <CollapsibleSection title="Source record">
         <KvRow label="Source" value={getFindingSourceLabel(finding.source)} />
-        <KvRow label="Source ID" value={finding.source_id} last />
+        <KvRow label="Source ID" value={finding.source_id} last selectable />
       </CollapsibleSection>
 
       {advisoryUrl ? (

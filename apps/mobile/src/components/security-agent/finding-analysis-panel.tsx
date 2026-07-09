@@ -145,8 +145,14 @@ export function FindingAnalysisPanel({
                 analysis.analysis?.analysisModel,
                 'Not recorded'
               )}
+              selectable
             />
-            <KvRow label="Analyzed" value={timeAgo(parseTimestamp(sandbox.analysisAt))} last />
+            <KvRow
+              label="Analyzed"
+              value={timeAgo(parseTimestamp(sandbox.analysisAt))}
+              last
+              selectable
+            />
           </View>
           {exploitabilityReasoning ? (
             <View className="rounded-lg bg-secondary p-3">

@@ -13,6 +13,8 @@ type KvRowProps = {
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
   className?: string;
+  /** Allow the value text to be selected/copied (e.g. identifiers, versions, paths). */
+  selectable?: boolean;
 };
 
 const VALUE_TONE: Record<NonNullable<KvRowProps['valueTone']>, string> = {
@@ -31,6 +33,7 @@ export function KvRow({
   valueTone = 'default',
   last,
   className,
+  selectable,
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
   return (
@@ -45,7 +48,11 @@ export function KvRow({
         {Icon ? <Icon size={14} color={colors.mutedForeground} /> : null}
         <Text className="text-sm text-muted-foreground">{label}</Text>
       </View>
-      <Text variant="mono" className={cn('text-[13px]', VALUE_TONE[valueTone])}>
+      <Text
+        variant="mono"
+        selectable={selectable}
+        className={cn('text-[13px]', VALUE_TONE[valueTone])}
+      >
         {value}
       </Text>
     </View>

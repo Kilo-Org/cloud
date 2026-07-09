@@ -3,6 +3,7 @@ import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
 import { isPersonalSecurityScope, type SecurityAnalysis } from '@/lib/security-agent';
+import { getNextSecurityFindingsOffset } from '@/lib/security-agent-filters';
 import {
   getRemediationUnavailableCopy,
   isActiveRemediationStatus,
@@ -36,7 +37,7 @@ export function useSecurityFindings(scope: string, filters: ListFindingsFilters)
           }),
     getNextPageParam: (lastPage, pages) => {
       const loadedCount = pages.reduce((count, page) => count + page.findings.length, 0);
-      return loadedCount < lastPage.totalCount ? (filters.offset ?? 0) + loadedCount : undefined;
+      return getNextSecurityFindingsOffset(filters.offset ?? 0, loadedCount, lastPage.totalCount);
     },
   });
 }

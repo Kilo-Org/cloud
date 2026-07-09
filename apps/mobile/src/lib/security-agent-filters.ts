@@ -49,6 +49,38 @@ export const DEFAULT_SECURITY_FINDING_FILTERS: SecurityFindingFilters = {
 
 const SECURITY_FINDINGS_PAGE_SIZE = 50;
 
+export function getNextSecurityFindingsOffset(
+  initialOffset: number,
+  loadedCount: number,
+  totalCount: number
+): number | undefined {
+  const nextOffset = initialOffset + loadedCount;
+  return nextOffset < totalCount ? nextOffset : undefined;
+}
+
+export function selectSecurityFindingStatus(
+  filters: SecurityFindingFilters,
+  status: SecurityFindingStatusFilter
+): SecurityFindingFilters {
+  return {
+    ...filters,
+    status,
+    outcome:
+      status !== 'all' && STATUS_IMPLYING_OUTCOMES.has(filters.outcome) ? 'all' : filters.outcome,
+  };
+}
+
+export function selectSecurityFindingOutcome(
+  filters: SecurityFindingFilters,
+  outcome: SecurityOutcomeFilter
+): SecurityFindingFilters {
+  return {
+    ...filters,
+    status: STATUS_IMPLYING_OUTCOMES.has(outcome) ? 'all' : filters.status,
+    outcome,
+  };
+}
+
 export function toSecurityFindingQuery(
   filters: SecurityFindingFilters,
   offset = 0
@@ -95,14 +127,17 @@ function pickOr<T extends string>(
 export function parseSecurityFindingFilters(
   params: SecurityFindingRouteParams
 ): SecurityFindingFilters {
+  const outcome = pickOr(
+    params.outcomeFilter,
+    OUTCOME_FILTERS,
+    DEFAULT_SECURITY_FINDING_FILTERS.outcome
+  );
   return {
-    status: pickOr(params.status, STATUS_FILTERS, DEFAULT_SECURITY_FINDING_FILTERS.status),
+    status: STATUS_IMPLYING_OUTCOMES.has(outcome)
+      ? 'all'
+      : pickOr(params.status, STATUS_FILTERS, DEFAULT_SECURITY_FINDING_FILTERS.status),
     severity: pickOr(params.severity, SEVERITY_FILTERS, DEFAULT_SECURITY_FINDING_FILTERS.severity),
-    outcome: pickOr(
-      params.outcomeFilter,
-      OUTCOME_FILTERS,
-      DEFAULT_SECURITY_FINDING_FILTERS.outcome
-    ),
+    outcome,
     repoFullName: params.repoFullName ?? null,
     sortBy: pickOr(params.sortBy, SORT_OPTIONS, DEFAULT_SECURITY_FINDING_FILTERS.sortBy),
     overdue: params.overdue === 'true' ? true : undefined,

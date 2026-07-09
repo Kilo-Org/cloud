@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_SECURITY_FINDING_FILTERS,
+  getNextSecurityFindingsOffset,
   hasActiveSecurityFindingFilters,
   parseSecurityFindingFilters,
+  selectSecurityFindingOutcome,
+  selectSecurityFindingStatus,
   toSecurityFindingQuery,
 } from '@/lib/security-agent-filters';
 
@@ -71,11 +74,11 @@ describe('toSecurityFindingQuery', () => {
 });
 
 describe('parseSecurityFindingFilters', () => {
-  it('maps recognized route params onto filter state', () => {
+  it('drops a conflicting status when a route selects a terminal outcome', () => {
     expect(
       parseSecurityFindingFilters({ status: 'closed', outcomeFilter: 'dismissed' })
     ).toMatchObject({
-      status: 'closed',
+      status: 'all',
       outcome: 'dismissed',
     });
   });
@@ -115,6 +118,40 @@ describe('parseSecurityFindingFilters', () => {
 
   it('treats any non-"true" overdue value as unset', () => {
     expect(parseSecurityFindingFilters({ overdue: 'false' }).overdue).toBeUndefined();
+  });
+});
+
+describe('filter selection', () => {
+  it('clears a terminal outcome when a concrete status is selected', () => {
+    expect(
+      selectSecurityFindingStatus(
+        { ...DEFAULT_SECURITY_FINDING_FILTERS, status: 'all', outcome: 'dismissed' },
+        'closed'
+      )
+    ).toMatchObject({ status: 'closed', outcome: 'all' });
+  });
+
+  it('clears status when a terminal outcome is selected', () => {
+    expect(selectSecurityFindingOutcome(DEFAULT_SECURITY_FINDING_FILTERS, 'fixed')).toMatchObject({
+      status: 'all',
+      outcome: 'fixed',
+    });
+  });
+
+  it('preserves status for outcomes that do not imply one', () => {
+    expect(
+      selectSecurityFindingOutcome(DEFAULT_SECURITY_FINDING_FILTERS, 'exploitable')
+    ).toMatchObject({ status: 'open', outcome: 'exploitable' });
+  });
+});
+
+describe('getNextSecurityFindingsOffset', () => {
+  it('returns the next absolute offset when more findings remain', () => {
+    expect(getNextSecurityFindingsOffset(20, 50, 100)).toBe(70);
+  });
+
+  it('stops after loading all findings remaining after a non-zero offset', () => {
+    expect(getNextSecurityFindingsOffset(20, 80, 100)).toBeUndefined();
   });
 });
 

@@ -12,6 +12,8 @@ import {
   type SecurityFindingStatusFilter,
   type SecurityOutcomeFilter,
   type SecuritySeverityFilter,
+  selectSecurityFindingOutcome,
+  selectSecurityFindingStatus,
 } from '@/lib/security-agent-filters';
 
 const STATUS_OPTIONS: { value: SecurityFindingStatusFilter; label: string }[] = [
@@ -151,7 +153,7 @@ export function FindingFilterModal({
                 options={STATUS_OPTIONS}
                 selected={draft.status}
                 onSelect={status => {
-                  setDraft(prev => ({ ...prev, status }));
+                  setDraft(prev => selectSecurityFindingStatus(prev, status));
                 }}
               />
               <FilterSection
@@ -167,7 +169,7 @@ export function FindingFilterModal({
                 options={OUTCOME_OPTIONS}
                 selected={draft.outcome}
                 onSelect={outcome => {
-                  setDraft(prev => ({ ...prev, outcome }));
+                  setDraft(prev => selectSecurityFindingOutcome(prev, outcome));
                 }}
               />
               <FilterSection

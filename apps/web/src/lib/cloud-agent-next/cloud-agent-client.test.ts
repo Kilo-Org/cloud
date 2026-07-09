@@ -15,7 +15,7 @@ jest.mock('@/lib/dotenvx', () => ({ getEnvVariable: jest.fn(() => 'https://agent
 jest.mock('@/lib/config.server', () => ({ INTERNAL_API_SECRET: 'internal-secret' }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
-let clientModule: ClientModule;
+let clientModule: typeof ClientModule;
 
 beforeAll(async () => {
   clientModule = await import('./cloud-agent-client');

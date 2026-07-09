@@ -1,3 +1,5 @@
+import { INGEST_CHUNK_MAX_BYTES } from '../util/ingest-limits';
+
 export type DirectIngestConfigInput = {
   DIRECT_INGEST_PERCENT: string | undefined;
   DIRECT_INGEST_MAX_BYTES: string | undefined;
@@ -87,4 +89,3 @@ function parseUnsignedInteger(value: string | undefined): number | null {
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
-import { INGEST_CHUNK_MAX_BYTES } from '../util/ingest-limits';

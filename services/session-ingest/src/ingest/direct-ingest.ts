@@ -42,9 +42,24 @@ type LegacyReason =
   | 'gate_percent'
   | 'no_content_length'
   | 'invalid_content_length'
+  | 'empty_body'
   | 'oversized_body'
   | 'oversized_item'
   | 'multi_chunk';
+
+type DirectIngestMetrics = {
+  declaredBytes: number | null;
+  actualBytes: number | null;
+  items: number | null;
+};
+
+type LegacyOptions = {
+  reason: LegacyReason;
+  metrics: DirectIngestMetrics;
+  startedAt: number;
+};
+
+type DirectIngestResult = IngestResult | { accepted?: undefined; changes: IngestResult['changes'] };
 
 type CommonEvent = {
   ingestRequestId: string;
@@ -62,17 +77,16 @@ export async function handleDirectIngestRequest(
   request: DirectIngestRequest
 ): Promise<DirectIngestResponse> {
   const startedAt = performance.now();
-  const baseEvent = {
-    ingestRequestId: request.ingestRequestId,
-    sessionId: request.sessionId,
-    ingestVersion: request.ingestVersion,
-  };
   const r2Key = `ingest/${request.kiloUserId}/${request.sessionId}/${request.ingestRequestId}`;
   const configResult = parseDirectIngestConfig(request.env);
 
   if (!configResult.ok) {
     console.error({ event: 'direct_ingest_config_error', reason: configResult.reason });
-    return legacy(request, r2Key, request.body, 'gate_config', null, null, null, startedAt);
+    return legacy(request, r2Key, request.body, {
+      reason: 'gate_config',
+      metrics: unknownMetrics(),
+      startedAt,
+    });
   }
 
   let selection;
@@ -84,39 +98,48 @@ export async function handleDirectIngestRequest(
       reason: 'bucket_failure',
       error: errorMessage(error),
     });
-    return legacy(request, r2Key, request.body, 'gate_config', null, null, null, startedAt);
+    return legacy(request, r2Key, request.body, {
+      reason: 'gate_config',
+      metrics: unknownMetrics(),
+      startedAt,
+    });
   }
   if (!selection.selected) {
-    return legacy(request, r2Key, request.body, 'gate_percent', null, null, null, startedAt);
+    return legacy(request, r2Key, request.body, {
+      reason: 'gate_percent',
+      metrics: unknownMetrics(),
+      startedAt,
+    });
   }
 
   const contentLength = parseContentLength(request.contentLength);
   if (contentLength === 'missing') {
-    return legacy(request, r2Key, request.body, 'no_content_length', null, null, null, startedAt);
+    return legacy(request, r2Key, request.body, {
+      reason: 'no_content_length',
+      metrics: unknownMetrics(),
+      startedAt,
+    });
   }
   if (contentLength === 'invalid') {
-    return legacy(
-      request,
-      r2Key,
-      request.body,
-      'invalid_content_length',
-      null,
-      null,
-      null,
-      startedAt
-    );
+    return legacy(request, r2Key, request.body, {
+      reason: 'invalid_content_length',
+      metrics: unknownMetrics(),
+      startedAt,
+    });
+  }
+  if (contentLength === 'empty') {
+    return legacy(request, r2Key, request.body, {
+      reason: 'empty_body',
+      metrics: { declaredBytes: 0, actualBytes: null, items: null },
+      startedAt,
+    });
   }
   if (contentLength > configResult.config.maxBytes) {
-    return legacy(
-      request,
-      r2Key,
-      request.body,
-      'oversized_body',
-      contentLength,
-      null,
-      null,
-      startedAt
-    );
+    return legacy(request, r2Key, request.body, {
+      reason: 'oversized_body',
+      metrics: { declaredBytes: contentLength, actualBytes: null, items: null },
+      startedAt,
+    });
   }
 
   const buffered = await readBoundedStream(
@@ -127,12 +150,12 @@ export async function handleDirectIngestRequest(
   if (!buffered.ok) {
     logEvent('warn', {
       event: 'direct_ingest_legacy',
-      ...baseEvent,
+      ...eventBase(request, startedAt, {
+        declaredBytes: contentLength,
+        actualBytes: null,
+        items: null,
+      }),
       reason: 'oversized_body',
-      declaredBytes: contentLength,
-      actualBytes: null,
-      durationMs: elapsed(startedAt),
-      items: null,
     });
     return { status: 413, body: { success: false, error: 'payload_too_large' } };
   }
@@ -142,11 +165,7 @@ export async function handleDirectIngestRequest(
   if (!validation.ok) {
     logEvent('warn', {
       event: 'direct_ingest_parse_reject',
-      ...baseEvent,
-      declaredBytes: contentLength,
-      actualBytes,
-      durationMs: elapsed(startedAt),
-      items: null,
+      ...eventBase(request, startedAt, { declaredBytes: contentLength, actualBytes, items: null }),
     });
     return { status: 400, body: { success: false, error: 'malformed_json' } };
   }
@@ -163,47 +182,33 @@ export async function handleDirectIngestRequest(
   if (validation.dataArray !== 'present' || validation.validItemCount === 0) {
     logEvent('info', {
       event: 'direct_ingest_ok',
-      ...baseEvent,
-      declaredBytes: contentLength,
-      actualBytes,
-      durationMs: elapsed(startedAt),
-      items: 0,
+      ...eventBase(request, startedAt, { declaredBytes: contentLength, actualBytes, items: 0 }),
       metadataChanges: 0,
     });
     return { status: 200, body: { success: true } };
   }
 
   if (validation.maxValidItemBytes > MAX_INGEST_ITEM_BYTES) {
-    return legacy(
-      request,
-      r2Key,
-      buffered.bytes,
-      'oversized_item',
-      contentLength,
-      actualBytes,
-      validation.validItemCount,
-      startedAt
-    );
+    return legacy(request, r2Key, buffered.bytes, {
+      reason: 'oversized_item',
+      metrics: { declaredBytes: contentLength, actualBytes, items: validation.validItemCount },
+      startedAt,
+    });
   }
   if (
     validation.validItemCount > INGEST_CHUNK_MAX_ITEMS ||
     validation.totalValidItemBytes > INGEST_CHUNK_MAX_BYTES
   ) {
-    return legacy(
-      request,
-      r2Key,
-      buffered.bytes,
-      'multi_chunk',
-      contentLength,
-      actualBytes,
-      validation.validItemCount,
-      startedAt
-    );
+    return legacy(request, r2Key, buffered.bytes, {
+      reason: 'multi_chunk',
+      metrics: { declaredBytes: contentLength, actualBytes, items: validation.validItemCount },
+      startedAt,
+    });
   }
 
-  let ingestResult: IngestResult;
+  let ingestResult: DirectIngestResult;
   try {
-    ingestResult = await withDORetry<ReturnType<typeof getSessionIngestDO>, IngestResult>(
+    ingestResult = await withDORetry<ReturnType<typeof getSessionIngestDO>, DirectIngestResult>(
       () => getSessionIngestDO(request.env, request),
       async stub =>
         stub.ingest(
@@ -221,22 +226,22 @@ export async function handleDirectIngestRequest(
       request,
       r2Key,
       buffered.bytes,
-      contentLength,
-      actualBytes,
-      validation.validItemCount,
+      { declaredBytes: contentLength, actualBytes, items: validation.validItemCount },
       startedAt,
       error
     );
   }
 
+  // `accepted === false` is intentionally exact for gradual deploy compatibility:
+  // older DO code returns `{ changes }` without an accepted flag and must remain success.
   if (ingestResult.accepted === false) {
     logEvent('info', {
       event: 'direct_ingest_tombstone',
-      ...baseEvent,
-      declaredBytes: contentLength,
-      actualBytes,
-      durationMs: elapsed(startedAt),
-      items: validation.validItemCount,
+      ...eventBase(request, startedAt, {
+        declaredBytes: contentLength,
+        actualBytes,
+        items: validation.validItemCount,
+      }),
     });
     return { status: 404, body: { success: false, error: 'session_not_found' } };
   }
@@ -244,11 +249,11 @@ export async function handleDirectIngestRequest(
   await runMetadataProjection(request, ingestResult.changes);
   logEvent('info', {
     event: 'direct_ingest_ok',
-    ...baseEvent,
-    declaredBytes: contentLength,
-    actualBytes,
-    durationMs: elapsed(startedAt),
-    items: validation.validItemCount,
+    ...eventBase(request, startedAt, {
+      declaredBytes: contentLength,
+      actualBytes,
+      items: validation.validItemCount,
+    }),
     metadataChanges: ingestResult.changes.length,
   });
   return { status: 200, body: { success: true } };
@@ -258,25 +263,15 @@ async function legacy(
   request: DirectIngestRequest,
   r2Key: string,
   body: ReadableStream<Uint8Array> | Uint8Array,
-  reason: LegacyReason,
-  declaredBytes: number | null,
-  actualBytes: number | null,
-  items: number | null,
-  startedAt: number
+  options: LegacyOptions
 ): Promise<DirectIngestResponse> {
   try {
     await stageAndEnqueue(request.env, queueParams(request, r2Key), body);
   } catch (error) {
     logEvent('warn', {
       event: 'direct_ingest_legacy',
-      ingestRequestId: request.ingestRequestId,
-      sessionId: request.sessionId,
-      ingestVersion: request.ingestVersion,
-      reason,
-      declaredBytes,
-      actualBytes,
-      durationMs: elapsed(startedAt),
-      items,
+      ...eventBase(request, options.startedAt, options.metrics),
+      reason: options.reason,
       failureStage: error instanceof StageAndEnqueueError ? error.stage : 'staging_upload',
       error: errorMessage(error),
     });
@@ -284,14 +279,8 @@ async function legacy(
   }
   logEvent('info', {
     event: 'direct_ingest_legacy',
-    ingestRequestId: request.ingestRequestId,
-    sessionId: request.sessionId,
-    ingestVersion: request.ingestVersion,
-    reason,
-    declaredBytes,
-    actualBytes,
-    durationMs: elapsed(startedAt),
-    items,
+    ...eventBase(request, options.startedAt, options.metrics),
+    reason: options.reason,
   });
   return { status: 200, body: { success: true } };
 }
@@ -300,28 +289,17 @@ async function fallbackAfterDirectFailure(
   request: DirectIngestRequest,
   r2Key: string,
   bytes: Uint8Array,
-  declaredBytes: number,
-  actualBytes: number,
-  items: number,
+  metrics: DirectIngestMetrics,
   startedAt: number,
   directError: unknown
 ): Promise<DirectIngestResponse> {
   try {
     await stageAndEnqueue(request.env, queueParams(request, r2Key), bytes);
   } catch (error) {
-    logFallback(
-      request,
-      declaredBytes,
-      actualBytes,
-      items,
-      startedAt,
-      error,
-      undefined,
-      directError
-    );
+    logFallback(request, metrics, startedAt, error, undefined, directError);
     throw error;
   }
-  logFallback(request, declaredBytes, actualBytes, items, startedAt, directError, 'do_rpc');
+  logFallback(request, metrics, startedAt, directError, 'do_rpc');
   return { status: 200, body: { success: true } };
 }
 
@@ -352,11 +330,12 @@ async function runMetadataProjection(
   }
 }
 
-function parseContentLength(value: string | undefined): number | 'missing' | 'invalid' {
+function parseContentLength(value: string | undefined): number | 'missing' | 'invalid' | 'empty' {
   if (value === undefined) return 'missing';
   if (!contentLengthPattern.test(value)) return 'invalid';
   const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 'invalid';
+  if (!Number.isSafeInteger(parsed)) return 'invalid';
+  return parsed === 0 ? 'empty' : parsed;
 }
 
 function queueParams(request: DirectIngestRequest, r2Key: string) {
@@ -371,9 +350,7 @@ function queueParams(request: DirectIngestRequest, r2Key: string) {
 
 function logFallback(
   request: DirectIngestRequest,
-  declaredBytes: number | null,
-  actualBytes: number | null,
-  items: number | null,
+  metrics: DirectIngestMetrics,
   startedAt: number,
   error: unknown,
   stage?: 'do_rpc',
@@ -383,17 +360,31 @@ function logFallback(
     stage ?? (error instanceof StageAndEnqueueError ? error.stage : 'staging_upload');
   logEvent('warn', {
     event: 'direct_ingest_fallback',
-    ingestRequestId: request.ingestRequestId,
-    sessionId: request.sessionId,
-    ingestVersion: request.ingestVersion,
-    declaredBytes,
-    actualBytes,
-    durationMs: elapsed(startedAt),
-    items,
+    ...eventBase(request, startedAt, metrics),
     stage: failureStage,
     error: errorMessage(error),
     ...(directError === undefined ? {} : { directError: errorMessage(directError) }),
   });
+}
+
+function unknownMetrics(): DirectIngestMetrics {
+  return { declaredBytes: null, actualBytes: null, items: null };
+}
+
+function eventBase(
+  request: DirectIngestRequest,
+  startedAt: number,
+  metrics: DirectIngestMetrics
+): CommonEvent {
+  return {
+    ingestRequestId: request.ingestRequestId,
+    sessionId: request.sessionId,
+    ingestVersion: request.ingestVersion,
+    declaredBytes: metrics.declaredBytes,
+    actualBytes: metrics.actualBytes,
+    durationMs: elapsed(startedAt),
+    items: metrics.items,
+  };
 }
 
 function logEvent(level: 'info' | 'warn', event: CommonEvent & Record<string, unknown>) {

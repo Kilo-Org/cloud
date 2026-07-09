@@ -36,6 +36,9 @@ export async function readBoundedStream(
         return {
           ok: false,
           reason: 'too_large',
+          // Route callers reject declaredBytes > configuredCap before reading, so the
+          // streaming overflow normally reports declared_bytes. The cap branch keeps
+          // this helper defensive for standalone callers.
           limit: totalBytes > configuredCap ? 'configured_cap' : 'declared_bytes',
         };
       }

@@ -613,7 +613,7 @@ describe('api routes', () => {
       ['negative', '-1', 'invalid_content_length'],
       ['fractional', '1.5', 'invalid_content_length'],
       ['non-numeric', 'abc', 'invalid_content_length'],
-      ['zero', '0', 'invalid_content_length'],
+      ['zero', '0', 'empty_body'],
       ['over cap', '4194305', 'oversized_body'],
     ])('uses the legacy path for %s Content-Length', async (_name, contentLength, reason) => {
       const { app, ingest } = prepareIngestRoute();

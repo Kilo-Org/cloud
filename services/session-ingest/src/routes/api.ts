@@ -38,6 +38,16 @@ function getOptionalExecutionContext(
   }
 }
 
+function getRequestBodyStream(request: Request): ReadableStream<Uint8Array> {
+  const body = request.body as ReadableStream<Uint8Array> | null;
+  if (body) return body;
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.close();
+    },
+  });
+}
+
 function notifyUserSessionEventFromContext(
   c: Context<ApiContext>,
   kiloUserId: string,
@@ -254,9 +264,7 @@ api.post('/session/:sessionId/ingest', async c => {
 
   const result = await handleDirectIngestRequest({
     env: c.env,
-    body:
-      (c.req.raw.body as ReadableStream<Uint8Array> | null) ??
-      (new Blob([]).stream() as ReadableStream<Uint8Array>),
+    body: getRequestBodyStream(c.req.raw),
     contentLength: c.req.header('content-length'),
     kiloUserId,
     sessionId,

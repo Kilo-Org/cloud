@@ -12,7 +12,7 @@ export default defineConfig({
         data_collection_permissions: {
           required: ['none'],
         },
-        id: 'kilo-extension@kilocode.ai',
+        id: 'browser-agent@kilo.ai',
       },
     },
     description: 'Side-panel AI chat agent. Use open-weight or frontier models.',

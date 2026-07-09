@@ -8,7 +8,7 @@ import { dirname, join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
 
-const extensionId = 'kilo-extension@kilocode.ai';
+const extensionId = 'browser-agent@kilo.ai';
 const firefoxExtensionPath = resolvePath(import.meta.dirname, '../../.output/firefox-mv3');
 
 interface InstalledFirefoxAddon {

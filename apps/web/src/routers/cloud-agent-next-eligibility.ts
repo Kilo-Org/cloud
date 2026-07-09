@@ -1,15 +1,22 @@
-import {
-  buildAccessLevelEligibility,
-  type AccessLevel,
-  type AccessLevelEligibility,
-} from '@/lib/access-level-eligibility';
-
 export const CLOUD_AGENT_NEXT_MIN_BALANCE_DOLLARS = 1;
 
-export type CloudAgentNextAccessLevel = AccessLevel;
+export type CloudAgentNextAccessLevel = 'full' | 'limited';
 
-export type CloudAgentNextEligibility = AccessLevelEligibility;
+export type CloudAgentNextEligibility = {
+  balance: number;
+  minBalance: number;
+  accessLevel: CloudAgentNextAccessLevel;
+  isEligible: boolean;
+  isLowBalance: boolean;
+};
 
 export function buildCloudAgentNextEligibility(balance: number): CloudAgentNextEligibility {
-  return buildAccessLevelEligibility(balance, CLOUD_AGENT_NEXT_MIN_BALANCE_DOLLARS);
+  const hasNoBalance = balance <= 0;
+  return {
+    balance,
+    minBalance: CLOUD_AGENT_NEXT_MIN_BALANCE_DOLLARS,
+    accessLevel: hasNoBalance ? 'limited' : 'full',
+    isEligible: !hasNoBalance,
+    isLowBalance: balance < CLOUD_AGENT_NEXT_MIN_BALANCE_DOLLARS,
+  };
 }

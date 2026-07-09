@@ -457,7 +457,6 @@ async function processWebhookMessage(
               'Content-Type': 'application/json',
               Authorization: `Bearer ${token}`,
               'x-internal-api-key': internalApiSecret,
-              'x-skip-balance-check': 'true',
             },
             body: JSON.stringify(prepareSessionBody),
           })
@@ -545,7 +544,6 @@ async function processWebhookMessage(
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
             'x-internal-api-key': internalApiSecret,
-            'x-skip-balance-check': 'true',
           },
           body: JSON.stringify({ cloudAgentSessionId }),
         })

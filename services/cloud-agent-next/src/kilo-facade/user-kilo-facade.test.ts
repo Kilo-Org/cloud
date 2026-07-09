@@ -2208,9 +2208,13 @@ describe('handleKiloFacadeRequest', () => {
     expect(admitPrompt).not.toHaveBeenCalled();
   });
 
-  it('rejects prompt_async attempts to bypass public balance validation after owner resolution', async () => {
+  it('does not let a balance bypass header change public prompt admission', async () => {
     const env = envStub();
-    const validatePromptBalance = vi.fn();
+    const validatePromptBalance = vi.fn().mockResolvedValue({
+      success: false,
+      status: 402,
+      message: 'Insufficient credits: a positive credit balance is required',
+    });
     const admitPrompt = vi.fn();
     const resolveRootSessionForKiloSession = vi.fn(async () => ({
       cloudAgentSessionId: 'agent_owned',
@@ -2235,17 +2239,17 @@ describe('handleKiloFacadeRequest', () => {
       },
     });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(402);
     await expect(response.json()).resolves.toEqual({
-      error: 'KILO_BALANCE_BYPASS_UNSUPPORTED',
-      message: 'Balance bypass is not supported for public Kilo prompt mutations',
+      error: 'KILO_BALANCE_VALIDATION_FAILED',
+      message: 'Insufficient credits: a positive credit balance is required',
     });
     expect(resolveRootSessionForKiloSession).toHaveBeenCalledWith({
       env,
       userId: 'usr_1',
       kiloSessionId,
     });
-    expect(validatePromptBalance).not.toHaveBeenCalled();
+    expect(validatePromptBalance).toHaveBeenCalled();
     expect(admitPrompt).not.toHaveBeenCalled();
   });
 
@@ -2286,7 +2290,7 @@ describe('handleKiloFacadeRequest', () => {
     const validatePromptBalance = vi.fn().mockResolvedValue({
       success: false,
       status: 402,
-      message: 'Insufficient credits: $1 minimum required',
+      message: 'Insufficient credits: a positive credit balance is required',
     });
 
     const response = await handleKiloFacadeRequest({

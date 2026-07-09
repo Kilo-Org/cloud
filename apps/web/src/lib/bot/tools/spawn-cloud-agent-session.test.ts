@@ -139,9 +139,7 @@ describe('spawnCloudAgentSession delegation', () => {
     for (const field of profileDerivedInlineFields) {
       expect(prepareInput).not.toHaveProperty(field);
     }
-    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('auth-token', {
-      skipBalanceCheck: true,
-    });
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('auth-token');
     expect(mockInitiateFromPreparedSession).toHaveBeenCalledWith({
       cloudAgentSessionId: 'cloud-session-1',
     });

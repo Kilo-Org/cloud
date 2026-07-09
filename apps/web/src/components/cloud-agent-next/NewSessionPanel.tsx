@@ -104,6 +104,10 @@ import {
   shouldCacheBitbucketRepositoryRefreshResult,
   shouldIncludeBitbucketRepositoryRefresh,
 } from '@/components/cloud-agent-next/repository-refresh';
+import {
+  filterModelsForCloudAgentBalance,
+  getNewSessionBalanceNotice,
+} from './new-session-balance';
 
 type Repository = {
   id: string | number;
@@ -161,9 +165,8 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   const isEligibilityLoading = organizationId
     ? orgEligibilityQuery.isPending
     : personalEligibilityQuery.isPending;
-  const hasInsufficientBalance =
-    !isEligibilityLoading && eligibilityData && !eligibilityData.isEligible;
-  const hasLimitedAccess = !isEligibilityLoading && eligibilityData?.accessLevel === 'limited';
+  const hasNoBalance = !isEligibilityLoading && eligibilityData?.accessLevel === 'limited';
+  const hasLowBalance = !isEligibilityLoading && eligibilityData?.isLowBalance === true;
 
   // ---------------------------------------------------------------------------
   // Models
@@ -185,9 +188,9 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       variants: model.opencode?.variants ? Object.keys(model.opencode.variants) : undefined,
     }));
     const withLocalTest = appendCloudAgentNextLocalTestModel(options);
-    if (!hasLimitedAccess) return withLocalTest;
-    return withLocalTest.filter(option => option.isFree || option.hasUserByokAvailable);
-  }, [allModels, hasLimitedAccess]);
+    return filterModelsForCloudAgentBalance(withLocalTest, hasNoBalance);
+  }, [allModels, hasNoBalance]);
+  const balanceNotice = getNewSessionBalanceNotice(hasNoBalance, hasLowBalance);
 
   // ---------------------------------------------------------------------------
   // Form state
@@ -888,21 +891,11 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
   // ---------------------------------------------------------------------------
   const isPromptTooLong = prompt.length > CLOUD_AGENT_PROMPT_MAX_LENGTH;
 
-  const selectedModelOption = modelOptions.find(m => m.id === model);
-  // Limited-access users can submit when they've picked a free or BYOK-capable
-  // model from the filtered picker; the server still gates paid models behind
-  // the minimum balance, but the submit button shouldn't pretend otherwise.
-  const limitedAccessModelIsAllowed =
-    hasLimitedAccess &&
-    !!selectedModelOption &&
-    (selectedModelOption.isFree || selectedModelOption.hasUserByokAvailable);
-
   const isFormValid =
     prompt.trim().length > 0 &&
     !isPromptTooLong &&
     model.length > 0 &&
     !isPreparing &&
-    (!hasInsufficientBalance || limitedAccessModelIsAllowed) &&
     !attachmentUpload.hasUploadingAttachments;
 
   const handleStartSession = useCallback(async () => {
@@ -1182,27 +1175,31 @@ export function NewSessionPanel({ organizationId, isDevcontainerAvailable }: New
       </SetPageTitle>
       <MobileSidebarToggle />
       <div className="w-full max-w-2xl space-y-4">
-        {/* Insufficient balance banner */}
-        {hasInsufficientBalance && eligibilityData && !hasLimitedAccess && (
-          <InsufficientBalanceBanner
-            balance={eligibilityData.balance}
-            organizationId={organizationId}
-            content={{ type: 'productName', productName: 'Cloud Agent' }}
-          />
-        )}
-
-        {/* Free-models-available banner when balance is low but free models are usable */}
-        {hasLimitedAccess && eligibilityData && (
+        {balanceNotice === 'zero-credit' && eligibilityData && (
           <InsufficientBalanceBanner
             balance={eligibilityData.balance}
             organizationId={organizationId}
             colorScheme="info"
             content={{
               type: 'custom',
-              title: 'Free Models Available',
+              title: 'Free and BYOK models remain available',
               description:
-                'You can use free models in Cloud Agent. Add credits to unlock all models.',
-              compactActionText: 'Add credits to unlock all models',
+                'Use free or eligible BYOK models in Cloud Agent. Add Credits to use other models.',
+              compactActionText: 'Add Credits',
+            }}
+          />
+        )}
+
+        {balanceNotice === 'low-funds' && eligibilityData && (
+          <InsufficientBalanceBanner
+            balance={eligibilityData.balance}
+            organizationId={organizationId}
+            colorScheme="info"
+            content={{
+              type: 'custom',
+              title: 'Credits are below $1',
+              description: 'All models remain available while your balance is positive.',
+              compactActionText: 'Add Credits',
             }}
           />
         )}

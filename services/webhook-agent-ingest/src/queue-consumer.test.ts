@@ -304,6 +304,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
 
     await handleWebhookDeliveryBatch(batch, env);
 
+    expect(prepareRequests[0]?.headers.get('x-skip-balance-check')).toBeNull();
     const prepareBody = await prepareRequests[0]?.json();
     const expectedToken = await deriveCallbackToken({
       secret: callbackTokenSecret,

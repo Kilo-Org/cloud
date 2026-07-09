@@ -71,7 +71,6 @@ export interface CodeReview {
   totalTokensOut?: number;
   /** Accumulated cost in dollars across all LLM calls */
   totalCost?: number;
-  skipBalanceCheck?: boolean; // Skip balance validation in cloud agent (for OSS sponsorship)
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
   sandboxRetryAttempted?: boolean;
@@ -139,7 +138,6 @@ export interface CodeReviewRequest {
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
-  skipBalanceCheck?: boolean;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
   /** Provider-reported repository storage size, formatted for log correlation. */

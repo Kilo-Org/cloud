@@ -158,7 +158,6 @@ function createInternalApiContext(options: {
   authToken?: string | null;
   internalApiSecret?: string | null;
   requestInternalApiKey?: string | null;
-  skipBalanceCheck?: boolean;
   doStub?: ReturnType<typeof createMockDOStub>;
   getBitbucketToken?: ReturnType<typeof vi.fn>;
   managedScmContainmentOrgIds?: string;
@@ -190,9 +189,6 @@ function createInternalApiContext(options: {
   const headers = new Headers();
   if (effectiveRequestInternalApiKey !== null) {
     headers.set('x-internal-api-key', effectiveRequestInternalApiKey);
-  }
-  if (options.skipBalanceCheck) {
-    headers.set('x-skip-balance-check', 'true');
   }
 
   return {
@@ -1190,13 +1186,12 @@ describe('start endpoint', () => {
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
   });
 
-  it('rejects non-member organization profile resolution when balance validation is skipped', async () => {
+  it('rejects non-member organization profile resolution before initial admission', async () => {
     organizationMembershipLimitMock.mockResolvedValueOnce([]);
     const doStub = createMockDOStub();
-    const context = createInternalApiContext({ doStub, skipBalanceCheck: true });
+    const context = createInternalApiContext({ doStub });
     const caller = appRouter.createCaller(context);
 
-    expect(context.request.headers.get('x-skip-balance-check')).toBe('true');
     await expect(
       caller.start({
         message: { prompt: 'Attempt organization profile access' },

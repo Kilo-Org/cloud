@@ -14,7 +14,7 @@ type ExistingPromptModelPreflightInput = StoredSessionPreflightInput & {
   requestedModel?: string;
 };
 
-async function requireSessionMetadata(
+export async function requireSessionMetadata(
   input: StoredSessionPreflightInput
 ): Promise<CloudAgentSessionState> {
   const metadata = await fetchSessionMetadata(input.env, input.userId, input.cloudAgentSessionId);

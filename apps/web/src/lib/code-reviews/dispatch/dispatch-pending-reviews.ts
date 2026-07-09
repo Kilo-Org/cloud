@@ -575,7 +575,6 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
     await codeReviewWorkerClient.dispatchReview({
       ...dispatchPayload,
       attemptId: attempt.id,
-      skipBalanceCheck: true,
     });
   } catch (dispatchError) {
     errorExceptInTest('[dispatchReview] Worker dispatch failed, leaving review queued', {

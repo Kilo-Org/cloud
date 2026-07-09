@@ -1,89 +1,49 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 
-jest.mock('@/lib/dotenvx', () => ({
-  getEnvVariable: jest.fn(() => 'http://cloud-agent-next'),
-}));
-
-jest.mock('@/lib/config.server', () => ({
-  INTERNAL_API_SECRET: 'test-secret',
-}));
+const createTRPCClient = jest.fn();
+const httpLink = jest.fn();
 
 jest.mock('@trpc/client', () => ({
-  createTRPCClient: jest.fn(() => ({})),
-  httpLink: jest.fn(),
+  createTRPCClient,
+  httpLink,
   TRPCClientError: class TRPCClientError extends Error {},
 }));
 
-jest.mock('@sentry/nextjs', () => ({
-  captureException: jest.fn(),
-}));
+jest.mock('@/lib/dotenvx', () => ({ getEnvVariable: jest.fn(() => 'https://agent.example.com') }));
+jest.mock('@/lib/config.server', () => ({ INTERNAL_API_SECRET: 'internal-secret' }));
+jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
-jest.mock('./cloud-agent-client', () => {
-  const createCloudAgentNextClient = jest.fn((_token: string) => ({ marker: 'default' }));
-  const createAppBuilderCloudAgentNextClient = jest.fn((_token: string) => ({
-    marker: 'appbuilder',
-  }));
-  return {
-    createCloudAgentNextClient,
-    createAppBuilderCloudAgentNextClient,
-    createCloudAgentNextClientForModel: jest.fn(
-      (token: string, model: { isFree: boolean; hasUserByokAvailable: boolean }) =>
-        model.isFree || model.hasUserByokAvailable
-          ? createAppBuilderCloudAgentNextClient(token)
-          : createCloudAgentNextClient(token)
-    ),
-    rethrowAsPaymentRequired: jest.fn(),
-  };
+let clientModule: typeof import('./cloud-agent-client');
+
+beforeAll(async () => {
+  clientModule = await import('./cloud-agent-client');
 });
 
-const clientModule: {
-  createCloudAgentNextClient: jest.Mock;
-  createAppBuilderCloudAgentNextClient: jest.Mock;
-  createCloudAgentNextClientForModel: (
-    token: string,
-    model: { isFree: boolean; hasUserByokAvailable: boolean }
-  ) => unknown;
-} = jest.requireMock('./cloud-agent-client');
+describe('CloudAgentNextClient', () => {
+  it('uses ordinary authentication headers without a balance bypass header', () => {
+    httpLink.mockReturnValue({});
+    createTRPCClient.mockReturnValue({});
 
-const {
-  createCloudAgentNextClient: mockCreateCloudAgentNextClient,
-  createAppBuilderCloudAgentNextClient: mockCreateAppBuilderCloudAgentNextClient,
-  createCloudAgentNextClientForModel,
-} = clientModule;
+    new clientModule.CloudAgentNextClient('user-token');
 
-beforeEach(() => {
-  mockCreateCloudAgentNextClient.mockClear();
-  mockCreateAppBuilderCloudAgentNextClient.mockClear();
-});
-
-describe('createCloudAgentNextClientForModel', () => {
-  it('returns the default client when the model is paid and has no BYOK', () => {
-    const result = createCloudAgentNextClientForModel('token', {
-      isFree: false,
-      hasUserByokAvailable: false,
+    const options = httpLink.mock.calls[0]?.[0] as { headers: () => Record<string, string> };
+    expect(options.headers()).toEqual({
+      Authorization: 'Bearer user-token',
+      'x-internal-api-key': 'internal-secret',
     });
-    expect(result).toEqual({ marker: 'default' });
-    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('token');
-    expect(mockCreateAppBuilderCloudAgentNextClient).not.toHaveBeenCalled();
+    expect(options.headers()).not.toHaveProperty('x-skip-balance-check');
   });
 
-  it('returns the AppBuilder client when the model is free', () => {
-    const result = createCloudAgentNextClientForModel('token', {
-      isFree: true,
-      hasUserByokAvailable: false,
-    });
-    expect(result).toEqual({ marker: 'appbuilder' });
-    expect(mockCreateAppBuilderCloudAgentNextClient).toHaveBeenCalledWith('token');
-    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
-  });
-
-  it('returns the AppBuilder client when the model is BYOK-capable, even if it is not free', () => {
-    const result = createCloudAgentNextClientForModel('token', {
-      isFree: false,
-      hasUserByokAvailable: true,
-    });
-    expect(result).toEqual({ marker: 'appbuilder' });
-    expect(mockCreateAppBuilderCloudAgentNextClient).toHaveBeenCalledWith('token');
-    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  it('normalizes an insufficient-credit error for web router procedures', () => {
+    try {
+      clientModule.rethrowAsPaymentRequired(new clientModule.InsufficientCreditsError());
+    } catch (error) {
+      expect(error).toMatchObject({
+        code: 'PAYMENT_REQUIRED',
+        message: 'Insufficient credits: a positive credit balance is required',
+      });
+      return;
+    }
+    throw new Error('Expected a PAYMENT_REQUIRED error');
   });
 });

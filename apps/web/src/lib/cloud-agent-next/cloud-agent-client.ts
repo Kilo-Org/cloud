@@ -367,7 +367,7 @@ export class InsufficientCreditsError extends Error {
   readonly httpStatus = 402;
   readonly code = 'PAYMENT_REQUIRED';
 
-  constructor(message = 'Insufficient credits: $1 minimum required') {
+  constructor(message = 'Insufficient credits: a positive credit balance is required') {
     super(message);
     this.name = 'InsufficientCreditsError';
   }
@@ -471,16 +471,6 @@ type CloudAgentNextTRPCClient = {
 };
 
 /**
- * Options for configuring the cloud agent client
- */
-export type CloudAgentNextClientOptions = {
-  /**
-   * Skip balance validation in cloud-agent (used by App Builder which handles its own billing).
-   */
-  skipBalanceCheck?: boolean;
-};
-
-/**
  * Client for communicating with the cloud-agent-next TRPC API
  *
  * This client only uses the V2 WebSocket-based API with mutation procedures.
@@ -489,19 +479,14 @@ export type CloudAgentNextClientOptions = {
 export class CloudAgentNextClient {
   private client: CloudAgentNextTRPCClient;
   private authToken: string;
-  private options: CloudAgentNextClientOptions;
 
-  constructor(authToken: string, options: CloudAgentNextClientOptions = {}) {
+  constructor(authToken: string) {
     this.authToken = authToken;
-    this.options = options;
 
     // Build common headers
     const baseHeaders: Record<string, string> = {
       Authorization: `Bearer ${this.authToken}`,
     };
-    if (this.options.skipBalanceCheck) {
-      baseHeaders['x-skip-balance-check'] = 'true';
-    }
 
     // Create TRPC client - only uses httpLink for mutations/queries
     // (streaming is handled via WebSocketManager)
@@ -794,43 +779,6 @@ export class CloudAgentNextClient {
 /**
  * Create a cloud agent next client instance with the provided auth token
  */
-export function createCloudAgentNextClient(
-  authToken: string,
-  options?: CloudAgentNextClientOptions
-): CloudAgentNextClient {
-  return new CloudAgentNextClient(authToken, options);
-}
-
-/**
- * Create a cloud agent next client instance configured for App Builder.
- */
-export function createAppBuilderCloudAgentNextClient(authToken: string): CloudAgentNextClient {
-  return new CloudAgentNextClient(authToken, {
-    skipBalanceCheck: true,
-  });
-}
-
-/**
- * Pick a Cloud Agent Next client for a session start based on whether the
- * chosen model is free or BYOK-billable for the caller.
- *
- * Free models (and BYOK-capable models, where the user provides their own key
- * and the model is therefore not billed against their balance) cost the user
- * nothing, so we mirror AppBuilder and set `x-skip-balance-check: true` to
- * allow $0-balance users to still create sessions when their selected model
- * is free. Paid models stay on the default client so the worker balance
- * middleware can still enforce the $1 minimum on paid-model sessions.
- *
- * The decision is made from caller-supplied booleans rather than re-querying
- * model metadata, so the helper can be unit-tested without a database and
- * matches the values the NewSessionPanel model picker already filters on.
- */
-export function createCloudAgentNextClientForModel(
-  authToken: string,
-  model: { isFree: boolean; hasUserByokAvailable: boolean }
-): CloudAgentNextClient {
-  if (model.isFree || model.hasUserByokAvailable) {
-    return createAppBuilderCloudAgentNextClient(authToken);
-  }
-  return createCloudAgentNextClient(authToken);
+export function createCloudAgentNextClient(authToken: string): CloudAgentNextClient {
+  return new CloudAgentNextClient(authToken);
 }

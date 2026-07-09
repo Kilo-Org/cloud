@@ -128,7 +128,6 @@ export type CodeReviewPayload = {
   authToken: string;
   sessionInput: SessionInput;
   owner: Owner;
-  skipBalanceCheck?: boolean;
   /** Cloud-agent session ID from a previous completed review, for session continuation */
   previousCloudAgentSessionId?: string;
   /** Provider-reported repository storage size, formatted for log correlation. */

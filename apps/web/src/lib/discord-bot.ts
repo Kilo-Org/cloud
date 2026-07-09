@@ -183,7 +183,7 @@ async function spawnCloudAgentSession(
     : args.prompt;
 
   const result = await runSessionToCompletion({
-    client: createCloudAgentNextClient(authToken, { skipBalanceCheck: true }),
+    client: createCloudAgentNextClient(authToken),
     prepareInput: {
       githubRepo: args.githubRepo,
       prompt: promptWithSignature,

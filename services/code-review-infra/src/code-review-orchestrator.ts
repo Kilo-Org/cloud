@@ -888,7 +888,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       id: string;
       userId: string;
     };
-    skipBalanceCheck?: boolean;
     previousCloudAgentSessionId?: string;
     repositorySize?: string | null;
     runReviewDelayMs?: number;
@@ -914,7 +913,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       owner: params.owner,
       status: 'queued',
       updatedAt: new Date().toISOString(),
-      skipBalanceCheck: params.skipBalanceCheck,
       previousCloudAgentSessionId:
         params.sessionInput.platform === 'bitbucket'
           ? undefined
@@ -1022,7 +1020,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       authToken: this.state.authToken,
       sessionInput: this.state.sessionInput,
       owner: this.state.owner,
-      skipBalanceCheck: this.state.skipBalanceCheck,
       previousCloudAgentSessionId: undefined,
       repositorySize: this.state.repositorySize,
       runReviewDelayMs: retryDelayMs,
@@ -1153,9 +1150,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         Authorization: `Bearer ${this.state.authToken}`,
         'x-internal-api-key': this.env.INTERNAL_API_SECRET,
       };
-      if (this.state.skipBalanceCheck) {
-        internalHeaders['x-skip-balance-check'] = 'true';
-      }
 
       // Step 1: Prepare session with callback target
       const callbackTarget = await callbackTargetForAttempt(
@@ -1197,7 +1191,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         reviewId: this.state.reviewId,
         callbackUrl: callbackTarget.url,
         createdOnPlatform: prepareInput.createdOnPlatform,
-        skipBalanceCheck: this.state.skipBalanceCheck,
         githubCloudReviewSkill: {
           attached: githubCloudReviewSkillAttached,
           name: GITHUB_CLOUD_REVIEW_SKILL_NAME,
@@ -1237,9 +1230,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       const userHeaders: Record<string, string> = {
         Authorization: `Bearer ${this.state.authToken}`,
       };
-      if (this.state.skipBalanceCheck) {
-        userHeaders['x-skip-balance-check'] = 'true';
-      }
 
       console.log('[CodeReviewOrchestrator] Calling initiateFromKilocodeSessionV2', {
         reviewId: this.state.reviewId,
@@ -1357,9 +1347,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       const userHeaders: Record<string, string> = {
         Authorization: `Bearer ${this.state.authToken}`,
       };
-      if (this.state.skipBalanceCheck) {
-        userHeaders['x-skip-balance-check'] = 'true';
-      }
 
       let health: CloudAgentSessionHealthOutput;
       try {
@@ -1398,9 +1385,6 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
         Authorization: `Bearer ${this.state.authToken}`,
         'x-internal-api-key': this.env.INTERNAL_API_SECRET,
       };
-      if (this.state.skipBalanceCheck) {
-        internalHeaders['x-skip-balance-check'] = 'true';
-      }
 
       // Step 1: Update callback target via updateSession (internal-only endpoint).
       // callbackTarget must be set through an internal procedure, not the

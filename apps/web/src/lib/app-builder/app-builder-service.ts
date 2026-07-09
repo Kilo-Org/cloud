@@ -1,7 +1,7 @@
 import 'server-only';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
-  createAppBuilderCloudAgentNextClient,
+  createCloudAgentNextClient,
   type InterruptResult,
   type InitiateSessionOutput,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
@@ -165,8 +165,7 @@ async function shouldCreateNewSession(
   }
 
   if (project.git_repo_full_name) {
-    const session =
-      await createAppBuilderCloudAgentNextClient(authToken).getSession(currentSessionId);
+    const session = await createCloudAgentNextClient(authToken).getSession(currentSessionId);
 
     if (session.gitUrl && !session.githubRepo) {
       return {
@@ -261,7 +260,7 @@ async function createCloudAgentNextSession(
     images,
     reason,
   } = params;
-  const client = createAppBuilderCloudAgentNextClient(authToken);
+  const client = createCloudAgentNextClient(authToken);
 
   const augmentedMessage = message + buildImageContextFromAttachments(images);
 
@@ -358,7 +357,7 @@ async function sendToExistingCloudAgentNextSession(
     gitToken = tokenResult.token;
   }
 
-  const client = createAppBuilderCloudAgentNextClient(authToken);
+  const client = createCloudAgentNextClient(authToken);
   const result = await client.sendMessage({
     cloudAgentSessionId: sessionId,
     payload: {
@@ -436,7 +435,7 @@ export async function createProject(input: CreateProjectInput): Promise<CreatePr
       createdOnPlatform: 'app-builder',
     };
 
-    const client = createAppBuilderCloudAgentNextClient(authToken);
+    const client = createCloudAgentNextClient(authToken);
     const { cloudAgentSessionId } = await client.prepareSession({
       ...sharedParams,
       mode: mode === 'ask' ? 'plan' : 'build',
@@ -536,7 +535,7 @@ export async function getProject(
 
     if (activeSession?.worker_version === REQUIRED_WORKER_VERSION) {
       try {
-        const client = createAppBuilderCloudAgentNextClient(authToken);
+        const client = createCloudAgentNextClient(authToken);
         const sessionState = await client.getSession(project.session_id);
 
         sessionPrepared = sessionState.preparedAt != null;
@@ -803,7 +802,7 @@ export async function interruptSession(
     };
   }
 
-  const client = createAppBuilderCloudAgentNextClient(authToken);
+  const client = createCloudAgentNextClient(authToken);
   return client.interruptSession(project.session_id);
 }
 
@@ -839,7 +838,7 @@ export async function startSessionForProject(
     });
   }
 
-  const client = createAppBuilderCloudAgentNextClient(authToken);
+  const client = createCloudAgentNextClient(authToken);
   const sessionState = await client.getSession(project.session_id);
 
   if (sessionState.initiatedAt) {

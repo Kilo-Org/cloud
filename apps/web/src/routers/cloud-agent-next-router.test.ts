@@ -42,24 +42,13 @@ const mockGenerateCloudAgentAttachmentUploadUrl = jest.fn<
   }) => Promise<{ signedUrl: string; key: string; expiresAt: string }>
 >(() => Promise.resolve({ signedUrl: 'signed', key: 'key', expiresAt: 'expires' }));
 
-const mockCreateCloudAgentNextClient = jest.fn(() => ({
-  prepareSession: mockPrepareSession,
-  sendMessage: mockSendMessage,
-}));
-
-const mockCreateCloudAgentNextClientForModel = jest.fn(
-  (_authToken: string, _eligibility: unknown) => ({
+const mockCreateCloudAgentNextClient = jest.fn((authToken: string) => {
+  void authToken;
+  return {
     prepareSession: mockPrepareSession,
     sendMessage: mockSendMessage,
-  })
-);
-
-const mockComputeCloudAgentNextBalanceCheckEligibility = jest.fn<
-  (...args: unknown[]) => Promise<{
-    isFree: boolean;
-    hasUserByokAvailable: boolean;
-  }>
->();
+  };
+});
 
 const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
@@ -93,12 +82,7 @@ jest.mock('@/lib/tokens', () => ({
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: mockCreateCloudAgentNextClient,
-  createCloudAgentNextClientForModel: mockCreateCloudAgentNextClientForModel,
   rethrowAsPaymentRequired: jest.fn(),
-}));
-
-jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
-  computeCloudAgentNextBalanceCheckEligibility: mockComputeCloudAgentNextBalanceCheckEligibility,
 }));
 
 jest.mock('@/lib/posthog-feature-flags', () => ({
@@ -162,7 +146,8 @@ let createCaller: (ctx: { user: User }) => {
     balance: number;
     minBalance: number;
     isEligible: boolean;
-    accessLevel: 'full' | 'limited' | 'blocked';
+    accessLevel: 'full' | 'limited';
+    isLowBalance: boolean;
   }>;
   listGitHubRepositories: (input: { forceRefresh: boolean }) => Promise<unknown>;
   listGitLabRepositories: (input: { forceRefresh: boolean }) => Promise<unknown>;
@@ -253,22 +238,27 @@ describe('cloudAgentNextRouter helper procedures', () => {
   });
 
   it.each([
-    { balance: 1, isEligible: true, accessLevel: 'full' as const },
-    { balance: 0.99, isEligible: false, accessLevel: 'limited' as const },
-  ])('reports eligibility for a $balance balance', async ({ balance, isEligible, accessLevel }) => {
-    mockGetBalanceForUser.mockResolvedValue({ balance });
-    const user = { id: 'user-eligibility', is_admin: false } as User;
-    const caller = createCaller({ user });
+    { balance: 0, isEligible: false, accessLevel: 'limited' as const, isLowBalance: true },
+    { balance: 0.01, isEligible: true, accessLevel: 'full' as const, isLowBalance: true },
+    { balance: 1, isEligible: true, accessLevel: 'full' as const, isLowBalance: false },
+  ])(
+    'reports eligibility for a $balance balance',
+    async ({ balance, isEligible, accessLevel, isLowBalance }) => {
+      mockGetBalanceForUser.mockResolvedValue({ balance });
+      const user = { id: 'user-eligibility', is_admin: false } as User;
+      const caller = createCaller({ user });
 
-    await expect(caller.checkEligibility()).resolves.toEqual({
-      balance,
-      minBalance: 1,
-      isEligible,
-      accessLevel,
-    });
-    expect(mockGetBalanceForUser).toHaveBeenCalledWith(user);
-    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
-  });
+      await expect(caller.checkEligibility()).resolves.toEqual({
+        balance,
+        minBalance: 1,
+        isEligible,
+        accessLevel,
+        isLowBalance,
+      });
+      expect(mockGetBalanceForUser).toHaveBeenCalledWith(user);
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     ['GitHub', 'listGitHubRepositories', mockFetchGitHubRepositoriesForUser],
@@ -297,10 +287,6 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     mockPrepareSession.mockResolvedValue({
       cloudAgentSessionId: 'agent_123',
       kiloSessionId: 'ses_12345678901234567890123456',
-    });
-    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
-      isFree: false,
-      hasUserByokAvailable: false,
     });
   });
 
@@ -406,63 +392,8 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     );
   });
 
-  it('routes free models through the AppBuilder client so the worker skips the balance minimum', async () => {
-    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
-      isFree: true,
-      hasUserByokAvailable: false,
-    });
-    const caller = createCaller({
-      user: { id: 'user-free', is_admin: false } as User,
-    });
-
-    await caller.prepareSession({
-      prompt: 'Test prompt',
-      mode: 'code',
-      model: 'kilo/test-model',
-      githubRepo: 'acme/repo',
-      autoInitiate: true,
-      devcontainer: false,
-    });
-
-    expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
-      expect.objectContaining({ modelId: 'kilo/test-model' })
-    );
-    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
-      isFree: true,
-      hasUserByokAvailable: false,
-    });
-    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
-  });
-
-  it('routes BYOK-capable paid models through the AppBuilder client so the worker skips the balance minimum', async () => {
-    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
-      isFree: false,
-      hasUserByokAvailable: true,
-    });
-    const caller = createCaller({
-      user: { id: 'user-byok', is_admin: false } as User,
-    });
-
-    await caller.prepareSession({
-      prompt: 'Test prompt',
-      mode: 'code',
-      model: 'kilo/paid-byok-model',
-      githubRepo: 'acme/repo',
-      autoInitiate: true,
-      devcontainer: false,
-    });
-
-    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
-      isFree: false,
-      hasUserByokAvailable: true,
-    });
-    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
-  });
-
-  it('routes paid models the user has no BYOK key for through the model-aware helper with a paid eligibility', async () => {
-    const caller = createCaller({
-      user: { id: 'user-paid', is_admin: false } as User,
-    });
+  it('uses the ordinary client without local model eligibility', async () => {
+    const caller = createCaller({ user: { id: 'user-paid', is_admin: false } as User });
 
     await caller.prepareSession({
       prompt: 'Test prompt',
@@ -473,9 +404,6 @@ describe('cloudAgentNextRouter.prepareSession', () => {
       devcontainer: false,
     });
 
-    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
-      isFree: false,
-      hasUserByokAvailable: false,
-    });
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
   });
 });

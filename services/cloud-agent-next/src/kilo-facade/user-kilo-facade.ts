@@ -10,11 +10,9 @@ import type {
   KiloSdkStoredMessage,
   ListCloudAgentRootSessionsParams,
 } from '../session-ingest-binding.js';
-import {
-  fetchOrgIdForSession,
-  validateBalanceOnly,
-  type BalanceOnlyResult,
-} from '../balance-validation.js';
+import { type BalanceOnlyResult } from '../balance-validation.js';
+import { hasInsufficientBalance, INSUFFICIENT_CREDITS_MESSAGE } from '../cloud-agent-admission.js';
+import { preflightCloudAgentModelBilling } from '../model-billing-preflight.js';
 import type {
   QueueExecutionTurnCommand,
   SubmittedSessionMessageRequest,
@@ -127,6 +125,7 @@ export type KiloFacadeRequestDeps = {
     authToken: string;
     userId: string;
     cloudAgentSessionId: string;
+    requestedModel?: string;
   }) => Promise<BalanceOnlyResult>;
   interruptPrompt?: (params: {
     env: Env;
@@ -710,9 +709,25 @@ async function defaultValidatePromptBalance(params: {
   authToken: string;
   userId: string;
   cloudAgentSessionId: string;
+  requestedModel?: string;
 }): Promise<BalanceOnlyResult> {
-  const orgId = await fetchOrgIdForSession(params.env, params.userId, params.cloudAgentSessionId);
-  return validateBalanceOnly(params.authToken, orgId, params.env);
+  const billing = await preflightCloudAgentModelBilling({
+    env: params.env,
+    userId: params.userId,
+    authToken: params.authToken,
+    procedure: 'kilo.prompt_async',
+    body: {
+      cloudAgentSessionId: params.cloudAgentSessionId,
+      ...(params.requestedModel ? { agent: { model: params.requestedModel } } : {}),
+    },
+  });
+  if (billing.classification !== 'balance-required') {
+    return { success: true };
+  }
+  if (hasInsufficientBalance(billing)) {
+    return { success: false, status: 402, message: INSUFFICIENT_CREDITS_MESSAGE };
+  }
+  return { success: true };
 }
 
 async function defaultAdmitPrompt(params: {
@@ -754,18 +769,12 @@ async function admitBasicPrompt(params: {
   if (!params.authToken) {
     return facadeError(500, 'KILO_FACADE_UNAVAILABLE', 'Durable prompt admission is unavailable');
   }
-  if (params.request.headers.get('x-skip-balance-check') !== null) {
-    return facadeError(
-      400,
-      'KILO_BALANCE_BYPASS_UNSUPPORTED',
-      'Balance bypass is not supported for public Kilo prompt mutations'
-    );
-  }
   const balance = await (params.deps?.validatePromptBalance ?? defaultValidatePromptBalance)({
     env: params.env,
     authToken: params.authToken,
     userId: params.userId,
     cloudAgentSessionId: params.cloudAgentSessionId,
+    requestedModel: parsed.prompt.agent?.model,
   });
   if (!balance.success) {
     return facadeError(balance.status, 'KILO_BALANCE_VALIDATION_FAILED', balance.message);

@@ -297,7 +297,10 @@ describe('tryDispatchPendingReviews', () => {
       expect.objectContaining({ reviewId: review.id, platform: 'bitbucket' })
     );
     expect(mockDispatchReview).toHaveBeenCalledWith(
-      expect.objectContaining({ reviewId: review.id, skipBalanceCheck: true })
+      expect.objectContaining({ reviewId: review.id })
+    );
+    expect(mockDispatchReview).not.toHaveBeenCalledWith(
+      expect.objectContaining({ skipBalanceCheck: expect.anything() })
     );
   });
 

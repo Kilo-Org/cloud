@@ -203,7 +203,7 @@ export default async function spawnCloudAgentSession(
     };
   }
 
-  const client = createCloudAgentNextClient(authToken, { skipBalanceCheck: true });
+  const client = createCloudAgentNextClient(authToken);
 
   let cloudAgentSessionId: string;
   let kiloSessionId: string;

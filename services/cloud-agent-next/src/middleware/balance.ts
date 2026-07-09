@@ -1,14 +1,31 @@
 import { createMiddleware } from 'hono/factory';
 import type { Context, Next } from 'hono';
+import { TRPCError } from '@trpc/server';
 import type { HonoContext } from '../hono-context.js';
 import { logger } from '../logger.js';
 import { buildTrpcErrorResponse } from '../trpc-error.js';
-import {
-  validateBalanceOnly,
-  extractProcedureName,
-  BALANCE_REQUIRED_MUTATIONS,
-} from '../balance-validation.js';
-import { projectSessionAccessHttpError, requireCurrentSessionAccess } from '../session-access.js';
+import { extractProcedureName, BALANCE_REQUIRED_MUTATIONS } from '../balance-validation.js';
+import { preflightCloudAgentModelBilling } from '../model-billing-preflight.js';
+import { hasInsufficientBalance, INSUFFICIENT_CREDITS_MESSAGE } from '../cloud-agent-admission.js';
+
+function projectBillingPreflightError(error: unknown): { status: number; message: string } {
+  if (!(error instanceof TRPCError)) {
+    return { status: 500, message: 'Billing admission is temporarily unavailable' };
+  }
+
+  switch (error.code) {
+    case 'BAD_REQUEST':
+      return { status: 400, message: error.message };
+    case 'FORBIDDEN':
+      return { status: 403, message: error.message };
+    case 'NOT_FOUND':
+      return { status: 404, message: error.message };
+    case 'SERVICE_UNAVAILABLE':
+      return { status: 503, message: error.message };
+    default:
+      return { status: 500, message: 'Billing admission is temporarily unavailable' };
+  }
+}
 
 /**
  * Middleware that validates user balance for mutations that require it.
@@ -23,33 +40,10 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
       return;
     }
 
-    const skipBalanceCheck = c.req.header('x-skip-balance-check') === 'true';
-
-    if (skipBalanceCheck) {
-      logger.withFields({ procedure: procedureName }).info('Skipping balance check per header');
-      await next();
-      return;
-    }
-
-    let orgId: string | undefined;
-    let sessionId: string | undefined;
+    let body: unknown;
     try {
       const clonedRequest = c.req.raw.clone();
-      const body = await clonedRequest.json();
-      if (body && typeof body === 'object') {
-        if ('kilocodeOrganizationId' in body && typeof body.kilocodeOrganizationId === 'string') {
-          orgId = body.kilocodeOrganizationId;
-        }
-        if (!orgId && 'options' in body && body.options && typeof body.options === 'object') {
-          const options = body.options as Record<string, unknown>;
-          if (typeof options.kilocodeOrganizationId === 'string') {
-            orgId = options.kilocodeOrganizationId;
-          }
-        }
-        if ('cloudAgentSessionId' in body && typeof body.cloudAgentSessionId === 'string') {
-          sessionId = body.cloudAgentSessionId;
-        }
-      }
+      body = await clonedRequest.json();
     } catch {
       return buildTrpcErrorResponse(400, 'Invalid request body', procedureName);
     }
@@ -59,48 +53,39 @@ export const balanceMiddleware = createMiddleware<HonoContext>(
     const authToken = c.get('authToken');
 
     // authMiddleware runs before this, so authToken should always be set for /trpc/* routes
-    if (!authToken) {
+    if (!authToken || !userId) {
       return buildTrpcErrorResponse(401, 'Missing auth token', procedureName);
     }
 
-    if (
-      (procedureName === 'sendMessageV2' ||
-        procedureName === 'initiateFromKilocodeSessionV2' ||
-        procedureName === 'send') &&
-      sessionId &&
-      userId
-    ) {
-      try {
-        const access = await requireCurrentSessionAccess({
-          env: c.env,
-          kiloUserId: userId,
-          cloudAgentSessionId: sessionId,
-          expectedOrganizationId: orgId,
-        });
-        c.set('validatedSessionAccess', {
-          kiloUserId: userId,
-          cloudAgentSessionId: sessionId,
-          ...access,
-        });
-        orgId = access.organizationId ?? undefined;
-      } catch (error) {
-        const response = projectSessionAccessHttpError(error);
-        return buildTrpcErrorResponse(response.status, await response.text(), procedureName);
-      }
+    let billing;
+    try {
+      billing = await preflightCloudAgentModelBilling({
+        env: c.env,
+        userId,
+        authToken,
+        procedure: procedureName,
+        body,
+      });
+    } catch (error) {
+      const response = projectBillingPreflightError(error);
+      return buildTrpcErrorResponse(response.status, response.message, procedureName);
     }
 
-    // Use balance-only validation since auth was already done by authMiddleware
-    const validationResult = await validateBalanceOnly(authToken, orgId, c.env);
-    if (!validationResult.success) {
+    if (billing.validatedSessionAccess) {
+      c.set('validatedSessionAccess', billing.validatedSessionAccess);
+    }
+
+    if (billing.classification !== 'balance-required') {
+      await next();
+      return;
+    }
+
+    if (hasInsufficientBalance(billing)) {
       logger
-        .withFields({ status: validationResult.status, procedure: procedureName })
+        .withFields({ status: 402, procedure: procedureName })
         .warn('Pre-flight balance validation failed for V2 mutation');
 
-      return buildTrpcErrorResponse(
-        validationResult.status,
-        validationResult.message,
-        procedureName
-      );
+      return buildTrpcErrorResponse(402, INSUFFICIENT_CREDITS_MESSAGE, procedureName);
     }
 
     await next();

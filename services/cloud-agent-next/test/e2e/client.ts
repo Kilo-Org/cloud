@@ -90,9 +90,6 @@ export async function trpcCall<T>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${mintApiToken(config.user, config.nextAuthSecret)}`,
-    // cloud-agent-client.ts sends this for App Builder callers; it cleanly
-    // skips dev billing checks and is safe to always send from the driver.
-    'x-skip-balance-check': 'true',
   };
   if (opts?.internalApiSecret) {
     headers['x-internal-api-key'] = opts.internalApiSecret;

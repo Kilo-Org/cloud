@@ -43,7 +43,8 @@ export type StreamEventType =
   | 'cloud.message.queued' // user message accepted into pending queue
   | 'cloud.message.sent' // queued user message delivered to Kilo
   | 'cloud.message.completed' // accepted user message completed execution
-  | 'cloud.message.failed'; // user message delivery failed or was canceled
+  | 'cloud.message.failed' // user message delivery failed or was canceled
+  | 'wrapper_event_truncated'; // internal size-safety signal (not persisted or broadcast)
 
 // ---------------------------------------------------------------------------
 // Server -> Client Events (/stream endpoint)

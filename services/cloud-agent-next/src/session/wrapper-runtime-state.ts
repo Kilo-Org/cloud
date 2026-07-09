@@ -742,6 +742,24 @@ export async function recordWrapperPong(
   }));
 }
 
+/**
+ * Clear a stale in-flight ping after an accepted reconnect. The ping (or its
+ * pong) was lost with the previous socket, so its deadline can never be
+ * satisfied; schedule a fresh ping instead of letting the stale deadline
+ * expire into a wrapper_ping_timeout.
+ */
+export async function resetOutstandingWrapperPing(
+  storage: DurableObjectStorage,
+  wrapperGeneration: number,
+  wrapperConnectionId: string,
+  nextPingAt: number
+): Promise<WrapperRuntimeState | null> {
+  return updateIfCurrent(storage, wrapperGeneration, wrapperConnectionId, current => {
+    if (current.pingDeadlineAt === undefined) return current;
+    return { ...current, pingDeadlineAt: undefined, nextPingAt };
+  });
+}
+
 export async function markWrapperFinalizing(
   storage: DurableObjectStorage,
   wrapperRunId: string

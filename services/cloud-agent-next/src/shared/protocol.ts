@@ -26,6 +26,8 @@ export type StreamEventType =
   | 'wrapper_resumed' // Wrapper reconnected after disconnect (may have lost events)
   | 'autocommit_started' // Auto-commit process began
   | 'autocommit_completed' // Auto-commit finished (success, skip, or failure)
+  // Wrapper -> DO (internal size-safety signal, not persisted or broadcast)
+  | 'wrapper_event_truncated' // A wrapper ingest event was compacted/replaced to fit the frame budget
   // DO -> /stream clients (connection status)
   | 'wrapper_disconnected' // Wrapper WebSocket closed unexpectedly
   | 'wrapper_reconnected' // Wrapper reconnected successfully
@@ -99,6 +101,22 @@ export type AutocommitCompletedData = {
   skipped?: boolean;
   commitHash?: string;
   commitMessage?: string;
+};
+
+/**
+ * Data included in internal 'wrapper_event_truncated' events.
+ *
+ * Emitted by the wrapper when an ingest event had to be compacted or replaced
+ * to stay under the per-frame byte budget. The DO treats this as a
+ * liveness-relevant signal but does not persist or broadcast it to /stream
+ * clients; it is an internal size-safety diagnostic only.
+ */
+export type WrapperEventTruncatedData = {
+  originalStreamEventType: StreamEventType;
+  kiloEventName?: string;
+  originalBytes: number;
+  compactedBytes?: number;
+  reason: string;
 };
 
 /**

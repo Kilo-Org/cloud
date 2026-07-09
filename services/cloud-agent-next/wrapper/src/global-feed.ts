@@ -249,14 +249,45 @@ export function openKiloGlobalFeed(options: OpenKiloGlobalFeedOptions): KiloGlob
         continue;
       }
 
-      if (ws.readyState === OPEN_READY_STATE) {
-        const serialized = JSON.stringify(parsed);
-        const pendingBytes = ws.bufferedAmount + encoder.encode(serialized).byteLength;
-        if (pendingBytes > MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES) {
-          throw new Error('Kilo global feed WebSocket buffer limit exceeded');
-        }
-        ws.send(serialized);
+      if (ws.readyState !== OPEN_READY_STATE) {
+        continue;
       }
+
+      const serialized = JSON.stringify(parsed);
+      const eventBytes = encoder.encode(serialized).byteLength;
+
+      // The global feed is best-effort: it does not own session completion, and
+      // the primary /ingest path remains authoritative. Never let a single
+      // oversized event or outbound backpressure fatal the feed loop — drop the
+      // event, log a structured signal, and keep consuming so later events
+      // still flow once pressure clears.
+
+      if (eventBytes > MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES) {
+        logToFile(
+          JSON.stringify({
+            message: 'kilo_global_feed_event_dropped_oversized',
+            eventBytes,
+            limitBytes: MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES,
+          })
+        );
+        continue;
+      }
+
+      const bufferedAmount = ws.bufferedAmount;
+      const pendingBytes = bufferedAmount + eventBytes;
+      if (pendingBytes > MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES) {
+        logToFile(
+          JSON.stringify({
+            message: 'kilo_global_feed_event_dropped_backpressure',
+            bufferedAmount,
+            eventBytes,
+            limitBytes: MAX_GLOBAL_FEED_WEBSOCKET_BUFFERED_BYTES,
+          })
+        );
+        continue;
+      }
+
+      ws.send(serialized);
     }
   }
 

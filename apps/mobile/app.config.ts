@@ -25,7 +25,7 @@ const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
-  version: '1.0.1',
+  version: '1.0.2',
   orientation: 'portrait',
   icon: './assets/images/logo.png',
   scheme: 'kiloapp',

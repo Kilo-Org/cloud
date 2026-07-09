@@ -112,7 +112,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
           ) : undefined
         }
       />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-24">
         {(['all', 'selected'] as const).map(option => (
           <Pressable
             key={option}

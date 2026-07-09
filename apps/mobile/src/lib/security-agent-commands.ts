@@ -92,6 +92,9 @@ const FAILURE_MESSAGE_BY_RESULT_CODE: Record<string, string> = {
     'Repository is no longer available to GitHub App. Refresh repository access, then retry.',
   INVALID_DISMISS_TARGET: 'Finding cannot be dismissed because its Dependabot target is invalid.',
   COMMAND_STALLED: 'Queued action did not finish in time. Retry action.',
+  // The backend stores a raw "…maximum delivery attempts" string in
+  // lastErrorRedacted for this code; surface friendly, actionable copy instead.
+  QUEUE_RETRIES_EXHAUSTED: 'Action could not be completed after several attempts. Retry action.',
 };
 
 export function getSecurityCommandFailureMessage(command: SecurityCommand): string {

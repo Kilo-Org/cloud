@@ -174,7 +174,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           );
         })}
       </View>
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pb-8 pt-2">
+      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-4 pb-24 pt-2">
         {tab === 'details' && <FindingDetailsPanel finding={finding} scope={scope} />}
         {tab === 'analysis' && (
           <FindingAnalysisPanel

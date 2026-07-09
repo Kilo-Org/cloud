@@ -86,7 +86,7 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Settings" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4 pb-10">
+      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4 pb-24">
         <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
           <View className="flex-1 pr-3">
             <Text className="text-sm font-medium">Security Agent</Text>

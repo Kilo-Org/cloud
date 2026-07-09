@@ -149,7 +149,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
       />
       <ScrollView
         className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4 pb-8"
+        contentContainerClassName="gap-6 pt-4 pb-24"
         automaticallyAdjustKeyboardInsets
       >
         <View className="gap-3">

@@ -131,7 +131,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
       />
       <ScrollView
         className="flex-1 px-6"
-        contentContainerClassName="gap-4 pb-10"
+        contentContainerClassName="gap-4 pb-24"
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >

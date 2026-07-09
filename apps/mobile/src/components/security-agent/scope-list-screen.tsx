@@ -23,7 +23,7 @@ export function ScopeListScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Security Agent" />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-8">
+      <ScrollView className="flex-1 px-6" contentContainerClassName="pt-4 pb-24">
         <ConfigureRow
           icon={User}
           title="Personal"

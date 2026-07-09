@@ -125,7 +125,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           ) : undefined
         }
       />
-      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4 pb-8">
+      <ScrollView className="flex-1 px-6" contentContainerClassName="gap-6 pt-4 pb-24">
         <View className="gap-2">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
             Analysis depth

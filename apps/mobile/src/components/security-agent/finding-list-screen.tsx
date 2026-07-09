@@ -110,7 +110,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
               hasAnalysisCapacity={hasAnalysisCapacity}
             />
           )}
-          contentContainerClassName="gap-3 px-6 pb-8 pt-4"
+          contentContainerClassName="gap-3 px-6 pb-24 pt-4"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
           ListEmptyComponent={
             <EmptyState

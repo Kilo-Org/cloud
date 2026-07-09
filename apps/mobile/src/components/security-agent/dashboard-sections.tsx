@@ -99,16 +99,20 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
         <KvRow
           label="Critical overdue"
           value={String(bySeverity.critical.overdue)}
-          valueTone={bySeverity.critical.overdue > 0 ? 'danger' : 'good'}
+          valueTone="muted"
+          dotTone={bySeverity.critical.overdue > 0 ? 'danger' : 'muted'}
         />
         <KvRow
           label="High overdue"
           value={String(bySeverity.high.overdue)}
-          valueTone={bySeverity.high.overdue > 0 ? 'danger' : 'good'}
+          valueTone="muted"
+          dotTone={bySeverity.high.overdue > 0 ? 'danger' : 'muted'}
         />
         <KvRow
           label="Medium & low overdue"
           value={String(bySeverity.medium.overdue + bySeverity.low.overdue)}
+          valueTone="muted"
+          dotTone={bySeverity.medium.overdue + bySeverity.low.overdue > 0 ? 'danger' : 'muted'}
           last
         />
       </SectionCard>
@@ -126,15 +130,28 @@ function PostureSection({ data, slaEnabled }: SectionProps) {
       <KvRow
         label="Confirmed exploitable"
         value={String(data.analysis.exploitable)}
-        valueTone="danger"
+        valueTone="muted"
+        dotTone="danger"
       />
       <KvRow
         label="Needs evidence review"
         value={String(data.analysis.needsReview)}
-        valueTone="warn"
+        valueTone="muted"
+        dotTone="warn"
       />
-      <KvRow label="Analysis not complete" value={String(analysisIncomplete)} />
-      <KvRow label="No immediate action" value={String(noImmediateAction)} last />
+      <KvRow
+        label="Analysis not complete"
+        value={String(analysisIncomplete)}
+        valueTone="muted"
+        dotTone="muted"
+      />
+      <KvRow
+        label="No immediate action"
+        value={String(noImmediateAction)}
+        valueTone="muted"
+        dotTone="good"
+        last
+      />
     </SectionCard>
   );
 }
@@ -196,7 +213,8 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
           <KvRow
             label={row.label}
             value={String(row.value)}
-            valueTone={row.tone}
+            valueTone="muted"
+            dotTone={row.tone}
             last={index === rows.length - 1}
           />
         </Pressable>

@@ -1,5 +1,7 @@
 import { beforeAll, describe, expect, it, jest } from '@jest/globals';
 
+import type * as ClientModule from './cloud-agent-client';
+
 const createTRPCClient = jest.fn();
 const httpLink = jest.fn();
 
@@ -13,7 +15,7 @@ jest.mock('@/lib/dotenvx', () => ({ getEnvVariable: jest.fn(() => 'https://agent
 jest.mock('@/lib/config.server', () => ({ INTERNAL_API_SECRET: 'internal-secret' }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
-let clientModule: typeof import('./cloud-agent-client');
+let clientModule: ClientModule;
 
 beforeAll(async () => {
   clientModule = await import('./cloud-agent-client');

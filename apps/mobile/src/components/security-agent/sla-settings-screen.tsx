@@ -41,7 +41,11 @@ function SlaSettingsSkeleton() {
 type SlaSeverity = 'critical' | 'high' | 'medium' | 'low';
 
 const SLA_ROWS: { key: SlaSeverity; label: string; description: string }[] = [
-  { key: 'critical', label: 'Critical', description: 'Remote exploitation without authentication.' },
+  {
+    key: 'critical',
+    label: 'Critical',
+    description: 'Remote exploitation without authentication.',
+  },
   { key: 'high', label: 'High', description: 'Potential significant data exposure.' },
   { key: 'medium', label: 'Medium', description: 'Limited impact or specific conditions.' },
   { key: 'low', label: 'Low', description: 'Minimal security impact.' },

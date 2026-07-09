@@ -10,7 +10,7 @@ import {
  * (e.g. an empty repository selection, an out-of-range SLA day count) — the
  * screen supplies `valid` since only it knows its own validation rule.
  */
-export type SettingsDirtyState = 'clean' | 'dirty-valid' | 'dirty-invalid';
+type SettingsDirtyState = 'clean' | 'dirty-valid' | 'dirty-invalid';
 
 const MIN_SLA_DAYS = 1;
 const MAX_SLA_DAYS = 365;
@@ -41,7 +41,7 @@ export function getSettingsDirtyState(
   return valid ? 'dirty-valid' : 'dirty-invalid';
 }
 
-export type SettingsBackGuardOption = 'save' | 'discard' | 'keep-editing';
+type SettingsBackGuardOption = 'save' | 'discard' | 'keep-editing';
 
 /**
  * Which buttons a back-navigation confirmation alert should offer. A clean

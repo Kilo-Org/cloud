@@ -1,10 +1,6 @@
 import { type SecurityCommand } from '@/lib/security-agent';
 
-export type SecurityCommandType =
-  | 'sync'
-  | 'dismiss_finding'
-  | 'start_analysis'
-  | 'apply_auto_remediation';
+type SecurityCommandType = 'sync' | 'dismiss_finding' | 'start_analysis' | 'apply_auto_remediation';
 
 export type SecurityQueryScope =
   | 'findings'

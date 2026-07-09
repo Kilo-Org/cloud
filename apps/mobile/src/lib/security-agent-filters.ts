@@ -51,7 +51,11 @@ const LIST_LIMIT = 100;
 const LIST_OFFSET = 0;
 
 export function toSecurityFindingQuery(filters: SecurityFindingFilters): SecurityFindingQuery {
-  const query: SecurityFindingQuery = { sortBy: filters.sortBy, limit: LIST_LIMIT, offset: LIST_OFFSET };
+  const query: SecurityFindingQuery = {
+    sortBy: filters.sortBy,
+    limit: LIST_LIMIT,
+    offset: LIST_OFFSET,
+  };
   if (filters.status !== 'all') {
     query.status = filters.status;
   }
@@ -92,7 +96,11 @@ export function parseSecurityFindingFilters(
   return {
     status: pickOr(params.status, STATUS_FILTERS, DEFAULT_SECURITY_FINDING_FILTERS.status),
     severity: pickOr(params.severity, SEVERITY_FILTERS, DEFAULT_SECURITY_FINDING_FILTERS.severity),
-    outcome: pickOr(params.outcomeFilter, OUTCOME_FILTERS, DEFAULT_SECURITY_FINDING_FILTERS.outcome),
+    outcome: pickOr(
+      params.outcomeFilter,
+      OUTCOME_FILTERS,
+      DEFAULT_SECURITY_FINDING_FILTERS.outcome
+    ),
     repoFullName: params.repoFullName ?? null,
     sortBy: pickOr(params.sortBy, SORT_OPTIONS, DEFAULT_SECURITY_FINDING_FILTERS.sortBy),
     overdue: params.overdue === 'true' ? true : undefined,

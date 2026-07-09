@@ -26,7 +26,7 @@ export type FindingIconKey =
   | 'clock'
   | 'alert-triangle';
 
-export type FindingStatusPresentation = {
+type FindingStatusPresentation = {
   label: string;
   tone: FindingTone;
   icon: FindingIconKey;
@@ -34,9 +34,9 @@ export type FindingStatusPresentation = {
   tooltip?: string | null;
 };
 
-export type FindingDeadlinePresentation = FindingStatusPresentation & { detail: string };
+type FindingDeadlinePresentation = FindingStatusPresentation & { detail: string };
 
-export type SecurityFindingAnalysisState =
+type SecurityFindingAnalysisState =
   | 'queued'
   | 'analyzing'
   | 'failed'
@@ -319,7 +319,7 @@ export function getSecurityDeadlinePresentation(
 // ---------------------------------------------------------------------------
 
 /** Label/tone pair for facts that don't need an icon (severity, lifecycle status). */
-export type FindingBadge = { label: string; tone: FindingTone };
+type FindingBadge = { label: string; tone: FindingTone };
 
 export function getFindingSeverityPresentation(severity: string): FindingBadge {
   if (severity === 'critical') {
@@ -381,7 +381,7 @@ export function getFindingSourceLabel(source: string): string {
 // hero/summary/action/steps narrative; action buttons belong to a later task).
 // ---------------------------------------------------------------------------
 
-export type SecurityAnalysisDetailPresentation = {
+type SecurityAnalysisDetailPresentation = {
   title: string;
   description: string;
   tone: FindingTone;
@@ -551,7 +551,7 @@ export function formatRemediationOrigin(origin: string): string {
   return origin.replaceAll('_', ' ');
 }
 
-export type RemediationStatusPresentation = FindingStatusPresentation;
+type RemediationStatusPresentation = FindingStatusPresentation;
 
 export function getRemediationStatusPresentation(
   status: string | null,
@@ -648,7 +648,7 @@ const REMEDIATION_UNAVAILABLE_COPY = {
     'Analysis completed before Auto Remediation was enabled. Manual remediation can still start when safety gates pass.',
 } as const;
 
-export type RemediationUnavailableReason = keyof typeof REMEDIATION_UNAVAILABLE_COPY;
+type RemediationUnavailableReason = keyof typeof REMEDIATION_UNAVAILABLE_COPY;
 
 export function getRemediationUnavailableCopy(reason: string | null | undefined): string | null {
   if (!reason || reason === 'eligible') {

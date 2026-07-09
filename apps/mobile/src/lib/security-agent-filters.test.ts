@@ -63,12 +63,12 @@ describe('toSecurityFindingQuery', () => {
 
 describe('parseSecurityFindingFilters', () => {
   it('maps recognized route params onto filter state', () => {
-    expect(parseSecurityFindingFilters({ status: 'closed', outcomeFilter: 'dismissed' })).toMatchObject(
-      {
-        status: 'closed',
-        outcome: 'dismissed',
-      }
-    );
+    expect(
+      parseSecurityFindingFilters({ status: 'closed', outcomeFilter: 'dismissed' })
+    ).toMatchObject({
+      status: 'closed',
+      outcome: 'dismissed',
+    });
   });
 
   it('falls back to defaults for missing params', () => {
@@ -115,9 +115,9 @@ describe('hasActiveSecurityFindingFilters', () => {
   });
 
   it('is true when status differs from the default', () => {
-    expect(hasActiveSecurityFindingFilters({ ...DEFAULT_SECURITY_FINDING_FILTERS, status: 'all' })).toBe(
-      true
-    );
+    expect(
+      hasActiveSecurityFindingFilters({ ...DEFAULT_SECURITY_FINDING_FILTERS, status: 'all' })
+    ).toBe(true);
   });
 
   it('is true when severity, outcome, repoFullName, sortBy, or overdue is set', () => {
@@ -125,7 +125,10 @@ describe('hasActiveSecurityFindingFilters', () => {
       hasActiveSecurityFindingFilters({ ...DEFAULT_SECURITY_FINDING_FILTERS, severity: 'critical' })
     ).toBe(true);
     expect(
-      hasActiveSecurityFindingFilters({ ...DEFAULT_SECURITY_FINDING_FILTERS, outcome: 'exploitable' })
+      hasActiveSecurityFindingFilters({
+        ...DEFAULT_SECURITY_FINDING_FILTERS,
+        outcome: 'exploitable',
+      })
     ).toBe(true);
     expect(
       hasActiveSecurityFindingFilters({
@@ -134,7 +137,10 @@ describe('hasActiveSecurityFindingFilters', () => {
       })
     ).toBe(true);
     expect(
-      hasActiveSecurityFindingFilters({ ...DEFAULT_SECURITY_FINDING_FILTERS, sortBy: 'severity_asc' })
+      hasActiveSecurityFindingFilters({
+        ...DEFAULT_SECURITY_FINDING_FILTERS,
+        sortBy: 'severity_asc',
+      })
     ).toBe(true);
     expect(
       hasActiveSecurityFindingFilters({ ...DEFAULT_SECURITY_FINDING_FILTERS, overdue: true })

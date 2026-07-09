@@ -70,6 +70,16 @@ const config: ExpoConfig = {
         android: {
           enableProguardInReleaseBuilds: true,
         },
+        ios: {
+          // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
+          // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
+          // modules, so pod install fails unless we force module maps on them. Unconditional
+          // because the google-signin pod autolinks whether or not the OAuth client is set.
+          extraPods: [
+            { name: 'GoogleUtilities', modular_headers: true },
+            { name: 'RecaptchaInterop', modular_headers: true },
+          ],
+        },
       },
     ],
     'expo-router',

@@ -1,15 +1,17 @@
 import * as Haptics from 'expo-haptics';
+import { Check } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 /**
- * Labeled segmented-pill picker for a fixed set of enum options — shared by
+ * Labeled single-select picker for a fixed set of enum options — shared by
  * the Automation screen's severity/confidence pickers and the Notification
- * screen's severity pickers. Mirrors the inline pill row already used for
- * analysis mode in analysis-settings-screen.tsx, generalized over the
- * option list so it isn't re-implemented per enum.
+ * screen's severity pickers. Renders a vertical row list (like the dismiss
+ * reason and finding-filter pickers) so long labels stay fully readable
+ * instead of being squeezed into a horizontal pill row.
  */
 export function PillGroup<T extends string>({
   label,
@@ -24,21 +26,22 @@ export function PillGroup<T extends string>({
   disabled: boolean;
   onChange: (value: T) => void;
 }>) {
+  const colors = useThemeColors();
   return (
     <View className="gap-2">
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
         {label}
       </Text>
-      <View className="flex-row gap-2 rounded-full bg-secondary p-1">
-        {options.map(option => {
+      <View className="overflow-hidden rounded-lg bg-secondary">
+        {options.map((option, index) => {
           const active = value === option.value;
           return (
             <Pressable
               key={option.value}
               disabled={disabled}
               className={cn(
-                'flex-1 items-center rounded-full py-2 active:opacity-70',
-                active && 'bg-foreground'
+                'min-h-11 flex-row items-center justify-between px-4 py-3 active:opacity-70',
+                index < options.length - 1 && 'border-b-[0.5px] border-hair-soft'
               )}
               onPress={() => {
                 void Haptics.selectionAsync();
@@ -49,14 +52,13 @@ export function PillGroup<T extends string>({
             >
               <Text
                 className={cn(
-                  'text-xs font-medium',
-                  active ? 'text-background' : 'text-foreground'
+                  'flex-1 text-sm',
+                  active ? 'font-medium text-foreground' : 'text-muted-foreground'
                 )}
-                numberOfLines={1}
-                adjustsFontSizeToFit
               >
                 {option.label}
               </Text>
+              {active && <Check size={16} color={colors.primary} />}
             </Pressable>
           );
         })}

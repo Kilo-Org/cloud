@@ -1,4 +1,4 @@
-import { createSignInCode } from '@/lib/auth/magic-link-tokens';
+import { createSignInCode, deleteSignInCode } from '@/lib/auth/magic-link-tokens';
 import { sendSignInCodeEmail } from '@/lib/email';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import { NextRequest } from 'next/server';
@@ -10,6 +10,7 @@ jest.mock('@/lib/auth/email-signin-eligibility');
 import { POST } from './route';
 
 const mockCreateSignInCode = jest.mocked(createSignInCode);
+const mockDeleteSignInCode = jest.mocked(deleteSignInCode);
 const mockSendSignInCodeEmail = jest.mocked(sendSignInCodeEmail);
 const mockCheckEmailSignInEligibility = jest.mocked(checkEmailSignInEligibility);
 
@@ -18,6 +19,13 @@ describe('POST /api/auth/native/otp', () => {
     new NextRequest('http://localhost:3000/api/auth/native/otp', {
       method: 'POST',
       body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  const createMalformedRequest = () =>
+    new NextRequest('http://localhost:3000/api/auth/native/otp', {
+      method: 'POST',
+      body: '{',
       headers: { 'Content-Type': 'application/json' },
     });
 
@@ -52,6 +60,7 @@ describe('POST /api/auth/native/otp', () => {
     mockCheckEmailSignInEligibility.mockResolvedValue({
       ok: false,
       status: 429,
+      errorCode: 'SIGNUP-RATE-LIMITED',
       body: { success: false, error: 'Rate limit exceeded. Please try again later.' },
     });
 
@@ -59,10 +68,41 @@ describe('POST /api/auth/native/otp', () => {
     const data = await response.json();
 
     expect(response.status).toBe(429);
-    expect(data).toEqual({ success: false, error: 'Rate limit exceeded. Please try again later.' });
+    expect(data).toEqual({ success: false, error: 'SIGNUP-RATE-LIMITED' });
     expect(mockCreateSignInCode).not.toHaveBeenCalled();
     expect(mockSendSignInCodeEmail).not.toHaveBeenCalled();
   });
+
+  it('keeps signup-only email rejection opaque to prevent account enumeration', async () => {
+    mockCheckEmailSignInEligibility.mockResolvedValue({
+      ok: false,
+      status: 400,
+      errorCode: 'INVALID_EMAIL',
+      body: { success: false, error: 'Email addresses with + aliases are not allowed.' },
+    });
+
+    const response = await POST(createRequest({ email: 'new+alias@example.com' }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true });
+    expect(mockCreateSignInCode).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['neverbounce_rejected' as const, 400, 'INVALID_EMAIL'],
+    ['provider_not_configured' as const, 500, 'EMAIL_DELIVERY_FAILED'],
+  ])(
+    'reports %s delivery failures and deletes the unusable code',
+    async (reason, status, error) => {
+      mockSendSignInCodeEmail.mockResolvedValue({ sent: false, reason });
+
+      const response = await POST(createRequest({ email: 'user@example.com' }));
+
+      expect(response.status).toBe(status);
+      expect(await response.json()).toEqual({ success: false, error });
+      expect(mockDeleteSignInCode).toHaveBeenCalledWith('user@example.com', '123456');
+    }
+  );
 
   it('returns an identical success body whether or not the user exists (anti-enumeration)', async () => {
     const existingUserResponse = await POST(createRequest({ email: 'exists@example.com' }));
@@ -77,7 +117,7 @@ describe('POST /api/auth/native/otp', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data).toEqual({ success: false, error: 'Invalid request data' });
+    expect(data).toEqual({ success: false, error: 'INVALID_REQUEST' });
     expect(mockCheckEmailSignInEligibility).not.toHaveBeenCalled();
   });
 
@@ -86,6 +126,13 @@ describe('POST /api/auth/native/otp', () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data).toEqual({ success: false, error: 'Invalid request data' });
+    expect(data).toEqual({ success: false, error: 'INVALID_REQUEST' });
+  });
+
+  it('returns 400 for malformed JSON', async () => {
+    const response = await POST(createMalformedRequest());
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ success: false, error: 'INVALID_REQUEST' });
   });
 });

@@ -74,13 +74,21 @@ export async function verifyAppleJwtWithJwks(
   }
 
   const pem = jwkToPem(matchingKey);
-  const payload = jwt.verify(token, pem, {
-    algorithms: ['RS256'],
-    issuer: 'https://appleid.apple.com',
-    audience: audience as jwt.VerifyOptions['audience'],
-  });
+  let payload: string | jwt.JwtPayload;
+  try {
+    payload = jwt.verify(token, pem, {
+      algorithms: ['RS256'],
+      issuer: 'https://appleid.apple.com',
+      audience: audience as jwt.VerifyOptions['audience'],
+    });
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      throw new AppleJwtClientError(error.message, { cause: error });
+    }
+    throw error;
+  }
   if (typeof payload === 'string' || !payload) {
-    throw new Error('Invalid JWT payload');
+    throw new AppleJwtClientError('Invalid JWT payload');
   }
 
   return payload;

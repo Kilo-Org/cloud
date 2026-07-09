@@ -1,10 +1,11 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { type useNativeAuth } from '@/lib/auth/use-native-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { canSubmitEmailCode } from './email-otp-state';
 
 export function EmailOtpForm({
   email,
@@ -21,6 +22,8 @@ export function EmailOtpForm({
 }>) {
   const colors = useThemeColors();
   const codeRef = useRef('');
+  const [hasCompleteCode, setHasCompleteCode] = useState(false);
+  const authBusy = busy !== undefined;
 
   return (
     <View className="gap-3">
@@ -39,15 +42,18 @@ export function EmailOtpForm({
         maxLength={6}
         onChangeText={value => {
           codeRef.current = value;
+          setHasCompleteCode(/^\d{6}$/.test(value));
         }}
         accessibilityLabel="Sign-in code"
       />
       <Button
         size="lg"
         className="flex-row gap-2"
-        disabled={busy === 'otp-verify'}
+        disabled={!hasCompleteCode || authBusy}
         onPress={() => {
-          onVerify(codeRef.current);
+          if (canSubmitEmailCode(codeRef.current, busy)) {
+            onVerify(codeRef.current);
+          }
         }}
         accessibilityLabel="Verify code"
       >
@@ -57,14 +63,14 @@ export function EmailOtpForm({
       <Button
         variant="outline"
         className="flex-row gap-2"
-        disabled={busy === 'otp-send'}
+        disabled={authBusy}
         onPress={onResend}
         accessibilityLabel="Resend code"
       >
         {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
         <Text>Resend code</Text>
       </Button>
-      <Button variant="ghost" onPress={onBack} accessibilityLabel="Back">
+      <Button variant="ghost" disabled={authBusy} onPress={onBack} accessibilityLabel="Back">
         <Text>Back</Text>
       </Button>
     </View>

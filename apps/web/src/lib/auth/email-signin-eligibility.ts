@@ -1,19 +1,19 @@
 import type { NextRequest } from 'next/server';
 import { checkRateLimit } from '@vercel/firewall';
 import { createHmac } from 'node:crypto';
-import { findUserByEmail, getWorkOSOrganization } from '@/lib/user';
+import { findUserByNormalizedEmail, getWorkOSOrganization } from '@/lib/user';
 import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
 import type { AuthErrorType } from '@/lib/auth/constants';
 
 const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';
 
 function getMagicLinkEmailRateLimitKey(email: string): string {
   const emailHash = createHmac('sha256', NEXTAUTH_SECRET)
-    .update(email.trim().toLowerCase())
+    .update(normalizeEmail(email))
     .digest('base64url');
   return `magic-link-email:${emailHash}`;
 }
@@ -45,7 +45,7 @@ export async function checkDomainSignInEligibility(
     return { ok: false, status: 403, errorCode: 'BLOCKED' };
   }
 
-  const existingUser = await findUserByEmail(email);
+  const existingUser = await findUserByNormalizedEmail(email);
 
   // Block new signups from blocked TLDs (existing users can still sign in)
   if (!existingUser && isBlockedTLD(email)) {
@@ -80,7 +80,12 @@ export async function checkDomainSignInEligibility(
 
 export type EmailSignInEligibility =
   | { ok: true }
-  | { ok: false; status: number; body: Record<string, unknown> };
+  | {
+      ok: false;
+      status: number;
+      errorCode: 'BLOCKED' | 'INVALID_EMAIL' | 'SIGNUP-RATE-LIMITED' | 'SSO_ERROR';
+      body: Record<string, unknown>;
+    };
 
 /**
  * Checks whether an email is eligible for email sign-in: not rate limited,
@@ -106,6 +111,7 @@ export async function checkEmailSignInEligibility(
     return {
       ok: false,
       status: 429,
+      errorCode: 'SIGNUP-RATE-LIMITED',
       body: { success: false, error: 'Rate limit exceeded. Please try again later.' },
     };
   }
@@ -116,6 +122,7 @@ export async function checkEmailSignInEligibility(
       return {
         ok: false,
         status: domainEligibility.status,
+        errorCode: 'BLOCKED',
         body: { success: false, error: 'BLOCKED' },
       };
     }
@@ -124,12 +131,14 @@ export async function checkEmailSignInEligibility(
       return {
         ok: false,
         status: 503,
+        errorCode: 'SSO_ERROR',
         body: { success: false, error: 'SSO configuration error. Contact your administrator.' },
       };
     }
     return {
       ok: false,
       status: domainEligibility.status,
+      errorCode: 'SSO_ERROR',
       body: {
         success: false,
         error: 'Sign in with your organization SSO provider.',
@@ -145,6 +154,7 @@ export async function checkEmailSignInEligibility(
       return {
         ok: false,
         status: 400,
+        errorCode: 'INVALID_EMAIL',
         body: { success: false, error: signupValidation.error },
       };
     }

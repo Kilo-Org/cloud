@@ -2,12 +2,13 @@ import { describe, it, expect, beforeEach } from '@jest/globals';
 import {
   createMagicLinkToken,
   createSignInCode,
+  deleteSignInCode,
   getMagicLinkUrl,
   verifyAndConsumeMagicLinkToken,
   verifyAndConsumeSignInCode,
 } from './magic-link-tokens';
 import { db } from '@/lib/drizzle';
-import { sql, eq } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import { createHash } from 'crypto';
 
@@ -129,9 +130,10 @@ describe('Magic Link Tokens', () => {
 
       const row = await rowFor(testEmail);
       expect(row).toBeDefined();
-      expect(row?.token_hash).toBe(
+      expect(row?.token_hash).not.toBe(
         createHash('sha256').update(`${testEmail}:${code}`).digest('hex')
       );
+      expect(row?.purpose).toBe('sign_in_code');
       expect(row?.consumed_at).toBeNull();
       expect(row?.attempts).toBe(0);
     });
@@ -140,14 +142,20 @@ describe('Magic Link Tokens', () => {
       const mixedCaseEmail = 'Test@Example.com';
       await db.execute(sql`DELETE FROM magic_link_tokens WHERE email = ${testEmail}`);
 
-      const code = await createSignInCode(mixedCaseEmail);
+      await createSignInCode(mixedCaseEmail);
       const row = await rowFor(testEmail);
 
       expect(row).toBeDefined();
       expect(row?.email).toBe(testEmail);
-      expect(row?.token_hash).toBe(
-        createHash('sha256').update(`${testEmail}:${code}`).digest('hex')
-      );
+      expect(row?.purpose).toBe('sign_in_code');
+    });
+
+    it('uses one live code and attempt budget for aliases of the same mailbox', async () => {
+      const firstCode = await createSignInCode('te.st+first@gmail.com');
+      const secondCode = await createSignInCode('test@gmail.com');
+
+      expect(await verifyAndConsumeSignInCode('te.st+first@gmail.com', firstCode)).toBe('invalid');
+      expect(await verifyAndConsumeSignInCode('test+second@googlemail.com', secondCode)).toBe('ok');
     });
 
     it('sets an expiry approximately 10 minutes out', async () => {
@@ -169,9 +177,7 @@ describe('Magic Link Tokens', () => {
         .where(eq(magic_link_tokens.email, testEmail));
 
       expect(rows).toHaveLength(1);
-      expect(rows[0]?.token_hash).toBe(
-        createHash('sha256').update(`${testEmail}:${secondCode}`).digest('hex')
-      );
+      expect(await verifyAndConsumeSignInCode(testEmail, secondCode)).toBe('ok');
     });
 
     it('does not delete already-consumed rows for the email', async () => {
@@ -185,6 +191,34 @@ describe('Magic Link Tokens', () => {
         .from(magic_link_tokens)
         .where(eq(magic_link_tokens.email, testEmail));
       expect(rows).toHaveLength(2);
+    });
+
+    it('does not delete or select browser magic-link tokens', async () => {
+      const magicLink = await createMagicLinkToken(testEmail);
+      const code = await createSignInCode(testEmail);
+
+      expect(await verifyAndConsumeSignInCode(testEmail, code)).toBe('ok');
+      expect(await verifyAndConsumeMagicLinkToken(magicLink.plaintext_token)).not.toBeNull();
+    });
+
+    it('serializes concurrent issuance so only the newest code remains live', async () => {
+      const [firstCode, secondCode] = await Promise.all([
+        createSignInCode(testEmail),
+        createSignInCode(testEmail),
+      ]);
+      const rows = await db
+        .select()
+        .from(magic_link_tokens)
+        .where(
+          and(eq(magic_link_tokens.email, testEmail), eq(magic_link_tokens.purpose, 'sign_in_code'))
+        );
+
+      expect(rows).toHaveLength(1);
+      const results = await Promise.all([
+        verifyAndConsumeSignInCode(testEmail, firstCode),
+        verifyAndConsumeSignInCode(testEmail, secondCode),
+      ]);
+      expect(results.toSorted()).toEqual(['invalid', 'ok']);
     });
   });
 
@@ -264,6 +298,7 @@ describe('Magic Link Tokens', () => {
       await db.insert(magic_link_tokens).values({
         token_hash,
         email: testEmail,
+        purpose: 'sign_in_code',
         created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
         expires_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
       });
@@ -284,6 +319,18 @@ describe('Magic Link Tokens', () => {
     it('returns invalid when there is no code for the email', async () => {
       const result = await verifyAndConsumeSignInCode(testEmail, '123456');
       expect(result).toBe('invalid');
+    });
+  });
+
+  describe('deleteSignInCode', () => {
+    it('deletes only the matching sign-in code', async () => {
+      const magicLink = await createMagicLinkToken(testEmail);
+      const code = await createSignInCode(testEmail);
+
+      await deleteSignInCode(testEmail, code);
+
+      expect(await verifyAndConsumeSignInCode(testEmail, code)).toBe('invalid');
+      expect(await verifyAndConsumeMagicLinkToken(magicLink.plaintext_token)).not.toBeNull();
     });
   });
 });

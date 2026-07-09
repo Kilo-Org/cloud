@@ -48,6 +48,8 @@ function ActionTile({
       onPress={onPress}
       disabled={disabled}
       accessibilityLabel={label}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: Boolean(disabled) }}
     >
       <Icon size={20} color={color} />
       <Text className={`text-sm ${destructive ? 'text-destructive' : 'text-muted-foreground'}`}>
@@ -222,7 +224,7 @@ export function ProfileScreen() {
         </View>
 
         {/* Restore Purchases (iOS-only; self-hides on Android and for org accounts) */}
-        {isAuthenticated && !organizationId ? (
+        {Platform.OS === 'ios' && isAuthenticated && !organizationId ? (
           <View className="mt-6">
             <RestorePurchasesButton />
           </View>

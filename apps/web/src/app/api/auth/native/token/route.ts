@@ -9,7 +9,13 @@ import {
 import { AppleJwtClientError } from '@/lib/auth/apple-jwks';
 import { verifyAndConsumeSignInCode } from '@/lib/auth/magic-link-tokens';
 import { hosted_domain_specials } from '@/lib/auth/constants';
-import { createOrUpdateUser, type CreateOrUpdateUserArgs } from '@/lib/user';
+import {
+  createOrUpdateUser,
+  findUserById,
+  findUserByNormalizedEmail,
+  findUserIdByAuthProvider,
+  type CreateOrUpdateUserArgs,
+} from '@/lib/user';
 import { generateApiToken } from '@/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 
@@ -17,6 +23,39 @@ import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibilit
 // server faults and must surface as 500, not be misreported as an invalid token.
 function isInvalidNativeTokenError(error: unknown): boolean {
   return error instanceof NativeIdTokenError || error instanceof AppleJwtClientError;
+}
+
+function eligibilityResponse(
+  eligibility: Exclude<Awaited<ReturnType<typeof checkDomainSignInEligibility>>, { ok: true }>
+) {
+  return NextResponse.json(
+    {
+      error: eligibility.errorCode,
+      ...(eligibility.ssoOrganizationId
+        ? { ssoOrganizationId: eligibility.ssoOrganizationId }
+        : {}),
+    },
+    { status: eligibility.status }
+  );
+}
+
+async function checkExistingProviderAccount(
+  provider: 'apple' | 'google',
+  providerAccountId: string
+) {
+  const userId = await findUserIdByAuthProvider(provider, providerAccountId);
+  if (!userId) {
+    return undefined;
+  }
+  const user = await findUserById(userId);
+  if (!user) {
+    throw new Error(`Auth provider references missing user ${userId}`);
+  }
+  if (user.blocked_reason) {
+    return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
+  }
+  const eligibility = await checkDomainSignInEligibility(user.google_user_email);
+  return eligibility.ok ? undefined : eligibilityResponse(eligibility);
 }
 
 const requestSchema = z.discriminatedUnion('provider', [
@@ -52,7 +91,7 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   400                                   — invalid request body
  */
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body = await request.json().catch(() => undefined);
   const validation = requestSchema.safeParse(body);
 
   if (!validation.success) {
@@ -76,15 +115,11 @@ export async function POST(request: NextRequest) {
 
     const eligibility = await checkDomainSignInEligibility(verified.email);
     if (!eligibility.ok) {
-      return NextResponse.json(
-        {
-          error: eligibility.errorCode,
-          ...(eligibility.ssoOrganizationId
-            ? { ssoOrganizationId: eligibility.ssoOrganizationId }
-            : {}),
-        },
-        { status: eligibility.status }
-      );
+      return eligibilityResponse(eligibility);
+    }
+    const existingAccountResponse = await checkExistingProviderAccount('apple', verified.sub);
+    if (existingAccountResponse) {
+      return existingAccountResponse;
     }
 
     args = {
@@ -110,15 +145,11 @@ export async function POST(request: NextRequest) {
 
     const eligibility = await checkDomainSignInEligibility(verified.email);
     if (!eligibility.ok) {
-      return NextResponse.json(
-        {
-          error: eligibility.errorCode,
-          ...(eligibility.ssoOrganizationId
-            ? { ssoOrganizationId: eligibility.ssoOrganizationId }
-            : {}),
-        },
-        { status: eligibility.status }
-      );
+      return eligibilityResponse(eligibility);
+    }
+    const existingAccountResponse = await checkExistingProviderAccount('google', verified.sub);
+    if (existingAccountResponse) {
+      return existingAccountResponse;
     }
 
     args = {
@@ -132,6 +163,8 @@ export async function POST(request: NextRequest) {
     };
     autoLinkToExistingUser = false;
   } else {
+    const existingUser = await findUserByNormalizedEmail(data.email);
+    const email = existingUser?.google_user_email ?? data.email.toLowerCase();
     const codeResult = await verifyAndConsumeSignInCode(data.email, data.code);
     if (codeResult === 'invalid') {
       return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
@@ -140,8 +173,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'TOO_MANY_ATTEMPTS' }, { status: 429 });
     }
 
-    // web NextAuth lowercases the email before use; this public endpoint shouldn't trust the client's casing.
-    const email = data.email.toLowerCase();
+    const eligibility = await checkDomainSignInEligibility(email);
+    if (!eligibility.ok) {
+      return eligibilityResponse(eligibility);
+    }
+
     const emailDomain = email.split('@')[1];
     args = {
       google_user_email: email,
@@ -158,6 +194,15 @@ export async function POST(request: NextRequest) {
   const result = await createOrUpdateUser(args, undefined, autoLinkToExistingUser, request.headers);
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 403 });
+  }
+
+  if (result.user.blocked_reason) {
+    return NextResponse.json({ error: 'BLOCKED' }, { status: 403 });
+  }
+
+  const resolvedEligibility = await checkDomainSignInEligibility(result.user.google_user_email);
+  if (!resolvedEligibility.ok) {
+    return eligibilityResponse(resolvedEligibility);
   }
 
   const token = generateApiToken(result.user);

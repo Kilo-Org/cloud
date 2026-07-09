@@ -3,14 +3,15 @@ import { sql, eq, and, isNull } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import * as z from 'zod';
 import 'server-only';
-import { NEXTAUTH_URL } from '@/lib/config.server';
-import { randomBytes, randomInt, createHash } from 'crypto';
+import { NEXTAUTH_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
+import { randomBytes, randomInt, createHash, createHmac } from 'crypto';
+import { normalizeEmail } from '@/lib/utils';
 
 const SIGN_IN_CODE_EXPIRY_MINUTES = 10;
 const SIGN_IN_CODE_MAX_ATTEMPTS = 5;
 
 function hashSignInCode(email: string, code: string): string {
-  return createHash('sha256').update(`${email}:${code}`).digest('hex');
+  return createHmac('sha256', NEXTAUTH_SECRET).update(`${email}:${code}`).digest('hex');
 }
 
 export type MagicLinkToken = z.infer<typeof MagicLinkToken>;
@@ -20,6 +21,7 @@ export const MagicLinkToken = z.object({
   expires_at: z.string(),
   consumed_at: z.string().nullable(),
   created_at: z.string(),
+  purpose: z.enum(['magic_link', 'sign_in_code']),
 });
 
 export type MagicLinkTokenWithPlaintext = z.infer<typeof MagicLinkTokenWithPlaintext>;
@@ -45,7 +47,7 @@ export async function createMagicLinkToken(
 
   const [inserted] = await db
     .insert(magic_link_tokens)
-    .values({ token_hash, email, expires_at })
+    .values({ token_hash, email, expires_at, purpose: 'magic_link' })
     .returning();
 
   if (!inserted) {
@@ -78,6 +80,7 @@ export async function verifyAndConsumeMagicLinkToken(
     .where(
       and(
         eq(magic_link_tokens.token_hash, token_hash),
+        eq(magic_link_tokens.purpose, 'magic_link'),
         isNull(magic_link_tokens.consumed_at),
         sql`${magic_link_tokens.expires_at} > NOW()`
       )
@@ -96,23 +99,34 @@ export async function verifyAndConsumeMagicLinkToken(
  * only one live (unconsumed) code is allowed per email at a time: any prior
  * unconsumed rows for the email are deleted before inserting the new one.
  *
- * The stored hash is keyed by email so a leaked hash can't be replayed
- * against a different address: sha256(`${email}:${code}`).
+ * The stored hash is an HMAC keyed by the server secret, so a database leak
+ * does not permit offline enumeration of the six-digit code space.
  *
  * @param email - The email address to send the code to (case-insensitive)
  * @returns The plaintext 6-digit code (for sending in email)
  */
 export async function createSignInCode(email: string): Promise<string> {
-  const emailLower = email.toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-  const token_hash = hashSignInCode(emailLower, code);
+  const token_hash = hashSignInCode(normalizedEmail, code);
   const expires_at = new Date(Date.now() + SIGN_IN_CODE_EXPIRY_MINUTES * 60 * 1000).toISOString();
 
   await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${`sign-in-code:${normalizedEmail}`}, 0))`
+    );
     await tx
       .delete(magic_link_tokens)
-      .where(and(eq(magic_link_tokens.email, emailLower), isNull(magic_link_tokens.consumed_at)));
-    await tx.insert(magic_link_tokens).values({ token_hash, email: emailLower, expires_at });
+      .where(
+        and(
+          eq(magic_link_tokens.email, normalizedEmail),
+          eq(magic_link_tokens.purpose, 'sign_in_code'),
+          isNull(magic_link_tokens.consumed_at)
+        )
+      );
+    await tx
+      .insert(magic_link_tokens)
+      .values({ token_hash, email: normalizedEmail, expires_at, purpose: 'sign_in_code' });
   });
 
   return code;
@@ -133,14 +147,15 @@ export async function verifyAndConsumeSignInCode(
   email: string,
   code: string
 ): Promise<VerifySignInCodeResult> {
-  const emailLower = email.toLowerCase();
+  const normalizedEmail = normalizeEmail(email);
 
   const [row] = await db
     .select()
     .from(magic_link_tokens)
     .where(
       and(
-        eq(magic_link_tokens.email, emailLower),
+        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.purpose, 'sign_in_code'),
         isNull(magic_link_tokens.consumed_at),
         sql`${magic_link_tokens.expires_at} > NOW()`
       )
@@ -155,7 +170,7 @@ export async function verifyAndConsumeSignInCode(
     return 'too_many_attempts';
   }
 
-  const token_hash = hashSignInCode(emailLower, code);
+  const token_hash = hashSignInCode(normalizedEmail, code);
   if (row.token_hash === token_hash) {
     // attempts < MAX is re-checked here atomically: the early read above is
     // only a fast path, and two concurrent wrong guesses can race it past
@@ -167,7 +182,8 @@ export async function verifyAndConsumeSignInCode(
       .where(
         and(
           eq(magic_link_tokens.token_hash, token_hash),
-          eq(magic_link_tokens.email, emailLower),
+          eq(magic_link_tokens.email, normalizedEmail),
+          eq(magic_link_tokens.purpose, 'sign_in_code'),
           isNull(magic_link_tokens.consumed_at),
           sql`${magic_link_tokens.expires_at} > NOW()`,
           sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
@@ -175,15 +191,54 @@ export async function verifyAndConsumeSignInCode(
       )
       .returning();
 
-    return consumed[0] ? 'ok' : 'invalid';
+    if (consumed[0]) {
+      return 'ok';
+    }
+
+    const [current] = await db
+      .select({ attempts: magic_link_tokens.attempts })
+      .from(magic_link_tokens)
+      .where(
+        and(
+          eq(magic_link_tokens.token_hash, token_hash),
+          eq(magic_link_tokens.email, normalizedEmail),
+          eq(magic_link_tokens.purpose, 'sign_in_code'),
+          isNull(magic_link_tokens.consumed_at)
+        )
+      )
+      .limit(1);
+    return current && current.attempts >= SIGN_IN_CODE_MAX_ATTEMPTS
+      ? 'too_many_attempts'
+      : 'invalid';
   }
 
   await db
     .update(magic_link_tokens)
     .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
-    .where(and(eq(magic_link_tokens.email, emailLower), isNull(magic_link_tokens.consumed_at)));
+    .where(
+      and(
+        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.purpose, 'sign_in_code'),
+        isNull(magic_link_tokens.consumed_at),
+        sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+      )
+    );
 
   return 'invalid';
+}
+
+export async function deleteSignInCode(email: string, code: string): Promise<void> {
+  const normalizedEmail = normalizeEmail(email);
+  await db
+    .delete(magic_link_tokens)
+    .where(
+      and(
+        eq(magic_link_tokens.token_hash, hashSignInCode(normalizedEmail, code)),
+        eq(magic_link_tokens.email, normalizedEmail),
+        eq(magic_link_tokens.purpose, 'sign_in_code'),
+        isNull(magic_link_tokens.consumed_at)
+      )
+    );
 }
 
 export function getMagicLinkUrl(

@@ -41,7 +41,17 @@ function getGoogleClient(): OAuth2Client {
 
 export async function verifyNativeGoogleIdToken(idToken: string): Promise<VerifiedGoogleIdToken> {
   const audience = [GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID].filter(Boolean);
-  const ticket = await getGoogleClient().verifyIdToken({ idToken, audience });
+  const googleClient = getGoogleClient();
+  const { certs } = await googleClient.getFederatedSignonCertsAsync();
+  let ticket;
+  try {
+    ticket = await googleClient.verifySignedJwtWithCertsAsync(idToken, certs, audience, [
+      'accounts.google.com',
+      'https://accounts.google.com',
+    ]);
+  } catch (error) {
+    throw new NativeIdTokenError('Google ID token verification failed', { cause: error });
+  }
   const payload = ticket.getPayload();
 
   if (!payload) {

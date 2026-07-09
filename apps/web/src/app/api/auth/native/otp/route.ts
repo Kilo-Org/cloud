@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { createSignInCode } from '@/lib/auth/magic-link-tokens';
+import { createSignInCode, deleteSignInCode } from '@/lib/auth/magic-link-tokens';
 import { sendSignInCodeEmail } from '@/lib/email';
 import * as z from 'zod';
 import { checkEmailSignInEligibility } from '@/lib/auth/email-signin-eligibility';
@@ -17,22 +17,45 @@ const requestSchema = z.object({
  * exists for the email, to avoid leaking account existence.
  */
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body = await request.json().catch(() => undefined);
   const validation = requestSchema.safeParse(body);
 
   if (!validation.success) {
-    return NextResponse.json({ success: false, error: 'Invalid request data' }, { status: 400 });
+    return NextResponse.json({ success: false, error: 'INVALID_REQUEST' }, { status: 400 });
   }
 
   const { email } = validation.data;
 
   const eligibility = await checkEmailSignInEligibility(email, request);
   if (!eligibility.ok) {
-    return NextResponse.json(eligibility.body, { status: eligibility.status });
+    if (eligibility.errorCode === 'INVALID_EMAIL') {
+      return NextResponse.json({ success: true });
+    }
+    return NextResponse.json(
+      {
+        success: false,
+        error: eligibility.errorCode,
+        ...(typeof eligibility.body.ssoOrganizationId === 'string'
+          ? { ssoOrganizationId: eligibility.body.ssoOrganizationId }
+          : {}),
+      },
+      { status: eligibility.status }
+    );
   }
 
   const code = await createSignInCode(email);
-  await sendSignInCodeEmail(email, code);
+  const result = await sendSignInCodeEmail(email, code);
+  if (!result.sent) {
+    await deleteSignInCode(email, code);
+    const neverbounceRejected = result.reason === 'neverbounce_rejected';
+    return NextResponse.json(
+      {
+        success: false,
+        error: neverbounceRejected ? 'INVALID_EMAIL' : 'EMAIL_DELIVERY_FAILED',
+      },
+      { status: neverbounceRejected ? 400 : 500 }
+    );
+  }
 
   return NextResponse.json({ success: true });
 }

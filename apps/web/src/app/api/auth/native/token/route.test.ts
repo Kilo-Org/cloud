@@ -5,9 +5,15 @@ import {
   NativeIdTokenError,
 } from '@/lib/auth/native-id-tokens';
 import { verifyAndConsumeSignInCode } from '@/lib/auth/magic-link-tokens';
-import { createOrUpdateUser } from '@/lib/user';
+import {
+  createOrUpdateUser,
+  findUserById,
+  findUserByNormalizedEmail,
+  findUserIdByAuthProvider,
+} from '@/lib/user';
 import { generateApiToken } from '@/lib/tokens';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
+import type { User } from '@kilocode/db/schema';
 
 // Keep the real NativeIdTokenError class (route.ts uses `instanceof` on it) and only mock
 // the verifier functions.
@@ -27,16 +33,26 @@ const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
 const mockVerifyNativeGoogleIdToken = jest.mocked(verifyNativeGoogleIdToken);
 const mockVerifyAndConsumeSignInCode = jest.mocked(verifyAndConsumeSignInCode);
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
+const mockFindUserById = jest.mocked(findUserById);
+const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
+const mockFindUserIdByAuthProvider = jest.mocked(findUserIdByAuthProvider);
 const mockGenerateApiToken = jest.mocked(generateApiToken);
 const mockCheckDomainSignInEligibility = jest.mocked(checkDomainSignInEligibility);
 
-const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as never;
+const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
 
 describe('POST /api/auth/native/token', () => {
   const createRequest = (body: unknown) =>
     new NextRequest('http://localhost:3000/api/auth/native/token', {
       method: 'POST',
       body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+  const createMalformedRequest = () =>
+    new NextRequest('http://localhost:3000/api/auth/native/token', {
+      method: 'POST',
+      body: '{',
       headers: { 'Content-Type': 'application/json' },
     });
 
@@ -49,6 +65,9 @@ describe('POST /api/auth/native/token', () => {
     } as never);
     mockGenerateApiToken.mockReturnValue('minted-jwt');
     mockCheckDomainSignInEligibility.mockResolvedValue({ ok: true, existingUser: false });
+    mockFindUserById.mockResolvedValue(undefined);
+    mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
+    mockFindUserIdByAuthProvider.mockResolvedValue(null);
   });
 
   describe('apple', () => {
@@ -314,6 +333,28 @@ describe('POST /api/auth/native/token', () => {
         true,
         expect.any(Headers)
       );
+      expect(mockCheckDomainSignInEligibility).toHaveBeenCalledWith('emailuser@example.com');
+    });
+
+    it('rechecks domain eligibility when redeeming an issued code', async () => {
+      mockVerifyAndConsumeSignInCode.mockResolvedValue('ok');
+      mockCheckDomainSignInEligibility.mockResolvedValue({
+        ok: false,
+        status: 403,
+        errorCode: 'SSO_ERROR',
+        ssoOrganizationId: 'workos-organization-id',
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'user@sso-required.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: 'SSO_ERROR',
+        ssoOrganizationId: 'workos-organization-id',
+      });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
 
     it('lowercases the client-supplied email before building args (does not trust client casing)', async () => {
@@ -378,6 +419,80 @@ describe('POST /api/auth/native/token', () => {
     expect(mockGenerateApiToken).not.toHaveBeenCalled();
   });
 
+  it('does not mint a token for an individually blocked user', async () => {
+    mockVerifyNativeGoogleIdToken.mockResolvedValue({
+      sub: 'google-sub-1',
+      email: 'googleuser@example.com',
+    });
+    mockCreateOrUpdateUser.mockResolvedValue({
+      success: true,
+      user: { ...fakeUser, blocked_reason: 'manual block' },
+      isNew: false,
+    } as never);
+
+    const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'BLOCKED' });
+    expect(mockGenerateApiToken).not.toHaveBeenCalled();
+  });
+
+  it('checks the resolved account email before minting a token', async () => {
+    mockVerifyNativeGoogleIdToken.mockResolvedValue({
+      sub: 'google-sub-1',
+      email: 'personal@gmail.com',
+    });
+    mockCreateOrUpdateUser.mockResolvedValue({
+      success: true,
+      user: { ...fakeUser, google_user_email: 'user@sso-required.com' },
+      isNew: false,
+    } as never);
+    mockCheckDomainSignInEligibility
+      .mockResolvedValueOnce({ ok: true, existingUser: false })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        errorCode: 'SSO_ERROR',
+        ssoOrganizationId: 'workos-organization-id',
+      });
+
+    const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: 'SSO_ERROR',
+      ssoOrganizationId: 'workos-organization-id',
+    });
+    expect(mockCheckDomainSignInEligibility).toHaveBeenLastCalledWith('user@sso-required.com');
+    expect(mockGenerateApiToken).not.toHaveBeenCalled();
+  });
+
+  it('checks a linked provider account primary email before user sync', async () => {
+    mockVerifyNativeGoogleIdToken.mockResolvedValue({
+      sub: 'google-sub-1',
+      email: 'personal@gmail.com',
+    });
+    mockFindUserIdByAuthProvider.mockResolvedValue('user-1');
+    mockFindUserById.mockResolvedValue({
+      ...fakeUser,
+      google_user_email: 'user@sso-required.com',
+      blocked_reason: null,
+    });
+    mockCheckDomainSignInEligibility
+      .mockResolvedValueOnce({ ok: true, existingUser: false })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        errorCode: 'SSO_ERROR',
+        ssoOrganizationId: 'workos-organization-id',
+      });
+
+    const response = await POST(createRequest({ provider: 'google', idToken: 'google-id-token' }));
+
+    expect(response.status).toBe(403);
+    expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+  });
+
   it('returns 400 for an invalid body (unknown provider)', async () => {
     const response = await POST(createRequest({ provider: 'bogus' }));
 
@@ -389,5 +504,12 @@ describe('POST /api/auth/native/token', () => {
     const response = await POST(createRequest({ provider: 'email', email: 'no-code@example.com' }));
 
     expect(response.status).toBe(400);
+  });
+
+  it('returns 400 when the request body is malformed JSON', async () => {
+    const response = await POST(createMalformedRequest());
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'INVALID_REQUEST' });
   });
 });

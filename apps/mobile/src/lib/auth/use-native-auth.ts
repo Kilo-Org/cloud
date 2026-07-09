@@ -1,5 +1,5 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { toast } from 'sonner-native';
 
@@ -7,6 +7,11 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 import { API_BASE_URL, GOOGLE_IOS_CLIENT_ID, GOOGLE_WEB_CLIENT_ID } from '@/lib/config';
 import { useAuth } from '@/lib/auth/auth-context';
+import {
+  parseAuthErrorCode,
+  parseEmailCodeResponse,
+  parseTokenResponse,
+} from '@/lib/auth/native-auth-contract';
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   'EMAIL-ALREADY-USED':
@@ -19,6 +24,9 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   INVALID_CODE: 'That code is incorrect. Please try again.',
   TOO_MANY_ATTEMPTS: 'Too many attempts. Please request a new code.',
   INVALID_TOKEN: 'Sign-in failed. Please try again.',
+  INVALID_EMAIL: 'Unable to deliver email to this address. Please use a different email.',
+  INVALID_REQUEST: 'Check your email address and try again.',
+  EMAIL_DELIVERY_FAILED: 'Email delivery is temporarily unavailable. Please try again later.',
 };
 
 const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Please try again.';
@@ -48,13 +56,7 @@ async function postAuth(
     }
 
     if (!response.ok) {
-      const errorCode =
-        typeof json === 'object' &&
-        json !== null &&
-        typeof (json as { error?: unknown }).error === 'string'
-          ? (json as { error: string }).error
-          : undefined;
-      return { ok: false, errorCode };
+      return { ok: false, errorCode: parseAuthErrorCode(json) };
     }
 
     return { ok: true, data: json };
@@ -90,8 +92,6 @@ function ensureGoogleConfigured() {
 
 type BusyAction = 'apple' | 'google' | 'otp-send' | 'otp-verify' | undefined;
 
-type TokenResponse = { token: string };
-
 type NativeAuthResult = {
   busy: BusyAction;
   googleConfigured: boolean;
@@ -104,12 +104,31 @@ type NativeAuthResult = {
 export function useNativeAuth(): NativeAuthResult {
   const { signIn } = useAuth();
   const [busy, setBusy] = useState<BusyAction>(undefined);
+  const busyRef = useRef<BusyAction>(undefined);
+
+  const startAction = useCallback((action: Exclude<BusyAction, undefined>) => {
+    if (busyRef.current) {
+      return false;
+    }
+    busyRef.current = action;
+    setBusy(action);
+    return true;
+  }, []);
+
+  const finishAction = useCallback((action: Exclude<BusyAction, undefined>) => {
+    if (busyRef.current === action) {
+      busyRef.current = undefined;
+      setBusy(undefined);
+    }
+  }, []);
 
   const googleConfigured =
     Boolean(GOOGLE_WEB_CLIENT_ID) && (Platform.OS !== 'ios' || Boolean(GOOGLE_IOS_CLIENT_ID));
 
   const signInWithApple = useCallback(async () => {
-    setBusy('apple');
+    if (!startAction('apple')) {
+      return;
+    }
     try {
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
@@ -135,7 +154,12 @@ export function useNativeAuth(): NativeAuthResult {
       });
 
       if (result.ok) {
-        await signIn((result.data as TokenResponse).token);
+        const parsed = parseTokenResponse(result.data);
+        if (!parsed) {
+          toast.error(DEFAULT_ERROR_MESSAGE);
+          return;
+        }
+        await signIn(parsed.token);
       } else {
         toast.error(mapError(result.errorCode));
       }
@@ -145,12 +169,14 @@ export function useNativeAuth(): NativeAuthResult {
       }
       toast.error(DEFAULT_ERROR_MESSAGE);
     } finally {
-      setBusy(undefined);
+      finishAction('apple');
     }
-  }, [signIn]);
+  }, [finishAction, signIn, startAction]);
 
   const signInWithGoogle = useCallback(async () => {
-    setBusy('google');
+    if (!startAction('google')) {
+      return;
+    }
     try {
       ensureGoogleConfigured();
       // Android: surfaces the "update Play Services" prompt instead of a cryptic failure; no-op on iOS.
@@ -173,41 +199,57 @@ export function useNativeAuth(): NativeAuthResult {
       });
 
       if (result.ok) {
-        await signIn((result.data as TokenResponse).token);
+        const parsed = parseTokenResponse(result.data);
+        if (!parsed) {
+          toast.error(DEFAULT_ERROR_MESSAGE);
+          return;
+        }
+        await signIn(parsed.token);
       } else {
         toast.error(mapError(result.errorCode));
       }
     } catch {
       toast.error(DEFAULT_ERROR_MESSAGE);
     } finally {
-      setBusy(undefined);
+      finishAction('google');
     }
-  }, [signIn]);
+  }, [finishAction, signIn, startAction]);
 
-  const requestEmailCode = useCallback(async (rawEmail: string) => {
-    const email = rawEmail.trim().toLowerCase();
-    if (!email) {
-      toast.error('Please enter your email address.');
-      return false;
-    }
-
-    setBusy('otp-send');
-    try {
-      const result = await postAuth('/api/auth/native/otp', { email });
-      if (!result.ok) {
-        toast.error(mapError(result.errorCode));
+  const requestEmailCode = useCallback(
+    async (rawEmail: string) => {
+      const email = rawEmail.trim().toLowerCase();
+      if (!email) {
+        toast.error('Please enter your email address.');
         return false;
       }
-      return true;
-    } finally {
-      setBusy(undefined);
-    }
-  }, []);
+
+      if (!startAction('otp-send')) {
+        return false;
+      }
+      try {
+        const result = await postAuth('/api/auth/native/otp', { email });
+        if (!result.ok) {
+          toast.error(mapError(result.errorCode));
+          return false;
+        }
+        if (!parseEmailCodeResponse(result.data)) {
+          toast.error(DEFAULT_ERROR_MESSAGE);
+          return false;
+        }
+        return true;
+      } finally {
+        finishAction('otp-send');
+      }
+    },
+    [finishAction, startAction]
+  );
 
   const verifyEmailCode = useCallback(
     async (rawEmail: string, code: string) => {
       const email = rawEmail.trim().toLowerCase();
-      setBusy('otp-verify');
+      if (!startAction('otp-verify')) {
+        return false;
+      }
       try {
         const result = await postAuth('/api/auth/native/token', {
           provider: 'email',
@@ -218,7 +260,12 @@ export function useNativeAuth(): NativeAuthResult {
           toast.error(mapError(result.errorCode));
           return false;
         }
-        await signIn((result.data as TokenResponse).token);
+        const parsed = parseTokenResponse(result.data);
+        if (!parsed) {
+          toast.error(DEFAULT_ERROR_MESSAGE);
+          return false;
+        }
+        await signIn(parsed.token);
         return true;
       } catch (error) {
         // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry
@@ -226,10 +273,10 @@ export function useNativeAuth(): NativeAuthResult {
         toast.error(DEFAULT_ERROR_MESSAGE);
         return false;
       } finally {
-        setBusy(undefined);
+        finishAction('otp-verify');
       }
     },
-    [signIn]
+    [finishAction, signIn, startAction]
   );
 
   return {

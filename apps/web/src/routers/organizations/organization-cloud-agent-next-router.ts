@@ -333,12 +333,22 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const authToken = generateCloudAgentToken(ctx.user);
       // Prompt turns carry their own model; command turns run the session's
       // stored model, so resolve it to apply the same free/BYOK eligibility
-      // to every follow-up that queues a model-using turn.
-      const modelId =
-        input.payload.type === 'prompt'
-          ? input.payload.model
-          : (await createCloudAgentNextClient(authToken).getSession(input.cloudAgentSessionId))
-              .model;
+      // to every follow-up that queues a model-using turn. If the worker
+      // can't return the session model, fall back to the balance-checked
+      // client (the safe default) rather than failing the mutation on a
+      // read-side error.
+      let modelId: string | undefined;
+      if (input.payload.type === 'prompt') {
+        modelId = input.payload.model;
+      } else {
+        try {
+          modelId = (
+            await createCloudAgentNextClient(authToken).getSession(input.cloudAgentSessionId)
+          ).model;
+        } catch {
+          modelId = undefined;
+        }
+      }
       const client = createCloudAgentNextClientForModel(
         authToken,
         modelId

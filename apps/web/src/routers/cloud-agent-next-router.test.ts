@@ -324,6 +324,24 @@ describe('cloudAgentNextRouter attachment forwarding', () => {
     });
   });
 
+  it('falls back to the balance-checked client when getSession rejects', async () => {
+    mockGetSession.mockRejectedValueOnce(new Error('worker unavailable'));
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await caller.sendMessage({
+      cloudAgentSessionId: 'agent_123',
+      payload: { type: 'command', command: 'review', arguments: '' },
+    });
+
+    expect(mockGetSession).toHaveBeenCalledWith('agent_123');
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('cloud-agent-token', {
+      isFree: false,
+      hasUserByokAvailable: false,
+    });
+    expect(mockSendMessage).toHaveBeenCalled();
+  });
+
   it('signs Cloud Agent document uploads with the authenticated user scope', async () => {
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
     await caller.getAttachmentUploadUrl({

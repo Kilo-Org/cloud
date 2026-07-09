@@ -379,9 +379,14 @@ describe('coding plans router', () => {
         total_microdollars_acquired: 150_000_000,
         microdollars_used: 0,
       });
-      await uploadKeysToInventory('minimax', planId, [inventoryEntry(`sk-cp-${crypto.randomUUID()}`)], {
-        validateCredential: async () => true,
-      });
+      await uploadKeysToInventory(
+        'minimax',
+        planId,
+        [inventoryEntry(`sk-cp-${crypto.randomUUID()}`)],
+        {
+          validateCredential: async () => true,
+        }
+      );
       const caller = await createCallerForUser(owner.id);
       const activation = await caller.codingPlans.subscribe({
         planId,
@@ -404,9 +409,14 @@ describe('coding plans router', () => {
       total_microdollars_acquired: COST_MICRODOLLARS,
       microdollars_used: 0,
     });
-    await uploadKeysToInventory('minimax', PLAN_ID, [inventoryEntry(`sk-cp-state-${crypto.randomUUID()}`)], {
-      validateCredential: async () => true,
-    });
+    await uploadKeysToInventory(
+      'minimax',
+      PLAN_ID,
+      [inventoryEntry(`sk-cp-state-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
     const caller = await createCallerForUser(owner.id);
     const activation = await caller.codingPlans.subscribe({
       planId: PLAN_ID,
@@ -439,9 +449,14 @@ describe('coding plans router', () => {
       total_microdollars_acquired: COST_MICRODOLLARS,
       microdollars_used: 0,
     });
-    await uploadKeysToInventory('minimax', PLAN_ID, [inventoryEntry(`sk-cp-corrupt-${crypto.randomUUID()}`)], {
-      validateCredential: async () => true,
-    });
+    await uploadKeysToInventory(
+      'minimax',
+      PLAN_ID,
+      [inventoryEntry(`sk-cp-corrupt-${crypto.randomUUID()}`)],
+      {
+        validateCredential: async () => true,
+      }
+    );
     const caller = await createCallerForUser(owner.id);
     const activation = await caller.codingPlans.subscribe({
       planId: PLAN_ID,

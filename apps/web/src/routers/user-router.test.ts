@@ -1,11 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
-import {
-  auto_top_up_configs,
-  credit_transactions,
-  kilocode_users,
-} from '@kilocode/db/schema';
+import { auto_top_up_configs, credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';

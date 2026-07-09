@@ -1,5 +1,4 @@
 import { buildLandingRedirectUrl } from '@/lib/landing-redirect';
-import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user/server';
 import { redirect } from 'next/navigation';
 
@@ -18,5 +17,5 @@ export default async function GetStartedPage({ searchParams }: AppPageProps) {
     redirect('/account-verification');
   }
 
-  redirect(maybeInterceptWithSurvey(user, await getProfileRedirectPath(user)));
+  redirect(await getProfileRedirectPath(user));
 }

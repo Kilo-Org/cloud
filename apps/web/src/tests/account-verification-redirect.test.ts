@@ -1,12 +1,9 @@
 /**
  * Tests for the account-verification page redirect logic.
  *
- * The CORRECT behavior should be:
- * - If stytchStatus !== null AND user.customer_source !== null:
- *   redirect directly to the final destination (callbackPath or /get-started),
- *   skipping the survey entirely.
- * - If stytchStatus !== null AND user.customer_source === null:
- *   redirect to /customer-source-survey with callbackPath forwarding.
+ * The redirect behavior should be:
+ * - If stytchStatus !== null, redirect directly to the final destination
+ *   (callbackPath or /get-started).
  * - If stytchStatus === null: render the page (no redirect).
  */
 
@@ -159,11 +156,8 @@ describe('account-verification redirect logic', () => {
     });
   });
 
-  // ---------------------------------------------------------------
-  // Case: verified user who has NOT completed the survey
-  // ---------------------------------------------------------------
-  describe('when stytchStatus is non-null AND customer_source is null (survey not completed)', () => {
-    it('should redirect to /customer-source-survey with /get-started as default destination', async () => {
+  describe('when stytchStatus is non-null', () => {
+    it('redirects to /get-started by default', async () => {
       const user = makeUser({ customer_source: null });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -171,12 +165,10 @@ describe('account-verification redirect logic', () => {
       await renderPage();
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith(
-        `/customer-source-survey?callbackPath=${encodeURIComponent('/get-started')}`
-      );
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should redirect to /customer-source-survey with callbackPath forwarded', async () => {
+    it('preserves a valid callbackPath', async () => {
       const user = makeUser({ customer_source: null });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -184,12 +176,10 @@ describe('account-verification redirect logic', () => {
       await renderPage({ callbackPath: '/get-started' });
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith(
-        `/customer-source-survey?callbackPath=${encodeURIComponent('/get-started')}`
-      );
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should redirect to /customer-source-survey with an org callbackPath forwarded', async () => {
+    it('preserves an organization callbackPath', async () => {
       const user = makeUser({ customer_source: null });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -197,18 +187,12 @@ describe('account-verification redirect logic', () => {
       await renderPage({ callbackPath: '/organizations/some-org-id' });
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith(
-        `/customer-source-survey?callbackPath=${encodeURIComponent('/organizations/some-org-id')}`
-      );
+      expect(mockRedirect).toHaveBeenCalledWith('/organizations/some-org-id');
     });
   });
 
-  // ---------------------------------------------------------------
-  // Case: verified user who HAS completed the survey
-  // These tests expose the redundant-redirect bug.
-  // ---------------------------------------------------------------
-  describe('when stytchStatus is non-null AND customer_source is set (survey already completed)', () => {
-    it('should redirect directly to /get-started, NOT through /customer-source-survey', async () => {
+  describe('when legacy customer_source values exist', () => {
+    it('redirects to /get-started', async () => {
       const user = makeUser({ customer_source: 'Twitter' });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -219,7 +203,7 @@ describe('account-verification redirect logic', () => {
       expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should redirect directly to callbackPath when customer_source is set', async () => {
+    it('preserves a callbackPath', async () => {
       const user = makeUser({ customer_source: 'Twitter' });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -230,7 +214,7 @@ describe('account-verification redirect logic', () => {
       expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should redirect directly to an org callbackPath when customer_source is set', async () => {
+    it('preserves an organization callbackPath', async () => {
       const user = makeUser({ customer_source: 'A friend or colleague' });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -241,7 +225,7 @@ describe('account-verification redirect logic', () => {
       expect(mockRedirect).toHaveBeenCalledWith('/organizations/some-org-id');
     });
 
-    it('should redirect to /get-started when customer_source is empty string (skipped survey)', async () => {
+    it('redirects to /get-started for a legacy skip sentinel', async () => {
       const user = makeUser({ customer_source: '' });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -252,7 +236,7 @@ describe('account-verification redirect logic', () => {
       expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should redirect directly to callbackPath when customer_source is empty string (skipped)', async () => {
+    it('preserves a callbackPath for a legacy skip sentinel', async () => {
       const user = makeUser({ customer_source: '' });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -277,12 +261,10 @@ describe('account-verification redirect logic', () => {
       await renderPage();
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith(
-        `/customer-source-survey?callbackPath=${encodeURIComponent('/get-started')}`
-      );
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should skip survey when customer_source is set even with stytchStatus=false', async () => {
+    it('redirects despite legacy customer_source values', async () => {
       const user = makeUser({ customer_source: 'Google search' });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(false);
@@ -548,7 +530,7 @@ describe('account-verification redirect logic', () => {
   // Edge: invalid callbackPath should be ignored
   // ---------------------------------------------------------------
   describe('when callbackPath is invalid', () => {
-    it('should ignore invalid callbackPath for user without customer_source', async () => {
+    it('should ignore invalid callbackPath', async () => {
       const user = makeUser({ customer_source: null });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);
@@ -556,13 +538,10 @@ describe('account-verification redirect logic', () => {
       await renderPage({ callbackPath: 'https://evil.com/phish' });
 
       expect(mockRedirect).toHaveBeenCalledTimes(1);
-      // Invalid callbackPath is dropped — redirect to survey with default destination
-      expect(mockRedirect).toHaveBeenCalledWith(
-        `/customer-source-survey?callbackPath=${encodeURIComponent('/get-started')}`
-      );
+      expect(mockRedirect).toHaveBeenCalledWith('/get-started');
     });
 
-    it('should ignore invalid callbackPath for user with customer_source set', async () => {
+    it('ignores invalid callbackPath when legacy customer_source values exist', async () => {
       const user = makeUser({ customer_source: 'Reddit' });
       mockGetUserFromAuthOrRedirect.mockResolvedValue(user);
       mockGetStytchStatus.mockResolvedValue(true);

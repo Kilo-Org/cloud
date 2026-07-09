@@ -1,6 +1,5 @@
 import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user/server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
-import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import PostHogClient from '@/lib/posthog';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
@@ -152,8 +151,6 @@ export async function GET(request: NextRequest) {
       } else {
         responsePath = '/account-verification';
       }
-    } else {
-      responsePath = maybeInterceptWithSurvey(user, responsePath);
     }
   }
 

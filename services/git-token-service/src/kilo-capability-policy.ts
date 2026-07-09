@@ -10,6 +10,11 @@ export type KiloCapabilityRouteClassification =
   | { success: true; routeClass: KiloCapabilityRouteClass }
   | { success: false; reason: 'invalid_upstream_url' | 'upstream_not_allowed' };
 
+export type KiloCapabilityRequestIdentity = {
+  requestMethod?: string;
+  bootstrapKiloSessionId?: string;
+};
+
 type ParsedTarget = {
   origin: string;
   basePath: string;
@@ -107,7 +112,12 @@ function isSessionIngestRoute(pathname: string, basePath: string, kiloSessionId:
   );
 }
 
+function isSessionBootstrapRoute(pathname: string, basePath: string): boolean {
+  return pathname === appendPath(basePath, '/api/session');
+}
+
 function isSessionIngestShapedRoute(pathname: string, basePath: string): boolean {
+  if (pathname === appendPath(basePath, '/api/session')) return true;
   const sessionsPrefix = appendPath(basePath, '/api/session/');
   if (!pathname.startsWith(sessionsPrefix)) return false;
   return /^[^/]+\/(?:export|import|ingest)$/.test(pathname.slice(sessionsPrefix.length));
@@ -116,7 +126,8 @@ function isSessionIngestShapedRoute(pathname: string, basePath: string): boolean
 export function classifyKiloCapabilityRequest(
   requestUrl: string,
   targets: KiloSessionCapabilityTargets,
-  kiloSessionId: string
+  kiloSessionId: string,
+  requestIdentity: KiloCapabilityRequestIdentity = {}
 ): KiloCapabilityRouteClassification {
   // requestUrl is only compile-time typed at the WorkerEntrypoint RPC boundary; a
   // caller can still send a non-string, which must fail closed like every other
@@ -158,6 +169,18 @@ export function classifyKiloCapabilityRequest(
     isSessionIngestRoute(url.pathname, sessionIngest.basePath, kiloSessionId)
   ) {
     return { success: true, routeClass: 'session_ingest' };
+  }
+  if (
+    isWithinTarget(url, sessionIngest) &&
+    isSessionBootstrapRoute(url.pathname, sessionIngest.basePath)
+  ) {
+    if (
+      requestIdentity.requestMethod?.toUpperCase() === 'POST' &&
+      requestIdentity.bootstrapKiloSessionId === kiloSessionId
+    ) {
+      return { success: true, routeClass: 'session_ingest' };
+    }
+    return { success: false, reason: 'upstream_not_allowed' };
   }
   // Backend is the catch-all for its origin, so it must exclude provider- and
   // session-ingest-shaped paths. Otherwise a shared backend/session-ingest origin

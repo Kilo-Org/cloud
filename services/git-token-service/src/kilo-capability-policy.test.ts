@@ -38,6 +38,32 @@ describe('classifyKiloCapabilityRequest', () => {
     });
   });
 
+  it('routes a matching session-ingest bootstrap request', () => {
+    expect(
+      classifyKiloCapabilityRequest(
+        'https://ingest.kilosessions.ai/api/session',
+        targets,
+        kiloSessionId,
+        { requestMethod: 'POST', bootstrapKiloSessionId: kiloSessionId }
+      )
+    ).toEqual({ success: true, routeClass: 'session_ingest' });
+  });
+
+  it.each([
+    ['another session', 'POST', 'another-kilo-session'],
+    ['missing session identity', 'POST', undefined],
+    ['wrong method', 'GET', kiloSessionId],
+  ] as const)('rejects a session-ingest bootstrap request with %s', (_description, method, id) => {
+    expect(
+      classifyKiloCapabilityRequest(
+        'https://ingest.kilosessions.ai/api/session',
+        targets,
+        kiloSessionId,
+        { requestMethod: method, bootstrapKiloSessionId: id }
+      )
+    ).toEqual({ success: false, reason: 'upstream_not_allowed' });
+  });
+
   it('allows percent-encoded characters in the query string', () => {
     expect(
       classifyKiloCapabilityRequest(
@@ -108,6 +134,17 @@ describe('classifyKiloCapabilityRequest', () => {
           kiloSessionId
         )
       ).toEqual({ success: true, routeClass: 'session_ingest' });
+    });
+
+    it('does not let the backend catch-all serve an unbound bootstrap request', () => {
+      expect(
+        classifyKiloCapabilityRequest(
+          'https://api.kilo.ai/api/session',
+          sharedOriginTargets,
+          kiloSessionId,
+          { requestMethod: 'POST' }
+        )
+      ).toEqual({ success: false, reason: 'upstream_not_allowed' });
     });
 
     it.each(['export', 'ingest'] as const)(

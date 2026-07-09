@@ -218,7 +218,9 @@ export function useNativeAuth(): NativeAuthResult {
         }
         await signIn((result.data as TokenResponse).token);
         return true;
-      } catch {
+      } catch (error) {
+        // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry
+        console.error('[native-auth] verifyEmailCode signIn failed:', error);
         toast.error(DEFAULT_ERROR_MESSAGE);
         return false;
       } finally {

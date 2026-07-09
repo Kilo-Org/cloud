@@ -12,6 +12,24 @@ import {
  */
 export type SettingsDirtyState = 'clean' | 'dirty-valid' | 'dirty-invalid';
 
+const MIN_SLA_DAYS = 1;
+const MAX_SLA_DAYS = 365;
+
+/**
+ * Parses a raw numeric `TextInput` string into a whole-day count, or `NaN`
+ * if it isn't one — shared by the notification screen's SLA warning lead
+ * time and the SLA screen's four severity day thresholds, all validated as
+ * 1-365 whole days.
+ */
+export function parseDayCount(raw: string): number {
+  const trimmed = raw.trim();
+  return /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN;
+}
+
+export function isValidDayCount(value: number): boolean {
+  return Number.isInteger(value) && value >= MIN_SLA_DAYS && value <= MAX_SLA_DAYS;
+}
+
 export function getSettingsDirtyState(
   config: Partial<SecurityAgentConfig>,
   patch: SecurityAgentConfigPatch,

@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { Cpu, FolderGit2 } from 'lucide-react-native';
+import { Bell, Clock, Cpu, FolderGit2, Zap } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
 import { ScrollView, Switch, View } from 'react-native';
 
@@ -64,6 +64,15 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
     data.repositorySelectionMode === 'all'
       ? 'All repositories'
       : `${data.selectedRepositoryIds.length} ${data.selectedRepositoryIds.length === 1 ? 'repository' : 'repositories'} selected`;
+  const automationEnabledCount = [
+    data.autoAnalysisEnabled,
+    data.autoRemediationEnabled,
+    data.autoDismissEnabled,
+  ].filter(Boolean).length;
+  const notificationsEnabledCount = [
+    data.newFindingNotificationsEnabled,
+    data.slaNotificationsEnabled,
+  ].filter(Boolean).length;
 
   const handleToggle = (value: boolean) => {
     void Haptics.selectionAsync();
@@ -120,9 +129,39 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
               icon={Cpu}
               title="Models & analysis"
               subtitle={`${capitalize(data.analysisMode)} analysis`}
-              last
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'settings/analysis'));
+              }}
+            />
+            <ConfigureRow
+              icon={Zap}
+              title="Automation"
+              subtitle={
+                automationEnabledCount === 0 ? 'All off' : `${automationEnabledCount} of 3 enabled`
+              }
+              onPress={() => {
+                router.push(getSecurityAgentPath(scope, 'settings/automation'));
+              }}
+            />
+            <ConfigureRow
+              icon={Bell}
+              title="Notifications"
+              subtitle={
+                notificationsEnabledCount === 0
+                  ? 'Off'
+                  : `${notificationsEnabledCount} of 2 enabled`
+              }
+              onPress={() => {
+                router.push(getSecurityAgentPath(scope, 'settings/notifications'));
+              }}
+            />
+            <ConfigureRow
+              icon={Clock}
+              title="SLA policy"
+              subtitle={data.slaEnabled ? 'On' : 'Off'}
+              last
+              onPress={() => {
+                router.push(getSecurityAgentPath(scope, 'settings/sla'));
               }}
             />
           </View>

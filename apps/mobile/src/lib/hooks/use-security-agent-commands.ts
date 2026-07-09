@@ -160,8 +160,17 @@ export function useSecurityAgentCommands(scope: string): void {
   });
 
   useEffect(() => {
+    // `listActiveCommands` can lag one poll behind `getCommandStatus` and
+    // still report an already-terminal command as active. Filtering those
+    // ids here stops us from re-adding a command the terminal-processing
+    // effect below already toasted and dropped — otherwise its
+    // `processedTerminalIdsRef` gate would keep that effect from ever
+    // removing it again, stranding the id (and its idle query) in
+    // `trackedIds` for the rest of the session.
     const merged = mergeTrackedCommandIds(
-      recoveredCommands.map(command => command.id),
+      recoveredCommands
+        .map(command => command.id)
+        .filter(id => !processedTerminalIdsRef.current.has(id)),
       trackedIds
     );
     if (!sameIds(merged, trackedIds)) {

@@ -15,7 +15,6 @@ jest.mock('google-auth-library');
 // GOOGLE_IOS_CLIENT_ID is mutable (via the getter) so a test can simulate it being unset.
 const mockConfig = { GOOGLE_IOS_CLIENT_ID: 'ios-client-id' };
 jest.mock('@/lib/config.server', () => ({
-  APPLE_NATIVE_CLIENT_IDS: 'com.kilocode.kiloapp',
   GOOGLE_CLIENT_ID: 'web-client-id',
   get GOOGLE_IOS_CLIENT_ID() {
     return mockConfig.GOOGLE_IOS_CLIENT_ID;
@@ -40,14 +39,14 @@ describe('verifyNativeAppleIdToken', () => {
     jest.clearAllMocks();
   });
 
-  it('verifies against the split APPLE_NATIVE_CLIENT_IDS audience and returns sub/email', async () => {
+  it('verifies against the Kilo app bundle ID and returns sub/email', async () => {
     mockVerifyAppleJwtWithJwks.mockResolvedValue(
       applePayload({ sub: 'apple-sub-1', email: 'user@example.com', email_verified: true })
     );
 
     const result = await verifyNativeAppleIdToken('a-token');
 
-    expect(mockVerifyAppleJwtWithJwks).toHaveBeenCalledWith('a-token', ['com.kilocode.kiloapp']);
+    expect(mockVerifyAppleJwtWithJwks).toHaveBeenCalledWith('a-token', 'com.kilocode.kiloapp');
     expect(result).toEqual({ sub: 'apple-sub-1', email: 'user@example.com' });
   });
 

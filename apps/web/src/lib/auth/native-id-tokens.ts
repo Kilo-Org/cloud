@@ -1,11 +1,7 @@
 import 'server-only';
 import { OAuth2Client } from 'google-auth-library';
 import { verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
-import {
-  APPLE_NATIVE_CLIENT_IDS,
-  GOOGLE_CLIENT_ID,
-  GOOGLE_IOS_CLIENT_ID,
-} from '@/lib/config.server';
+import { GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID } from '@/lib/config.server';
 
 /** Thrown when a native (mobile) ID token fails verification — maps to 401 INVALID_TOKEN. */
 export class NativeIdTokenError extends Error {}
@@ -21,10 +17,7 @@ export type VerifiedGoogleIdToken = {
 };
 
 export async function verifyNativeAppleIdToken(idToken: string): Promise<VerifiedAppleIdToken> {
-  const audience = APPLE_NATIVE_CLIENT_IDS.split(',')
-    .map(id => id.trim())
-    .filter(Boolean);
-  const payload = await verifyAppleJwtWithJwks(idToken, audience);
+  const payload = await verifyAppleJwtWithJwks(idToken, 'com.kilocode.kiloapp');
 
   if (typeof payload.email !== 'string' || !payload.email) {
     throw new NativeIdTokenError('Apple ID token missing email');

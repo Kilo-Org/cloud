@@ -195,6 +195,10 @@ export function useSecurityAgentCommands(scope: string): void {
   });
 
   useEffect(() => {
+    const unavailableIds = commandStatusQueries.flatMap((query, index) => {
+      const id = trackedIds[index];
+      return query.error?.data?.code === 'NOT_FOUND' && id ? [id] : [];
+    });
     const terminalCommands = commandStatusQueries
       .map(query => query.data)
       .filter(
@@ -203,8 +207,15 @@ export function useSecurityAgentCommands(scope: string): void {
           !isActiveSecurityCommand(command) &&
           !processedTerminalIdsRef.current.has(command.id)
       );
-    if (terminalCommands.length === 0) {
+    if (terminalCommands.length === 0 && unavailableIds.length === 0) {
       return;
+    }
+
+    if (unavailableIds.length > 0) {
+      toast.error('A queued action could no longer be tracked. Refresh to see the latest state.');
+      for (const id of unavailableIds) {
+        processedTerminalIdsRef.current.add(id);
+      }
     }
 
     for (const command of terminalCommands) {
@@ -222,9 +233,10 @@ export function useSecurityAgentCommands(scope: string): void {
     }
 
     const terminalIds = new Set(terminalCommands.map(command => command.id));
+    const completedIds = new Set([...terminalIds, ...unavailableIds]);
     queryClient.setQueryData(
       trackedIdsKey,
-      trackedIds.filter(id => !terminalIds.has(id))
+      trackedIds.filter(id => !completedIds.has(id))
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps -- trpc/queryClient are stable; trackedIds/scope drive the effect body directly
   }, [commandStatusQueries, trackedIds, scope, trackedIdsKey]);

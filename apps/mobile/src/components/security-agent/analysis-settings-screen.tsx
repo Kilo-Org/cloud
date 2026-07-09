@@ -7,6 +7,7 @@ import { SettingsSaveButton } from '@/components/security-agent/settings-save-bu
 import { getSettingsDirtyState } from '@/components/security-agent/settings-screen-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { ScreenHeader } from '@/components/screen-header';
+import { QueryError } from '@/components/query-error';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -59,6 +60,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const [remediationModelSlug, setRemediationModelSlug] = useState('');
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('auto');
   const hydratedRef = useRef(false);
+  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
@@ -68,6 +70,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
       return;
     }
     hydratedRef.current = true;
+    initialConfigRef.current = config.data;
     setTriageModelSlug(config.data.triageModelSlug);
     setAnalysisModelSlug(config.data.analysisModelSlug);
     setRemediationModelSlug(config.data.remediationModelSlug);
@@ -86,7 +89,8 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     analysisMode,
   };
   const dirty =
-    hydratedRef.current && getSettingsDirtyState(config.data ?? {}, patch, valid) !== 'clean';
+    hydratedRef.current &&
+    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
@@ -94,6 +98,18 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
 
   const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
+  if (config.isError && !config.data) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Models & Analysis" />
+        <QueryError
+          className="flex-1"
+          message="Could not load analysis settings"
+          onRetry={() => void config.refetch()}
+        />
+      </View>
+    );
+  }
   if (config.isLoading || !config.data) {
     return <AnalysisSettingsSkeleton />;
   }

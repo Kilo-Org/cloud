@@ -17,6 +17,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { getSecurityRepositoriesInScope } from '@/lib/security-agent';
 import {
   DEFAULT_SECURITY_FINDING_FILTERS,
   hasActiveSecurityFindingFilters,
@@ -29,6 +30,20 @@ type FindingListScreenProps = {
   scope: string;
   routeParams: SecurityFindingRouteParams;
 };
+
+function FindingsListFooter({
+  loading,
+  error,
+  onRetry,
+}: Readonly<{ loading: boolean; error: boolean; onRetry: () => void }>) {
+  if (loading) {
+    return <Skeleton className="h-24 w-full rounded-lg" />;
+  }
+  if (error) {
+    return <QueryError message="Could not load more findings" onRetry={onRetry} />;
+  }
+  return null;
+}
 
 export function FindingListScreen({ scope, routeParams }: Readonly<FindingListScreenProps>) {
   const colors = useThemeColors();
@@ -48,7 +63,8 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     capacity.concurrencyLimit !== undefined &&
     capacity.runningCount < capacity.concurrencyLimit;
   const filtersActive = hasActiveSecurityFindingFilters(filters);
-  const items = findings.data?.findings ?? [];
+  const items = findings.data?.pages.flatMap(page => page.findings) ?? [];
+  const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
 
   const handleRefresh = () => {
     void (async () => {
@@ -73,8 +89,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             }}
             accessibilityRole="button"
             accessibilityLabel="Filter findings"
-            hitSlop={8}
-            className="active:opacity-70"
+            className="size-11 items-center justify-center active:opacity-70"
           >
             <SlidersHorizontal
               size={20}
@@ -112,6 +127,19 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           )}
           contentContainerClassName="gap-3 px-6 pb-24 pt-4"
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          onEndReached={() => {
+            if (findings.hasNextPage && !findings.isFetchingNextPage) {
+              void findings.fetchNextPage();
+            }
+          }}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            <FindingsListFooter
+              loading={findings.isFetchingNextPage}
+              error={findings.isFetchNextPageError}
+              onRetry={() => void findings.fetchNextPage()}
+            />
+          }
           ListEmptyComponent={
             <EmptyState
               icon={ShieldCheck}
@@ -141,7 +169,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       {showFilterModal && (
         <FindingFilterModal
           filters={filters}
-          repositories={repositories.data ?? []}
+          repositories={scopedRepositories}
           onClose={() => {
             setShowFilterModal(false);
           }}

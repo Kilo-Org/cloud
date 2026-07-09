@@ -10,6 +10,7 @@ import {
 } from '@/components/security-agent/settings-screen-state';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
+import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -74,6 +75,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   const warningDaysRef = useRef('');
   const [slaNotificationWarningDays, setSlaNotificationWarningDays] = useState(Number.NaN);
   const hydratedRef = useRef(false);
+  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
@@ -83,6 +85,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
       return;
     }
     hydratedRef.current = true;
+    initialConfigRef.current = config.data;
     setNewFindingNotificationsEnabled(config.data.newFindingNotificationsEnabled);
     setNewFindingNotificationMinSeverity(config.data.newFindingNotificationMinSeverity);
     setSlaNotificationsEnabled(config.data.slaNotificationsEnabled);
@@ -116,7 +119,8 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     slaNotificationWarningDays,
   };
   const dirty =
-    hydratedRef.current && getSettingsDirtyState(config.data ?? {}, patch, valid) !== 'clean';
+    hydratedRef.current &&
+    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
@@ -124,6 +128,18 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
 
   const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
+  if (config.isError && !config.data) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Notifications" />
+        <QueryError
+          className="flex-1"
+          message="Could not load notification settings"
+          onRetry={() => void config.refetch()}
+        />
+      </View>
+    );
+  }
   if (config.isLoading || !config.data) {
     return <NotificationSettingsSkeleton />;
   }
@@ -199,6 +215,12 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                   SLA warning lead time (days)
                 </Text>
                 <TextInput
+                  accessibilityLabel="SLA warning lead time in days"
+                  accessibilityHint={
+                    isValidDayCount(slaNotificationWarningDays)
+                      ? undefined
+                      : 'Enter a whole number between 1 and 365'
+                  }
                   className="h-11 rounded-lg bg-secondary px-3 text-sm leading-5 text-foreground"
                   editable={canManage}
                   keyboardType="number-pad"

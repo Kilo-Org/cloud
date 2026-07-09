@@ -166,42 +166,46 @@ export function FindingRow({
     hasAnalysisCapacity;
 
   return (
-    <Pressable
-      className="gap-1.5 rounded-lg bg-secondary p-3 active:opacity-70"
-      onPress={() => {
-        router.push(getSecurityAgentPath(scope, `findings/${finding.id}`));
-      }}
-    >
-      <Text
-        className={cn(
-          'font-mono-medium text-[11px] uppercase tracking-[0.6px]',
-          SEVERITY_TEXT_CLASS[finding.severity] ?? 'text-muted-foreground'
-        )}
+    <View className="gap-1.5 rounded-lg bg-secondary p-3">
+      <Pressable
+        className="gap-1.5 active:opacity-70"
+        accessibilityRole="button"
+        accessibilityLabel={`${severityLabel(finding.severity)} finding: ${finding.title}. ${finding.repo_full_name}. ${analysis.label}${deadline ? `. ${deadline.label}` : ''}`}
+        onPress={() => {
+          router.push(getSecurityAgentPath(scope, `findings/${finding.id}`));
+        }}
       >
-        {severityLabel(finding.severity)}
-      </Text>
-      <Text className="text-sm font-medium" numberOfLines={2}>
-        {finding.title}
-      </Text>
-      <Text variant="muted" className="text-xs" numberOfLines={1}>
-        {finding.repo_full_name}
-      </Text>
-      <View className="flex-row flex-wrap items-center gap-3 pt-0.5">
-        <View className="flex-row items-center gap-1">
-          <AnalysisIcon size={13} color={findingToneColor(colors, analysis.tone)} />
-          <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
-            {analysis.label}
-          </Text>
-        </View>
-        {deadline && DeadlineIcon && (
+        <Text
+          className={cn(
+            'font-mono-medium text-[11px] uppercase tracking-[0.6px]',
+            SEVERITY_TEXT_CLASS[finding.severity] ?? 'text-muted-foreground'
+          )}
+        >
+          {severityLabel(finding.severity)}
+        </Text>
+        <Text className="text-sm font-medium" numberOfLines={2}>
+          {finding.title}
+        </Text>
+        <Text variant="muted" className="text-xs" numberOfLines={1}>
+          {finding.repo_full_name}
+        </Text>
+        <View className="flex-row flex-wrap items-center gap-3 pt-0.5">
           <View className="flex-row items-center gap-1">
-            <DeadlineIcon size={13} color={findingToneColor(colors, deadline.tone)} />
-            <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
-              {deadline.label}
+            <AnalysisIcon size={13} color={findingToneColor(colors, analysis.tone)} />
+            <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[analysis.tone])}>
+              {analysis.label}
             </Text>
           </View>
-        )}
-      </View>
+          {deadline && DeadlineIcon && (
+            <View className="flex-row items-center gap-1">
+              <DeadlineIcon size={13} color={findingToneColor(colors, deadline.tone)} />
+              <Text className={cn('text-xs', FINDING_TONE_TEXT_CLASS[deadline.tone])}>
+                {deadline.label}
+              </Text>
+            </View>
+          )}
+        </View>
+      </Pressable>
       <FindingRowQuickAction
         finding={finding}
         scope={scope}
@@ -209,6 +213,6 @@ export function FindingRow({
         canQuickAnalyze={canQuickAnalyze}
         nextAction={nextAction}
       />
-    </Pressable>
+    </View>
   );
 }

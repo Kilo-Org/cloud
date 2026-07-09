@@ -92,6 +92,7 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
           Comment (optional)
         </Text>
         <TextInput
+          accessibilityLabel="Dismissal comment"
           className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
           multiline
           textAlignVertical="top"

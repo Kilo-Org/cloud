@@ -249,7 +249,11 @@ export function useSetSecurityAgentEnabled(scope: string) {
       toast.error(error.message);
     },
     onSuccess: result => {
-      if ('initialSync' in result && result.initialSync) {
+      if ('initialSyncAdmissionFailed' in result && result.initialSyncAdmissionFailed) {
+        toast.error(
+          'Security Agent was enabled, but the initial sync could not be queued. Sync again.'
+        );
+      } else if ('initialSync' in result && result.initialSync) {
         trackSecurityAgentCommand(queryClient, scope, result.initialSync.commandId);
       }
     },

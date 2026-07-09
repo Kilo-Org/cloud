@@ -9,6 +9,7 @@ import {
 } from '@/components/security-agent/settings-screen-state';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
+import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -22,6 +23,7 @@ import {
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { type SecurityAgentConfig } from '@/lib/security-agent';
 
 function SlaSettingsSkeleton() {
   return (
@@ -84,6 +86,10 @@ function SlaDayRow({
         )}
       </View>
       <TextInput
+        accessibilityLabel={`${label} remediation deadline in days`}
+        accessibilityHint={
+          isValidDayCount(days) ? undefined : 'Enter a whole number between 1 and 365'
+        }
         className="h-11 w-16 rounded-lg border border-input bg-background px-2 text-sm leading-5 text-foreground"
         textAlign="center"
         editable={!disabled}
@@ -113,6 +119,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const [slaMediumDays, setSlaMediumDays] = useState(Number.NaN);
   const [slaLowDays, setSlaLowDays] = useState(Number.NaN);
   const hydratedRef = useRef(false);
+  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
@@ -124,6 +131,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
       return;
     }
     hydratedRef.current = true;
+    initialConfigRef.current = config.data;
     setSlaEnabled(config.data.slaEnabled);
     setSlaCriticalDays(config.data.slaCriticalDays);
     setSlaHighDays(config.data.slaHighDays);
@@ -160,7 +168,8 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     slaLowDays,
   };
   const dirty =
-    hydratedRef.current && getSettingsDirtyState(config.data ?? {}, patch, valid) !== 'clean';
+    hydratedRef.current &&
+    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
@@ -168,6 +177,18 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
 
   const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
+  if (config.isError && !config.data) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="SLA Policy" />
+        <QueryError
+          className="flex-1"
+          message="Could not load SLA settings"
+          onRetry={() => void config.refetch()}
+        />
+      </View>
+    );
+  }
   if (config.isLoading || !config.data) {
     return <SlaSettingsSkeleton />;
   }

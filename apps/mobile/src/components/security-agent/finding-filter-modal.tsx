@@ -130,14 +130,11 @@ export function FindingFilterModal({
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1 justify-start px-6 pt-[15%]" onPress={onClose}>
-        <View className="absolute inset-0 bg-black opacity-50" />
-        <Pressable
-          className="max-h-[75%] gap-4 rounded-2xl bg-popover p-5"
-          onPress={e => {
-            e.stopPropagation();
-          }}
-        >
+      <View className="flex-1 justify-start px-6 pt-[15%]">
+        <Pressable className="absolute inset-0" onPress={onClose} accessible={false}>
+          <View className="absolute inset-0 bg-black opacity-50" />
+        </Pressable>
+        <View className="max-h-[75%] gap-4 rounded-2xl bg-popover p-5" accessibilityViewIsModal>
           <Text className="text-base font-semibold">Filter Findings</Text>
           <ScrollView showsVerticalScrollIndicator={false}>
             <View className="gap-4">
@@ -207,8 +204,8 @@ export function FindingFilterModal({
               </Button>
             </View>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

@@ -19,7 +19,11 @@ import {
   useTriggerSecuritySync,
 } from '@/lib/hooks/use-security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getSecurityAgentAuditUrl, getSecurityAgentPath } from '@/lib/security-agent';
+import {
+  getSecurityAgentAuditUrl,
+  getSecurityAgentPath,
+  getSecurityRepositoriesInScope,
+} from '@/lib/security-agent';
 import {
   buildSecurityDashboardMetrics,
   type DashboardMetricTone,
@@ -68,7 +72,9 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   };
 
   const openRepoFilter = () => {
-    const repoNames = repositories.data?.map(repo => repo.fullName) ?? [];
+    const repoNames = getSecurityRepositoriesInScope(repositories.data ?? [], config.data).map(
+      repo => repo.fullName
+    );
     const options = ['All repositories', ...repoNames, 'Cancel'];
     showActionSheetWithOptions({ options, cancelButtonIndex: options.length - 1 }, index => {
       if (index === undefined || index === options.length - 1) {
@@ -92,15 +98,14 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
       <ScreenHeader
         title="Security Agent"
         headerRight={
-          <View className="flex-row items-center gap-4">
+          <View className="flex-row items-center">
             <Pressable
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'findings'));
               }}
               accessibilityRole="button"
               accessibilityLabel="Findings"
-              hitSlop={8}
-              className="active:opacity-70"
+              className="size-11 items-center justify-center active:opacity-70"
             >
               <ShieldAlert size={20} color={colors.foreground} />
             </Pressable>
@@ -110,8 +115,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               }}
               accessibilityRole="button"
               accessibilityLabel="Settings"
-              hitSlop={8}
-              className="active:opacity-70"
+              className="size-11 items-center justify-center active:opacity-70"
             >
               <Settings size={20} color={colors.foreground} />
             </Pressable>
@@ -120,8 +124,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 onPress={openMoreActions}
                 accessibilityRole="button"
                 accessibilityLabel="More actions"
-                hitSlop={8}
-                className="active:opacity-70"
+                className="size-11 items-center justify-center active:opacity-70"
               >
                 <MoreHorizontal size={20} color={colors.foreground} />
               </Pressable>
@@ -156,8 +159,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             disabled={triggerSync.isPending}
             accessibilityRole="button"
             accessibilityLabel="Sync now"
-            hitSlop={8}
-            className="active:opacity-70"
+            className="size-11 items-center justify-center active:opacity-70"
           >
             <RefreshCw size={18} color={colors.mutedForeground} />
           </Pressable>

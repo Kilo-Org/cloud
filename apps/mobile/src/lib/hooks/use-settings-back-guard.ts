@@ -6,7 +6,7 @@ import { getSettingsBackGuardOptions } from '@/components/security-agent/setting
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const BUTTON_LABEL = {
-  save: 'Save',
+  save: 'Save changes',
   discard: 'Discard',
   'keep-editing': 'Keep Editing',
 } as const;

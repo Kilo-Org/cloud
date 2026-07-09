@@ -30,6 +30,7 @@ export function ToggleRow({
         </Text>
       </View>
       <Switch
+        accessibilityLabel={title}
         value={value}
         disabled={disabled}
         onValueChange={next => {

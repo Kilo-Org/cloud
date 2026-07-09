@@ -24,7 +24,7 @@ describe('toSecurityFindingQuery', () => {
     expect(toSecurityFindingQuery(DEFAULT_SECURITY_FINDING_FILTERS)).toEqual({
       status: 'open',
       sortBy: 'severity_desc',
-      limit: 100,
+      limit: 50,
       offset: 0,
     });
   });
@@ -43,7 +43,7 @@ describe('toSecurityFindingQuery', () => {
       outcomeFilter: 'exploitable',
       repoFullName: 'kilocode/cloud',
       sortBy: 'sla_due_at_asc',
-      limit: 100,
+      limit: 50,
       offset: 0,
     });
   });
@@ -58,6 +58,15 @@ describe('toSecurityFindingQuery', () => {
     expect(
       toSecurityFindingQuery({ ...DEFAULT_SECURITY_FINDING_FILTERS, overdue: true })
     ).toMatchObject({ overdue: true });
+  });
+
+  it('omits status when the selected outcome already implies a terminal status', () => {
+    expect(
+      toSecurityFindingQuery({ ...DEFAULT_SECURITY_FINDING_FILTERS, outcome: 'fixed' })
+    ).not.toHaveProperty('status');
+    expect(
+      toSecurityFindingQuery({ ...DEFAULT_SECURITY_FINDING_FILTERS, outcome: 'dismissed' })
+    ).not.toHaveProperty('status');
   });
 });
 

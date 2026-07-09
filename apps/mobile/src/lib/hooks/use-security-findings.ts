@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { trackSecurityAgentCommand } from '@/lib/hooks/use-security-agent-commands';
@@ -17,18 +17,28 @@ type ListFindingsFilters = Parameters<typeof trpcClient.securityAgent.listFindin
 
 export function useSecurityFindings(scope: string, filters: ListFindingsFilters) {
   const trpc = useTRPC();
-  const personal = useQuery({
-    ...trpc.securityAgent.listFindings.queryOptions(filters),
-    enabled: isPersonalSecurityScope(scope),
+  const isPersonal = isPersonalSecurityScope(scope);
+  const baseQueryKey = isPersonal
+    ? trpc.securityAgent.listFindings.queryKey()
+    : trpc.organizations.securityAgent.listFindings.queryKey({ organizationId: scope });
+
+  return useInfiniteQuery({
+    queryKey: [...baseQueryKey, filters],
+    initialPageParam: filters.offset ?? 0,
+    // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+    queryFn: ({ pageParam }) =>
+      isPersonal
+        ? trpcClient.securityAgent.listFindings.query({ ...filters, offset: pageParam })
+        : trpcClient.organizations.securityAgent.listFindings.query({
+            organizationId: scope,
+            ...filters,
+            offset: pageParam,
+          }),
+    getNextPageParam: (lastPage, pages) => {
+      const loadedCount = pages.reduce((count, page) => count + page.findings.length, 0);
+      return loadedCount < lastPage.totalCount ? (filters.offset ?? 0) + loadedCount : undefined;
+    },
   });
-  const organization = useQuery({
-    ...trpc.organizations.securityAgent.listFindings.queryOptions({
-      organizationId: scope,
-      ...filters,
-    }),
-    enabled: !isPersonalSecurityScope(scope),
-  });
-  return isPersonalSecurityScope(scope) ? personal : organization;
 }
 
 export function useSecurityFinding(scope: string, id: string) {
@@ -100,6 +110,7 @@ export function useDismissSecurityFinding(scope: string) {
 }
 
 export function useStartSecurityAnalysis(scope: string) {
+  const trpc = useTRPC();
   const queryClient = useQueryClient();
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -113,13 +124,86 @@ export function useStartSecurityAnalysis(scope: string) {
     onError: error => {
       toast.error(error.message);
     },
-    onSuccess: result => {
+    onSuccess: async (result, vars) => {
       trackSecurityAgentCommand(queryClient, scope, result.commandId);
+      if (isPersonalSecurityScope(scope)) {
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: trpc.securityAgent.getAnalysis.queryKey({ findingId: vars.findingId }),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: trpc.securityAgent.getFinding.queryKey({ id: vars.findingId }),
+          }),
+          queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
+        ]);
+        return;
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getAnalysis.queryKey({
+            organizationId: scope,
+            findingId: vars.findingId,
+          }),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.getFinding.queryKey({
+            organizationId: scope,
+            id: vars.findingId,
+          }),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: trpc.organizations.securityAgent.listFindings.queryKey({
+            organizationId: scope,
+          }),
+        }),
+      ]);
     },
   });
 }
 
+async function invalidateRemediationQueries(
+  deps: {
+    trpc: ReturnType<typeof useTRPC>;
+    queryClient: ReturnType<typeof useQueryClient>;
+  },
+  target: { scope: string; findingId: string }
+): Promise<void> {
+  const { trpc, queryClient } = deps;
+  const { scope, findingId } = target;
+  if (isPersonalSecurityScope(scope)) {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: trpc.securityAgent.getAnalysis.queryKey({ findingId }),
+      }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getFinding.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.listFindings.queryKey() }),
+      queryClient.invalidateQueries({ queryKey: trpc.securityAgent.getDashboardStats.queryKey() }),
+    ]);
+    return;
+  }
+  const ownerInput = { organizationId: scope };
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: trpc.organizations.securityAgent.getAnalysis.queryKey({
+        ...ownerInput,
+        findingId,
+      }),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: trpc.organizations.securityAgent.getFinding.queryKey(ownerInput),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: trpc.organizations.securityAgent.listFindings.queryKey(ownerInput),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: trpc.organizations.securityAgent.getDashboardStats.queryKey(ownerInput),
+    }),
+  ]);
+}
+
 export function useStartSecurityRemediation(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.startRemediation.mutate>[0]) =>
@@ -132,18 +216,26 @@ export function useStartSecurityRemediation(scope: string) {
     onError: error => {
       toast.error(error.message);
     },
-    onSuccess: result => {
+    onSuccess: async (result, vars) => {
       if (!result.queued) {
         toast.error(
           getRemediationUnavailableCopy(result.reason) ??
             'Remediation is unavailable for this finding.'
         );
+      } else {
+        toast.success('Remediation queued');
       }
+      await invalidateRemediationQueries(
+        { trpc, queryClient },
+        { scope, findingId: vars.findingId }
+      );
     },
   });
 }
 
 export function useRetrySecurityRemediation(scope: string) {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   return useMutation({
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.retryRemediation.mutate>[0]) =>
@@ -156,13 +248,19 @@ export function useRetrySecurityRemediation(scope: string) {
     onError: error => {
       toast.error(error.message);
     },
-    onSuccess: result => {
+    onSuccess: async (result, vars) => {
       if (!result.queued) {
         toast.error(
           getRemediationUnavailableCopy(result.reason) ??
             'Remediation is unavailable for this finding.'
         );
+      } else {
+        toast.success('Remediation retry queued');
       }
+      await invalidateRemediationQueries(
+        { trpc, queryClient },
+        { scope, findingId: vars.findingId }
+      );
     },
   });
 }

@@ -18,10 +18,8 @@ describe('getSettingsDirtyState', () => {
     expect(getSettingsDirtyState(config, { selectedRepositoryIds: [1, 2] }, true)).toBe('clean');
   });
 
-  it('is dirty when the selected-repository array order changes, even with the same members', () => {
-    expect(getSettingsDirtyState(config, { selectedRepositoryIds: [2, 1] }, true)).toBe(
-      'dirty-valid'
-    );
+  it('is clean when selected repositories have the same members in a different order', () => {
+    expect(getSettingsDirtyState(config, { selectedRepositoryIds: [2, 1] }, true)).toBe('clean');
   });
 
   it('is dirty-invalid when an SLA edit is numerically invalid', () => {

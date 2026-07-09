@@ -4,6 +4,7 @@ import {
   canManageSecurityAgent,
   getSecurityAgentAuditUrl,
   getSecurityAgentPath,
+  getSecurityRepositoriesInScope,
   isSecurityConfigPatchDirty,
   PERSONAL_SECURITY_SCOPE,
   type SecurityAgentConfig,
@@ -43,6 +44,26 @@ describe('Security Agent helpers', () => {
     expect(isSecurityConfigPatchDirty(config, { analysisMode: 'auto' })).toBe(false);
     expect(isSecurityConfigPatchDirty(config, { analysisMode: 'deep' })).toBe(true);
     expect(isSecurityConfigPatchDirty(config, { selectedRepositoryIds: [1, 2] })).toBe(false);
-    expect(isSecurityConfigPatchDirty(config, { selectedRepositoryIds: [2, 1] })).toBe(true);
+    expect(isSecurityConfigPatchDirty(config, { selectedRepositoryIds: [2, 1] })).toBe(false);
+    expect(isSecurityConfigPatchDirty(config, { selectedRepositoryIds: [1, 3] })).toBe(true);
+  });
+
+  it('limits repository choices to configured Security Agent scope', () => {
+    const repositories = [
+      { id: 1, fullName: 'kilo/one' },
+      { id: 2, fullName: 'kilo/two' },
+    ];
+    expect(
+      getSecurityRepositoriesInScope(repositories, {
+        repositorySelectionMode: 'selected',
+        selectedRepositoryIds: [2],
+      })
+    ).toEqual([{ id: 2, fullName: 'kilo/two' }]);
+    expect(
+      getSecurityRepositoriesInScope(repositories, {
+        repositorySelectionMode: 'all',
+        selectedRepositoryIds: [],
+      })
+    ).toEqual(repositories);
   });
 });

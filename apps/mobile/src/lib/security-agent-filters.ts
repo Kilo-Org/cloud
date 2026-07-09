@@ -23,6 +23,7 @@ const OUTCOME_FILTERS = [
   'dismissed',
 ] as const;
 const SORT_OPTIONS = ['severity_desc', 'severity_asc', 'sla_due_at_asc'] as const;
+const STATUS_IMPLYING_OUTCOMES = new Set<SecurityOutcomeFilter>(['fixed', 'dismissed']);
 
 export type SecurityFindingStatusFilter = (typeof STATUS_FILTERS)[number];
 export type SecuritySeverityFilter = (typeof SEVERITY_FILTERS)[number];
@@ -46,17 +47,18 @@ export const DEFAULT_SECURITY_FINDING_FILTERS: SecurityFindingFilters = {
   sortBy: 'severity_desc',
 };
 
-// The Findings screen never paginates (matches the current web ceiling).
-const LIST_LIMIT = 100;
-const LIST_OFFSET = 0;
+const SECURITY_FINDINGS_PAGE_SIZE = 50;
 
-export function toSecurityFindingQuery(filters: SecurityFindingFilters): SecurityFindingQuery {
+export function toSecurityFindingQuery(
+  filters: SecurityFindingFilters,
+  offset = 0
+): SecurityFindingQuery {
   const query: SecurityFindingQuery = {
     sortBy: filters.sortBy,
-    limit: LIST_LIMIT,
-    offset: LIST_OFFSET,
+    limit: SECURITY_FINDINGS_PAGE_SIZE,
+    offset,
   };
-  if (filters.status !== 'all') {
+  if (filters.status !== 'all' && !STATUS_IMPLYING_OUTCOMES.has(filters.outcome)) {
     query.status = filters.status;
   }
   if (filters.severity !== 'all') {

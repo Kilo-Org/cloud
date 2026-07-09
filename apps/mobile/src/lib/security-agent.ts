@@ -38,8 +38,22 @@ export function isSecurityConfigPatchDirty(
 ): boolean {
   return Object.entries(patch).some(([key, next]) => {
     const current = config[key as keyof SecurityAgentConfig];
-    return Array.isArray(next) && Array.isArray(current)
-      ? next.length !== current.length || next.some((value, index) => value !== current[index])
-      : !Object.is(next, current);
+    if (Array.isArray(next) && Array.isArray(current)) {
+      return next.length !== current.length || next.some(value => !current.includes(value));
+    }
+    return !Object.is(next, current);
   });
+}
+
+type SecurityRepository = { id: number };
+
+export function getSecurityRepositoriesInScope<T extends SecurityRepository>(
+  repositories: readonly T[],
+  config: Pick<SecurityAgentConfig, 'repositorySelectionMode' | 'selectedRepositoryIds'> | undefined
+): T[] {
+  if (!config || config.repositorySelectionMode === 'all') {
+    return [...repositories];
+  }
+  const selectedIds = new Set(config.selectedRepositoryIds);
+  return repositories.filter(repository => selectedIds.has(repository.id));
 }

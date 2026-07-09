@@ -5,6 +5,7 @@ import { useEffect, useRef } from 'react';
 import { ScrollView, Switch, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/screen-header';
+import { QueryError } from '@/components/query-error';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -55,6 +56,18 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
     trackRef.current({ interaction: 'settings_config_viewed' });
   }, []);
 
+  if (config.isError && !config.data) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Settings" />
+        <QueryError
+          className="flex-1"
+          message="Could not load Security Agent settings"
+          onRetry={() => void config.refetch()}
+        />
+      </View>
+    );
+  }
   if (config.isLoading || !config.data) {
     return <SettingsOverviewSkeleton />;
   }
@@ -96,6 +109,7 @@ export function SettingsOverviewScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
           {canManage ? (
             <Switch
+              accessibilityLabel="Security Agent"
               value={data.isEnabled}
               disabled={setEnabled.isPending}
               onValueChange={handleToggle}

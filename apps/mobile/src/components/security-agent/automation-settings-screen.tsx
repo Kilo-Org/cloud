@@ -7,6 +7,7 @@ import { SettingsSaveButton } from '@/components/security-agent/settings-save-bu
 import { getSettingsDirtyState } from '@/components/security-agent/settings-screen-state';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
+import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -68,6 +69,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const [autoDismissConfidenceThreshold, setAutoDismissConfidenceThreshold] =
     useState<ConfidenceThreshold>('high');
   const hydratedRef = useRef(false);
+  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
@@ -77,6 +79,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
       return;
     }
     hydratedRef.current = true;
+    initialConfigRef.current = config.data;
     setAutoAnalysisEnabled(config.data.autoAnalysisEnabled);
     setAutoAnalysisMinSeverity(config.data.autoAnalysisMinSeverity);
     setAutoAnalysisIncludeExisting(config.data.autoAnalysisIncludeExisting);
@@ -117,7 +120,8 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     autoDismissConfidenceThreshold,
   };
   const dirty =
-    hydratedRef.current && getSettingsDirtyState(config.data ?? {}, patch, valid) !== 'clean';
+    hydratedRef.current &&
+    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
 
   const handleSave = async () => {
     const result = await save.mutateAsync(patch);
@@ -130,6 +134,18 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
+  if (config.isError && !config.data) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Automation" />
+        <QueryError
+          className="flex-1"
+          message="Could not load automation settings"
+          onRetry={() => void config.refetch()}
+        />
+      </View>
+    );
+  }
   if (config.isLoading || !config.data) {
     return <AutomationSettingsSkeleton />;
   }

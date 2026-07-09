@@ -44,7 +44,7 @@ export function SettingsSaveButton({
       }}
     >
       {pending ? <ActivityIndicator size="small" color={colors.primaryForeground} /> : null}
-      <Text>Save</Text>
+      <Text>Save changes</Text>
     </Button>
   );
 }

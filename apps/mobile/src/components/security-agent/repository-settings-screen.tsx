@@ -6,6 +6,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
 import { getSettingsDirtyState } from '@/components/security-agent/settings-screen-state';
 import { ScreenHeader } from '@/components/screen-header';
+import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -47,6 +48,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const hydratedRef = useRef(false);
+  const initialConfigRef = useRef<Partial<SecurityAgentConfig>>({});
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
@@ -56,6 +58,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
       return;
     }
     hydratedRef.current = true;
+    initialConfigRef.current = config.data;
     setMode(config.data.repositorySelectionMode);
     setSelectedIds(config.data.selectedRepositoryIds);
   }, [config.data]);
@@ -66,7 +69,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   const dirty =
     hydratedRef.current &&
     getSettingsDirtyState(
-      config.data ?? {},
+      initialConfigRef.current,
       { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds },
       valid
     ) !== 'clean';
@@ -77,6 +80,18 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const { onBack } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
 
+  if (config.isError && !config.data) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="Repositories" />
+        <QueryError
+          className="flex-1"
+          message="Could not load repository settings"
+          onRetry={() => void config.refetch()}
+        />
+      </View>
+    );
+  }
   if (config.isLoading || !config.data) {
     return <RepositorySettingsSkeleton />;
   }

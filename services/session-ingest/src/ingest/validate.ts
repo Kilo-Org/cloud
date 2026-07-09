@@ -20,6 +20,7 @@ export function validateAndParseIngestPayload(bytes: Uint8Array): IngestPayloadV
   const extractor = createItemExtractor('buffered-ingest-validation', {
     logErrors: false,
     logOversizedItems: false,
+    validateStructure: true,
   });
   extractor.tokenizer.write(bytes);
   extractor.tokenizer.end();

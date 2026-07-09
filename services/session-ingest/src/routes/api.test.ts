@@ -378,6 +378,38 @@ describe('api routes', () => {
     expect(typeof queueMsg['ingestedAt']).toBe('number');
   });
 
+  it('captures ingestedAt after staging completes', async () => {
+    const { db } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({ has: vi.fn(async () => true) } as never);
+
+    const app = makeApiApp();
+    const env = makeTestEnv();
+    const operations: string[] = [];
+    env.SESSION_INGEST_R2.put.mockImplementationOnce(async () => {
+      operations.push('put');
+    });
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => {
+      operations.push('now');
+      return 123;
+    });
+
+    const response = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/ingest', {
+        method: 'POST',
+        body: JSON.stringify({ data: [] }),
+      }),
+      env
+    );
+    now.mockRestore();
+
+    expect(response.status).toBe(200);
+    expect(operations).toEqual(['put', 'now']);
+    expect(env.INGEST_QUEUE.send).toHaveBeenCalledWith(
+      expect.objectContaining({ ingestedAt: 123 })
+    );
+  });
+
   it('deletes the staged object when queue enqueue fails', async () => {
     const { db } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);

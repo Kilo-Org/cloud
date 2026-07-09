@@ -259,7 +259,6 @@ api.post('/session/:sessionId/ingest', async c => {
       kiloUserId,
       sessionId,
       ingestVersion,
-      ingestedAt: Date.now(),
     },
     c.req.raw.body ?? new Uint8Array()
   );

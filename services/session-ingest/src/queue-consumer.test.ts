@@ -130,6 +130,27 @@ describe('createItemExtractor', () => {
     expect(ext.getParseError()).toBeInstanceOf(Error);
   });
 
+  it('preserves lexical-only parsing for concatenated roots', () => {
+    const ext = createItemExtractor('test-key');
+    feedAll(ext, '{}{}');
+
+    expect(ext.getParseError()).toBeNull();
+  });
+
+  it('counts a large array entry once without treating it as an oversized object', () => {
+    const ext = createItemExtractor('test-key', { logOversizedItems: false });
+    feedAll(
+      ext,
+      JSON.stringify({
+        data: [Array.from({ length: 600 }, () => 'x'), { type: 'message', data: { id: 'msg_1' } }],
+      })
+    );
+
+    expect(ext.getSkippedItemCount()).toBe(1);
+    expect(ext.getOversizedItemCount()).toBe(0);
+    expect(ext.pending).toEqual([{ type: 'message', data: { id: 'msg_1' } }]);
+  });
+
   it('ignores non-data top-level keys', () => {
     const ext = createItemExtractor('test-key');
     const payload = JSON.stringify({
@@ -476,6 +497,55 @@ describe('queue', () => {
 
     expect(ingest).toHaveBeenCalledTimes(1);
     expect(deleteObject).toHaveBeenCalledWith('staging/tombstoned-tail');
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
+  it('does not stage a duplicate item after its preceding chunk is tombstoned', async () => {
+    const ingest = vi.fn(
+      async () => ({ accepted: false, reason: 'deleted', changes: [] }) as const
+    );
+    vi.mocked(getSessionIngestDO).mockReturnValue({ ingest } as never);
+    const limit = vi.fn(async () => [{ session_id: 'ses_tombstoned_duplicate' }]);
+    const where = vi.fn(() => ({ limit }));
+    const from = vi.fn(() => ({ where }));
+    vi.mocked(getWorkerDb).mockReturnValue({ select: vi.fn(() => ({ from })) } as never);
+
+    const item = { type: 'message', data: { id: 'msg_duplicate' } };
+    const deleteObject = vi.fn(async () => undefined);
+    const env = {
+      HYPERDRIVE: { connectionString: 'postgres://unused' },
+      SESSION_INGEST_R2: {
+        get: vi.fn(async () => new Response(JSON.stringify({ data: [item, item] }))),
+        put: vi.fn(async () => undefined),
+        delete: deleteObject,
+      },
+    } as never;
+    const ack = vi.fn();
+    const retry = vi.fn();
+
+    await queue(
+      {
+        messages: [
+          {
+            body: {
+              r2Key: 'staging/tombstoned-duplicate',
+              kiloUserId: 'usr_tombstoned_duplicate',
+              sessionId: 'ses_tombstoned_duplicate',
+              ingestVersion: 1,
+              ingestedAt: 1,
+            },
+            ack,
+            retry,
+          },
+        ],
+      } as never,
+      env,
+      { waitUntil: vi.fn() } as unknown as ExecutionContext
+    );
+
+    expect(ingest).toHaveBeenCalledTimes(1);
+    expect(deleteObject).toHaveBeenCalledWith('staging/tombstoned-duplicate');
     expect(ack).toHaveBeenCalledTimes(1);
     expect(retry).not.toHaveBeenCalled();
   });

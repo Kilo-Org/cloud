@@ -2,7 +2,11 @@ import { Tokenizer, TokenParser, TokenType } from '@streamparser/json';
 
 import { MAX_SINGLE_ITEM_BYTES } from '../util/ingest-limits';
 
-type ItemExtractorOptions = { logErrors?: boolean; logOversizedItems?: boolean };
+type ItemExtractorOptions = {
+  logErrors?: boolean;
+  logOversizedItems?: boolean;
+  validateStructure?: boolean;
+};
 
 type ContainerState =
   | { type: 'object'; state: 'key_or_end' | 'key' | 'colon' | 'value' | 'comma_or_end' }
@@ -127,7 +131,7 @@ export function createItemExtractor(r2Key: string, options: ItemExtractorOptions
 
   const tokenizer = new Tokenizer();
   tokenizer.onToken = ({ token, value, offset }) => {
-    if (!validateToken(token)) {
+    if (options.validateStructure && !validateToken(token)) {
       setParseError(`Unexpected JSON token ${TokenType[token]}`);
       return;
     }
@@ -177,6 +181,9 @@ export function createItemExtractor(r2Key: string, options: ItemExtractorOptions
         depth === 1 && token === TokenType.LEFT_BRACKET && pendingKey === 'data';
       if (foundDataArray && depth === 2 && token === TokenType.LEFT_BRACKET) {
         skippedItemCount += 1;
+        skippingItem = true;
+        depth++;
+        return;
       }
       if (depth === 1 && pendingKey === 'data') {
         dataArray = opensDataArray ? 'present' : 'wrong_type';
@@ -237,8 +244,7 @@ export function createItemExtractor(r2Key: string, options: ItemExtractorOptions
     getSkippedItemCount: () => skippedItemCount,
     getOversizedItemCount: () => oversizedItemCount,
     isComplete: () =>
-      rootState === 'complete' &&
-      containers.length === 0 &&
+      (!options.validateStructure || (rootState === 'complete' && containers.length === 0)) &&
       depth === 0 &&
       itemParser === null &&
       !skippingItem,

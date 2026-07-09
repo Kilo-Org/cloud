@@ -231,6 +231,7 @@ function createIngestChunker(
 
     if (chunkItemIds.has(item_id)) {
       await flushChunkToSessionDO();
+      if (!accepted) return false;
     }
 
     // Offload data above the DO SQLite row limit to R2; the DO stores a

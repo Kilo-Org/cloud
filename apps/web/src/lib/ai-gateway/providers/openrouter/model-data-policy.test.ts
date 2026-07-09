@@ -1,5 +1,8 @@
 import { describe, expect, test } from '@jest/globals';
-import { modelRetainsPrompts } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
+import {
+  modelRetainsPrompts,
+  modelTrains,
+} from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { OpenRouterSearchResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 const baseModel = {
@@ -14,8 +17,8 @@ const baseModel = {
   updated_at: '2026-06-09T00:00:00Z',
 };
 
-describe('modelRetainsPrompts', () => {
-  test('preserves and uses a model endpoint retention override', () => {
+describe('model data policy', () => {
+  test('preserves and uses model endpoint policy overrides', () => {
     const response = OpenRouterSearchResponse.parse({
       data: {
         models: [
@@ -37,7 +40,8 @@ describe('modelRetainsPrompts', () => {
     });
 
     const model = response.data.models[0];
-    expect(model?.endpoint?.data_policy).toEqual({ retainsPrompts: true });
+    expect(model?.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: true });
+    expect(model && modelTrains(model, true)).toBe(false);
     expect(model && modelRetainsPrompts(model, false)).toBe(true);
   });
 
@@ -58,6 +62,7 @@ describe('modelRetainsPrompts', () => {
     });
 
     const model = response.data.models[0];
+    expect(model && modelTrains(model, true)).toBe(true);
     expect(model && modelRetainsPrompts(model, true)).toBe(true);
   });
 });

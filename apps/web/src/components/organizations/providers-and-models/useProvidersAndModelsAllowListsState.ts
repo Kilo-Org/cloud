@@ -28,6 +28,7 @@ export type ProvidersAndModelsAllowListsReadyState = {
   providerSearch: string;
   enabledProvidersOnly: boolean;
   providerTrainsFilter: ProviderPolicyFilter;
+  providerRetainsPromptsFilter: ProviderPolicyFilter;
   providerLocationsFilter: string[];
   infoProviderSlug: string | null;
 };
@@ -41,6 +42,7 @@ export type ProvidersAndModelsAllowListsState =
       providerSearch: string;
       enabledProvidersOnly: boolean;
       providerTrainsFilter: ProviderPolicyFilter;
+      providerRetainsPromptsFilter: ProviderPolicyFilter;
       providerLocationsFilter: string[];
       infoProviderSlug: string | null;
     }
@@ -93,6 +95,10 @@ export type ProvidersAndModelsAllowListsAction =
       value: ProviderPolicyFilter;
     }
   | {
+      type: 'SET_PROVIDER_RETAINS_PROMPTS_FILTER';
+      value: ProviderPolicyFilter;
+    }
+  | {
       type: 'SET_PROVIDER_LOCATIONS_FILTER';
       value: string[];
     }
@@ -110,6 +116,7 @@ export function createProvidersAndModelsAllowListsInitialState(): ProvidersAndMo
     providerSearch: '',
     enabledProvidersOnly: false,
     providerTrainsFilter: 'all',
+    providerRetainsPromptsFilter: 'all',
     providerLocationsFilter: [],
     infoProviderSlug: null,
   };
@@ -135,6 +142,7 @@ export function providersAndModelsAllowListsReducer(
         providerSearch: state.providerSearch,
         enabledProvidersOnly: state.enabledProvidersOnly,
         providerTrainsFilter: state.providerTrainsFilter,
+        providerRetainsPromptsFilter: state.providerRetainsPromptsFilter,
         providerLocationsFilter: state.providerLocationsFilter,
         infoProviderSlug: state.infoProviderSlug,
       };
@@ -196,6 +204,8 @@ export function providersAndModelsAllowListsReducer(
       return { ...state, enabledProvidersOnly: action.value };
     case 'SET_PROVIDER_TRAINS_FILTER':
       return { ...state, providerTrainsFilter: action.value };
+    case 'SET_PROVIDER_RETAINS_PROMPTS_FILTER':
+      return { ...state, providerRetainsPromptsFilter: action.value };
     case 'SET_PROVIDER_LOCATIONS_FILTER':
       return { ...state, providerLocationsFilter: action.value };
     case 'SET_INFO_PROVIDER_SLUG':
@@ -234,6 +244,7 @@ export function useProvidersAndModelsAllowListsState(params: {
     setProviderSearch: (value: string) => void;
     setEnabledProvidersOnly: (value: boolean) => void;
     setProviderTrainsFilter: (value: ProviderPolicyFilter) => void;
+    setProviderRetainsPromptsFilter: (value: ProviderPolicyFilter) => void;
     setProviderLocationsFilter: (value: string[]) => void;
     setInfoProviderSlug: (value: string | null) => void;
   };
@@ -350,6 +361,8 @@ export function useProvidersAndModelsAllowListsState(params: {
         dispatch({ type: 'SET_ENABLED_PROVIDERS_ONLY', value }),
       setProviderTrainsFilter: (value: ProviderPolicyFilter) =>
         dispatch({ type: 'SET_PROVIDER_TRAINS_FILTER', value }),
+      setProviderRetainsPromptsFilter: (value: ProviderPolicyFilter) =>
+        dispatch({ type: 'SET_PROVIDER_RETAINS_PROMPTS_FILTER', value }),
       setProviderLocationsFilter: (value: string[]) =>
         dispatch({ type: 'SET_PROVIDER_LOCATIONS_FILTER', value }),
       setInfoProviderSlug: (value: string | null) =>

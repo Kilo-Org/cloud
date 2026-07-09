@@ -14,6 +14,7 @@ export type ProviderRow = {
   providerIconUrl: string | null;
   modelCount: number;
   trains: boolean;
+  retainsPrompts: boolean;
   headquarters?: string;
   datacenters?: string[];
 };
@@ -35,5 +36,6 @@ export type ProviderModelRow = {
   sourceIndex: number;
   promptPrice: string;
   completionPrice: string;
+  trains: boolean;
   retainsPrompts: boolean;
 };

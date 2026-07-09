@@ -1421,6 +1421,7 @@ export const OpenRouterEndpoint = z.object({
   pricing: OpenRouterPricing,
   data_policy: z
     .object({
+      training: z.boolean().optional(),
       retainsPrompts: z.boolean().optional(),
     })
     .nullish(),

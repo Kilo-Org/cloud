@@ -20,6 +20,11 @@
   "placement": {
     "mode": "smart",
   },
+  "vars": {
+    "DIRECT_INGEST_PERCENT": "0",
+    "DIRECT_INGEST_USER_IDS": "",
+    "DIRECT_INGEST_MAX_BYTES": "4194304",
+  },
   "observability": {
     "enabled": true,
   },

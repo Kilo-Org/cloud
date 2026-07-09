@@ -50,7 +50,7 @@ export async function applyMetadataChanges(
   kiloUserId: string,
   sessionId: string,
   mergedChanges: Map<string, string | null>,
-  ctx: ExecutionContext
+  ctx?: { waitUntil(promise: Promise<unknown>): void }
 ): Promise<void> {
   if (mergedChanges.size === 0) return;
 
@@ -214,7 +214,7 @@ export async function flushPartialMetadataChanges(
   env: Env,
   params: { r2Key: string; kiloUserId: string; sessionId: string },
   mergedChanges: Map<string, string | null>,
-  ctx: ExecutionContext
+  ctx: { waitUntil(promise: Promise<unknown>): void }
 ): Promise<void> {
   if (mergedChanges.size === 0) return;
   try {

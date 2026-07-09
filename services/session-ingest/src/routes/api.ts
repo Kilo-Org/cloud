@@ -11,7 +11,7 @@ import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { getSessionExport } from '../services/session-export';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
-import type { IngestQueueMessage } from '../queue-consumer';
+import { stageAndEnqueue } from '../ingest/stage-and-enqueue';
 
 export type ApiContext = {
   Bindings: Env;
@@ -252,23 +252,17 @@ api.post('/session/:sessionId/ingest', async c => {
 
   // Stream request body directly to R2 (zero memory)
   const r2Key = `ingest/${kiloUserId}/${sessionId}/${crypto.randomUUID()}`;
-  await c.env.SESSION_INGEST_R2.put(r2Key, c.req.raw.body);
-
-  // Enqueue for async processing
-  const queueMessage: IngestQueueMessage = {
-    r2Key,
-    kiloUserId,
-    sessionId,
-    ingestVersion,
-    ingestedAt: Date.now(),
-  };
-  try {
-    await c.env.INGEST_QUEUE.send(queueMessage);
-  } catch (err) {
-    // Clean up staging R2 object to prevent orphaned blobs
-    await c.env.SESSION_INGEST_R2.delete(r2Key).catch(() => {});
-    throw err;
-  }
+  await stageAndEnqueue(
+    c.env,
+    {
+      r2Key,
+      kiloUserId,
+      sessionId,
+      ingestVersion,
+      ingestedAt: Date.now(),
+    },
+    c.req.raw.body ?? new Uint8Array()
+  );
 
   return c.json({ success: true }, 200);
 });

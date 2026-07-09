@@ -40,7 +40,7 @@ type HyperdriveBinding = { connectionString: string };
 
 type TestBindings = {
   HYPERDRIVE: HyperdriveBinding;
-  SESSION_INGEST_R2: { put: ReturnType<typeof vi.fn> };
+  SESSION_INGEST_R2: { put: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> };
   INGEST_QUEUE: { send: ReturnType<typeof vi.fn> };
   NOTIFICATIONS: { sendSessionReadyNotification: ReturnType<typeof vi.fn> };
 };
@@ -48,7 +48,10 @@ type TestBindings = {
 function makeTestEnv(): TestBindings {
   return {
     HYPERDRIVE: { connectionString: 'postgres://test' },
-    SESSION_INGEST_R2: { put: vi.fn(async () => undefined) },
+    SESSION_INGEST_R2: {
+      put: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined),
+    },
     INGEST_QUEUE: { send: vi.fn(async () => undefined) },
     NOTIFICATIONS: { sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })) },
   };
@@ -373,6 +376,29 @@ describe('api routes', () => {
     });
     expect(queueMsg['r2Key']).toMatch(/^ingest\/usr_test\/ses_12345678901234567890123456\//);
     expect(typeof queueMsg['ingestedAt']).toBe('number');
+  });
+
+  it('deletes the staged object when queue enqueue fails', async () => {
+    const { db } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(getSessionAccessCacheDO).mockReturnValue({ has: vi.fn(async () => true) } as never);
+
+    const app = makeApiApp();
+    const env = makeTestEnv();
+    env.INGEST_QUEUE.send.mockRejectedValueOnce(new Error('queue unavailable'));
+
+    const response = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/ingest', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ data: [] }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(500);
+    const r2Key = env.SESSION_INGEST_R2.put.mock.calls[0][0];
+    expect(env.SESSION_INGEST_R2.delete).toHaveBeenCalledWith(r2Key);
   });
 
   it('POST /session/:sessionId/ingest returns 404 on cache miss + missing session', async () => {

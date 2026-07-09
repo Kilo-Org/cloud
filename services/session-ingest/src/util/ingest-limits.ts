@@ -6,3 +6,7 @@ export const MAX_INGEST_ITEM_BYTES = 2 * 1024 * 1024 - 64 * 1024;
 // Items above this byte count are skipped during queue processing.
 // Tracked incrementally during streaming parse — item is aborted as soon as it exceeds this.
 export const MAX_SINGLE_ITEM_BYTES = 50 * 1024 * 1024;
+
+// Shared policy for keeping one ingest RPC within conservative payload bounds.
+export const INGEST_CHUNK_MAX_BYTES = 4 * 1024 * 1024;
+export const INGEST_CHUNK_MAX_ITEMS = 128;

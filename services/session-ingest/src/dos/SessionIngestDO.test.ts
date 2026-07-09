@@ -159,7 +159,10 @@ describe('SessionIngestDO ingest ordering', () => {
     );
     await Promise.all(waitUntilPromises);
 
-    expect(result.changes).toEqual([{ name: 'title', value: 'Hello' }]);
+    expect(result).toMatchObject({
+      accepted: true,
+      changes: [{ name: 'title', value: 'Hello' }],
+    });
     expect(deleteObject).toHaveBeenCalledWith(['items/old']);
     expect(operations.indexOf('meta:title:Hello')).toBeLessThan(operations.indexOf('r2Delete'));
     expect(metaValues.get('title')).toBe('Newer');
@@ -312,6 +315,30 @@ describe('SessionIngestDO session-ready push', () => {
     await settle();
 
     expect(sendSessionReadyNotification).not.toHaveBeenCalled();
+  });
+
+  it('reports a deleted ingest and cleans up caller R2 references', async () => {
+    const { durableObject, rows } = makeHarness();
+    rows.set('deleted', { value: 'true' });
+    const deleteObject = vi.mocked(
+      (
+        durableObject as unknown as {
+          env: { SESSION_INGEST_R2: { delete: ReturnType<typeof vi.fn> } };
+        }
+      ).env.SESSION_INGEST_R2.delete
+    );
+
+    const result = await durableObject.ingest(
+      [{ type: 'message', data: { id: 'msg_deleted' } }],
+      'usr_deleted',
+      'ses_deleted',
+      1,
+      1,
+      { 'message/msg_deleted': 'items/deleted' }
+    );
+
+    expect(result).toEqual({ accepted: false, reason: 'deleted', changes: [] });
+    expect(deleteObject).toHaveBeenCalledWith(['items/deleted']);
   });
 
   it('does not push from ingest, even for a parentless session record', async () => {
